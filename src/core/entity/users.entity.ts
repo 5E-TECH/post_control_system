@@ -1,17 +1,12 @@
+import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Roles, Status } from 'src/common/enums';
 import {
   Column,
-  CreateDateColumn,
   Entity,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
 } from 'typeorm';
 
 @Entity('users')
-export class UserEntity {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class UserEntity extends BaseEntity {
   @Column({
     type: 'varchar',
   })
@@ -45,10 +40,4 @@ export class UserEntity {
     default: Roles.ADMIN,
   })
   role: Roles;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updateAt: Date;
 }
