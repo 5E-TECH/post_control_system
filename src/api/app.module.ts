@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import config from 'src/config';
 import { UsersModule } from './users/users.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -12,7 +13,8 @@ import { UsersModule } from './users/users.module';
       synchronize: true,
       autoLoadEntities: true,
     }),
-    UsersModule
+    UsersModule,
+    JwtModule.register({ global: true }),
   ]
 })
 export class AppModule {}
