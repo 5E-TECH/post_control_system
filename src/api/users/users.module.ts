@@ -4,10 +4,11 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { UserService } from './users.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { Token } from 'src/infrastructure/lib/token-generator/token';
 
 @Module({
   imports:[TypeOrmModule.forFeature([UserEntity])],
   controllers: [UsersController],
-  providers: [UserService, BcryptEncryption],
+  providers: [UserService, BcryptEncryption, Token],
 })
 export class UsersModule {}
