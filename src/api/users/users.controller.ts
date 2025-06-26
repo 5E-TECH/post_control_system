@@ -20,7 +20,17 @@ export class UsersController {
 
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.create(createUserDto);
+    return this.userService.createAdmin(createUserDto);
+  }
+
+  @Post('courier')
+  createCourier(@Body() createUserDto: CreateUserDto) {
+    return this.userService.createCourier(createUserDto);
+  }
+
+  @Post('registrator')
+  createRegistrator(@Body() createUserDto: CreateUserDto) {
+    return this.userService.createRegistrator(createUserDto);
   }
 
   @Post('confirmsignin')
@@ -37,8 +47,18 @@ export class UsersController {
   }
 
   @Get()
-  findAll() {
-    return this.userService.findAll();
+  findAllAdmin() {
+    return this.userService.findAllAdmin();
+  }
+
+  @Get('courier')
+  findAllCourier() {
+    return this.userService.findAllCourier();
+  }
+
+  @Get('registrator')
+  findAllRegistrator() {
+    return this.userService.findAllRegistrator();
   }
 
   @Get(':id')

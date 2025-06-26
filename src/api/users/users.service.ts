@@ -49,14 +49,16 @@ export class UserService {
     }
   }
 
-  async create(createUserDto: CreateUserDto) {
+  async createAdmin(createUserDto: CreateUserDto) {
     try {
       const { password, phone_number, first_name, last_name } = createUserDto;
       const exists_Phone_number = await this.userRepo.findOne({
         where: { phone_number },
       });
       if (exists_Phone_number) {
-        throw new ConflictException(`username already exists: ${phone_number}`);
+        throw new ConflictException(
+          `phone number already exists: ${phone_number}`,
+        );
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
       const admin = this.userRepo.create({
@@ -64,6 +66,7 @@ export class UserService {
         last_name,
         phone_number,
         password: hashedPassword,
+        role: Roles.ADMIN,
       });
       await this.userRepo.save(admin);
       return successRes(admin, 201);
@@ -72,9 +75,85 @@ export class UserService {
     }
   }
 
-  async findAll() {
+  async createCourier(createUserDto: CreateUserDto) {
     try {
-      const admin = await this.userRepo.find();
+      const { password, phone_number, first_name, last_name } = createUserDto;
+      const exists_Phone_number = await this.userRepo.findOne({
+        where: { phone_number },
+      });
+      if (exists_Phone_number) {
+        throw new ConflictException(
+          `phone number already exists: ${phone_number}`,
+        );
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const admin = this.userRepo.create({
+        first_name,
+        last_name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.COURIER,
+      });
+      await this.userRepo.save(admin);
+      return successRes(admin, 201);
+    } catch (error) {
+      throw new InternalServerErrorException(error, error?.message);
+    }
+  }
+
+  async createRegistrator(createUserDto: CreateUserDto) {
+    try {
+      const { password, phone_number, first_name, last_name } = createUserDto;
+      const exists_Phone_number = await this.userRepo.findOne({
+        where: { phone_number },
+      });
+      if (exists_Phone_number) {
+        throw new ConflictException(
+          `phone number already exists: ${phone_number}`,
+        );
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const admin = this.userRepo.create({
+        first_name,
+        last_name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.REGISTRATOR,
+      });
+      await this.userRepo.save(admin);
+      return successRes(admin, 201);
+    } catch (error) {
+      throw new InternalServerErrorException(error, error?.message);
+    }
+  }
+
+  async findAllAdmin() {
+    try {
+      const admin = await this.userRepo.find({
+        where: { role: Roles.ADMIN && Roles.SUPERADMIN },
+      });
+      return successRes(admin);
+    } catch (error) {
+      throw new InternalServerErrorException(error, error?.message);
+    }
+  }
+
+  async findAllCourier() {
+    try {
+      const admin = await this.userRepo.find({
+        where: { role: Roles.COURIER },
+      });
+      return successRes(admin);
+    } catch (error) {
+      throw new InternalServerErrorException(error, error?.message);
+    }
+  }
+
+  async findAllRegistrator() {
+    try {
+      const admin = await this.userRepo.find({
+        where: { role: Roles.REGISTRATOR },
+      });
       return successRes(admin);
     } catch (error) {
       throw new InternalServerErrorException(error, error?.message);
