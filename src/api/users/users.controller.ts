@@ -7,17 +7,25 @@ import {
   Param,
   Delete,
   Res,
+  UseGuards,
+  SetMetadata,
 } from '@nestjs/common';
 import { UserService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Response } from 'express';
+import { Roles } from 'src/common/enums';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
+import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 
 @Controller('admin')
 export class UsersController {
   constructor(private readonly userService: UserService) {}
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.createAdmin(createUserDto);
