@@ -33,6 +33,7 @@ export class UserEntity extends BaseEntity {
     enum:Status,
     default:Status.ACTIVE
   })
+  status:Status
 
   @Column({
     type: 'enum',

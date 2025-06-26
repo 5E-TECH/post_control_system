@@ -5,9 +5,6 @@ export class BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'boolean', name: 'is_active', default: true })
-  is_active: boolean;
-
   @Column({
     name: 'created_at',
     type: 'bigint',

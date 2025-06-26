@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import config from 'src/config';
 import { UsersModule } from './users/users.module';
 import { ProductModule } from './product/product.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -14,7 +15,8 @@ import { ProductModule } from './product/product.module';
       autoLoadEntities: true,
     }),
     UsersModule,
-    ProductModule
+    ProductModule,
+    JwtModule.register({ global: true }),
   ]
 })
 export class AppModule {}
