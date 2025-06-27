@@ -14,3 +14,9 @@ export enum AddOrder {
   ALLOW = 'allow',
   FORBID = 'forbid',
 }
+
+export enum PaymentMethod {
+  CASH = 'cash',
+  CLICK = 'click',
+  CLICK_TO_MARKET = 'click_to_market'
+}
