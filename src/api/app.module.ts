@@ -8,6 +8,8 @@ import { MarketModule } from './market/market.module';
 import { CasheBoxModule } from './cashe-box/cashe-box.module';
 import { PaymentsFromCourierModule } from './payments-from-courier/payments-from-courier.module';
 import { PaymentsToMarketModule } from './payments-to-market/payments-to-market.module';
+import { RegionModule } from './region/region.module';
+import { DistrictModule } from './district/district.module';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { PaymentsToMarketModule } from './payments-to-market/payments-to-market.
     CasheBoxModule,
     PaymentsFromCourierModule,
     PaymentsToMarketModule,
+    RegionModule,
+    DistrictModule,
   ]
 })
 export class AppModule {}

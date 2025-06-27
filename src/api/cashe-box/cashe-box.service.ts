@@ -1,10 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { CreateCasheBoxDto } from './dto/create-cashe-box.dto';
-import { UpdateCasheBoxDto } from './dto/update-cashe-box.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CasheEntity } from 'src/core/entity/cashe-box.entity';
 import { CasheRepository } from 'src/core/repository/cashe.box.repository';
-import { BADFLAGS } from 'dns';
 import { catchError } from 'rxjs';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
 import { DeepPartial } from 'typeorm';
