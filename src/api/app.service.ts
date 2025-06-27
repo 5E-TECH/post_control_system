@@ -6,24 +6,24 @@ import * as cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.exception.filter';
 import config from 'src/config';
 import * as express from 'express';
-import * as path from 'path';
+import {join} from 'path'
 
 export default class Application {
   public static async main(): Promise<void> {
     let app = await NestFactory.create(AppModule);
-    app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+    app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
     app.useGlobalFilters(new AllExceptionsFilter());
     app.use(cookieParser());
     app.enableCors({
       origin: '*',
     });
-    // app.useGlobalPipes(
-    //   new ValidationPipe({
-    //     whitelist: true,
-    //     forbidNonWhitelisted: true,
-    //     errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-    //   }),
-    // );
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      }),
+    );
     const api = 'api/v1';
     app.setGlobalPrefix(api);
     const config_swagger = new DocumentBuilder()
