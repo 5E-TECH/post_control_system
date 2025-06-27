@@ -6,7 +6,8 @@ import { MarketEntity } from 'src/core/entity/market.entity';
 import { MarketRepository } from 'src/core/repository/market.repository';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
-import { catchError } from 'src/infrastructure/lib/response';
+import { catchError, successRes } from 'src/infrastructure/lib/response';
+import { Roles } from 'src/common/enums';
 
 @Injectable()
 export class MarketService {
@@ -27,9 +28,13 @@ export class MarketService {
         );
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
-      const market = this.marketRepo.create({
+      const newMarket = this.marketRepo.create({
         market_name,
+        phone_number,
+        password: hashedPassword,
       });
+      await this.marketRepo.save(newMarket);
+      return successRes(newMarket, 201);
     } catch (error) {
       return catchError(error);
     }
