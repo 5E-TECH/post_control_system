@@ -5,6 +5,7 @@ import { UsersModule } from './users/users.module';
 import { ProductModule } from './product/product.module';
 import { JwtModule } from '@nestjs/jwt';
 import { MarketModule } from './market/market.module';
+import { CasheBoxModule } from './cashe-box/cashe-box.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { MarketModule } from './market/market.module';
     ProductModule,
     JwtModule.register({ global: true }),
     MarketModule,
+    CasheBoxModule,
   ]
 })
 export class AppModule {}

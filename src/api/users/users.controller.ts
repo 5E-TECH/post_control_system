@@ -8,6 +8,7 @@ import {
   Delete,
   Res,
   UseGuards,
+  SetMetadata,
 } from '@nestjs/common';
 import { UserService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -18,6 +19,8 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
+import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
+import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 
 @Controller('admin')
 export class UsersController {

@@ -45,7 +45,7 @@ export class UserService {
         await this.userRepo.save(superAdminthis);
       }
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -71,7 +71,7 @@ export class UserService {
       await this.userRepo.save(admin);
       return successRes(admin, 201);
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -97,7 +97,7 @@ export class UserService {
       await this.userRepo.save(admin);
       return successRes(admin, 201);
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -123,7 +123,7 @@ export class UserService {
       await this.userRepo.save(admin);
       return successRes(admin, 201);
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -134,7 +134,7 @@ export class UserService {
       });
       return successRes(admin);
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -145,7 +145,7 @@ export class UserService {
       });
       return successRes(admin);
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -156,7 +156,7 @@ export class UserService {
       });
       return successRes(admin);
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -168,7 +168,7 @@ export class UserService {
       }
       return successRes(admin);
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -201,7 +201,7 @@ export class UserService {
       const updatedAdmin = await this.userRepo.findOne({ where: { id } });
       return successRes(updatedAdmin);
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -219,7 +219,7 @@ export class UserService {
       await this.userRepo.delete({ id });
       return successRes({});
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
@@ -256,7 +256,7 @@ export class UserService {
         token: accessToken,
       };
     } catch (error) {
-      throw new InternalServerErrorException(error, error?.message);
+      return catchError(error);
     }
   }
 
