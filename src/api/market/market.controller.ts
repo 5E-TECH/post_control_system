@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { MarketService } from './market.service';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
@@ -9,7 +17,7 @@ export class MarketController {
 
   @Post()
   create(@Body() createMarketDto: CreateMarketDto) {
-    return this.marketService.create(createMarketDto);
+    return this.marketService.createMarket(createMarketDto);
   }
 
   @Get()
