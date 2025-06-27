@@ -7,9 +7,11 @@ import { RegionRepository } from "src/core/repository/region.repository";
 import { BaseService } from "src/infrastructure/lib/baseServise";
 import { CreateDistrictDto } from "./dto/create-district.dto";
 import { DeepPartial } from "typeorm";
+import { successRes } from "src/infrastructure/lib/response";
+import { catchError } from "rxjs";
 
 @Injectable()
-export class DistrictService extends BaseService<CreateDistrictDto, DeepPartial<DistrictEntity>> implements OnModuleInit {
+export class DistrictService implements OnModuleInit {
   constructor(
     @InjectRepository(DistrictEntity)
     private readonly districtRepository: DistrictRepository,
@@ -17,8 +19,6 @@ export class DistrictService extends BaseService<CreateDistrictDto, DeepPartial<
     @InjectRepository(RegionEntity)
     private readonly regionRepository: RegionRepository,
   ) {
-    super (districtRepository)
-    super (regionRepository)
   }
 
   async onModuleInit() {
@@ -54,4 +54,13 @@ export class DistrictService extends BaseService<CreateDistrictDto, DeepPartial<
     }
     return map;
   }
+
+  async findAll() {
+      try {
+        const district = await this.districtRepository.find({relations:['region']});
+        return successRes(district);
+      } catch (error) {
+        return catchError(error);
+      }
+    }
 }

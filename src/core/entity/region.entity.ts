@@ -9,6 +9,9 @@ export class RegionEntity extends BaseEntity {
   })
   name: string;
 
-  @OneToMany(() => DistrictEntity, district => district.region)
+  @OneToMany(() => DistrictEntity, (district) => district.region, {
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
   districts: DistrictEntity[];
 }

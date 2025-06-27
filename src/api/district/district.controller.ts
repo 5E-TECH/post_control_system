@@ -7,4 +7,9 @@ import { UpdateDistrictDto } from './dto/update-district.dto';
 export class DistrictController {
   constructor(private readonly districtService: DistrictService) {}
 
+  @Get()
+  getAll(){
+    return this.districtService.findAll()
+  }
+
 }
