@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -6,6 +6,7 @@ import { MarketEntity } from 'src/core/entity/market.entity';
 import { MarketRepository } from 'src/core/repository/market.repository';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
+import { catchError } from 'src/infrastructure/lib/response';
 
 @Injectable()
 export class MarketService {
@@ -14,8 +15,24 @@ export class MarketService {
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
   ) {}
-  create(createMarketDto: CreateMarketDto) {
-    return 'This action adds a new market';
+  async createMarket(createMarketDto: CreateMarketDto) {
+    try {
+      const { market_name, phone_number, password } = createMarketDto;
+      const existMarket = await this.marketRepo.findOne({
+        where: { phone_number },
+      });
+      if (existMarket) {
+        throw new ConflictException(
+          'Market with this phone number already exist',
+        );
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const market = this.marketRepo.create({
+        market_name,
+      });
+    } catch (error) {
+      return catchError(error);
+    }
   }
 
   findAll() {
