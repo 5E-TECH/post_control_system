@@ -15,8 +15,10 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Response } from 'express';
-import { Roles } from 'src/common/enums';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
+import { AcceptRoles } from 'src/common/decorator/roles.decorator';
+import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 

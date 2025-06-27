@@ -5,10 +5,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.exception.filter';
 import config from 'src/config';
+import * as express from 'express';
+import * as path from 'path';
 
 export default class Application {
   public static async main(): Promise<void> {
     let app = await NestFactory.create(AppModule);
+    app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
     app.useGlobalFilters(new AllExceptionsFilter());
     app.use(cookieParser());
     app.enableCors({

@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import config from 'src/config';
 import { UsersModule } from './users/users.module';
+import { ProductModule } from './product/product.module';
 import { JwtModule } from '@nestjs/jwt';
+import { MarketModule } from './market/market.module';
 import { CasheBoxModule } from './cashe-box/cashe-box.module';
 
 @Module({
@@ -15,7 +17,9 @@ import { CasheBoxModule } from './cashe-box/cashe-box.module';
       autoLoadEntities: true,
     }),
     UsersModule,
+    ProductModule,
     JwtModule.register({ global: true }),
+    MarketModule,
     CasheBoxModule,
   ]
 })
