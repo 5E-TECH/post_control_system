@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,8 +24,30 @@ export class ProductService {
     return `${config.HOST_URL}/uploads/${filename}`;
   }
 
+  private normalizeName(name: string): string {
+    return name.trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
   async create(createProductDto: CreateProductDto, file?: Express.Multer.File) {
     try {
+      const normalizedName = this.normalizeName(createProductDto.name);
+      createProductDto.name = normalizedName;
+
+      const exists = await this.productRepo.findOne({
+        where: {
+          name: normalizedName,
+          market_id: createProductDto.market_id,
+        },
+      });
+
+      if (exists) {
+        if (file) {
+          const filePath = path.join('uploads', file.filename);
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+        throw new ConflictException('Product name already exists');
+      }
+
       if (file) {
         createProductDto.image_url = file.filename;
       }
@@ -79,15 +105,41 @@ export class ProductService {
       if (!product)
         throw new NotFoundException(`Product not found by id: ${id}`);
 
+      if (updateProductDto.name) {
+        updateProductDto.name = this.normalizeName(updateProductDto.name);
+      }
+
+      if (updateProductDto.name || updateProductDto.market_id) {
+        const nameToCheck = updateProductDto.name || product.name;
+        const marketToCheck = updateProductDto.market_id || product.market_id;
+
+        const exists = await this.productRepo.findOne({
+          where: {
+            name: nameToCheck,
+            market_id: marketToCheck,
+          },
+        });
+
+        if (exists && exists.id !== product.id) {
+          if (file) {
+            const filePath = path.join('uploads', file.filename);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          }
+          throw new ConflictException(
+            'Another product with same name and market already exists',
+          );
+        }
+      }
+
       if (file) {
-        const oldPath = path.join(
-          __dirname,
-          '..',
-          '..',
-          'uploads',
-          product.image_url,
-        );
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        if (product.image_url) {
+          const oldPath = path.join(
+            process.cwd(),
+            'uploads',
+            product.image_url,
+          );
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
         updateProductDto.image_url = file.filename;
       }
 

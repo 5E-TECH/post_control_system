@@ -10,6 +10,7 @@ import {
   UploadedFile,
   HttpCode,
   HttpStatus,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -42,39 +43,69 @@ export class ProductController {
   @UseInterceptors(FileInterceptor('image', { storage }))
   @HttpCode(HttpStatus.CREATED)
   async create(
-    @Body() createProductDto: CreateProductDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      }),
+    )
+    createProductDto: CreateProductDto,
   ) {
-    const data = await this.productService.create(createProductDto, file);
-    return data;
+    try {
+      const result = await this.productService.create(createProductDto, file);
+      return result;
+    } catch (error) {
+      if (file) {
+        const filePath = `${uploadDir}/${file.filename}`;
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+      throw error;
+    }
   }
 
   @Get()
   async findAll() {
-    const data = await this.productService.findAll();
-    return data;
+    return this.productService.findAll();
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string) {
-    const data = await this.productService.findOne(id);
-    return data;
+    return this.productService.findOne(id);
   }
 
   @Patch(':id')
   @UseInterceptors(FileInterceptor('image', { storage }))
   async update(
     @Param('id') id: string,
-    @Body() updateProductDto: UpdateProductDto,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      }),
+    )
+    updateProductDto: UpdateProductDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    const data = await this.productService.update(id, updateProductDto, file);
-    return data;
+    try {
+      return await this.productService.update(id, updateProductDto, file);
+    } catch (error) {
+      if (file) {
+        const filePath = `${uploadDir}/${file.filename}`;
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+      throw error;
+    }
   }
 
   @Delete(':id')
   async remove(@Param('id') id: string) {
-    const data = await this.productService.remove(id);
-    return data;
+    return this.productService.remove(id);
   }
 }
