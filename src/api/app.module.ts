@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import config from 'src/config';
 import { UsersModule } from './users/users.module';
 import { JwtModule } from '@nestjs/jwt';
+import { CasheBoxModule } from './cashe-box/cashe-box.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { JwtModule } from '@nestjs/jwt';
     }),
     UsersModule,
     JwtModule.register({ global: true }),
+    CasheBoxModule,
   ]
 })
 export class AppModule {}
