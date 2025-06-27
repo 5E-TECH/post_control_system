@@ -4,6 +4,7 @@ import config from 'src/config';
 import { UsersModule } from './users/users.module';
 import { ProductModule } from './product/product.module';
 import { JwtModule } from '@nestjs/jwt';
+import { MarketModule } from './market/market.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { JwtModule } from '@nestjs/jwt';
     UsersModule,
     ProductModule,
     JwtModule.register({ global: true }),
+    MarketModule,
   ]
 })
 export class AppModule {}
