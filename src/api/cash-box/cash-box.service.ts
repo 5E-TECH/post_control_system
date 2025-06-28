@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { CreateCasheBoxDto } from './dto/create-cashe-box.dto';
+import { CreateCashBoxDto } from './dto/create-cash-box.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
@@ -8,8 +8,8 @@ import { BaseService } from 'src/infrastructure/lib/baseServise';
 import { DeepPartial } from 'typeorm';
 
 @Injectable()
-export class CasheBoxService
-  extends BaseService<CreateCasheBoxDto, DeepPartial<CashEntity>>
+export class CashBoxService
+  extends BaseService<CreateCashBoxDto, DeepPartial<CashEntity>>
   implements OnModuleInit
 {
   constructor(
