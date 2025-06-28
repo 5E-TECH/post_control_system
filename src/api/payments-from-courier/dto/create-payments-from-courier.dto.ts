@@ -45,6 +45,6 @@ export class CreatePaymentsFromCourierDto {
     })
     @IsOptional()
     @IsString()
-    seller_id: string;
+    market_id: string;
 
 }

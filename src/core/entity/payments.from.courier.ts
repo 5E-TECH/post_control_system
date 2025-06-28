@@ -16,10 +16,10 @@ export class PaymentsFromCourierEntity extends BaseEntity {
     @Column({ type: 'timestamp' })
     payment_date: Date;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     comment?: string;
 
-    @Column({ nullable: true })
-    seller_id?: string | null;
+    @Column({ type: 'varchar', nullable: true })
+    market_id?: string | null;
 
 }
