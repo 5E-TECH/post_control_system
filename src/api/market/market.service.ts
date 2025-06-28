@@ -98,7 +98,7 @@ export class MarketService {
   async marketLogin(
     loginMarketDto: LoginMarketDto,
     res: Response,
-  ): Promise<Object> {
+  ): Promise<object> {
     try {
       const { login, password } = loginMarketDto;
       const isExisUser = await this.marketRepo.findOne({
@@ -120,8 +120,17 @@ export class MarketService {
       const payload = { id, role: Roles.MARKET };
       const accessTokenMarket = await this.token.generateAccessToken(payload);
       const refreshTokenMarket = await this.token.generateRefreshToken(payload);
-      writeToCookie(res, 'refreshTokenmarket', refreshTokenMarket);
-      return successRes(accessTokenMarket, 200);
+      writeToCookie(res, 'refreshTokenMarket', refreshTokenMarket);
+      return successRes(accessTokenMarket, 200, 'Successfully logged in');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async signOut(res: Response): Promise<object> {
+    try {
+      res.clearCookie('refreshTokenMarket');
+      return successRes({});
     } catch (error) {
       return catchError(error);
     }
