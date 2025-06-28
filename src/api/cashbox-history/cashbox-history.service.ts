@@ -1,30 +1,46 @@
-import { Injectable } from '@nestjs/common';
+import { successRes } from './../../infrastructure/lib/response/index';
+import { CashboxHistoryEntity } from './../../core/entity/cashbox-history.entity';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCashboxHistoryDto } from './dto/create-cashbox-history.dto';
 import { UpdateCashboxHistoryDto } from './dto/update-cashbox-history.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { catchError } from 'src/infrastructure/lib/response';
 
 @Injectable()
 export class CashboxHistoryService {
-  create(createCashboxHistoryDto: CreateCashboxHistoryDto) {
+  constructor ( 
+    @InjectRepository(CashboxHistoryEntity) 
+    private readonly cashboxRepo: Repository<CashboxHistoryEntity> ) {}
+
+  async create(createCashboxHistoryDto: CreateCashboxHistoryDto) {
     try {
-      
+      const cashboxHistory = this.cashboxRepo.create({...createCashboxHistoryDto});
+      const savedCashboxHistory = await this.cashboxRepo.save(cashboxHistory);
+      return successRes(savedCashboxHistory);
     } catch (error) {
-      
+      return catchError(error.message)
     }
   }
 
-  findAll() {
-    return `This action returns all cashboxHistory`;
+  async findAll() {
+    try {
+      const cashboxHistories = await this.cashboxRepo.find()
+      return successRes(cashboxHistories)
+    } catch (error) {
+      return catchError(error.message)
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} cashboxHistory`;
-  }
-
-  update(id: number, updateCashboxHistoryDto: UpdateCashboxHistoryDto) {
-    return `This action updates a #${id} cashboxHistory`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} cashboxHistory`;
+  async findOne(id: string) {
+    try {
+      const cashboxHistory = await this.cashboxRepo.findOne({ where: { id } });
+      if(!cashboxHistory) {
+        throw new NotFoundException('CashboxHistory not found by id: ', id)
+      }
+      return successRes(cashboxHistory)
+    } catch (error) {
+      return catchError(error.message)
+    }
   }
 }
