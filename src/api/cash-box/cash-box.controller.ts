@@ -1,11 +1,10 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { CasheBoxService } from './cash-box.service';
-import { CreateCasheBoxDto } from './dto/create-cashe-box.dto';
-import { UpdateCasheBoxDto } from './dto/update-cashe-box.dto';
+import { CashBoxService } from './cash-box.service';
+import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 
 @Controller('cashe-box')
 export class CasheBoxController {
-  constructor(private readonly casheBoxService: CasheBoxService) {}
+  constructor(private readonly casheBoxService: CashBoxService) {}
 
   @Get()
   getBalance(){
@@ -13,7 +12,7 @@ export class CasheBoxController {
   }
 
   @Patch(':id')
-  updateBalance(@Param('id') id:string, @Body() updateCasheBoxDto: UpdateCasheBoxDto){
+  updateBalance(@Param('id') id:string, @Body() updateCasheBoxDto: UpdateCashBoxDto){
     return this.casheBoxService.update(id, updateCasheBoxDto)
   }
 
