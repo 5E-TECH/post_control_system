@@ -241,11 +241,7 @@ export class UserService {
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
-      return {
-        StatusCode: 200,
-        message: 'success',
-        token: accessToken,
-      };
+      return successRes(accessToken)
     } catch (error) {
       return catchError(error);
     }

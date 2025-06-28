@@ -7,7 +7,7 @@ export const regions = [
     ]
   },
   {
-    "name": "Toshkent viloyati",
+    "name": "Toshkent ",
     "districts": [
       "Angren", "Bekobod", "Bo'ka", "Bo'stonliq", "Chinoz", "Ohangaron",
       "Olmaliq", "Oqqo'rg'on", "Parkent", "Piskent", "Quyichirchiq",
@@ -15,7 +15,7 @@ export const regions = [
     ]
   },
   {
-    "name": "Andijon viloyati",
+    "name": "Andijon ",
     "districts": [
       "Andijon", "Asaka", "Baliqchi", "Bo'ston", "Buloqboshy", "Izboskan",
       "Jalaquduq", "Khojaobod", "Marhamat", "Paxtaobod", "Shahrixon", "Ulug'nor",
@@ -23,7 +23,7 @@ export const regions = [
     ]
   },
   {
-    "name": "Farg'ona viloyati",
+    "name": "Farg'ona",
     "districts": [
       "Beshariq", "Bog'dod", "Buvaida", "Dang'ara", "Farg'ona", "Furqat",
       "Marg'ilon", "Oltiariq", "Qo'qon", "Quva", "Rishton", "So'x", "Toshloq",
@@ -31,14 +31,14 @@ export const regions = [
     ]
   },
   {
-    "name": "Namangan viloyati",
+    "name": "Namangan ",
     "districts": [
       "Chortoq", "Chust", "Kosonsoy", "Mingbuloq", "Namangan", "Norin", "Pop",
       "To'raqo'rg'on", "Uchqo'rg'on", "Yangiqo'rg'on"
     ]
   },
   {
-    "name": "Samarqand viloyati",
+    "name": "Samarqand ",
     "districts": [
       "Bulung'ur", "Ishtixon", "Jomboy", "Kattaqo'rg'on", "Narpay", "Nurobod",
       "Oqdaryo", "Paxtachi", "Payariq", "Pastdarg'om", "Samarqand", "Tayloq",
@@ -46,28 +46,28 @@ export const regions = [
     ]
   },
   {
-    "name": "Buxoro viloyati",
+    "name": "Buxoro ",
     "districts": [
       "Buxoro", "G'ijduvon", "Jondor", "Kogon", "Olot", "Peshku", "Qorako'l",
       "Qorovulbozor", "Romitan", "Shofirkon", "Vobkent"
     ]
   },
   {
-    "name": "Navoiy viloyati",
+    "name": "Navoiy ",
     "districts": [
       "Karmana", "Konimex", "Navbahor", "Navoiy", "Nurota", "Qiziltepa",
       "Xatirchi", "Zarafshon"
     ]
   },
   {
-    "name": "Xorazm viloyati",
+    "name": "Xorazm ",
     "districts": [
       "Bog'ot", "Gurlan", "Hazorasp", "Khiva", "Qo'shko'pir", "Shovot",
       "Urganch", "Yangiariq", "Yangibozor"
     ]
   },
   {
-    "name": "Surxondaryo viloyati",
+    "name": "Surxondaryo ",
     "districts": [
       "Angor", "Bandixon", "Boysun", "Denov", "Jarqo'rg'on", "Qiziriq",
       "Qumqo'rg'on", "Muzrabot", "Oltinsoy", "Sariosiyo", "Sherobod",
@@ -75,21 +75,21 @@ export const regions = [
     ]
   },
   {
-    "name": "Qashqadaryo viloyati",
+    "name": "Qashqadaryo ",
     "districts": [
       "Chiroqchi", "Dehqonobod", "G'uzor", "Kamashi", "Karshi", "Kasbi",
       "Kitob", "Koson", "Mirishkor", "Muborak", "Nishon", "Shahrisabz", "Yakkabog'"
     ]
   },
   {
-    "name": "Jizzax viloyati",
+    "name": "Jizzax ",
     "districts": [
       "Arnasoy", "Baxmal", "Dustlik", "Forish", "G'allaorol", "Jizzax",
       "Mirzacho'l", "Paxtakor", "Yangiobod", "Zafarobod", "Zarbdor"
     ]
   },
   {
-    "name": "Sirdaryo viloyati",
+    "name": "Sirdaryo ",
     "districts": [
       "Akaltyn", "Boyovut", "Guliston", "Mirzaobod", "Oqoltin", "Sayxunobod",
       "Sardoba", "Shirin", "Sirdaryo", "Xovos", "Yangier"

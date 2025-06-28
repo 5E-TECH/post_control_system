@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { CasheBoxService } from './cashe-box.service';
+import { CasheBoxService } from './cash-box.service';
 import { CreateCasheBoxDto } from './dto/create-cashe-box.dto';
 import { UpdateCasheBoxDto } from './dto/update-cashe-box.dto';
 
