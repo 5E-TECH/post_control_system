@@ -19,16 +19,6 @@ export class CashboxHistoryController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.cashboxHistoryService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCashboxHistoryDto: UpdateCashboxHistoryDto) {
-    return this.cashboxHistoryService.update(+id, updateCashboxHistoryDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.cashboxHistoryService.remove(+id);
+    return this.cashboxHistoryService.findOne(id);
   }
 }

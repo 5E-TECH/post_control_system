@@ -26,3 +26,11 @@ export enum Operation_type {
   INCOME = 'income',
   EXPENSE = 'expense'
 }
+
+export enum Source_type {
+  COURIER_PAYMENT = 'courier_payment',
+  SELLER_PAYMENT = 'seller_payment',
+  MANUAL_EXPENSE = 'manual_expense',
+  MANUAL_INCOME = 'manual_income',
+  CORRECTION = 'correction'
+}
