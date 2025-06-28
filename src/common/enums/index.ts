@@ -20,3 +20,8 @@ export enum PaymentMethod {
   CLICK = 'click',
   CLICK_TO_MARKET = 'click_to_market'
 }
+
+export enum Operation_type {
+  INCOME = 'income',
+  EXPENSE = 'expense'
+}
