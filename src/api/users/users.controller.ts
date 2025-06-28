@@ -16,9 +16,9 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Response } from 'express';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
+import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 
 @Controller('admin')
 export class UsersController {

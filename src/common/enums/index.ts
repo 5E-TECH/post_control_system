@@ -3,6 +3,7 @@ export enum Roles {
   ADMIN = 'admin',
   COURIER = 'courier',
   REGISTRATOR = 'registrator',
+  MARKET = 'market',
 }
 
 export enum Status {
@@ -18,5 +19,10 @@ export enum AddOrder {
 export enum PaymentMethod {
   CASH = 'cash',
   CLICK = 'click',
-  CLICK_TO_MARKET = 'click_to_market'
+  CLICK_TO_MARKET = 'click_to_market',
+}
+
+export enum Operation_type {
+  INCOME = 'income',
+  EXPENSE = 'expense'
 }
