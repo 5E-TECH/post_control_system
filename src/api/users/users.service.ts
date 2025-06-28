@@ -184,19 +184,10 @@ export class UserService {
         });
         if (exists_Phone_number) {
           throw new ConflictException(
-            `username already exists: ${updateUserDto.phone_number}`,
+            `phone_number already exists: ${updateUserDto.phone_number}`,
           );
         }
-      } else if (updateUserDto.phone_number) {
-        const exists_Phone_number = await this.userRepo.findOne({
-          where: { phone_number: updateUserDto.phone_number },
-        });
-        if (exists_Phone_number) {
-          throw new ConflictException(
-            `email already exists: ${updateUserDto.phone_number}`,
-          );
-        }
-      }
+      } 
       await this.userRepo.update({ id }, updateUserDto);
       const updatedAdmin = await this.userRepo.findOne({ where: { id } });
       return successRes(updatedAdmin);
@@ -250,11 +241,7 @@ export class UserService {
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
-      return {
-        StatusCode: 200,
-        message: 'success',
-        token: accessToken,
-      };
+      return successRes(accessToken)
     } catch (error) {
       return catchError(error);
     }
