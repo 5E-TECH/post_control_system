@@ -34,7 +34,6 @@ export class DistrictService implements OnModuleInit {
       { name: 'Bog\'ot', regionName: 'Xorazm' },
       { name: 'Qo\'qon', regionName: 'Farg\'ona' },
       { name: 'Marg\'ilon', regionName: 'Farg\'ona' },
-      // davom ettirishingiz mumkin...
     ];
 
     const districtEntities = districts.map(d => ({
