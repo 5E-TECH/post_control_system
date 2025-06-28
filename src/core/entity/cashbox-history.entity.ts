@@ -9,7 +9,7 @@ export class CashboxHistoryEntity extends BaseEntity {
     @Column ({ type: 'enum', enum: Source_type })
     source_type: Source_type;
 
-    @Column ({ type: 'varchar' })
+    @Column ({ type: 'uuid', nullable: true })
     source_id: string | null;
 
     @Column ({ type: 'number' })
