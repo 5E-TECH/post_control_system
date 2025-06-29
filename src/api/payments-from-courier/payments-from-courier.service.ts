@@ -27,13 +27,19 @@ export class PaymentsFromCourierService {
     private readonly dataSource: DataSource
   ) {}
 
-  async create(createPaymentsFromCourierDto: CreatePaymentsFromCourierDto) {
+  async create(
+    user: any,
+    createPaymentsFromCourierDto: CreatePaymentsFromCourierDto) {
     const transaction = this.dataSource.createQueryRunner();
 
     await transaction.connect();
+    
+    
     await transaction.startTransaction();
 
     try {
+      
+      const { id } = user;
       const { courier_id, amount, payment_method, payment_date, comment, market_id } = createPaymentsFromCourierDto;
 
       if (payment_method === PaymentMethod.CLICK_TO_MARKET && ! market_id) {
@@ -44,25 +50,41 @@ export class PaymentsFromCourierService {
       const savedPayment = await transaction.manager.save(payment);
 
       const [cashbox] = await this.cashboxRepo.find();
+      if (!cashbox) throw new BadRequestException("Kassa topilmadi!");
 
-      cashbox.balance += amount;
+      
+      cashbox.balance = Number(cashbox.balance) + amount;
+      console.log(cashbox.balance);
+      
 
       const updatedCashbox = await transaction.manager.save(CashEntity, cashbox);
       
-      await this.cashboxHistoryRepo.create({
+      console.log(updatedCashbox, 1);
+      console.log(savedPayment, 2);
+      
+      
+      const incomeHistory = this.cashboxHistoryRepo.create({
         operation_type: Operation_type.INCOME,
         source_type: Source_type.COURIER_PAYMENT,
         source_id: savedPayment.id,
         amount: amount,
         balance_after: updatedCashbox.balance,
-        comment: comment,
-        // created_by: 
+        comment,
+        created_by: id
       })
+      
+      
 
+      await transaction.manager.save(incomeHistory)
+      console.log(incomeHistory, 3);
 
-
+      // updatedCashbox.balance -= amount;
+      
+      // const minusCashbox = await transaction.manager.save(CashEntity, )
+      
       await transaction.commitTransaction();
-      return savedPayment;
+      return {"this is cashbox":cashbox, "updated":updatedCashbox}
+      // return savedPayment;
 
     } catch (error) {
       await transaction.rollbackTransaction();

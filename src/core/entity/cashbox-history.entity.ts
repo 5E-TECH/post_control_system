@@ -12,13 +12,13 @@ export class CashboxHistoryEntity extends BaseEntity {
     @Column ({ type: 'uuid', nullable: true })
     source_id: string | null;
 
-    @Column ({ type: 'number' })
+    @Column ({ type: 'int' })
     amount: number;
 
-    @Column ({ type: 'number' })
+    @Column ({ type: 'int' })
     balance_after: number;
 
-    @Column ({ type: 'varchar' })
+    @Column ({ type: 'varchar', nullable: true })
     comment: string;
 
     @Column ({ type: 'varchar' })
