@@ -8,5 +8,6 @@ import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
   imports:[TypeOrmModule.forFeature([CashboxHistoryEntity])],
   controllers: [CashboxHistoryController],
   providers: [CashboxHistoryService],
+  exports: [TypeOrmModule]
 })
 export class CashboxHistoryModule {}
