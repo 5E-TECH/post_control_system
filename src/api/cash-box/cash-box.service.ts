@@ -6,6 +6,7 @@ import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { catchError } from 'rxjs';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
 import { DeepPartial } from 'typeorm';
+import { Cashbox_type } from 'src/common/enums';
 
 @Injectable()
 export class CashBoxService
@@ -24,7 +25,7 @@ export class CashBoxService
 
       if (existsCashe.length == 0) {
         const cashe = this.cashRepository.create({
-          balance: 0,
+          cashbox_type: Cashbox_type.MAIN,
         });
         await this.cashRepository.save(cashe);
         console.log('Initial cashe created');
