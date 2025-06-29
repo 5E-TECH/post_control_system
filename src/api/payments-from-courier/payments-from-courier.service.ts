@@ -1,11 +1,11 @@
 import { CashboxHistoryRepository } from './../../core/repository/cashbox-history.repository';
 import { PaymentsFromCourierEntity } from './../../core/entity/payments.from.courier';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePaymentsFromCourierDto } from './dto/create-payments-from-courier.dto';
 import { UpdatePaymentsFromCourierDto } from './dto/update-payments-from-courier.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { catchError } from 'src/infrastructure/lib/response';
+import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { Operation_type, PaymentMethod, Source_type } from 'src/common/enums';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
@@ -52,17 +52,10 @@ export class PaymentsFromCourierService {
       const [cashbox] = await this.cashboxRepo.find();
       if (!cashbox) throw new BadRequestException("Kassa topilmadi!");
 
-      
-      cashbox.balance = Number(cashbox.balance) + amount;
-      console.log(cashbox.balance);
-      
+      cashbox.balance = Number(cashbox.balance) + amount;      
 
       const updatedCashbox = await transaction.manager.save(CashEntity, cashbox);
-      
-      console.log(updatedCashbox, 1);
-      console.log(savedPayment, 2);
-      
-      
+            
       const incomeHistory = this.cashboxHistoryRepo.create({
         operation_type: Operation_type.INCOME,
         source_type: Source_type.COURIER_PAYMENT,
@@ -72,41 +65,61 @@ export class PaymentsFromCourierService {
         comment,
         created_by: id
       })
-      
-      
 
       await transaction.manager.save(incomeHistory)
-      console.log(incomeHistory, 3);
+      
+      let outcomeHistory;
 
-      // updatedCashbox.balance -= amount;
-      
-      // const minusCashbox = await transaction.manager.save(CashEntity, )
-      
+      if(payment_method === PaymentMethod.CLICK_TO_MARKET) {
+
+        cashbox.balance -= amount;
+        
+        const minusCashbox = await transaction.manager.save(CashEntity, cashbox)
+  
+          outcomeHistory = this.cashboxHistoryRepo.create({
+          operation_type: Operation_type.INCOME,
+          source_type: Source_type.COURIER_PAYMENT,
+          source_id: savedPayment.id,
+          amount: amount,
+          balance_after: minusCashbox.balance,
+          comment,
+          created_by: id
+        })
+
+        await transaction.manager.save(outcomeHistory)
+      }
+
+
       await transaction.commitTransaction();
-      return {"this is cashbox":cashbox, "updated":updatedCashbox}
-      // return savedPayment;
+      return successRes({ income: incomeHistory, outcome: outcomeHistory }, 201, " To'lov qabul qilindi !!! ");
 
     } catch (error) {
       await transaction.rollbackTransaction();
+      console.error('Xatolik:', error); 
       return catchError(error.message);
     } finally {
       await transaction.release();
     }
   }
 
-  findAll() {
-    return `This action returns all paymentsFromCourier`;
+  async findAll() {
+    try {
+      const paymentsfromcouriers = await this.paymentsFromCourierRepo.find()
+      return successRes(paymentsfromcouriers)
+    } catch (error) {
+      return catchError(error.message)
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} paymentsFromCourier`;
-  }
-
-  update(id: number, updatePaymentsFromCourierDto: UpdatePaymentsFromCourierDto) {
-    return `This action updates a #${id} paymentsFromCourier`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} paymentsFromCourier`;
+  async findOne(id: string) {
+    try {
+      const paymentfromcourier = await this.paymentsFromCourierRepo.findOne({ where: { id } })
+      if (!paymentfromcourier) {
+        throw new NotFoundException('Payments from courier not found by id: ', id)
+      }
+      return successRes(paymentfromcourier)
+    } catch (error) {
+      return catchError(error.message)
+    }
   }
 }

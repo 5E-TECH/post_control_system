@@ -24,16 +24,6 @@ export class PaymentsFromCourierController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.paymentsFromCourierService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaymentsFromCourierDto: UpdatePaymentsFromCourierDto) {
-    return this.paymentsFromCourierService.update(+id, updatePaymentsFromCourierDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsFromCourierService.remove(+id);
+    return this.paymentsFromCourierService.findOne(id);
   }
 }
