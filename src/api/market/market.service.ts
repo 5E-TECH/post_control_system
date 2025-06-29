@@ -13,14 +13,17 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { LoginMarketDto } from './dto/login-market.dto';
-import { Roles } from 'src/common/enums';
+import { Cashbox_type, Roles } from 'src/common/enums';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
 import { Response } from 'express';
+import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { CashRepository } from 'src/core/repository/cash.box.repository';
 
 @Injectable()
 export class MarketService {
   constructor(
     @InjectRepository(MarketEntity) private marketRepo: MarketRepository,
+    @InjectRepository(CashEntity) private cashRepo: CashRepository,
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
   ) {}
@@ -41,7 +44,12 @@ export class MarketService {
         phone_number,
         password: hashedPassword,
       });
+      const cashbox = this.cashRepo.create({
+        cashbox_type: Cashbox_type.FOR_MARKET,
+        user_id: newMarket.id,
+      });
       await this.marketRepo.save(newMarket);
+      await this.cashRepo.save(cashbox);
       return successRes(newMarket, 201);
     } catch (error) {
       return catchError(error);

@@ -24,7 +24,7 @@ export enum PaymentMethod {
 
 export enum Operation_type {
   INCOME = 'income',
-  EXPENSE = 'expense'
+  EXPENSE = 'expense',
 }
 
 export enum Source_type {
@@ -32,5 +32,22 @@ export enum Source_type {
   SELLER_PAYMENT = 'seller_payment',
   MANUAL_EXPENSE = 'manual_expense',
   MANUAL_INCOME = 'manual_income',
-  CORRECTION = 'correction'
+  CORRECTION = 'correction',
+}
+
+export enum Order_status {
+  RECEIVED = 'received',
+  ON_THE_ROAD = 'on the road',
+  WAITING = 'waiting',
+  SOLD = 'sold',
+  PAID = 'paid',
+  CANCELLED = 'cancelled',
+  CANCELLED_SENT = 'cancelled (sent)',
+  CLOSED = 'closed',
+}
+
+export enum Cashbox_type {
+  MAIN = 'main',
+  FOR_COURIER = 'for_courier',
+  FOR_MARKET = 'for_market',
 }
