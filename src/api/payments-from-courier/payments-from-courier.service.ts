@@ -51,9 +51,13 @@ export class PaymentsFromCourierService {
 
       const [cashbox] = await this.cashboxRepo.find();
       if (!cashbox) throw new BadRequestException("Kassa topilmadi!");
+      const courier_cashbox = await this.cashboxRepo.findOne({ where: { user_id: courier_id } })
+      if(!courier_cashbox) throw new BadRequestException("Courier kassasi topilmadi");
 
-      cashbox.balance = Number(cashbox.balance) + amount;      
+      courier_cashbox.balance -= amount;
+      cashbox.balance += amount;      
 
+      await transaction.manager.save(CashEntity, courier_cashbox)
       const updatedCashbox = await transaction.manager.save(CashEntity, cashbox);
             
       const incomeHistory = this.cashboxHistoryRepo.create({
@@ -70,11 +74,21 @@ export class PaymentsFromCourierService {
       
       let outcomeHistory;
 
-      if(payment_method === PaymentMethod.CLICK_TO_MARKET) {
+      if(payment_method === PaymentMethod.CLICK_TO_MARKET && market_id != null) {
+
+        const market_cashbox = await this.cashboxRepo.findOne({ where: { user_id: market_id } })
+
+        if(!market_cashbox) {
+          throw new NotFoundException("Market cashbox topilmadi");
+        }
 
         cashbox.balance -= amount;
+
+        market_cashbox.balance -= amount
         
+
         const minusCashbox = await transaction.manager.save(CashEntity, cashbox)
+        await transaction.manager.save(CashEntity, market_cashbox)
   
           outcomeHistory = this.cashboxHistoryRepo.create({
           operation_type: Operation_type.INCOME,
