@@ -1,15 +1,30 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderRepository } from 'src/core/repository/order.repository';
+import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
+import { UserDecorator } from 'src/common/decorator/user.decorator';
 
 @Controller('order')
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
+  @UseGuards(JwtGuard)
   @Post()
-  create(@Body() createOrderDto: CreateOrderDto) {
-    return this.orderService.create(createOrderDto);
+  create(@UserDecorator() user: any, @Body() createOrderDto: CreateOrderDto) {
+    return this.orderService.create(user, createOrderDto);
   }
 
   @Get()
