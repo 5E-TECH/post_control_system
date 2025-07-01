@@ -43,7 +43,7 @@ export class MarketController {
     return this.marketService.remove(id);
   }
 
-  @Post()
+  @Post('login')
   loginMarket(
     @Body() loginMarketDto: LoginMarketDto,
     @Res({ passthrough: true }) res: Response,
