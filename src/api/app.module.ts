@@ -11,6 +11,7 @@ import { PaymentsToMarketModule } from './payments-to-market/payments-to-market.
 import { RegionModule } from './region/region.module';
 import { DistrictModule } from './district/district.module';
 import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
+import { LoggerModule } from 'src/logger/logger.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
     RegionModule,
     DistrictModule,
     CashboxHistoryModule,
+    LoggerModule
   ]
 })
 export class AppModule {}
