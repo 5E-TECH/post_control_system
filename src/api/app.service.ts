@@ -6,7 +6,7 @@ import * as cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.exception.filter';
 import config from 'src/config';
 import * as express from 'express';
-import {join} from 'path'
+import { join } from 'path';
 
 export default class Application {
   public static async main(): Promise<void> {
@@ -39,7 +39,7 @@ export default class Application {
       SwaggerModule.createDocument(app, config_swagger);
     SwaggerModule.setup(api, app, documentFactory);
     await app.listen(config.PORT, () => {
-      console.log(Date.now());
+      console.log(`Server started on port ${config.PORT}...`);
     });
   }
 }

@@ -20,6 +20,7 @@ import { Response } from 'express';
 import { AdminRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
+import { DataSource, Not } from 'typeorm';
 
 @Injectable()
 export class UserService {
@@ -28,6 +29,7 @@ export class UserService {
     @InjectRepository(CashEntity) private cashRepo: CashRepository,
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
+    private readonly dataSource: DataSource,
   ) {}
 
   async onModuleInit() {
@@ -40,7 +42,7 @@ export class UserService {
         const hashedPassword = await this.bcrypt.encrypt(config.ADMIN_PASSWORD);
         const superAdminthis = this.userRepo.create({
           first_name: config.ADMIN_FIRSTNAME,
-          last_name: config.ADMIN_LASTRNAME,
+          last_name: config.ADMIN_LASTNAME,
           phone_number: config.ADMIN_PHONE_NUMBER,
           password: hashedPassword,
           role: Roles.SUPERADMIN,
@@ -52,15 +54,15 @@ export class UserService {
     }
   }
 
-  async createAdmin(createUserDto: CreateUserDto) {
+  async createAdmin(createUserDto: CreateUserDto): Promise<object> {
     try {
       const { password, phone_number, first_name, last_name } = createUserDto;
-      const exists_Phone_number = await this.userRepo.findOne({
+      const existAdmin = await this.userRepo.findOne({
         where: { phone_number },
       });
-      if (exists_Phone_number) {
+      if (existAdmin) {
         throw new ConflictException(
-          `phone number already exists: ${phone_number}`,
+          `Admin with ${phone_number} number already exists`,
         );
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
@@ -72,184 +74,156 @@ export class UserService {
         role: Roles.ADMIN,
       });
       await this.userRepo.save(admin);
-      return successRes(admin, 201);
+      return successRes(admin, 201, 'New Admin created');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async createCourier(createUserDto: CreateUserDto) {
+  async createStaff(createUserDto: CreateUserDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     try {
-      const { password, phone_number, first_name, last_name } = createUserDto;
-      const exists_Phone_number = await this.userRepo.findOne({
+      const { password, phone_number, first_name, last_name, role } =
+        createUserDto;
+      if (role === Roles.ADMIN) {
+        throw new BadRequestException('Unacceptable role');
+      }
+      const existUser = await queryRunner.manager.findOne(UserEntity, {
         where: { phone_number },
       });
-      if (exists_Phone_number) {
+      if (existUser) {
         throw new ConflictException(
-          `phone number already exists: ${phone_number}`,
+          `User with ${phone_number} number already exists`,
         );
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
-      const courier = this.userRepo.create({
+      const staff = queryRunner.manager.create(UserEntity, {
         first_name,
         last_name,
         phone_number,
         password: hashedPassword,
-        role: Roles.COURIER,
+        role,
       });
-      const cashbox = this.cashRepo.create({
-        cashbox_type: Cashbox_type.FOR_COURIER,
-        user_id: courier.id,
-      });
-      await this.userRepo.save(courier);
-      await this.cashRepo.save(cashbox);
-      return successRes(courier, 201, 'New courier created');
-    } catch (error) {
-      return catchError(error);
-    }
-  }
+      await queryRunner.manager.save(UserEntity, staff);
 
-  async createRegistrator(createUserDto: CreateUserDto) {
-    try {
-      const { password, phone_number, first_name, last_name } = createUserDto;
-      const exists_Phone_number = await this.userRepo.findOne({
-        where: { phone_number },
-      });
-      if (exists_Phone_number) {
-        throw new ConflictException(
-          `phone number already exists: ${phone_number}`,
-        );
+      if (role === Roles.COURIER) {
+        const cashbox = queryRunner.manager.create(CashEntity, {
+          cashbox_type: Cashbox_type.FOR_COURIER,
+          user_id: staff.id,
+        });
+        await queryRunner.manager.save(CashEntity, cashbox);
       }
-      const hashedPassword = await this.bcrypt.encrypt(password);
-      const admin = this.userRepo.create({
-        first_name,
-        last_name,
-        phone_number,
-        password: hashedPassword,
-        role: Roles.REGISTRATOR,
+      await queryRunner.commitTransaction();
+      return successRes(staff, 201, `New ${role} created`);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async allUsers(): Promise<object> {
+    try {
+      const allUsers = await this.userRepo.find({
+        where: { role: Not(Roles.SUPERADMIN) },
       });
-      await this.userRepo.save(admin);
-      return successRes(admin, 201);
+      return successRes(allUsers, 200, 'All users');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async findAllAdmin() {
+  async findOne(id: string): Promise<object> {
     try {
-      const admin = await this.userRepo.find({
-        where: { role: Roles.ADMIN && Roles.SUPERADMIN },
+      const user = await this.userRepo.findOne({
+        where: { id: id, role: Not(Roles.SUPERADMIN) },
       });
-      return successRes(admin);
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  async findAllCourier() {
-    try {
-      const admin = await this.userRepo.find({
-        where: { role: Roles.COURIER },
-      });
-      return successRes(admin);
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  async findAllRegistrator() {
-    try {
-      const admin = await this.userRepo.find({
-        where: { role: Roles.REGISTRATOR },
-      });
-      return successRes(admin);
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  async findOne(id: string) {
-    try {
-      const admin = await this.userRepo.findOne({ where: { id } });
-      if (!admin) {
-        throw new NotFoundException(`admin not fount by id: ${id}}`);
+      if (!user) {
+        throw new NotFoundException('User not fount');
       }
-      return successRes(admin);
+      return successRes(user, 200, 'User by id');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto) {
+  async profile(user: any): Promise<object> {
     try {
-      const admin = await this.userRepo.findOne({ where: { id } });
-      if (!admin) {
-        throw new NotFoundException(`admin not fount by id: ${id}}`);
+      const { id } = user;
+      const myProfile = await this.userRepo.findOne({ where: { id } });
+      return successRes(myProfile, 200, 'Profile info');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<object> {
+    try {
+      const user = await this.userRepo.findOne({ where: { id } });
+      if (!user) {
+        throw new NotFoundException('User not found');
       }
       if (updateUserDto.phone_number) {
-        const exists_Phone_number = await this.userRepo.findOne({
+        const existsPhoneNumber = await this.userRepo.findOne({
           where: { phone_number: updateUserDto.phone_number },
         });
-        if (exists_Phone_number) {
+        if (existsPhoneNumber) {
           throw new ConflictException(
-            `phone_number already exists: ${updateUserDto.phone_number}`,
+            `User with ${updateUserDto.phone_number} number already exists`,
           );
         }
       }
       await this.userRepo.update({ id }, updateUserDto);
-      const updatedAdmin = await this.userRepo.findOne({ where: { id } });
-      return successRes(updatedAdmin);
+      const updatedUser = await this.userRepo.findOne({ where: { id } });
+      return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string): Promise<object> {
     try {
-      const admin = await this.userRepo.findOne({ where: { id } });
-      if (!admin) {
-        throw new NotFoundException(`admin not fount by id: ${id}}`);
-      } else if (admin.role == Roles.SUPERADMIN) {
-        throw new ConflictException(
-          "You're stupid, you can't delete super admin",
-        );
+      const user = await this.userRepo.findOne({ where: { id } });
+      if (!user) {
+        throw new NotFoundException('User not fount');
       }
-
+      if (user.role === Roles.SUPERADMIN) {
+        throw new BadRequestException('Super admin can not be deleted!');
+      }
       await this.userRepo.delete({ id });
-      return successRes({});
+      return successRes({}, 200, 'User deleted');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async signInUser(
-    signInAdminDto: SignInUserDto,
-    res: Response,
-  ): Promise<object> {
+  async signInUser(signInDto: SignInUserDto, res: Response): Promise<object> {
     try {
-      console.log('salom');
-
-      const { phone_number, password } = signInAdminDto;
+      const { phone_number, password } = signInDto;
 
       const user = await this.userRepo.findOne({ where: { phone_number } });
       if (!user) {
-        throw new BadRequestException('emial or password incorrect');
-      } else if (user.status == Status.INACTIVE) {
-        throw new BadRequestException('user not found');
+        throw new BadRequestException('Phone number or password incorrect');
       }
-      const ISMatchPassword = await this.bcrypt.compare(
+      if (user.status === Status.INACTIVE) {
+        throw new BadRequestException('You have been blocked by superadmin');
+      }
+      const IsMatchPassword = await this.bcrypt.compare(
         password,
         user?.password,
       );
-      if (!ISMatchPassword) {
-        throw new BadRequestException('emial or password incorrect');
+      if (!IsMatchPassword) {
+        throw new BadRequestException('Phone number or password incorrect');
       }
-      const { id, role } = user;
-      const payload = { id, role };
+      const { id, role, status } = user;
+      const payload = { id, role, status };
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
-      return successRes(accessToken);
+      return successRes(accessToken, 200, 'Logged in successfully');
     } catch (error) {
       return catchError(error);
     }
@@ -258,11 +232,7 @@ export class UserService {
   async signOut(res: Response): Promise<object> {
     try {
       res.clearCookie('refreshToken');
-
-      return {
-        statusCode: 200,
-        message: 'Successfully signed out',
-      };
+      return successRes({}, 200, 'Signed out!');
     } catch (error) {
       return catchError(error);
     }
