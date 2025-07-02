@@ -9,6 +9,9 @@ export class DistrictEntity extends BaseEntity {
   })
   name: string;
 
+  @Column({type:String})
+  region_id:string
+
   @ManyToOne(() => RegionEntity, (region) => region.districts, {})
   @JoinColumn({ name: 'region_id' })
   region: RegionEntity;

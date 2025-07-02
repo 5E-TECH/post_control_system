@@ -5,9 +5,10 @@ import { UserService } from './users.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
+import { CashEntity } from 'src/core/entity/cash-box.entity';
 
 @Module({
-  imports:[TypeOrmModule.forFeature([UserEntity])],
+  imports: [TypeOrmModule.forFeature([UserEntity, CashEntity])],
   controllers: [UsersController],
   providers: [UserService, BcryptEncryption, Token],
 })

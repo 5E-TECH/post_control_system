@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Roles, Status } from 'src/common/enums';
+import { Cashbox_type, Roles, Status } from 'src/common/enums';
 import config from 'src/config';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -18,11 +18,14 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
 import { Response } from 'express';
 import { AdminRepository } from 'src/core/repository/user.repository';
+import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { CashRepository } from 'src/core/repository/cash.box.repository';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(UserEntity) private userRepo: AdminRepository,
+    @InjectRepository(CashEntity) private cashRepo: CashRepository,
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
   ) {}
@@ -87,15 +90,20 @@ export class UserService {
         );
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
-      const admin = this.userRepo.create({
+      const courier = this.userRepo.create({
         first_name,
         last_name,
         phone_number,
         password: hashedPassword,
         role: Roles.COURIER,
       });
-      await this.userRepo.save(admin);
-      return successRes(admin, 201);
+      const cashbox = this.cashRepo.create({
+        cashbox_type: Cashbox_type.FOR_COURIER,
+        user_id: courier.id,
+      });
+      await this.userRepo.save(courier);
+      await this.cashRepo.save(cashbox);
+      return successRes(courier, 201, 'New courier created');
     } catch (error) {
       return catchError(error);
     }
@@ -184,16 +192,7 @@ export class UserService {
         });
         if (exists_Phone_number) {
           throw new ConflictException(
-            `username already exists: ${updateUserDto.phone_number}`,
-          );
-        }
-      } else if (updateUserDto.phone_number) {
-        const exists_Phone_number = await this.userRepo.findOne({
-          where: { phone_number: updateUserDto.phone_number },
-        });
-        if (exists_Phone_number) {
-          throw new ConflictException(
-            `email already exists: ${updateUserDto.phone_number}`,
+            `phone_number already exists: ${updateUserDto.phone_number}`,
           );
         }
       }
@@ -250,11 +249,7 @@ export class UserService {
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
-      return {
-        StatusCode: 200,
-        message: 'success',
-        token: accessToken,
-      };
+      return successRes(accessToken);
     } catch (error) {
       return catchError(error);
     }

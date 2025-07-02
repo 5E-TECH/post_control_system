@@ -5,10 +5,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketEntity } from 'src/core/entity/market.entity';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
+import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { CashBoxService } from '../cash-box/cash-box.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MarketEntity])],
+  imports: [TypeOrmModule.forFeature([MarketEntity, CashEntity])],
   controllers: [MarketController],
-  providers: [MarketService, BcryptEncryption, Token],
+  providers: [MarketService, BcryptEncryption, Token, CashBoxService],
 })
 export class MarketModule {}

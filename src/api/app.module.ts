@@ -5,13 +5,14 @@ import { UsersModule } from './users/users.module';
 import { ProductModule } from './product/product.module';
 import { JwtModule } from '@nestjs/jwt';
 import { MarketModule } from './market/market.module';
-import { CasheBoxModule } from './cashe-box/cashe-box.module';
+import { CashBoxModule } from './cash-box/cash-box.module';
 import { PaymentsFromCourierModule } from './payments-from-courier/payments-from-courier.module';
 import { PaymentsToMarketModule } from './payments-to-market/payments-to-market.module';
 import { RegionModule } from './region/region.module';
 import { DistrictModule } from './district/district.module';
 import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
 import { LoggerModule } from 'src/logger/logger.module';
+import { OrderModule } from './order/order.module';
 
 @Module({
   imports: [
@@ -26,13 +27,14 @@ import { LoggerModule } from 'src/logger/logger.module';
     ProductModule,
     JwtModule.register({ global: true }),
     MarketModule,
-    CasheBoxModule,
+    CashBoxModule,
     PaymentsFromCourierModule,
     PaymentsToMarketModule,
     RegionModule,
     DistrictModule,
     CashboxHistoryModule,
-    LoggerModule
+    LoggerModule,
+    OrderModule,
   ]
 })
 export class AppModule {}
