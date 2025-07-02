@@ -24,26 +24,21 @@ export class OrderController {
   @UseGuards(JwtGuard)
   @Post()
   create(@UserDecorator() user: any, @Body() createOrderDto: CreateOrderDto) {
-    return this.orderService.create(user, createOrderDto);
+    return this.orderService.createOrder(user, createOrderDto);
   }
 
   @Get()
   findAll() {
-    return this.orderService.findAll();
+    return this.orderService.findAllWithPagination();
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.orderService.findOne(+id);
+    return this.orderService.findOneById(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateOrderDto: UpdateOrderDto) {
-    return this.orderService.update(+id, updateOrderDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.orderService.remove(+id);
+    return this.orderService.update(id, updateOrderDto);
   }
 }

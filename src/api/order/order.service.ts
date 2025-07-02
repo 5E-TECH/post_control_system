@@ -18,9 +18,10 @@ import { ProductRepository } from 'src/core/repository/product.repository';
 import { MarketRepository } from 'src/core/repository/market.repository';
 import { ProductEntity } from 'src/core/entity/product.entity';
 import { MarketEntity } from 'src/core/entity/market.entity';
+import { BaseService } from 'src/infrastructure/lib/baseServise';
 
 @Injectable()
-export class OrderService {
+export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   constructor(
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
@@ -35,8 +36,13 @@ export class OrderService {
     private readonly marketRepo: MarketRepository,
 
     private readonly dataSource: DataSource,
-  ) {}
-  async create(user: any, createOrderDto: CreateOrderDto) {
+  ) {
+    super(orderRepo);
+  }
+  async createOrder(
+    user: any,
+    createOrderDto: CreateOrderDto,
+  ): Promise<object> {
     const transaction = this.dataSource.createQueryRunner();
     await transaction.connect();
     await transaction.startTransaction();
@@ -112,19 +118,28 @@ export class OrderService {
     }
   }
 
-  findAll() {
-    return `This action returns all order`;
-  }
+  // async findAll(): Promise<object> {
+  //   try {
+  //     const allOrders = await this.orderRepo.find();
+  //     return successRes(allOrders, 200, 'All orders');
+  //   } catch (error) {
+  //     return catchError(error);
+  //   }
+  // }
 
-  findOne(id: number) {
-    return `This action returns a #${id} order`;
-  }
+  // async findOne(id: string): Promise<object> {
+  //   try {
+  //     const
+  //   } catch (error) {
+  //     return catchError(error)
+  //   }
+  // }
 
-  update(id: number, updateOrderDto: UpdateOrderDto) {
-    return `This action updates a #${id} order`;
-  }
+  // update(id: number, updateOrderDto: UpdateOrderDto) {
+  //   return `This action updates a #${id} order`;
+  // }
 
-  remove(id: number) {
-    return `This action removes a #${id} order`;
-  }
+  // remove(id: number) {
+  //   return `This action removes a #${id} order`;
+  // }
 }

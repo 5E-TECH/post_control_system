@@ -10,14 +10,14 @@ export class PaymentsToMarketService {
   constructor(
     @InjectRepository(PaymentsToMarketEntity)
     private readonly paymentsToMarketRepo: PaymentsToMarketRepository,
-  ) {  }
+  ) {}
 
   create(createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
     return 'This action adds a new paymentsToMarket';
   }
 
   async findAll() {
-    const paymentToMarket = await 
+    // const paymentToMarket = await
   }
 
   findOne(id: number) {
