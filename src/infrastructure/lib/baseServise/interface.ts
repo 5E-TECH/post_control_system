@@ -18,4 +18,7 @@ export interface IResponsePagination<T> {
   message: string;
 }
 
-export interface IFindOptions<T> extends FindManyOptions<T> {}
+export interface IFindOptions<T> extends FindManyOptions<T> {
+  page?: number;
+  limit?: number;
+}

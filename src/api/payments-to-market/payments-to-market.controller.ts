@@ -1,11 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { PaymentsToMarketService } from './payments-to-market.service';
 import { CreatePaymentsToMarketDto } from './dto/create-payments-to-market.dto';
 import { UpdatePaymentsToMarketDto } from './dto/update-payments-to-market.dto';
 
 @Controller('payments-to-market')
 export class PaymentsToMarketController {
-  constructor(private readonly paymentsToMarketService: PaymentsToMarketService) {}
+  constructor(
+    private readonly paymentsToMarketService: PaymentsToMarketService,
+  ) {}
 
   @Post()
   create(@Body() createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
@@ -22,13 +32,13 @@ export class PaymentsToMarketController {
     return this.paymentsToMarketService.findOne(+id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaymentsToMarketDto: UpdatePaymentsToMarketDto) {
-    return this.paymentsToMarketService.update(+id, updatePaymentsToMarketDto);
-  }
+  // @Patch(':id')
+  // update(@Param('id') id: string, @Body() updatePaymentsToMarketDto: UpdatePaymentsToMarketDto) {
+  //   return this.paymentsToMarketService.update(+id, updatePaymentsToMarketDto);
+  // }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsToMarketService.remove(+id);
-  }
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.paymentsToMarketService.remove(+id);
+  // }
 }
