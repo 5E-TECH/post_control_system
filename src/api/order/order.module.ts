@@ -8,6 +8,9 @@ import { ProductEntity } from 'src/core/entity/product.entity';
 import { MarketEntity } from 'src/core/entity/market.entity';
 import { ProductService } from '../product/product.service';
 import { MarketService } from '../market/market.service';
+import { CashBoxModule } from '../cash-box/cash-box.module';
+import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
+import { Token } from 'src/infrastructure/lib/token-generator/token';
 
 @Module({
   imports: [
@@ -17,8 +20,15 @@ import { MarketService } from '../market/market.service';
       ProductEntity,
       MarketEntity,
     ]),
+    CashBoxModule,
   ],
   controllers: [OrderController],
-  providers: [OrderService, ProductService, MarketService],
+  providers: [
+    OrderService,
+    ProductService,
+    MarketService,
+    BcryptEncryption,
+    Token,
+  ],
 })
 export class OrderModule {}

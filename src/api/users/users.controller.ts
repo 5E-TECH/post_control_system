@@ -19,66 +19,70 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
+import { UserDecorator } from 'src/common/decorator/user.decorator';
 
-@Controller('admin')
+@Controller('user')
 export class UsersController {
   constructor(private readonly userService: UserService) {}
 
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
-  @Post()
+  @Post('admin')
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.createAdmin(createUserDto);
   }
 
-  @Post('courier')
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('staff')
   createCourier(@Body() createUserDto: CreateUserDto) {
-    return this.userService.createCourier(createUserDto);
+    return this.userService.createStaff(createUserDto);
   }
 
-  @Post('registrator')
-  createRegistrator(@Body() createUserDto: CreateUserDto) {
-    return this.userService.createRegistrator(createUserDto);
-  }
-
-  @Post('confirmsignin')
-  async confirmSign(
+  @Post('signin')
+  async signIn(
     @Body() signInuser: SignInUserDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     return this.userService.signInUser(signInuser, res);
   }
 
+  @UseGuards(JwtGuard)
   @Post('signout')
   async signOut(@Res({ passthrough: true }) res: Response) {
     return this.userService.signOut(res);
   }
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get()
-  findAllAdmin() {
-    return this.userService.findAllAdmin();
+  findAllUsers() {
+    return this.userService.allUsers();
   }
 
-  @Get('courier')
-  findAllCourier() {
-    return this.userService.findAllCourier();
-  }
-
-  @Get('registrator')
-  findAllRegistrator() {
-    return this.userService.findAllRegistrator();
-  }
-
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
   }
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
+  @Get('profile')
+  profile(@UserDecorator() user: any) {
+    return this.userService.profile(user);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.userService.update(id, updateUserDto);
   }
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.userService.remove(id);

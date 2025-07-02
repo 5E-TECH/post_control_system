@@ -8,5 +8,6 @@ import { CashEntity } from 'src/core/entity/cash-box.entity';
   imports: [TypeOrmModule.forFeature([CashEntity])],
   controllers: [CasheBoxController],
   providers: [CashBoxService],
+  exports: [TypeOrmModule],
 })
 export class CashBoxModule {}

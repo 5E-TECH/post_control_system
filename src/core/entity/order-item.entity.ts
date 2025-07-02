@@ -1,7 +1,10 @@
-import { BaseEntity, Column, Entity } from 'typeorm';
+import { BaseEntity, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('order_item')
 export class OrderItemEntity extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: string;
+
   @Column({ type: 'uuid' })
   productId: string;
 
