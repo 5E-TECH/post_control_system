@@ -106,14 +106,14 @@ export class UserService {
         password: hashedPassword,
         role,
       });
-      await queryRunner.manager.save(UserEntity, staff);
+      await queryRunner.manager.save(staff);
 
       if (role === Roles.COURIER) {
         const cashbox = queryRunner.manager.create(CashEntity, {
           cashbox_type: Cashbox_type.FOR_COURIER,
           user_id: staff.id,
         });
-        await queryRunner.manager.save(CashEntity, cashbox);
+        await queryRunner.manager.save(cashbox);
       }
       await queryRunner.commitTransaction();
       return successRes(staff, 201, `New ${role} created`);
@@ -162,21 +162,29 @@ export class UserService {
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<object> {
     try {
+      const { password, ...otherFields } = updateUserDto;
       const user = await this.userRepo.findOne({ where: { id } });
       if (!user) {
         throw new NotFoundException('User not found');
       }
-      if (updateUserDto.phone_number) {
+      if (otherFields.phone_number) {
         const existsPhoneNumber = await this.userRepo.findOne({
-          where: { phone_number: updateUserDto.phone_number },
+          where: { phone_number: otherFields.phone_number },
         });
         if (existsPhoneNumber) {
           throw new ConflictException(
-            `User with ${updateUserDto.phone_number} number already exists`,
+            `User with ${otherFields.phone_number} number already exists`,
           );
         }
       }
-      await this.userRepo.update({ id }, updateUserDto);
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+      await this.userRepo.update(
+        { id },
+        { ...otherFields, ...(hashedPassword && { password: hashedPassword }) },
+      );
       const updatedUser = await this.userRepo.findOne({ where: { id } });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {

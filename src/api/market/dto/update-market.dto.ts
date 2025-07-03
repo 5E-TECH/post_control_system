@@ -1,23 +1,24 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { AddOrder, Status } from 'src/common/enums';
 
 export class UpdateMarketDto {
-  @IsString()
   @IsOptional()
-  market_name: string;
+  @IsString()
+  market_name?: string;
 
-  @IsString()
   @IsOptional()
-  phone_number: string;
+  @IsString()
+  phone_number?: string;
 
-  @IsString()
   @IsOptional()
-  password: string;
+  @IsString()
+  password?: string;
 
-  @IsString()
   @IsOptional()
-  status: string;
+  @IsEnum(Status)
+  status?: Status;
 
-  @IsString()
   @IsOptional()
-  add_order: string;
+  @IsEnum(AddOrder)
+  add_order?: AddOrder;
 }
