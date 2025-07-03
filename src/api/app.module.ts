@@ -7,11 +7,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { MarketModule } from './market/market.module';
 import { CashBoxModule } from './cash-box/cash-box.module';
 import { PaymentsFromCourierModule } from './payments-from-courier/payments-from-courier.module';
-import { PaymentsToMarketModule } from './payments-to-market/payments-to-market.module';
+// import { PaymentsToMarketModule } from './payments-to-market/payments-to-market.module';
 import { RegionModule } from './region/region.module';
 import { DistrictModule } from './district/district.module';
 import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
 import { OrderModule } from './order/order.module';
+import { CourierDistrictModule } from './courier_district/courier_district.module';
 
 @Module({
   imports: [
@@ -28,11 +29,12 @@ import { OrderModule } from './order/order.module';
     MarketModule,
     CashBoxModule,
     PaymentsFromCourierModule,
-    PaymentsToMarketModule,
+    // PaymentsToMarketModule,
     RegionModule,
     DistrictModule,
     CashboxHistoryModule,
     OrderModule,
+    CourierDistrictModule,
   ]
 })
 export class AppModule {}

@@ -16,9 +16,9 @@ export class PaymentsToMarketService {
     return 'This action adds a new paymentsToMarket';
   }
 
-  async findAll() {
-    const paymentToMarket = await 
-  }
+  // async findAll() {
+  //   const paymentToMarket = await 
+  // }
 
   findOne(id: number) {
     return `This action returns a #${id} paymentsToMarket`;

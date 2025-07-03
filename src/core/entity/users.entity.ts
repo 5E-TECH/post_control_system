@@ -3,7 +3,9 @@ import { Roles, Status } from 'src/common/enums';
 import {
   Column,
   Entity,
+  OneToMany,
 } from 'typeorm';
+import { CourierDistrict } from './courier_district.entity';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -41,4 +43,7 @@ export class UserEntity extends BaseEntity {
     default: Roles.ADMIN,
   })
   role: Roles;
+
+  @OneToMany(() => CourierDistrict, (cd) => cd.courier)
+  courierDistricts: CourierDistrict[];
 }
