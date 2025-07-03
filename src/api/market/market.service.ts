@@ -22,8 +22,9 @@ import { CashRepository } from 'src/core/repository/cash.box.repository';
 @Injectable()
 export class MarketService {
   constructor(
-    @InjectRepository(MarketEntity) private marketRepo: MarketRepository,
-    @InjectRepository(CashEntity) private cashRepo: CashRepository,
+    @InjectRepository(MarketEntity)
+    private readonly marketRepo: MarketRepository,
+    @InjectRepository(CashEntity) private readonly cashRepo: CashRepository,
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
   ) {}

@@ -25,7 +25,7 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'float' })
   total_price: number;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', default: 0 })
   product_quantity: number;
 
   @Column({ type: 'enum', enum: Order_status })

@@ -14,7 +14,6 @@ export class PaymentsToMarketService {
   constructor(
     @InjectRepository(PaymentsToMarketEntity)
     private readonly paymentsToMarketRepo: PaymentsToMarketRepository,
-
     private readonly datasource: DataSource
   ) {  }
 

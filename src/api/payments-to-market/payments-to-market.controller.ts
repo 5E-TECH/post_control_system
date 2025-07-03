@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { PaymentsToMarketService } from './payments-to-market.service';
 import { CreatePaymentsToMarketDto } from './dto/create-payments-to-market.dto';
 import { UpdatePaymentsToMarketDto } from './dto/update-payments-to-market.dto';
@@ -7,7 +15,9 @@ import { UserDecorator } from 'src/common/decorator/user.decorator';
 
 @Controller('payments-to-market')
 export class PaymentsToMarketController {
-  constructor(private readonly paymentsToMarketService: PaymentsToMarketService) {}
+  constructor(
+    private readonly paymentsToMarketService: PaymentsToMarketService,
+  ) {}
 
   @UseGuards(JwtGuard)
   @Post()
@@ -30,5 +40,10 @@ export class PaymentsToMarketController {
   // @Patch(':id')
   // update(@Param('id') id: string, @Body() updatePaymentsToMarketDto: UpdatePaymentsToMarketDto) {
   //   return this.paymentsToMarketService.update(+id, updatePaymentsToMarketDto);
+  // }
+
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.paymentsToMarketService.remove(+id);
   // }
 }
