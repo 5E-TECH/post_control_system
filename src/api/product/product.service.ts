@@ -12,12 +12,13 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import * as fs from 'fs';
 import * as path from 'path';
 import config from 'src/config';
+import { ProductRepository } from 'src/core/repository/product.repository';
 
 @Injectable()
 export class ProductService {
   constructor(
     @InjectRepository(ProductEntity)
-    private readonly productRepo: Repository<ProductEntity>,
+    private readonly productRepo: ProductRepository,
   ) {}
 
   private buildImageUrl(filename: string): string {

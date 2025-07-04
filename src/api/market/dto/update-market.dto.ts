@@ -1,4 +1,24 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateMarketDto } from './create-market.dto';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { AddOrder, Status } from 'src/common/enums';
 
-export class UpdateMarketDto extends PartialType(CreateMarketDto) {}
+export class UpdateMarketDto {
+  @IsOptional()
+  @IsString()
+  market_name?: string;
+
+  @IsOptional()
+  @IsString()
+  phone_number?: string;
+
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @IsOptional()
+  @IsEnum(Status)
+  status?: Status;
+
+  @IsOptional()
+  @IsEnum(AddOrder)
+  add_order?: AddOrder;
+}

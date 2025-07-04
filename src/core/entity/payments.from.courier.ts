@@ -13,8 +13,8 @@ export class PaymentsFromCourierEntity extends BaseEntity {
     @Column({ type: 'enum', enum: PaymentMethod })
     payment_method: PaymentMethod;
 
-    @Column({ type: 'timestamp' })
-    payment_date: Date;
+    @Column({ type: 'varchar' })
+    payment_date: string;
 
     @Column({ type: 'varchar', nullable: true })
     comment?: string;

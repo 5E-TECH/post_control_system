@@ -1,15 +1,30 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { PaymentsToMarketService } from './payments-to-market.service';
 import { CreatePaymentsToMarketDto } from './dto/create-payments-to-market.dto';
 import { UpdatePaymentsToMarketDto } from './dto/update-payments-to-market.dto';
+import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
+import { UserDecorator } from 'src/common/decorator/user.decorator';
 
 @Controller('payments-to-market')
 export class PaymentsToMarketController {
-  constructor(private readonly paymentsToMarketService: PaymentsToMarketService) {}
+  constructor(
+    private readonly paymentsToMarketService: PaymentsToMarketService,
+  ) {}
 
+  @UseGuards(JwtGuard)
   @Post()
-  create(@Body() createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
-    return this.paymentsToMarketService.create(createPaymentsToMarketDto);
+  create(
+    @UserDecorator() user: any,
+    @Body() createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
+    return this.paymentsToMarketService.create(user, createPaymentsToMarketDto);
   }
 
   @Get()
@@ -19,16 +34,16 @@ export class PaymentsToMarketController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.paymentsToMarketService.findOne(+id);
+    return this.paymentsToMarketService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaymentsToMarketDto: UpdatePaymentsToMarketDto) {
-    return this.paymentsToMarketService.update(+id, updatePaymentsToMarketDto);
-  }
+  // @Patch(':id')
+  // update(@Param('id') id: string, @Body() updatePaymentsToMarketDto: UpdatePaymentsToMarketDto) {
+  //   return this.paymentsToMarketService.update(+id, updatePaymentsToMarketDto);
+  // }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsToMarketService.remove(+id);
-  }
+  // @Delete(':id')
+  // remove(@Param('id') id: string) {
+  //   return this.paymentsToMarketService.remove(+id);
+  // }
 }

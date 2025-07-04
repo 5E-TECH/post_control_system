@@ -1,15 +1,20 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { PaymentsFromCourierService } from './payments-from-courier.service';
 import { CreatePaymentsFromCourierDto } from './dto/create-payments-from-courier.dto';
 import { UpdatePaymentsFromCourierDto } from './dto/update-payments-from-courier.dto';
+import { UserDecorator } from 'src/common/decorator/user.decorator';
+import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 
 @Controller('payments-from-courier')
 export class PaymentsFromCourierController {
   constructor(private readonly paymentsFromCourierService: PaymentsFromCourierService) {}
 
+  @UseGuards(JwtGuard)
   @Post()
-  create(@Body() createPaymentsFromCourierDto: CreatePaymentsFromCourierDto) {
-    return this.paymentsFromCourierService.create(createPaymentsFromCourierDto);
+  create(
+    @UserDecorator() user: any,
+    @Body() createPaymentsFromCourierDto: CreatePaymentsFromCourierDto) {
+    return this.paymentsFromCourierService.create(user, createPaymentsFromCourierDto);
   }
 
   @Get()
@@ -19,16 +24,6 @@ export class PaymentsFromCourierController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.paymentsFromCourierService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaymentsFromCourierDto: UpdatePaymentsFromCourierDto) {
-    return this.paymentsFromCourierService.update(+id, updatePaymentsFromCourierDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsFromCourierService.remove(+id);
+    return this.paymentsFromCourierService.findOne(id);
   }
 }
