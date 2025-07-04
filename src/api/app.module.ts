@@ -12,6 +12,7 @@ import { RegionModule } from './region/region.module';
 import { DistrictModule } from './district/district.module';
 import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
 import { LoggerModule } from 'src/logger/logger.module';
+import { PostModule } from './post/post.module';
 import { OrderModule } from './order/order.module';
 
 @Module({
@@ -34,6 +35,7 @@ import { OrderModule } from './order/order.module';
     DistrictModule,
     CashboxHistoryModule,
     LoggerModule,
+    PostModule,
     OrderModule,
   ]
 })
