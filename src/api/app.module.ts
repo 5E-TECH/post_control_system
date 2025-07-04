@@ -12,6 +12,7 @@ import { RegionModule } from './region/region.module';
 import { DistrictModule } from './district/district.module';
 import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
 import { LoggerModule } from 'src/logger/logger.module';
+import { PostModule } from './post/post.module';
 
 @Module({
   imports: [
@@ -32,7 +33,8 @@ import { LoggerModule } from 'src/logger/logger.module';
     RegionModule,
     DistrictModule,
     CashboxHistoryModule,
-    LoggerModule
+    LoggerModule,
+    PostModule
   ]
 })
 export class AppModule {}
