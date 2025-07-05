@@ -12,6 +12,6 @@ export class PostEntity extends BaseEntity {
     @Column({ type: 'smallint', name: 'order_quantity' })
     order_quantity: number;
 
-    @Column({ type: 'varchar', name: 'QR_code_name' })
-    QR_code_name: string;
+    @Column({ type: 'varchar', name: 'qr_code_token' })
+    qr_code_token: string;
 }

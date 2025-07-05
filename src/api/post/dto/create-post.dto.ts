@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsNumber, IsString, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsString,
+  IsUUID,
+  ArrayNotEmpty,
+} from 'class-validator';
 
 export class CreatePostDto {
   @ApiProperty({
@@ -13,29 +19,24 @@ export class CreatePostDto {
   courier_id: string;
 
   @ApiProperty({
-    type: Number,
-    example: 125000.5,
-    description: 'Post orqali yetkazilgan buyurtmalarning umumiy summasi',
-  })
-  @IsNumber()
-  @IsNotEmpty()
-  post_total_price: number;
-
-  @ApiProperty({
-    type: Number,
-    example: 3,
-    description: 'Ushbu post tarkibidagi buyurtmalar soni',
-  })
-  @IsInt()
-  @IsNotEmpty()
-  order_quantity: number;
-
-  @ApiProperty({
     type: String,
-    example: 'QR-POST-001',
-    description: 'Post uchun QR kod nomi',
+    example: 'QR123TOKEN456',
+    description: 'QR kod orqali berilgan token',
   })
   @IsString()
   @IsNotEmpty()
-  QR_code_name: string;
+  qr_code_token: string;
+
+  @ApiProperty({
+    type: [String],
+    example: [
+      'd5f6e1ad-8a5b-4b91-bb5a-9876501a0b15',
+      'e8e7a3dc-449e-4e58-95b4-fc94e8c333c7',
+    ],
+    description: 'Postga boglanadigan buyurtmalar ID lar royxati',
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('all', { each: true })
+  orderIDs: string[];
 }

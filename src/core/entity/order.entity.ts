@@ -35,7 +35,7 @@ export class OrderEntity extends BaseEntity {
   parent_order_id: string;
 
   @Column({ type: 'uuid', nullable: true })
-  post_id: string;
+  post_id: string | null;
 
   @Column({ type: 'varchar' })
   qr_code_token: string;
