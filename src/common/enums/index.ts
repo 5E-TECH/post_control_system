@@ -29,7 +29,7 @@ export enum Operation_type {
 
 export enum Source_type {
   COURIER_PAYMENT = 'courier_payment',
-  SELLER_PAYMENT = 'seller_payment',
+  MARKET_PAYMENT = 'market_payment',
   MANUAL_EXPENSE = 'manual_expense',
   MANUAL_INCOME = 'manual_income',
   CORRECTION = 'correction',

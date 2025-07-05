@@ -17,17 +17,17 @@ export class CreatePaymentsToMarketDto {
     @IsNumber()
     amount: number;
 
-    @ApiProperty({
+    @ApiPropertyOptional({
         type: String
     })
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
-    payment_date: string;
+    payment_date?: string;
 
     @ApiPropertyOptional({
         type: String
     })
     @IsOptional()
     @IsString()
-    comment: string
+    comment?: string;
 }

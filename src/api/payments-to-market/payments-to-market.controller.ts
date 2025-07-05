@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { PaymentsToMarketService } from './payments-to-market.service';
 import { CreatePaymentsToMarketDto } from './dto/create-payments-to-market.dto';
