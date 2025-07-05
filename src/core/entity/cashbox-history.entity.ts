@@ -1,11 +1,14 @@
 import { BaseEntity } from "src/common/database/BaseEntity";
-import { Operation_type, Source_type } from "src/common/enums";
+import { Cashbox_type, Operation_type, Source_type } from "src/common/enums";
 import { Column, Entity } from "typeorm";
 
 @Entity("cashbox-history")
 export class CashboxHistoryEntity extends BaseEntity {
     @Column ({ type: 'enum', enum: Operation_type })
     operation_type: Operation_type;
+
+    @Column ({ type: 'uuid' })
+    cashbox_id: string;
 
     @Column ({ type: 'enum', enum: Source_type })
     source_type: Source_type;
