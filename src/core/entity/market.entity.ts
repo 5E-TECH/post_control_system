@@ -13,7 +13,7 @@ export class MarketEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   password: string;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'int'})
   tariff: number;
 
   @Column({ type: 'enum', enum: Status, default: Status.ACTIVE })

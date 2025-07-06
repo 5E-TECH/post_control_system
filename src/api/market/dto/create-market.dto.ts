@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateMarketDto {
   @IsNotEmpty()
@@ -8,6 +8,10 @@ export class CreateMarketDto {
   @IsNotEmpty()
   @IsString()
   phone_number: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  tariff: number
 
   @IsNotEmpty()
   @IsString()
