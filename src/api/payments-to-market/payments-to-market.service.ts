@@ -47,29 +47,50 @@ async create(user: any, createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
 
     const { id } = user;
     const { market_id, amount, payment_date, comment } = createPaymentsToMarketDto;
+    
 
     // 1. Main cashboxni topamiz
     const mainCashbox = await transaction.manager.findOne(CashEntity, {
       where: { cashbox_type: Cashbox_type.MAIN },
     });
 
+    const marketCashbox = await transaction.manager.findOne(CashEntity, {
+      where: {
+        cashbox_type: Cashbox_type.FOR_MARKET,
+        user_id: market_id,
+      },
+    });
+
     if (!mainCashbox) throw new NotFoundException('Main cashbox topilmadi');
+     if (!marketCashbox) throw new NotFoundException('Market kassasi topilmadi');
 
     if (mainCashbox.balance < amount) {
       throw new Error("Asosiy kassada yetarli mablag' mavjud emas");
     }
 
     const allSoldOrders = await transaction.manager.find(OrderEntity, {
-      where: {status: Order_status.SOLD},  
+      where: {status: Order_status.SOLD, market_id},  
       order: { updated_at: 'ASC' }
     })
 
     const market = await transaction.manager.findOne(MarketEntity, {where: { id: market_id }})
-    // const marketTarif = market.tarif
-    // let possiblePayment: number = 0
-    for(let i = 0; i <= allSoldOrders.length; i ++) {
-      // if()
+    if(!market) throw new NotFoundException("Market not found")
+
+    const marketTarif = market.tariff;
+
+    let possiblePayment: number = 0;
+    if(amount === marketCashbox.balance){
+        allSoldOrders.forEach(async (order)=>{
+          const updatedOrder = await transaction.manager.update(OrderEntity, {id: order.id}, {status: Order_status.PAID} )
+        })
+    }else{
+        for(let i = 0; i <= allSoldOrders.length; i ++) {
+          if(amount > possiblePayment){
+            possiblePayment += (allSoldOrders[i].total_price - marketTarif);
+          }
+        }
     }
+    
 
     mainCashbox.balance -= amount;
     await transaction.manager.save(mainCashbox);
@@ -89,14 +110,9 @@ async create(user: any, createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
     await transaction.manager.save(mainCashHistory);
 
     // 2. Market kassasini topamiz
-    const marketCashbox = await transaction.manager.findOne(CashEntity, {
-      where: {
-        cashbox_type: Cashbox_type.FOR_MARKET,
-        user_id: market_id,
-      },
-    });
+    
 
-    if (!marketCashbox) throw new NotFoundException('Market kassasi topilmadi');
+   
 
     marketCashbox.balance += amount;
     await transaction.manager.save(marketCashbox);
