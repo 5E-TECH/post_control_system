@@ -12,7 +12,10 @@ import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { CashboxHistoryRepository } from 'src/core/repository/cashbox-history.repository';
-import { Cashbox_type, Operation_type, Source_type } from 'src/common/enums';
+import { Cashbox_type, Operation_type, Order_status, Source_type, Status } from 'src/common/enums';
+import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderRepository } from 'src/core/repository/order.repository';
+import { MarketRepository } from 'src/core/repository/market.repository';
 
 @Injectable()
 export class PaymentsToMarketService {
@@ -26,6 +29,12 @@ export class PaymentsToMarketService {
     @InjectRepository(CashboxHistoryEntity)
     private readonly cashboxHistoryRepo: CashboxHistoryRepository,
 
+    @InjectRepository(OrderEntity)
+    private readonly orderRepo: OrderRepository,
+
+    @InjectRepository(MarketEntity)
+    private readonly marketRepo: MarketRepository,
+
     private readonly datasource: DataSource
   ) {  }
 
@@ -35,6 +44,7 @@ async create(user: any, createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
   await transaction.startTransaction();
 
   try {
+
     const { id } = user;
     const { market_id, amount, payment_date, comment } = createPaymentsToMarketDto;
 
@@ -47,6 +57,18 @@ async create(user: any, createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
 
     if (mainCashbox.balance < amount) {
       throw new Error("Asosiy kassada yetarli mablag' mavjud emas");
+    }
+
+    const allSoldOrders = await transaction.manager.find(OrderEntity, {
+      where: {status: Order_status.SOLD},  
+      order: { updated_at: 'ASC' }
+    })
+
+    const market = await transaction.manager.findOne(MarketEntity, {where: { id: market_id }})
+    // const marketTarif = market.tarif
+    // let possiblePayment: number = 0
+    for(let i = 0; i <= allSoldOrders.length; i ++) {
+      // if()
     }
 
     mainCashbox.balance -= amount;
