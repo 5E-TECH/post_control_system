@@ -48,6 +48,6 @@ export enum Order_status {
 
 export enum Cashbox_type {
   MAIN = 'main',
-  FOR_COURIER = 'for_courier',
-  FOR_MARKET = 'for_market',
+  FOR_COURIER = 'couriers',
+  FOR_MARKET = 'markets',
 }

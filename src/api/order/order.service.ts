@@ -118,28 +118,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  // async findAll(): Promise<object> {
-  //   try {
-  //     const allOrders = await this.orderRepo.find();
-  //     return successRes(allOrders, 200, 'All orders');
-  //   } catch (error) {
-  //     return catchError(error);
-  //   }
-  // }
+  async findOne(id: string) {
+    try {
+    } catch (error) {
+      return catchError(error);
+    }
+  }
 
-  // async findOne(id: string): Promise<object> {
-  //   try {
-  //     const
-  //   } catch (error) {
-  //     return catchError(error)
-  //   }
-  // }
+  updateStatus(id: number, updateOrderDto: UpdateOrderDto) {
+    return `This action updates a #${id} order`;
+  }
 
-  // update(id: number, updateOrderDto: UpdateOrderDto) {
-  //   return `This action updates a #${id} order`;
-  // }
-
-  // remove(id: number) {
-  //   return `This action removes a #${id} order`;
-  // }
+  remove(id: number) {
+    return `This action removes a #${id} order`;
+  }
 }

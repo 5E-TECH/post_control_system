@@ -1,9 +1,6 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Roles, Status } from 'src/common/enums';
-import {
-  Column,
-  Entity,
-} from 'typeorm';
+import { Column, Entity } from 'typeorm';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -29,11 +26,17 @@ export class UserEntity extends BaseEntity {
   password: string;
 
   @Column({
-    type:'enum',
-    enum:Status,
-    default:Status.ACTIVE
+    type: 'int',
+    nullable: true,
   })
-  status:Status
+  tariff: number;
+
+  @Column({
+    type: 'enum',
+    enum: Status,
+    default: Status.ACTIVE,
+  })
+  status: Status;
 
   @Column({
     type: 'enum',

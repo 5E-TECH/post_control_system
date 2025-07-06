@@ -24,7 +24,8 @@ export class PaymentsToMarketController {
   @Post()
   create(
     @UserDecorator() user: any,
-    @Body() createPaymentsToMarketDto: CreatePaymentsToMarketDto) {
+    @Body() createPaymentsToMarketDto: CreatePaymentsToMarketDto,
+  ) {
     return this.paymentsToMarketService.create(user, createPaymentsToMarketDto);
   }
 
