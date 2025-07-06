@@ -37,7 +37,7 @@ export class ProductService {
       const exists = await this.productRepo.findOne({
         where: {
           name: normalizedName,
-          market_id: createProductDto.market_id,
+          market: { id: createProductDto.market_id },
         },
       });
 
@@ -112,12 +112,12 @@ export class ProductService {
 
       if (updateProductDto.name || updateProductDto.market_id) {
         const nameToCheck = updateProductDto.name || product.name;
-        const marketToCheck = updateProductDto.market_id || product.market_id;
+        const marketToCheck = updateProductDto.market_id || product.market?.id;
 
         const exists = await this.productRepo.findOne({
           where: {
             name: nameToCheck,
-            market_id: marketToCheck,
+            market: {id: marketToCheck},
           },
         });
 

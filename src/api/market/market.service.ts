@@ -75,7 +75,7 @@ export class MarketService {
   async findAll(): Promise<object> {
     try {
       const allMarkets = await this.marketRepo.find({
-        select: ['market_name', 'phone_number', 'status', 'created_at'],
+        select: ['id', 'market_name', 'phone_number', 'status', 'created_at'],
       });
       return successRes(allMarkets, 200, 'All markets');
     } catch (error) {

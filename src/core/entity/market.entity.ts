@@ -1,6 +1,7 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { AddOrder, Status } from 'src/common/enums';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, OneToMany } from 'typeorm';
+import { ProductEntity } from './product.entity';
 
 @Entity('market')
 export class MarketEntity extends BaseEntity {
@@ -21,4 +22,7 @@ export class MarketEntity extends BaseEntity {
 
   @Column({ type: 'enum', enum: AddOrder, default: AddOrder.FORBID })
   add_order: AddOrder;
+
+  @OneToMany(() => ProductEntity, product => product.market)
+  products: ProductEntity[];
 }
