@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { AddOrder, Status } from 'src/common/enums';
 
 export class UpdateMarketDto {
@@ -21,4 +21,14 @@ export class UpdateMarketDto {
   @IsOptional()
   @IsEnum(AddOrder)
   add_order?: AddOrder;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tariff_home?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tariff_center?: number;
 }

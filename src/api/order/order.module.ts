@@ -11,6 +11,8 @@ import { MarketService } from '../market/market.service';
 import { CashBoxModule } from '../cash-box/cash-box.module';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
+import { CustomerInfoEntity } from 'src/core/entity/customer-info.entity';
+import { CashEntity } from 'src/core/entity/cash-box.entity';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
       OrderItemEntity,
       ProductEntity,
       MarketEntity,
+      CustomerInfoEntity,
+      CashEntity,
     ]),
     CashBoxModule,
   ],

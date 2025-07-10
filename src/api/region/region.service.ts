@@ -30,9 +30,7 @@ export class RegionService implements OnModuleInit {
 
   async findAll() {
     try {
-      const region = await this.regionRepository.find({
-        relations: ['district'],
-      });
+      const region = await this.regionRepository.find();
       return successRes(region);
     } catch (error) {
       return catchError(error);

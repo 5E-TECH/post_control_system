@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -8,6 +9,7 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
+import { Where_deliver } from 'src/common/enums';
 import { OrderItems } from 'src/common/utils/order-item.type';
 
 export class CreateOrderDto {
@@ -39,6 +41,10 @@ export class CreateOrderDto {
   @IsNumber()
   @Min(0)
   total_price: number;
+
+  @IsOptional()
+  @IsEnum(Where_deliver)
+  where_deliver: Where_deliver;
 
   @IsNotEmpty()
   @IsObject()

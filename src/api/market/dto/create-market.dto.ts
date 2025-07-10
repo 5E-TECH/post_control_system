@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateMarketDto {
   @IsNotEmpty()
@@ -11,7 +17,13 @@ export class CreateMarketDto {
 
   @IsNotEmpty()
   @IsNumber()
-  tariff: number
+  @Min(0)
+  tariff_home: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @Min(0)
+  tariff_center: number;
 
   @IsNotEmpty()
   @IsString()
