@@ -14,8 +14,11 @@ export class MarketEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   password: string;
 
-  @Column({ type: 'int'})
-  tariff: number;
+  @Column({ type: 'int' })
+  tariff_home: number;
+
+  @Column({ type: 'int' })
+  tariff_center: number;
 
   @Column({ type: 'enum', enum: Status, default: Status.ACTIVE })
   status: Status;
@@ -23,6 +26,6 @@ export class MarketEntity extends BaseEntity {
   @Column({ type: 'enum', enum: AddOrder, default: AddOrder.FORBID })
   add_order: AddOrder;
 
-  @OneToMany(() => ProductEntity, product => product.market)
+  @OneToMany(() => ProductEntity, (product) => product.market)
   products: ProductEntity[];
 }

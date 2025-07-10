@@ -36,6 +36,7 @@ export enum Source_type {
 }
 
 export enum Order_status {
+  NEW = 'new',
   RECEIVED = 'received',
   ON_THE_ROAD = 'on the road',
   WAITING = 'waiting',
@@ -50,4 +51,9 @@ export enum Cashbox_type {
   MAIN = 'main',
   FOR_COURIER = 'couriers',
   FOR_MARKET = 'markets',
+}
+
+export enum Where_deliver {
+  CENTER = 'center',
+  ADDRESS = 'address',
 }

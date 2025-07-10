@@ -38,7 +38,13 @@ export class MarketService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { market_name, phone_number, tariff, password } = createMarketDto;
+      const {
+        market_name,
+        phone_number,
+        tariff_center,
+        tariff_home,
+        password,
+      } = createMarketDto;
       const existMarket = await queryRunner.manager.findOne(MarketEntity, {
         where: { phone_number },
       });
@@ -51,7 +57,8 @@ export class MarketService {
       const newMarket = queryRunner.manager.create(MarketEntity, {
         market_name,
         phone_number,
-        tariff,
+        tariff_center,
+        tariff_home,
         password: hashedPassword,
       });
       await queryRunner.manager.save(newMarket);
