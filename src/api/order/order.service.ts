@@ -31,6 +31,7 @@ import { UpdateManyStatusesDto } from './dto/update-many-statuses.dto';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { generateComment } from 'src/common/utils/generate-comment';
+import { PartlySoldDto } from './dto/partly-sold.dto';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -387,7 +388,149 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  remove(id: number) {
+  async partlySold(id: string, partlySoldDto: PartlySoldDto): Promise<object> {
+    const transaction = this.dataSource.createQueryRunner();
+    await transaction.connect();
+    await transaction.startTransaction();
+
+    try {
+      const { order_item_info, totalPrice, extraCost, comment } = partlySoldDto;
+
+      const order = await transaction.manager.findOne(OrderEntity, {
+        where: { id },
+      });
+      if (!order) throw new NotFoundException('Order not found');
+
+      const oldOrderItems = await transaction.manager.find(OrderItemEntity, {
+        where: { orderId: order.id },
+      });
+
+      const market = await this.marketRepo.findOne({
+        where: { id: order.market_id },
+      });
+      if (!market) throw new NotFoundException('Market not found');
+
+      const marketCashbox = await transaction.manager.findOne(CashEntity, {
+        where: {
+          cashbox_type: Cashbox_type.FOR_MARKET,
+          user_id: order.market_id,
+        },
+      });
+      if (!marketCashbox)
+        throw new NotFoundException('Market cashbox not found');
+
+      const tarif =
+        order.where_deliver === Where_deliver.CENTER
+          ? market.tariff_center
+          : market.tariff_home;
+
+      const to_be_paid = totalPrice - (extraCost ?? 0) - tarif;
+
+      const soldProductQuantity = order_item_info.reduce(
+        (acc, item) => acc + item.quantity,
+        0,
+      );
+
+      // 🔁 Eski itemlarni yangilash (kamaytirish)
+      for (const dtoItem of order_item_info) {
+        const foundItem = oldOrderItems.find(
+          (i) => i.productId === dtoItem.product_id,
+        );
+        if (!foundItem) {
+          throw new NotFoundException(
+            `Product not found in order: ${dtoItem.product_id}`,
+          );
+        }
+        if (dtoItem.quantity > foundItem.quantity) {
+          throw new BadRequestException(
+            `Product quantity (${dtoItem.quantity}) exceeds original quantity`,
+          );
+        }
+
+        foundItem.quantity -= dtoItem.quantity;
+        await transaction.manager.save(foundItem);
+      }
+
+      // ✅ Asosiy (eski) orderni yangilash (SOLD)
+      const finalComment = generateComment(order.comment, comment, extraCost, [
+        'Buyurtmaning bir qismi sotildi',
+      ]);
+
+      await transaction.manager.update(
+        OrderEntity,
+        { id },
+        {
+          status: Order_status.SOLD,
+          to_be_paid,
+          comment: finalComment,
+          product_quantity: soldProductQuantity,
+        },
+      );
+
+      marketCashbox.balance += to_be_paid;
+      await transaction.manager.save(marketCashbox);
+
+      // ✅ Qolgan mahsulotlar bo‘yicha CANCELLED order yaratish
+      const remainingItems = oldOrderItems.filter((item) => item.quantity > 0);
+      const remainingQuantity = remainingItems.reduce(
+        (acc, item) => acc + item.quantity,
+        0,
+      );
+
+      if (remainingItems.length > 0) {
+        const cancelledOrder = transaction.manager.create(OrderEntity, {
+          market_id: order.market_id,
+          comment: '!!! Qolgan mahsulotlar bekor qilindi',
+          total_price: 0,
+          to_be_paid: 0,
+          where_deliver: order.where_deliver,
+          status: Order_status.CANCELLED,
+          qr_code_token: generateQrToken(),
+          parent_order_id: id,
+        });
+        await transaction.manager.save(cancelledOrder);
+
+        for (const item of remainingItems) {
+          const newItem = transaction.manager.create(OrderItemEntity, {
+            productId: item.productId,
+            quantity: item.quantity,
+            orderId: cancelledOrder.id,
+          });
+          await transaction.manager.save(newItem);
+        }
+
+        await transaction.manager.update(
+          OrderEntity,
+          { id: cancelledOrder.id },
+          { product_quantity: remainingQuantity },
+        );
+
+        const customer = await transaction.manager.findOne(CustomerInfoEntity, {
+          where: { order_id: id },
+        });
+        if (!customer) throw new NotFoundException('Customer info not found');
+
+        const newCustomerInfo = transaction.manager.create(CustomerInfoEntity, {
+          order_id: cancelledOrder.id,
+          name: customer.name,
+          phone_number: customer.phone_number,
+          address: customer.address,
+          district_id: customer.district_id,
+        });
+        await transaction.manager.save(newCustomerInfo);
+      }
+
+      await transaction.commitTransaction();
+      return successRes({}, 200, 'Order qisman sotildi');
+    } catch (error) {
+      await transaction.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await transaction.release();
+    }
+  }
+
+  async remove(id: number) {
     return `This action removes a #${id} order`;
   }
 }
