@@ -42,6 +42,7 @@ export enum Order_status {
   WAITING = 'waiting',
   SOLD = 'sold',
   PAID = 'paid',
+  PARTLY_PAID = 'partly_paid',
   CANCELLED = 'cancelled',
   CANCELLED_SENT = 'cancelled (sent)',
   CLOSED = 'closed',

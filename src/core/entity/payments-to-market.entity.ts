@@ -14,4 +14,7 @@ export class PaymentsToMarketEntity extends BaseEntity {
 
     @Column({type: 'varchar', nullable: true})
     comment?: string;
+
+    @Column ({ type: 'uuid' })
+    created_by: string
 }

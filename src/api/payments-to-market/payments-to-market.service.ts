@@ -7,7 +7,7 @@ import { PaymentsToMarketEntity } from 'src/core/entity/payments-to-market.entit
 import { PaymentsToMarketRepository } from 'src/core/repository/paymentstomarket.repository';
 import { InjectRepository } from '@nestjs/typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
@@ -54,8 +54,9 @@ export class PaymentsToMarketService {
 
     try {
       const { id } = user;
-      const { market_id, amount, payment_date, comment } =
+      const { market_id, payment_date, amount, comment } =
         createPaymentsToMarketDto;
+      let paymentInProcess  = amount;
 
       // 1. Main cashboxni topamiz
       const mainCashbox = await transaction.manager.findOne(CashEntity, {
@@ -78,7 +79,7 @@ export class PaymentsToMarketService {
       }
 
       const allSoldOrders = await transaction.manager.find(OrderEntity, {
-        where: { status: Order_status.SOLD, market_id },
+        where: { status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),  market_id },
         order: { updated_at: 'ASC' },
       });
 
@@ -86,24 +87,23 @@ export class PaymentsToMarketService {
         where: { id: market_id },
       });
       if (!market) throw new NotFoundException('Market not found');
-
-      let possiblePayment: number = 0;
-      if (amount === marketCashbox.balance) {
-        allSoldOrders.forEach(async (order) => {
-          const updatedOrder = await transaction.manager.update(
-            OrderEntity,
-            { id: order.id },
-            { status: Order_status.PAID },
-          );
-        });
-      } else {
-        for (let i = 0; i <= allSoldOrders.length; i++) {
-          if (amount > possiblePayment) {
-            possiblePayment += allSoldOrders[i].total_price;
-          }
+      
+      for(let i = 0; i < allSoldOrders.length; i ++) {
+        if(paymentInProcess >= allSoldOrders[i].to_be_paid) {
+          paymentInProcess -= allSoldOrders[i].to_be_paid;
+          await transaction.manager.update(OrderEntity, {
+            id: allSoldOrders[i].id
+          }, { paid_amount: allSoldOrders[i].to_be_paid, status: Order_status.PAID })
+        }
+        else {
+          await transaction.manager.update(OrderEntity, {
+            id: allSoldOrders[i].id
+          }, { paid_amount: paymentInProcess, status: Order_status.PARTLY_PAID })
+          paymentInProcess = 0;
+          break;
         }
       }
-
+    
       mainCashbox.balance -= amount;
       await transaction.manager.save(mainCashbox);
 
@@ -123,7 +123,7 @@ export class PaymentsToMarketService {
 
       // 2. Market kassasini topamiz
 
-      marketCashbox.balance += amount;
+      marketCashbox.balance -= amount;
       await transaction.manager.save(marketCashbox);
 
       // 2.1 Market kassaga kirgan pulni tarixga yozamiz
