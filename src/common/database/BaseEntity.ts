@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  BeforeInsert,
+  BeforeUpdate,
+} from 'typeorm';
 
 @Entity()
 export class BaseEntity {
@@ -8,14 +14,24 @@ export class BaseEntity {
   @Column({
     name: 'created_at',
     type: 'bigint',
-    default: () => '(EXTRACT(epoch FROM NOW()) * 1000)::bigint',
   })
   created_at: number;
 
   @Column({
     name: 'updated_at',
     type: 'bigint',
-    default: () => '(EXTRACT(epoch FROM NOW()) * 1000)::bigint',
   })
   updated_at: number;
+
+  @BeforeInsert()
+  setCreationTimestamps() {
+    const now = Date.now();
+    this.created_at = now;
+    this.updated_at = now;
+  }
+
+  @BeforeUpdate()
+  setUpdateTimestamp() {
+    this.updated_at = Date.now();
+  }
 }

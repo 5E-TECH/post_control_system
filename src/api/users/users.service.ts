@@ -134,6 +134,7 @@ export class UserService {
         phone_number,
         password: hashedPassword,
         role,
+        region_id: role === Roles.COURIER ? region_id : null,
         tariff_center: role === Roles.COURIER ? tariff_center : null,
         tariff_home: role === Roles.COURIER ? tariff_home : null,
       } as DeepPartial<UserEntity>);
