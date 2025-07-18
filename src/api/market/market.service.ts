@@ -19,6 +19,8 @@ import { Response } from 'express';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { DataSource } from 'typeorm';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { UpdateOwnMarketDto } from './dto/update-own.dto';
 
 @Injectable()
 export class MarketService {
@@ -120,6 +122,42 @@ export class MarketService {
       );
       const updatedMarket = await this.marketRepo.findOne({ where: { id } });
       return successRes(updatedMarket, 200, 'Market updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateMe(
+    id: string,
+    user: JwtPayload,
+    updateOwnMarketDto: UpdateOwnMarketDto,
+  ) {
+    try {
+      const { phone_number, password } = updateOwnMarketDto;
+
+      const market = await this.marketRepo.findOne({ where: { id } });
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+
+      const updateData: Partial<typeof market> = {};
+
+      if (phone_number) {
+        updateData.phone_number = phone_number;
+      }
+
+      if (password) {
+        const hashedPassword = await this.bcrypt.encrypt(password);
+        updateData.password = hashedPassword;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        throw new BadRequestException('No fields provided to update');
+      }
+
+      await this.marketRepo.update({ id }, updateData);
+
+      return { message: 'Market updated successfully' };
     } catch (error) {
       return catchError(error);
     }

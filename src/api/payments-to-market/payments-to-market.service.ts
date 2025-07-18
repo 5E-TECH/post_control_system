@@ -56,7 +56,7 @@ export class PaymentsToMarketService {
       const { id } = user;
       const { market_id, payment_date, amount, comment } =
         createPaymentsToMarketDto;
-      let paymentInProcess  = amount;
+      let paymentInProcess = amount;
 
       // 1. Main cashboxni topamiz
       const mainCashbox = await transaction.manager.findOne(CashEntity, {
@@ -79,7 +79,10 @@ export class PaymentsToMarketService {
       }
 
       const allSoldOrders = await transaction.manager.find(OrderEntity, {
-        where: { status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),  market_id },
+        where: {
+          status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
+          market_id,
+        },
         order: { updated_at: 'ASC' },
       });
 
@@ -87,23 +90,38 @@ export class PaymentsToMarketService {
         where: { id: market_id },
       });
       if (!market) throw new NotFoundException('Market not found');
-      
-      for(let i = 0; i < allSoldOrders.length; i ++) {
-        if(paymentInProcess >= allSoldOrders[i].to_be_paid) {
-          paymentInProcess -= allSoldOrders[i].to_be_paid;
-          await transaction.manager.update(OrderEntity, {
-            id: allSoldOrders[i].id
-          }, { paid_amount: allSoldOrders[i].to_be_paid, status: Order_status.PAID })
-        }
-        else {
-          await transaction.manager.update(OrderEntity, {
-            id: allSoldOrders[i].id
-          }, { paid_amount: paymentInProcess, status: Order_status.PARTLY_PAID })
-          paymentInProcess = 0;
-          break;
+
+      if (allSoldOrders.length > 0) {
+        for (let i = 0; i < allSoldOrders.length; i++) {
+          if (paymentInProcess >= allSoldOrders[i].to_be_paid) {
+            paymentInProcess -= allSoldOrders[i].to_be_paid;
+            await transaction.manager.update(
+              OrderEntity,
+              {
+                id: allSoldOrders[i].id,
+              },
+              {
+                paid_amount: allSoldOrders[i].to_be_paid,
+                status: Order_status.PAID,
+              },
+            );
+          } else {
+            await transaction.manager.update(
+              OrderEntity,
+              {
+                id: allSoldOrders[i].id,
+              },
+              {
+                paid_amount: paymentInProcess,
+                status: Order_status.PARTLY_PAID,
+              },
+            );
+            paymentInProcess = 0;
+            break;
+          }
         }
       }
-    
+
       mainCashbox.balance -= amount;
       await transaction.manager.save(mainCashbox);
 

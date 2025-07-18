@@ -36,10 +36,12 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.1",
     "nest-winston": "^1.10.2",
+    "nestjs-telegraf": "^2.9.1",
     "pg": "^8.16.2",
     "pg-hstore": "^2.3.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "telegraf": "^4.16.3",
     "typeorm": "^0.3.25",
     "winston": "^3.17.0"
   },

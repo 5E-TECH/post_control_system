@@ -20,13 +20,24 @@ import { Response } from 'express';
 import { AdminRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
-import { DataSource, Not } from 'typeorm';
+import { DataSource, DeepPartial, Not } from 'typeorm';
+import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
+import { CourierRegionReository } from 'src/core/repository/courier-region.repository';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { CreateAdminDto } from './dto/create-admin.dto';
 
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(UserEntity) private userRepo: AdminRepository,
-    @InjectRepository(CashEntity) private cashRepo: CashRepository,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: AdminRepository,
+
+    @InjectRepository(CashEntity)
+    private readonly cashRepo: CashRepository,
+
+    @InjectRepository(CourierRegionEntity)
+    private readonly courierRegionRepo: CourierRegionReository,
+
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
     private readonly dataSource: DataSource,
@@ -54,9 +65,9 @@ export class UserService {
     }
   }
 
-  async createAdmin(createUserDto: CreateUserDto): Promise<object> {
+  async createAdmin(createAdminDto: CreateAdminDto): Promise<object> {
     try {
-      const { password, phone_number, first_name, last_name } = createUserDto;
+      const { password, phone_number, first_name, last_name } = createAdminDto;
       const existAdmin = await this.userRepo.findOne({
         where: { phone_number },
       });
@@ -85,10 +96,28 @@ export class UserService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { password, phone_number, first_name, last_name, role } =
-        createUserDto;
+      const {
+        password,
+        phone_number,
+        first_name,
+        last_name,
+        role,
+        region_id,
+        tariff_center,
+        tariff_home,
+      } = createUserDto;
       if (role === Roles.ADMIN) {
         throw new BadRequestException('Unacceptable role');
+      }
+      if (role === Roles.COURIER && !region_id) {
+        throw new NotFoundException(
+          'You have to choose the region for this courier',
+        );
+      }
+      if (role === Roles.COURIER && (!tariff_center || !tariff_home)) {
+        throw new BadRequestException(
+          'You have to choose both home and center tariffs',
+        );
       }
       const existUser = await queryRunner.manager.findOne(UserEntity, {
         where: { phone_number },
@@ -105,7 +134,9 @@ export class UserService {
         phone_number,
         password: hashedPassword,
         role,
-      });
+        tariff_center: role === Roles.COURIER ? tariff_center : null,
+        tariff_home: role === Roles.COURIER ? tariff_home : null,
+      } as DeepPartial<UserEntity>);
       await queryRunner.manager.save(staff);
 
       if (role === Roles.COURIER) {
@@ -114,6 +145,16 @@ export class UserService {
           user_id: staff.id,
         });
         await queryRunner.manager.save(cashbox);
+
+        const newCourierRegion = queryRunner.manager.create(
+          CourierRegionEntity,
+          {
+            courier_id: staff.id,
+            region_id,
+          },
+        );
+
+        await queryRunner.manager.save(newCourierRegion);
       }
       await queryRunner.commitTransaction();
       return successRes(staff, 201, `New ${role} created`);
@@ -150,7 +191,7 @@ export class UserService {
     }
   }
 
-  async profile(user: any): Promise<object> {
+  async profile(user: JwtPayload): Promise<object> {
     try {
       const { id } = user;
       const myProfile = await this.userRepo.findOne({ where: { id } });
@@ -163,28 +204,53 @@ export class UserService {
   async update(id: string, updateUserDto: UpdateUserDto): Promise<object> {
     try {
       const { password, ...otherFields } = updateUserDto;
+
       const user = await this.userRepo.findOne({ where: { id } });
       if (!user) {
         throw new NotFoundException('User not found');
       }
+
       if (otherFields.phone_number) {
         const existsPhoneNumber = await this.userRepo.findOne({
           where: { phone_number: otherFields.phone_number },
         });
-        if (existsPhoneNumber) {
+        if (existsPhoneNumber && existsPhoneNumber.id !== id) {
           throw new ConflictException(
             `User with ${otherFields.phone_number} number already exists`,
           );
         }
       }
+
+      if (user.role === Roles.COURIER && otherFields.region_id) {
+        const existingRegion = await this.courierRegionRepo.findOne({
+          where: { courier_id: user.id },
+        });
+
+        if (existingRegion) {
+          await this.courierRegionRepo.update(
+            { courier_id: user.id },
+            { region_id: otherFields.region_id },
+          );
+        } else {
+          await this.courierRegionRepo.save({
+            courier_id: user.id,
+            region_id: otherFields.region_id,
+          });
+        }
+      }
+
+      delete otherFields.region_id;
+
       let hashedPassword: string | undefined;
       if (password) {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
+
       await this.userRepo.update(
         { id },
         { ...otherFields, ...(hashedPassword && { password: hashedPassword }) },
       );
+
       const updatedUser = await this.userRepo.findOne({ where: { id } });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
@@ -227,7 +293,7 @@ export class UserService {
         throw new BadRequestException('Phone number or password incorrect');
       }
       const { id, role, status } = user;
-      const payload = { id, role, status };
+      const payload: JwtPayload = { id, role, status };
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);

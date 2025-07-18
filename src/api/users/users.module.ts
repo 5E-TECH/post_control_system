@@ -6,9 +6,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserEntity, CashEntity])],
+  imports: [
+    TypeOrmModule.forFeature([UserEntity, CashEntity, CourierRegionEntity]),
+  ],
   controllers: [UsersController],
   providers: [UserService, BcryptEncryption, Token],
 })

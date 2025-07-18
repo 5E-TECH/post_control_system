@@ -2,40 +2,40 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
-  InternalServerErrorException,
-  NotFoundException,
   UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Observable } from 'rxjs';
+import { Request } from 'express';
 import config from 'src/config';
-import { catchError } from 'src/infrastructure/lib/response';
 
 @Injectable()
 export class JwtGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
-    try {
-      const req = context.switchToHttp().getRequest();
-      const auth = req.headers?.authorization;
 
-      if (auth == undefined || !auth) {
-        throw new NotFoundException('Token not found');
-      }
-      const bearer = auth.split(' ')[0];
-      const token = auth.split(' ')[1];
-      if (bearer != 'Bearer' || !token) {
-        throw new UnauthorizedException('Unauthorizated');
-      }
+  canActivate(context: ExecutionContext): boolean {
+    const req: Request = context.switchToHttp().getRequest();
+    const authHeader = req.headers?.authorization;
+
+    if (!authHeader) {
+      throw new NotFoundException('Authorization header not found');
+    }
+
+    const [bearer, token] = authHeader.split(' ');
+
+    if (bearer !== 'Bearer' || !token) {
+      throw new UnauthorizedException('Invalid authorization format');
+    }
+
+    try {
       const user = this.jwtService.verify(token, {
-        secret: config.ACCESS_TOKEN_KEY,
+        secret: config.ACCESS_TOKEN_KEY, // or replace with ConfigService
       });
+
       req.user = user;
       return true;
-    } catch (error) {
-      return catchError(error);
+    } catch (err) {
+      throw new UnauthorizedException('Invalid or expired token');
     }
   }
 }

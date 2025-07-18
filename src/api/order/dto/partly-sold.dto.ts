@@ -6,7 +6,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { OrderItems } from 'src/common/utils/order-item.type';
+import { OrderItems } from 'src/common/utils/types/order-item.type';
 
 export class PartlySoldDto {
   @IsNotEmpty()
