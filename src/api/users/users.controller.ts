@@ -19,7 +19,9 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
-import { UserDecorator } from 'src/common/decorator/user.decorator';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { CreateAdminDto } from './dto/create-admin.dto';
 
 @Controller('user')
 export class UsersController {
@@ -28,8 +30,8 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Post('admin')
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.createAdmin(createUserDto);
+  create(@Body() createAdminDto: CreateAdminDto) {
+    return this.userService.createAdmin(createAdminDto);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
@@ -63,7 +65,7 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
   @Get('profile')
-  profile(@UserDecorator() user: any) {
+  profile(@CurrentUser() user: JwtPayload) {
     return this.userService.profile(user);
   }
 

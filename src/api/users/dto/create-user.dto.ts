@@ -3,8 +3,11 @@ import {
   IsEnum,
   IsIn,
   IsNotEmpty,
+  IsNumber,
+  IsOptional,
   IsPhoneNumber,
   IsString,
+  Min,
 } from 'class-validator';
 import { Roles } from 'src/common/enums';
 
@@ -33,6 +36,10 @@ export class CreateUserDto {
   @IsIn([Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR])
   role: Roles;
 
+  @IsOptional()
+  @IsString()
+  region_id?: string;
+
   @ApiProperty({
     type: String,
     example: '+998905234382',
@@ -45,7 +52,17 @@ export class CreateUserDto {
     type: String,
     example: '0990',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   password: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tariff_home?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tariff_center?: number;
 }

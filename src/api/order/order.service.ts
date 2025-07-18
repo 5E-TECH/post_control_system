@@ -69,6 +69,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { id, role } = user;
       let { market_id } = createOrderDto;
+      let status = Order_status.RECEIVED;
       if (role === Roles.REGISTRATOR) {
         const isExistMarket = await this.marketRepo.findOne({
           where: { id: market_id },
@@ -79,6 +80,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
       if (role === Roles.MARKET) {
         market_id = id;
+        status = Order_status.NEW;
       }
       const {
         where_deliver,
@@ -98,7 +100,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
-        status: Order_status.RECEIVED,
+        status,
         qr_code_token,
       });
       await transaction.manager.save(newOrder);
@@ -143,6 +145,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return catchError(error);
     } finally {
       await transaction.release();
+    }
+  }
+
+  async newOrdersByMarketId(id: string) {
+    try {
+      const market = await this.marketRepo.findOne({ where: { id } });
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+      const allNewOrders = await this.orderRepo.find({
+        where: {
+          market_id: id,
+          status: Order_status.NEW,
+        },
+      });
+      return successRes(
+        allNewOrders,
+        200,
+        `${market.market_name}'s new Orders`,
+      );
+    } catch (error) {
+      return catchError(error);
     }
   }
 
@@ -263,6 +287,41 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return catchError(error);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async receiveNewOrders(ordersArray: UpdateManyStatusesDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { order_ids } = ordersArray;
+      const newOrders = await queryRunner.manager.find(OrderEntity, {
+        where: { id: In(order_ids) },
+      });
+      if (newOrders.length === 0) {
+        throw new NotFoundException('No orders found!');
+      }
+
+      // Mavjud bo'lmagan IDlar uchun xatolik chiqarish
+      const foundIds = newOrders.map((o) => o.id);
+      const notFoundIds = order_ids.filter((id) => !foundIds.includes(id));
+      if (notFoundIds.length > 0) {
+        throw new NotFoundException(
+          'There is error to find some orders in the list',
+        );
+      }
+
+      await queryRunner.manager.update(
+        this.orderRepo.target,
+        { id: In(order_ids) },
+        { status: Order_status.RECEIVED },
+      );
+    } catch (error) {
+      queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      queryRunner.release();
     }
   }
 

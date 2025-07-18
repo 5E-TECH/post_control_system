@@ -10,7 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { Where_deliver } from 'src/common/enums';
-import { OrderItems } from 'src/common/utils/order-item.type';
+import { OrderItems } from 'src/common/utils/types/order-item.type';
 
 export class CreateOrderDto {
   @IsOptional()

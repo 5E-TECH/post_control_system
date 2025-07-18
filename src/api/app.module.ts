@@ -14,9 +14,14 @@ import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
 import { LoggerModule } from 'src/logger/logger.module';
 import { PostModule } from './post/post.module';
 import { OrderModule } from './order/order.module';
+import { BotModule } from './bot/bot.module';
+import { TelegrafModule } from 'nestjs-telegraf';
 
 @Module({
   imports: [
+    TelegrafModule.forRoot({
+      token: config.BOT_TOKEN,
+    }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: config.DB_URL,
@@ -37,6 +42,7 @@ import { OrderModule } from './order/order.module';
     LoggerModule,
     PostModule,
     OrderModule,
-  ]
+    BotModule,
+  ],
 })
 export class AppModule {}

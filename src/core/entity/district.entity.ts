@@ -4,13 +4,14 @@ import { RegionEntity } from './region.entity';
 
 @Entity('district')
 export class DistrictEntity extends BaseEntity {
-  @Column({
-    type: 'varchar',
-  })
+  @Column({ type: 'varchar' })
   name: string;
 
-  @Column({type:String})
-  region_id:string
+  @Column({ type: 'uuid' })
+  region_id: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  assigned_region: string;
 
   @ManyToOne(() => RegionEntity, (region) => region.districts, {})
   @JoinColumn({ name: 'region_id' })

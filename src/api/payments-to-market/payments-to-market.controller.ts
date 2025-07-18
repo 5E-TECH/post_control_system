@@ -12,7 +12,7 @@ import { PaymentsToMarketService } from './payments-to-market.service';
 import { CreatePaymentsToMarketDto } from './dto/create-payments-to-market.dto';
 import { UpdatePaymentsToMarketDto } from './dto/update-payments-to-market.dto';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
-import { UserDecorator } from 'src/common/decorator/user.decorator';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
 
 @Controller('payments-to-market')
 export class PaymentsToMarketController {
@@ -23,7 +23,7 @@ export class PaymentsToMarketController {
   @UseGuards(JwtGuard)
   @Post()
   create(
-    @UserDecorator() user: any,
+    @CurrentUser() user: any,
     @Body() createPaymentsToMarketDto: CreatePaymentsToMarketDto,
   ) {
     return this.paymentsToMarketService.create(user, createPaymentsToMarketDto);
