@@ -25,6 +25,8 @@ import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { CourierRegionReository } from 'src/core/repository/courier-region.repository';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { UpdateAdminDto } from './dto/update-admin.dto';
+import { UpdateSelfDto } from './dto/self-update.dto';
 
 @Injectable()
 export class UserService {
@@ -202,36 +204,94 @@ export class UserService {
     }
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<object> {
+  async updateAdmin(
+    id: string,
+    updateAdminDto: UpdateAdminDto,
+    currentUser: JwtPayload,
+  ) {
+    try {
+      const { password, ...otherFields } = updateAdminDto;
+      // Find is user exist or not
+      const user = await this.userRepo.findOne({ where: { id } });
+      if (!user || user.role !== Roles.ADMIN) {
+        throw new NotFoundException('Admin not found');
+      }
+      // If admins try to change their status they can not
+      if (otherFields.status && currentUser.role !== Roles.SUPERADMIN) {
+        throw new BadRequestException('Only SuperAdmin can change statuses');
+      }
+      // Phone number oldin ro'yxatdan o'tganmi yoki yo'qligini tekshirish
+      if (otherFields.phone_number) {
+        const existPhone = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (existPhone) {
+          throw new ConflictException(
+            `User with ${otherFields.phone_number} already exist`,
+          );
+        }
+      }
+      // Super admin can not be blocked
+      if (
+        otherFields.status &&
+        id === currentUser.id &&
+        currentUser.role === Roles.SUPERADMIN
+      ) {
+        throw new BadRequestException('Super admin can not be blocked');
+      }
+
+      // If user want to edit password encript it first
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+
+      Object.assign(user, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+      await this.userRepo.save(user);
+
+      const updatedUser = await this.userRepo.findOne({ where: { id } });
+      return successRes(updatedUser, 200, 'User updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateStaff(id: string, updateUserDto: UpdateUserDto): Promise<object> {
     try {
       const { password, ...otherFields } = updateUserDto;
 
       const user = await this.userRepo.findOne({ where: { id } });
-      if (!user) {
+      if (!user || user.role === Roles.ADMIN) {
         throw new NotFoundException('User not found');
       }
 
+      // Update qilganda telefon nomer databasada bor yoki yo'qligini tekshirish
       if (otherFields.phone_number) {
-        const existsPhoneNumber = await this.userRepo.findOne({
+        const existUser = await this.userRepo.findOne({
           where: { phone_number: otherFields.phone_number },
         });
-        if (existsPhoneNumber && existsPhoneNumber.id !== id) {
+        if (existUser) {
           throw new ConflictException(
             `User with ${otherFields.phone_number} number already exists`,
           );
         }
       }
 
+      // Courierni update qilganda region_id kelsa courierRegion tableini update qilish
       if (user.role === Roles.COURIER && otherFields.region_id) {
         const existingRegion = await this.courierRegionRepo.findOne({
           where: { courier_id: user.id },
         });
 
         if (existingRegion) {
-          await this.courierRegionRepo.update(
-            { courier_id: user.id },
-            { region_id: otherFields.region_id },
-          );
+          Object.assign(existingRegion, {
+            courier_id: user.id,
+            region_id: otherFields.region_id,
+          });
+          await this.courierRegionRepo.save(existingRegion);
         } else {
           await this.courierRegionRepo.save({
             courier_id: user.id,
@@ -247,16 +307,49 @@ export class UserService {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
 
-      await this.userRepo.update(
-        { id },
-        { ...otherFields, ...(hashedPassword && { password: hashedPassword }) },
-      );
+      Object.assign(user, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+      await this.userRepo.save(user);
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }
+  }
+
+  async selfUpdate(id: string, selfUpdateDto: UpdateSelfDto) {
+    try {
+      const { password, ...otherFields } = selfUpdateDto;
+      const user = await this.userRepo.findOne({ where: { id } });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      if (otherFields.phone_number) {
+        const phoneNumber = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (phoneNumber) {
+          throw new ConflictException(
+            `User with ${otherFields.phone_number} number already exist`,
+          );
+        }
+      }
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+      Object.assign(user, {
+        ...otherFields,
+        ...(hashedPassword && { hashedPassword: password }),
+      });
+      await this.userRepo.save(user);
+
+      const updatedUser = await this.userRepo.findOne({ where: { id } });
+      return successRes(updatedUser, 200, 'User updated');
+    } catch (error) {}
   }
 
   async remove(id: string): Promise<object> {

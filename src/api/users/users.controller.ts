@@ -22,6 +22,9 @@ import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { UpdateAdminDto } from './dto/update-admin.dto';
+import { SelfGuard } from 'src/common/guards/self.guard';
+import { UpdateSelfDto } from './dto/self-update.dto';
 
 @Controller('user')
 export class UsersController {
@@ -76,11 +79,29 @@ export class UsersController {
     return this.userService.findOne(id);
   }
 
+  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
+  @AcceptRoles(Roles.SUPERADMIN)
+  @Patch('admin/:id')
+  updateAdmin(
+    @Param('id') id: string,
+    @Body() updateAdminDto: UpdateAdminDto,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.userService.updateAdmin(id, updateAdminDto, currentUser);
+  }
+
   @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Patch('staff/:id')
+  updateStaff(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return this.userService.updateStaff(id, updateUserDto);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(id, updateUserDto);
+  @Patch('self/:id')
+  selfUpdate(@Param('id') id: string, @Body() updateSelfDto: UpdateSelfDto) {
+    return this.userService.selfUpdate(id, updateSelfDto);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
