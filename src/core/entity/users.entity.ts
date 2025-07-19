@@ -16,6 +16,9 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   password: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  region_id: string;
+
   @Column({ type: 'int', nullable: true })
   tariff_home: number;
 
