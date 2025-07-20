@@ -26,6 +26,9 @@ export class MarketEntity extends BaseEntity {
   @Column({ type: 'enum', enum: AddOrder, default: AddOrder.FORBID })
   add_order: AddOrder;
 
+  @Column({ type: 'varchar' })
+  telegram_token: string;
+
   @OneToMany(() => ProductEntity, (product) => product.market)
   products: ProductEntity[];
 }

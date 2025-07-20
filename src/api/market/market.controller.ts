@@ -50,7 +50,7 @@ export class MarketController {
 
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
-  @Patch(':id')
+  @Patch('update/:id')
   update(@Param('id') id: string, @Body() updateMarketDto: UpdateMarketDto) {
     return this.marketService.update(id, updateMarketDto);
   }
@@ -60,10 +60,9 @@ export class MarketController {
   @Patch('update/me/:id')
   updateMe(
     @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
     @Body() updateOwnMarketDto: UpdateOwnMarketDto,
   ) {
-    return this.marketService.updateMe(id, user, updateOwnMarketDto);
+    return this.marketService.updateMe(id, updateOwnMarketDto);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
