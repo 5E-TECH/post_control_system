@@ -17,6 +17,8 @@ export default class Application {
 
     app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
 
+    console.log(join(process.cwd(), 'uploads'));
+
     app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
     app.useGlobalFilters(new AllExceptionsFilter());
     app.use(cookieParser());
@@ -49,10 +51,7 @@ export default class Application {
 
     await app.listen(config.PORT, () => {
       const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
-      logger.log(
-        'info',
-        `Server running on http://localhost:${config.PORT}`,
-      );
+      logger.log('info', `Server running on http://localhost:${config.PORT}`);
     });
   }
 }

@@ -46,6 +46,8 @@ export class DistrictService implements OnModuleInit {
           await this.districtRepository.save({
             name: districtName,
             region: regionEntity,
+            created_at: Date.now(),
+            updated_at: Date.now(),
           });
         }
       }

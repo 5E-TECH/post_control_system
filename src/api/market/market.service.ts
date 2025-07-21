@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,7 +14,7 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { LoginMarketDto } from './dto/login-market.dto';
-import { Cashbox_type, Roles } from 'src/common/enums';
+import { Cashbox_type, Roles, Status } from 'src/common/enums';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
 import { Response } from 'express';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
@@ -21,6 +22,7 @@ import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { DataSource } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { UpdateOwnMarketDto } from './dto/update-own.dto';
+import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 
 @Injectable()
 export class MarketService {
@@ -55,6 +57,8 @@ export class MarketService {
           'Market with this phone number already exist',
         );
       }
+      const telegram_token = 'group_token-' + generateCustomToken();
+
       const hashedPassword = await this.bcrypt.encrypt(password);
       const newMarket = queryRunner.manager.create(MarketEntity, {
         market_name,
@@ -62,6 +66,7 @@ export class MarketService {
         tariff_center,
         tariff_home,
         password: hashedPassword,
+        telegram_token,
       });
       await queryRunner.manager.save(newMarket);
 
@@ -109,18 +114,20 @@ export class MarketService {
       const { password, ...otherFields } = updateMarketDto;
       const market = await this.marketRepo.findOne({ where: { id } });
       if (!market) {
-        throw new NotFoundException('Market not found');
+        throw new NotFoundException('Market nottt found');
       }
       let hashedPassword: string | undefined;
       if (password) {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
 
-      await this.marketRepo.update(
-        { id },
-        { ...otherFields, ...(hashedPassword && { password: hashedPassword }) },
-      );
-      const updatedMarket = await this.marketRepo.findOne({ where: { id } });
+      Object.assign(market, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+
+      const updatedMarket = await this.marketRepo.save(market);
+
       return successRes(updatedMarket, 200, 'Market updated');
     } catch (error) {
       return catchError(error);
@@ -129,9 +136,8 @@ export class MarketService {
 
   async updateMe(
     id: string,
-    user: JwtPayload,
     updateOwnMarketDto: UpdateOwnMarketDto,
-  ) {
+  ): Promise<object> {
     try {
       const { phone_number, password } = updateOwnMarketDto;
 
@@ -140,24 +146,29 @@ export class MarketService {
         throw new NotFoundException('Market not found');
       }
 
-      const updateData: Partial<typeof market> = {};
-
       if (phone_number) {
-        updateData.phone_number = phone_number;
+        const existPhone = await this.marketRepo.findOne({
+          where: { phone_number },
+        });
+        if (existPhone) {
+          throw new ConflictException(
+            `Market with ${phone_number} number already exist`,
+          );
+        }
       }
 
+      let hashedPassword: string | undefined;
       if (password) {
-        const hashedPassword = await this.bcrypt.encrypt(password);
-        updateData.password = hashedPassword;
+        hashedPassword = await this.bcrypt.encrypt(password);
       }
 
-      if (Object.keys(updateData).length === 0) {
-        throw new BadRequestException('No fields provided to update');
-      }
+      Object.assign(market, {
+        phone_number: phone_number,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
 
-      await this.marketRepo.update({ id }, updateData);
-
-      return { message: 'Market updated successfully' };
+      const updatedMarket = await this.marketRepo.save(market);
+      return successRes(updatedMarket, 200, 'You have been updated your data');
     } catch (error) {
       return catchError(error);
     }
@@ -197,8 +208,14 @@ export class MarketService {
       if (!isMatchedPassword) {
         throw new BadRequestException('Wrong login or password');
       }
-      const { id } = isExisUser;
-      const payload = { id, role: Roles.MARKET };
+
+      if (isExisUser.status === Status.INACTIVE) {
+        throw new ForbiddenException(
+          'You have no acces to this platform. You have beed blocked',
+        );
+      }
+      const { id, status } = isExisUser;
+      const payload: JwtPayload = { id, role: Roles.MARKET, status };
       const accessTokenMarket = await this.token.generateAccessToken(payload);
       const refreshTokenMarket = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshTokenMarket', refreshTokenMarket);

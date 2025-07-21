@@ -19,9 +19,9 @@ import { TelegrafModule } from 'nestjs-telegraf';
 
 @Module({
   imports: [
-    TelegrafModule.forRoot({
-      token: config.BOT_TOKEN,
-    }),
+    // TelegrafModule.forRoot({
+    //   token: config.BOT_TOKEN,
+    // }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: config.DB_URL,
