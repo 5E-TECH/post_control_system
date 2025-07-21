@@ -28,7 +28,4 @@ export class MarketEntity extends BaseEntity {
 
   @Column({ type: 'varchar' })
   telegram_token: string;
-
-  @OneToMany(() => ProductEntity, (product) => product.market)
-  products: ProductEntity[];
 }

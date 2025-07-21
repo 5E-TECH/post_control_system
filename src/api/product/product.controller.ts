@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   ValidationPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -19,6 +20,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import * as fs from 'fs';
+import { AcceptRoles } from 'src/common/decorator/roles.decorator';
+import { Roles } from 'src/common/enums';
+import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 const uploadDir = './uploads';
 
@@ -39,6 +44,8 @@ const storage = diskStorage({
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post()
   @UseInterceptors(FileInterceptor('image', { storage }))
   @HttpCode(HttpStatus.CREATED)
@@ -67,6 +74,7 @@ export class ProductController {
     }
   }
 
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get()
   async findAll() {
     return this.productService.findAll();

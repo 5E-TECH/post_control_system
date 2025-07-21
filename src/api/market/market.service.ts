@@ -22,6 +22,7 @@ import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { DataSource } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { UpdateOwnMarketDto } from './dto/update-own.dto';
+import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 
 @Injectable()
 export class MarketService {
@@ -56,6 +57,8 @@ export class MarketService {
           'Market with this phone number already exist',
         );
       }
+      const telegram_token = 'group_token-' + generateCustomToken();
+
       const hashedPassword = await this.bcrypt.encrypt(password);
       const newMarket = queryRunner.manager.create(MarketEntity, {
         market_name,
@@ -63,6 +66,7 @@ export class MarketService {
         tariff_center,
         tariff_home,
         password: hashedPassword,
+        telegram_token,
       });
       await queryRunner.manager.save(newMarket);
 

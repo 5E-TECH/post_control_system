@@ -18,7 +18,7 @@ import {
   Roles,
   Where_deliver,
 } from 'src/common/enums';
-import { generateQrToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { ProductRepository } from 'src/core/repository/product.repository';
 import { MarketRepository } from 'src/core/repository/market.repository';
 import { ProductEntity } from 'src/core/entity/product.entity';
@@ -93,7 +93,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order_item_info,
       } = createOrderDto;
 
-      const qr_code_token = generateQrToken();
+      const qr_code_token = generateCustomToken();
 
       const newOrder = transaction.manager.create(OrderEntity, {
         market_id,
@@ -544,7 +544,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           to_be_paid: 0,
           where_deliver: order.where_deliver,
           status: Order_status.CANCELLED,
-          qr_code_token: generateQrToken(),
+          qr_code_token: generateCustomToken(),
           parent_order_id: id,
         });
         await transaction.manager.save(cancelledOrder);

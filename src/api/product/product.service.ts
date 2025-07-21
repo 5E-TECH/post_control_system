@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -22,7 +23,7 @@ export class ProductService {
   ) {}
 
   private buildImageUrl(filename: string): string {
-    return `${config.HOST_URL}/uploads/${filename}`;
+    return `${config.HOST_URL}${config.PORT}/uploads/${filename}`;
   }
 
   private normalizeName(name: string): string {
@@ -34,18 +35,16 @@ export class ProductService {
       const normalizedName = this.normalizeName(createProductDto.name);
       createProductDto.name = normalizedName;
 
+      const { name, market_id } = createProductDto;
+
       const exists = await this.productRepo.findOne({
         where: {
-          name: normalizedName,
-          market: { id: createProductDto.market_id },
+          name,
+          market_id,
         },
       });
 
       if (exists) {
-        if (file) {
-          const filePath = path.join('uploads', file.filename);
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        }
         throw new ConflictException('Product name already exists');
       }
 
@@ -60,7 +59,7 @@ export class ProductService {
         product.image_url = this.buildImageUrl(product.image_url);
       }
 
-      return successRes(product, 201);
+      return successRes(product, 201, 'New product added');
     } catch (error) {
       return catchError(error);
     }
@@ -103,35 +102,38 @@ export class ProductService {
   ) {
     try {
       const product = await this.productRepo.findOne({ where: { id } });
-      if (!product)
-        throw new NotFoundException(`Product not found by id: ${id}`);
+      if (!product) throw new NotFoundException('Product not found');
 
-      if (updateProductDto.name) {
-        updateProductDto.name = this.normalizeName(updateProductDto.name);
+      // ✅ Name majburiy, normalize qilamiz
+      if (!updateProductDto.name) {
+        throw new BadRequestException('Product name is required');
+      }
+      updateProductDto.name = this.normalizeName(updateProductDto.name);
+
+      // ✅ Market ID ham majburiy
+      if (!updateProductDto.market_id) {
+        throw new BadRequestException('Market ID is required');
       }
 
-      if (updateProductDto.name || updateProductDto.market_id) {
-        const nameToCheck = updateProductDto.name || product.name;
-        const marketToCheck = updateProductDto.market_id || product.market?.id;
+      const { name, market_id } = updateProductDto;
 
-        const exists = await this.productRepo.findOne({
-          where: {
-            name: nameToCheck,
-            market: {id: marketToCheck},
-          },
-        });
+      // ✅ Boshqa mahsulotda bu name + market_id mavjudmi?
+      const exists = await this.productRepo.findOne({
+        where: { name, market_id },
+      });
 
-        if (exists && exists.id !== product.id) {
-          if (file) {
-            const filePath = path.join('uploads', file.filename);
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-          }
-          throw new ConflictException(
-            'Another product with same name and market already exists',
-          );
+      if (exists && exists.id !== product.id) {
+        // ❌ Conflict — eski rasmni o‘chiramiz agar file kelgan bo‘lsa
+        if (file) {
+          const filePath = path.join('uploads', file.filename);
+          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
         }
+        throw new ConflictException(
+          'Another product with same name and market already exists',
+        );
       }
 
+      // ✅ Agar yangi fayl kelgan bo‘lsa — eski rasmni o‘chir
       if (file) {
         if (product.image_url) {
           const oldPath = path.join(
@@ -144,14 +146,16 @@ export class ProductService {
         updateProductDto.image_url = file.filename;
       }
 
+      // ✅ Update qilamiz
       const updated = this.productRepo.merge(product, updateProductDto);
       await this.productRepo.save(updated);
 
+      // ✅ To‘liq URL yasaymiz
       if (updated.image_url) {
         updated.image_url = this.buildImageUrl(updated.image_url);
       }
 
-      return successRes(updated);
+      return successRes(updated, 200, 'Product updated');
     } catch (error) {
       return catchError(error);
     }
