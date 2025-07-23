@@ -14,6 +14,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import config from 'src/config';
 import { ProductRepository } from 'src/core/repository/product.repository';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { Roles } from 'src/common/enums';
 
 @Injectable()
 export class ProductService {
@@ -30,13 +32,22 @@ export class ProductService {
     return name.trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
-  async create(createProductDto: CreateProductDto, file?: Express.Multer.File) {
+  async create(
+    createProductDto: CreateProductDto,
+    file?: Express.Multer.File,
+    currentUser?: JwtPayload,
+  ) {
     try {
       const normalizedName = this.normalizeName(createProductDto.name);
       createProductDto.name = normalizedName;
 
+      if (currentUser?.role === Roles.MARKET) {
+        createProductDto.market_id = currentUser?.id;
+      }
       const { name, market_id } = createProductDto;
-
+      if (!market_id) {
+        throw new BadRequestException('Market ID is required');
+      }
       const exists = await this.productRepo.findOne({
         where: {
           name,
@@ -68,6 +79,22 @@ export class ProductService {
   async findAll() {
     try {
       const products = await this.productRepo.find();
+      products.forEach((product) => {
+        if (product.image_url) {
+          product.image_url = this.buildImageUrl(product.image_url);
+        }
+      });
+      return successRes(products);
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async findByMarketId(marketId: string) {
+    try {
+      const products = await this.productRepo.find({
+        where: { market_id: marketId },
+      });
       products.forEach((product) => {
         if (product.image_url) {
           product.image_url = this.buildImageUrl(product.image_url);

@@ -24,6 +24,9 @@ import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { SelfGuard } from 'src/common/guards/self.guard';
 
 const uploadDir = './uploads';
 
@@ -45,7 +48,7 @@ export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Post()
   @UseInterceptors(FileInterceptor('image', { storage }))
   @HttpCode(HttpStatus.CREATED)
@@ -59,9 +62,14 @@ export class ProductController {
       }),
     )
     createProductDto: CreateProductDto,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
     try {
-      const result = await this.productService.create(createProductDto, file);
+      const result = await this.productService.create(
+        createProductDto,
+        file,
+        currentUser,
+      );
       return result;
     } catch (error) {
       if (file) {
@@ -74,17 +82,28 @@ export class ProductController {
     }
   }
 
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get()
   async findAll() {
     return this.productService.findAll();
   }
 
+  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
+  @Get('market/:marketId')
+  async findByMarketId(@Param('marketId') marketId: string) {
+    return this.productService.findByMarketId(marketId);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.productService.findOne(id);
   }
 
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.MARKET, Roles.REGISTRATOR)
   @Patch(':id')
   @UseInterceptors(FileInterceptor('image', { storage }))
   async update(
@@ -112,6 +131,7 @@ export class ProductController {
     }
   }
 
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.productService.remove(id);
