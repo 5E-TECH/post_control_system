@@ -1,8 +1,8 @@
 import {
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
   IsPhoneNumber,
   IsString,
@@ -29,13 +29,9 @@ export class CreateOrderDto {
   @IsPhoneNumber('UZ')
   client_phone_number: string;
 
-  @IsOptional()
-  @IsString()
-  address: string;
-
-  @IsOptional()
-  @IsString()
-  comment: string;
+  @IsNotEmpty()
+  @IsArray()
+  order_item_info: OrderItems[];
 
   @IsNotEmpty()
   @IsNumber()
@@ -46,7 +42,11 @@ export class CreateOrderDto {
   @IsEnum(Where_deliver)
   where_deliver: Where_deliver;
 
-  @IsNotEmpty()
-  @IsObject()
-  order_item_info: OrderItems[];
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  comment?: string;
 }

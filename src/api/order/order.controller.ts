@@ -36,6 +36,13 @@ export class OrderController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Get('/market/:id')
+  newOrdersByMarketId(@Param('id') id: string) {
+    return this.orderService.newOrdersByMarketId(id);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get(':id')
   findOne(@Param('id') id: string) {

@@ -15,6 +15,7 @@ import { OrderItemRepository } from 'src/core/repository/order-item.repository';
 import {
   Cashbox_type,
   Order_status,
+  Post_status,
   Roles,
   Where_deliver,
 } from 'src/common/enums';
@@ -27,11 +28,13 @@ import { BaseService } from 'src/infrastructure/lib/baseServise';
 import { CustomerInfoEntity } from 'src/core/entity/customer-info.entity';
 import { CustomerInfoRepository } from 'src/core/repository/customer-info.repository';
 import { UpdateStatusDto } from './dto/status-order.dto';
-import { UpdateManyStatusesDto } from './dto/update-many-statuses.dto';
+import { OrdersArrayDto } from './dto/orders-array.dto';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { generateComment } from 'src/common/utils/generate-comment';
 import { PartlySoldDto } from './dto/partly-sold.dto';
+import { DistrictEntity } from 'src/core/entity/district.entity';
+import { PostEntity } from 'src/core/entity/post.entity';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -69,7 +72,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { id, role } = user;
       let { market_id } = createOrderDto;
-      let status = Order_status.RECEIVED;
       if (role === Roles.REGISTRATOR) {
         const isExistMarket = await this.marketRepo.findOne({
           where: { id: market_id },
@@ -80,7 +82,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
       if (role === Roles.MARKET) {
         market_id = id;
-        status = Order_status.NEW;
       }
       const {
         where_deliver,
@@ -100,7 +101,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
-        status,
+        status: Order_status.NEW,
         qr_code_token,
       });
       await transaction.manager.save(newOrder);
@@ -121,6 +122,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         await transaction.manager.save(newOrderItem);
         product_quantity += o_item.quantity;
       }
+
       await transaction.manager.update(
         this.orderRepo.target,
         {
@@ -128,6 +130,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         },
         { product_quantity },
       );
+
+      newOrder.product_quantity = product_quantity;
 
       const customer_info = transaction.manager.create(CustomerInfoEntity, {
         order_id: newOrder.id,
@@ -247,8 +251,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         // 🟡 3. Edit customer info
         if (
-          updateOrderDto.name ||
-          updateOrderDto.phone_number ||
+          updateOrderDto.client_name ||
+          updateOrderDto.client_phone_number ||
           updateOrderDto.address ||
           updateOrderDto.district_id
         ) {
@@ -261,10 +265,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           }
 
           const updateCustomerFields: Partial<CustomerInfoEntity> = {};
-          if (updateOrderDto.name)
-            updateCustomerFields.name = updateOrderDto.name;
-          if (updateOrderDto.phone_number)
-            updateCustomerFields.phone_number = updateOrderDto.phone_number;
+          if (updateOrderDto.client_name)
+            updateCustomerFields.name = updateOrderDto.client_name;
+          if (updateOrderDto.client_phone_number)
+            updateCustomerFields.phone_number =
+              updateOrderDto.client_phone_number;
           if (updateOrderDto.address)
             updateCustomerFields.address = updateOrderDto.address;
           if (updateOrderDto.district_id)
@@ -290,78 +295,124 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async receiveNewOrders(ordersArray: UpdateManyStatusesDto) {
+  async receiveNewOrders(ordersArray: OrdersArrayDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     try {
       const { order_ids } = ordersArray;
+
+      // 1. Find new orders
       const newOrders = await queryRunner.manager.find(OrderEntity, {
-        where: { id: In(order_ids) },
+        where: { id: In(order_ids), status: Order_status.NEW },
       });
+
       if (newOrders.length === 0) {
         throw new NotFoundException('No orders found!');
       }
 
-      // Mavjud bo'lmagan IDlar uchun xatolik chiqarish
-      const foundIds = newOrders.map((o) => o.id);
-      const notFoundIds = order_ids.filter((id) => !foundIds.includes(id));
-      if (notFoundIds.length > 0) {
-        throw new NotFoundException(
-          'There is error to find some orders in the list',
+      if (order_ids.length !== newOrders.length) {
+        throw new BadRequestException(
+          'Some orders are not found or not in NEW status',
         );
       }
 
-      await queryRunner.manager.update(
-        this.orderRepo.target,
-        { id: In(order_ids) },
-        { status: Order_status.RECEIVED },
-      );
-    } catch (error) {
-      queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      queryRunner.release();
-    }
-  }
-
-  async updateManyStatuses(dto: UpdateManyStatusesDto) {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const { order_ids, status } = dto;
-
-      const orders = await this.orderRepo.find({
-        where: { id: In(order_ids) },
+      // 2. Bulk fetch related data
+      const customerList = await queryRunner.manager.find(CustomerInfoEntity, {
+        where: { order_id: In(order_ids) },
       });
+      const customerMap = new Map(customerList.map((c) => [c.order_id, c]));
 
-      if (orders.length === 0) {
-        throw new NotFoundException('No orders found');
+      const districtIds = customerList.map((c) => c.district_id);
+      const districtList = await queryRunner.manager.find(DistrictEntity, {
+        where: { id: In(districtIds) },
+      });
+      const districtMap = new Map(districtList.map((d) => [d.id, d]));
+
+      const regionIds = districtList.map((d) => d.assigned_region);
+      const postList = await queryRunner.manager.find(PostEntity, {
+        where: {
+          region_id: In(regionIds),
+          status: Post_status.NEW,
+        },
+      });
+      const postMap = new Map(postList.map((p) => [p.region_id, p]));
+
+      // 3. Group orders by region and prepare post assignments
+      const newPosts: PostEntity[] = [];
+
+      for (const order of newOrders) {
+        const customer = customerMap.get(order.id);
+        if (!customer) {
+          throw new NotFoundException(
+            `Customer not found for order ${order.id}`,
+          );
+        }
+
+        const district = districtMap.get(customer.district_id);
+        if (!district) {
+          throw new NotFoundException(
+            `District not found for customer ${customer.id}`,
+          );
+        }
+
+        let post = postMap.get(district.assigned_region);
+
+        if (!post) {
+          const post_qr_code = generateCustomToken();
+          post = queryRunner.manager.create(PostEntity, {
+            region_id: district.assigned_region,
+            qr_code_token: post_qr_code,
+          });
+          postMap.set(district.assigned_region, post);
+          newPosts.push(post);
+        }
+
+        order.status = Order_status.RECEIVED;
+        order.post_id = post.id; // Might be undefined now, updated after save
       }
 
-      // Mavjud bo'lmagan IDlar uchun xatolik chiqarish
-      const foundIds = orders.map((o) => o.id);
-      const notFoundIds = order_ids.filter((id) => !foundIds.includes(id));
-      if (notFoundIds.length > 0) {
-        throw new NotFoundException(
-          'There is error on changing some orders status',
-        );
+      // 4. Save new posts and fix post_id references
+      if (newPosts.length > 0) {
+        await queryRunner.manager.save(PostEntity, newPosts);
+
+        // Replace temp post references with real IDs
+        for (const post of newPosts) {
+          postMap.set(post.region_id, post);
+        }
+
+        for (const order of newOrders) {
+          const customer = customerMap.get(order.id);
+          if (!customer) {
+            throw new NotFoundException(
+              `Customer not found for order ${order.id}`,
+            );
+          }
+
+          const district = districtMap.get(customer.district_id);
+          if (!district) {
+            throw new NotFoundException(
+              `District not found for customer ${customer.id}`,
+            );
+          }
+
+          const post = postMap.get(district.assigned_region);
+          if (!post) {
+            throw new NotFoundException(
+              `Post not found after save for region ${district.assigned_region}`,
+            );
+          }
+
+          order.post_id = post.id;
+        }
       }
 
-      await queryRunner.manager.update(
-        this.orderRepo.target,
-        { id: In(order_ids) },
-        { status },
-      );
+      // 5. Save updated orders
+      await queryRunner.manager.save(OrderEntity, newOrders);
 
       await queryRunner.commitTransaction();
-      return successRes(
-        {},
-        200,
-        `Updated ${order_ids.length} orders to status '${status}'`,
-      );
+      return successRes({}, 200, 'Orders received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -370,82 +421,127 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async updateStatus(id: string, updateStatusDto: UpdateStatusDto) {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const { status, extraCost, comment } = updateStatusDto;
-      const order = await queryRunner.manager.findOne(OrderEntity, {
-        where: { id },
-      });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-      const deliveringPlace = order.where_deliver;
-      const marketId = order.market_id;
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: marketId },
-      });
-      if (!market) {
-        throw new NotFoundException(
-          'This orders owner is not found or blocked by admins',
-        );
-      }
-      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
-      });
-      if (!marketCashbox) {
-        throw new NotFoundException('Market cashbox not found');
-      }
+  // async updateManyStatuses(dto: UpdateManyStatusesDto) {
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
 
-      // Sotilgan holatdagi logika ====================================
+  //   try {
+  //     const { order_ids, status } = dto;
 
-      if (status === Order_status.SOLD) {
-        const tarif: number =
-          deliveringPlace === Where_deliver.CENTER
-            ? market.tariff_center
-            : market.tariff_home;
+  //     const orders = await this.orderRepo.find({
+  //       where: { id: In(order_ids) },
+  //     });
 
-        const to_be_paid: number = extraCost
-          ? order.total_price - extraCost - tarif
-          : order.total_price - tarif;
+  //     if (orders.length === 0) {
+  //       throw new NotFoundException('No orders found');
+  //     }
 
-        const finalComment = generateComment(order.comment, comment, extraCost);
+  //     // Mavjud bo'lmagan IDlar uchun xatolik chiqarish
+  //     const foundIds = orders.map((o) => o.id);
+  //     const notFoundIds = order_ids.filter((id) => !foundIds.includes(id));
+  //     if (notFoundIds.length > 0) {
+  //       throw new NotFoundException(
+  //         'There is error on changing some orders status',
+  //       );
+  //     }
 
-        await queryRunner.manager.update(
-          this.orderRepo.target,
-          { id },
-          { status, to_be_paid, comment: finalComment },
-        );
+  //     await queryRunner.manager.update(
+  //       this.orderRepo.target,
+  //       { id: In(order_ids) },
+  //       { status },
+  //     );
 
-        marketCashbox.balance += to_be_paid;
-        await queryRunner.manager.save(marketCashbox);
-      }
-      // Bekor qilingan holatdagi logika =========================================
-      if (status === Order_status.CANCELLED) {
-        if (extraCost) {
-          marketCashbox.balance -= extraCost;
-          await queryRunner.manager.save(marketCashbox);
-        }
+  //     await queryRunner.commitTransaction();
+  //     return successRes(
+  //       {},
+  //       200,
+  //       `Updated ${order_ids.length} orders to status '${status}'`,
+  //     );
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     return catchError(error);
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
 
-        const finalComment = generateComment(order.comment, comment, extraCost);
+  // async updateStatus(id: string, updateStatusDto: UpdateStatusDto) {
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+  //   try {
+  //     const { status, extraCost, comment } = updateStatusDto;
+  //     const order = await queryRunner.manager.findOne(OrderEntity, {
+  //       where: { id },
+  //     });
+  //     if (!order) {
+  //       throw new NotFoundException('Order not found');
+  //     }
+  //     const deliveringPlace = order.where_deliver;
+  //     const marketId = order.market_id;
+  //     const market = await queryRunner.manager.findOne(MarketEntity, {
+  //       where: { id: marketId },
+  //     });
+  //     if (!market) {
+  //       throw new NotFoundException(
+  //         'This orders owner is not found or blocked by admins',
+  //       );
+  //     }
+  //     const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
+  //       where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
+  //     });
+  //     if (!marketCashbox) {
+  //       throw new NotFoundException('Market cashbox not found');
+  //     }
 
-        await queryRunner.manager.update(
-          this.orderRepo.target,
-          { id },
-          { status, comment: finalComment },
-        );
-      }
-      await queryRunner.commitTransaction();
-      return successRes({}, 200, `Order satus changed to ${status}`);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      queryRunner.release();
-    }
-  }
+  //     // Sotilgan holatdagi logika ====================================
+
+  //     if (status === Order_status.SOLD) {
+  //       const tarif: number =
+  //         deliveringPlace === Where_deliver.CENTER
+  //           ? market.tariff_center
+  //           : market.tariff_home;
+
+  //       const to_be_paid: number = extraCost
+  //         ? order.total_price - extraCost - tarif
+  //         : order.total_price - tarif;
+
+  //       const finalComment = generateComment(order.comment, comment, extraCost);
+
+  //       await queryRunner.manager.update(
+  //         this.orderRepo.target,
+  //         { id },
+  //         { status, to_be_paid, comment: finalComment },
+  //       );
+
+  //       marketCashbox.balance += to_be_paid;
+  //       await queryRunner.manager.save(marketCashbox);
+  //     }
+  //     // Bekor qilingan holatdagi logika =========================================
+  //     if (status === Order_status.CANCELLED) {
+  //       if (extraCost) {
+  //         marketCashbox.balance -= extraCost;
+  //         await queryRunner.manager.save(marketCashbox);
+  //       }
+
+  //       const finalComment = generateComment(order.comment, comment, extraCost);
+
+  //       await queryRunner.manager.update(
+  //         this.orderRepo.target,
+  //         { id },
+  //         { status, comment: finalComment },
+  //       );
+  //     }
+  //     await queryRunner.commitTransaction();
+  //     return successRes({}, 200, `Order satus changed to ${status}`);
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     return catchError(error);
+  //   } finally {
+  //     queryRunner.release();
+  //   }
+  // }
 
   async partlySold(id: string, partlySoldDto: PartlySoldDto): Promise<object> {
     const transaction = this.dataSource.createQueryRunner();

@@ -58,3 +58,9 @@ export enum Where_deliver {
   CENTER = 'center',
   ADDRESS = 'address',
 }
+
+export enum Post_status {
+  NEW = 'new',
+  SENT = 'sent',
+  RECEIVED = 'received',
+}
