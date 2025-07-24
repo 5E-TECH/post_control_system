@@ -106,6 +106,22 @@ export class ProductService {
     }
   }
 
+  async getMyProducts(user: JwtPayload) {
+    try {
+      const products = await this.productRepo.find({
+        where: { market_id: user.id },
+      });
+      products.forEach((product) => {
+        if (product.image_url) {
+          product.image_url = this.buildImageUrl(product.image_url);
+        }
+      });
+      return successRes(products);
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async findOne(id: string) {
     try {
       const product = await this.productRepo.findOne({ where: { id } });

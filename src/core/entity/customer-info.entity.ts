@@ -12,7 +12,7 @@ export class CustomerInfoEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   phone_number: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', nullable: true })
   address: string;
 
   @Column({ type: 'uuid' })

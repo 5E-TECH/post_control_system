@@ -97,6 +97,13 @@ export class ProductController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET)
+  @Get('/my-products')
+  async myProducts(@CurrentUser() user: JwtPayload) {
+    return this.productService.getMyProducts(user);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
   @Get(':id')
   async findOne(@Param('id') id: string) {

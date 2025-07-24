@@ -1,9 +1,7 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateOrderDto } from './create-order.dto';
 import {
+  IsArray,
   IsEnum,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
   Min,
@@ -27,11 +25,11 @@ export class UpdateOrderDto {
 
   @IsOptional()
   @IsString()
-  name?: string;
+  client_name?: string;
 
   @IsOptional()
   @IsString()
-  phone_number?: string;
+  client_phone_number?: string;
 
   @IsOptional()
   @IsString()
@@ -42,6 +40,6 @@ export class UpdateOrderDto {
   district_id?: string;
 
   @IsOptional()
-  @IsObject()
+  @IsArray()
   order_item_info?: OrderItems[];
 }
