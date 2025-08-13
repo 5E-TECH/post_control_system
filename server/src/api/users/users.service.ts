@@ -17,7 +17,7 @@ import { SignInUserDto } from './dto/signInUserDto';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
 import { Response } from 'express';
-import { AdminRepository } from 'src/core/repository/user.repository';
+import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { DataSource, DeepPartial, Not } from 'typeorm';
@@ -32,7 +32,7 @@ import { UpdateSelfDto } from './dto/self-update.dto';
 export class UserService {
   constructor(
     @InjectRepository(UserEntity)
-    private readonly userRepo: AdminRepository,
+    private readonly userRepo: UserRepository,
 
     @InjectRepository(CashEntity)
     private readonly cashRepo: CashRepository,
