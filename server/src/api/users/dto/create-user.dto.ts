@@ -65,4 +65,6 @@ export class CreateUserDto {
   @IsNumber()
   @Min(0)
   tariff_center?: number;
+
+  // Salary qo'shish kerak
 }

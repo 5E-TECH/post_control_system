@@ -1,4 +1,4 @@
 import { Repository } from "typeorm";
 import { UserEntity } from "../entity/users.entity";
 
-export type AdminRepository = Repository<UserEntity>
+export type UserRepository = Repository<UserEntity>

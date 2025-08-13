@@ -17,4 +17,6 @@ export class CreateAdminDto {
   @IsNotEmpty()
   @IsString()
   password: string;
+
+  // Salary qo'shish kerak
 }
