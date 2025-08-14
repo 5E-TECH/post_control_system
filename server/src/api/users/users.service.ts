@@ -69,7 +69,8 @@ export class UserService {
 
   async createAdmin(createAdminDto: CreateAdminDto): Promise<object> {
     try {
-      const { password, phone_number, first_name, last_name } = createAdminDto;
+      const { password, phone_number, first_name, last_name, salary } =
+        createAdminDto;
       const existAdmin = await this.userRepo.findOne({
         where: { phone_number },
       });
