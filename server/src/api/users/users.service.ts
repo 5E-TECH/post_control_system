@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Cashbox_type, Roles, Status } from 'src/common/enums';
 import config from 'src/config';
 import { UserEntity } from 'src/core/entity/users.entity';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateCourierDto } from './dto/create-courier.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
@@ -27,6 +27,8 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { UpdateSelfDto } from './dto/self-update.dto';
+import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
+import { UserSalaryRepository } from 'src/core/repository/user-salary.repository';
 
 @Injectable()
 export class UserService {
@@ -39,6 +41,9 @@ export class UserService {
 
     @InjectRepository(CourierRegionEntity)
     private readonly courierRegionRepo: CourierRegionReository,
+
+    @InjectRepository(UserSalaryEntity)
+    private readonly userSalaryRepo: UserSalaryRepository,
 
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
@@ -68,33 +73,103 @@ export class UserService {
   }
 
   async createAdmin(createAdminDto: CreateAdminDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     try {
       const { password, phone_number, first_name, last_name, salary } =
         createAdminDto;
-      const existAdmin = await this.userRepo.findOne({
+      let { payment_day } = createAdminDto;
+      const existAdmin = await queryRunner.manager.findOne(UserEntity, {
         where: { phone_number },
       });
       if (existAdmin) {
         throw new ConflictException(
-          `Admin with ${phone_number} number already exists`,
+          `User with ${phone_number} number already exists`,
         );
       }
+      if (!payment_day) {
+        const dayToPay = Number(
+          new Date(Date.now()).toLocaleDateString('uz-UZ').split('.')[0],
+        );
+
+        payment_day = dayToPay;
+      }
       const hashedPassword = await this.bcrypt.encrypt(password);
-      const admin = this.userRepo.create({
+      const admin = queryRunner.manager.create(UserEntity, {
         first_name,
         last_name,
         phone_number,
         password: hashedPassword,
         role: Roles.ADMIN,
       });
-      await this.userRepo.save(admin);
+      const adminSalary = queryRunner.manager.create(UserSalaryEntity, {
+        user_id: admin.id,
+        salary_amount: salary,
+        have_to_pay: salary,
+        payment_day,
+      });
+      await queryRunner.manager.save(admin);
+      await queryRunner.manager.save(adminSalary);
+      await queryRunner.commitTransaction();
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
+      await queryRunner.rollbackTransaction();
       return catchError(error);
+    } finally {
+      await queryRunner.release();
     }
   }
 
-  async createStaff(createUserDto: CreateUserDto): Promise<object> {
+  async createRegistrator(createAdminDto: CreateAdminDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { password, phone_number, first_name, last_name, salary } =
+        createAdminDto;
+      let { payment_day } = createAdminDto;
+      const existUser = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number },
+      });
+      if (existUser) {
+        throw new ConflictException(
+          `User with ${phone_number} number already exists`,
+        );
+      }
+      if (!payment_day) {
+        const dayToPay = Number(
+          new Date(Date.now()).toLocaleDateString('uz-UZ').split('.')[0],
+        );
+        payment_day = dayToPay;
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const user = queryRunner.manager.create(UserEntity, {
+        first_name,
+        last_name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.REGISTRATOR,
+      });
+      const userSalary = queryRunner.manager.create(UserSalaryEntity, {
+        user_id: user.id,
+        salary_amount: salary,
+        have_to_pay: salary,
+        payment_day,
+      });
+      await queryRunner.manager.save(user);
+      await queryRunner.manager.save(userSalary);
+      await queryRunner.commitTransaction();
+      return successRes(user, 201, 'New Admin created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createCourier(createCourierDto: CreateCourierDto): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -104,24 +179,11 @@ export class UserService {
         phone_number,
         first_name,
         last_name,
-        role,
         region_id,
         tariff_center,
         tariff_home,
-      } = createUserDto;
-      if (role === Roles.ADMIN) {
-        throw new BadRequestException('Unacceptable role');
-      }
-      if (role === Roles.COURIER && !region_id) {
-        throw new NotFoundException(
-          'You have to choose the region for this courier',
-        );
-      }
-      if (role === Roles.COURIER && (!tariff_center || !tariff_home)) {
-        throw new BadRequestException(
-          'You have to choose both home and center tariffs',
-        );
-      }
+      } = createCourierDto;
+
       const existUser = await queryRunner.manager.findOne(UserEntity, {
         where: { phone_number },
       });
@@ -131,37 +193,31 @@ export class UserService {
         );
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
-      const staff = queryRunner.manager.create(UserEntity, {
+      const courier = queryRunner.manager.create(UserEntity, {
         first_name,
         last_name,
         phone_number,
         password: hashedPassword,
-        role,
-        region_id: role === Roles.COURIER ? region_id : null,
-        tariff_center: role === Roles.COURIER ? tariff_center : null,
-        tariff_home: role === Roles.COURIER ? tariff_home : null,
+        region_id,
+        tariff_center,
+        tariff_home,
       } as DeepPartial<UserEntity>);
-      await queryRunner.manager.save(staff);
+      await queryRunner.manager.save(courier);
 
-      if (role === Roles.COURIER) {
-        const cashbox = queryRunner.manager.create(CashEntity, {
-          cashbox_type: Cashbox_type.FOR_COURIER,
-          user_id: staff.id,
-        });
-        await queryRunner.manager.save(cashbox);
+      const cashbox = queryRunner.manager.create(CashEntity, {
+        cashbox_type: Cashbox_type.FOR_COURIER,
+        user_id: courier.id,
+      });
+      await queryRunner.manager.save(cashbox);
 
-        const newCourierRegion = queryRunner.manager.create(
-          CourierRegionEntity,
-          {
-            courier_id: staff.id,
-            region_id,
-          },
-        );
+      const newCourierRegion = queryRunner.manager.create(CourierRegionEntity, {
+        courier_id: courier.id,
+        region_id,
+      });
+      await queryRunner.manager.save(newCourierRegion);
 
-        await queryRunner.manager.save(newCourierRegion);
-      }
       await queryRunner.commitTransaction();
-      return successRes(staff, 201, `New ${role} created`);
+      return successRes(courier, 201, `New courier created`);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
