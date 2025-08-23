@@ -1,14 +1,21 @@
+import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsEnum,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsPhoneNumber,
   IsString,
-  Max,
   Min,
 } from 'class-validator';
+import { Roles } from 'src/common/enums';
 
-export class CreateAdminDto {
+export class CreateCourierDto {
+  @IsNotEmpty()
+  @IsString()
+  region_id: string;
+
   @IsNotEmpty()
   @IsString()
   first_name: string;
@@ -28,11 +35,10 @@ export class CreateAdminDto {
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
-  salary: number;
+  tariff_home: number;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsNumber()
-  @Min(1)
-  @Max(30)
-  payment_day: number;
+  @Min(0)
+  tariff_center: number;
 }

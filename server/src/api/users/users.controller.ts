@@ -11,7 +11,7 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import { UserService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateCourierDto } from './dto/create-courier.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Response } from 'express';
@@ -39,9 +39,16 @@ export class UsersController {
 
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Post('staff')
-  createCourier(@Body() createUserDto: CreateUserDto) {
-    return this.userService.createStaff(createUserDto);
+  @Post('registrator')
+  createRegistrator(@Body() createRegistratorDto: CreateAdminDto) {
+    return this.userService.createRegistrator(createRegistratorDto);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('courier')
+  createCourier(@Body() createCourierDto: CreateCourierDto) {
+    return this.userService.createCourier(createCourierDto);
   }
 
   @Post('signin')
