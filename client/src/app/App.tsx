@@ -1,4 +1,4 @@
-import { memo } from "react";
+import React from "react";
 import AppProvider from "./provider";
 import AppRouters from "./routes";
 
@@ -10,4 +10,4 @@ const App = () => {
   );
 };
 
-export default memo(App);
+export default React.memo(App);
