@@ -1,6 +1,9 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Post_status } from 'src/common/enums';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { UserEntity } from './users.entity';
+import { RegionEntity } from './region.entity';
+import { OrderEntity } from './order.entity';
 
 @Entity('post')
 export class PostEntity extends BaseEntity {
@@ -21,4 +24,22 @@ export class PostEntity extends BaseEntity {
 
   @Column({ type: 'enum', enum: Post_status, default: Post_status.NEW })
   status: Post_status;
+
+  // N-1 Post → Courier (User)
+  @ManyToOne(() => UserEntity, (user) => user.posts, {
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'courier_id' })
+  courier: UserEntity;
+
+  // N-1 Post → Region
+  @ManyToOne(() => RegionEntity, (region) => region.posts, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'region_id' })
+  region: RegionEntity;
+
+  // 1-N Post → Orders
+  @OneToMany(() => OrderEntity, (order) => order.post)
+  orders: OrderEntity[];
 }

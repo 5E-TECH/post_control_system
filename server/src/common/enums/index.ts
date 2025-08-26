@@ -33,6 +33,8 @@ export enum Source_type {
   MANUAL_EXPENSE = 'manual_expense',
   MANUAL_INCOME = 'manual_income',
   CORRECTION = 'correction',
+  SELL = 'sell',
+  CANCEL = 'cancel',
 }
 
 export enum Order_status {

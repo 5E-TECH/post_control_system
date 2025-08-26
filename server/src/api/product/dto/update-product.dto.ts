@@ -1,15 +1,9 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateProductDto } from './create-product.dto';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class UpdateProductDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   name: string;
-
-  @IsNotEmpty()
-  @IsString()
-  market_id: string;
 
   @IsOptional()
   @IsString()

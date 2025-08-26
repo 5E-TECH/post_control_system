@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -46,6 +47,7 @@ export class DistrictService implements OnModuleInit {
           await this.districtRepository.save({
             name: districtName,
             region: regionEntity,
+            assigned_region: regionEntity.id,
             created_at: Date.now(),
             updated_at: Date.now(),
           });
@@ -54,27 +56,27 @@ export class DistrictService implements OnModuleInit {
     }
   }
 
-  async create(createDistrictDto: CreateDistrictDto) {
-    try {
-      const { name, region_id } = createDistrictDto;
-      const existsName = await this.districtRepository.findOneBy({ name });
-      if (existsName) {
-        throw new ConflictException('district alread exists');
-      }
-      const existsRegion = await this.regionRepository.findOneBy({
-        id: region_id,
-      });
-      if (!existsRegion) {
-        throw new NotFoundException('region not found');
-      }
-      const district = this.districtRepository.create({
-        name,
-        region_id,
-      });
-    } catch (error) {
-      return catchError(error);
-    }
-  }
+  // async create(createDistrictDto: CreateDistrictDto) {
+  //   try {
+  //     const { name, region_id } = createDistrictDto;
+  //     const existsName = await this.districtRepository.findOneBy({ name });
+  //     if (existsName) {
+  //       throw new ConflictException('district alread exists');
+  //     }
+  //     const existsRegion = await this.regionRepository.findOneBy({
+  //       id: region_id,
+  //     });
+  //     if (!existsRegion) {
+  //       throw new NotFoundException('region not found');
+  //     }
+  //     const district = this.districtRepository.create({
+  //       name,
+  //       region_id,
+  //     });
+  //   } catch (error) {
+  //     return catchError(error);
+  //   }
+  // }
 
   async findAll() {
     try {
@@ -104,43 +106,30 @@ export class DistrictService implements OnModuleInit {
 
   async update(id: string, updateDistrictDto: UpdateDistrictDto) {
     try {
+      const { assigned_region } = updateDistrictDto;
       const district = await this.districtRepository.findOne({ where: { id } });
       if (!district) {
-        throw new NotFoundException('district nor found');
+        throw new NotFoundException('District not found');
       }
-      if (updateDistrictDto.name) {
-        const existsName = await this.districtRepository.findOne({
-          where: { name: updateDistrictDto.name },
-        });
-        if (existsName) {
-          throw new ConflictException('district alread exists');
-        } else if (updateDistrictDto.region_id) {
-          const existsRegion = await this.regionRepository.findOne({
-            where: { id: updateDistrictDto.region_id },
-          });
-          if (!existsRegion) {
-            throw new NotFoundException('region not found');
-          }
-        }
-      }
-      await this.districtRepository.update({ id }, updateDistrictDto);
-      const updateDistrict = await this.districtRepository.findOne({
-        where: { id },
+      const assigningRegion = await this.regionRepository.findOne({
+        where: { id: assigned_region },
       });
-      return successRes(updateDistrict);
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  async remove(id: string) {
-    try {
-      const district = await this.districtRepository.findOne({ where: { id } });
-      if (!district) {
-        throw new NotFoundException('district nor found');
+      if (!assigningRegion) {
+        throw new NotFoundException(
+          'The region you are trying to assign is not exist',
+        );
       }
-      await this.districtRepository.delete({ id });
-      return successRes({});
+      if (district.assigned_region === assigningRegion.id) {
+        throw new BadRequestException(
+          'This district already assigned to this region',
+        );
+      }
+      Object.assign(district, {
+        assigned_region: assigningRegion.id,
+      });
+      await this.districtRepository.save(district);
+
+      return successRes({}, 200, 'District assigned to new region');
     } catch (error) {
       return catchError(error);
     }

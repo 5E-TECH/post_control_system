@@ -10,10 +10,20 @@ export class DistrictEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   region_id: string;
 
-  @Column({ type: 'uuid', nullable: true })
-  assigned_region: string;
+  @Column({ type: 'uuid' })
+  assigned_region: string; // ❌ nullable yo‘q
 
-  @ManyToOne(() => RegionEntity, (region) => region.districts, {})
+  // N-1 District → Region
+  @ManyToOne(() => RegionEntity, (region) => region.districts, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'region_id' })
   region: RegionEntity;
+
+  // N-1 District → Assigned Region (always required)
+  @ManyToOne(() => RegionEntity, (region) => region.assignedDistricts, {
+    onDelete: 'CASCADE', // agar parent region o‘chsa, shu district ham o‘chadi
+  })
+  @JoinColumn({ name: 'assigned_region' })
+  assignedRegion: RegionEntity;
 }

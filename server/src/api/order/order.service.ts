@@ -14,9 +14,11 @@ import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { OrderItemRepository } from 'src/core/repository/order-item.repository';
 import {
   Cashbox_type,
+  Operation_type,
   Order_status,
   Post_status,
   Roles,
+  Source_type,
   Where_deliver,
 } from 'src/common/enums';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
@@ -25,9 +27,9 @@ import { MarketRepository } from 'src/core/repository/market.repository';
 import { ProductEntity } from 'src/core/entity/product.entity';
 import { MarketEntity } from 'src/core/entity/market.entity';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
-import { CustomerInfoEntity } from 'src/core/entity/customer-info.entity';
-import { CustomerInfoRepository } from 'src/core/repository/customer-info.repository';
-import { UpdateStatusDto } from './dto/status-order.dto';
+import { CustomerEntity } from 'src/core/entity/customer.entity';
+import { CustomerRepository } from 'src/core/repository/customer.repository';
+import { SellCancelOrderDto } from './dto/sellCancel-order.dto';
 import { OrdersArrayDto } from './dto/orders-array.dto';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
@@ -35,6 +37,11 @@ import { generateComment } from 'src/common/utils/generate-comment';
 import { PartlySoldDto } from './dto/partly-sold.dto';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
+import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
+import { CashboxHistoryRepository } from 'src/core/repository/cashbox-history.repository';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { UserEntity } from 'src/core/entity/users.entity';
+import { UserRepository } from 'src/core/repository/user.repository';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -51,105 +58,21 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     @InjectRepository(MarketEntity)
     private readonly marketRepo: MarketRepository,
 
-    @InjectRepository(CustomerInfoEntity)
-    private readonly customerInfoRepo: CustomerInfoRepository,
+    @InjectRepository(CustomerEntity)
+    private readonly customerInfoRepo: CustomerRepository,
 
     @InjectRepository(CashEntity)
     private readonly cashboxRepo: CashRepository,
 
+    @InjectRepository(CashboxHistoryEntity)
+    private readonly cashboxHistoryRepo: CashboxHistoryRepository,
+
+    @InjectRepository(UserEntity)
+    private readonly userRepo: UserRepository,
+
     private readonly dataSource: DataSource,
   ) {
     super(orderRepo);
-  }
-  async createOrder(
-    user: any,
-    createOrderDto: CreateOrderDto,
-  ): Promise<object> {
-    const transaction = this.dataSource.createQueryRunner();
-    await transaction.connect();
-    await transaction.startTransaction();
-
-    try {
-      const { id, role } = user;
-      let { market_id } = createOrderDto;
-      if (role === Roles.REGISTRATOR) {
-        const isExistMarket = await this.marketRepo.findOne({
-          where: { id: market_id },
-        });
-        if (!isExistMarket) {
-          throw new NotFoundException('Market not found');
-        }
-      }
-      if (role === Roles.MARKET) {
-        market_id = id;
-      }
-      const {
-        where_deliver,
-        total_price,
-        comment,
-        client_name,
-        client_phone_number,
-        address,
-        district_id,
-        order_item_info,
-      } = createOrderDto;
-
-      const qr_code_token = generateCustomToken();
-
-      const newOrder = transaction.manager.create(OrderEntity, {
-        market_id,
-        comment,
-        total_price,
-        where_deliver: where_deliver || Where_deliver.CENTER,
-        status: Order_status.NEW,
-        qr_code_token,
-      });
-      await transaction.manager.save(newOrder);
-
-      let product_quantity: number = 0;
-      for (const o_item of order_item_info) {
-        const isExistProduct = await this.productRepo.findOne({
-          where: { id: o_item.product_id },
-        });
-        if (!isExistProduct) {
-          throw new NotFoundException('Product not found');
-        }
-        const newOrderItem = transaction.manager.create(OrderItemEntity, {
-          productId: o_item.product_id,
-          quantity: o_item.quantity,
-          orderId: newOrder.id,
-        });
-        await transaction.manager.save(newOrderItem);
-        product_quantity += o_item.quantity;
-      }
-
-      await transaction.manager.update(
-        this.orderRepo.target,
-        {
-          id: newOrder.id,
-        },
-        { product_quantity },
-      );
-
-      newOrder.product_quantity = product_quantity;
-
-      const customer_info = transaction.manager.create(CustomerInfoEntity, {
-        order_id: newOrder.id,
-        name: client_name,
-        phone_number: client_phone_number,
-        address,
-        district_id,
-      });
-      await transaction.manager.save(customer_info);
-
-      await transaction.commitTransaction();
-      return successRes(newOrder, 201, 'New order created');
-    } catch (error) {
-      await transaction.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      await transaction.release();
-    }
   }
 
   async newOrdersByMarketId(id: string) {
@@ -176,6 +99,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async findOne(id: string) {
     try {
+      const newOrder = await this.orderRepo.findOne({ where: { id } });
+      if (!newOrder) {
+        throw new NotFoundException('Order not found');
+      }
+      return successRes(newOrder, 200, 'Order by id');
     } catch (error) {
       return catchError(error);
     }
@@ -225,11 +153,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             product_quantity += o_item.quantity;
           }
 
-          await queryRunner.manager.update(
-            this.orderRepo.target,
-            { id: editingOrder.id },
-            { product_quantity },
-          );
+          Object.assign(editingOrder, {
+            product_quantity,
+          });
+          await queryRunner.manager.save(editingOrder);
         }
 
         // 🟡 2. Edit order info
@@ -242,44 +169,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           updateOrderFields.comment = updateOrderDto.comment;
 
         if (Object.keys(updateOrderFields).length > 0) {
-          await queryRunner.manager.update(
-            OrderEntity,
-            { id: editingOrder.id },
+          Object.assign(editingOrder, {
             updateOrderFields,
-          );
-        }
-
-        // 🟡 3. Edit customer info
-        if (
-          updateOrderDto.client_name ||
-          updateOrderDto.client_phone_number ||
-          updateOrderDto.address ||
-          updateOrderDto.district_id
-        ) {
-          const customer = await this.customerInfoRepo.findOne({
-            where: { order_id: editingOrder.id },
           });
-
-          if (!customer) {
-            throw new NotFoundException('Customer info not found');
-          }
-
-          const updateCustomerFields: Partial<CustomerInfoEntity> = {};
-          if (updateOrderDto.client_name)
-            updateCustomerFields.name = updateOrderDto.client_name;
-          if (updateOrderDto.client_phone_number)
-            updateCustomerFields.phone_number =
-              updateOrderDto.client_phone_number;
-          if (updateOrderDto.address)
-            updateCustomerFields.address = updateOrderDto.address;
-          if (updateOrderDto.district_id)
-            updateCustomerFields.district_id = updateOrderDto.district_id;
-
-          await queryRunner.manager.update(
-            CustomerInfoEntity,
-            { order_id: editingOrder.id },
-            updateCustomerFields,
-          );
+          await queryRunner.manager.save(editingOrder);
         }
 
         await queryRunner.commitTransaction();
@@ -318,102 +211,77 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // 2. Bulk fetch related data
-      const customerList = await queryRunner.manager.find(CustomerInfoEntity, {
-        where: { order_id: In(order_ids) },
+      // 2. Fetch related data in bulk
+      const customerIds = newOrders.map((o) => o.customer_id);
+      const customers = await queryRunner.manager.find(CustomerEntity, {
+        where: { id: In(customerIds) },
       });
-      const customerMap = new Map(customerList.map((c) => [c.order_id, c]));
+      const customerMap = new Map(customers.map((c) => [c.id, c]));
 
-      const districtIds = customerList.map((c) => c.district_id);
-      const districtList = await queryRunner.manager.find(DistrictEntity, {
+      const districtIds = customers.map((c) => c.district_id);
+      const districts = await queryRunner.manager.find(DistrictEntity, {
         where: { id: In(districtIds) },
       });
-      const districtMap = new Map(districtList.map((d) => [d.id, d]));
+      const districtMap = new Map(districts.map((d) => [d.id, d]));
 
-      const regionIds = districtList.map((d) => d.assigned_region);
-      const postList = await queryRunner.manager.find(PostEntity, {
-        where: {
-          region_id: In(regionIds),
-          status: Post_status.NEW,
-        },
+      const regionIds = districts.map((d) => d.assigned_region);
+      const posts = await queryRunner.manager.find(PostEntity, {
+        where: { region_id: In(regionIds), status: Post_status.NEW },
       });
-      const postMap = new Map(postList.map((p) => [p.region_id, p]));
+      const postMap = new Map(posts.map((p) => [p.region_id, p]));
 
-      // 3. Group orders by region and assign to post
+      // 3. Assign orders to posts
       const newPosts: PostEntity[] = [];
 
       for (const order of newOrders) {
-        const customer = customerMap.get(order.id);
-        if (!customer) {
+        const customer = customerMap.get(order.customer_id);
+        if (!customer)
           throw new NotFoundException(
             `Customer not found for order ${order.id}`,
           );
-        }
 
         const district = districtMap.get(customer.district_id);
-        if (!district) {
+        if (!district)
           throw new NotFoundException(
             `District not found for customer ${customer.id}`,
           );
-        }
 
         let post = postMap.get(district.assigned_region);
 
+        // Agar mavjud bo'lmasa yangi post yaratamiz
         if (!post) {
-          const post_qr_code = generateCustomToken();
           post = queryRunner.manager.create(PostEntity, {
             region_id: district.assigned_region,
-            qr_code_token: post_qr_code,
+            qr_code_token: generateCustomToken(),
             post_total_price: 0,
             order_quantity: 0,
             status: Post_status.NEW,
           });
-          postMap.set(district.assigned_region, post);
           newPosts.push(post);
+          postMap.set(district.assigned_region, post);
         }
 
-        // Accumulate totals
+        // post statistikalarini yangilash
         post.post_total_price =
           (post.post_total_price ?? 0) + (order.total_price ?? 0);
         post.order_quantity = (post.order_quantity ?? 0) + 1;
 
         order.status = Order_status.RECEIVED;
-        order.post_id = post.id;
+        order.post_id = post.id; // yangi post bo‘lsa keyin save qilinganda id tushadi
       }
 
-      // 4. Save new posts and reassign post_ids
+      // 4. Save new posts (yangi id olish uchun)
       if (newPosts.length > 0) {
         await queryRunner.manager.save(PostEntity, newPosts);
 
-        // Update postMap with real post IDs
-        for (const post of newPosts) {
-          postMap.set(post.region_id, post);
-        }
-
-        // Update order.post_id with saved post.id
+        // yangilangan post.id larni update qilamiz
         for (const order of newOrders) {
-          const customer = customerMap.get(order.id);
-          if (!customer) {
-            throw new NotFoundException(
-              `Customer not found for order ${order.id}`,
-            );
+          if (!order.post_id) {
+            const customer = customerMap.get(order.customer_id)!;
+            const district = districtMap.get(customer.district_id)!;
+            const post = postMap.get(district.assigned_region)!;
+            order.post_id = post.id;
           }
-
-          const district = districtMap.get(customer.district_id);
-          if (!district) {
-            throw new NotFoundException(
-              `District not found for customer ${customer.id}`,
-            );
-          }
-
-          const post = postMap.get(district.assigned_region);
-          if (!post) {
-            throw new NotFoundException(
-              `Post not found after save for region ${district.assigned_region}`,
-            );
-          }
-
-          order.post_id = post.id;
         }
       }
 
@@ -430,72 +298,30 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  // async updateManyStatuses(dto: UpdateManyStatusesDto) {
-  //   const queryRunner = this.dataSource.createQueryRunner();
-  //   await queryRunner.connect();
-  //   await queryRunner.startTransaction();
-
-  //   try {
-  //     const { order_ids, status } = dto;
-
-  //     const orders = await this.orderRepo.find({
-  //       where: { id: In(order_ids) },
-  //     });
-
-  //     if (orders.length === 0) {
-  //       throw new NotFoundException('No orders found');
-  //     }
-
-  //     // Mavjud bo'lmagan IDlar uchun xatolik chiqarish
-  //     const foundIds = orders.map((o) => o.id);
-  //     const notFoundIds = order_ids.filter((id) => !foundIds.includes(id));
-  //     if (notFoundIds.length > 0) {
-  //       throw new NotFoundException(
-  //         'There is error on changing some orders status',
-  //       );
-  //     }
-
-  //     await queryRunner.manager.update(
-  //       this.orderRepo.target,
-  //       { id: In(order_ids) },
-  //       { status },
-  //     );
-
-  //     await queryRunner.commitTransaction();
-  //     return successRes(
-  //       {},
-  //       200,
-  //       `Updated ${order_ids.length} orders to status '${status}'`,
-  //     );
-  //   } catch (error) {
-  //     await queryRunner.rollbackTransaction();
-  //     return catchError(error);
-  //   } finally {
-  //     await queryRunner.release();
-  //   }
-  // }
-
-  async updateStatus(id: string, updateStatusDto: UpdateStatusDto) {
+  async sellOrder(
+    user: JwtPayload,
+    id: string,
+    sellOrderDto: SellCancelOrderDto,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { status, extraCost, comment } = updateStatusDto;
+      const { extraCost, comment } = sellOrderDto;
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
       }
+
       const deliveringPlace = order.where_deliver;
       const marketId = order.market_id;
       const market = await queryRunner.manager.findOne(MarketEntity, {
         where: { id: marketId },
       });
       if (!market) {
-        throw new NotFoundException(
-          'This orders owner is not found or blocked by admins',
-        );
+        throw new NotFoundException('This orders owner is not found');
       }
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
@@ -504,77 +330,188 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Market cashbox not found');
       }
 
-      // Sotilgan holatdagi logika ====================================
-
-      if (status === Order_status.SOLD) {
-        const tarif: number =
-          deliveringPlace === Where_deliver.CENTER
-            ? market.tariff_center
-            : market.tariff_home;
-
-        const to_be_paid: number = extraCost
-          ? order.total_price - extraCost - tarif
-          : order.total_price - tarif;
-
-        const finalComment = generateComment(order.comment, comment, extraCost);
-
-        await queryRunner.manager.update(
-          this.orderRepo.target,
-          { id },
-          { status, to_be_paid, comment: finalComment },
-        );
-
-        marketCashbox.balance += to_be_paid;
-        await queryRunner.manager.save(marketCashbox);
+      const courier = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: user.id },
+      });
+      if (!courier) {
+        throw new NotFoundException('Courier not found');
       }
-      // Bekor qilingan holatdagi logika =========================================
-      if (status === Order_status.CANCELLED) {
-        if (extraCost) {
-          marketCashbox.balance -= extraCost;
-          await queryRunner.manager.save(marketCashbox);
-        }
 
-        const finalComment = generateComment(order.comment, comment, extraCost);
+      const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier?.id },
+      });
 
-        await queryRunner.manager.update(
-          this.orderRepo.target,
-          { id },
-          { status, comment: finalComment },
-        );
+      if (!courierCashbox) {
+        throw new NotFoundException('Courier cashbox not found');
       }
+
+      const marketTarif: number =
+        deliveringPlace === Where_deliver.CENTER
+          ? market.tariff_center
+          : market.tariff_home;
+
+      const courierTarif: number =
+        deliveringPlace === Where_deliver.CENTER
+          ? courier.tariff_center
+          : courier.tariff_home;
+
+      const to_be_paid: number = extraCost
+        ? order.total_price - extraCost - marketTarif
+        : order.total_price - marketTarif;
+
+      const courier_to_be_paid: number = extraCost
+        ? order.total_price - extraCost - courierTarif
+        : order.total_price - courierTarif;
+
+      const finalComment = generateComment(order.comment, comment, extraCost);
+
+      Object.assign(order, {
+        status: Order_status.SOLD,
+        to_be_paid,
+        comment: finalComment,
+      });
+      await queryRunner.manager.save(order);
+
+      marketCashbox.balance += to_be_paid;
+      await queryRunner.manager.save(marketCashbox);
+      const marketCashboxHistory = queryRunner.manager.create(
+        CashboxHistoryEntity,
+        {
+          operation_type: Operation_type.INCOME,
+          cashbox_id: marketCashbox.id,
+          source_id: order.id,
+          source_type: Source_type.SELL,
+          amount: to_be_paid,
+          balance_after: marketCashbox.balance,
+          comment: finalComment,
+          created_by: courier.id,
+        },
+      );
+      await queryRunner.manager.save(marketCashboxHistory);
+
+      courierCashbox.balance += courier_to_be_paid;
+      await queryRunner.manager.save(courierCashbox);
+      const courierCashboxHistory = queryRunner.manager.create(
+        CashboxHistoryEntity,
+        {
+          operation_type: Operation_type.INCOME,
+          cashbox_id: courierCashbox.id,
+          source_type: Source_type.SELL,
+          source_id: order.id,
+          amount: courier_to_be_paid,
+          balance_after: courierCashbox.balance,
+          comment: finalComment,
+          created_by: courier.id,
+        },
+      );
+      await queryRunner.manager.save(courierCashboxHistory);
+
       await queryRunner.commitTransaction();
-      return successRes({}, 200, `Order satus changed to ${status}`);
+      return successRes({}, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
-      queryRunner.release();
+      await queryRunner.release();
     }
   }
 
-  async partlySold(id: string, partlySoldDto: PartlySoldDto): Promise<object> {
-    const transaction = this.dataSource.createQueryRunner();
-    await transaction.connect();
-    await transaction.startTransaction();
+  async cancelOrder(
+    currentUser: JwtPayload,
+    id: string,
+    cancelOrderDto: SellCancelOrderDto,
+  ) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { extraCost, comment } = cancelOrderDto;
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      const marketId = order.market_id;
+      const market = await queryRunner.manager.findOne(MarketEntity, {
+        where: { id: marketId },
+      });
+      if (!market) {
+        throw new NotFoundException('This orders owner is not found');
+      }
+
+      const finalComment = generateComment(order.comment, comment, extraCost);
+      if (extraCost) {
+        const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
+          where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
+        });
+        if (!marketCashbox) {
+          throw new NotFoundException('Market cashbox not found');
+        }
+        marketCashbox.balance -= extraCost;
+        await queryRunner.manager.save(marketCashbox);
+
+        const history = queryRunner.manager.create(CashboxHistoryEntity, {
+          operation_type: Operation_type.EXPENSE,
+          cashbox_id: marketCashbox.id,
+          source_type: Source_type.CANCEL,
+          source_id: order.id,
+          amount: extraCost,
+          balance_after: marketCashbox.balance,
+          comment: finalComment,
+          created_by: currentUser.id,
+        });
+        await queryRunner.manager.save(history);
+      }
+
+      Object.assign(order, {
+        status: Order_status.CANCELLED,
+        comment: finalComment,
+      });
+      await queryRunner.manager.save(order);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Order canceled');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async partlySold(
+    user: JwtPayload,
+    id: string,
+    partlySoldDto: PartlySoldDto,
+  ): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
     try {
       const { order_item_info, totalPrice, extraCost, comment } = partlySoldDto;
 
-      const order = await transaction.manager.findOne(OrderEntity, {
-        where: { id },
+      // 🔎 1. Check order (must be WAITING)
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id, status: Order_status.WAITING },
       });
-      if (!order) throw new NotFoundException('Order not found');
+      if (!order)
+        throw new NotFoundException('Order not found or not in Waiting status');
 
-      const oldOrderItems = await transaction.manager.find(OrderItemEntity, {
+      // 🔎 2. Get old items
+      const oldOrderItems = await queryRunner.manager.find(OrderItemEntity, {
         where: { orderId: order.id },
       });
 
-      const market = await this.marketRepo.findOne({
+      // 🔎 3. Market + cashbox
+      const market = await queryRunner.manager.findOne(MarketEntity, {
         where: { id: order.market_id },
       });
       if (!market) throw new NotFoundException('Market not found');
 
-      const marketCashbox = await transaction.manager.findOne(CashEntity, {
+      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: {
           cashbox_type: Cashbox_type.FOR_MARKET,
           user_id: order.market_id,
@@ -583,19 +520,45 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!marketCashbox)
         throw new NotFoundException('Market cashbox not found');
 
-      const tarif =
+      // 🔎 4. Courier + cashbox
+      const courier = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: user.id },
+      });
+      if (!courier) throw new NotFoundException('Courier not found');
+
+      const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier.id },
+      });
+      if (!courierCashbox)
+        throw new NotFoundException('Courier cashbox not found');
+
+      // 🔎 5. Tariffs
+      const marketTarif =
         order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
           : market.tariff_home;
 
-      const to_be_paid = totalPrice - (extraCost ?? 0) - tarif;
+      const courierTarif =
+        order.where_deliver === Where_deliver.CENTER
+          ? courier.tariff_center
+          : courier.tariff_home;
 
+      // 🔎 6. Calculate payments
+      const to_be_paid: number = extraCost
+        ? totalPrice - extraCost - marketTarif
+        : totalPrice - marketTarif;
+
+      const courier_to_be_paid: number = extraCost
+        ? totalPrice - extraCost - courierTarif
+        : totalPrice - courierTarif;
+
+      // 🔎 7. Calculate sold product quantity
       const soldProductQuantity = order_item_info.reduce(
         (acc, item) => acc + item.quantity,
         0,
       );
 
-      // 🔁 Eski itemlarni yangilash (kamaytirish)
+      // 🔎 8. Update old items (reduce quantities)
       for (const dtoItem of order_item_info) {
         const foundItem = oldOrderItems.find(
           (i) => i.productId === dtoItem.product_id,
@@ -610,31 +573,58 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             `Product quantity (${dtoItem.quantity}) exceeds original quantity`,
           );
         }
-
         foundItem.quantity -= dtoItem.quantity;
-        await transaction.manager.save(foundItem);
+        await queryRunner.manager.save(foundItem);
       }
 
-      // ✅ Asosiy (eski) orderni yangilash (SOLD)
+      // 🔎 9. Update original order → SOLD
       const finalComment = generateComment(order.comment, comment, extraCost, [
         'Buyurtmaning bir qismi sotildi',
       ]);
 
-      await transaction.manager.update(
-        OrderEntity,
-        { id },
-        {
-          status: Order_status.SOLD,
-          to_be_paid,
+      Object.assign(order, {
+        status: Order_status.SOLD,
+        to_be_paid,
+        comment: finalComment,
+        product_quantity: soldProductQuantity,
+      });
+      await queryRunner.manager.save(order);
+
+      // Market cashbox update
+      marketCashbox.balance += to_be_paid;
+      await queryRunner.manager.save(marketCashbox);
+
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
+          operation_type: Operation_type.INCOME,
+          cashbox_id: marketCashbox.id,
+          source_id: order.id,
+          source_type: Source_type.SELL,
+          amount: to_be_paid,
+          balance_after: marketCashbox.balance,
           comment: finalComment,
-          product_quantity: soldProductQuantity,
-        },
+          created_by: courier.id,
+        }),
       );
 
-      marketCashbox.balance += to_be_paid;
-      await transaction.manager.save(marketCashbox);
+      // Courier cashbox update
+      courierCashbox.balance += courier_to_be_paid;
+      await queryRunner.manager.save(courierCashbox);
 
-      // ✅ Qolgan mahsulotlar bo‘yicha CANCELLED order yaratish
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
+          operation_type: Operation_type.INCOME,
+          cashbox_id: courierCashbox.id,
+          source_id: order.id,
+          source_type: Source_type.SELL,
+          amount: courier_to_be_paid,
+          balance_after: courierCashbox.balance,
+          comment: finalComment,
+          created_by: courier.id,
+        }),
+      );
+
+      // 🔎 10. Create CANCELLED order for remaining items
       const remainingItems = oldOrderItems.filter((item) => item.quantity > 0);
       const remainingQuantity = remainingItems.reduce(
         (acc, item) => acc + item.quantity,
@@ -642,59 +632,54 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       if (remainingItems.length > 0) {
-        const cancelledOrder = transaction.manager.create(OrderEntity, {
+        const cancelledOrder = queryRunner.manager.create(OrderEntity, {
           market_id: order.market_id,
-          comment: '!!! Qolgan mahsulotlar bekor qilindi',
+          customer_id: order.customer_id, // ✅ same customer
+          comment: 'Qolgan mahsulotlar bekor qilindi',
           total_price: 0,
           to_be_paid: 0,
           where_deliver: order.where_deliver,
           status: Order_status.CANCELLED,
           qr_code_token: generateCustomToken(),
           parent_order_id: id,
+          product_quantity: remainingQuantity,
         });
-        await transaction.manager.save(cancelledOrder);
+        await queryRunner.manager.save(cancelledOrder);
 
         for (const item of remainingItems) {
-          const newItem = transaction.manager.create(OrderItemEntity, {
-            productId: item.productId,
-            quantity: item.quantity,
-            orderId: cancelledOrder.id,
-          });
-          await transaction.manager.save(newItem);
+          await queryRunner.manager.save(
+            queryRunner.manager.create(OrderItemEntity, {
+              productId: item.productId,
+              quantity: item.quantity,
+              orderId: cancelledOrder.id,
+            }),
+          );
         }
-
-        await transaction.manager.update(
-          OrderEntity,
-          { id: cancelledOrder.id },
-          { product_quantity: remainingQuantity },
-        );
-
-        const customer = await transaction.manager.findOne(CustomerInfoEntity, {
-          where: { order_id: id },
-        });
-        if (!customer) throw new NotFoundException('Customer info not found');
-
-        const newCustomerInfo = transaction.manager.create(CustomerInfoEntity, {
-          order_id: cancelledOrder.id,
-          name: customer.name,
-          phone_number: customer.phone_number,
-          address: customer.address,
-          district_id: customer.district_id,
-        });
-        await transaction.manager.save(newCustomerInfo);
       }
 
-      await transaction.commitTransaction();
+      await queryRunner.commitTransaction();
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
-      await transaction.rollbackTransaction();
+      await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
-      await transaction.release();
+      await queryRunner.release();
     }
   }
 
-  async remove(id: number) {
-    return `This action removes a #${id} order`;
+  async remove(id: string) {
+    try {
+      const order = await this.orderRepo.findOne({
+        where: { id, status: Order_status.NEW },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      await this.orderRepo.delete({ id });
+
+      return successRes({}, 200, 'Order deleted');
+    } catch (error) {
+      return catchError(error);
+    }
   }
 }

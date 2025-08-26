@@ -1,6 +1,18 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Roles, Status } from 'src/common/enums';
-import { Column, Entity } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  OneToOne,
+  OneToMany,
+  ManyToOne,
+} from 'typeorm';
+import { UserSalaryEntity } from './user-salary.entity';
+import { CashEntity } from './cash-box.entity';
+import { CashboxHistoryEntity } from './cashbox-history.entity';
+import { RegionEntity } from './region.entity';
+import { PostEntity } from './post.entity';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -30,4 +42,30 @@ export class UserEntity extends BaseEntity {
 
   @Column({ type: 'enum', enum: Roles, default: Roles.ADMIN })
   role: Roles;
+
+  // 1-1 User → Salary
+  @OneToOne(() => UserSalaryEntity, (userSalary) => userSalary.user, {
+    cascade: true,
+  })
+  @JoinColumn()
+  salary: UserSalaryEntity;
+
+  // 1-1 User → Cashbox
+  @OneToOne(() => CashEntity, (cashbox) => cashbox.user, { cascade: true })
+  cashbox: CashEntity;
+
+  // 1-N User → CashboxHistory (created_by)
+  @OneToMany(() => CashboxHistoryEntity, (history) => history.createdByUser)
+  histories: CashboxHistoryEntity[];
+
+  // N-1 User (courier) → Region
+  @ManyToOne(() => RegionEntity, (region) => region.couriers, {
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'region_id' })
+  region: RegionEntity;
+
+  // 1-N Courier (User) → Posts
+  @OneToMany(() => PostEntity, (post) => post.courier)
+  posts: PostEntity[];
 }

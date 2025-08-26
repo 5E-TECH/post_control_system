@@ -1,9 +1,7 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateUserDto } from './create-courier.dto';
-import { Roles, Status } from 'src/common/enums';
-import { IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
+import { Status } from 'src/common/enums';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 
-export class UpdateUserDto {
+export class UpdateCourierDto {
   @IsOptional()
   @IsString()
   first_name?: string;

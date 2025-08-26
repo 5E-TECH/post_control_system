@@ -1,15 +1,10 @@
-import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEnum,
-  IsIn,
   IsNotEmpty,
   IsNumber,
-  IsOptional,
   IsPhoneNumber,
   IsString,
   Min,
 } from 'class-validator';
-import { Roles } from 'src/common/enums';
 
 export class CreateCourierDto {
   @IsNotEmpty()
