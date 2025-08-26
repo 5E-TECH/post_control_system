@@ -110,11 +110,13 @@ export class ProductController {
     return this.productService.findOne(id);
   }
 
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.MARKET, Roles.REGISTRATOR)
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Patch(':id')
   @UseInterceptors(FileInterceptor('image', { storage }))
   async update(
     @Param('id') id: string,
+    @CurrentUser() currentUser: JwtPayload,
     @Body(
       new ValidationPipe({
         whitelist: true,
@@ -126,7 +128,47 @@ export class ProductController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     try {
-      return await this.productService.update(id, updateProductDto, file);
+      return await this.productService.update(
+        id,
+        currentUser,
+        updateProductDto,
+        file,
+      );
+    } catch (error) {
+      if (file) {
+        const filePath = `${uploadDir}/${file.filename}`;
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+      throw error;
+    }
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET)
+  @Patch(':id')
+  @UseInterceptors(FileInterceptor('image', { storage }))
+  async updateOwnProduct(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      }),
+    )
+    updateProductDto: UpdateProductDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    try {
+      return await this.productService.updateOwnProduct(
+        id,
+        currentUser,
+        updateProductDto,
+        file,
+      );
     } catch (error) {
       if (file) {
         const filePath = `${uploadDir}/${file.filename}`;

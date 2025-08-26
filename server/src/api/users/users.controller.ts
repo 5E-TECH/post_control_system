@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from './users.service';
 import { CreateCourierDto } from './dto/create-courier.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateCourierDto } from './dto/update-courier.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Response } from 'express';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -72,7 +72,7 @@ export class UsersController {
     return this.userService.allUsers();
   }
 
-  @UseGuards(JwtGuard, RolesGuard)
+  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload) {
@@ -86,7 +86,7 @@ export class UsersController {
     return this.userService.findOne(id);
   }
 
-  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Patch('admin/:id')
   updateAdmin(
@@ -98,10 +98,23 @@ export class UsersController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @Patch('registrator/:id')
+  updateRegistrator(
+    @Param('id') id: string,
+    @Body() updateRegisDto: UpdateAdminDto,
+  ) {
+    return this.userService.updateRegistrator(id, updateRegisDto);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Patch('staff/:id')
-  updateStaff(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.updateStaff(id, updateUserDto);
+  @Patch('courier/:id')
+  updateCourier(
+    @Param('id') id: string,
+    @Body() updateCourierDto: UpdateCourierDto,
+  ) {
+    return this.userService.updateCourier(id, updateCourierDto);
   }
 
   @UseGuards(JwtGuard, RolesGuard, SelfGuard)

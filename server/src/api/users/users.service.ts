@@ -10,7 +10,7 @@ import { Cashbox_type, Roles, Status } from 'src/common/enums';
 import config from 'src/config';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { CreateCourierDto } from './dto/create-courier.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateCourierDto } from './dto/update-courier.dto';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { SignInUserDto } from './dto/signInUserDto';
@@ -21,14 +21,14 @@ import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { DataSource, DeepPartial, Not } from 'typeorm';
-import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
-import { CourierRegionReository } from 'src/core/repository/courier-region.repository';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { UpdateSelfDto } from './dto/self-update.dto';
 import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
 import { UserSalaryRepository } from 'src/core/repository/user-salary.repository';
+import { RegionEntity } from 'src/core/entity/region.entity';
+import { RegionRepository } from 'src/core/repository/region.repository';
 
 @Injectable()
 export class UserService {
@@ -39,11 +39,11 @@ export class UserService {
     @InjectRepository(CashEntity)
     private readonly cashRepo: CashRepository,
 
-    @InjectRepository(CourierRegionEntity)
-    private readonly courierRegionRepo: CourierRegionReository,
-
     @InjectRepository(UserSalaryEntity)
     private readonly userSalaryRepo: UserSalaryRepository,
+
+    @InjectRepository(RegionEntity)
+    private readonly regionRepo: RegionRepository,
 
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
@@ -210,12 +210,6 @@ export class UserService {
       });
       await queryRunner.manager.save(cashbox);
 
-      const newCourierRegion = queryRunner.manager.create(CourierRegionEntity, {
-        courier_id: courier.id,
-        region_id,
-      });
-      await queryRunner.manager.save(newCourierRegion);
-
       await queryRunner.commitTransaction();
       return successRes(courier, 201, `New courier created`);
     } catch (error) {
@@ -269,13 +263,15 @@ export class UserService {
     try {
       const { password, ...otherFields } = updateAdminDto;
       // Find is user exist or not
-      const user = await this.userRepo.findOne({ where: { id } });
-      if (!user || user.role !== Roles.ADMIN) {
+      const user = await this.userRepo.findOne({
+        where: { id, role: Roles.ADMIN },
+      });
+      if (!user) {
         throw new NotFoundException('Admin not found');
       }
       // If admins try to change their status they can not
       if (otherFields.status && currentUser.role !== Roles.SUPERADMIN) {
-        throw new BadRequestException('Only SuperAdmin can change statuses');
+        throw new BadRequestException('Only SuperAdmin can change the status');
       }
       // Phone number oldin ro'yxatdan o'tganmi yoki yo'qligini tekshirish
       if (otherFields.phone_number) {
@@ -288,15 +284,6 @@ export class UserService {
           );
         }
       }
-      // Super admin can not be blocked
-      if (
-        otherFields.status &&
-        id === currentUser.id &&
-        currentUser.role === Roles.SUPERADMIN
-      ) {
-        throw new BadRequestException('Super admin can not be blocked');
-      }
-
       // If user want to edit password encript it first
       let hashedPassword: string | undefined;
       if (password) {
@@ -316,12 +303,52 @@ export class UserService {
     }
   }
 
-  async updateStaff(id: string, updateUserDto: UpdateUserDto): Promise<object> {
+  async updateRegistrator(id: string, updateRegistratorDto: UpdateAdminDto) {
     try {
-      const { password, ...otherFields } = updateUserDto;
+      const { password, ...otherFields } = updateRegistratorDto;
+      const registrator = await this.userRepo.findOne({
+        where: { id, role: Roles.REGISTRATOR },
+      });
+      if (!registrator) {
+        throw new NotFoundException('Registrator not found');
+      }
+      if (otherFields.phone_number) {
+        const isExistPhone = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (isExistPhone) {
+          throw new BadRequestException(
+            `User with ${otherFields.phone_number} already exist`,
+          );
+        }
+      }
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+      Object.assign(registrator, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+      await this.userRepo.save(registrator);
 
-      const user = await this.userRepo.findOne({ where: { id } });
-      if (!user || user.role === Roles.ADMIN) {
+      return successRes({}, 200, 'Registrator updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateCourier(
+    id: string,
+    updateCourierDto: UpdateCourierDto,
+  ): Promise<object> {
+    try {
+      const { password, ...otherFields } = updateCourierDto;
+
+      const courier = await this.userRepo.findOne({
+        where: { id, role: Roles.COURIER },
+      });
+      if (!courier) {
         throw new NotFoundException('User not found');
       }
 
@@ -338,37 +365,26 @@ export class UserService {
       }
 
       // Courierni update qilganda region_id kelsa courierRegion tableini update qilish
-      if (user.role === Roles.COURIER && otherFields.region_id) {
-        const existingRegion = await this.courierRegionRepo.findOne({
-          where: { courier_id: user.id },
+      if (otherFields.region_id) {
+        const existingRegion = await this.regionRepo.findOne({
+          where: { id: otherFields.region_id },
         });
 
-        if (existingRegion) {
-          Object.assign(existingRegion, {
-            courier_id: user.id,
-            region_id: otherFields.region_id,
-          });
-          await this.courierRegionRepo.save(existingRegion);
-        } else {
-          await this.courierRegionRepo.save({
-            courier_id: user.id,
-            region_id: otherFields.region_id,
-          });
+        if (!existingRegion) {
+          throw new NotFoundException('Region not found');
         }
       }
-
-      delete otherFields.region_id;
 
       let hashedPassword: string | undefined;
       if (password) {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
 
-      Object.assign(user, {
+      Object.assign(courier, {
         ...otherFields,
         ...(hashedPassword && { password: hashedPassword }),
       });
-      await this.userRepo.save(user);
+      await this.userRepo.save(courier);
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
       return successRes(updatedUser, 200, 'User updated');

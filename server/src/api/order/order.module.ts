@@ -11,8 +11,10 @@ import { MarketService } from '../market/market.service';
 import { CashBoxModule } from '../cash-box/cash-box.module';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
-import { CustomerInfoEntity } from 'src/core/entity/customer-info.entity';
+import { CustomerEntity } from 'src/core/entity/customer.entity';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
+import { UserEntity } from 'src/core/entity/users.entity';
 
 @Module({
   imports: [
@@ -21,8 +23,10 @@ import { CashEntity } from 'src/core/entity/cash-box.entity';
       OrderItemEntity,
       ProductEntity,
       MarketEntity,
-      CustomerInfoEntity,
+      CustomerEntity,
       CashEntity,
+      CashboxHistoryEntity,
+      UserEntity,
     ]),
     CashBoxModule,
   ],

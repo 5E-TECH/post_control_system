@@ -140,6 +140,7 @@ export class ProductService {
 
   async update(
     id: string,
+    currentUser: JwtPayload,
     updateProductDto: UpdateProductDto,
     file?: Express.Multer.File,
   ) {
@@ -153,24 +154,78 @@ export class ProductService {
       }
       updateProductDto.name = this.normalizeName(updateProductDto.name);
 
-      // ✅ Market ID ham majburiy
-      if (!updateProductDto.market_id) {
-        throw new BadRequestException('Market ID is required');
-      }
-
-      const { name, market_id } = updateProductDto;
+      const { name } = updateProductDto;
 
       // ✅ Boshqa mahsulotda bu name + market_id mavjudmi?
       const exists = await this.productRepo.findOne({
-        where: { name, market_id },
+        where: { name, market_id: product.market_id },
       });
 
-      if (exists && exists.id !== product.id) {
-        // ❌ Conflict — eski rasmni o‘chiramiz agar file kelgan bo‘lsa
-        if (file) {
-          const filePath = path.join('uploads', file.filename);
-          if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      if (exists) {
+        throw new ConflictException(
+          'Another product with same name and market already exists',
+        );
+      }
+
+      if (file) {
+        const filePath = path.join('uploads', file.filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+
+      // ✅ Agar yangi fayl kelgan bo‘lsa — eski rasmni o‘chir
+      if (file) {
+        if (product.image_url) {
+          const oldPath = path.join(
+            process.cwd(),
+            'uploads',
+            product.image_url,
+          );
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
         }
+        updateProductDto.image_url = file.filename;
+      }
+
+      // ✅ Update qilamiz
+      const updated = this.productRepo.merge(product, updateProductDto);
+      await this.productRepo.save(updated);
+
+      // ✅ To‘liq URL yasaymiz
+      if (updated.image_url) {
+        updated.image_url = this.buildImageUrl(updated.image_url);
+      }
+
+      return successRes(updated, 200, 'Product updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateOwnProduct(
+    id: string,
+    currentUser: JwtPayload,
+    updateProductDto: UpdateProductDto,
+    file?: Express.Multer.File,
+  ) {
+    try {
+      const product = await this.productRepo.findOne({
+        where: { id, market_id: currentUser.id },
+      });
+      if (!product) throw new NotFoundException('Product not found');
+
+      // ✅ Name majburiy, normalize qilamiz
+      if (!updateProductDto.name) {
+        throw new BadRequestException('Product name is required');
+      }
+      updateProductDto.name = this.normalizeName(updateProductDto.name);
+
+      const { name } = updateProductDto;
+
+      // ✅ Boshqa mahsulotda bu name + market_id mavjudmi?
+      const exists = await this.productRepo.findOne({
+        where: { name, market_id: currentUser.id },
+      });
+
+      if (exists) {
         throw new ConflictException(
           'Another product with same name and market already exists',
         );

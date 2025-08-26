@@ -1,5 +1,7 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, OneToOne } from 'typeorm';
+import { UserEntity } from './users.entity';
+import { Max, Min } from 'class-validator';
 
 @Entity('userSalary')
 export class UserSalaryEntity extends BaseEntity {
@@ -14,5 +16,10 @@ export class UserSalaryEntity extends BaseEntity {
 
   // Bu faqat 1 dan 30 gacha son qabul qiladi
   @Column({ type: 'int' })
+  @Min(1)
+  @Max(30)
   payment_day: number;
+
+  @OneToOne(() => UserEntity, (user) => user.salary)
+  user: UserEntity;
 }
