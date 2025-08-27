@@ -14,6 +14,7 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { Order_status, Post_status, Roles } from 'src/common/enums';
+import { ReceivePostDto } from './dto/receive-post.dto';
 
 @Injectable()
 export class PostService {
@@ -112,6 +113,67 @@ export class PostService {
 
       await queryRunner.commitTransaction();
       return successRes(updatedPost, 200, 'Post updated');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async receivePost(id: string, ordersArrayDto: ReceivePostDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 📦 Postni topamiz
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id },
+        relations: ['orders'],
+      });
+
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+
+      // DTO orqali kelgan order_id lar
+      const waitingOrderIds = ordersArrayDto.order_ids;
+
+      // ✅ Kelgan id-lar => WAITING
+      if (waitingOrderIds.length > 0) {
+        await queryRunner.manager.update(
+          OrderEntity,
+          { id: In(waitingOrderIds), post_id: id },
+          { status: Order_status.WAITING },
+        );
+      }
+
+      // ❌ Qolgan (post ichida bor, lekin dto da yo‘q) orderlar => RECEIVED
+      const remainingOrders = post.orders.filter(
+        (order) => !waitingOrderIds.includes(order.id),
+      );
+
+      if (remainingOrders.length > 0) {
+        const remainingIds = remainingOrders.map((o) => o.id);
+
+        await queryRunner.manager.update(
+          OrderEntity,
+          { id: In(remainingIds), post_id: id },
+          { status: Order_status.RECEIVED },
+        );
+      }
+
+      // 📌 Postning statusi har doim RECEIVED bo‘lib qoladi
+      await queryRunner.manager.update(
+        PostEntity,
+        { id },
+        { status: Post_status.RECEIVED },
+      );
+
+      await queryRunner.commitTransaction();
+
+      return successRes({}, 200, 'Post received successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
