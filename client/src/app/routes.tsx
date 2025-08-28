@@ -9,7 +9,7 @@ const Users = lazy(() => import("../pages/users"))
 const Mails = lazy(() => import("../pages/mails"))
 const SendMessage = lazy(() => import("../pages/send-message"))
 const History = lazy(() => import("../pages/history"))
-const Logs = lazy(() => import("../pages/logs"))
+const LogsPage = lazy(() => import("../pages/logs-page"))
 const Payments = lazy(() => import("../pages/payments"))
 const RolesPermissions = lazy(() => import("../pages/roles-permissions"))
 const Profile = lazy(() => import("../pages/profile"))
@@ -25,7 +25,7 @@ const AppRouters = () => {
         { path: "mails", element: <Mails /> },
         { path: "send-message", element: <SendMessage /> },
         { path: "history", element: <History /> },
-        { path: "logs", element: <Logs /> },
+        { path: "logs", element: <LogsPage /> },
         { path: "payments", element: <Payments /> },
         { path: "roles-permissions", element: <RolesPermissions /> },
         { path: "profile", element: <Profile /> },
