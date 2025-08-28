@@ -1,5 +1,10 @@
 import { Button, Form, Input, type FormProps } from "antd";
 import React from "react";
+
+import logo from "../../shared/assets/login/logo.svg";
+import left from "../../shared/assets/login/Frame 1.svg"
+import right from "../../shared/assets/login/Tree.svg"
+
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../shared/lib";
@@ -32,8 +37,19 @@ const Login = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-white px-4">
-      <div className="w-full max-w-sm bg-gray-200 p-8 rounded-lg">
+    <div className="flex items-center justify-center min-h-[90vh] bg-gray-100">
+      <div className="absolute bottom-0 flex w-full justify-between px-10">
+        <img src={left} alt="Left plant" className="h-[221px] w-[98] mb-14 mr-28" />
+        <img src={right} alt="Right plant" className="h-[221px] w-[92px]" />
+      </div>
+      {/* <div className="absolute bottom-0 w-full flex justify-center z-0">
+        <img
+          src={background}
+          alt="Gray decorative line"
+          className="opacity-70 h-10" // rang va balandlikni sozlashing mumkin
+        />
+      </div> */}
+      <div className="max-w-sm bg-white p-8 rounded-lg w-[460px] shadow-2xl">
         <Form
           name="basic"
           layout="vertical"
@@ -41,21 +57,26 @@ const Login = () => {
           onFinish={onFinish}
           autoComplete="off"
         >
-          <h2 className="text-lg font-semibold text-center mb-4">Login</h2>
+          <div className="flex items-center justify-center gap-2 text-2xl mb-6">
+            <img src={logo} alt="" />
+            <strong className="bold">Beepost</strong>
+          </div>
+
+          <div className="mb-5">
+            <p className="text-2xl">Welcome to Beepost! 👋🏻</p>
+          </div>
 
           <Form.Item<ILogin>
-            label="Phone"
             name="phone"
             rules={[
               { required: true, message: "Please input your phone!" },
               { min: 9, message: "Iltimos telefon raqamni to'g'ri kiriting!" },
             ]}
           >
-            <Input size="large" />
+            <Input size="large" placeholder="Phone number" type="text" />
           </Form.Item>
 
           <Form.Item<ILogin>
-            label="Password"
             name="password"
             rules={[
               { required: true, message: "Please input your password!" },
@@ -65,7 +86,7 @@ const Login = () => {
               },
             ]}
           >
-            <Input.Password size="large" />
+            <Input.Password size="large" placeholder="Password" type="text" />
           </Form.Item>
 
           <Form.Item label={null}>
@@ -74,7 +95,7 @@ const Login = () => {
               type="primary"
               htmlType="submit"
               size="large"
-              className="w-full"
+              className="bg-[#8C57FF]! w-full"
             >
               Submit
             </Button>
