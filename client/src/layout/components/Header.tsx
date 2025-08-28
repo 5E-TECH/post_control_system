@@ -25,7 +25,7 @@ const Header = () => {
         <input className='outline-none' type="text" id="search" placeholder='Search' />
       </label>
       <div className='flex gap-4'>
-        <button onClick={() => setDark(!dark)}>{dark ? <div><img className='bg-white' src={sun} alt="" /></div> : <div><img className='bg-white' src={moon} alt="" /></div>}</button>
+        <button onClick={() => setDark(!dark)}>{dark ? <div><img className='' src={sun} alt="" /></div> : <div><img className='bg-white' src={moon} alt="" /></div>}</button>
         <button onClick={() => navigate('/profile')}>Profile</button>
       </div>
     </div>
