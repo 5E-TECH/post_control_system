@@ -1,5 +1,6 @@
 import { lazy, memo } from 'react';
 import { useRoutes } from 'react-router-dom';
+import Login from '../pages/login';
 
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"))
 const Dashboards = lazy(() => import("../pages/dashboards"))
@@ -17,6 +18,9 @@ const Profile = lazy(() => import("../pages/profile"))
 
 const AppRouters = () => {
   return useRoutes([
+    {
+      path: "/login", element: <Login/>
+    },
     {
       path: "/", element: <DashboardLayout />, children: [
         { index: true, element: <Dashboards /> },
