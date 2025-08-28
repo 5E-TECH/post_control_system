@@ -7,13 +7,13 @@ import right from "../../shared/assets/login/Tree.svg"
 
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import type { RootState } from "../../shared/lib";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../../shared/api";
 import { clearSignInData } from "../../shared/lib/features/login/signInSlice";
 import { setToken } from "../../shared/lib/features/login/authSlice";
 import type { ILogin } from "../../shared/types/typesLogin";
 import { useLogin } from "../../shared/api/hooks/useLogin";
+import type { RootState } from "../../app/store";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -23,15 +23,15 @@ const Login = () => {
   const initialValues = useSelector((state: RootState) => state.signInSlice);
 
   const login = useMutation({
-    mutationFn: (data: any) => api.post("user/login", data),
+    mutationFn: (data: any) => api.post("user/signin", data),
   });
 
   const onFinish: FormProps<ILogin>["onFinish"] = (values: any) => {
     login.mutate(values, {
       onSuccess: (res) => {
         dispatch(clearSignInData());
-        dispatch(setToken(res?.data?.accsestoken));
-        navigate("/profile");
+        dispatch(setToken(res?.data?.data));
+        navigate("/");
       },
     });
   };
@@ -67,7 +67,7 @@ const Login = () => {
           </div>
 
           <Form.Item<ILogin>
-            name="phone"
+            name="phone_number"
             rules={[
               { required: true, message: "Please input your phone!" },
               { min: 9, message: "Iltimos telefon raqamni to'g'ri kiriting!" },
@@ -81,7 +81,7 @@ const Login = () => {
             rules={[
               { required: true, message: "Please input your password!" },
               {
-                min: 6,
+                min: 4,
                 message: "Parol kamida 6 ta belgidan iborat bo‘lishi kerak!",
               },
             ]}
