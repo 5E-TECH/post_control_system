@@ -15,6 +15,8 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { Order_status, Post_status, Roles } from 'src/common/enums';
 import { ReceivePostDto } from './dto/receive-post.dto';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 
 @Injectable()
 export class PostService {
@@ -174,6 +176,46 @@ export class PostService {
       await queryRunner.commitTransaction();
 
       return successRes({}, 200, 'Post received successfully');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createCanceledPost(user: JwtPayload, ordersArrayDto: ReceivePostDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { order_ids } = ordersArrayDto;
+      const orders = await queryRunner.manager.find(OrderEntity, {
+        where: { id: In([order_ids]), status: Order_status.CANCELLED },
+      });
+      if (order_ids.length !== orders.length) {
+        throw new BadRequestException(
+          'Some orders not found or not in Canceled status',
+        );
+      }
+      const courier = await queryRunner.manager.findOne(UserEntity, {
+        where: {
+          id: user.id,
+        },
+      });
+      if (!courier) {
+        throw new NotFoundException('Courier not found');
+      }
+      const customToken = generateCustomToken();
+      const canceledPost = queryRunner.manager.create(PostEntity, {
+        courier_id: courier?.id,
+        region_id: courier.region_id,
+        post_total_price: 0,
+        order_quantity: Number(order_ids.length),
+        qr_code_token: customToken,
+        status: Post_status.CANCELED,
+      });
+      await queryRunner.manager.save(canceledPost);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
