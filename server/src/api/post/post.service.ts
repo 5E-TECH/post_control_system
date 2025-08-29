@@ -188,34 +188,50 @@ export class PostService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     try {
       const { order_ids } = ordersArrayDto;
+
       const orders = await queryRunner.manager.find(OrderEntity, {
-        where: { id: In([order_ids]), status: Order_status.CANCELLED },
+        where: { id: In(order_ids), status: Order_status.CANCELLED },
       });
+
       if (order_ids.length !== orders.length) {
         throw new BadRequestException(
           'Some orders not found or not in Canceled status',
         );
       }
+
       const courier = await queryRunner.manager.findOne(UserEntity, {
-        where: {
-          id: user.id,
-        },
+        where: { id: user.id },
       });
       if (!courier) {
         throw new NotFoundException('Courier not found');
       }
+
       const customToken = generateCustomToken();
       const canceledPost = queryRunner.manager.create(PostEntity, {
-        courier_id: courier?.id,
+        courier_id: courier.id,
         region_id: courier.region_id,
         post_total_price: 0,
-        order_quantity: Number(order_ids.length),
+        order_quantity: orders.length,
         qr_code_token: customToken,
         status: Post_status.CANCELED,
       });
       await queryRunner.manager.save(canceledPost);
+
+      for (const order of orders) {
+        order.post_id = canceledPost.id;
+        order.status = Order_status.CANCELLED_SENT;
+      }
+      await queryRunner.manager.save(orders);
+
+      await queryRunner.commitTransaction();
+      return successRes(
+        { post_id: canceledPost.id, order_ids },
+        200,
+        'Canceled Order created and sent to central post',
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -223,6 +239,18 @@ export class PostService {
       await queryRunner.release();
     }
   }
+
+  // async receiveCanceledPost(ordersArrayDto: ReceivePostDto) {
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+  //   try {
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     return catchError(error);
+  //   } finally {
+  //   }
+  // }
 
   // async remove(id: string) {
   //   const queryRunner = this.dataSource.createQueryRunner();
