@@ -10,7 +10,7 @@ const DashboardLayout = () => {
       <Sidebar />
       <div className='flex-1'>
         <Header />
-        <main className='bg-white dark:bg-[#312d4b] m-6 rounded-md'>
+        <main className='m-6 rounded-md'>
           <Outlet />
         </main>
         <Footer />
