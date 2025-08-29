@@ -19,7 +19,7 @@ export class CreateProductDto {
   })
   @IsOptional()
   @IsUUID()
-  market_id: string;
+  market_id?: string;
 
   @IsOptional()
   @IsString()

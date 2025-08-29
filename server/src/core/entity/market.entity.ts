@@ -1,12 +1,11 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { AddOrder, Status } from 'src/common/enums';
-import { Column, Entity, ManyToMany, OneToMany } from 'typeorm';
+import { Column, Entity, OneToOne, OneToMany } from 'typeorm';
 import { ProductEntity } from './product.entity';
-import { CustomerEntity } from './customer.entity';
-import { OrderEntity } from './order.entity';
 import { CustomerMarketEntity } from './customer-market.entity';
+import { OrderEntity } from './order.entity';
+import { CashEntity } from './cash-box.entity';
 
-// market.entity.ts
 @Entity('market')
 export class MarketEntity extends BaseEntity {
   @Column({ type: 'varchar' })
@@ -32,6 +31,10 @@ export class MarketEntity extends BaseEntity {
 
   @Column({ type: 'varchar' })
   telegram_token: string;
+
+  // 🟢 1 Market = 1 Cashbox
+  @OneToOne(() => CashEntity, (cashbox) => cashbox.market, { cascade: true })
+  cashbox: CashEntity;
 
   @OneToMany(() => CustomerMarketEntity, (cm) => cm.market)
   customerMarkets: CustomerMarketEntity[];
