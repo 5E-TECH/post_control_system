@@ -5,8 +5,15 @@ import Export from "./components/export";
 import SearchInput from "./components/search-input";
 import Button from "./components/button";
 import UserTable from "./components/user-table";
+import { Outlet, useLocation } from "react-router-dom";
 
 const Users = () => {
+  const { pathname } = useLocation();
+
+  const isChecked = pathname === "/users/create-user";
+
+  if (isChecked) return <Outlet />;
+
   return (
     <div className="">
       <UsersStatistics />
