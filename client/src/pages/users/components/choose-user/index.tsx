@@ -7,16 +7,18 @@ interface Props {
   body: string;
 }
 
-const ChooseUser: FC<Props> = ({ className = "", title, body }) => {
+const ChooseUser: FC<Props> = ({ title, body }) => {
   return (
     <div
-      className={`flex flex-col items-center justify-center w-[364px] h-[194px] rounded-[6px] ${className} bg-gradient-to-r from-[#CDB5FF] via-[#A378FF] to-[#8146FF] text-[#ffffff] cursor-pointer`}
+      className={`flex flex-col items-center justify-center w-[364px] h-[194px] rounded-[6px] select-none`}
     >
       <div>
         <img src={admin} alt="" />
       </div>
-      <h1 className="py-[12px] font-medium text-[#E8DDFF]">{title}</h1>
-      <p className="text-center font-normal text-[#E8DDFF]">{body}</p>
+      <div className="flex flex-col items-center justify-center">
+        <h1 className="py-[12px] font-medium">{title}</h1>
+        <p className="text-center font-normal">{body}</p>
+      </div>
     </div>
   );
 };

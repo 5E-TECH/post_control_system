@@ -6,7 +6,7 @@ import Footer from './components/Footer';
 
 const DashboardLayout = () => {
   return (
-    <div className="flex bg-[#f4f5fa] dark:bg-[#28243d] dark:text-[#E7E3FCE5]">
+    <div className="flex dark:bg-[#28243d] dark:text-[#E7E3FCE5]">
       <Sidebar />
       <div className='flex-1'>
         <Header />

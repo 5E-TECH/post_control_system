@@ -1,13 +1,8 @@
 import { memo } from "react";
-import ChooseUser from "../../components/choose-user";
+import CreateUserForm from "../../components/create-user-form";
 
 const CreateAdmin = () => {
-  return (
-    <ChooseUser
-      title="Market"
-      body="Expert tips & tools to improve your website or online store using blog."
-    />
-  );
+  return <CreateUserForm title="Admin" />;
 };
 
 export default memo(CreateAdmin);

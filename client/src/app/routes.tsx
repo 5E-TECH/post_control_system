@@ -1,5 +1,8 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+import CreateAdmin from "../pages/users/pages/create-admin";
+import CreateCourier from "../pages/users/pages/create-courier";
+import CreateMarket from "../pages/users/pages/create-market";
 
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
 const Dashboards = lazy(() => import("../pages/dashboards"));
@@ -13,7 +16,7 @@ const LogsPage = lazy(() => import("../pages/logs-page"));
 const Payments = lazy(() => import("../pages/payments"));
 const RolesPermissions = lazy(() => import("../pages/roles-permissions"));
 const Profile = lazy(() => import("../pages/profile"));
-const CreateUser = lazy(() => import("../pages/users/pages/create-user"));
+const CreateUser = lazy(() => import("../pages/users/create-user"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -27,10 +30,22 @@ const AppRouters = () => {
         {
           path: "users",
           element: <Users />,
+        },
+        {
+          path: "create-user",
+          element: <CreateUser />,
           children: [
             {
-              path: "create-user",
-              element: <CreateUser />,
+              index: true,
+              element: <CreateAdmin />,
+            },
+            {
+              path: "courier",
+              element: <CreateCourier />,
+            },
+            {
+              path: "market",
+              element: <CreateMarket />,
             },
           ],
         },
