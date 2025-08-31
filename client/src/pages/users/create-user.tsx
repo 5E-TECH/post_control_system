@@ -4,12 +4,12 @@ import { NavLink, Outlet } from "react-router-dom";
 
 const CreateUser = () => {
   return (
-    <div className="flex dark:bg-[#312D4B]">
+    <div className="flex gap-[300px] max-[1500px]:flex-col dark:bg-[#312D4B] pb-[50px]">
       <div className="">
-        <h1 className="font-medium text-[18px] text-[#000000] pl-[90px] pt-[40px] dark:text-[#ffffff]">
+        <h1 className="font-medium text-[18px] text-[#000000] pl-[115px] pt-[40px] dark:text-[#ffffff] max-[1500px]:text-center">
           Foydalanuvchi rolini tanlang
         </h1>
-        <div className="flex flex-col pt-[78px] pb-[78px] pl-[22px] pr-[22px] gap-[40px]">
+        <div className="flex flex-col pt-[78px] pb-[78px] pl-[42px] pr-[42px] gap-[40px] max-[1500px]:flex-row">
           <NavLink
             end
             to={""}
@@ -58,7 +58,7 @@ const CreateUser = () => {
           </NavLink>
         </div>
       </div>
-      <div className="pt-[165px] pl-[165px]">
+      <div className="pt-[165px] pb-[50px] max-[1500px]:pt-[50px] max-[1500px]:flex max-[1500px]:justify-center">
         <Outlet />
       </div>
     </div>
