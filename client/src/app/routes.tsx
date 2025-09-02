@@ -1,5 +1,6 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+import SelectRole from "../pages/select-role";
 
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
@@ -23,6 +24,10 @@ const CreateMarket = lazy(() => import("../pages/users/pages/create-market"));
 
 const AppRouters = () => {
   return useRoutes([
+    {
+      path: "/select-role",
+      element: <SelectRole/>
+    },
     {
       path: "/login",
       element: <Login />,
