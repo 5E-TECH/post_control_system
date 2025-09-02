@@ -3,6 +3,11 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-laylo: red;
-  --color-bg-py: blue;
+  --color-bg-py: #F4F5FA;
+  --color-dark-bg-py: #28243D;
 }
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
