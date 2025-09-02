@@ -5,7 +5,7 @@ import { Apple, CarFront, FileText, History, House, LockKeyhole, MailOpen, Messa
 
 const Sidebar = () => {
   return (
-    <div>
+    <div className='dark:bg-[#28243d] dark:text-[#E7E3FCE5]'>
       <div className='h-16 flex justify-center items-center'>
         <NavLink to={'/'} className={'flex items-center gap-3'}>
           <div>

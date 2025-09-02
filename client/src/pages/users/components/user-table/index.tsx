@@ -286,8 +286,8 @@ const UserTable = () => {
         </div>
 
         <div className="flex items-center gap-[23px]">
-          <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 hover:text-black dark:text-[#E7E3FCE5]" />
-          <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 hover:text-black dark:text-[#E7E3FCE5]" />
+          <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
+          <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
         </div>
       </div>
     </div>
