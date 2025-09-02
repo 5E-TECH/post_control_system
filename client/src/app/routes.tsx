@@ -1,8 +1,6 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
-import CreateAdmin from "../pages/users/pages/create-admin";
-import CreateCourier from "../pages/users/pages/create-courier";
-import CreateMarket from "../pages/users/pages/create-market";
+
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -19,45 +17,13 @@ const Payments = lazy(() => import("../pages/payments"));
 const RolesPermissions = lazy(() => import("../pages/roles-permissions"));
 const Profile = lazy(() => import("../pages/profile"));
 const CreateUser = lazy(() => import("../pages/users/create-user"));
+const CreateAdmin = lazy(() => import("../pages/users/pages/create-admin"));
+const CreateCourier = lazy(() => import("../pages/users/pages/create-courier"));
+const CreateMarket = lazy(() => import("../pages/users/pages/create-market"));
 
 const AppRouters = () => {
   return useRoutes([
     {
-      path: "/",
-      element: <DashboardLayout />,
-      children: [
-        { index: true, element: <Dashboards /> },
-        { path: "orders", element: <Orders /> },
-        { path: "regions", element: <Regions /> },
-        {
-          path: "users",
-          element: <Users />,
-        },
-        {
-          path: "create-user",
-          element: <CreateUser />,
-          children: [
-            {
-              index: true,
-              element: <CreateAdmin />,
-            },
-            {
-              path: "courier",
-              element: <CreateCourier />,
-            },
-            {
-              path: "market",
-              element: <CreateMarket />,
-            },
-          ],
-        },
-        { path: "mails", element: <Mails /> },
-        { path: "send-message", element: <SendMessage /> },
-        { path: "history", element: <History /> },
-        { path: "logs", element: <LogsPage /> },
-        { path: "payments", element: <Payments /> },
-        { path: "roles-permissions", element: <RolesPermissions /> },
-        { path: "profile", element: <Profile /> },
       path: "/login",
       element: <Login />,
     },
@@ -73,6 +39,15 @@ const AppRouters = () => {
             { path: "orders", element: <Orders /> },
             { path: "regions", element: <Regions /> },
             { path: "users", element: <Users /> },
+            {
+              path: "create-user",
+              element: <CreateUser />,
+              children: [
+                { index: true, element: <CreateAdmin /> },
+                { path: "courier", element: <CreateCourier /> },
+                { path: "market", element: <CreateMarket /> },
+              ],
+            },
             { path: "mails", element: <Mails /> },
             { path: "products", element: <Products /> },
             { path: "send-message", element: <SendMessage /> },
