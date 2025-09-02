@@ -7,7 +7,7 @@ export const useLogin = () => {
   const client = useQueryClient();
 
   const createUser = useMutation({
-    mutationFn: (data: any) => api.post("users/login", data),
+    mutationFn: (data: any) => api.post("user/signin", data),
     onSuccess: () => client.invalidateQueries({ queryKey: [login] }),
   });
 

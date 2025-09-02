@@ -14,6 +14,9 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { Order_status, Post_status, Roles } from 'src/common/enums';
+import { ReceivePostDto } from './dto/receive-post.dto';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 
 @Injectable()
 export class PostService {
@@ -119,6 +122,135 @@ export class PostService {
       await queryRunner.release();
     }
   }
+
+  async receivePost(id: string, ordersArrayDto: ReceivePostDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 📦 Postni topamiz
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id },
+        relations: ['orders'],
+      });
+
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+
+      // DTO orqali kelgan order_id lar
+      const waitingOrderIds = ordersArrayDto.order_ids;
+
+      // ✅ Kelgan id-lar => WAITING
+      if (waitingOrderIds.length > 0) {
+        await queryRunner.manager.update(
+          OrderEntity,
+          { id: In(waitingOrderIds), post_id: id },
+          { status: Order_status.WAITING },
+        );
+      }
+
+      // ❌ Qolgan (post ichida bor, lekin dto da yo‘q) orderlar => RECEIVED
+      const remainingOrders = post.orders.filter(
+        (order) => !waitingOrderIds.includes(order.id),
+      );
+
+      if (remainingOrders.length > 0) {
+        const remainingIds = remainingOrders.map((o) => o.id);
+
+        await queryRunner.manager.update(
+          OrderEntity,
+          { id: In(remainingIds), post_id: id },
+          { status: Order_status.RECEIVED },
+        );
+      }
+
+      // 📌 Postning statusi har doim RECEIVED bo‘lib qoladi
+      await queryRunner.manager.update(
+        PostEntity,
+        { id },
+        { status: Post_status.RECEIVED },
+      );
+
+      await queryRunner.commitTransaction();
+
+      return successRes({}, 200, 'Post received successfully');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createCanceledPost(user: JwtPayload, ordersArrayDto: ReceivePostDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const { order_ids } = ordersArrayDto;
+
+      const orders = await queryRunner.manager.find(OrderEntity, {
+        where: { id: In(order_ids), status: Order_status.CANCELLED },
+      });
+
+      if (order_ids.length !== orders.length) {
+        throw new BadRequestException(
+          'Some orders not found or not in Canceled status',
+        );
+      }
+
+      const courier = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: user.id },
+      });
+      if (!courier) {
+        throw new NotFoundException('Courier not found');
+      }
+
+      const customToken = generateCustomToken();
+      const canceledPost = queryRunner.manager.create(PostEntity, {
+        courier_id: courier.id,
+        region_id: courier.region_id,
+        post_total_price: 0,
+        order_quantity: orders.length,
+        qr_code_token: customToken,
+        status: Post_status.CANCELED,
+      });
+      await queryRunner.manager.save(canceledPost);
+
+      for (const order of orders) {
+        order.post_id = canceledPost.id;
+        order.status = Order_status.CANCELLED_SENT;
+      }
+      await queryRunner.manager.save(orders);
+
+      await queryRunner.commitTransaction();
+      return successRes(
+        { post_id: canceledPost.id, order_ids },
+        200,
+        'Canceled Order created and sent to central post',
+      );
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // async receiveCanceledPost(ordersArrayDto: ReceivePostDto) {
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+  //   try {
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     return catchError(error);
+  //   } finally {
+  //   }
+  // }
 
   // async remove(id: string) {
   //   const queryRunner = this.dataSource.createQueryRunner();
