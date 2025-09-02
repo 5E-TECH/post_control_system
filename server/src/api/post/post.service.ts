@@ -240,17 +240,18 @@ export class PostService {
     }
   }
 
-  // async receiveCanceledPost(ordersArrayDto: ReceivePostDto) {
-  //   const queryRunner = this.dataSource.createQueryRunner();
-  //   await queryRunner.connect();
-  //   await queryRunner.startTransaction();
-  //   try {
-  //   } catch (error) {
-  //     await queryRunner.rollbackTransaction();
-  //     return catchError(error);
-  //   } finally {
-  //   }
-  // }
+  async receiveCanceledPost(ordersArrayDto: ReceivePostDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
 
   // async remove(id: string) {
   //   const queryRunner = this.dataSource.createQueryRunner();
