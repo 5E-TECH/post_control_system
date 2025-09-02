@@ -68,13 +68,13 @@ export class MarketService {
         password: hashedPassword,
         telegram_token,
       });
+      await queryRunner.manager.save(newMarket);
       const cashbox = queryRunner.manager.create(CashEntity, {
         cashbox_type: Cashbox_type.FOR_MARKET,
-        user_id: newMarket.id,
+        market_id: newMarket.id,
         market: newMarket,
       });
       await queryRunner.manager.save(cashbox);
-      await queryRunner.manager.save(newMarket);
 
       await queryRunner.commitTransaction();
       return successRes(newMarket, 201, 'New market created');

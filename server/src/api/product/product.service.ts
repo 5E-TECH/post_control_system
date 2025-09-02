@@ -8,7 +8,6 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ProductEntity } from 'src/core/entity/product.entity';
-import { Repository } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -16,12 +15,17 @@ import config from 'src/config';
 import { ProductRepository } from 'src/core/repository/product.repository';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Roles } from 'src/common/enums';
+import { MarketRepository } from 'src/core/repository/market.repository';
+import { MarketEntity } from 'src/core/entity/market.entity';
 
 @Injectable()
 export class ProductService {
   constructor(
     @InjectRepository(ProductEntity)
     private readonly productRepo: ProductRepository,
+
+    @InjectRepository(MarketEntity)
+    private readonly marketRepo: MarketRepository,
   ) {}
 
   private buildImageUrl(filename: string): string {
@@ -47,6 +51,12 @@ export class ProductService {
       const { name, market_id } = createProductDto;
       if (!market_id) {
         throw new BadRequestException('Market ID is required');
+      }
+      const isExistMarket = await this.marketRepo.findOne({
+        where: { id: market_id },
+      });
+      if (!isExistMarket) {
+        throw new NotFoundException('Market not found');
       }
       const exists = await this.productRepo.findOne({
         where: {
