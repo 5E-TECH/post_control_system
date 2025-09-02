@@ -14,9 +14,12 @@ import * as path from 'path';
 import config from 'src/config';
 import { ProductRepository } from 'src/core/repository/product.repository';
 import { JwtPayload } from 'src/common/utils/types/user.type';
-import { Roles } from 'src/common/enums';
+import { Order_status, Roles } from 'src/common/enums';
 import { MarketRepository } from 'src/core/repository/market.repository';
 import { MarketEntity } from 'src/core/entity/market.entity';
+import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderRepository } from 'src/core/repository/order.repository';
+import { In } from 'typeorm';
 
 @Injectable()
 export class ProductService {
@@ -26,6 +29,9 @@ export class ProductService {
 
     @InjectRepository(MarketEntity)
     private readonly marketRepo: MarketRepository,
+
+    @InjectRepository(OrderEntity)
+    private readonly orderRepo: OrderRepository,
   ) {}
 
   private buildImageUrl(filename: string): string {
@@ -97,6 +103,38 @@ export class ProductService {
       return successRes(products);
     } catch (error) {
       return catchError(error);
+    }
+  }
+
+  async haveNewOrderMarkets() {
+    try {
+      const allNewOrders = await this.orderRepo.find({
+        where: { status: Order_status.NEW },
+      });
+
+      if (!allNewOrders.length) {
+        return successRes([], 200, 'No new orders');
+      }
+
+      const uniqueMarketIds = Array.from(
+        new Set(allNewOrders.map((order) => order.market_id)),
+      );
+
+      const allUniqueMarkets = await this.marketRepo.find({
+        where: { id: In(uniqueMarketIds) },
+      });
+
+      return successRes(
+        {
+          count: allUniqueMarkets.length,
+          markets: allUniqueMarkets,
+        },
+        200,
+        'Markets with new orders',
+      );
+    } catch (error) {
+      console.error(error);
+      throw error;
     }
   }
 
