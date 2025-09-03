@@ -8,7 +8,7 @@ export interface AddProductRef {
   onClear: () => void;
 }
 
-const AddProduct = forwardRef<AddProductRef>((props, ref) => {
+const AddProduct = forwardRef<AddProductRef>((_, ref) => {
   const { createProduct } = useProduct();
 
   const [dragActive, setDragActive] = useState(false);
