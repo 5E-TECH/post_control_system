@@ -3,7 +3,10 @@ import { memo } from 'react';
 const ProfilCard1 = () => {
   return (
     <div className="">
-      <div className="w-[343px] h-[724px]"></div>
+      
+      <div className="border w-[100%] h-[724px]">
+
+      </div>
     </div>
   );
 };
