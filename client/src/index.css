@@ -7,11 +7,12 @@
   --color-bg-py: blue;
 }
 
-/* .container {
-  max-width: 1472px;
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 16px;
-  padding-right: 16px;
-} */
+  --color-bg-py: #F4F5FA;
+  --color-dark-bg-py: #28243D;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+

@@ -65,4 +65,6 @@ export enum Post_status {
   NEW = 'new',
   SENT = 'sent',
   RECEIVED = 'received',
+  CANCELED = 'canceled',
+  CANCELED_RECEIVED = 'canceled_received',
 }

@@ -5,7 +5,7 @@ import { Apple, CarFront, FileText, History, House, LockKeyhole, MailOpen, Messa
 
 const Sidebar = () => {
   return (
-    <div>
+    <div className='bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]'>
       <div className='h-16 flex justify-center items-center'>
         <NavLink to={'/'} className={'flex items-center gap-3'}>
           <div>
@@ -14,7 +14,7 @@ const Sidebar = () => {
           <span className='text-xl font-semibold'>Beepost</span>
         </NavLink>
       </div>
-      <ul className='w-65 h-screen flex flex-col gap-1.5 mr-4'>
+      <ul className='w-65 flex flex-col gap-1.5 mr-4'>
         <li>
           <NavLink to={'/'} end={true} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <House />

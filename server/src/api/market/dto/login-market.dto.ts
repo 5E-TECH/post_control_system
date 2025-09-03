@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 export class LoginMarketDto {
   @IsString()
   @IsNotEmpty()
-  login: string;
+  phone_number: string;
 
   @IsString()
   @IsNotEmpty()

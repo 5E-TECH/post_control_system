@@ -19,7 +19,7 @@ const Header = () => {
 
   const navigate = useNavigate();
   return (
-    <div className="w-full h-16 px-6 flex justify-between items-center">
+    <div className="w-full h-16 px-6 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
       <label htmlFor="search" className='flex gap-4'>
         <Search />
         <input className='outline-none' type="text" id="search" placeholder='Search' />
