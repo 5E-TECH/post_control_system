@@ -1,3 +1,8 @@
+        
+import Overview from '../pages/profile/overview/overview';
+import Maosh from '../pages/profile/maosh/maosh';
+import ProfilLogs from '../pages/profile/profil-logs/profil-logs';
+import ProfileProduct from '../pages/profile/products/product';
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
 import CreateRegistrator from "../pages/users/pages/create-registrator";
@@ -22,6 +27,8 @@ const CreateUser = lazy(() => import("../pages/users/create-user"));
 const CreateAdmin = lazy(() => import("../pages/users/pages/create-admin"));
 const CreateCourier = lazy(() => import("../pages/users/pages/create-courier"));
 const CreateMarket = lazy(() => import("../pages/users/pages/create-market"));
+  const Profile = lazy(() => import('../pages/profile'));
+const ProfileOrders = lazy(() => import('../pages/profile/orders/orders'));
 
 const AppRouters = () => {
   return useRoutes([
@@ -81,7 +88,16 @@ const AppRouters = () => {
             { path: "logs", element: <LogsPage /> },
             { path: "payments", element: <Payments /> },
             { path: "roles-permissions", element: <RolesPermissions /> },
-            { path: "profile", element: <Profile /> },
+            {
+          path: 'profile',
+          element: <Profile />,
+          children: [
+            { index: true, element: <Overview /> },
+            { path: 'profil-orders', element: <ProfileOrders /> },
+            { path: 'profil-maosh', element: <Maosh /> },
+            { path: 'profil-logs', element: <ProfilLogs /> },
+            { path: 'profil-products', element: <ProfileProduct /> },
+            }
           ],
         },
       ],
