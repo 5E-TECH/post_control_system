@@ -68,13 +68,13 @@ export class MarketService {
         password: hashedPassword,
         telegram_token,
       });
+      await queryRunner.manager.save(newMarket);
       const cashbox = queryRunner.manager.create(CashEntity, {
         cashbox_type: Cashbox_type.FOR_MARKET,
-        user_id: newMarket.id,
+        market_id: newMarket.id,
         market: newMarket,
       });
       await queryRunner.manager.save(cashbox);
-      await queryRunner.manager.save(newMarket);
 
       await queryRunner.commitTransaction();
       return successRes(newMarket, 201, 'New market created');
@@ -192,9 +192,9 @@ export class MarketService {
     res: Response,
   ): Promise<object> {
     try {
-      const { login, password } = loginMarketDto;
+      const { phone_number, password } = loginMarketDto;
       const isExisUser = await this.marketRepo.findOne({
-        where: { phone_number: login },
+        where: { phone_number: phone_number },
       });
       if (!isExisUser) {
         throw new BadRequestException('Wrong login or password');

@@ -1,55 +1,75 @@
 import { Button, Form, Input, type FormProps } from "antd";
-import React from "react";
+import React, { type FC } from "react";
 
 import logo from "../../shared/assets/login/logo.svg";
-import left from "../../shared/assets/login/Frame 1.svg"
-import right from "../../shared/assets/login/Tree.svg"
+import left from "../../shared/assets/login/Frame 1.svg";
+import right from "../../shared/assets/login/Tree.svg";
+import line from "../../shared/assets/login/Mask.svg"
 
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { useMutation } from "@tanstack/react-query";
-import { api } from "../../shared/api";
 import { clearSignInData } from "../../shared/lib/features/login/signInSlice";
 import { setToken } from "../../shared/lib/features/login/authSlice";
 import type { ILogin } from "../../shared/types/typesLogin";
 import { useLogin } from "../../shared/api/hooks/useLogin";
 import type { RootState } from "../../app/store";
 
-const Login = () => {
+
+const Login: FC = () => {
+   const location = useLocation();
+   const role = location.state?.role; 
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { createUser } = useLogin();
+  const { signinUser, signinMarket } = useLogin();
 
   const initialValues = useSelector((state: RootState) => state.signInSlice);
 
-  const login = useMutation({
-    mutationFn: (data: any) => api.post("user/signin", data),
-  });
-
   const onFinish: FormProps<ILogin>["onFinish"] = (values: any) => {
-    login.mutate(values, {
-      onSuccess: (res) => {
-        dispatch(clearSignInData());
-        dispatch(setToken(res?.data?.data));
-        navigate("/");
-      },
-    });
+    if(role === "user") {
+      signinUser.mutate(values, {
+        onSuccess: (res) => {
+          dispatch(clearSignInData());
+          dispatch(setToken(res?.data?.data));
+          navigate("/");
+        },
+      });
+    }
+    else if(role === "market") {
+      signinMarket.mutate(values, {
+        onSuccess: (res) => {
+          dispatch(clearSignInData());
+          dispatch(setToken(res?.data?.data));
+          navigate("/");
+        },
+      });
+    }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[90vh] bg-gray-100">
-      <div className="absolute bottom-0 flex w-full justify-between px-10">
-        <img src={left} alt="Left plant" className="h-[221px] w-[98] mb-14 mr-28" />
-        <img src={right} alt="Right plant" className="h-[221px] w-[92px]" />
+    <div className="flex items-center justify-center min-h-[90vh] bg-gray-100 relative px-4 sm:px-10">
+      <div className="absolute bottom-0 flex w-full justify-between px-4 sm:px-10">
+        <div>
+          <div>
+            <img
+              src={left}
+              alt="Left plant"
+              className="h-[100px] w-[60px] sm:h-[221px] sm:w-[98px] mb-6 sm:mb-14 mr-6 sm:mr-28"
+            />
+          </div>
+          <div>
+            <img
+              src={right}
+              alt="Right plant"
+              className="h-[100px] w-[60px] sm:h-[221px] sm:w-[92px]"
+            />
+          </div>
+        </div>
+        <div>
+          <img src={line} alt="" className=""/>
+        </div>
       </div>
-      {/* <div className="absolute bottom-0 w-full flex justify-center z-0">
-        <img
-          src={background}
-          alt="Gray decorative line"
-          className="opacity-70 h-10" // rang va balandlikni sozlashing mumkin
-        />
-      </div> */}
-      <div className="max-w-sm bg-white p-8 rounded-lg w-[460px] shadow-2xl">
+
+      <div className="bg-white p-6 sm:p-8 rounded-lg shadow-2xl w-[460px] max-w-full mx-4">
         <Form
           name="basic"
           layout="vertical"
@@ -57,13 +77,13 @@ const Login = () => {
           onFinish={onFinish}
           autoComplete="off"
         >
-          <div className="flex items-center justify-center gap-2 text-2xl mb-6">
-            <img src={logo} alt="" />
+          <div className="flex items-center justify-center gap-2 text-xl sm:text-2xl mb-6">
+            <img src={logo} alt="" className="h-8 sm:h-10" />
             <strong className="bold">Beepost</strong>
           </div>
 
-          <div className="mb-5">
-            <p className="text-2xl">Welcome to Beepost! 👋🏻</p>
+          <div className="mb-5 text-center">
+            <p className="text-lg sm:text-2xl">Welcome to Beepost! 👋🏻</p>
           </div>
 
           <Form.Item<ILogin>
@@ -91,7 +111,7 @@ const Login = () => {
 
           <Form.Item label={null}>
             <Button
-              loading={createUser.isPending}
+              loading={signinUser.isPending}
               type="primary"
               htmlType="submit"
               size="large"

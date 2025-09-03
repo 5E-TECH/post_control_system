@@ -1,8 +1,12 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-laylo: red;
-  --color-bg-py: blue;
+  --color-bg-py: #f4f5fa;
+  --color-dark-bg-py: #28243d;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

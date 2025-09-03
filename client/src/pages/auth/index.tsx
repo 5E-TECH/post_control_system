@@ -5,10 +5,13 @@ import type { RootState } from "../../app/store";
 
 const Auth = () => {
   const token = useSelector((state: RootState) => state.authSlice.token);
-  console.log(token);
   
 //   const token = true;
   return token ? <Outlet /> : <Navigate replace to={"/login"} />;
+  console.log(token);
+
+  //   const token = true;
+  return token ? <Outlet /> : <Navigate replace to={"/select-role"} />;
 };
 
 export default memo(Auth);

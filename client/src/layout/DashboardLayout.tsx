@@ -6,11 +6,11 @@ import Footer from './components/Footer';
 
 const DashboardLayout = () => {
   return (
-    <div className="flex bg-[#f4f5fa] dark:bg-[#28243d] dark:text-[#E7E3FCE5]">
+    <div className="flex h-screen dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]">
       <Sidebar />
-      <div className='flex-1'>
+      <div className='flex-1 overflow-y-scroll scrollbar-hide'>
         <Header />
-        <main className='m-6 rounded-md'>
+        <main className='rounded-md'>
           <Outlet />
         </main>
         <Footer />
