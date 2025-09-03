@@ -63,7 +63,7 @@ const UserTable = () => {
               <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
             </td>
             <td className="w-[250px] h-[56px] pl-[20px] text-left">
-              <div className="flex gap-4">
+              <div className="flex items-center gap-4">
                 <div>
                   <img src={user} alt="" />
                 </div>
@@ -114,7 +114,7 @@ const UserTable = () => {
               <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
             </td>
             <td className="w-[250px] h-[56px] pl-[20px] text-left">
-              <div className="flex gap-4">
+              <div className="flex items-center gap-4">
                 <div>
                   <img src={user} alt="" />
                 </div>
@@ -165,7 +165,7 @@ const UserTable = () => {
               <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
             </td>
             <td className="w-[250px] h-[56px] pl-[20px] text-left">
-              <div className="flex gap-4">
+              <div className="flex items-center gap-4">
                 <div>
                   <img src={user} alt="" />
                 </div>
@@ -216,7 +216,7 @@ const UserTable = () => {
               <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
             </td>
             <td className="w-[250px] h-[56px] pl-[20px] text-left">
-              <div className="flex gap-4">
+              <div className="flex items-center gap-4">
                 <div>
                   <img src={user} alt="" />
                 </div>
