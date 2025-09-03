@@ -5,26 +5,25 @@ import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
 
 type FieldType = {
-  region_id: string;
   first_name: string;
   last_name: string;
   phone_number: string;
   password: string;
-  tariff_home: string | number;
-  tariff_center: string | number;
+  salary: string | number;
+  payment_day?: string | number;
 };
 
-const CreateCourier = () => {
-  const { createUser } = useUser("courier");
+const CreateRegistrator = () => {
+  const { createUser } = useUser("registrator");
   const navigate = useNavigate();
 
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
-    const newCourier = {
+    const newRegistrator = {
       ...values,
-      tariff_home: Number(values.tariff_home),
-      tariff_center: Number(values.tariff_center),
+      salary: Number(values.salary),
+      payment_day: Number(values.payment_day),
     };
-    createUser.mutate(newCourier, {
+    createUser.mutate(newRegistrator, {
       onSuccess: () => {
         navigate("/users");
       },
@@ -34,22 +33,12 @@ const CreateCourier = () => {
   return (
     <div className="w-[420px]">
       <h1 className="font-medium text-[24px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-        Kuryer yaratish
+        Ro'yxatchini yaratish
       </h1>
       <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-        Kuryer ma'lumotlarini kiriting
+        Ro'yxatchini ma'lumotlarini kiriting
       </span>
       <Form onFinish={onFinish} className="pt-5!">
-        <Form.Item
-          name="region_id"
-          rules={[{ required: true, message: "Hududni kiriting" }]}
-        >
-          <Input
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-            placeholder="Hudud IDni kiriting"
-          />
-        </Form.Item>
-
         <Form.Item
           name="first_name"
           rules={[{ required: true, message: "Ismni kiriting" }]}
@@ -99,13 +88,13 @@ const CreateCourier = () => {
         </Form.Item>
 
         <Form.Item
-          name="tariff_home"
+          name="salary"
           rules={[
-            { required: true, message: "Uy tarifi qiymatini kiriting" },
+            { required: true, message: "Oylikni kiriting" },
             {
               type: "number",
               min: 0,
-              message: "Tarif 0 dan kam bo‘lmasligi kerak",
+              message: "Oylik 0 dan kam bo‘lmasligi kerak",
               transform: (value) => Number(value),
             },
           ]}
@@ -113,18 +102,18 @@ const CreateCourier = () => {
           <Input
             type="number"
             className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-            placeholder="Uy tarifini kiriting (so'm)"
+            placeholder="Oylikni kiriting (so'm)"
           />
         </Form.Item>
 
         <Form.Item
-          name="tariff_center"
+          name="payment_day"
           rules={[
-            { required: true, message: "Markaz tarifi qiymatini kiriting" },
             {
               type: "number",
-              min: 0,
-              message: "Tarif 0 dan kam bo‘lmasligi kerak",
+              min: 1,
+              max: 30,
+              message: "To‘lov kuni 1 dan 30 gacha bo‘lishi kerak",
               transform: (value) => Number(value),
             },
           ]}
@@ -132,7 +121,7 @@ const CreateCourier = () => {
           <Input
             type="number"
             className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-            placeholder="Markaz tarifini kiriting (so'm)"
+            placeholder="To'lov kunini kiriting (1-30)"
           />
         </Form.Item>
 
@@ -153,4 +142,4 @@ const CreateCourier = () => {
   );
 };
 
-export default memo(CreateCourier);
+export default memo(CreateRegistrator);

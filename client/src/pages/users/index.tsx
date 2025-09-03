@@ -10,14 +10,14 @@ import { Outlet, useLocation } from "react-router-dom";
 const Users = () => {
   const { pathname } = useLocation();
 
-  const isChecked = pathname === "/users/create-user";
+  const isChecked = pathname.startsWith("/users/create-user");
 
   if (isChecked) return <Outlet />;
 
   return (
-    <div className="">
+    <div className="p-6 h-[89vh] bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
       <UsersStatistics />
-      <div className="rounded-md mt-6 bg-[#FFFFFF] flex flex-col shadow-lg dark:bg-[#312D4B] pt-[20px]">
+      <div className="rounded-md mt-6 bg-[#FFFFFF] shadow-lg flex flex-col dark:bg-[#312D4B] pt-[20px]">
         <div className="pl-[20px] pr-[20px]">
           <span className="text-[18px]">Filters</span>
         </div>

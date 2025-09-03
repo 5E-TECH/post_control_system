@@ -3,7 +3,7 @@ import allusers from "../../../../shared/assets/users/all-users.svg";
 import markets from "../../../../shared/assets/users/markets.svg";
 import employers from "../../../../shared/assets/users/employer.svg";
 
-const UsersStati = () => {
+const UsersStatistics = () => {
   return (
     <div className="grid grid-cols-3 max-[1250px]:grid-cols-2 max-[950px]:grid-cols-1 gap-6">
       <div className="h-[114px] bg-[#ffffff] shadow-lg rounded-md pl-[20px] pr-[20px] flex justify-between dark:bg-[#312D4B]">
@@ -73,4 +73,4 @@ const UsersStati = () => {
   );
 };
 
-export default memo(UsersStati);
+export default memo(UsersStatistics);
