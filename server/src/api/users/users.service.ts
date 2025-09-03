@@ -110,6 +110,7 @@ export class UserService {
         have_to_pay: salary,
         payment_day,
       });
+
       await queryRunner.manager.save(adminSalary);
       await queryRunner.commitTransaction();
       return successRes(admin, 201, 'New Admin created');
@@ -152,6 +153,7 @@ export class UserService {
         role: Roles.REGISTRATOR,
       });
       await queryRunner.manager.save(user);
+
       const userSalary = queryRunner.manager.create(UserSalaryEntity, {
         user_id: user.id,
         salary_amount: salary,
@@ -159,6 +161,7 @@ export class UserService {
         payment_day,
       });
       await queryRunner.manager.save(userSalary);
+
       await queryRunner.commitTransaction();
       return successRes(user, 201, 'New Admin created');
     } catch (error) {
@@ -464,7 +467,11 @@ export class UserService {
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
-      return successRes(accessToken, 200, 'Logged in successfully');
+      return successRes(
+        { access_token: accessToken, refresh_token: refreshToken },
+        200,
+        'Logged in successfully',
+      );
     } catch (error) {
       return catchError(error);
     }
