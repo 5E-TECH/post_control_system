@@ -1,12 +1,17 @@
 import React from 'react'
+import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { setRole } from '../../shared/lib/features/roleSlice';
 
 const selectRole = () => {
+
+  const dispatch = useDispatch()
 
   const navigate = useNavigate();
 
   const handleRole = (role: string) => {
    navigate("/login", { state: { role } });
+   dispatch(setRole(role))
   }
 
   return (
@@ -17,8 +22,6 @@ const selectRole = () => {
         </h1>
         <button
           onClick={() => handleRole("user")}
-
-          
 
           className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition"
         >
