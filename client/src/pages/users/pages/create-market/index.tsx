@@ -3,6 +3,7 @@ import { Button, Form, Input, type FormProps } from "antd";
 import { ArrowRight } from "lucide-react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
+import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 
 type FieldType = {
   market_name: string;
@@ -13,7 +14,7 @@ type FieldType = {
 };
 
 const CreateMarket = () => {
-  const { createUser } = useUser("market");
+  const { createMarket } = useMarket();
   const navigate = useNavigate();
 
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
@@ -22,7 +23,7 @@ const CreateMarket = () => {
       tariff_home: Number(values.tariff_home),
       tariff_center: Number(values.tariff_center),
     };
-    createUser.mutate(newMarket, {
+    createMarket.mutate(newMarket, {
       onSuccess: () => {
         navigate("/users");
       },
@@ -116,8 +117,8 @@ const CreateMarket = () => {
 
         <div className="flex items-center justify-center">
           <Button
-            disabled={createUser.isPending}
-            loading={createUser.isPending}
+            disabled={createMarket.isPending}
+            loading={createMarket.isPending}
             type="primary"
             htmlType="submit"
             className="bg-[#8C57FF]! w-[115px]"

@@ -75,7 +75,7 @@ const CreateUser = () => {
           </NavLink>
         </div>
       </div>
-      <div className="mt-[190px] mb-[50px] max-[1500px]:pt-[50px] max-[1500px]:flex max-[1500px]:justify-center">
+      <div className="mt-[190px] mb-[50px] max-[1500px]:pt-[50px] max-[1500px]:flex max-[1500px]:justify-center fixed top-0 right-70">
         <Outlet />
       </div>
     </div>
