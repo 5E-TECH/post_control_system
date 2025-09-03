@@ -7,7 +7,7 @@ export const useUser = (path: string) => {
   const client = useQueryClient();
 
   const createUser = useMutation({
-    mutationFn: (data: any) => api.post(`user/${path}`, data),
+    mutationFn: (data: any) => api.post(`${path}`, data),
     onSuccess: () => client.invalidateQueries({ queryKey: [user] }),
   });
   return {

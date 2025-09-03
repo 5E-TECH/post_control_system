@@ -103,13 +103,13 @@ export class UserService {
         password: hashedPassword,
         role: Roles.ADMIN,
       });
+      await queryRunner.manager.save(admin);
       const adminSalary = queryRunner.manager.create(UserSalaryEntity, {
         user_id: admin.id,
         salary_amount: salary,
         have_to_pay: salary,
         payment_day,
       });
-      await queryRunner.manager.save(admin);
       await queryRunner.manager.save(adminSalary);
       await queryRunner.commitTransaction();
       return successRes(admin, 201, 'New Admin created');
@@ -151,13 +151,13 @@ export class UserService {
         password: hashedPassword,
         role: Roles.REGISTRATOR,
       });
+      await queryRunner.manager.save(user);
       const userSalary = queryRunner.manager.create(UserSalaryEntity, {
         user_id: user.id,
         salary_amount: salary,
         have_to_pay: salary,
         payment_day,
       });
-      await queryRunner.manager.save(user);
       await queryRunner.manager.save(userSalary);
       await queryRunner.commitTransaction();
       return successRes(user, 201, 'New Admin created');

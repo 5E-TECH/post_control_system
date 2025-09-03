@@ -5,7 +5,7 @@ import { Max, Min } from 'class-validator';
 
 @Entity('userSalary')
 export class UserSalaryEntity extends BaseEntity {
-  @Column({ type: 'int' })
+  @Column({ type: 'uuid' })
   user_id: string;
 
   @Column({ type: 'int' })
