@@ -30,15 +30,7 @@ const Profil = () => {
             Maosh
           </NavLink>
         </li>
-        <li>
-          <NavLink
-            to={'profil-products'}
-            className={({ isActive }) => linkClasses(isActive)}
-          >
-            <Package className="w-5 h-5" />
-            Products
-          </NavLink>
-        </li>
+
         <li>
           <NavLink
             to={'profil-logs'}
