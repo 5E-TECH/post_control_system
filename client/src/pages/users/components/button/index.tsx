@@ -9,7 +9,7 @@ const Button: FC<Props> = ({ text }) => {
   const navigate = useNavigate();
 
   return (
-    <div onClick={() => navigate("/create-user")}>
+    <div onClick={() => navigate("/users/create-user")}>
       <button className="bg-[#8C57FF] text-[#ffffff] px-[18px] py-[8px] rounded-md cursor-pointer hover:opacity-85">
         {text}
       </button>

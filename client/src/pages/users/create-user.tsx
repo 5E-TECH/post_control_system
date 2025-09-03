@@ -4,15 +4,14 @@ import { NavLink, Outlet } from "react-router-dom";
 
 const CreateUser = () => {
   return (
-    <div className="flex gap-[300px] max-[1500px]:flex-col dark:bg-[#312D4B] pb-[50px]">
+    <div className="flex gap-[300px] max-[1500px]:flex-col dark:bg-[#312D4B]">
       <div className="">
         <h1 className="font-medium text-[18px] text-[#000000] pl-[115px] pt-[40px] dark:text-[#ffffff] max-[1500px]:text-center">
           Foydalanuvchi rolini tanlang
         </h1>
-        <div className="flex flex-col pt-[78px] pb-[78px] pl-[42px] pr-[42px] gap-[40px] max-[1500px]:flex-row">
+        <div className="flex flex-col pt-[78px] pb-[45px] pl-[42px] pr-[42px] gap-[40px] max-[1500px]:flex-row">
           <NavLink
             end
-            to={""}
             className={({ isActive }) =>
               `${
                 isActive
@@ -20,9 +19,27 @@ const CreateUser = () => {
                   : "bg-[#ffffff] text-[#000000] border border-[#2E263D1F] dark:bg-[#312D4B] dark:text-[#ffffff]"
               }`
             }
+            to={""}
           >
             <ChooseUser
-              title="Admin & Ro’yxatchi"
+              title="Admin"
+              body="Expert tips & tools to improve your website or online store using blog."
+            />
+          </NavLink>
+
+          <NavLink
+            end
+            className={({ isActive }) =>
+              `${
+                isActive
+                  ? "bg-gradient-to-r from-[#CDB5FF] via-[#A378FF] to-[#8146FF] text-[#ffffff]"
+                  : "bg-[#ffffff] text-[#000000] border border-[#2E263D1F] dark:bg-[#312D4B] dark:text-[#ffffff]"
+              }`
+            }
+            to={"registrator"}
+          >
+            <ChooseUser
+              title="Ro’yxatchi"
               body="Expert tips & tools to improve your website or online store using blog."
             />
           </NavLink>
