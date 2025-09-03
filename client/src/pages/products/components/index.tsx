@@ -1,10 +1,27 @@
-import { memo, useState } from "react";
+import { memo, useState, forwardRef, useImperativeHandle } from "react";
 import upload from "../../../shared/assets/product/upload.png";
 import { Image } from "antd";
+import { useProduct } from "../../../shared/api/hooks/useProduct";
+import { X } from "lucide-react";
 
-const AddProduct = () => {
+export interface AddProductRef {
+  onClear: () => void;
+}
+
+const AddProduct = forwardRef<AddProductRef>((props, ref) => {
+  const { createProduct } = useProduct();
+
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [productName, setProductName] = useState("");
+
+  // 🔑 tashqaridan chaqiriladigan funksiya
+  useImperativeHandle(ref, () => ({
+    onClear() {
+      setProductName("");
+      setFile(null);
+    },
+  }));
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -31,63 +48,102 @@ const AddProduct = () => {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!productName || !file) {
+      alert("Product name va rasm tanlanishi kerak");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("name", productName);
+    formData.append("image", file);
+
+    try {
+      await createProduct.mutate(formData);
+      setProductName("");
+      setFile(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <section>
-      <div className="w-full  h-[478px] bg-white p-5 text-[#2E263DE5] flex gap-5 flex-col rounded-md dark:text-[#E7E3FCE5] dark:bg-[#312d4b]">
+      <div className="w-full bg-white p-5 text-[#2E263DE5] flex gap-5 flex-col rounded-md dark:text-[#E7E3FCE5] dark:bg-[#312d4b]">
         <h2 className="text-[18px] font-medium opacity-[90%] select-none">Product information</h2>
-        <div>
-          <form action="">
-            <input
-              className="w-full border px-4 py-3 rounded-md"
-              type="text"
-              placeholder="Product Name"
-            />
-          </form>
-        </div>
-        <div className="flex justify-between mt-5">
-          <h2 className="text-[18px] font-medium opacity-[90%] select-none">Product Image</h2>
-          <h2 className="text-[15px] font-medium text-[#8C57FF] select-none">Add media from URL</h2>
-        </div>
 
-        {/* Upload Area */}
-        <div
-          className={`w-full h-full border border-dashed rounded-md border-gray-300 flex items-center justify-center flex-col gap-2 transition ${
-            dragActive ? "bg-purple-50 border-[#8C57FF]" : ""
-          }`}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onDragLeave={handleDragLeave}
-        >
-          {!file ? (
-            <>
-              <div className="bg-[#F0EFF0] rounded-md p-2 dark:bg-[#3f3b59]">
-                <img src={upload} alt="Upload" />
-              </div>
-              <h2 className="font-medium text-[24px] select-none">
-                Drag and drop your image here
-              </h2>
-              <p className="text-[#2E263D66] select-none">or</p>
-              <div className="relative">
-                <button className="border border-[#8C57FF] text-[#8C57FF] px-[14px] py-[8px] rounded-md font-medium text-[13px]">
-                  Browse Image
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 h-full">
+          <input
+            className="w-full border px-4 py-3 rounded-md"
+            type="text"
+            placeholder="Product Name"
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
+          />
+
+          <div className="flex justify-between mt-2">
+            <h2 className="text-[18px] font-medium opacity-[90%] select-none">Product Image</h2>
+            <h2 className="text-[15px] font-medium text-[#8C57FF] select-none">Add media from URL</h2>
+          </div>
+
+          <div
+            className={`w-full flex-1 border border-dashed rounded-md border-gray-300 flex items-center justify-center flex-col gap-2 transition ${
+              dragActive ? "bg-purple-50 border-[#8C57FF]" : ""
+            }`}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragLeave={handleDragLeave}
+          >
+            {!file ? (
+              <>
+                <div className="bg-[#F0EFF0] rounded-md p-2 dark:bg-[#3f3b59] mt-[48px]">
+                  <img src={upload} alt="Upload" />
+                </div>
+                <h2 className="font-medium text-[24px] select-none">
+                  Drag and drop your image here
+                </h2>
+                <p className="text-[#2E263D66] select-none">or</p>
+                <div className="relative mb-[48px]">
+                  <button
+                    type="button"
+                    className="border border-[#8C57FF] text-[#8C57FF] px-[14px] py-[8px] rounded-md font-medium text-[13px]"
+                  >
+                    Browse Image
+                  </button>
+                  <input
+                    type="file"
+                    className="absolute top-0 left-0 opacity-0 w-full h-full cursor-pointer"
+                    onChange={handleFileChange}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-2 relative">
+                <Image src={URL.createObjectURL(file)} className="max-h-[200px] object-contain" />
+                <p className="text-[14px] font-medium">{file.name}</p>
+                <button
+                  type="button"
+                  className="absolute top-1 right-1 bg-red-500 rounded-full text-white"
+                  onClick={() => setFile(null)}
+                >
+                  <X className="w-[20px] h-[20px]" />
                 </button>
-                <input
-                  type="file"
-                  className="absolute top-0 left-0 opacity-0 w-full h-full cursor-pointer"
-                  onChange={handleFileChange}
-                />
               </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <Image src={URL.createObjectURL(file)} className="max-h-[200px] object-contain"/>
-              <p className="text-[14px] font-medium">{file.name}</p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="bg-[#8C57FF] text-white px-4 py-2 rounded-md font-medium mt-4"
+          >
+            Save Product
+          </button>
+        </form>
       </div>
     </section>
   );
-};
+});
 
 export default memo(AddProduct);
