@@ -7,7 +7,7 @@ import { MarketEntity } from './market.entity';
 
 @Entity('cash_box')
 export class CashEntity extends BaseEntity {
-  @Column({ type: 'decimal', default: 0 })
+  @Column({ type: 'int', default: 0 })
   balance: number;
 
   @Column({ type: 'enum', enum: Cashbox_type })
@@ -25,7 +25,9 @@ export class CashEntity extends BaseEntity {
   user: UserEntity;
 
   // 1-1 Cashbox → Market
-  @OneToOne(() => MarketEntity, (market) => market.cashbox, { onDelete: 'CASCADE' })
+  @OneToOne(() => MarketEntity, (market) => market.cashbox, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'market_id' })
   market: MarketEntity;
 

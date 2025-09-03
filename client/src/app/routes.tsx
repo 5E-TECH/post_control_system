@@ -1,7 +1,8 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
 import CreateRegistrator from "../pages/users/pages/create-registrator";
-
+import SelectRole from "../pages/select-role";
+import AuthRole from "../pages/auth/authRole";
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -25,8 +26,18 @@ const CreateMarket = lazy(() => import("../pages/users/pages/create-market"));
 const AppRouters = () => {
   return useRoutes([
     {
+      path: "/select-role",
+      element: <SelectRole />,
+    },
+    {
       path: "/login",
-      element: <Login />,
+      element: <AuthRole />,
+      children:[
+        {
+          index:true,
+          element:<Login/>
+        }
+      ]
     },
     {
       path: "/",
@@ -53,6 +64,14 @@ const AppRouters = () => {
                     { path: "market", element: <CreateMarket /> },
                   ],
                 },
+            { path: "users", element: <Users /> },
+            {
+              path: "create-user",
+              element: <CreateUser />,
+              children: [
+                { index: true, element: <CreateAdmin /> },
+                { path: "courier", element: <CreateCourier /> },
+                { path: "market", element: <CreateMarket /> },
               ],
             },
             { path: "mails", element: <Mails /> },
