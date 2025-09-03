@@ -32,12 +32,12 @@ const AppRouters = () => {
     {
       path: "/login",
       element: <AuthRole />,
-      children:[
+      children: [
         {
-          index:true,
-          element:<Login/>
-        }
-      ]
+          index: true,
+          element: <Login />,
+        },
+      ],
     },
     {
       path: "/",
@@ -64,14 +64,6 @@ const AppRouters = () => {
                     { path: "market", element: <CreateMarket /> },
                   ],
                 },
-            { path: "users", element: <Users /> },
-            {
-              path: "create-user",
-              element: <CreateUser />,
-              children: [
-                { index: true, element: <CreateAdmin /> },
-                { path: "courier", element: <CreateCourier /> },
-                { path: "market", element: <CreateMarket /> },
               ],
             },
             { path: "mails", element: <Mails /> },
