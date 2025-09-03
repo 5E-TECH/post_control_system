@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { Button, Form, Input, type FormProps } from "antd";
 import { ArrowRight } from "lucide-react";
-import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 

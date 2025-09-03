@@ -1,8 +1,9 @@
 import { memo } from "react";
-import { Button, Form, Input, type FormProps } from "antd";
+import { Button, Form, Input, Select, type FormProps } from "antd";
 import { ArrowRight } from "lucide-react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
+import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 
 type FieldType = {
   region_id: string;
@@ -31,6 +32,12 @@ const CreateCourier = () => {
     });
   };
 
+  const { getRegions } = useRegion();
+  const { data } = getRegions();
+  const regions = data?.data.map((item: any) => ({
+    value: item.id,
+    label: item.name,
+  }));
   return (
     <div className="w-[420px]">
       <h1 className="font-medium text-[24px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
@@ -44,9 +51,11 @@ const CreateCourier = () => {
           name="region_id"
           rules={[{ required: true, message: "Hududni kiriting" }]}
         >
-          <Input
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-            placeholder="Hudud IDni kiriting"
+          <Select
+            className="custom-select-dropdown !h-[48px]"
+            placeholder="Hududni tanlang"
+            options={regions}
+            dropdownClassName="dark-dropdown"
           />
         </Form.Item>
 
