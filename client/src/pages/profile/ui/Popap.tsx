@@ -68,22 +68,6 @@ const EditProfileModal = ({
         initialValues={data || user}
       >
         <Form.Item
-          label="First Name"
-          name="first_name"
-          rules={[{ required: true, message: 'First name majburiy!' }]}
-        >
-          <Input placeholder="First name" />
-        </Form.Item>
-
-        <Form.Item
-          label="Last Name"
-          name="last_name"
-          rules={[{ required: true, message: 'Last name majburiy!' }]}
-        >
-          <Input placeholder="Last name" />
-        </Form.Item>
-
-        <Form.Item
           label="Phone Number"
           name="phone_number"
           rules={[{ required: true, message: 'Phone number majburiy!' }]}
