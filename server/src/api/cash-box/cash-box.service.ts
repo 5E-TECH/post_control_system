@@ -56,146 +56,142 @@ export class CashBoxService
     }
   }
 
-  // async paymentsFromCourier(
-  //   user: JwtPayload,
-  //   createPaymentsFromCourierDto: CreatePaymentsFromCourierDto,
-  // ) {
-  //   const transaction = this.dataSource.createQueryRunner();
-  //   await transaction.connect();
-  //   await transaction.startTransaction();
+  async paymentsFromCourier(
+    user: JwtPayload,
+    createPaymentsFromCourierDto: CreatePaymentsFromCourierDto,
+  ) {
+    const transaction = this.dataSource.createQueryRunner();
+    await transaction.connect();
+    await transaction.startTransaction();
+    try {
+      const {
+        courier_id,
+        amount,
+        payment_method,
+        payment_date,
+        comment,
+        market_id,
+      } = createPaymentsFromCourierDto;
 
-  //   try {
-  //     const {
-  //       courier_id,
-  //       amount,
-  //       payment_method,
-  //       payment_date,
-  //       comment,
-  //       market_id,
-  //     } = createPaymentsFromCourierDto;
+      if (payment_method === PaymentMethod.CLICK_TO_MARKET && !market_id) {
+        throw new BadRequestException(
+          "Click_to_market usulida market_id bo'lishi shart va majburiy !!!",
+        );
+      }
 
-  //     if (payment_method === PaymentMethod.CLICK_TO_MARKET && !market_id) {
-  //       throw new BadRequestException(
-  //         "Click_to_market usulida market_id bo'lishi shart va majburiy !!!",
-  //       );
-  //     }
+      const courierCashbox = await transaction.manager.findOne(CashEntity, {
+        where: { user_id: courier_id },
+      });
+      if (!courierCashbox) {
+        throw new NotFoundException('Courier cashbox not found');
+      }
 
-  //     const courierCashbox = await transaction.manager.findOne(CashEntity, {
-  //       where: { user_id: courier_id },
-  //     });
-  //     if (!courierCashbox) {
-  //       throw new NotFoundException('Courier cashbox not found');
-  //     }
+      const mainCashbox = await transaction.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) {
+        throw new NotFoundException('Main cashbox not found');
+      }
 
-  //     const mainCashbox = await transaction.manager.findOne(CashEntity, {
-  //       where: { cashbox_type: Cashbox_type.MAIN },
-  //     });
-  //     if (!mainCashbox) {
-  //       throw new NotFoundException('Main cashbox not found');
-  //     }
+      courierCashbox.balance -= amount;
+      await transaction.manager.save(courierCashbox);
 
-  //     courierCashbox.balance -= amount;
-  //     const courierCashboxHistory = transaction.manager.create(
-  //       CashboxHistoryEntity,
-  //       {
-  //         operation_type: Operation_type.EXPENSE,
-  //         amount,
-  //         balance_after: courierCashbox.balance,
-  //         cashbox_id: courierCashbox.id,
-  //         comment,
-  //         created_by: user.id,
+      const courierCashboxHistory = transaction.manager.create(
+        CashboxHistoryEntity,
+        {
+          operation_type: Operation_type.EXPENSE,
+          cashbox_id: courierCashbox.id,
+          source_type: Source_type.COURIER_PAYMENT,
+          amount,
+          balance_after: courierCashbox.balance,
+          comment,
+          created_by: user.id,
+          payment_date,
+          payment_method,
+        },
+      ); // Davom etaman ......
 
-  //       },
-  //     ); // Davom etaman ......
+      await transaction.manager.save(courierCashboxHistory);
 
-  //     const payment = this.cashboxHistoryRepo.create({
-  //       courier_id,
-  //       amount,
-  //       payment_method,
-  //       payment_date,
-  //       comment,
-  //       market_id:
-  //         payment_method === PaymentMethod.CLICK_TO_MARKET ? market_id : null,
-  //     });
-  //     const savedPayment = await transaction.manager.save(payment);
+      mainCashbox.balance += amount;
+      await transaction.manager.save(mainCashbox);
 
-  //     if (!cashbox) throw new BadRequestException('Kassa topilmadi!');
-  //     const courier_cashbox = await this.cashboxRepo.findOne({
-  //       where: { user_id: courier_id },
-  //     });
-  //     if (!courier_cashbox)
-  //       throw new BadRequestException('Courier kassasi topilmadi');
+      const mainCashboxHistory = transaction.manager.create(
+        CashboxHistoryEntity,
+        {
+          operation_type: Operation_type.INCOME,
+          cashbox_id: mainCashbox.id,
+          source_type: Source_type.COURIER_PAYMENT,
+          amount,
+          balance_after: mainCashbox.balance,
+          comment,
+          created_by: user.id,
+          payment_date,
+          payment_method,
+        },
+      );
+      await transaction.manager.save(mainCashboxHistory);
 
-  //     courier_cashbox.balance -= amount;
-  //     cashbox.balance += amount;
+      if (
+        payment_method === PaymentMethod.CLICK_TO_MARKET &&
+        market_id != null
+      ) {
+        const market_cashbox = await this.cashboxRepo.findOne({
+          where: { user_id: market_id },
+        });
 
-  //     await transaction.manager.save(CashEntity, courier_cashbox);
-  //     const updatedCashbox = await transaction.manager.save(
-  //       CashEntity,
-  //       cashbox,
-  //     );
+        if (!market_cashbox) {
+          throw new NotFoundException('Market cashbox topilmadi');
+        }
+        // Davom etaman ..........
 
-  //     const incomeHistory = this.cashboxHistoryRepo.create({
-  //       operation_type: Operation_type.INCOME,
-  //       source_type: Source_type.COURIER_PAYMENT,
-  //       source_id: savedPayment.id,
-  //       amount: amount,
-  //       balance_after: updatedCashbox.balance,
-  //       comment,
-  //       created_by: id,
-  //     });
+        mainCashbox.balance -= amount;
+        await transaction.manager.save(mainCashbox);
 
-  //     await transaction.manager.save(incomeHistory);
+        const mainCashboxHistoryMarket = transaction.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: mainCashbox.id,
+            source_type: Source_type.MARKET_PAYMENT,
+            amount,
+            balance_after: mainCashbox.balance,
+            comment,
+            created_by: user.id,
+            payment_date,
+            payment_method,
+          },
+        );
+        await transaction.manager.save(mainCashboxHistoryMarket);
 
-  //     let outcomeHistory;
+        market_cashbox.balance -= amount;
+        await transaction.manager.save(market_cashbox);
 
-  //     if (
-  //       payment_method === PaymentMethod.CLICK_TO_MARKET &&
-  //       market_id != null
-  //     ) {
-  //       const market_cashbox = await this.cashboxRepo.findOne({
-  //         where: { user_id: market_id },
-  //       });
+        const marketCashboxHistory = await transaction.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: market_cashbox.id,
+            source_type: Source_type.MARKET_PAYMENT,
+            amount,
+            balance_after: market_cashbox.balance,
+            comment,
+            created_by: user.id,
+            payment_date,
+            payment_method,
+          },
+        );
+        await transaction.manager.save(marketCashboxHistory);
+      }
 
-  //       if (!market_cashbox) {
-  //         throw new NotFoundException('Market cashbox topilmadi');
-  //       }
-
-  //       cashbox.balance -= amount;
-
-  //       market_cashbox.balance -= amount;
-
-  //       const minusCashbox = await transaction.manager.save(
-  //         CashEntity,
-  //         cashbox,
-  //       );
-  //       await transaction.manager.save(CashEntity, market_cashbox);
-
-  //       outcomeHistory = this.cashboxHistoryRepo.create({
-  //         operation_type: Operation_type.INCOME,
-  //         source_type: Source_type.COURIER_PAYMENT,
-  //         source_id: savedPayment.id,
-  //         amount: amount,
-  //         balance_after: minusCashbox.balance,
-  //         comment,
-  //         created_by: id,
-  //       });
-
-  //       await transaction.manager.save(outcomeHistory);
-  //     }
-
-  //     await transaction.commitTransaction();
-  //     return successRes(
-  //       { income: incomeHistory, outcome: outcomeHistory },
-  //       201,
-  //       " To'lov qabul qilindi !!! ",
-  //     );
-  //   } catch (error) {
-  //     await transaction.rollbackTransaction();
-  //     console.error('Xatolik:', error);
-  //     return catchError(error.message);
-  //   } finally {
-  //     await transaction.release();
-  //   }
-  // }
+      await transaction.commitTransaction();
+      return successRes({}, 201, " To'lov qabul qilindi !!! ");
+    } catch (error) {
+      await transaction.rollbackTransaction();
+      console.error('Xatolik:', error);
+      return catchError(error.message);
+    } finally {
+      await transaction.release();
+    }
+  }
 }
