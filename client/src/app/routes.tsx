@@ -25,13 +25,13 @@ const Maosh = lazy(() => import("../pages/profile/maosh/maosh"));
 const ProfilLogs = lazy(
   () => import("../pages/profile/profil-logs/profil-logs")
 );
-const ProfileProduct = lazy(() => import("../pages/profile/products/product"));
 const CreateRegistrator = lazy(
   () => import("../pages/users/pages/create-registrator")
 );
 const SelectRole = lazy(() => import("../pages/select-role"));
 const AuthRole = lazy(() => import("../pages/auth/authRole"));
 const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
+const NotFound = lazy(() => import("../pages/orders/pages/create-order"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -100,14 +100,13 @@ const AppRouters = () => {
                 { path: "profil-orders", element: <ProfileOrders /> },
                 { path: "profil-maosh", element: <Maosh /> },
                 { path: "profil-logs", element: <ProfilLogs /> },
-                { path: "profil-products", element: <ProfileProduct /> },
               ],
             },
           ],
         },
       ],
     },
-    { path: '*', element: <NotFound /> },
+    { path: "*", element: <NotFound /> },
   ]);
 };
 
