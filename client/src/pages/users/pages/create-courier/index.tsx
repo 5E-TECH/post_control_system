@@ -49,7 +49,7 @@ const CreateCourier = () => {
       <Form onFinish={onFinish} className="pt-5!">
         <Form.Item
           name="region_id"
-          rules={[{ required: true, message: "Hududni kiriting" }]}
+          rules={[{ required: true, message: "Hududni tanlang" }]}
         >
           <Select
             className="custom-select-dropdown !h-[48px]"
