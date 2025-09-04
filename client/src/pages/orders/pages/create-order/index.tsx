@@ -14,7 +14,7 @@ const CreateOrder = () => {
             <Check className="w-[10px] h-[10px] text-white" />
           </div>
 
-          <span className="font-medium text-[22px] text-[#2E263DE5]">01</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5]">01</span>
 
           <div className="flex flex-col">
             <span className="font-medium text-[#2E263DE5] text-[15px]">
@@ -31,7 +31,7 @@ const CreateOrder = () => {
         <div className="flex items-center gap-2 mt-2">
           <div className="flex w-[18px] h-[18px] rounded-full p-[3px] border-4 border-[var(--color-bg-sy)]"></div>
 
-          <span className="font-medium text-[22px] text-[#2E263DE5]">02</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5]">02</span>
 
           <div className="flex flex-col">
             <span className="font-medium text-[#2E263DE5] text-[15px]">
@@ -50,7 +50,7 @@ const CreateOrder = () => {
             <Check className="w-[10px] h-[10px] text-white" />
           </div>
 
-          <span className="font-medium text-[22px] text-[#2E263DE5]">03</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5]">03</span>
 
           <div className="flex flex-col">
             <span className="font-medium text-[#2E263DE5] text-[15px]">

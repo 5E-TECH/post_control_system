@@ -31,7 +31,7 @@ const CreateRegistrator = lazy(
 const SelectRole = lazy(() => import("../pages/select-role"));
 const AuthRole = lazy(() => import("../pages/auth/authRole"));
 const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
-const NotFound = lazy(() => import("../pages/orders/pages/create-order"));
+const NotFound = lazy(() => import("../shared/ui/NotFound"));
 
 const AppRouters = () => {
   return useRoutes([
