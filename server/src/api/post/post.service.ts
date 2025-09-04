@@ -123,15 +123,19 @@ export class PostService {
     }
   }
 
-  async receivePost(id: string, ordersArrayDto: ReceivePostDto) {
+  async receivePost(
+    user: JwtPayload,
+    id: string,
+    ordersArrayDto: ReceivePostDto,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // 📦 Postni topamiz
+      // Postni topamiz
       const post = await queryRunner.manager.findOne(PostEntity, {
-        where: { id },
+        where: { id, courier_id: user.id },
         relations: ['orders'],
       });
 
@@ -142,7 +146,7 @@ export class PostService {
       // DTO orqali kelgan order_id lar
       const waitingOrderIds = ordersArrayDto.order_ids;
 
-      // ✅ Kelgan id-lar => WAITING
+      // Kelgan id-lar => WAITING
       if (waitingOrderIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
@@ -151,7 +155,7 @@ export class PostService {
         );
       }
 
-      // ❌ Qolgan (post ichida bor, lekin dto da yo‘q) orderlar => RECEIVED
+      // Qolgan (post ichida bor, lekin dto da yo‘q) orderlar => RECEIVED
       const remainingOrders = post.orders.filter(
         (order) => !waitingOrderIds.includes(order.id),
       );
@@ -166,7 +170,7 @@ export class PostService {
         );
       }
 
-      // 📌 Postning statusi har doim RECEIVED bo‘lib qoladi
+      // Postning statusi har doim RECEIVED bo‘lib qoladi
       await queryRunner.manager.update(
         PostEntity,
         { id },
@@ -240,11 +244,59 @@ export class PostService {
     }
   }
 
-  async receiveCanceledPost(ordersArrayDto: ReceivePostDto) {
+  async receiveCanceledPost(id: string, ordersArrayDto: ReceivePostDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     try {
+      // Pochtani topamiz
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id },
+        relations: ['orders'],
+      });
+
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+
+      // DTO orqali kelgan order_id lar
+      const canceledOrderIds = ordersArrayDto.order_ids;
+
+      // Kelgan id-lar => CLOSED
+      if (canceledOrderIds.length > 0) {
+        await queryRunner.manager.update(
+          OrderEntity,
+          { id: In(canceledOrderIds), post_id: id },
+          { status: Order_status.CLOSED },
+        );
+      }
+
+      // Qolgan orderlar => CANCELED
+      const remainingOrders = post.orders.filter(
+        (order) => !canceledOrderIds.includes(order.id),
+      );
+
+      if (remainingOrders.length > 0) {
+        const remainingIds = remainingOrders.map((o) => o.id);
+
+        await queryRunner.manager.update(
+          OrderEntity,
+          { id: In(remainingIds), post_id: id },
+          { status: Order_status.CANCELLED },
+        );
+      }
+
+      // Pochtaning statusi har doim Canceled_RECEIVED bo‘lib qoladi
+      await queryRunner.manager.update(
+        PostEntity,
+        { id },
+        { status: Post_status.CANCELED_RECEIVED },
+      );
+
+      await queryRunner.commitTransaction();
+
+      return successRes({}, 200, 'Post received successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -252,29 +304,4 @@ export class PostService {
       await queryRunner.release();
     }
   }
-
-  // async remove(id: string) {
-  //   const queryRunner = this.dataSource.createQueryRunner();
-  //   await queryRunner.connect();
-  //   await queryRunner.startTransaction();
-  //   try {
-  //     const post = await this.postRepo.findOne({ where: { id } });
-  //     if (!post) {
-  //       throw new NotFoundException('Post not found');
-  //     }
-  //     const orders = await this.orderRepo.findBy({ post_id: id });
-  //     for (const order of orders) {
-  //       order.post_id = null;
-  //       await queryRunner.manager.save(order);
-  //     }
-  //     await queryRunner.manager.remove(PostEntity, post);
-  //     await queryRunner.commitTransaction();
-  //     return successRes(null, 200, 'Post deleted');
-  //   } catch (error) {
-  //     await queryRunner.rollbackTransaction();
-  //     return catchError(error);
-  //   } finally {
-  //     await queryRunner.release();
-  //   }
-  // }
 }
