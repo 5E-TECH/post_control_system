@@ -227,6 +227,7 @@ export class UserService {
     try {
       const allUsers = await this.userRepo.find({
         where: { role: Not(Roles.SUPERADMIN) },
+        relations:['region']
       });
       return successRes(allUsers, 200, 'All users');
     } catch (error) {
