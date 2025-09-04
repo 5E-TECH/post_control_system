@@ -5,8 +5,11 @@ import Vector from '../../../shared/assets/profile-image/Vector.svg';
 import Star from '../../../shared/assets/profile-image/star.svg';
 import { useProfile } from '../../../shared/api/hooks/useProfile';
 import EditProfileModal from '../ui/Popap';
+import { setEditing } from '../../../shared/lib/features/profile/profileEditSlice';
+import { useDispatch } from 'react-redux';
 
 const Overview = () => {
+  const dispatch = useDispatch();
   const { getUser } = useProfile();
   const { data, isLoading, refetch } = getUser();
   const [open, setOpen] = useState(false);
@@ -14,13 +17,13 @@ const Overview = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Spin size="large" tip="Loading profile..." />
+        <Spin size="large" tip="Loading profile..." fullscreen />
       </div>
     );
   }
 
   const user = data?.data;
-
+  console.log(user)
   return (
     <div className="flex justify-center min-h-screen px-4 md:px-8 lg:px-16">
       <div className="flex flex-col w-full max-w-[900px]">
@@ -133,8 +136,6 @@ const Overview = () => {
                 </div>
               )}
 
-
-
               {user.role && (
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -163,7 +164,16 @@ const Overview = () => {
         <div className="flex justify-center items-center mt-6">
           <div className="flex flex-wrap justify-center gap-4">
             <button
-              onClick={() => setOpen(true)}
+              onClick={() => {
+                setOpen(true);
+                dispatch(
+                  setEditing({
+                    first_name: user?.first_name,
+                    last_name: user?.last_name,
+                    phone_number: user?.phone_number,
+                  }),
+                );
+              }}
               className="hover:bg-[#9b72f5] border-none bg-[#8C57FF]  px-4 h-[38px] w-[100px] rounded-[6px] text-white"
             >
               Edit
@@ -175,7 +185,7 @@ const Overview = () => {
           <EditProfileModal
             open={open}
             onClose={() => setOpen(false)}
-            user={user} 
+            user={user}
             refetch={refetch}
           />
         )}
