@@ -8,12 +8,13 @@ import { CreateCashBoxDto } from './dto/create-cash-box.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
-import { catchError } from 'rxjs';
+import { catchError } from 'src/infrastructure/lib/response';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
-import { DataSource, DeepPartial } from 'typeorm';
+import { DataSource, DeepPartial, In } from 'typeorm';
 import {
   Cashbox_type,
   Operation_type,
+  Order_status,
   PaymentMethod,
   Source_type,
 } from 'src/common/enums';
@@ -22,6 +23,10 @@ import { CreatePaymentsFromCourierDto } from './dto/payments-from-courier.dto';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { CashboxHistoryRepository } from 'src/core/repository/cashbox-history.repository';
 import { JwtPayload } from 'src/common/utils/types/user.type';
+import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
+import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderRepository } from 'src/core/repository/order.repository';
+import { MarketEntity } from 'src/core/entity/market.entity';
 
 @Injectable()
 export class CashBoxService
@@ -34,6 +39,9 @@ export class CashBoxService
 
     @InjectRepository(CashboxHistoryEntity)
     private readonly cashboxHistoryRepo: CashboxHistoryRepository,
+
+    @InjectRepository(OrderEntity)
+    private readonly orderRepo: OrderRepository,
 
     private readonly dataSource: DataSource,
   ) {
@@ -185,13 +193,128 @@ export class CashBoxService
       }
 
       await transaction.commitTransaction();
-      return successRes({}, 201, " To'lov qabul qilindi !!! ");
+      return successRes({}, 201, "To'lov qabul qilindi !!! ");
     } catch (error) {
       await transaction.rollbackTransaction();
       console.error('Xatolik:', error);
       return catchError(error.message);
     } finally {
       await transaction.release();
+    }
+  }
+
+  async paymentsToMarket(
+    user: JwtPayload,
+    paymentToMarketDto: PaymentsToMarketDto,
+  ) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { amount, market_id, comment, payment_date, payment_method } =
+        paymentToMarketDto;
+      let paymentInProcess = amount;
+
+      const market = await queryRunner.manager.findOne(MarketEntity, {
+        where: { id: market_id },
+      });
+      if (!market) {
+        throw new NotFoundException('Market you choose is not exist');
+      }
+
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) {
+        throw new NotFoundException('Main cashbox not found');
+      }
+
+      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: {
+          market_id,
+        },
+      });
+      if (!marketCashbox) {
+        throw new NotFoundException('Market cashbox not found');
+      }
+
+      // Asosiy kassadagi mablag' kiritilgan qiymatdan ko'p bo'lsa jarayonga ruxsat berilmaydi
+      if (Number(mainCashbox.balance) < Number(amount)) {
+        throw new BadRequestException(`Asosiy kassada mablag' yetarli emas`);
+      }
+
+      // Barcha sotilgan yoki yarim sotilgan mahsulotlarni topish
+      const allSoldOrders = await queryRunner.manager.find(OrderEntity, {
+        where: {
+          status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
+          market_id,
+        },
+        order: { updated_at: 'ASC' },
+      });
+
+      // Main cashboxdan pul ayirish va history yozish
+      mainCashbox.balance -= amount;
+      await queryRunner.manager.save(mainCashbox);
+
+      const mainCashboxHistory = queryRunner.manager.create(
+        CashboxHistoryEntity,
+        {
+          operation_type: Operation_type.EXPENSE,
+          cashbox_id: mainCashbox.id,
+          source_type: Source_type.MARKET_PAYMENT,
+          amount,
+          balance_after: mainCashbox.balance,
+          comment,
+          created_by: user.id,
+          payment_date,
+          payment_method,
+        },
+      );
+      await queryRunner.manager.save(mainCashboxHistory);
+
+      // Pul yetgan barcha sotilgan mahsulotlarni paid yoki paryli_paid statusiga o'zgartirish
+      for (let i = 0; i < allSoldOrders.length; i++) {
+        if (paymentInProcess >= allSoldOrders[i].to_be_paid) {
+          paymentInProcess -= allSoldOrders[i].to_be_paid;
+          allSoldOrders[i].paid_amount = allSoldOrders[i].to_be_paid;
+          allSoldOrders[i].status = Order_status.PAID;
+          await queryRunner.manager.save(allSoldOrders[i]);
+        } else {
+          (allSoldOrders[i].paid_amount = paymentInProcess),
+            (allSoldOrders[i].status = Order_status.PARTLY_PAID);
+          await queryRunner.manager.save(allSoldOrders[i]);
+          paymentInProcess = 0;
+          break;
+        }
+      }
+
+      // Market Cashboxdan pul ayirish va uni hisyoryga yozib quyish
+      marketCashbox.balance -= amount;
+      await queryRunner.manager.save(marketCashbox);
+
+      const marketCashboxHistory = await queryRunner.manager.create(
+        CashboxHistoryEntity,
+        {
+          operation_type: Operation_type.EXPENSE,
+          cashbox_id: marketCashbox.id,
+          source_type: Source_type.MARKET_PAYMENT,
+          amount,
+          balance_after: marketCashbox.balance,
+          comment,
+          created_by: user.id,
+          payment_date,
+          payment_method,
+        },
+      );
+      await queryRunner.manager.save(marketCashboxHistory);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, `Marketga ${amount} so'm to'landi`);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
     }
   }
 }
