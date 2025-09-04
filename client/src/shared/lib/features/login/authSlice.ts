@@ -20,7 +20,7 @@ export const authSlice = createSlice({
       if (action.payload) {
         localStorage.setItem("x-auth-token", action.payload?.access_token);
       } else {
-        localStorage.removeItem("x-auth-token"); // ✅ tokenni tozalash
+        localStorage.removeItem("x-auth-token");
       }
     },
     removeToken: (state) => {
