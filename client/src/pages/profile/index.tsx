@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Users, Wallet, Package, FileText, ShoppingCart } from 'lucide-react';
+import { Users, Wallet,FileText, ShoppingCart } from 'lucide-react';
 
 const Profil = () => {
   const linkClasses = (isActive: boolean) =>
