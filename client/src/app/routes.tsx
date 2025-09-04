@@ -1,12 +1,13 @@
 import Overview from '../pages/profile/overview/overview';
 import Maosh from '../pages/profile/maosh/maosh';
 import ProfilLogs from '../pages/profile/profil-logs/profil-logs';
-import ProfileProduct from '../pages/profile/products/product';
 import { lazy, memo } from 'react';
 import { useRoutes } from 'react-router-dom';
 import CreateRegistrator from '../pages/users/pages/create-registrator';
 import SelectRole from '../pages/select-role';
 import AuthRole from '../pages/auth/authRole';
+import NotFound from '../shared/ui/NotFound';
+import ProductCreate from '../pages/products/product-create';
 
 const Login = lazy(() => import('../pages/login'));
 const Auth = lazy(() => import('../pages/auth'));
@@ -74,6 +75,7 @@ const AppRouters = () => {
             },
             { path: 'mails', element: <Mails /> },
             { path: 'products', element: <Products /> },
+            { path: 'products-create', element: <ProductCreate /> },
             { path: 'send-message', element: <SendMessage /> },
             { path: 'history', element: <History /> },
             { path: 'logs', element: <LogsPage /> },
@@ -87,13 +89,13 @@ const AppRouters = () => {
                 { path: 'profil-orders', element: <ProfileOrders /> },
                 { path: 'profil-maosh', element: <Maosh /> },
                 { path: 'profil-logs', element: <ProfilLogs /> },
-                { path: 'profil-products', element: <ProfileProduct /> },
               ],
             },
           ],
         },
       ],
     },
+    { path: '*', element: <NotFound /> },
   ]);
 };
 
