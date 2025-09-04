@@ -3,6 +3,7 @@ import { memo, useState, useEffect } from 'react';
 import ProductImg from '../../shared/assets/profile-image/Image.svg';
 import { useNavigate } from 'react-router-dom';
 import { Spin } from 'antd';
+import { useProductss } from './service/getProducts';
 
 const Products = () => {
   const navigate = useNavigate();
@@ -13,6 +14,10 @@ const Products = () => {
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
+  const { getProduct } = useProductss();
+
+  const { data } = getProduct();
+  console.log(data);
 
   return (
     <div className="mt-6">
