@@ -27,6 +27,7 @@ import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { MarketEntity } from 'src/core/entity/market.entity';
+import { MarketRepository } from 'src/core/repository/market.repository';
 
 @Injectable()
 export class CashBoxService
@@ -42,6 +43,9 @@ export class CashBoxService
 
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
+
+    @InjectRepository(MarketEntity)
+    private readonly marketRepo: MarketRepository,
 
     private readonly dataSource: DataSource,
   ) {
