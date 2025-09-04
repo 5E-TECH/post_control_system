@@ -9,11 +9,11 @@ import {
 import { Operation_type, Source_type } from 'src/common/enums';
 
 export class CreateCashboxHistoryDto {
-  @IsEnum(Operation_type)
-  operation_type: Operation_type;
+  // @IsEnum(Operation_type)
+  // operation_type: Operation_type;
 
-  @IsEnum(Source_type)
-  source_type: Source_type;
+  // @IsEnum(Source_type)
+  // source_type: Source_type;
 
   @IsOptional()
   @IsString()

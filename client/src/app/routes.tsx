@@ -1,6 +1,5 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
-
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -108,6 +107,7 @@ const AppRouters = () => {
         },
       ],
     },
+    { path: '*', element: <NotFound /> },
   ]);
 };
 
