@@ -80,6 +80,12 @@ export class MarketController {
     return this.marketService.marketLogin(loginMarketDto, res);
   }
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET)
+  @Get('profile')
+  profile(@CurrentUser() user: JwtPayload) {
+    return this.marketService.profile(user);
+  }
   @UseGuards(JwtGuard)
   @Post('signout')
   async logoutMarket(@Res({ passthrough: true }) res: Response) {

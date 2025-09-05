@@ -235,6 +235,16 @@ export class MarketService {
     }
   }
 
+  async profile(user: JwtPayload): Promise<object> {
+    try {
+      const { id } = user;
+      const myProfile = await this.marketRepo.findOne({ where: { id } });
+      return successRes(myProfile, 200, 'Profile info');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async signOut(res: Response): Promise<object> {
     try {
       res.clearCookie('refreshTokenMarket');

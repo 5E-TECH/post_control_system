@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -59,8 +58,7 @@ export class UserService {
       if (!isSuperAdmin) {
         const hashedPassword = await this.bcrypt.encrypt(config.ADMIN_PASSWORD);
         const superAdminthis = this.userRepo.create({
-          first_name: config.ADMIN_FIRSTNAME,
-          last_name: config.ADMIN_LASTNAME,
+          name: config.ADMIN_NAME,
           phone_number: config.ADMIN_PHONE_NUMBER,
           password: hashedPassword,
           role: Roles.SUPERADMIN,
@@ -77,8 +75,7 @@ export class UserService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { password, phone_number, first_name, last_name, salary } =
-        createAdminDto;
+      const { password, phone_number, name, salary } = createAdminDto;
       let { payment_day } = createAdminDto;
       const existAdmin = await queryRunner.manager.findOne(UserEntity, {
         where: { phone_number },
@@ -89,20 +86,16 @@ export class UserService {
         );
       }
       if (!payment_day) {
-        const dayToPay = Number(
-          new Date(Date.now()).toLocaleDateString('uz-UZ').split('.')[0],
-        );
-
-        payment_day = dayToPay;
+        payment_day = new Date(Date.now()).getDate();
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
       const admin = queryRunner.manager.create(UserEntity, {
-        first_name,
-        last_name,
+        name,
         phone_number,
         password: hashedPassword,
         role: Roles.ADMIN,
       });
+      console.log('payment date: ', payment_day);
       await queryRunner.manager.save(admin);
       const adminSalary = queryRunner.manager.create(UserSalaryEntity, {
         user_id: admin.id,
@@ -115,6 +108,8 @@ export class UserService {
       await queryRunner.commitTransaction();
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
+      console.log(error);
+
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
@@ -127,8 +122,7 @@ export class UserService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { password, phone_number, first_name, last_name, salary } =
-        createAdminDto;
+      const { password, phone_number, name, salary } = createAdminDto;
       let { payment_day } = createAdminDto;
       const existUser = await queryRunner.manager.findOne(UserEntity, {
         where: { phone_number },
@@ -146,8 +140,7 @@ export class UserService {
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
       const user = queryRunner.manager.create(UserEntity, {
-        first_name,
-        last_name,
+        name,
         phone_number,
         password: hashedPassword,
         role: Roles.REGISTRATOR,
