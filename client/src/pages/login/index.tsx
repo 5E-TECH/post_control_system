@@ -8,7 +8,6 @@ import line from "../../shared/assets/login/Mask.svg"
 
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { clearSignInData } from "../../shared/lib/features/login/signInSlice";
 import { setToken } from "../../shared/lib/features/login/authSlice";
 import type { ILogin } from "../../shared/types/typesLogin";
 import { useLogin } from "../../shared/api/hooks/useLogin";
@@ -28,7 +27,6 @@ const Login: FC = () => {
     if(role === "user") {
       signinUser.mutate(values, {
         onSuccess: (res) => {
-          dispatch(clearSignInData());
           dispatch(setToken(res?.data?.data));
           navigate("/");
         },
@@ -37,7 +35,6 @@ const Login: FC = () => {
     else if(role === "market") {
       signinMarket.mutate(values, {
         onSuccess: (res) => {
-          dispatch(clearSignInData());
           dispatch(setToken(res?.data?.data));
           navigate("/");
         },

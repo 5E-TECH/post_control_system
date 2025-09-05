@@ -1,18 +1,7 @@
-import { ArrowRight, Check } from "lucide-react";
-import React from "react";
-import CustomerInfo from "./components/customer-info";
-import CustomerDetails from "./components/customer-details";
-import Discard from "./components/button/discard";
-import Success from "./components/button/success";
-import { Outlet, useLocation } from "react-router-dom";
+import { Check } from "lucide-react";
+import { memo } from "react";
 
-const Orders = () => {
-  const { pathname } = useLocation();
-
-  if (pathname.startsWith("/orders/confirm")) {
-    return <Outlet />;
-  }
-
+const CreateOrder = () => {
   return (
     <div className="flex gap-6 px-6 pt-6 bg-[#F4F5FA] h-[91vh]">
       <div className="w-fit h-fit pr-[81px]">
@@ -73,20 +62,8 @@ const Orders = () => {
           </div>
         </div>
       </div>
-
-      <div className="flex flex-col gap-6 w-full">
-        <CustomerInfo />
-        <CustomerDetails />
-        <div className="flex gap-4 justify-end">
-          <Discard children="Discard" />
-          <Success
-            text="Next"
-            icon={<ArrowRight className="h-[13px] w-[13px]" />}
-          />
-        </div>
-      </div>
     </div>
   );
 };
 
-export default React.memo(Orders);
+export default memo(CreateOrder);

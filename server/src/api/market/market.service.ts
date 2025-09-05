@@ -23,6 +23,8 @@ import { DataSource } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { UpdateOwnMarketDto } from './dto/update-own.dto';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
+import { CashboxHistoryRepository } from 'src/core/repository/cashbox-history.repository';
 
 @Injectable()
 export class MarketService {
@@ -30,9 +32,13 @@ export class MarketService {
     @InjectRepository(MarketEntity)
     private readonly marketRepo: MarketRepository,
 
-    @InjectRepository(CashEntity) private readonly cashRepo: CashRepository,
-    private readonly bcrypt: BcryptEncryption,
+    @InjectRepository(CashEntity)
+    private readonly cashRepo: CashRepository,
 
+    @InjectRepository(CashboxHistoryEntity)
+    private readonly cashboxHistory: CashboxHistoryRepository,
+
+    private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
     private readonly dataSource: DataSource,
   ) {}
