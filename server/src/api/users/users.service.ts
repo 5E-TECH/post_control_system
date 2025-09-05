@@ -227,7 +227,7 @@ export class UserService {
     try {
       const allUsers = await this.userRepo.find({
         where: { role: Not(Roles.SUPERADMIN) },
-        relations:['region']
+        relations: ['region'],
       });
       return successRes(allUsers, 200, 'All users');
     } catch (error) {
@@ -420,13 +420,15 @@ export class UserService {
       }
       Object.assign(user, {
         ...otherFields,
-        ...(hashedPassword && { hashedPassword: password }),
+        ...(password && { password: hashedPassword }),
       });
       await this.userRepo.save(user);
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
       return successRes(updatedUser, 200, 'User updated');
-    } catch (error) {}
+    } catch (error) {
+      return catchError(error);
+    }
   }
 
   async remove(id: string): Promise<object> {
