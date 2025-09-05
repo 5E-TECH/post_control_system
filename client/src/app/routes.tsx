@@ -36,6 +36,9 @@ const SelectRole = lazy(() => import("../pages/select-role"));
 const AuthRole = lazy(() => import("../pages/auth/authRole"));
 const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
+const CustomerInfoOrder = lazy(
+  () => import("../pages/orders/pages/customer-info")
+);
 
 const AppRouters = () => {
   return useRoutes([
@@ -67,9 +70,10 @@ const AppRouters = () => {
               element: <Orders />,
               children: [
                 {
-                  path: "confirm",
-                  element: <CreateOrder />,
+                  path: "customer-info",
+                  element: <CustomerInfoOrder />,
                 },
+                { path: "confirm", element: <CreateOrder /> },
               ],
             },
             { path: "regions", element: <Regions /> },
