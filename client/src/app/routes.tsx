@@ -1,9 +1,5 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
-import ProductCreate from "../pages/products/product-create";
-import UsersTable from "../pages/users/components/users/users-table";
-import AllMarketsTable from "../pages/users/components/users/all-markets-table";
-import AllUsersTable from "../pages/users/components/users/all-users-table";
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -39,6 +35,16 @@ const NotFound = lazy(() => import("../shared/ui/NotFound"));
 const CustomerInfoOrder = lazy(
   () => import("../pages/orders/pages/customer-info")
 );
+const AllUsersTable = lazy(
+  () => import("../pages/users/components/users/all-users-table")
+);
+const AllMarketsTable = lazy(
+  () => import("../pages/users/components/users/all-markets-table")
+);
+const UsersTable = lazy(
+  () => import("../pages/users/components/users/users-table")
+);
+const ProductCreate = lazy(() => import("../pages/products/product-create"));
 
 const AppRouters = () => {
   return useRoutes([
