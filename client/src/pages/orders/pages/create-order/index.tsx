@@ -31,7 +31,9 @@ const CreateOrder = () => {
         <div className="w-[3px] h-[40px] rounded-[20px] bg-[var(--color-bg-sy)] ml-[7px] mt-[8px]"></div>
 
         <div className="flex items-center gap-2 mt-2">
-          <div className="flex w-[18px] h-[18px] rounded-full p-[3px] border-4 border-[var(--color-bg-sy)]"></div>
+          <div className="flex w-fit rounded-full p-[4px] bg-[var(--color-bg-sy)]">
+            <Check className="w-[10px] h-[10px] text-white" />
+          </div>
 
           <span className="font-medium text-[25px] text-[#2E263DE5]">02</span>
 
@@ -45,12 +47,10 @@ const CreateOrder = () => {
           </div>
         </div>
 
-        <div className="w-[3px] h-[40px] rounded-[20px] bg-[#E3DCFB] ml-[7px] mt-[8px]"></div>
+        <div className="w-[3px] h-[40px] rounded-[20px] bg-[var(--color-bg-sy)] ml-[7px] mt-[8px]"></div>
 
         <div className="flex items-center gap-2 mt-2">
-          <div className="flex  w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#E3DCFB]">
-            <Check className="w-[10px] h-[10px] text-white" />
-          </div>
+          <div className="flex w-[18px] h-[18px] rounded-full p-[3px] border-4 border-[var(--color-bg-sy)]"></div>
 
           <span className="font-medium text-[25px] text-[#2E263DE5]">03</span>
 
