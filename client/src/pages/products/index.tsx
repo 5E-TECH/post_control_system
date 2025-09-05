@@ -5,7 +5,7 @@ const Products = () => {
   const addProductRef = useRef<AddProductRef>(null);
 
   const handleDiscard = () => {
-    addProductRef.current?.onClear(); // 🔑 shu yerda tozalaymiz
+    addProductRef.current?.onClear();
   };
 
   return (
@@ -27,7 +27,7 @@ const Products = () => {
             </div>
           </div>
         </div>
-        <div className="m-[24px]">
+        <div className="mx-[24px] mt-[24px]">
           <AddProduct ref={addProductRef} />
         </div>
       </div>
