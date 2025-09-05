@@ -4,13 +4,12 @@ import Select from "./components/select";
 import Export from "./components/export";
 import SearchInput from "./components/search-input";
 import Button from "./components/button";
-import UserTable from "./components/user-table";
 import { Outlet, useLocation } from "react-router-dom";
 
 const Users = () => {
   const { pathname } = useLocation();
 
-  const isChecked = pathname.startsWith("/users/create-user");
+  const isChecked = pathname.startsWith("/all-users/create-user");
 
   if (isChecked) return <Outlet />;
 
@@ -40,7 +39,7 @@ const Users = () => {
             <Button text="Add New User" />
           </div>
         </div>
-        <UserTable />
+        <Outlet />
       </div>
     </div>
   );

@@ -1,5 +1,9 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+import ProductCreate from "../pages/products/product-create";
+import UsersTable from "../pages/users/components/users/users-table";
+import AllMarketsTable from "../pages/users/components/users/all-markets-table";
+import AllUsersTable from "../pages/users/components/users/all-users-table";
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -70,9 +74,12 @@ const AppRouters = () => {
             },
             { path: "regions", element: <Regions /> },
             {
-              path: "users",
+              path: "all-users",
               element: <Users />,
               children: [
+                { index: true, element: <AllUsersTable /> },
+                { path: "markets", element: <AllMarketsTable /> },
+                { path: "users", element: <UsersTable /> },
                 {
                   path: "create-user",
                   element: <CreateUser />,
@@ -86,7 +93,11 @@ const AppRouters = () => {
               ],
             },
             { path: "mails", element: <Mails /> },
-            { path: "products", element: <Products /> },
+            {
+              path: "products",
+              element: <Products />,
+              children: [{ path: "create", element: <ProductCreate /> }],
+            },
             { path: "send-message", element: <SendMessage /> },
             { path: "history", element: <History /> },
             { path: "logs", element: <LogsPage /> },
