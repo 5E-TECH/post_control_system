@@ -1,0 +1,489 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Cashbox_type, Roles, Status } from 'src/common/enums';
+import config from 'src/config';
+import { UserEntity } from 'src/core/entity/users.entity';
+import { CreateCourierDto } from './dto/create-courier.dto';
+import { UpdateCourierDto } from './dto/update-courier.dto';
+import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
+import { catchError, successRes } from 'src/infrastructure/lib/response';
+import { SignInUserDto } from './dto/signInUserDto';
+import { Token } from 'src/infrastructure/lib/token-generator/token';
+import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
+import { Response } from 'express';
+import { UserRepository } from 'src/core/repository/user.repository';
+import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { CashRepository } from 'src/core/repository/cash.box.repository';
+import { DataSource, DeepPartial, Not } from 'typeorm';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { CreateAdminDto } from './dto/create-admin.dto';
+import { UpdateAdminDto } from './dto/update-admin.dto';
+import { UpdateSelfDto } from './dto/self-update.dto';
+import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
+import { UserSalaryRepository } from 'src/core/repository/user-salary.repository';
+import { RegionEntity } from 'src/core/entity/region.entity';
+import { RegionRepository } from 'src/core/repository/region.repository';
+
+@Injectable()
+export class UserService {
+  constructor(
+    @InjectRepository(UserEntity)
+    private readonly userRepo: UserRepository,
+
+    @InjectRepository(CashEntity)
+    private readonly cashRepo: CashRepository,
+
+    @InjectRepository(UserSalaryEntity)
+    private readonly userSalaryRepo: UserSalaryRepository,
+
+    @InjectRepository(RegionEntity)
+    private readonly regionRepo: RegionRepository,
+
+    private readonly bcrypt: BcryptEncryption,
+    private readonly token: Token,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  async onModuleInit() {
+    try {
+      const isSuperAdmin = await this.userRepo.findOne({
+        where: { role: Roles.SUPERADMIN },
+      });
+
+      if (!isSuperAdmin) {
+        const hashedPassword = await this.bcrypt.encrypt(config.ADMIN_PASSWORD);
+        const superAdminthis = this.userRepo.create({
+          first_name: config.ADMIN_FIRSTNAME,
+          last_name: config.ADMIN_LASTNAME,
+          phone_number: config.ADMIN_PHONE_NUMBER,
+          password: hashedPassword,
+          role: Roles.SUPERADMIN,
+        });
+        await this.userRepo.save(superAdminthis);
+      }
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async createAdmin(createAdminDto: CreateAdminDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { password, phone_number, first_name, last_name, salary } =
+        createAdminDto;
+      let { payment_day } = createAdminDto;
+      const existAdmin = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number },
+      });
+      if (existAdmin) {
+        throw new ConflictException(
+          `User with ${phone_number} number already exists`,
+        );
+      }
+      if (!payment_day) {
+        const dayToPay = Number(
+          new Date(Date.now()).toLocaleDateString('uz-UZ').split('.')[0],
+        );
+
+        payment_day = dayToPay;
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const admin = queryRunner.manager.create(UserEntity, {
+        first_name,
+        last_name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.ADMIN,
+      });
+      await queryRunner.manager.save(admin);
+      const adminSalary = queryRunner.manager.create(UserSalaryEntity, {
+        user_id: admin.id,
+        salary_amount: salary,
+        have_to_pay: salary,
+        payment_day,
+      });
+
+      await queryRunner.manager.save(adminSalary);
+      await queryRunner.commitTransaction();
+      return successRes(admin, 201, 'New Admin created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createRegistrator(createAdminDto: CreateAdminDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { password, phone_number, first_name, last_name, salary } =
+        createAdminDto;
+      let { payment_day } = createAdminDto;
+      const existUser = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number },
+      });
+      if (existUser) {
+        throw new ConflictException(
+          `User with ${phone_number} number already exists`,
+        );
+      }
+      if (!payment_day) {
+        const dayToPay = Number(
+          new Date(Date.now()).toLocaleDateString('uz-UZ').split('.')[0],
+        );
+        payment_day = dayToPay;
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const user = queryRunner.manager.create(UserEntity, {
+        first_name,
+        last_name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.REGISTRATOR,
+      });
+      await queryRunner.manager.save(user);
+
+      const userSalary = queryRunner.manager.create(UserSalaryEntity, {
+        user_id: user.id,
+        salary_amount: salary,
+        have_to_pay: salary,
+        payment_day,
+      });
+      await queryRunner.manager.save(userSalary);
+
+      await queryRunner.commitTransaction();
+      return successRes(user, 201, 'New Admin created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createCourier(createCourierDto: CreateCourierDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const {
+        password,
+        phone_number,
+        first_name,
+        last_name,
+        region_id,
+        tariff_center,
+        tariff_home,
+      } = createCourierDto;
+
+      const existUser = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number },
+      });
+      if (existUser) {
+        throw new ConflictException(
+          `User with ${phone_number} number already exists`,
+        );
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const courier = queryRunner.manager.create(UserEntity, {
+        first_name,
+        last_name,
+        phone_number,
+        password: hashedPassword,
+        region_id,
+        tariff_center,
+        tariff_home,
+      } as DeepPartial<UserEntity>);
+      await queryRunner.manager.save(courier);
+
+      const cashbox = queryRunner.manager.create(CashEntity, {
+        cashbox_type: Cashbox_type.FOR_COURIER,
+        user_id: courier.id,
+      });
+      await queryRunner.manager.save(cashbox);
+
+      await queryRunner.commitTransaction();
+      return successRes(courier, 201, `New courier created`);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async allUsers(): Promise<object> {
+    try {
+      const allUsers = await this.userRepo.find({
+        where: { role: Not(Roles.SUPERADMIN) },
+        relations:['region']
+      });
+      return successRes(allUsers, 200, 'All users');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async findOne(id: string): Promise<object> {
+    try {
+      const user = await this.userRepo.findOne({
+        where: { id: id, role: Not(Roles.SUPERADMIN) },
+      });
+      if (!user) {
+        throw new NotFoundException('User not fount');
+      }
+      return successRes(user, 200, 'User by id');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async profile(user: JwtPayload): Promise<object> {
+    try {
+      const { id } = user;
+      const myProfile = await this.userRepo.findOne({ where: { id } });
+      return successRes(myProfile, 200, 'Profile info');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateAdmin(
+    id: string,
+    updateAdminDto: UpdateAdminDto,
+    currentUser: JwtPayload,
+  ) {
+    try {
+      const { password, ...otherFields } = updateAdminDto;
+      // Find is user exist or not
+      const user = await this.userRepo.findOne({
+        where: { id, role: Roles.ADMIN },
+      });
+      if (!user) {
+        throw new NotFoundException('Admin not found');
+      }
+      // If admins try to change their status they can not
+      if (otherFields.status && currentUser.role !== Roles.SUPERADMIN) {
+        throw new BadRequestException('Only SuperAdmin can change the status');
+      }
+      // Phone number oldin ro'yxatdan o'tganmi yoki yo'qligini tekshirish
+      if (otherFields.phone_number) {
+        const existPhone = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (existPhone) {
+          throw new ConflictException(
+            `User with ${otherFields.phone_number} already exist`,
+          );
+        }
+      }
+      // If user want to edit password encript it first
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+
+      Object.assign(user, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+      await this.userRepo.save(user);
+
+      const updatedUser = await this.userRepo.findOne({ where: { id } });
+      return successRes(updatedUser, 200, 'User updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateRegistrator(id: string, updateRegistratorDto: UpdateAdminDto) {
+    try {
+      const { password, ...otherFields } = updateRegistratorDto;
+      const registrator = await this.userRepo.findOne({
+        where: { id, role: Roles.REGISTRATOR },
+      });
+      if (!registrator) {
+        throw new NotFoundException('Registrator not found');
+      }
+      if (otherFields.phone_number) {
+        const isExistPhone = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (isExistPhone) {
+          throw new BadRequestException(
+            `User with ${otherFields.phone_number} already exist`,
+          );
+        }
+      }
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+      Object.assign(registrator, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+      await this.userRepo.save(registrator);
+
+      return successRes({}, 200, 'Registrator updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateCourier(
+    id: string,
+    updateCourierDto: UpdateCourierDto,
+  ): Promise<object> {
+    try {
+      const { password, ...otherFields } = updateCourierDto;
+
+      const courier = await this.userRepo.findOne({
+        where: { id, role: Roles.COURIER },
+      });
+      if (!courier) {
+        throw new NotFoundException('User not found');
+      }
+
+      // Update qilganda telefon nomer databasada bor yoki yo'qligini tekshirish
+      if (otherFields.phone_number) {
+        const existUser = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (existUser) {
+          throw new ConflictException(
+            `User with ${otherFields.phone_number} number already exists`,
+          );
+        }
+      }
+
+      // Courierni update qilganda region_id kelsa courierRegion tableini update qilish
+      if (otherFields.region_id) {
+        const existingRegion = await this.regionRepo.findOne({
+          where: { id: otherFields.region_id },
+        });
+
+        if (!existingRegion) {
+          throw new NotFoundException('Region not found');
+        }
+      }
+
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+
+      Object.assign(courier, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+      await this.userRepo.save(courier);
+
+      const updatedUser = await this.userRepo.findOne({ where: { id } });
+      return successRes(updatedUser, 200, 'User updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async selfUpdate(id: string, selfUpdateDto: UpdateSelfDto) {
+    try {
+      const { password, ...otherFields } = selfUpdateDto;
+      const user = await this.userRepo.findOne({ where: { id } });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      if (otherFields.phone_number) {
+        const phoneNumber = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (phoneNumber) {
+          throw new ConflictException(
+            `User with ${otherFields.phone_number} number already exist`,
+          );
+        }
+      }
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+      Object.assign(user, {
+        ...otherFields,
+        ...(hashedPassword && { hashedPassword: password }),
+      });
+      await this.userRepo.save(user);
+
+      const updatedUser = await this.userRepo.findOne({ where: { id } });
+      return successRes(updatedUser, 200, 'User updated');
+    } catch (error) {}
+  }
+
+  async remove(id: string): Promise<object> {
+    try {
+      const user = await this.userRepo.findOne({ where: { id } });
+      if (!user) {
+        throw new NotFoundException('User not fount');
+      }
+      if (user.role === Roles.SUPERADMIN) {
+        throw new BadRequestException('Super admin can not be deleted!');
+      }
+      await this.userRepo.delete({ id });
+      return successRes({}, 200, 'User deleted');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async signInUser(signInDto: SignInUserDto, res: Response): Promise<object> {
+    try {
+      const { phone_number, password } = signInDto;
+
+      const user = await this.userRepo.findOne({ where: { phone_number } });
+      if (!user) {
+        throw new BadRequestException('Phone number or password incorrect');
+      }
+      if (user.status === Status.INACTIVE) {
+        throw new BadRequestException('You have been blocked by superadmin');
+      }
+      const IsMatchPassword = await this.bcrypt.compare(
+        password,
+        user?.password,
+      );
+      if (!IsMatchPassword) {
+        throw new BadRequestException('Phone number or password incorrect');
+      }
+      const { id, role, status } = user;
+      const payload: JwtPayload = { id, role, status };
+      const accessToken = await this.token.generateAccessToken(payload);
+      const refreshToken = await this.token.generateRefreshToken(payload);
+      writeToCookie(res, 'refreshToken', refreshToken);
+      return successRes(
+        { access_token: accessToken, refresh_token: refreshToken },
+        200,
+        'Logged in successfully',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async signOut(res: Response): Promise<object> {
+    try {
+      res.clearCookie('refreshToken');
+      return successRes({}, 200, 'Signed out!');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+}

@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-bg-py: #f4f5fa;
+  --color-bg-sy: #8C57FF;
+  --color-dark-bg-py: #28243d;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.dark .custom-select-dropdown .ant-select-selector {
+  background-color: #312d4b !important;
+  border-color: rgba(231, 227, 252, 0.22) !important;
+  color: rgba(231, 227, 252, 0.4) !important;
+}
+
+.dark .custom-select-dropdown .ant-select-selection-placeholder {
+  color: rgba(231, 227, 252, 0.4) !important;
+}
+
+.dark .custom-select-dropdown .ant-select-arrow {
+  color: rgba(231, 227, 252, 0.4) !important;
+}
+
+.dark .custom-select-dropdown {
+  background-color: #312d4b !important;
+  color: rgba(231, 227, 252, 0.8) !important;
+  border-radius: 8px !important;
+}
+
+.dark .custom-select-dropdown .ant-select-item-option {
+  color: rgba(231, 227, 252, 0.8) !important;
+}
+
+.dark .custom-select-dropdown .ant-select-item-option-active {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .dark-dropdown {
+   background-color: #312d4b !important;
+  color: white;
+  transition: all;
+}
+
+.dark .dark-dropdown .ant-select-item-option {
+  color: white !important;
+  transition: all;
+}
+
+.dark .dark-dropdown .ant-select-item-option-active {
+   background-color: #312d4b !important;
+  transition: all;
+}
