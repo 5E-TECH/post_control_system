@@ -6,12 +6,13 @@ interface Props {
   text: string;
   icon: JSX.Element;
   className?: string;
+  path:string
 }
 
-const Success: FC<Props> = ({ text, icon, className }) => {
+const Success: FC<Props> = ({ text, icon, className, path }) => {
   const navigate = useNavigate();
   const onClick = () => {
-    navigate("/orders/confirm");
+    navigate(path);
   };
   return (
     <Button

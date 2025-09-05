@@ -3,7 +3,7 @@ import { Option } from "antd/es/mentions";
 import { Bell } from "lucide-react";
 import { memo } from "react";
 
-const CustomerInfo = () => {
+const CustomerInfocomp = () => {
   return (
     <div className="w-full p-5 rounded-md bg-[#ffffff] shadow-lg">
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px]">
@@ -51,4 +51,4 @@ const CustomerInfo = () => {
   );
 };
 
-export default memo(CustomerInfo);
+export default memo(CustomerInfocomp);
