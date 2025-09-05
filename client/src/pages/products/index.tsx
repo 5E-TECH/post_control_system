@@ -7,7 +7,6 @@ import { useProductss } from './service/getProducts';
 
 const Products = () => {
   const navigate = useNavigate();
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
