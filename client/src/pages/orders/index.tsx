@@ -18,8 +18,8 @@ const Orders = () => {
   }
   return (
     <div className="p-7 pt-[21px]">
-      <div className="rounded-md shadow-lg">
-        <div className="flex items-center justify-between px-5 pt-[25px]">
+      <div className="rounded-md shadow-lg bg-[#ffffff]">
+        <div className="flex items-center justify-between px-5 pt-[20px]">
           <h1 className="font-medium text-[18px] text-[#2E263DE5]">
             Orders list
           </h1>
@@ -27,43 +27,43 @@ const Orders = () => {
             onClick={() => navigate("/orders/customer-info")}
             className="bg-[#8C57FF]! text-[#ffffff]! w-[131px]! h-[38px]! hover:opacity-85"
           >
-            Add Order <ArrowRight />
+            Add Order <ArrowRight className="w-[15px] h-[15px]" />
           </Button>
         </div>
         <table className="overflow-hidden rounded-md mt-5">
           <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
             <tr>
-              <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <th className="w-[265px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
                   #
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
-              <th className="w-[270px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <th className="w-[265px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
                   CUSTOMER
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
-              <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <th className="w-[265px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
                   NUMBER
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
-              <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <th className="w-[265px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
                   STATUS
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
-              <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <th className="w-[265px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
                   PRICE
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
-              <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <th className="w-[265px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
                   ITEMS
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>

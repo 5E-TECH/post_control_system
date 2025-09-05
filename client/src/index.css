@@ -4,7 +4,7 @@
 
 @theme {
   --color-bg-py: #f4f5fa;
-  --color-bg-sy: #8C57FF;
+  --color-bg-sy: #8c57ff;
   --color-dark-bg-py: #28243d;
 }
 
@@ -41,7 +41,7 @@
 }
 
 .dark .dark-dropdown {
-   background-color: #312d4b !important;
+  background-color: #312d4b !important;
   color: white;
   transition: all;
 }
@@ -52,6 +52,10 @@
 }
 
 .dark .dark-dropdown .ant-select-item-option-active {
-   background-color: #312d4b !important;
+  background-color: #312d4b !important;
   transition: all;
+}
+
+.scroll-order-items::-webkit-scrollbar {
+  display: none;
 }

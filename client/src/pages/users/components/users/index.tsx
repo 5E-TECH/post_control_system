@@ -28,31 +28,31 @@ const UsersTableComp: FC<Props> = ({ data }) => {
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[270px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 PHONE
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 ROLE
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 LOCATION
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 STATUS
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 ACTION
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
