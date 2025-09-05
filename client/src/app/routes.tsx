@@ -32,6 +32,19 @@ const SelectRole = lazy(() => import("../pages/select-role"));
 const AuthRole = lazy(() => import("../pages/auth/authRole"));
 const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
+const CustomerInfoOrder = lazy(
+  () => import("../pages/orders/pages/customer-info")
+);
+const AllUsersTable = lazy(
+  () => import("../pages/users/components/users/all-users-table")
+);
+const AllMarketsTable = lazy(
+  () => import("../pages/users/components/users/all-markets-table")
+);
+const UsersTable = lazy(
+  () => import("../pages/users/components/users/users-table")
+);
+const ProductCreate = lazy(() => import("../pages/products/product-create"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -63,16 +76,20 @@ const AppRouters = () => {
               element: <Orders />,
               children: [
                 {
-                  path: "confirm",
-                  element: <CreateOrder />,
+                  path: "customer-info",
+                  element: <CustomerInfoOrder />,
                 },
+                { path: "confirm", element: <CreateOrder /> },
               ],
             },
             { path: "regions", element: <Regions /> },
             {
-              path: "users",
+              path: "all-users",
               element: <Users />,
               children: [
+                { index: true, element: <AllUsersTable /> },
+                { path: "markets", element: <AllMarketsTable /> },
+                { path: "users", element: <UsersTable /> },
                 {
                   path: "create-user",
                   element: <CreateUser />,
@@ -86,7 +103,11 @@ const AppRouters = () => {
               ],
             },
             { path: "mails", element: <Mails /> },
-            { path: "products", element: <Products /> },
+            {
+              path: "products",
+              element: <Products />,
+              children: [{ path: "create", element: <ProductCreate /> }],
+            },
             { path: "send-message", element: <SendMessage /> },
             { path: "history", element: <History /> },
             { path: "logs", element: <LogsPage /> },
