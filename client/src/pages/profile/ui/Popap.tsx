@@ -1,6 +1,9 @@
-import { memo, useEffect } from "react";
-import { Modal, Form, Input, Button, message } from "antd";
-import { useProfile } from "../../../shared/api/hooks/useProfile";
+import { memo } from 'react';
+import { Modal, Form, Input, Button, message } from 'antd';
+import { useProfile } from '../../../shared/api/hooks/useProfile';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '../../../app/store';
+import { setEditing } from '../../../shared/lib/features/profile/profileEditSlice';
 
 interface EditProfileModalProps {
   open: boolean;
@@ -21,32 +24,29 @@ interface FormValues {
   password?: string;
 }
 
-const EditProfileModal = ({ open, onClose, user, refetch }: EditProfileModalProps) => {
+const EditProfileModal = ({
+  open,
+  onClose,
+  user,
+  refetch,
+}: EditProfileModalProps) => {
   const [form] = Form.useForm<FormValues>();
   const { updateProfil } = useProfile();
 
-  useEffect(() => {
-    if (user) {
-      form.setFieldsValue({
-        first_name: user.first_name,
-        last_name: user.last_name,
-        phone_number: user.phone_number,
-        password: "",
-      });
-    }
-  }, [user, form]);
-
+  const data = useSelector((state: RootState) => state.profileEditSlice.value);
+  const dispatch = useDispatch();
   const handleSubmit = async (values: FormValues) => {
     try {
       await updateProfil.mutateAsync({
         id: user.id,
         data: values,
       });
-      message.success("Profil muvaffaqiyatli yangilandi!");
+      message.success('Profil muvaffaqiyatli yangilandi!');
+      dispatch(setEditing(null));
       refetch();
       onClose();
     } catch (error) {
-      message.error("Xatolik yuz berdi, qayta urinib ko‘ring!");
+      message.error('Xatolik yuz berdi, qayta urinib ko‘ring!');
       console.error(error);
     }
   };
@@ -58,40 +58,21 @@ const EditProfileModal = ({ open, onClose, user, refetch }: EditProfileModalProp
       onCancel={onClose}
       footer={null}
       centered
-      destroyOnClose  // ✅ modal yopilganda eski qiymatlar saqlanmaydi
+      destroyOnHidden
     >
       <Form
-        form={form}           // ✅ form hook ulandi
+        form={form}
         layout="vertical"
         onFinish={handleSubmit}
-        preserve={false}      // ✅ eski form qiymatlari saqlanmaydi
+        preserve={false}
+        initialValues={data || user}
       >
-        <Form.Item
-          label="First Name"
-          name="first_name"
-          rules={[{ required: true, message: "First name majburiy!" }]}
-        >
-          <Input placeholder="First name" />
-        </Form.Item>
-
-        <Form.Item
-          label="Last Name"
-          name="last_name"
-          rules={[{ required: true, message: "Last name majburiy!" }]}
-        >
-          <Input placeholder="Last name" />
-        </Form.Item>
-
         <Form.Item
           label="Phone Number"
           name="phone_number"
-          rules={[{ required: true, message: "Phone number majburiy!" }]}
+          rules={[{ required: true, message: 'Phone number majburiy!' }]}
         >
           <Input placeholder="Phone number" />
-        </Form.Item>
-
-        <Form.Item label="Password" name="password">
-          <Input.Password placeholder="New password" />
         </Form.Item>
 
         <Form.Item>
