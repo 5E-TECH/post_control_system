@@ -19,7 +19,7 @@ const Orders = () => {
   return (
     <div className="p-7 pt-[21px]">
       <div className="rounded-md shadow-lg bg-[#ffffff]">
-        <div className="flex items-center justify-between px-5 pt-[25px]">
+        <div className="flex items-center justify-between px-5 pt-[20px]">
           <h1 className="font-medium text-[18px] text-[#2E263DE5]">
             Orders list
           </h1>
