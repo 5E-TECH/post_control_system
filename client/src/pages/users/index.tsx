@@ -14,7 +14,7 @@ const Users = () => {
   if (isChecked) return <Outlet />;
 
   return (
-    <div className="p-6 h-[91vh]">
+    <div className="p-6">
       <UsersStatistics />
       <div className="rounded-md mt-6 bg-[#FFFFFF] shadow-lg flex flex-col dark:bg-[#312D4B] pt-[20px]">
         <div className="pl-[20px] pr-[20px]">
