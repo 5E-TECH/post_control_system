@@ -31,6 +31,7 @@ const CreateRegistrator = lazy(
 const SelectRole = lazy(() => import("../pages/select-role"));
 const AuthRole = lazy(() => import("../pages/auth/authRole"));
 const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
+const OrderDetail = lazy(() => import("../pages/orders/pages/orderDetail"));
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
 const CustomerInfoOrder = lazy(
   () => import("../pages/orders/pages/customer-info")
@@ -80,6 +81,10 @@ const AppRouters = () => {
                   element: <CustomerInfoOrder />,
                 },
                 { path: "confirm", element: <CreateOrder /> },
+                {
+                  path: "customer/detail",
+                  element: <OrderDetail />,
+                },
               ],
             },
             { path: "regions", element: <Regions /> },

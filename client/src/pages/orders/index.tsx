@@ -13,7 +13,10 @@ const Orders = () => {
 
   const { pathname } = useLocation();
 
-  if (pathname.startsWith("/orders/")) {
+  if (
+    pathname.startsWith("/orders/confirm") ||
+    pathname.startsWith("/orders/customer/detail")
+  ) {
     return <Outlet />;
   }
   return (
