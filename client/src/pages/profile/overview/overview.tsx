@@ -23,7 +23,6 @@ const Overview = () => {
   }
 
   const user = data?.data;
-  console.log(user);
   return (
     <div className="flex justify-center min-h-screen px-4 md:px-8 lg:px-16">
       <div className="flex flex-col w-full max-w-[900px]">
