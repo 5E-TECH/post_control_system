@@ -13,7 +13,7 @@ const CustomerInfoOrder = () => {
     return <Outlet />;
   }
   return (
-    <div className="flex gap-6 px-6 pt-6 bg-[#F4F5FA] h-[91vh]">
+    <div className="flex gap-6 px-6 pt-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
       <div className="w-fit h-fit pr-[81px]">
         <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
           Process
@@ -24,13 +24,15 @@ const CustomerInfoOrder = () => {
             <Check className="w-[10px] h-[10px] text-white" />
           </div>
 
-          <span className="font-medium text-[25px] text-[#2E263DE5]">01</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+            01
+          </span>
 
           <div className="flex flex-col">
-            <span className="font-medium text-[#2E263DE5] text-[15px]">
+            <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
               Market details
             </span>
-            <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap">
+            <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap dark:text-[#AEAAC2]">
               Enter your Market Details
             </span>
           </div>
@@ -41,32 +43,32 @@ const CustomerInfoOrder = () => {
         <div className="flex items-center gap-2 mt-2">
           <div className="flex w-[18px] h-[18px] rounded-full p-[3px] border-4 border-[var(--color-bg-sy)]"></div>
 
-          <span className="font-medium text-[25px] text-[#2E263DE5]">02</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+            02
+          </span>
 
           <div className="flex flex-col">
-            <span className="font-medium text-[#2E263DE5] text-[15px]">
+            <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
               Customer Info
             </span>
-            <span className="font-normal text-[#2E263DB2] text-[13px]">
+            <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
               Setup information{" "}
             </span>
           </div>
         </div>
 
-        <div className="w-[3px] h-[40px] rounded-[20px] bg-[#E3DCFB] ml-[7px] mt-[8px]"></div>
+        <div className="w-[3px] h-[40px] rounded-[20px] bg-[#E3DCFB] ml-[7px] mt-[8px] dark:bg-[#8C57FF29]"></div>
 
         <div className="flex items-center gap-2 mt-2">
-          <div className="flex  w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#E3DCFB]">
-            <Check className="w-[10px] h-[10px] text-white" />
-          </div>
+          <div className="flex  w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#372C5A] dark:bg-[#312D4B]"></div>
 
           <span className="font-medium text-[25px] text-[#2E263DE5]">03</span>
 
           <div className="flex flex-col">
-            <span className="font-medium text-[#2E263DE5] text-[15px]">
+            <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
               Order details
             </span>
-            <span className="font-normal text-[#2E263DB2] text-[13px]">
+            <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
               Add order details
             </span>
           </div>
@@ -77,7 +79,7 @@ const CustomerInfoOrder = () => {
         <CustomerInfo />
         <CustomerDetails />
         <div className="flex gap-4 justify-end">
-          <Discard children="Discard" />
+          <Discard children="Discard"/>
           <Success
             text="Next"
             icon={<ArrowRight className="h-[13px] w-[13px]" />}

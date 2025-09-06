@@ -16,13 +16,13 @@ const CreateOrder = () => {
             <Check className="w-[10px] h-[10px] text-white" />
           </div>
 
-          <span className="font-medium text-[25px] text-[#2E263DE5]">01</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">01</span>
 
           <div className="flex flex-col">
-            <span className="font-medium text-[#2E263DE5] text-[15px]">
+            <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
               Market details
             </span>
-            <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap">
+            <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap dark:text-[#AEAAC2]">
               Enter your Market Details
             </span>
           </div>
@@ -35,13 +35,13 @@ const CreateOrder = () => {
             <Check className="w-[10px] h-[10px] text-white" />
           </div>
 
-          <span className="font-medium text-[25px] text-[#2E263DE5]">02</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">02</span>
 
           <div className="flex flex-col">
-            <span className="font-medium text-[#2E263DE5] text-[15px]">
+            <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
               Customer Info
             </span>
-            <span className="font-normal text-[#2E263DB2] text-[13px]">
+            <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
               Setup information{" "}
             </span>
           </div>
@@ -52,13 +52,13 @@ const CreateOrder = () => {
         <div className="flex items-center gap-2 mt-2">
           <div className="flex w-[18px] h-[18px] rounded-full p-[3px] border-4 border-[var(--color-bg-sy)]"></div>
 
-          <span className="font-medium text-[25px] text-[#2E263DE5]">03</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">03</span>
 
           <div className="flex flex-col">
-            <span className="font-medium text-[#2E263DE5] text-[15px]">
+            <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
               Order details
             </span>
-            <span className="font-normal text-[#2E263DB2] text-[13px]">
+            <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
               Add order details
             </span>
           </div>
