@@ -18,9 +18,9 @@ const Orders = () => {
   }
   return (
     <div className="p-7 pt-[21px]">
-      <div className="rounded-md shadow-lg bg-[#ffffff]">
+      <div className="rounded-md shadow-lg bg-[#ffffff]  dark:bg-[var(--color-dark-bg-py)]">
         <div className="flex items-center justify-between px-5 pt-[20px]">
-          <h1 className="font-medium text-[18px] text-[#2E263DE5]">
+          <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
             Orders list
           </h1>
           <Button
