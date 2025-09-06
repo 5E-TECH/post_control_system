@@ -18,7 +18,7 @@ const Sidebar = () => {
         <li>
           <NavLink to={'/'} end={true} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <House />
-            <span>Dashboards</span>
+            <span>Dashboard</span>
           </NavLink>
         </li>
         <li>
@@ -34,7 +34,7 @@ const Sidebar = () => {
           </NavLink>
         </li>
         <li>
-          <NavLink to={'/users'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
+          <NavLink to={'/all-users'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <UserRound />
             <span>Users</span>
           </NavLink>

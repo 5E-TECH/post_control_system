@@ -1,13 +1,12 @@
-import { Edit, FilePlus, Send, Trash } from 'lucide-react';
-import { memo, useState, useEffect } from 'react';
-import ProductImg from '../../shared/assets/profile-image/Image.svg';
-import { useNavigate } from 'react-router-dom';
-import { Spin } from 'antd';
-import { useProductss } from './service/getProducts';
+import { Edit, FilePlus, Send, Trash } from "lucide-react";
+import { memo, useState, useEffect } from "react";
+import ProductImg from "../../shared/assets/profile-image/Image.svg";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Spin } from "antd";
+import { useProductss } from "./service/getProducts";
 
 const Products = () => {
   const navigate = useNavigate();
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,6 +18,9 @@ const Products = () => {
   const { data } = getProduct();
   console.log(data);
 
+  const { pathname } = useLocation();
+
+  if (pathname.startsWith("/products/create")) return <Outlet />;
   return (
     <div className="mt-6">
       <div className="flex flex-col md:flex-row gap-3 md:gap-0 md:items-center md:justify-between px-4">
@@ -35,7 +37,7 @@ const Products = () => {
           </button>
 
           <button
-            onClick={() => navigate('/products-create')}
+            onClick={() => navigate("/products/create")}
             className="w-[146px] h-[38px] bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
           >
             <FilePlus size={18} />

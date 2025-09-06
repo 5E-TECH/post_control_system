@@ -667,6 +667,158 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  // async rollbackOrderToWaiting(user: JwtPayload, id: string) {
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+
+  //   try {
+  //     // 1. Orderni olish
+  //     const order = await queryRunner.manager.findOne(OrderEntity, {
+  //       where: { id },
+  //       relations: ['market', 'courier'],
+  //     });
+  //     if (!order) throw new NotFoundException('Order not found');
+
+  //     if (![Order_status.SOLD, Order_status.CANCELLED].includes(order.status)) {
+  //       throw new BadRequestException(
+  //         `Order rollback uchun mos emas (status: ${order.status})`,
+  //       );
+  //     }
+
+  //     const market = await queryRunner.manager.findOne(MarketEntity, {
+  //       where: { id: order.market_id },
+  //     });
+  //     if (!market) throw new NotFoundException('Market not found');
+
+  //     const courier = await queryRunner.manager.findOne(UserEntity, {
+  //       where: { id: order.post.courier_id },
+  //     });
+  //     if (!courier) throw new NotFoundException('Courier not found');
+
+  //     const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
+  //       where: { cashbox_type: Cashbox_type.FOR_MARKET, market_id: market.id },
+  //     });
+  //     if (!marketCashbox)
+  //       throw new NotFoundException('Market cashbox not found');
+
+  //     const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
+  //       where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier.id },
+  //     });
+  //     if (!courierCashbox)
+  //       throw new NotFoundException('Courier cashbox not found');
+
+  //     const rollbackComment = `[ROLLBACK] ${order.comment || ''}`;
+
+  //     const
+
+  //     // 2. SOLD / PARTLY_SOLD → pulni qaytarish
+  //     if (order.status === Order_status.SOLD) {
+  //       const deliveringPlace = order.where_deliver;
+
+  //       const marketTarif: number =
+  //         deliveringPlace === Where_deliver.CENTER
+  //           ? market.tariff_center
+  //           : market.tariff_home;
+
+  //       const courierTarif: number =
+  //         deliveringPlace === Where_deliver.CENTER
+  //           ? courier.tariff_center
+  //           : courier.tariff_home;
+
+  //       const to_be_paid: number = extraCost
+  //         ? order.total_price - extraCost - marketTarif
+  //         : order.total_price - marketTarif;
+
+  //       const courier_to_be_paid: number = extraCost
+  //         ? order.total_price - extraCost - courierTarif
+  //         : order.total_price - courierTarif;
+  //       if (order.to_be_paid && order.to_be_paid > 0) {
+  //         marketCashbox.balance -= order.to_be_paid;
+  //         await queryRunner.manager.save(marketCashbox);
+
+  //         await queryRunner.manager.save(
+  //           queryRunner.manager.create(CashboxHistoryEntity, {
+  //             operation_type: Operation_type.EXPENSE,
+  //             cashbox_id: marketCashbox.id,
+  //             source_id: order.id,
+  //             source_type: Source_type.CORRECTION,
+  //             amount: order.to_be_paid,
+  //             balance_after: marketCashbox.balance,
+  //             comment: rollbackComment,
+  //             created_by: user.id,
+  //           }),
+  //         );
+  //       }
+
+  //       // courier rollback
+  //       const courierPayment = order.to_be_paid ?? 0;
+  //       if (courierPayment > 0) {
+  //         courierCashbox.balance -= courierPayment;
+  //         await queryRunner.manager.save(courierCashbox);
+
+  //         await queryRunner.manager.save(
+  //           queryRunner.manager.create(CashboxHistoryEntity, {
+  //             operation_type: Operation_type.EXPENSE,
+  //             cashbox_id: courierCashbox.id,
+  //             source_id: order.id,
+  //             source_type: Source_type.ROLLBACK,
+  //             amount: courierPayment,
+  //             balance_after: courierCashbox.balance,
+  //             comment: rollbackComment,
+  //             created_by: user.id,
+  //           }),
+  //         );
+  //       }
+
+  //       // agar PARTLY_SOLD bo‘lsa → yaratilgan CANCELLED order’ni ham qaytarish
+  //       if (order.status === Order_status.PARTLY_SOLD) {
+  //         const childOrders = await queryRunner.manager.find(OrderEntity, {
+  //           where: {
+  //             parent_order_id: order.id,
+  //             status: Order_status.CANCELLED,
+  //           },
+  //         });
+  //         for (const child of childOrders) {
+  //           child.status = Order_status.WAITING;
+  //           await queryRunner.manager.save(child);
+  //         }
+  //       }
+  //     }
+
+  //     // 3. CANCELLED → agar extraCost bo‘lsa, qaytarib yozamiz
+  //     if (order.status === Order_status.CANCELLED && order.extraCost) {
+  //       marketCashbox.balance += order.extraCost;
+  //       await queryRunner.manager.save(marketCashbox);
+
+  //       await queryRunner.manager.save(
+  //         queryRunner.manager.create(CashboxHistoryEntity, {
+  //           operation_type: Operation_type.INCOME,
+  //           cashbox_id: marketCashbox.id,
+  //           source_id: order.id,
+  //           source_type: Source_type.ROLLBACK,
+  //           amount: order.extraCost,
+  //           balance_after: marketCashbox.balance,
+  //           comment: rollbackComment,
+  //           created_by: user.id,
+  //         }),
+  //       );
+  //     }
+
+  //     // 4. Asosiy orderni WAITING ga qaytarish
+  //     order.status = Order_status.WAITING;
+  //     await queryRunner.manager.save(order);
+
+  //     await queryRunner.commitTransaction();
+  //     return successRes({}, 200, 'Order WAITING ga qaytarildi');
+  //   } catch (err) {
+  //     await queryRunner.rollbackTransaction();
+  //     throw err;
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
+
   async remove(id: string) {
     try {
       const order = await this.orderRepo.findOne({
