@@ -32,6 +32,7 @@ const SelectRole = lazy(() => import("../pages/select-role"));
 const AuthRole = lazy(() => import("../pages/auth/authRole"));
 const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
 const OrderDetail = lazy(() => import("../pages/orders/pages/orderDetail"));
+const CashDetail = lazy(() => import("../pages/payments/pages/cashDetail"))
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
 const CustomerInfoOrder = lazy(
   () => import("../pages/orders/pages/customer-info")
@@ -116,7 +117,9 @@ const AppRouters = () => {
             { path: "send-message", element: <SendMessage /> },
             { path: "history", element: <History /> },
             { path: "logs", element: <LogsPage /> },
-            { path: "payments", element: <Payments /> },
+            { path: "payments", element: <Payments />, children: [
+              {path: "cash-detail", element: <CashDetail/>}
+            ] },
             { path: "roles-permissions", element: <RolesPermissions /> },
             {
               path: "profile",

@@ -1,25 +1,263 @@
-import { ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
-import React from "react";
+import { ChevronLeft, ChevronRight, MoreVertical, Search } from "lucide-react";
+import React, { useState } from "react";
 import Select from "../users/components/select";
+import Popup from "../../shared/ui/Popup";
+import { X } from "lucide-react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 const Payments = () => {
+  const [showMarket, setShowMarket] = useState(false);
+  const [showCurier, setShowCurier] = useState(false);
+
+  const navigate = useNavigate()
+
+  const {pathname} = useLocation()
+
+  if(pathname.startsWith("/payments/cash-detail")) {
+    return <Outlet/>
+  }
+
   return (
     <div className="mt-10">
       <div className="grid grid-cols-3 gap-14 text-center text-2xl items-end mx-5 ">
-        <div className="py-15 rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white">
+        <div
+          onClick={() => setShowMarket(true)}
+          className="py-15 rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
+        >
           <h3>Berilishi kerak</h3>
           <strong className="block pt-3">10 000 000 UZS</strong>
         </div>
 
-        <div className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white">
+        <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
+          <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d]">
+            <button
+              onClick={() => setShowMarket(false)}
+              className="cursor-pointer bg-red-600 hover:bg-red-700 text-white p-2 rounded- ml-111 flex items-center justify-center shadow-md"
+            >
+              <X size={18} />
+            </button>
+            <h1 className="font-bold text-left">Choose Market</h1>
+            <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
+              <input
+                type="text"
+                placeholder="Search order..."
+                className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
+              />
+              <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
+            </div>
+            <div className="max-h-[520px] overflow-y-auto">
+              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
+                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+                  <tr>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        # ID
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        MARKET NAME
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="pl-89 py-2">
+              <button className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer">
+                Selected
+              </button>
+            </div>
+          </div>
+        </Popup>
+
+        <div onClick={() => navigate("cash-detail")} className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white">
           <h3>Kassadagi miqdor</h3>
           <strong className="block pt-3">40 000 000 UZS</strong>
         </div>
 
-        <div className="py-15 rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white">
+        <div
+          onClick={() => setShowCurier(true)}
+          className="py-15 rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
+        >
           <h3>Olinishi kerak</h3>
           <strong className="block pt-3">70 000 000 UZS</strong>
         </div>
+
+        <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>
+          <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d]">
+            <button
+              onClick={() => setShowCurier(false)}
+              className="cursor-pointer bg-red-600 hover:bg-red-700 text-white p-2 rounded- ml-111 flex items-center justify-center shadow-md"
+            >
+              <X size={18} />
+            </button>
+            <h1 className="font-bold text-left">Olinishi kerak</h1>
+            <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
+              <input
+                type="text"
+                placeholder="Search order..."
+                className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
+              />
+              <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
+            </div>
+            <div className="max-h-[520px] overflow-y-auto">
+              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
+                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+                  <tr>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        # ID
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        CURIER NAME
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        REGION
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
+                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                    <td className="pr-26 py-3">Bahodir</td>
+                    <td className="pr-10 py-3">Tashkent</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="pl-89 py-2">
+              <button className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer">
+                Selected
+              </button>
+            </div>
+          </div>
+        </Popup>
       </div>
 
       <div className="mt-12 mx-5">
@@ -37,35 +275,35 @@ const Payments = () => {
           <div>
             <div>
               <table className="w-full border-collapse">
-                <thead className="dark:bg-[#3D3759] bg-[#F6F7FB] border-4 border-white dark:border-[#3D3759]">
+                <thead className="dark:bg-[#3D3759] text-[13px] bg-[#F6F7FB] border-4 border-white dark:border-[#3D3759]">
                   <tr>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    <th className="h-[56px] font-medium  text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
                         # ID
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        Created By
+                        CREATED BY
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        CASHBOX TYPE
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        OPERTAION TYPE
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        Cashbox Type
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        Operation Type
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        Amount
+                        AMOUNT
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
@@ -191,3 +429,47 @@ const Payments = () => {
 };
 
 export default React.memo(Payments);
+
+
+
+// import { useState } from "react";
+// import PaymentCard from "./components/PaymentCard";
+// import ChooseMarketPopup from "./components/MarketPopup";
+// import OlinishiKerakPopup from "./components/CruierPopup";
+
+// const Payments = () => {
+//   const [showMarket, setShowMarket] = useState(false);
+//   const [showCourier, setShowCourier] = useState(false);
+
+//   return (
+//     <div className="mt-10 grid grid-cols-3 gap-14 text-center text-2xl items-end mx-5">
+//       <PaymentCard
+//         title="Berilishi kerak"
+//         amount="10 000 000 UZS"
+//         onClick={() => setShowMarket(true)}
+//       />
+
+//       <div className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white">
+//         <h3>Kassadagi miqdor</h3>
+//         <strong className="block pt-3">40 000 000 UZS</strong>
+//       </div>
+
+//       <PaymentCard
+//         title="Olinishi kerak"
+//         amount="70 000 000 UZS"
+//         onClick={() => setShowCourier(true)}
+//       />
+
+//       <ChooseMarketPopup
+//         open={showMarket}
+//         onClose={() => setShowMarket(false)}
+//       />
+//       <OlinishiKerakPopup
+//         open={showCourier}
+//         onClose={() => setShowCourier(false)}
+//       />
+//     </div>
+//   );
+// };
+
+// export default Payments;
