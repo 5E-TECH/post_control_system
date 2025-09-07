@@ -24,7 +24,7 @@ const Orders = () => {
             Orders list
           </h1>
           <Button
-            onClick={() => navigate("/orders/customer-info")}
+            onClick={() => navigate("/orders/choose-market")}
             className="bg-[#8C57FF]! text-[#ffffff]! w-[131px]! h-[38px]! hover:opacity-85"
           >
             Add Order <ArrowRight className="w-[15px] h-[15px]" />

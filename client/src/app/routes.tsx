@@ -45,6 +45,7 @@ const UsersTable = lazy(
   () => import("../pages/users/components/users/users-table")
 );
 const ProductCreate = lazy(() => import("../pages/products/product-create"));
+const ChooseMarket = lazy(() => import("../pages/orders/pages/choose-market"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -75,6 +76,7 @@ const AppRouters = () => {
               path: "orders",
               element: <Orders />,
               children: [
+                { path: "choose-market", element: <ChooseMarket /> },
                 {
                   path: "customer-info",
                   element: <CustomerInfoOrder />,
