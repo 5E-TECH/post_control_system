@@ -27,12 +27,12 @@ import { UpdateOwnMarketDto } from './dto/update-own.dto';
 export class MarketController {
   constructor(private readonly marketService: MarketService) {}
 
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Post()
-  create(@Body() createMarketDto: CreateMarketDto) {
-    return this.marketService.createMarket(createMarketDto);
-  }
+  // @UseGuards(JwtGuard, RolesGuard)
+  // @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  // @Post()
+  // create(@Body() createMarketDto: CreateMarketDto) {
+  //   return this.marketService.createMarket(createMarketDto);
+  // }
 
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)

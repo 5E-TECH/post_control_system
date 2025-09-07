@@ -25,6 +25,8 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { SelfGuard } from 'src/common/guards/self.guard';
 import { UpdateSelfDto } from './dto/self-update.dto';
+import { CreateMarketDto } from './dto/create-market.dto';
+import { CreateCustomerDto } from './dto/create-customer.dto';
 
 @Controller('user')
 export class UsersController {
@@ -49,6 +51,20 @@ export class UsersController {
   @Post('courier')
   createCourier(@Body() createCourierDto: CreateCourierDto) {
     return this.userService.createCourier(createCourierDto);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('market')
+  createMarket(@Body() createMarketDto: CreateMarketDto) {
+    return this.userService.createMarket(createMarketDto);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
+  @Post('customer')
+  createCustomer(@Body() createCustomerDto: CreateCustomerDto) {
+    return this.userService.createCustomer(createCustomerDto);
   }
 
   @Post('signin')

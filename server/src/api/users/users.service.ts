@@ -28,6 +28,13 @@ import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
 import { UserSalaryRepository } from 'src/core/repository/user-salary.repository';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { RegionRepository } from 'src/core/repository/region.repository';
+import { CreateMarketDto } from './dto/create-market.dto';
+import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { DistrictEntity } from 'src/core/entity/district.entity';
+import { DistrictRepository } from 'src/core/repository/district.repository';
+import { CustomerMarketEntity } from 'src/core/entity/customer-market.entity';
+import { CustomerMarketReository } from 'src/core/repository/customer-market.repository';
 
 @Injectable()
 export class UserService {
@@ -43,6 +50,12 @@ export class UserService {
 
     @InjectRepository(RegionEntity)
     private readonly regionRepo: RegionRepository,
+
+    @InjectRepository(DistrictEntity)
+    private readonly districtRepo: DistrictRepository,
+
+    @InjectRepository(CustomerMarketEntity)
+    private readonly customerMarketRepo: CustomerMarketReository,
 
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
@@ -208,6 +221,137 @@ export class UserService {
 
       await queryRunner.commitTransaction();
       return successRes(courier, 201, `New courier created`);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createMarket(createMarketDto: CreateMarketDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { name, phone_number, tariff_center, tariff_home, password } =
+        createMarketDto;
+      const existMarket = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number },
+      });
+      if (existMarket) {
+        throw new ConflictException(
+          'User with this phone number already exist',
+        );
+      }
+      const telegram_token = 'group_token-' + generateCustomToken();
+
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const newMarket = queryRunner.manager.create(UserEntity, {
+        name,
+        phone_number,
+        role: Roles.MARKET,
+        tariff_center,
+        tariff_home,
+        password: hashedPassword,
+        telegram_token,
+      });
+      await queryRunner.manager.save(newMarket);
+      const cashbox = queryRunner.manager.create(CashEntity, {
+        cashbox_type: Cashbox_type.FOR_MARKET,
+        market_id: newMarket.id,
+      });
+      await queryRunner.manager.save(cashbox);
+
+      await queryRunner.commitTransaction();
+      return successRes(newMarket, 201, 'New market created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createCustomer(createCustomerDto: CreateCustomerDto): Promise<Object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { market_id, client_name, phone_number, district_id, address } =
+        createCustomerDto;
+
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: market_id, role: Roles.MARKET, status: Status.ACTIVE },
+      });
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+
+      const district = await queryRunner.manager.findOne(DistrictEntity, {
+        where: { id: district_id },
+      });
+      if (!district) {
+        throw new NotFoundException('District not found');
+      }
+
+      const isExistClient = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number, role: Roles.CUSTOMER },
+        relations: ['customerLinks', 'customerLinks.market'],
+      });
+
+      let assignedToMarket: boolean = false;
+      if (isExistClient) {
+        const isAssignedToMarket = await queryRunner.manager.findOne(
+          CustomerMarketEntity,
+          {
+            where: { market_id, customer_id: isExistClient.id },
+          },
+        );
+        if (isAssignedToMarket) {
+          assignedToMarket = true;
+        }
+      }
+
+      if (assignedToMarket) {
+        await queryRunner.commitTransaction();
+        return successRes(
+          {},
+          200,
+          'This is your client and you can assign him new order',
+        );
+      }
+      if (isExistClient && !assignedToMarket) {
+        const newClientForMarket = queryRunner.manager.create(
+          CustomerMarketEntity,
+          {
+            customer_id: isExistClient.id,
+            market_id,
+          },
+        );
+        await queryRunner.manager.save(newClientForMarket);
+
+        await queryRunner.commitTransaction();
+        return successRes(isExistClient, 200, 'Client assigned to market');
+      }
+
+      const customer = queryRunner.manager.create(UserEntity, {
+        name: client_name,
+        phone_number,
+        role: Roles.CUSTOMER,
+        district_id,
+        address,
+      });
+      await queryRunner.manager.save(customer);
+
+      const customerMarket = queryRunner.manager.create(CustomerMarketEntity, {
+        market_id,
+        customer_id: customer.id,
+      });
+      await queryRunner.manager.save(customerMarket);
+
+      await queryRunner.commitTransaction();
+      return successRes(customer, 201, 'New Customer created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

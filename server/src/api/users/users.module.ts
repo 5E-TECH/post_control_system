@@ -8,6 +8,8 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
+import { DistrictEntity } from 'src/core/entity/district.entity';
+import { CustomerMarketEntity } from 'src/core/entity/customer-market.entity';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { RegionEntity } from 'src/core/entity/region.entity';
       CashEntity,
       UserSalaryEntity,
       RegionEntity,
+      DistrictEntity,
+      CustomerMarketEntity,
     ]),
   ],
   controllers: [UsersController],

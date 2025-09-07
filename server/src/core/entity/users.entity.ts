@@ -13,6 +13,7 @@ import { CashEntity } from './cash-box.entity';
 import { CashboxHistoryEntity } from './cashbox-history.entity';
 import { RegionEntity } from './region.entity';
 import { PostEntity } from './post.entity';
+import { CustomerMarketEntity } from './customer-market.entity';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -22,7 +23,7 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   phone_number: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', nullable: true })
   password: string;
 
   @Column({ type: 'uuid', nullable: true })
@@ -80,4 +81,11 @@ export class UserEntity extends BaseEntity {
   // 1-N Courier (User) → Posts
   @OneToMany(() => PostEntity, (post) => post.courier)
   posts: PostEntity[];
+
+  // users.entity.ts
+  @OneToMany(() => CustomerMarketEntity, (cm) => cm.customer)
+  customerLinks: CustomerMarketEntity[];
+
+  @OneToMany(() => CustomerMarketEntity, (cm) => cm.market)
+  marketLinks: CustomerMarketEntity[];
 }

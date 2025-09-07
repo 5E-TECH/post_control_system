@@ -32,10 +32,6 @@ export class MarketEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   telegram_token: string;
 
-  // 🟢 1 Market = 1 Cashbox
-  @OneToOne(() => CashEntity, (cashbox) => cashbox.market, { cascade: true })
-  cashbox: CashEntity;
-
   @OneToMany(() => CustomerMarketEntity, (cm) => cm.market)
   customerMarkets: CustomerMarketEntity[];
 

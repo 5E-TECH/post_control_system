@@ -24,13 +24,6 @@ export class CashEntity extends BaseEntity {
   @JoinColumn({ name: 'user_id' })
   user: UserEntity;
 
-  // 1-1 Cashbox → Market
-  @OneToOne(() => MarketEntity, (market) => market.cashbox, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'market_id' })
-  market: MarketEntity;
-
   // 1-N Cashbox → CashboxHistory
   @OneToMany(() => CashboxHistoryEntity, (history) => history.cashbox)
   histories: CashboxHistoryEntity[];
