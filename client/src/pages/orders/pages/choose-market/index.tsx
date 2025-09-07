@@ -1,10 +1,12 @@
 import { Form, Input } from "antd";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { memo } from "react";
+import Discard from "../../components/button/discard";
+import Success from "../../components/button/success";
 
 const ChooseMarket = () => {
   return (
-    <div className="p-5 flex items-start">
+    <div className="px-6 pt-6 flex items-start">
       <div className="w-fit h-fit pr-[81px]">
         <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
           Process
@@ -64,44 +66,45 @@ const ChooseMarket = () => {
         </div>
       </div>
 
-      <div className="bg-[#ffffff] shadow-lg rounded-md pb-8">
-        <div className="flex justify-between px-5 pt-6">
-          <h1 className="mt-2 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
-            Marketni tanlang
-          </h1>
+      <div className="flex flex-col gap-7">
+        <div className="bg-[#ffffff] shadow-lg rounded-md flex-1 pb-7">
+          <div className="flex justify-between px-5 pt-6">
+            <h1 className="mt-2 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
+              Marketni tanlang
+            </h1>
 
-          <Form.Item>
-            <Input
-              placeholder="Search..."
-              className="h-[40px]! min-w-[350px]!"
-            />
-          </Form.Item>
-        </div>
-        <div className="">
-          <table>
-            <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
-              <tr>
-                <th className="w-[438px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    #
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[438px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    MARKET NOMI
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[438px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    TELEFON NOMERI
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            {/* <tbody>
+            <Form.Item>
+              <Input
+                placeholder="Search..."
+                className="h-[40px]! min-w-[350px]!"
+              />
+            </Form.Item>
+          </div>
+          <div className="">
+            <table>
+              <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
+                <tr>
+                  <th className="w-[438px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                    <div className="flex items-center justify-between pr-[21px]">
+                      #
+                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    </div>
+                  </th>
+                  <th className="w-[438px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                    <div className="flex items-center justify-between pr-[21px]">
+                      MARKET NOMI
+                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    </div>
+                  </th>
+                  <th className="w-[438px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                    <div className="flex items-center justify-between pr-[21px]">
+                      TELEFON NOMERI
+                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              {/* <tbody>
               {data?.data?.map((user: any) => (
                 <tr key={user?.id}>
                   <td className="p-[20px] flex items-center">
@@ -160,34 +163,43 @@ const ChooseMarket = () => {
                 </tr>
               ))}
             </tbody> */}
-          </table>
-          <div className="flex justify-end items-center pr-[105px] pt-4 gap-6">
-            <div className="flex items-center">
-              <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-                Rows per page:
-              </span>
-              <select
-                className="rounded px-2 py-1 text-[15px] outline-none"
-                defaultValue="10"
-              >
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="25">25</option>
-                <option value="50">50</option>
-              </select>
-            </div>
+            </table>
+            <div className="flex justify-end items-center pr-[105px] pt-4 gap-6">
+              <div className="flex items-center">
+                <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
+                  Rows per page:
+                </span>
+                <select
+                  className="rounded px-2 py-1 text-[15px] outline-none"
+                  defaultValue="10"
+                >
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
 
-            <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-              <span className="mr-1">1-5</span>
-              <span className="mr-1">of</span>
-              <span className="">13</span>
-            </div>
+              <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+                <span className="mr-1">1-5</span>
+                <span className="mr-1">of</span>
+                <span className="">13</span>
+              </div>
 
-            <div className="flex items-center gap-[23px]">
-              <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-              <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
+              <div className="flex items-center gap-[23px]">
+                <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
+                <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
+              </div>
             </div>
           </div>
+        </div>
+        <div className="flex gap-4 justify-end">
+          <Discard children="Discard" />
+          <Success
+            path="customer-info"
+            text="Next"
+            icon={<ArrowRight className="h-[13px] w-[13px]" />}
+          />
         </div>
       </div>
     </div>

@@ -81,6 +81,7 @@ const CustomerInfoOrder = () => {
         <div className="flex gap-4 justify-end">
           <Discard children="Discard"/>
           <Success
+            path="confirm"
             text="Next"
             icon={<ArrowRight className="h-[13px] w-[13px]" />}
           />

@@ -5,13 +5,14 @@ import { useNavigate } from "react-router-dom";
 interface Props {
   text: string;
   icon: JSX.Element;
+  path: string;
   className?: string;
 }
 
-const Success: FC<Props> = ({ text, icon, className }) => {
+const Success: FC<Props> = ({ text, icon, className, path }) => {
   const navigate = useNavigate();
   const onClick = () => {
-    navigate("/orders/confirm");
+    navigate(`/orders/${path}`);
   };
   return (
     <Button
