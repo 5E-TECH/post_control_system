@@ -48,6 +48,7 @@ const UsersTable = lazy(
 const ProductCreate = lazy(() => import("../pages/products/product-create"));
 const ChooseMarket = lazy(() => import("../pages/orders/pages/choose-market"));
 const OrderDetails = lazy(()=> import("../pages/orders/pages/order-details"))
+const TodayOrders = lazy(() => import("../pages/today-orders"))
 
 const AppRouters = () => {
   return useRoutes([
@@ -74,6 +75,10 @@ const AppRouters = () => {
           element: <DashboardLayout />,
           children: [
             { index: true, element: <Dashboards /> },
+            {
+              path:"today-order",
+              element:<TodayOrders/>
+            },
             {
               path: "orders",
               element: <Orders />,
