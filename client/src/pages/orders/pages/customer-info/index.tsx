@@ -60,7 +60,7 @@ const CustomerInfoOrder = () => {
         <div className="w-[3px] h-[40px] rounded-[20px] bg-[#E3DCFB] ml-[7px] mt-[8px] dark:bg-[#8C57FF29]"></div>
 
         <div className="flex items-center gap-2 mt-2">
-          <div className="flex  w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#372C5A] dark:bg-[#312D4B]"></div>
+          <div className="flex  w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#E3DCFB] dark:bg-[#312D4B] dark:border-[#382C5C]"></div>
 
           <span className="font-medium text-[25px] text-[#2E263DE5]">03</span>
 
@@ -81,6 +81,7 @@ const CustomerInfoOrder = () => {
         <div className="flex gap-4 justify-end">
           <Discard children="Discard"/>
           <Success
+            path="confirm"
             text="Next"
             icon={<ArrowRight className="h-[13px] w-[13px]" />}
           />

@@ -24,10 +24,11 @@ const Overview = lazy(() => import('../pages/profile/overview/overview'));
 const CreateRegistrator = lazy(
   () => import('../pages/users/pages/create-registrator'),
 );
-const SelectRole = lazy(() => import('../pages/select-role'));
-const AuthRole = lazy(() => import('../pages/auth/authRole'));
-const CreateOrder = lazy(() => import('../pages/orders/pages/create-order'));
-const NotFound = lazy(() => import('../shared/ui/NotFound'));
+// const SelectRole = lazy(() => import("../pages/select-role"));
+// const AuthRole = lazy(() => import("../pages/auth/authRole"));
+const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
+const OrderDetail = lazy(() => import("../pages/orders/pages/orderDetail"));
+const NotFound = lazy(() => import("../shared/ui/NotFound"));
 const CustomerInfoOrder = lazy(
   () => import('../pages/orders/pages/customer-info'),
 );
@@ -40,24 +41,29 @@ const AllMarketsTable = lazy(
 const UsersTable = lazy(
   () => import('../pages/users/components/users/users-table'),
 );
-const ProductCreate = lazy(() => import('../pages/products/product-create'));
+
+const ProductCreate = lazy(() => import("../pages/products/product-create"));
+const ChooseMarket = lazy(() => import("../pages/orders/pages/choose-market"));
+const OrderDetails = lazy(()=> import("../pages/orders/pages/order-details"))
+const TodayOrders = lazy(() => import("../pages/today-orders"))
+
 
 const AppRouters = () => {
   return useRoutes([
     {
-      path: '/select-role',
-      element: <SelectRole />,
+      path: "/login",
+      element: <Login />,
     },
-    {
-      path: '/login',
-      element: <AuthRole />,
-      children: [
-        {
-          index: true,
-          element: <Login />,
-        },
-      ],
-    },
+    // {
+    //   path: "/login",
+    //   element: <AuthRole />,
+    //   children: [
+    //     {
+    //       index: true,
+    //       element: <Login />,
+    //     },
+    //   ],
+    // },
     {
       path: '/',
       element: <Auth />,
@@ -68,14 +74,27 @@ const AppRouters = () => {
           children: [
             { index: true, element: <Dashboards /> },
             {
-              path: 'orders',
+              path:"today-order",
+              element:<TodayOrders/>
+            },
+            {
+              path: "orders",
               element: <Orders />,
               children: [
+                { path: "choose-market", element: <ChooseMarket /> },
                 {
                   path: 'customer-info',
                   element: <CustomerInfoOrder />,
                 },
-                { path: 'confirm', element: <CreateOrder /> },
+                { path: "confirm", element: <CreateOrder /> },
+                {
+                  path: "customer/detail",
+                  element: <OrderDetail />,
+                },
+                {
+                  path:"order-detail",
+                  element:<OrderDetails />
+                }
               ],
             },
             { path: 'regions', element: <Regions /> },
