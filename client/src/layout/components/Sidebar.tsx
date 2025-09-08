@@ -22,6 +22,12 @@ const Sidebar = () => {
           </NavLink>
         </li>
         <li>
+          <NavLink to={'/today-order'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
+            <ShoppingBag />
+            <span>Today Order</span>
+          </NavLink>
+        </li>
+        <li>
           <NavLink to={'/orders'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <ShoppingBag />
             <span>Orders</span>
