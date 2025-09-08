@@ -17,15 +17,15 @@ const Overview = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Spin size="large" tip="Loading profile..." fullscreen />
+        <Spin size="large" tip="Loading profile..." />
       </div>
     );
   }
 
   const user = data?.data;
   return (
-    <div className="flex justify-center min-h-screen px-4 md:px-8 lg:px-16">
-      <div className="flex flex-col w-full max-w-[900px]">
+    <div className="flex flex-col min-h-screen px-4 md:px-8 lg:px-16">
+      <div className="flex flex-col w-full max-w-[900px] mx-auto flex-grow">
         <div className="flex justify-center">
           <div className="w-full md:w-[400px] lg:w-[450px] mt-8 p-4 flex flex-col items-center justify-between bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md">
             <div className="flex flex-col items-center">
@@ -187,6 +187,50 @@ const Overview = () => {
           />
         )}
       </div>
+
+<div className="w-full mt-5 mx-auto bg-white dark:bg-[#312D4B] shadow-xl rounded-xl p-6 space-y-6 text-gray-900 dark:text-gray-200">
+  <div className="flex w-full justify-between items-center">
+    <div>
+      <h2 className="px-4 py-1 rounded-2xl bg-[#8C57FF29] text-[#9155FD] text-sm font-medium">
+        Maosh
+      </h2>
+    </div>
+    <div className="flex items-end gap-2">
+      <h2 className="text-[#9155FD] text-lg font-medium">so'm</h2>
+      <h2 className="text-[#9155FD] text-6xl font-bold leading-none">
+        3mln
+      </h2>
+    </div>
+  </div>
+
+  <ul className="space-y-2 text-gray-700 dark:text-gray-300 text-left">
+    <li className="flex items-center gap-2">
+      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span> 10 Users
+    </li>
+    <li className="flex items-center gap-2">
+      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span> Up to 10 GB storage
+    </li>
+    <li className="flex items-center gap-2">
+      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span> Basic Support
+    </li>
+  </ul>
+
+  <div>
+    <div className="flex justify-between text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+      <span>Days</span>
+      <span>26 of 30 Days</span>
+    </div>
+    <div className="w-full bg-purple-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
+      <div className="bg-[#9155FD] h-1.5 rounded-full w-[86%]"></div>
+    </div>
+    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">4 days remaining</p>
+  </div>
+
+  <button className="w-full bg-[#9155FD] text-white font-semibold py-3 rounded-lg hover:bg-purple-700 transition">
+    To’lash
+  </button>
+</div>
+
     </div>
   );
 };

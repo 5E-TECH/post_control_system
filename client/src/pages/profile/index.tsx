@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Users, Wallet,FileText, ShoppingCart } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 const Profil = () => {
   const linkClasses = (isActive: boolean) =>
@@ -9,7 +9,7 @@ const Profil = () => {
 
   return (
     <div className="">
-      <ul className="flex gap-5 bg-[#f4f5fa] dark:text-white dark:bg-[#28243d] pb-[24px]">
+      <ul className="flex fixed gap-5 bg-[#f4f5fa] dark:text-white dark:bg-[#28243d] pb-[24px]">
         <li>
           <NavLink
             to={''}
@@ -18,35 +18,6 @@ const Profil = () => {
           >
             <Users className=" w-5 h-5" />
             Profil
-          </NavLink>
-        </li>
-        <li>
-          <NavLink
-            to={'profil-maosh'}
-            end
-            className={({ isActive }) => linkClasses(isActive)}
-          >
-            <Wallet className="w-5 h-5" />
-            Maosh
-          </NavLink>
-        </li>
-
-        <li>
-          <NavLink
-            to={'profil-logs'}
-            className={({ isActive }) => linkClasses(isActive)}
-          >
-            <FileText className="w-5 h-5" />
-            Logs
-          </NavLink>
-        </li>
-        <li>
-          <NavLink
-            to={'profil-orders'}
-            className={({ isActive }) => linkClasses(isActive)}
-          >
-            <ShoppingCart className="w-5 h-5" />
-            Orders
           </NavLink>
         </li>
       </ul>
