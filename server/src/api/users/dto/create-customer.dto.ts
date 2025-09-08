@@ -1,34 +1,29 @@
 import {
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsPhoneNumber,
   IsString,
-  Max,
-  Min,
+  IsUUID,
 } from 'class-validator';
 
-export class CreateAdminDto {
+export class CreateCustomerDto {
+  @IsNotEmpty()
+  @IsUUID()
+  market_id: string;
+
   @IsNotEmpty()
   @IsString()
-  name: string;
+  client_name: string;
 
   @IsNotEmpty()
   @IsPhoneNumber('UZ')
   phone_number: string;
 
   @IsNotEmpty()
-  @IsString()
-  password: string;
-
-  @IsNotEmpty()
-  @IsNumber()
-  @Min(0)
-  salary: number;
+  @IsUUID()
+  district_id: string;
 
   @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(30)
-  payment_day: number;
+  @IsString()
+  address?: string;
 }

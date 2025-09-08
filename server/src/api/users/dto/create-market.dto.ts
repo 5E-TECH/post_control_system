@@ -2,33 +2,30 @@ import {
   IsNotEmpty,
   IsNumber,
   IsOptional,
-  IsPhoneNumber,
   IsString,
-  Max,
   Min,
 } from 'class-validator';
 
-export class CreateAdminDto {
+export class CreateMarketDto {
   @IsNotEmpty()
   @IsString()
   name: string;
 
   @IsNotEmpty()
-  @IsPhoneNumber('UZ')
-  phone_number: string;
-
-  @IsNotEmpty()
   @IsString()
-  password: string;
+  phone_number: string;
 
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
-  salary: number;
+  tariff_home: number;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsNumber()
-  @Min(1)
-  @Max(30)
-  payment_day: number;
+  @Min(0)
+  tariff_center: number;
+
+  @IsNotEmpty()
+  @IsString()
+  password: string;
 }

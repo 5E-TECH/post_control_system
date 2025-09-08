@@ -43,54 +43,54 @@ export class MarketService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async createMarket(createMarketDto: CreateMarketDto): Promise<object> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const {
-        market_name,
-        phone_number,
-        tariff_center,
-        tariff_home,
-        password,
-      } = createMarketDto;
-      const existMarket = await queryRunner.manager.findOne(MarketEntity, {
-        where: { phone_number },
-      });
-      if (existMarket) {
-        throw new ConflictException(
-          'Market with this phone number already exist',
-        );
-      }
-      const telegram_token = 'group_token-' + generateCustomToken();
+  // async createMarket(createMarketDto: CreateMarketDto): Promise<object> {
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+  //   try {
+  //     const {
+  //       market_name,
+  //       phone_number,
+  //       tariff_center,
+  //       tariff_home,
+  //       password,
+  //     } = createMarketDto;
+  //     const existMarket = await queryRunner.manager.findOne(MarketEntity, {
+  //       where: { phone_number },
+  //     });
+  //     if (existMarket) {
+  //       throw new ConflictException(
+  //         'Market with this phone number already exist',
+  //       );
+  //     }
+  //     const telegram_token = 'group_token-' + generateCustomToken();
 
-      const hashedPassword = await this.bcrypt.encrypt(password);
-      const newMarket = queryRunner.manager.create(MarketEntity, {
-        market_name,
-        phone_number,
-        tariff_center,
-        tariff_home,
-        password: hashedPassword,
-        telegram_token,
-      });
-      await queryRunner.manager.save(newMarket);
-      const cashbox = queryRunner.manager.create(CashEntity, {
-        cashbox_type: Cashbox_type.FOR_MARKET,
-        market_id: newMarket.id,
-        market: newMarket,
-      });
-      await queryRunner.manager.save(cashbox);
+  //     const hashedPassword = await this.bcrypt.encrypt(password);
+  //     const newMarket = queryRunner.manager.create(MarketEntity, {
+  //       market_name,
+  //       phone_number,
+  //       tariff_center,
+  //       tariff_home,
+  //       password: hashedPassword,
+  //       telegram_token,
+  //     });
+  //     await queryRunner.manager.save(newMarket);
+  //     const cashbox = queryRunner.manager.create(CashEntity, {
+  //       cashbox_type: Cashbox_type.FOR_MARKET,
+  //       market_id: newMarket.id,
+  //       market: newMarket,
+  //     });
+  //     await queryRunner.manager.save(cashbox);
 
-      await queryRunner.commitTransaction();
-      return successRes(newMarket, 201, 'New market created');
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      await queryRunner.release();
-    }
-  }
+  //     await queryRunner.commitTransaction();
+  //     return successRes(newMarket, 201, 'New market created');
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     return catchError(error);
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
 
   async findAll(): Promise<object> {
     try {
@@ -230,6 +230,16 @@ export class MarketService {
         200,
         'Successfully logged in',
       );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async profile(user: JwtPayload): Promise<object> {
+    try {
+      const { id } = user;
+      const myProfile = await this.marketRepo.findOne({ where: { id } });
+      return successRes(myProfile, 200, 'Profile info');
     } catch (error) {
       return catchError(error);
     }
