@@ -116,6 +116,7 @@ const Filter = () => {
             text="Add Order"
             path="choose-market"
             icon={<ArrowRight className="h-[13px] w-[13px]" />}
+            className="w-[140px]!"
           />
         </div>
       </div>
