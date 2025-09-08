@@ -58,7 +58,6 @@ const Payments = () => {
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
                         MARKET NAME
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                   </tr>
