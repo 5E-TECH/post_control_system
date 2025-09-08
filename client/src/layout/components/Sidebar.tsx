@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { NavLink } from 'react-router-dom';
 import logo from '../../shared/assets/logo.svg'
-import { Apple, CarFront, FileText, History, House, LockKeyhole, MailOpen, MessagesSquare, ShoppingBag, SquareDashedMousePointer, UserRound } from 'lucide-react';
+import { Apple, CarFront, FileText, History, House, MailOpen, ShoppingBag, SquareDashedMousePointer, UserRound } from 'lucide-react';
 
 const Sidebar = () => {
   return (
@@ -24,61 +24,49 @@ const Sidebar = () => {
         <li>
           <NavLink to={'/orders'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <ShoppingBag />
-            <span>Orders</span>
+            <span>Buyurtmalar</span>
           </NavLink>
         </li>
         <li>
           <NavLink to={'/regions'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <CarFront />
-            <span>Regions</span>
-          </NavLink>
-        </li>
-        <li>
-          <NavLink to={'/all-users'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
-            <UserRound />
-            <span>Users</span>
+            <span>Bugungi buyurtmalar</span>
           </NavLink>
         </li>
         <li>
           <NavLink to={'/mails'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <MailOpen />
-            <span>Mails</span>
+            <span>Pochta</span>
           </NavLink>
         </li>
         <li>
           <NavLink to={'/products'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <Apple />
-            <span>Products</span>
+            <span>Mahsulotlar</span>
           </NavLink>
         </li>
         <li>
-          <NavLink to={'/send-message'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
-            <MessagesSquare />
-            <span>Send message</span>
-          </NavLink>
-        </li>
-        <li>
-          <NavLink to={'/history'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
-            <History />
-            <span>History</span>
-          </NavLink>
-        </li>
-        <li>
-          <NavLink to={'/logs'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
-            <SquareDashedMousePointer />
-            <span>Logs</span>
+          <NavLink to={'/users'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
+            <UserRound />
+            <span>Foydalanuvchilar</span>
           </NavLink>
         </li>
         <li>
           <NavLink to={'/payments'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
             <FileText />
-            <span>Payments</span>
+            <span>To'lovlar</span>
           </NavLink>
         </li>
         <li>
-          <NavLink to={'/roles-permissions'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
-            <LockKeyhole />
-            <span>Roles & Permissions</span>
+          <NavLink to={'/history'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
+            <History />
+            <span>Moliyaviy balans</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink to={'/logs'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
+            <SquareDashedMousePointer />
+            <span>Loglar</span>
           </NavLink>
         </li>
       </ul>

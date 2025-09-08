@@ -4,7 +4,7 @@ import cart from "../../../../shared/assets/order/cart.svg";
 
 const CustomerDetails = () => {
   return (
-    <div className="w-full flex flex-col gap-5 p-5 rounded-md bg-[#ffffff] dark:bg-[var(--color-dark-bg-py)] shadow-lg">
+    <div className="w-full flex flex-col gap-5 p-5 rounded-md bg-[#ffffff] dark:bg-[#312D48] shadow-lg">
       <h1 className="font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
         Customer details
       </h1>

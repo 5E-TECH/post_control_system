@@ -2,11 +2,13 @@ import { Check } from "lucide-react";
 import { memo } from "react";
 import OrderItems from "../../components/order-items";
 import ProductInfo from "../../components/product-info";
+import Discard from "../../components/button/discard";
+import Success from "../../components/button/success";
 
 const CreateOrder = () => {
   return (
-    <div className="flex gap-6 p-6">
-      <div className="w-fit h-fit pr-[81px]">
+    <div className="flex gap-6 p-5">
+      <div className="w-fit pr-[81px]">
         <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
           Process
         </h1>
@@ -16,7 +18,9 @@ const CreateOrder = () => {
             <Check className="w-[10px] h-[10px] text-white" />
           </div>
 
-          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">01</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+            01
+          </span>
 
           <div className="flex flex-col">
             <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
@@ -35,7 +39,9 @@ const CreateOrder = () => {
             <Check className="w-[10px] h-[10px] text-white" />
           </div>
 
-          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">02</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+            02
+          </span>
 
           <div className="flex flex-col">
             <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
@@ -52,7 +58,9 @@ const CreateOrder = () => {
         <div className="flex items-center gap-2 mt-2">
           <div className="flex w-[18px] h-[18px] rounded-full p-[3px] border-4 border-[var(--color-bg-sy)]"></div>
 
-          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">03</span>
+          <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+            03
+          </span>
 
           <div className="flex flex-col">
             <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
@@ -73,7 +81,16 @@ const CreateOrder = () => {
           <ProductInfo />
         </div>
 
-        <div></div>
+        <div className="flex justify-end">
+          <div className="flex gap-4">
+            <Discard children="Discard" />
+            <Success
+              path="#"
+              text="Create order"
+              className="w-[130px]!"
+            ></Success>
+          </div>
+        </div>
       </div>
     </div>
   );
