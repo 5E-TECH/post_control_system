@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../..";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '../..';
 
-export const user = "user";
+export const user = 'user';
 
 export const useProfile = () => {
   const client = useQueryClient();
@@ -9,11 +9,7 @@ export const useProfile = () => {
   const getUser = () => {
     return useQuery({
       queryKey: [user],
-      queryFn: () =>
-        api.get("user/profile").then((res) => {
-          res.data;
-          console.log(res.data);
-        }),
+      queryFn: () => api.get('user/profile').then((res) => res.data),
     });
   };
 
