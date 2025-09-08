@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { OrderData } from "../../../../shared/static/order";
+import { useNavigate } from "react-router-dom";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -15,6 +16,7 @@ const statusColors: Record<string, string> = {
 };
 
 const OrderView = () => {
+  const navigate = useNavigate()
   return (
     <div className="w-full bg-white py-5">
       <table className="w-full">
@@ -71,7 +73,7 @@ const OrderView = () => {
         </thead>
         <tbody>
           {OrderData?.map((item: any) => (
-            <tr className="h-[56px]">
+            <tr className="h-[56px] hover:bg-[#f6f7fb]" onClick={() => navigate("/orders/order-detail")}>
               <td className="pl-10">{item.id}</td>
               <td className="pl-10 text-[#2E263DE5] text-[15px]">
                 {item.customer}
