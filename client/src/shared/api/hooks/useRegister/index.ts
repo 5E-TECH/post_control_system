@@ -15,6 +15,9 @@ export const useUser = (path?: string) => {
     useQuery({
       queryKey: [user],
       queryFn: () => api.get("user").then((res) => res.data),
+      staleTime: Infinity,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
     });
   return {
     createUser,
