@@ -28,6 +28,7 @@ const CreateRegistrator = lazy(
 // const AuthRole = lazy(() => import("../pages/auth/authRole"));
 const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
 const OrderDetail = lazy(() => import("../pages/orders/pages/orderDetail"));
+const CashDetail = lazy(() => import("../pages/payments/pages/cashDetail"))
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
 const CustomerInfoOrder = lazy(
   () => import('../pages/orders/pages/customer-info'),
@@ -123,11 +124,13 @@ const AppRouters = () => {
               element: <Products />,
               children: [{ path: 'create', element: <ProductCreate /> }],
             },
-            { path: 'send-message', element: <SendMessage /> },
-            { path: 'history', element: <History /> },
-            { path: 'logs', element: <LogsPage /> },
-            { path: 'payments', element: <Payments /> },
-            { path: 'roles-permissions', element: <RolesPermissions /> },
+            { path: "send-message", element: <SendMessage /> },
+            { path: "history", element: <History /> },
+            { path: "logs", element: <LogsPage /> },
+            { path: "payments", element: <Payments />, children: [
+              {path: "cash-detail", element: <CashDetail/>}
+            ] },
+            { path: "roles-permissions", element: <RolesPermissions /> },
             {
               path: 'profile',
               element: <Profile />,

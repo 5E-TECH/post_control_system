@@ -12,6 +12,10 @@
   display: none;
 }
 
+::-webkit-scrollbar {
+    display: none;
+}
+
 .dark .custom-select-dropdown .ant-select-selector {
   background-color: #312d4b !important;
   border-color: rgba(231, 227, 252, 0.22) !important;
