@@ -44,11 +44,6 @@ const Sidebar = () => {
             <Apple />
             <span>Mahsulotlar</span>
           </NavLink>
-        </li><li>
-          <NavLink to={'/products'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
-            <Apple />
-            <span>Mahsulotlar</span>
-          </NavLink>
         </li>
         <li>
           <NavLink to={'/users'} className={({ isActive }) => `flex gap-2 pl-5.5 py-2 ${isActive ? 'bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]' : ''}`}>
