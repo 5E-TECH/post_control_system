@@ -11,7 +11,11 @@ import { useDispatch } from 'react-redux';
 const Overview = () => {
   const dispatch = useDispatch();
   const { getUser } = useProfile();
-  const { data, isLoading, refetch } = getUser();
+  const { data, isLoading, refetch } = getUser() as {
+    data?: { data?: any };
+    isLoading: boolean;
+    refetch: () => void;
+  };
   const [open, setOpen] = useState(false);
 
   if (isLoading) {
