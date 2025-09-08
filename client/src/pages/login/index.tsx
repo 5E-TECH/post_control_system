@@ -4,42 +4,31 @@ import React, { type FC } from "react";
 import logo from "../../shared/assets/login/logo.svg";
 import left from "../../shared/assets/login/Frame 1.svg";
 import right from "../../shared/assets/login/Tree.svg";
-import line from "../../shared/assets/login/Mask.svg"
+import line from "../../shared/assets/login/Mask.svg";
 
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { setToken } from "../../shared/lib/features/login/authSlice";
 import type { ILogin } from "../../shared/types/typesLogin";
 import { useLogin } from "../../shared/api/hooks/useLogin";
 import type { RootState } from "../../app/store";
 
-
 const Login: FC = () => {
-   const location = useLocation();
-   const role = location.state?.role; 
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { signinUser, signinMarket } = useLogin();
+  const { signinUser } = useLogin();
 
+  
   const initialValues = useSelector((state: RootState) => state.signInSlice);
-
   const onFinish: FormProps<ILogin>["onFinish"] = (values: any) => {
-    if(role === "user") {
-      signinUser.mutate(values, {
-        onSuccess: (res) => {
-          dispatch(setToken(res?.data?.data));
-          navigate("/");
-        },
-      });
-    }
-    else if(role === "market") {
-      signinMarket.mutate(values, {
-        onSuccess: (res) => {
-          dispatch(setToken(res?.data?.data));
-          navigate("/");
-        },
-      });
-    }
+    signinUser.mutate(values, {
+      onSuccess: (res) => {
+        dispatch(setToken(res?.data?.data));
+        
+        navigate('/')
+                
+      },
+    });
   };
 
   return (
@@ -62,7 +51,7 @@ const Login: FC = () => {
           </div>
         </div>
         <div>
-          <img src={line} alt="" className=""/>
+          <img src={line} alt="" className="" />
         </div>
       </div>
 

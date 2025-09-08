@@ -28,8 +28,8 @@ const ProfilLogs = lazy(
 const CreateRegistrator = lazy(
   () => import("../pages/users/pages/create-registrator")
 );
-const SelectRole = lazy(() => import("../pages/select-role"));
-const AuthRole = lazy(() => import("../pages/auth/authRole"));
+// const SelectRole = lazy(() => import("../pages/select-role"));
+// const AuthRole = lazy(() => import("../pages/auth/authRole"));
 const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
 const OrderDetail = lazy(() => import("../pages/orders/pages/orderDetail"));
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
@@ -53,19 +53,19 @@ const TodayOrders = lazy(() => import("../pages/today-orders"))
 const AppRouters = () => {
   return useRoutes([
     {
-      path: "/select-role",
-      element: <SelectRole />,
-    },
-    {
       path: "/login",
-      element: <AuthRole />,
-      children: [
-        {
-          index: true,
-          element: <Login />,
-        },
-      ],
+      element: <Login />,
     },
+    // {
+    //   path: "/login",
+    //   element: <AuthRole />,
+    //   children: [
+    //     {
+    //       index: true,
+    //       element: <Login />,
+    //     },
+    //   ],
+    // },
     {
       path: "/",
       element: <Auth />,

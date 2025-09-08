@@ -9,7 +9,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 
-const Sidebar = () => {
+const RegistratorSidebar = () => {
   return (
     <div className="bg-gray-200 dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]">
       <div className="h-16 flex justify-center items-center">
@@ -102,4 +102,4 @@ const Sidebar = () => {
   );
 };
 
-export default memo(Sidebar);
+export default memo(RegistratorSidebar);
