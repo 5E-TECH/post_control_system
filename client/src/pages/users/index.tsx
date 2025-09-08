@@ -9,7 +9,7 @@ import { Outlet, useLocation } from "react-router-dom";
 const Users = () => {
   const { pathname } = useLocation();
 
-  const isChecked = pathname.startsWith("/all-users/create-user");
+  const isChecked = pathname.startsWith("/users/create-user");
 
   if (isChecked) return <Outlet />;
 
