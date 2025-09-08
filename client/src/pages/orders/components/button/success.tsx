@@ -22,6 +22,7 @@ const Success: FC<Props> = ({ text, icon, path,className }) => {
       {text} {icon}
     </Button>
   );
-};
+}
+
 
 export default memo(Success);
