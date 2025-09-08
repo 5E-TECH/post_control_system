@@ -8,15 +8,11 @@ const Orders = () => {
   if (pathname.startsWith("/orders/")) {
     return <Outlet />;
   }
-
   return (
     <div className="bg-[#f4f5fa] p-5">
-      <OrderList/>
+      <OrderList />
     </div>
-  )
-
-
-  
+  );
 };
 
 export default React.memo(Orders);

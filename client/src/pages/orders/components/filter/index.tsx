@@ -114,7 +114,7 @@ const Filter = () => {
           />
           <Success
             text="Add Order"
-            path="/orders/customer-info"
+            path="choose-market"
             icon={<ArrowRight className="h-[13px] w-[13px]" />}
           />
         </div>

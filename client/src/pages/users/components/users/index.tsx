@@ -1,4 +1,3 @@
-import { memo } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -6,13 +5,15 @@ import {
   Eye,
   Trash,
 } from "lucide-react";
+import { memo, type FC } from "react";
 import userImg from "../../../../shared/assets/users/table-user.svg";
 import superImg from "../../../../shared/assets/users/super.svg";
-import { useUser } from "../../../../shared/api/hooks/useRegister";
 
-const UserTable = () => {
-  const { getUser } = useUser();
-  const { data } = getUser();
+interface Props {
+  data: any;
+}
+
+const UsersTableComp: FC<Props> = ({ data }) => {
   return (
     <div className="pt-[21px]">
       <table>
@@ -21,37 +22,37 @@ const UserTable = () => {
             <th className="p-[20px] flex items-center">
               <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
             </th>
-            <th className="w-[250px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 USER
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[270px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 PHONE
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 ROLE
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 LOCATION
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 STATUS
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 ACTION
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -69,7 +70,7 @@ const UserTable = () => {
                   className="w-[18px] h-[18px] rounded-sm"
                 />
               </td>
-              <td className="w-[250px] h-[56px] pl-[20px] text-left">
+              <td className="w-[254px] h-[56px] pl-[20px] text-left">
                 <div className="flex items-center gap-4">
                   <div>
                     <img src={userImg} alt="" />
@@ -84,12 +85,12 @@ const UserTable = () => {
                   </div>
                 </div>
               </td>
-              <td className="w-[250px] h-[56px] pl-[20px] text-left">
+              <td className="w-[254px] h-[56px] pl-[20px] text-left">
                 <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
                   {user?.phone_number}
                 </span>
               </td>
-              <td className="w-[203px] h-[56px] pl-[20px] text-left">
+              <td className="w-[254px] h-[56px] pl-[20px] text-left">
                 <div className="flex gap-2.5 items-center">
                   <div>
                     <img src={superImg} alt="" />
@@ -99,15 +100,15 @@ const UserTable = () => {
                   </span>
                 </div>
               </td>
-              <td className="w-[203px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+              <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
                 {user?.region?.name ? user?.region?.name : "Noaniq"}
               </td>
-              <td className="w-[203px] h-[56px] pl-[20px] text-left">
+              <td className="w-[254px] h-[56px] pl-[20px] text-left">
                 <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
                   {user?.status}
                 </span>
               </td>
-              <td className="w-[203px] h-[56px] pl-[19px] text-left">
+              <td className="w-[254px] h-[56px] pl-[19px] text-left">
                 <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
                   <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
                   <Eye className="w-[22px] h-[22px] ml-1 cursor-pointer hover:opacity-80" />
@@ -149,4 +150,4 @@ const UserTable = () => {
   );
 };
 
-export default memo(UserTable);
+export default memo(UsersTableComp);

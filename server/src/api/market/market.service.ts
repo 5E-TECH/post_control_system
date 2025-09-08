@@ -222,10 +222,14 @@ export class MarketService {
       }
       const { id, status } = isExisUser;
       const payload: JwtPayload = { id, role: Roles.MARKET, status };
-      const accessTokenMarket = await this.token.generateAccessToken(payload);
-      const refreshTokenMarket = await this.token.generateRefreshToken(payload);
-      writeToCookie(res, 'refreshTokenMarket', refreshTokenMarket);
-      return successRes(accessTokenMarket, 200, 'Successfully logged in');
+      const accessToken = await this.token.generateAccessToken(payload);
+      const refreshToken = await this.token.generateRefreshToken(payload);
+      writeToCookie(res, 'refreshTokenMarket', refreshToken);
+      return successRes(
+        { access_token: accessToken, refresh_token: refreshToken },
+        200,
+        'Successfully logged in',
+      );
     } catch (error) {
       return catchError(error);
     }
