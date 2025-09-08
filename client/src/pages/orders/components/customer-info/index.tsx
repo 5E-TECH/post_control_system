@@ -2,7 +2,7 @@ import { Input, Select } from "antd";
 import { Bell } from "lucide-react";
 import { memo } from "react";
 
-const CustomerInfo = () => {
+const CustomerInfocomp = () => {
   return (
     <div className="w-full p-5 rounded-md bg-[#ffffff] dark:bg-[#312D48] shadow-lg">
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
@@ -61,4 +61,4 @@ const CustomerInfo = () => {
   );
 };
 
-export default memo(CustomerInfo);
+export default memo(CustomerInfocomp);

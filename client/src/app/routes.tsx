@@ -47,6 +47,7 @@ const UsersTable = lazy(
 );
 const ProductCreate = lazy(() => import("../pages/products/product-create"));
 const ChooseMarket = lazy(() => import("../pages/orders/pages/choose-market"));
+const OrderDetails = lazy(()=> import("../pages/orders/pages/order-details"))
 
 const AppRouters = () => {
   return useRoutes([
@@ -87,6 +88,10 @@ const AppRouters = () => {
                   path: "customer/detail",
                   element: <OrderDetail />,
                 },
+                {
+                  path:"order-detail",
+                  element:<OrderDetails />
+                }
               ],
             },
             { path: "regions", element: <Regions /> },
