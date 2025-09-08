@@ -1,5 +1,5 @@
 import { Button, Form, Input, Select } from "antd";
-import { Plus, Trash } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 
 const OrderItems = () => {
@@ -39,7 +39,7 @@ const OrderItems = () => {
               <Form.Item className="">
                 <Select
                   placeholder="Select item 1"
-                  className="!w-[563px] !h-[48px] custom-select-dropdown-bright"
+                  className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
                   dropdownClassName="dark-dropdown"
                 ></Select>
               </Form.Item>
@@ -47,7 +47,7 @@ const OrderItems = () => {
               <Form.Item>
                 <Input
                   placeholder="Quantity"
-                  className="!w-[385px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+                  className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                 />
               </Form.Item>
             </div>
@@ -62,7 +62,7 @@ const OrderItems = () => {
               <Form.Item className="">
                 <Select
                   placeholder="Select item 2"
-                  className="!w-[563px] !h-[48px] custom-select-dropdown-bright"
+                  className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
                   dropdownClassName="dark-dropdown"
                 ></Select>
               </Form.Item>
@@ -70,7 +70,7 @@ const OrderItems = () => {
               <Form.Item>
                 <Input
                   placeholder="Quantity"
-                  className="!w-[385px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+                  className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                 />
               </Form.Item>
             </div>
@@ -78,7 +78,7 @@ const OrderItems = () => {
 
           {items.map((item) => (
             <div key={item} className="flex gap-5 px-5 relative">
-              <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2]">
+              <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
                 Item {item + 2}
               </span>
 
@@ -86,28 +86,29 @@ const OrderItems = () => {
                 <Form.Item>
                   <Select
                     placeholder={`Select item ${item + 2}`}
-                    className="!w-[563px] !h-[48px]"
+                    className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
+                    dropdownClassName="dark-dropdown"
                   />
                 </Form.Item>
 
                 <Form.Item>
                   <Input
                     placeholder="Quantity"
-                    className="!w-[385px] !h-[48px]"
+                    className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                   />
                 </Form.Item>
               </div>
 
-              <Trash
+              <X
                 onClick={() => removeItem(item)}
-                className="mt-[10px] cursor-pointer text-red-500 opacity-80 hover:fill-red-500"
+                className="w-[14px] h-[14px] cursor-pointer text-red-500 hover:opacity-80 absolute top-[-19px] right-5"
               />
             </div>
           ))}
         </div>
 
         <div className="px-5 pb-5" onClick={addItem}>
-          <Button className="!w-[183px] !h-[40px] !bg-[var(--color-bg-sy)] !text-[white] !font-medium !text-[15px]">
+          <Button className="!w-[183px] !h-[40px] !bg-[var(--color-bg-sy)] !text-[white] !font-medium !text-[15px] dark:border-none! hover:opacity-85!">
             {" "}
             <Plus className="w-[17px] h-[17px]" />
             Add Another Item
