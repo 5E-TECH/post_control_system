@@ -11,11 +11,7 @@ import { useDispatch } from 'react-redux';
 const Overview = () => {
   const dispatch = useDispatch();
   const { getUser } = useProfile();
-  const { data, isLoading, refetch } = getUser() as {
-    data?: { data?: any };
-    isLoading: boolean;
-    refetch: () => void;
-  };
+  const { data, isLoading, refetch } = getUser() 
   const [open, setOpen] = useState(false);
 
   if (isLoading) {
@@ -27,6 +23,8 @@ const Overview = () => {
   }
 
   const user = data?.data;
+  console.log(`profileee: ${JSON.stringify(user,null,2) }`);
+  
   return (
     <div className="flex flex-col min-h-screen px-4 md:px-8 lg:px-16">
       <div className="flex flex-col w-full max-w-[900px] mx-auto flex-grow">
@@ -40,7 +38,7 @@ const Overview = () => {
                 preview={false}
               />
               <h2 className="mt-3 text-lg md:text-xl font-semibold">
-                {user?.first_name}
+                {user?.name}
               </h2>
               <h2
                 className={`mt-3 px-3 py-1 text-sm md:text-[15px] rounded-2xl 
@@ -84,27 +82,17 @@ const Overview = () => {
             <div className="w-full border border-[#2E263D1F] my-3"></div>
 
             <div className="grid md:grid-cols-2 gap-4">
-              {user.first_name && (
+              {user.name && (
                 <div className="flex flex-col">
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     First Name
                   </span>
                   <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                    {user.first_name}
+                    {user.name}
                   </span>
                 </div>
               )}
 
-              {user.last_name && (
-                <div className="flex flex-col">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    Last Name
-                  </span>
-                  <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                    {user.last_name}
-                  </span>
-                </div>
-              )}
 
               {user.region_id && (
                 <div className="flex flex-col">
