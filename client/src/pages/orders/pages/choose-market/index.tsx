@@ -13,7 +13,7 @@ const ChooseMarket = () => {
         </h1>
 
         <div className="flex items-center gap-2 mt-4">
-          <div className="flex w-[18px] h-[18px] rounded-full p-[4px] border-3 border-[var(--color-bg-sy)] bg-[white]"></div>
+          <div className="flex w-[18px] h-[18px] rounded-full p-[4px] border-3 border-[var(--color-bg-sy)] bg-[white] dark:bg-[var(--color-dark-bg-py)]"></div>
 
           <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
             01
@@ -32,7 +32,7 @@ const ChooseMarket = () => {
         <div className="w-[3px] h-[40px] rounded-[20px] bg-[#E3DCFB] ml-[7px] mt-[8px] dark:bg-[#8C57FF29]"></div>
 
         <div className="flex items-center gap-2 mt-2">
-          <div className="flex w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#E3DCFB] dark:bg-[#312D4B]"></div>
+          <div className="flex w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#E3DCFB] dark:bg-[#312D4B] dark:border-[#382C5C]"></div>
 
           <span className="font-medium text-[25px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
             02
@@ -51,7 +51,7 @@ const ChooseMarket = () => {
         <div className="w-[3px] h-[40px] rounded-[20px] bg-[#E3DCFB] ml-[7px] mt-[8px] dark:bg-[#8C57FF29]"></div>
 
         <div className="flex items-center gap-2 mt-2">
-          <div className="flex w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#E3DCFB] dark:bg-[#312D4B]"></div>
+          <div className="flex w-[18px] h-[18px] rounded-full p-[3px] bg-white border-3 border-[#E3DCFB] dark:bg-[#312D4B] dark:border-[#382C5C]"></div>
 
           <span className="font-medium text-[25px] text-[#2E263DE5]">03</span>
 
@@ -67,7 +67,7 @@ const ChooseMarket = () => {
       </div>
 
       <div className="flex flex-col gap-7">
-        <div className="bg-[#ffffff] shadow-lg rounded-md flex-1 pb-7">
+        <div className="bg-[#ffffff] shadow-lg rounded-md flex-1 pb-7 dark:bg-[#312D48]">
           <div className="flex justify-between px-5 pt-6">
             <h1 className="mt-2 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
               Marketni tanlang
@@ -76,13 +76,13 @@ const ChooseMarket = () => {
             <Form.Item>
               <Input
                 placeholder="Search..."
-                className="h-[40px]! min-w-[350px]!"
+                className="h-[40px]! min-w-[350px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
               />
             </Form.Item>
           </div>
           <div className="">
             <table>
-              <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
+              <thead className="bg-[#F6F7FB] dark:bg-[var(--color-dark-bg-py)]">
                 <tr>
                   <th className="w-[438px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
