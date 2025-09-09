@@ -5,17 +5,17 @@ import logo from "../../shared/assets/logo.svg";
 
 const Header = () => {
   const [dark, setDark] = useState(() => {
-    const stored = localStorage.getItem("darkMode");
+    const stored = localStorage.getItem('darkMode');
     return stored ? JSON.parse(stored) : false;
   });
 
   useEffect(() => {
     if (dark) {
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.add('dark');
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem("darkMode", JSON.stringify(dark));
+    localStorage.setItem('darkMode', JSON.stringify(dark));
   }, [dark]);
 
   const navigate = useNavigate();
@@ -49,11 +49,18 @@ const Header = () => {
         <button onClick={() => setDark(!dark)} className="cursor-pointer">
           {dark ? <Sun /> : <Moon />}
         </button>
-        <button
-          onClick={() => navigate("/profile")}
-          className="cursor-pointer font-medium">
-          Profile
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => navigate('/profile')}
+            className="p-2 rounded-full border border-gray-400 dark:border-gray-600 
+               bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
+               hover:bg-gray-200 dark:hover:bg-gray-700 
+               hover:scale-105 shadow-sm hover:shadow-md transition-all duration-200"
+          >
+            <User size={20} />
+          </button>
+        </div>
       </div>
     </div>
   );
