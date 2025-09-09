@@ -4,7 +4,7 @@ import { Outlet } from "react-router-dom";
 
 const Mails = () => {
   return (
-    <div className="h-[800px] p-5">
+    <div className="p-5 flex flex-col gap-12">
       <ChooseMail />
       <div>
         <Outlet />

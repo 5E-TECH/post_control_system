@@ -3,6 +3,7 @@ import { useRoutes } from "react-router-dom";
 import TodayMails from "../pages/mails/components/today-mails";
 import RefusedMails from "../pages/mails/components/refused-mails";
 import OldMails from "../pages/mails/components/old-mails";
+import MailDetail from "../pages/mails/pages/mail-detail";
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -125,6 +126,10 @@ const AppRouters = () => {
                   element: <OldMails />,
                 },
               ],
+            },
+            {
+              path: "mails/:id",
+              element: <MailDetail />,
             },
             {
               path: "products",
