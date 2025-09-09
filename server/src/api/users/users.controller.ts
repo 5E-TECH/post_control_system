@@ -90,6 +90,13 @@ export class UsersController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Get('markets')
+  findAllMarkets() {
+    return this.userService.allMarkets();
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(
     Roles.SUPERADMIN,
     Roles.ADMIN,

@@ -75,6 +75,81 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     super(orderRepo);
   }
 
+  async createOrder(createOrderDto: CreateOrderDto): Promise<Object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const {
+        market_id,
+        customer_id,
+        order_item_info,
+        total_price,
+        where_deliver,
+        comment,
+      } = createOrderDto;
+
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: market_id, role: Roles.MARKET },
+      });
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: customer_id, role: Roles.CUSTOMER },
+      });
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+
+      const qr_code_token = generateCustomToken();
+
+      const newOrder = queryRunner.manager.create(OrderEntity, {
+        market_id,
+        comment,
+        total_price,
+        where_deliver: where_deliver || Where_deliver.CENTER,
+        status: Order_status.NEW,
+        qr_code_token,
+        customer_id,
+      });
+
+      let product_quantity: number = 0;
+      for (const o_item of order_item_info) {
+        const isExistProduct = await queryRunner.manager.findOne(
+          OrderItemEntity,
+          {
+            where: { id: o_item.product_id },
+          },
+        );
+        if (!isExistProduct) {
+          throw new NotFoundException('Product not found');
+        }
+        const newOrderItem = queryRunner.manager.create(OrderItemEntity, {
+          productId: o_item.product_id,
+          quantity: o_item.quantity,
+          orderId: newOrder.id,
+        });
+        await queryRunner.manager.save(newOrderItem);
+        product_quantity += Number(o_item.quantity);
+      }
+
+      Object.assign(newOrder, {
+        product_quantity,
+      });
+      await queryRunner.manager.save(newOrder);
+
+      await queryRunner.commitTransaction();
+      return successRes(newOrder, 201, 'New order created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async newOrdersByMarketId(id: string) {
     try {
       const market = await this.marketRepo.findOne({ where: { id } });

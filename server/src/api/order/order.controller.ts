@@ -25,6 +25,11 @@ import { PartlySoldDto } from './dto/partly-sold.dto';
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
+  @Post()
+  createOrder(@Body() creteOrderDto: CreateOrderDto) {
+    return this.orderService.createOrder(creteOrderDto);
+  }
+
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get()
