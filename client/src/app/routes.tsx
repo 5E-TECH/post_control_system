@@ -90,7 +90,7 @@ const AppRouters = () => {
             },
             { path: "regions", element: <Regions /> },
             {
-              path: "users",
+              path: "all-users",
               element: <Users />,
               children: [
                 { index: true, element: <AllUsersTable /> },

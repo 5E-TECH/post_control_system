@@ -9,7 +9,7 @@ const ChooseMail = () => {
         to={""}
         className={({ isActive }) =>
           `${
-            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : ""
+            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : "hover:bg-gray-200"
           } flex items-center justify-center shadow-lg rounded-md text-[20px]`
         }
       >
@@ -19,7 +19,7 @@ const ChooseMail = () => {
         to={"refused"}
         className={({ isActive }) =>
           `${
-            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : ""
+            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : "hover:bg-gray-200"
           } flex items-center justify-center shadow-lg rounded-md text-[20px]`
         }
       >
@@ -29,7 +29,7 @@ const ChooseMail = () => {
         to={"old"}
         className={({ isActive }) =>
           `${
-            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : ""
+            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : "hover:bg-gray-200"
           } flex items-center justify-center shadow-lg rounded-md text-[20px]`
         }
       >
