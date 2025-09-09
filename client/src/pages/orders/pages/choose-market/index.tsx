@@ -82,7 +82,7 @@ const ChooseMarket = () => {
           </div>
           <div className="">
             <table>
-              <thead className="bg-[#F6F7FB] dark:bg-[var(--color-dark-bg-py)]">
+              <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
                 <tr>
                   <th className="w-[438px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">

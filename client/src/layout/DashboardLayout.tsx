@@ -39,7 +39,7 @@ const DashboardLayout = () => {
   return (
     <div className="flex h-screen dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]">
       {sidebar}
-      <div className="flex-1 overflow-y-scroll scrollbar-hide">
+      <div className="flex-1 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] overflow-y-scroll scrollbar-hide">
         <Header />
         <main className="rounded-md">
           <Outlet />

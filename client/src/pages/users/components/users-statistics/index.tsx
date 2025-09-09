@@ -19,7 +19,7 @@ const UsersStatistics = () => {
         className={({ isActive }) =>
           `${isActive ? "border border-[var(--color-bg-sy)] rounded-md" : ""}`
         }
-        to={"/all-users"}
+        to={""}
       >
         <div className="h-[114px] bg-[#ffffff] shadow-lg rounded-md pl-[20px] pr-[20px] flex justify-between dark:bg-[#312D4B]">
           <div className="flex items-center">
