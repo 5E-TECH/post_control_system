@@ -210,6 +210,7 @@ export class UserService {
         region_id,
         tariff_center,
         tariff_home,
+        role: Roles.COURIER,
       } as DeepPartial<UserEntity>);
       await queryRunner.manager.save(courier);
 
