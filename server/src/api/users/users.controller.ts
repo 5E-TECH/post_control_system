@@ -27,6 +27,7 @@ import { SelfGuard } from 'src/common/guards/self.guard';
 import { UpdateSelfDto } from './dto/self-update.dto';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateMarketDto } from './dto/update-market.dto';
 
 @Controller('user')
 export class UsersController {
@@ -133,11 +134,25 @@ export class UsersController {
     return this.userService.updateCourier(id, updateCourierDto);
   }
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Patch('market/:id')
+  updateMarket(
+    @Param('id') id: string,
+    @Body() updateMarketDto: UpdateMarketDto,
+  ) {
+    return this.userService.updateMarket(id, updateMarketDto);
+  }
+
   @UseGuards(JwtGuard, RolesGuard, SelfGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
   @Patch('self/:id')
-  selfUpdate(@Param('id') id: string, @Body() updateSelfDto: UpdateSelfDto) {
-    return this.userService.selfUpdate(id, updateSelfDto);
+  selfUpdate(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() updateSelfDto: UpdateSelfDto,
+  ) {
+    return this.userService.selfUpdate(user, id, updateSelfDto);
   }
 
   @UseGuards(JwtGuard, RolesGuard)

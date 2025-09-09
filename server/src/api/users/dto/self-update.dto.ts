@@ -3,11 +3,7 @@ import { IsOptional, IsString } from 'class-validator';
 export class UpdateSelfDto {
   @IsOptional()
   @IsString()
-  first_name?: string;
-
-  @IsOptional()
-  @IsString()
-  last_name?: string;
+  name?: string;
 
   @IsOptional()
   @IsString()

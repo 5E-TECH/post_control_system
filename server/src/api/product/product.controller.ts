@@ -83,14 +83,14 @@ export class ProductController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get()
   async findAll() {
     return this.productService.findAll();
   }
 
-  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get('market/:marketId')
   async findByMarketId(@Param('marketId') marketId: string) {
     return this.productService.findByMarketId(marketId);
@@ -104,10 +104,10 @@ export class ProductController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET, Roles.REGISTRATOR)
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.productService.findOne(id);
+  async findOne(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.productService.findOne(user, id);
   }
 
   @UseGuards(JwtGuard, RolesGuard)

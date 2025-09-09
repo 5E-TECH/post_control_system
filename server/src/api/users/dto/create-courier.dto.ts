@@ -13,11 +13,7 @@ export class CreateCourierDto {
 
   @IsNotEmpty()
   @IsString()
-  first_name: string;
-
-  @IsNotEmpty()
-  @IsString()
-  last_name: string;
+  name: string;
 
   @IsNotEmpty()
   @IsPhoneNumber('UZ')
