@@ -41,7 +41,7 @@ const DashboardLayout = () => {
       {sidebar}
       <div className="flex-1 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] overflow-y-scroll scrollbar-hide">
         <Header />
-        <main className="rounded-md">
+        <main className="rounded-md pb-14">
           <Outlet />
         </main>
         <Footer />
