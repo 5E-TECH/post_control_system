@@ -21,25 +21,25 @@ const MarketsTable = () => {
             <th className="p-[20px] flex items-center">
               <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
             </th>
-            <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[385px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 USER
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[270px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[385px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 PHONE
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[385px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 STATUS
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[211px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[385px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 ACTION
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>

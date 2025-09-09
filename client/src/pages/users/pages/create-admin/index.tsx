@@ -25,7 +25,7 @@ const CreateAdmin = () => {
     };
     createUser.mutate(newAdmin, {
       onSuccess: () => {
-        navigate("/users");
+        navigate("/all-users");
       },
     });
   };
