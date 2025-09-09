@@ -373,6 +373,18 @@ export class UserService {
     }
   }
 
+  async allMarkets(): Promise<object> {
+    try {
+      const allMarkets = await this.userRepo.find({
+        where: { role: Roles.MARKET },
+        select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+      });
+      return successRes(allMarkets, 200, 'All markets');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async findOne(id: string): Promise<object> {
     try {
       const user = await this.userRepo.findOne({
