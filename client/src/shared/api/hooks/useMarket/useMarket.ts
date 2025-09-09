@@ -7,14 +7,14 @@ export const useMarket = () => {
   const client = useQueryClient();
 
   const createMarket = useMutation({
-    mutationFn: (data: any) => api.post(`market`, data),
+    mutationFn: (data: any) => api.post(`user/market`, data),
     onSuccess: () => client.invalidateQueries({ queryKey: [market] }),
   });
 
   const getMarkets = () =>
     useQuery({
       queryKey: [market],
-      queryFn: () => api.get("market").then((res) => res.data),
+      queryFn: () => api.get("").then((res) => res.data),
       staleTime: Infinity,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
