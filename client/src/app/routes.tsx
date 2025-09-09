@@ -1,9 +1,5 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
-import TodayMails from "../pages/mails/components/today-mails";
-import RefusedMails from "../pages/mails/components/refused-mails";
-import OldMails from "../pages/mails/components/old-mails";
-import MailDetail from "../pages/mails/pages/mail-detail";
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -49,6 +45,12 @@ const ProductCreate = lazy(() => import("../pages/products/product-create"));
 const ChooseMarket = lazy(() => import("../pages/orders/pages/choose-market"));
 const OrderDetails = lazy(() => import("../pages/orders/pages/order-details"));
 const TodayOrders = lazy(() => import("../pages/today-orders"));
+const TodayMails = lazy(() => import("../pages/mails/components/today-mails"));
+const RefusedMails = lazy(
+  () => import("../pages/mails/components/refused-mails")
+);
+const OldMails = lazy(() => import("../pages/mails/components/old-mails"));
+const MailDetail = lazy(() => import("../pages/mails/pages/mail-detail"));
 
 const AppRouters = () => {
   return useRoutes([
