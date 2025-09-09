@@ -24,7 +24,7 @@ const CreateMarket = () => {
     };
     createMarket.mutate(newMarket, {
       onSuccess: () => {
-        navigate("/users");
+        navigate("/all-users");
       },
     });
   };

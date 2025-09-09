@@ -8,7 +8,7 @@ import Success from "../../components/button/success";
 const CreateOrder = () => {
   return (
     <div className="flex gap-6 p-5">
-      <div className="w-fit pr-[81px]">
+      <div className="pr-[81px]">
         <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
           Process
         </h1>

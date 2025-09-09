@@ -25,7 +25,7 @@ const CreateRegistrator = () => {
     };
     createUser.mutate(newRegistrator, {
       onSuccess: () => {
-        navigate("/users");
+        navigate("/all-users");
       },
     });
   };

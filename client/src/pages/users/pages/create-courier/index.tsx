@@ -27,7 +27,7 @@ const CreateCourier = () => {
     };
     createUser.mutate(newCourier, {
       onSuccess: () => {
-        navigate("/users");
+        navigate("/all-users");
       },
     });
   };
