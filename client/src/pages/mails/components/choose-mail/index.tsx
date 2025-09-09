@@ -3,14 +3,16 @@ import { NavLink } from "react-router-dom";
 
 const ChooseMail = () => {
   return (
-    <div className="grid grid-cols-3 gap-18 h-[60px]">
+    <div className="grid grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-15">
       <NavLink
         end
         to={""}
         className={({ isActive }) =>
           `${
-            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : "dark:bg-[#312D48]"
-          } flex items-center justify-center shadow-lg rounded-md text-[20px]`
+            isActive
+              ? "bg-[var(--color-bg-sy)] text-[#ffffff]"
+              : "dark:bg-[#312D48]"
+          } min-h-[60px] flex items-center justify-center shadow-lg rounded-md text-[20px]`
         }
       >
         Bugungi pochtalar
@@ -19,8 +21,10 @@ const ChooseMail = () => {
         to={"refused"}
         className={({ isActive }) =>
           `${
-            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : "dark:bg-[#312D48]"
-          } flex items-center justify-center shadow-lg rounded-md text-[20px]`
+            isActive
+              ? "bg-[var(--color-bg-sy)] text-[#ffffff]"
+              : "dark:bg-[#312D48]"
+          } min-h-[60px] flex items-center justify-center shadow-lg rounded-md text-[20px]`
         }
       >
         Qaytgan pochtalar
@@ -29,8 +33,10 @@ const ChooseMail = () => {
         to={"old"}
         className={({ isActive }) =>
           `${
-            isActive ? "bg-[var(--color-bg-sy)] text-[#ffffff]" : "dark:bg-[#312D48]"
-          } flex items-center justify-center shadow-lg rounded-md text-[20px]`
+            isActive
+              ? "bg-[var(--color-bg-sy)] text-[#ffffff]"
+              : "dark:bg-[#312D48]"
+          } min-h-[60px] flex items-center justify-center shadow-lg rounded-md text-[20px]`
         }
       >
         Eski pochtalar

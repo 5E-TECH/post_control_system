@@ -21,10 +21,8 @@ const Auth = () => {
     api
       .get("user/profile") // 🔑 backendda token tekshirish
       .then((res) => {
-        console.log(res)
         setValid(true); // token to‘g‘ri bo‘lsa
         dispatch(setRole(res.data.data.role))
-        console.log(res.data.data.role);
         
       })
       .catch(() => {
