@@ -1,102 +1,24 @@
 import { memo } from "react";
-import { NavLink } from "react-router-dom";
-import logo from "../../shared/assets/logo.svg";
-import {
-  Apple,
-  CarFront,
-  House,
-  MailOpen,
-  ShoppingBag,
-} from "lucide-react";
+import { House, ShoppingBag, MailOpen, FileText, History } from "lucide-react";
+import SidebarLink from "./SidebarLink";
 
 const RegistratorSidebar = () => {
+  const links = [
+    { to: "/", icon: <House />, label: "Dashboard", end: true },
+    { to: "/orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
+    { to: "/history", icon: <History />, label: "Bugungi buyurtmalar" },
+    { to: "/mails", icon: <MailOpen />, label: "Pochta" },
+    { to: "/payments", icon: <FileText />, label: "Mahsulotlar" },
+  ];
+
   return (
-    <div className="bg-gray-200 dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]">
-      <div className="h-16 flex justify-center items-center">
-        <NavLink to={"/"} className={"flex items-center gap-3"}>
-          <div>
-            <img src={logo} alt="" />
-          </div>
-          <span className="text-xl font-semibold">Beepost</span>
-        </NavLink>
-      </div>
-      <ul className="w-65 flex flex-col gap-1.5 mr-4">
-        <li>
-          <NavLink
-            to={"/"}
-            end={true}
-            className={({ isActive }) =>
-              `flex gap-2 pl-5.5 py-2 ${
-                isActive
-                  ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]"
-                  : ""
-              }`
-            }
-          >
-            <House />
-            <span>Dashboard</span>
-          </NavLink>
-        </li>
-        <li>
-          <NavLink
-            to={"/orders"}
-            className={({ isActive }) =>
-              `flex gap-2 pl-5.5 py-2 ${
-                isActive
-                  ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]"
-                  : ""
-              }`
-            }
-          >
-            <ShoppingBag />
-            <span>Buyurtmalar</span>
-          </NavLink>
-        </li>
-        <li>
-          <NavLink
-            to={"/order/markets/new-orders"}
-            className={({ isActive }) =>
-              `flex gap-2 pl-5.5 py-2 ${
-                isActive
-                  ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]"
-                  : ""
-              }`
-            }
-          >
-            <CarFront />
-            <span>Bugungi buyurtmalar</span>
-          </NavLink>
-        </li>
-        <li>
-          <NavLink
-            to={"/mails"}
-            className={({ isActive }) =>
-              `flex gap-2 pl-5.5 py-2 ${
-                isActive
-                  ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]"
-                  : ""
-              }`
-            }
-          >
-            <MailOpen />
-            <span>Pochta</span>
-          </NavLink>
-        </li>
-        <li>
-          <NavLink
-            to={"/products"}
-            className={({ isActive }) =>
-              `flex gap-2 pl-5.5 py-2 ${
-                isActive
-                  ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]"
-                  : ""
-              }`
-            }
-          >
-            <Apple />
-            <span>Mahsulotlar</span>
-          </NavLink>
-        </li>
+    <div className="bg-[var(--color-bg-py)] pt-6 dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5] h-full">
+      <ul className="w-61 flex flex-col gap-1.5 mr-4">
+        {links.map((link, i) => (
+          <li key={i}>
+            <SidebarLink {...link} />
+          </li>
+        ))}
       </ul>
     </div>
   );

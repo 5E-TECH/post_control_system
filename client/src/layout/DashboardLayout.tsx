@@ -10,7 +10,6 @@ import Courier from "./components/Courier";
 import MarketSidebar from "./components/MarketSidebar";
 import RegistratorSidebar from "./components/RegistratorSidebar";
 import type { UserRole } from "../shared/enums/Roles";
-// import Courier from "./components/Courier";
 
 const DashboardLayout = () => {
   const role = useSelector((state: RootState) => state.roleSlice.role);
@@ -37,15 +36,26 @@ const DashboardLayout = () => {
   }
 
   return (
-    <div className="flex h-screen dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]">
-      {sidebar}
-      <div className="flex-1 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] overflow-y-scroll scrollbar-hide">
+    <div className="grid h-screen grid-rows-[auto_1fr_auto] grid-cols-[250px_1fr] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]">
+      {/* Navbar */}
+      <div className="col-span-2 sticky top-0 z-10">
         <Header />
-        <main className="rounded-md pb-14">
+      </div>
+
+      {/* Sidebar */}
+      <aside className="row-span-1 overflow-y-auto">{sidebar}</aside>
+
+      {/* Dashboard container */}
+      <div className=" overflow-y-auto pr-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
+        <main className="w-full h-full p-6 rounded-lg shadow-md bg-white dark:bg-[var(--color-dark-bg-py)] overflow-y-auto">
           <Outlet />
         </main>
-        <Footer />
       </div>
+
+      {/* Footer */}
+      <footer className="col-span-2 sticky bottom-0 z-10">
+        <Footer />
+      </footer>
     </div>
   );
 };
