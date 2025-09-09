@@ -35,6 +35,8 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { DistrictRepository } from 'src/core/repository/district.repository';
 import { CustomerMarketEntity } from 'src/core/entity/customer-market.entity';
 import { CustomerMarketReository } from 'src/core/repository/customer-market.repository';
+import { UpdateMarketDto } from './dto/update-market.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @Injectable()
 export class UserService {
@@ -186,8 +188,7 @@ export class UserService {
       const {
         password,
         phone_number,
-        first_name,
-        last_name,
+        name,
         region_id,
         tariff_center,
         tariff_home,
@@ -203,8 +204,7 @@ export class UserService {
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
       const courier = queryRunner.manager.create(UserEntity, {
-        first_name,
-        last_name,
+        name,
         phone_number,
         password: hashedPassword,
         region_id,
@@ -278,7 +278,7 @@ export class UserService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { market_id, client_name, phone_number, district_id, address } =
+      const { market_id, name, phone_number, district_id, address } =
         createCustomerDto;
 
       const market = await queryRunner.manager.findOne(UserEntity, {
@@ -336,7 +336,7 @@ export class UserService {
       }
 
       const customer = queryRunner.manager.create(UserEntity, {
-        name: client_name,
+        name,
         phone_number,
         role: Roles.CUSTOMER,
         district_id,
@@ -534,11 +534,84 @@ export class UserService {
     }
   }
 
-  async selfUpdate(id: string, selfUpdateDto: UpdateSelfDto) {
+  async updateMarket(
+    id: string,
+    updateMarketDto: UpdateMarketDto,
+  ): Promise<object> {
+    try {
+      const { password, ...otherFields } = updateMarketDto;
+      const market = await this.userRepo.findOne({ where: { id } });
+      if (!market) {
+        throw new NotFoundException('Market nottt found');
+      }
+
+      if (otherFields.phone_number) {
+        const isExistPhoneNumber = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (isExistPhoneNumber) {
+          throw new ConflictException(
+            'User with this phone number already exist',
+          );
+        }
+      }
+
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+
+      Object.assign(market, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+
+      const updatedMarket = await this.userRepo.save(market);
+
+      return successRes(updatedMarket, 200, 'Market updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateCustomer(id: string, updateCustomerDto: UpdateCustomerDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id, role: Roles.CUSTOMER },
+      });
+
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+      const { market_id, name, phone_number, district_id, address } =
+        updateCustomerDto;
+
+      if (market_id) {
+        const isRelatedToMarket = await queryRunner.manager.find(
+          CustomerMarketEntity,
+          {
+            where: { market_id },
+          },
+        );
+        if (isRelatedToMarket.length > 1) {
+        }
+      }
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async selfUpdate(user: JwtPayload, id: string, selfUpdateDto: UpdateSelfDto) {
     try {
       const { password, ...otherFields } = selfUpdateDto;
-      const user = await this.userRepo.findOne({ where: { id } });
-      if (!user) {
+      const me = await this.userRepo.findOne({ where: { id } });
+      if (!me) {
         throw new NotFoundException('User not found');
       }
       if (otherFields.phone_number) {
@@ -551,15 +624,20 @@ export class UserService {
           );
         }
       }
+      if (user.role === Roles.MARKET && otherFields.name) {
+        throw new BadRequestException(
+          'Markets can not change their names by themselves',
+        );
+      }
       let hashedPassword: string | undefined;
       if (password) {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
-      Object.assign(user, {
+      Object.assign(me, {
         ...otherFields,
         ...(password && { password: hashedPassword }),
       });
-      await this.userRepo.save(user);
+      await this.userRepo.save(me);
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
       return successRes(updatedUser, 200, 'User updated');
@@ -588,7 +666,9 @@ export class UserService {
     try {
       const { phone_number, password } = signInDto;
 
-      const user = await this.userRepo.findOne({ where: { phone_number } });
+      const user = await this.userRepo.findOne({
+        where: { phone_number, role: Not(Roles.CUSTOMER) },
+      });
       if (!user) {
         throw new BadRequestException('Phone number or password incorrect');
       }

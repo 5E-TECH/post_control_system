@@ -15,11 +15,11 @@ import config from 'src/config';
 import { ProductRepository } from 'src/core/repository/product.repository';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Order_status, Roles } from 'src/common/enums';
-import { MarketRepository } from 'src/core/repository/market.repository';
-import { MarketEntity } from 'src/core/entity/market.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { In } from 'typeorm';
+import { UserEntity } from 'src/core/entity/users.entity';
+import { UserRepository } from 'src/core/repository/user.repository';
 
 @Injectable()
 export class ProductService {
@@ -27,8 +27,8 @@ export class ProductService {
     @InjectRepository(ProductEntity)
     private readonly productRepo: ProductRepository,
 
-    @InjectRepository(MarketEntity)
-    private readonly marketRepo: MarketRepository,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: UserRepository,
 
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
@@ -58,8 +58,8 @@ export class ProductService {
       if (!market_id) {
         throw new BadRequestException('Market ID is required');
       }
-      const isExistMarket = await this.marketRepo.findOne({
-        where: { id: market_id },
+      const isExistMarket = await this.userRepo.findOne({
+        where: { id: market_id, role: Roles.MARKET },
       });
       if (!isExistMarket) {
         throw new NotFoundException('Market not found');
@@ -100,7 +100,7 @@ export class ProductService {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products);
+      return successRes(products, 200, 'All products');
     } catch (error) {
       return catchError(error);
     }
@@ -120,8 +120,8 @@ export class ProductService {
         new Set(allNewOrders.map((order) => order.market_id)),
       );
 
-      const allUniqueMarkets = await this.marketRepo.find({
-        where: { id: In(uniqueMarketIds) },
+      const allUniqueMarkets = await this.userRepo.find({
+        where: { id: In(uniqueMarketIds), role: Roles.MARKET },
       });
 
       return successRes(
@@ -140,6 +140,13 @@ export class ProductService {
 
   async findByMarketId(marketId: string) {
     try {
+      const market = await this.userRepo.findOne({
+        where: { id: marketId, role: Roles.MARKET },
+      });
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+
       const products = await this.productRepo.find({
         where: { market_id: marketId },
       });
@@ -148,7 +155,7 @@ export class ProductService {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products);
+      return successRes(products, 200, `All products of ${market.name}`);
     } catch (error) {
       return catchError(error);
     }
@@ -164,18 +171,18 @@ export class ProductService {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products);
+      return successRes(products, 200, 'All my products');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async findOne(id: string) {
+  async findOne(user: JwtPayload, id: string) {
     try {
       const product = await this.productRepo.findOne({ where: { id } });
-      if (!product)
+      if (!product || product.market_id !== user.id) {
         throw new NotFoundException(`Product not found by id: ${id}`);
-
+      }
       if (product.image_url) {
         product.image_url = this.buildImageUrl(product.image_url);
       }
