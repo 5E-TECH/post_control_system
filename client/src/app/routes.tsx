@@ -1,5 +1,6 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+import Orderview from "../pages/today-orders/pages/orderview";
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -70,6 +71,12 @@ const AppRouters = () => {
             {
               path: "today-order",
               element: <TodayOrders />,
+              children:[
+                {
+                  path:"order-view",
+                  element:<Orderview/>
+                }
+              ]
             },
             {
               path: "orders",
