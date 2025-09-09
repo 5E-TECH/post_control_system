@@ -90,7 +90,13 @@ export class UsersController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.COURIER,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+  )
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload) {
     return this.userService.profile(user);
