@@ -57,7 +57,7 @@ const AdminSidebar = () => {
         </li>
         <li>
           <NavLink
-            to={"/regions"}
+            to={"/order/markets/new-orders"}
             className={({ isActive }) =>
               `flex gap-2 pl-5.5 py-2 ${
                 isActive

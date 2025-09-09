@@ -2,6 +2,7 @@ import { memo } from "react";
 import { NavLink } from "react-router-dom";
 import logo from "../../shared/assets/logo.svg";
 import {
+  CarFront,
   FileText,
   House,
   MailOpen,
@@ -33,8 +34,38 @@ const Sidebar = () => {
             }
           >
             <House />
-            
+
             <span>Dashboard</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
+            to={"/regions"}
+            className={({ isActive }) =>
+              `flex gap-2 pl-5.5 py-2 ${
+                isActive
+                  ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]"
+                  : ""
+              }`
+            }
+          >
+            <CarFront />
+            <span>Buyurtmalar</span>
+          </NavLink>
+        </li>
+        <li>
+          <NavLink
+            to={"/regions"}
+            className={({ isActive }) =>
+              `flex gap-2 pl-5.5 py-2 ${
+                isActive
+                  ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] rounded-r-[50px]"
+                  : ""
+              }`
+            }
+          >
+            <CarFront />
+            <span>Bugungi buyurtmalar</span>
           </NavLink>
         </li>
         <li>

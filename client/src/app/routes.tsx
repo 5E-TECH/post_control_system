@@ -68,7 +68,7 @@ const AppRouters = () => {
           children: [
             { index: true, element: <Dashboards /> },
             {
-              path: "today-order",
+              path: "order/markets/new-orders",
               element: <TodayOrders />,
             },
             {
