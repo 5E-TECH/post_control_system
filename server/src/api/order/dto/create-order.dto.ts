@@ -13,6 +13,14 @@ import { OrderItems } from 'src/common/utils/types/order-item.type';
 
 export class CreateOrderDto {
   @IsNotEmpty()
+  @IsUUID()
+  market_id: string;
+
+  @IsNotEmpty()
+  @IsUUID()
+  customer_id: string;
+
+  @IsNotEmpty()
   @IsNotEmpty()
   @IsArray()
   order_item_info: OrderItems[];
