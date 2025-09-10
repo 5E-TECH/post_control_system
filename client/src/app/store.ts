@@ -5,7 +5,7 @@ import roleSlice from "../shared/lib/features/roleSlice";
 import profileEditSlice from "../shared/lib/features/profile/profileEditSlice";
 import setCustomerMarketId from "../shared/lib/features/customer_and_market-id";
 import resetCustomerMarketId from "../shared/lib/features/customer_and_market-id";
-
+import setCustomerData from "../shared/lib/features/customer_and_market-id";
 export const store = configureStore({
   reducer: {
     authSlice,
@@ -14,6 +14,7 @@ export const store = configureStore({
     profileEditSlice,
     setCustomerMarketId,
     resetCustomerMarketId,
+    setCustomerData,
   },
 });
 

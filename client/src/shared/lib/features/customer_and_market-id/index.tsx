@@ -1,6 +1,8 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import type { ICustomer } from "../../../../pages/orders/components/customer-info";
 
 interface ICustomerId {
+  customerData?: ICustomer | null;
   marketId?: string | null;
   customerId?: string | null;
 }
@@ -8,6 +10,13 @@ interface ICustomerId {
 const initialState: ICustomerId = {
   marketId: null,
   customerId: null,
+  customerData: {
+    name: "",
+    address: "",
+    phone_number: "",
+    district: "",
+    region: "",
+  },
 };
 
 export const customerIdSlice = createSlice({
@@ -22,9 +31,12 @@ export const customerIdSlice = createSlice({
       state.marketId = null;
       state.customerId = null;
     },
+    setCustomerData: (state, actions: PayloadAction<ICustomer | null>) => {
+      state.customerData = actions.payload;
+    },
   },
 });
 
-export const { setCustomerMarketId, resetCustomerMarketId } =
+export const { setCustomerMarketId, resetCustomerMarketId, setCustomerData } =
   customerIdSlice.actions;
 export default customerIdSlice.reducer;
