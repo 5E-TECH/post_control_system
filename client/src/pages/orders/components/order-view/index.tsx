@@ -19,77 +19,80 @@ const statusColors: Record<string, string> = {
 const OrderView = () => {
   const navigate = useNavigate();
   return (
-    <div className="w-full bg-white py-5">
+    <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
       <table className="w-full">
-        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center">
-          <th>
-            <div className="flex items-center gap-10 ml-10">
-              <span>#</span>
-              {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div> */}
-            </div>
-          </th>
-          <th>
-            <div className="flex items-center gap-10">
-              <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              <span>CUSTOMER</span>
-            </div>
-          </th>
-          <th>
-            <div className="flex items-center gap-10">
-              <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              <span>PHONE</span>
-            </div>
-          </th>
-          <th>
-            <div className="flex items-center gap-10">
-              <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              <span>ADDRESS</span>
-            </div>
-          </th>
-          <th>
-            <div className="flex items-center gap-10">
-              <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              <span>MARKET</span>
-            </div>
-          </th>
-          <th>
-            <div className="flex items-center gap-10">
-              <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              <span>STATUS</span>
-            </div>
-          </th>
-          <th>
-            <div className="flex items-center gap-10">
-              <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              <span>PRICE</span>
-            </div>
-          </th>
-          <th>
-            <div className="flex items-center gap-10">
-              <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              <span>STOCK</span>
-              <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-            </div>
-          </th>
+        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
+          <tr>
+            <th>
+              <div className="flex items-center gap-10 ml-10">
+                <span>#</span>
+                {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div> */}
+              </div>
+            </th>
+
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>CUSTOMER</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>PHONE</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>ADDRESS</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>MARKET</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>STATUS</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>PRICE</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>STOCK</span>
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
+          </tr>
         </thead>
         <tbody>
           {OrderData?.map((item: any) => (
             <tr
               key={item.id}
-              className="h-[56px] hover:bg-[#f6f7fb]"
+              className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
               onClick={() => navigate("/orders/order-detail")}
             >
               <td className="pl-10">{item.id}</td>
-              <td className="pl-10 text-[#2E263DE5] text-[15px]">
+              <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
                 {item.customer}
               </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px]">
+              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 {item.phone}
               </td>
-              <td className="pl-10 text-[#2E263DE5] text-[15px]">
+              <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
                 {item.address}
               </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px]">
+              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 {item.market}
               </td>
               <td className="pl-10">
@@ -101,10 +104,10 @@ const OrderView = () => {
                   {item.status.toUpperCase()}
                 </span>
               </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px]">
+              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 {item.price}
               </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px]">
+              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 {item.stock}
               </td>
             </tr>

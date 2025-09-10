@@ -6,9 +6,9 @@ import OrderView from "../../components/order-view";
 
 const OrderList = () => {
   return (
-    <div>
+    <div className="dark:bg-[#29253e]">
       <h2 className="text-[25px] mb-5">Order List</h2>
-      <div className="bg-white p-5 rounded-md">
+      <div className="bg-white p-5 rounded-md dark:bg-[#312d4b]">
           <Filter />
       </div>
           <OrderView/>
