@@ -1,6 +1,7 @@
 import { Spin } from "antd";
 import { Edit, Trash } from "lucide-react";
 import { memo, useEffect, useState, type FC } from "react";
+import { useProduct } from "../../api/hooks/useProduct";
 
 interface IProps {
   data:any
@@ -9,7 +10,12 @@ interface IProps {
 const ProductView:FC<IProps> = ({data}) => {
   const [loading, setLoading] = useState(true);
 
-  console.log(data);
+
+    const {deleteProduct} = useProduct()
+
+  const handleDelete = (id:any) => {
+    deleteProduct.mutate(id)
+  }
     
 
   useEffect(() => {
@@ -52,14 +58,14 @@ const ProductView:FC<IProps> = ({data}) => {
                   </div>
                 </td>
 
-                <td className="p-3">{item.name}</td>
+                <td className="p-3">{item.user.name}</td>
 
 
                 <td className="p-3 flex items-center gap-3">
                   <button className="hover:text-[#8C57FF]">
                     <Edit />
                   </button>
-                  <button className="hover:text-red-500">
+                  <button onClick={() => handleDelete(item.id)} className="hover:text-red-500">
                     <Trash />
                   </button>
                 </td>

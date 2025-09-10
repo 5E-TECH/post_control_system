@@ -24,7 +24,7 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getProductsByMarket = (id:string) =>
+  const getProductsByMarket = (id: string) =>
     useQuery({
       queryKey: [product, id],
       queryFn: () => api.get(`product/market/${id}`).then((res) => res.data),
@@ -32,9 +32,17 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
+  const deleteProduct = useMutation({
+    mutationFn: (id: number) => api.delete(`product/${id}`),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [product] });
+    },
+  });
+
   return {
     createProduct,
     getProducts,
-    getProductsByMarket
+    getProductsByMarket,
+    deleteProduct
   };
 };
