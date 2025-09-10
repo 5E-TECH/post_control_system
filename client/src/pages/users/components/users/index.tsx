@@ -88,11 +88,19 @@ const UsersTableComp: FC<Props> = ({ data }) => {
                 </div>
               </td>
 
-              <td className="w-[254px] h-[56px] pl-[20px] text-left">
-                <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
-                  {user?.status}
-                </span>
-              </td>
+              {user?.status === "active" ? (
+                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                  <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
+                    {user?.status}
+                  </span>
+                </td>
+              ) : (
+                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                  <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
+                    {user?.status}
+                  </span>
+                </td>
+              )}
               <td className="w-[254px] h-[56px] pl-[19px] text-left">
                 <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
                   <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />

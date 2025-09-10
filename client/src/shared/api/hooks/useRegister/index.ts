@@ -16,8 +16,6 @@ export const useUser = (path?: string) => {
     useQuery({
       queryKey: [user],
       queryFn: () => api.get("user").then((res) => res.data),
-      staleTime: 1000 * 60 * 60 * 24,
-      refetchOnWindowFocus: false,
     });
   return {
     createUser,
