@@ -45,6 +45,13 @@ export class OrderController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET)
+  @Get('market/my-new-orders')
+  myNewOrders(@CurrentUser() user: JwtPayload) {
+    return this.orderService.myNewOrders(user);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('market/:id')
   newOrdersByMarketId(@Param('id') id: string) {
