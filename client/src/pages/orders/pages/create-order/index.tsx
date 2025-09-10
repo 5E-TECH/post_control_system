@@ -4,8 +4,13 @@ import OrderItems from "../../components/order-items";
 import ProductInfo from "../../components/product-info";
 import Discard from "../../components/button/discard";
 import Success from "../../components/button/success";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 
 const CreateOrder = () => {
+  const customer_id = useSelector((state:RootState)=> state.setCustomerMarketId.customerId)
+  console.log(customer_id)
+ 
   return (
     <div className="flex gap-6 p-5">
       <div className="pr-[81px]">

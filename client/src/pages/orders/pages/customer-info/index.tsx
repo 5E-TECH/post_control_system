@@ -2,9 +2,13 @@ import { ArrowRight, Check } from "lucide-react";
 import { memo } from "react";
 import CustomerDetails from "../../components/customer-details";
 import Discard from "../../components/button/discard";
-import Success from "../../components/button/success";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import CustomerInfo from "../../components/customer-info";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
+import { Button } from "antd";
+import { useUser } from "../../../../shared/api/hooks/useRegister";
+import { setCustomerMarketId } from "../../../../shared/lib/features/customer_and_market-id";
 
 const CustomerInfoOrder = () => {
   const { pathname } = useLocation();
@@ -12,6 +16,30 @@ const CustomerInfoOrder = () => {
   if (pathname.startsWith("/orders/confirm")) {
     return <Outlet />;
   }
+
+  const customerData = useSelector(
+    (state: RootState) => state.setCustomerData.customerData
+  );
+  const market_id = useSelector(
+    (state: RootState) => state.setCustomerMarketId.marketId
+  );
+  const { createUser } = useUser("customer");
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    const customer = {
+      ...customerData,
+      market_id,
+    };
+    createUser.mutate(customer, {
+      onSuccess: (res) => {
+        dispatch(setCustomerMarketId({ customerId: res?.data?.data?.id }));
+        navigate("/orders/confirm");
+      },
+    });
+  };
+
   return (
     <div className="flex gap-6 px-6 pt-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
       <div className="w-fit h-fit pr-[81px]">
@@ -79,12 +107,14 @@ const CustomerInfoOrder = () => {
         <CustomerInfo />
         <CustomerDetails />
         <div className="flex gap-4 justify-end">
-          <Discard children="Discard"/>
-          <Success
-            path="confirm"
-            text="Next"
-            icon={<ArrowRight className="h-[13px] w-[13px]" />}
-          />
+          <Discard children="Discard" />
+          <Button
+            onClick={handleClick}
+            className="w-[91px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
+          >
+            Next
+            <ArrowRight className="h-[13px] w-[13px]" />
+          </Button>
         </div>
       </div>
     </div>
