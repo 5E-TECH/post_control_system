@@ -2,10 +2,10 @@ import { memo } from "react";
 import { Button, Form, Input, type FormProps } from "antd";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
+import { useUser } from "../../../../shared/api/hooks/useRegister";
 
 type FieldType = {
-  market_name: string;
+  name: string;
   phone_number: string;
   tariff_home: string | number;
   tariff_center: string | number;
@@ -13,7 +13,7 @@ type FieldType = {
 };
 
 const CreateMarket = () => {
-  const { createMarket } = useMarket();
+  const { createUser } = useUser("market");
   const navigate = useNavigate();
 
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
@@ -22,7 +22,7 @@ const CreateMarket = () => {
       tariff_home: Number(values.tariff_home),
       tariff_center: Number(values.tariff_center),
     };
-    createMarket.mutate(newMarket, {
+    createUser.mutate(newMarket, {
       onSuccess: () => {
         navigate("/all-users");
       },
@@ -39,7 +39,7 @@ const CreateMarket = () => {
       </span>
       <Form onFinish={onFinish} className="pt-5!">
         <Form.Item
-          name="market_name"
+          name="name"
           rules={[{ required: true, message: "Market nomini kiriting" }]}
         >
           <Input
@@ -116,8 +116,8 @@ const CreateMarket = () => {
 
         <div className="flex items-center justify-center">
           <Button
-            disabled={createMarket.isPending}
-            loading={createMarket.isPending}
+            disabled={createUser.isPending}
+            loading={createUser.isPending}
             type="primary"
             htmlType="submit"
             className="bg-[#8C57FF]! w-[115px]"

@@ -4,9 +4,10 @@ import UsersTableComp from "..";
 
 const AllUsersTable = () => {
   const { getUser } = useUser();
-  const { data: users } = getUser();
+  const { data } = getUser();
+  const allUsers = data?.data;
 
-  return <UsersTableComp data={users} />;
+  return <UsersTableComp data={allUsers} />;
 };
 
 export default memo(AllUsersTable);

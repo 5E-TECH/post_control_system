@@ -8,16 +8,16 @@ export const useMarket = () => {
 
   const createMarket = useMutation({
     mutationFn: (data: any) => api.post(`user/market`, data),
-    onSuccess: () => client.invalidateQueries({ queryKey: [market] }),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [market], refetchType: "active" }),
   });
 
   const getMarkets = () =>
     useQuery({
       queryKey: [market],
-      queryFn: () => api.get("").then((res) => res.data),
-      staleTime: Infinity,
+      queryFn: () => api.get("user/markets").then((res) => res.data),
+      staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
-      refetchOnMount: false,
     });
   return {
     createMarket,

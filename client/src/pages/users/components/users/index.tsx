@@ -6,7 +6,6 @@ import {
   Trash,
 } from "lucide-react";
 import { memo, type FC } from "react";
-import userImg from "../../../../shared/assets/users/table-user.svg";
 import superImg from "../../../../shared/assets/users/super.svg";
 
 interface Props {
@@ -22,37 +21,31 @@ const UsersTableComp: FC<Props> = ({ data }) => {
             <th className="p-[20px] flex items-center">
               <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
             </th>
-            <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
-                USER
+                NAME
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 PHONE
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 ROLE
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-              <div className="flex items-center justify-between pr-[21px]">
-                LOCATION
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              </div>
-            </th>
-            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 STATUS
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
-            <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 ACTION
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -61,7 +54,7 @@ const UsersTableComp: FC<Props> = ({ data }) => {
           </tr>
         </thead>
         <tbody>
-          {data?.data?.map((user: any) => (
+          {data?.map((user: any) => (
             <tr key={user?.id}>
               <td className="p-[20px] flex items-center">
                 {" "}
@@ -72,15 +65,9 @@ const UsersTableComp: FC<Props> = ({ data }) => {
               </td>
               <td className="w-[254px] h-[56px] pl-[20px] text-left">
                 <div className="flex items-center gap-4">
-                  <div>
-                    <img src={userImg} alt="" />
-                  </div>
                   <div className="flex flex-col">
                     <span className="font-medium text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
-                      {`${user?.first_name}.${user?.last_name}`}
-                    </span>
-                    <span className="font-normal text-[13px] text-[#2E263DB2] dark:text-[#D5D1EB]">
-                      {`${user?.first_name}.${user?.last_name}`}
+                      {user?.name}
                     </span>
                   </div>
                 </div>
@@ -100,9 +87,7 @@ const UsersTableComp: FC<Props> = ({ data }) => {
                   </span>
                 </div>
               </td>
-              <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                {user?.region?.name ? user?.region?.name : "Noaniq"}
-              </td>
+
               <td className="w-[254px] h-[56px] pl-[20px] text-left">
                 <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
                   {user?.status}

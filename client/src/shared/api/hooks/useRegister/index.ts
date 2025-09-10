@@ -8,16 +8,16 @@ export const useUser = (path?: string) => {
 
   const createUser = useMutation({
     mutationFn: (data: any) => api.post(`user/${path}`, data),
-    onSuccess: () => client.invalidateQueries({ queryKey: [user] }),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
   });
 
   const getUser = () =>
     useQuery({
       queryKey: [user],
       queryFn: () => api.get("user").then((res) => res.data),
-      staleTime: Infinity,
+      staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
-      refetchOnMount: false,
     });
   return {
     createUser,

@@ -4,14 +4,13 @@ import market from "../../../../shared/assets/users/markets.svg";
 import employers from "../../../../shared/assets/users/employer.svg";
 import { NavLink } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
-import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 
 const UsersStatistics = () => {
   const { getUser } = useUser();
-  const { getMarkets } = useMarket();
-  const { data: users } = getUser();
-  const { data: markets } = getMarkets();
-  const allUsers = users?.data.concat(markets?.data);
+  const { data: allUsers } = getUser();
+  const markets = allUsers?.data?.filter((user: any) => user.role === "market");
+  const users = allUsers?.data?.filter((user: any) => user.role !== "market");
+
   return (
     <div className="grid grid-cols-3 max-[1250px]:grid-cols-2 max-[950px]:grid-cols-1 gap-6">
       <NavLink
@@ -29,7 +28,7 @@ const UsersStatistics = () => {
               </p>
               <div className="flex gap-2">
                 <span className="font-medium text-2xl text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                  {allUsers?.length}
+                  {allUsers?.data?.length}
                 </span>
                 <span className="font-normal text-[15px] pt-1 text-[#56CA00]">
                   (+29%)
@@ -57,7 +56,7 @@ const UsersStatistics = () => {
               </p>
               <div className="flex gap-2">
                 <span className="font-medium text-2xl text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                  {markets?.data?.length}
+                  {markets?.length}
                 </span>
                 <span className="font-normal text-[15px] pt-1 text-[#56CA00]">
                   (+18%)
@@ -85,7 +84,7 @@ const UsersStatistics = () => {
               </p>
               <div className="flex gap-2">
                 <span className="font-medium text-2xl text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                  {users?.data?.length}
+                  {users?.length}
                 </span>
                 <span className="font-normal text-[15px] pt-1 text-[#FF4C51]">
                   (-14%)
