@@ -21,7 +21,7 @@ export class ProductEntity extends BaseEntity {
   user_id: string;
 
   @Column({ type: 'varchar', nullable: true, name: 'image_url' })
-  image_url: string;
+  image_url: string | null;
 
   // Many Products → One User (Market owner)
   @ManyToOne(() => UserEntity, (user) => user.products, {

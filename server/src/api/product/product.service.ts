@@ -58,12 +58,14 @@ export class ProductService {
       if (!market_id) {
         throw new BadRequestException('Market ID is required');
       }
+
       const isExistMarket = await this.userRepo.findOne({
         where: { id: market_id, role: Roles.MARKET },
       });
       if (!isExistMarket) {
         throw new NotFoundException('Market not found');
       }
+
       const exists = await this.productRepo.findOne({
         where: {
           name,
@@ -75,16 +77,19 @@ export class ProductService {
         throw new ConflictException('Product name already exists');
       }
 
+      let imageFileName: string | null = null;
       if (file) {
-        createProductDto.image_url = file.filename;
+        imageFileName = file.filename;
       }
 
       const product = this.productRepo.create({
         name,
         user_id: market_id,
+        image_url: imageFileName,
       });
       await this.productRepo.save(product);
 
+      // 🔧 Save qilinganidan keyin pathni qayta yozamiz
       if (product.image_url) {
         product.image_url = this.buildImageUrl(product.image_url);
       }
