@@ -15,7 +15,11 @@ const AdminSidebar = () => {
   const links = [
     { to: "/", icon: <House />, label: "Dashboard", end: true },
     { to: "/orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
-    { to: "/regions", icon: <CarFront />, label: "Bugungi buyurtmalar" },
+    {
+      to: "/order/markets/new-orders",
+      icon: <CarFront />,
+      label: "Bugungi buyurtmalar",
+    },
     { to: "/mails", icon: <MailOpen />, label: "Pochta" },
     { to: "/products", icon: <Apple />, label: "Mahsulotlar" },
     { to: "/all-users", icon: <UserRound />, label: "Foydalanuvchilar" },
