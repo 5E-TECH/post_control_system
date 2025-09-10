@@ -9,6 +9,7 @@ import {
   Res,
   UseGuards,
   SetMetadata,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './users.service';
 import { CreateCourierDto } from './dto/create-courier.dto';
@@ -85,8 +86,12 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get()
-  findAllUsers() {
-    return this.userService.allUsers();
+  findAllUsers(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('role') role?: string,
+  ) {
+    return this.userService.allUsers({ search, status, role });
   }
 
   @UseGuards(JwtGuard, RolesGuard)

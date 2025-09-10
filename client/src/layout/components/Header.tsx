@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Moon, Search, Sun } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { Moon, Search, Sun, User } from "lucide-react";
+import logo from "../../shared/assets/logo.svg";
 
 const Header = () => {
   const [dark, setDark] = useState(() => {
@@ -19,21 +20,46 @@ const Header = () => {
 
   const navigate = useNavigate();
   return (
-    <div className="w-full h-16 px-6 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
-      <label htmlFor="search" className="flex gap-4">
-        <Search />
+    <div className="w-full h-16 px-8 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
+      {/* Logo */}
+      <div className="h-16 flex items-center gap-3">
+        <NavLink to={"/"} className="flex items-center gap-3">
+          <div>
+            <img src={logo} alt="logo" className="h-8" />
+          </div>
+          <span className="text-xl font-semibold">Beepost</span>
+        </NavLink>
+      </div>
+
+      {/* Search */}
+      <label
+        htmlFor="search"
+        className="flex items-center gap-3 w-full max-w-xl mx-12">
+        <Search className="text-gray-500" />
         <input
-          className="outline-none"
+          className="w-full bg-white dark:bg-gray-800 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
           type="text"
           id="search"
           placeholder="Search"
         />
       </label>
-      <div className="flex gap-4">
+
+      {/* Actions */}
+      <div className="flex gap-6">
         <button onClick={() => setDark(!dark)} className="cursor-pointer">
           {dark ? <Sun /> : <Moon />}
         </button>
-        <button onClick={() => navigate("/profile")} className="cursor-pointer">Profile</button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => navigate("/profile")}
+            className="p-2 rounded-full border border-gray-400 dark:border-gray-600 
+               bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
+               hover:bg-gray-200 dark:hover:bg-gray-700 
+               hover:scale-105 shadow-sm hover:shadow-md transition-all duration-200">
+            <User size={20} />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import type { RootState } from "../../app/store";
 import { api } from "../../shared/api";
 import { setToken } from "../../shared/lib/features/login/authSlice";
-import { setRole } from "../../shared/lib/features/roleSlice";
+import { setId, setRole } from "../../shared/lib/features/roleSlice";
 
 const Auth = () => {
   const dispatch = useDispatch();
@@ -23,7 +23,7 @@ const Auth = () => {
       .then((res) => {
         setValid(true); // token to‘g‘ri bo‘lsa
         dispatch(setRole(res.data.data.role))
-        
+        dispatch(setId(res.data.data.id))
       })
       .catch(() => {
         dispatch(setToken(null)); // ❌ noto‘g‘ri token → localStorage va reduxdan o‘chir

@@ -106,38 +106,6 @@ export class ProductService {
     }
   }
 
-  async haveNewOrderMarkets() {
-    try {
-      const allNewOrders = await this.orderRepo.find({
-        where: { status: Order_status.NEW },
-      });
-
-      if (!allNewOrders.length) {
-        return successRes([], 200, 'No new orders');
-      }
-
-      const uniqueMarketIds = Array.from(
-        new Set(allNewOrders.map((order) => order.market_id)),
-      );
-
-      const allUniqueMarkets = await this.userRepo.find({
-        where: { id: In(uniqueMarketIds), role: Roles.MARKET },
-      });
-
-      return successRes(
-        {
-          count: allUniqueMarkets.length,
-          markets: allUniqueMarkets,
-        },
-        200,
-        'Markets with new orders',
-      );
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
   async findByMarketId(marketId: string) {
     try {
       const market = await this.userRepo.findOne({

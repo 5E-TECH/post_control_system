@@ -157,3 +157,27 @@ export const OrderData = [
     stock: 5,
   },
 ];
+
+export const TodayOrder = [
+  { id: 1, market: "Korzinka", phone: "+998913607434", totalPrice: "$1200", stock: 15 },
+  { id: 2, market: "Makro", phone: "+998913607434", totalPrice: "$850", stock: 8 },
+  { id: 3, market: "Carrefour", phone: "+998913607434", totalPrice: "$2100", stock: 23 },
+  { id: 4, market: "Havas", phone: "+998913607434", totalPrice: "$640", stock: 5 },
+  { id: 5, market: "Magnum", phone: "+998913607434", totalPrice: "$1500", stock: 18 },
+  { id: 6, market: "Bi1", phone: "+998913607434", totalPrice: "$430", stock: 6 },
+  { id: 7, market: "Globus", phone: "+998913607434", totalPrice: "$980", stock: 12 },
+  { id: 8, market: "Malika Market", phone: "+998913607434", totalPrice: "$560", stock: 7 },
+  { id: 9, market: "Askar Market", phone: "+998913607434", totalPrice: "$300", stock: 3 },
+  { id: 10, market: "Grand Market", phone: "+998913607434", totalPrice: "$1750", stock: 20 },
+
+  { id: 11, market: "Olcha.uz", phone: "+998913607434", totalPrice: "$2200", stock: 25 },
+  { id: 12, market: "Mediapark", phone: "+998913607434", totalPrice: "$1340", stock: 14 },
+  { id: 13, market: "Goodzone", phone: "+998913607434", totalPrice: "$890", stock: 4 },
+  { id: 14, market: "Texnomart", phone: "+998913607434", totalPrice: "$1670", stock: 10 },
+  { id: 15, market: "Asaxiy.uz", phone: "+998913607434", totalPrice: "$2500", stock: 28 },
+  { id: 16, market: "ZoodMall", phone: "+998913607434", totalPrice: "$720", stock: 9 },
+  { id: 17, market: "Uzum Market", phone: "+998913607434", totalPrice: "$1950", stock: 22 },
+  { id: 18, market: "Express24", phone: "+998913607434", totalPrice: "$400", stock: 2 },
+  { id: 19, market: "Chopar", phone: "+998913607434", totalPrice: "$1100", stock: 11 },
+  { id: 20, market: "BookCafe.uz", phone: "+998913607434", totalPrice: "$570", stock: 6 },
+];

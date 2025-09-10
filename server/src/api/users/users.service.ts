@@ -19,7 +19,7 @@ import { Response } from 'express';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
-import { DataSource, DeepPartial, Not } from 'typeorm';
+import { DataSource, DeepPartial, In, Not } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
@@ -361,12 +361,40 @@ export class UserService {
     }
   }
 
-  async allUsers(): Promise<object> {
+  async allUsers(filters: {
+    search?: string;
+    status?: string;
+    role?: string;
+  }): Promise<object> {
     try {
-      const allUsers = await this.userRepo.find({
-        where: { role: Not(Roles.SUPERADMIN) },
-        relations: ['region'],
-      });
+      const { search, status, role } = filters;
+
+      const qb = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.region', 'region')
+        .where('user.role NOT IN (:...excludedRoles)', {
+          excludedRoles: [Roles.CUSTOMER],
+        });
+
+      // 🔎 Search: name yoki phone_number bo‘yicha qisman qidirish
+      if (search) {
+        qb.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🎯 Status filter
+      if (status) {
+        qb.andWhere('user.status = :status', { status });
+      }
+
+      // 🎯 Role filter
+      if (role) {
+        qb.andWhere('user.role = :role', { role });
+      }
+
+      const allUsers = await qb.getMany();
       return successRes(allUsers, 200, 'All users');
     } catch (error) {
       return catchError(error);
@@ -380,6 +408,17 @@ export class UserService {
         select: ['id', 'name', 'phone_number', 'status', 'created_at'],
       });
       return successRes(allMarkets, 200, 'All markets');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allEmployees() {
+    try {
+      const allEmployees = await this.userRepo.find({
+        where: { role: In([Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR]) },
+      });
+      return successRes(allEmployees, 200, 'Barcha xodimlar');
     } catch (error) {
       return catchError(error);
     }

@@ -4,7 +4,6 @@ import config from 'src/config';
 import { UsersModule } from './users/users.module';
 import { ProductModule } from './product/product.module';
 import { JwtModule } from '@nestjs/jwt';
-import { MarketModule } from './market/market.module';
 import { CashBoxModule } from './cash-box/cash-box.module';
 import { RegionModule } from './region/region.module';
 import { DistrictModule } from './district/district.module';
@@ -14,7 +13,6 @@ import { PostModule } from './post/post.module';
 import { OrderModule } from './order/order.module';
 import { BotModule } from './bot/bot.module';
 import { TelegrafModule } from 'nestjs-telegraf';
-import { CustomerModule } from './customer/customer.module';
 
 @Module({
   imports: [
@@ -31,7 +29,6 @@ import { CustomerModule } from './customer/customer.module';
     UsersModule,
     ProductModule,
     JwtModule.register({ global: true }),
-    MarketModule,
     CashBoxModule,
     RegionModule,
     DistrictModule,
@@ -40,7 +37,6 @@ import { CustomerModule } from './customer/customer.module';
     PostModule,
     OrderModule,
     BotModule,
-    CustomerModule,
   ],
 })
 export class AppModule {}
