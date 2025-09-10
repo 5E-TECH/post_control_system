@@ -128,6 +128,7 @@ export class ProductService {
 
       const products = await this.productRepo.find({
         where: { user_id: marketId },
+        relations: ['user'],
         order: { created_at: 'ASC' },
       });
       products.forEach((product) => {
