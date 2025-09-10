@@ -14,8 +14,7 @@ const initialState: ICustomerId = {
     name: "",
     address: "",
     phone_number: "",
-    district: "",
-    region: "",
+    district_id:""
   },
 };
 
