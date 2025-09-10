@@ -9,8 +9,8 @@ interface IProps {
 const ProductView:FC<IProps> = ({data}) => {
   const [loading, setLoading] = useState(true);
 
-  console.log(data?.data);
-  
+  console.log(data);
+    
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 500);
@@ -52,7 +52,7 @@ const ProductView:FC<IProps> = ({data}) => {
                   </div>
                 </td>
 
-                <td className="p-3">4,689</td>
+                <td className="p-3">{item.name}</td>
 
 
                 <td className="p-3 flex items-center gap-3">

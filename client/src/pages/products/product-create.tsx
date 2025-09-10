@@ -2,6 +2,7 @@ import React, { useRef, type FC } from "react";
 import AddProduct, { type AddProductRef } from "./components";
 import { useLocation } from "react-router-dom";
 import ProductView from "../../shared/components/product-view";
+import { useProduct } from "../../shared/api/hooks/useProduct";
 // import { useLocation } from 'react-router-dom';
 
 // interface Iprops {
@@ -14,7 +15,9 @@ const ProductsCreate: FC = () => {
   const location = useLocation();
   const market = location.state?.market; // state'dan olamiz
 
-  console.log(market);
+  const {getProductsByMarket} = useProduct()
+  
+    const {data} = getProductsByMarket(market.id)
 
   const handleDiscard = () => {
     addProductRef.current?.onClear();
@@ -43,7 +46,7 @@ const ProductsCreate: FC = () => {
         </div>
         <div className="m-[24px]">
           <AddProduct ref={addProductRef} />
-          <ProductView data={""} />
+          <ProductView data={data} />
         </div>
       </div>
       <div></div>

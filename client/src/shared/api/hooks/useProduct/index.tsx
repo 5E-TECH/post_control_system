@@ -24,8 +24,17 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
+  const getProductsByMarket = (id:string) =>
+    useQuery({
+      queryKey: [product, id],
+      queryFn: () => api.get(`product/market/${id}`).then((res) => res.data),
+      staleTime: 1000 * 60 * 60 * 24,
+      refetchOnWindowFocus: false,
+    });
+
   return {
     createProduct,
     getProducts,
+    getProductsByMarket
   };
 };
