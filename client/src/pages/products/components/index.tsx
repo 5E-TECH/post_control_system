@@ -3,6 +3,7 @@ import upload from "../../../shared/assets/product/upload.png";
 import { Image } from "antd";
 import { useProduct } from "../../../shared/api/hooks/useProduct";
 import { X } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 export interface AddProductRef {
   onClear: () => void;
@@ -10,6 +11,11 @@ export interface AddProductRef {
 
 const AddProduct = forwardRef<AddProductRef>((_, ref) => {
   const { createProduct } = useProduct();
+
+  const location = useLocation();
+  const market = location.state?.market; // state'dan olamiz
+
+  // console.log(market.id);
 
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -58,7 +64,11 @@ const AddProduct = forwardRef<AddProductRef>((_, ref) => {
 
     const formData = new FormData();
     formData.append("name", productName);
+    formData.append("market_id", market.id);
     formData.append("image", file);
+
+    console.log(formData);
+    
 
     try {
       await createProduct.mutate(formData);

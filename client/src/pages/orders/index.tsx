@@ -9,7 +9,7 @@ const Orders = () => {
     return <Outlet />;
   }
   return (
-    <div className="bg-[#f4f5fa] p-5">
+    <div className="bg-[#f4f5fa] m-5">
       <OrderList />
     </div>
   );

@@ -80,7 +80,7 @@ const Filter = () => {
         </Select>
       </div>
 
-      <div className="border-t w-full mt-5 flex pt-5 justify-between border-[#F6F7FB]">
+      <div className="border-t w-full mt-5 flex pt-5 justify-between border-[#F6F7FB] dark:border-[#595572]">
         <div className="flex gap-5">
           <Select
             name="from"
