@@ -3,7 +3,6 @@ import { Cashbox_type } from 'src/common/enums';
 import { Column, Entity, OneToOne, OneToMany, JoinColumn } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { CashboxHistoryEntity } from './cashbox-history.entity';
-import { MarketEntity } from './market.entity';
 
 @Entity('cash_box')
 export class CashEntity extends BaseEntity {

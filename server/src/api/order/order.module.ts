@@ -5,12 +5,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { ProductEntity } from 'src/core/entity/product.entity';
-import { MarketEntity } from 'src/core/entity/market.entity';
 import { ProductService } from '../product/product.service';
 import { CashBoxModule } from '../cash-box/cash-box.module';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
-import { CustomerEntity } from 'src/core/entity/customer.entity';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
@@ -21,8 +19,6 @@ import { UserEntity } from 'src/core/entity/users.entity';
       OrderEntity,
       OrderItemEntity,
       ProductEntity,
-      MarketEntity,
-      CustomerEntity,
       CashEntity,
       CashboxHistoryEntity,
       UserEntity,

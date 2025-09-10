@@ -14,6 +14,8 @@ import { CashboxHistoryEntity } from './cashbox-history.entity';
 import { RegionEntity } from './region.entity';
 import { PostEntity } from './post.entity';
 import { CustomerMarketEntity } from './customer-market.entity';
+import { ProductEntity } from './product.entity';
+import { OrderEntity } from './order.entity';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -88,4 +90,14 @@ export class UserEntity extends BaseEntity {
 
   @OneToMany(() => CustomerMarketEntity, (cm) => cm.market)
   marketLinks: CustomerMarketEntity[];
+
+  // ...
+  @OneToMany(() => ProductEntity, (product) => product.user)
+  products: ProductEntity[];
+
+  // users.entity.ts ichida
+
+  // ...
+  @OneToMany(() => OrderEntity, (order) => order.user)
+  orders: OrderEntity[];
 }
