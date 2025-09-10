@@ -16,6 +16,7 @@ import {
   Operation_type,
   Order_status,
   PaymentMethod,
+  Roles,
   Source_type,
 } from 'src/common/enums';
 import { successRes } from 'src/infrastructure/lib/response';
@@ -26,8 +27,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { MarketEntity } from 'src/core/entity/market.entity';
-import { MarketRepository } from 'src/core/repository/market.repository';
+import { UserEntity } from 'src/core/entity/users.entity';
 
 @Injectable()
 export class CashBoxService
@@ -43,9 +43,6 @@ export class CashBoxService
 
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
-
-    @InjectRepository(MarketEntity)
-    private readonly marketRepo: MarketRepository,
 
     private readonly dataSource: DataSource,
   ) {
@@ -92,7 +89,7 @@ export class CashBoxService
       }
 
       const courierCashbox = await transaction.manager.findOne(CashEntity, {
-        where: { user_id: courier_id },
+        where: { user_id: courier_id, cashbox_type: Cashbox_type.FOR_COURIER },
       });
       if (!courierCashbox) {
         throw new NotFoundException('Courier cashbox not found');
@@ -121,7 +118,7 @@ export class CashBoxService
           payment_date,
           payment_method,
         },
-      ); // Davom etaman ......
+      );
 
       await transaction.manager.save(courierCashboxHistory);
 
@@ -149,7 +146,7 @@ export class CashBoxService
         market_id != null
       ) {
         const market_cashbox = await this.cashboxRepo.findOne({
-          where: { user_id: market_id },
+          where: { user_id: market_id, cashbox_type: Cashbox_type.FOR_MARKET },
         });
 
         if (!market_cashbox) {
@@ -179,7 +176,7 @@ export class CashBoxService
         market_cashbox.balance -= amount;
         await transaction.manager.save(market_cashbox);
 
-        const marketCashboxHistory = await transaction.manager.create(
+        const marketCashboxHistory = transaction.manager.create(
           CashboxHistoryEntity,
           {
             operation_type: Operation_type.EXPENSE,
@@ -200,7 +197,6 @@ export class CashBoxService
       return successRes({}, 201, "To'lov qabul qilindi !!! ");
     } catch (error) {
       await transaction.rollbackTransaction();
-      console.error('Xatolik:', error);
       return catchError(error.message);
     } finally {
       await transaction.release();
@@ -219,8 +215,8 @@ export class CashBoxService
         paymentToMarketDto;
       let paymentInProcess = amount;
 
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: market_id },
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: market_id, role: Roles.MARKET },
       });
       if (!market) {
         throw new NotFoundException('Market you choose is not exist');
@@ -236,6 +232,7 @@ export class CashBoxService
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: {
           market_id,
+          cashbox_type: Cashbox_type.FOR_MARKET,
         },
       });
       if (!marketCashbox) {
@@ -251,7 +248,7 @@ export class CashBoxService
       const allSoldOrders = await queryRunner.manager.find(OrderEntity, {
         where: {
           status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
-          market_id,
+          user_id: market_id,
         },
         order: { updated_at: 'ASC' },
       });

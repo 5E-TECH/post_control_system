@@ -67,7 +67,7 @@ export class ProductService {
       const exists = await this.productRepo.findOne({
         where: {
           name,
-          market_id,
+          user_id: market_id,
         },
       });
 
@@ -79,7 +79,10 @@ export class ProductService {
         createProductDto.image_url = file.filename;
       }
 
-      const product = this.productRepo.create(createProductDto);
+      const product = this.productRepo.create({
+        name,
+        user_id: market_id,
+      });
       await this.productRepo.save(product);
 
       if (product.image_url) {
@@ -116,7 +119,7 @@ export class ProductService {
       }
 
       const products = await this.productRepo.find({
-        where: { market_id: marketId },
+        where: { user_id: marketId },
       });
       products.forEach((product) => {
         if (product.image_url) {
@@ -132,7 +135,7 @@ export class ProductService {
   async getMyProducts(user: JwtPayload) {
     try {
       const products = await this.productRepo.find({
-        where: { market_id: user.id },
+        where: { user_id: user.id },
       });
       products.forEach((product) => {
         if (product.image_url) {
@@ -148,7 +151,7 @@ export class ProductService {
   async findOne(user: JwtPayload, id: string) {
     try {
       const product = await this.productRepo.findOne({ where: { id } });
-      if (!product || product.market_id !== user.id) {
+      if (!product || product.user_id !== user.id) {
         throw new NotFoundException(`Product not found by id: ${id}`);
       }
       if (product.image_url) {
@@ -181,7 +184,7 @@ export class ProductService {
 
       // ✅ Boshqa mahsulotda bu name + market_id mavjudmi?
       const exists = await this.productRepo.findOne({
-        where: { name, market_id: product.market_id },
+        where: { name, user_id: product.user_id },
       });
 
       if (exists) {
@@ -231,7 +234,7 @@ export class ProductService {
   ) {
     try {
       const product = await this.productRepo.findOne({
-        where: { id, market_id: currentUser.id },
+        where: { id, user_id: currentUser.id },
       });
       if (!product) throw new NotFoundException('Product not found');
 
@@ -245,7 +248,7 @@ export class ProductService {
 
       // ✅ Boshqa mahsulotda bu name + market_id mavjudmi?
       const exists = await this.productRepo.findOne({
-        where: { name, market_id: currentUser.id },
+        where: { name, user_id: currentUser.id },
       });
 
       if (exists) {

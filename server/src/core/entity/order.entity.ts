@@ -1,15 +1,14 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Order_status, Where_deliver } from 'src/common/enums';
 import { Column, Entity, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
-import { CustomerEntity } from './customer.entity';
 import { OrderItemEntity } from './order-item.entity';
 import { PostEntity } from './post.entity';
-import { MarketEntity } from './market.entity';
+import { UserEntity } from './users.entity';
 
 @Entity('order')
 export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid' })
-  market_id: string;
+  user_id: string;
 
   @Column({ type: 'int', default: 0 })
   product_quantity: number;
@@ -44,28 +43,21 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   customer_id: string;
 
-  // 🟢 Relation: Many Orders → One Customer
-  @ManyToOne(() => CustomerEntity, (customer) => customer.orders, {
-    eager: true,
-  })
-  @JoinColumn({ name: 'customer_id' })
-  customer: CustomerEntity;
-
-  // 🟢 Relation: One Order → Many OrderItems
+  // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order, { cascade: true })
   items: OrderItemEntity[];
 
-  // 🟢 Relation: Many Orders → One Post
+  // 🟢 Many Orders → One Post
   @ManyToOne(() => PostEntity, (post) => post.orders, {
     onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'post_id' })
   post: PostEntity;
 
-  // 🟢 Relation: Many Orders → One Market
-  @ManyToOne(() => MarketEntity, (market) => market.orders, {
+  // 🟢 Many Orders → One User (Market owner)
+  @ManyToOne(() => UserEntity, (user) => user.orders, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'market_id' })
-  market: MarketEntity;
+  @JoinColumn({ name: 'user_id' })
+  user: UserEntity;
 }

@@ -5,16 +5,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
-import { MarketEntity } from 'src/core/entity/market.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      CashEntity,
-      CashboxHistoryEntity,
-      OrderEntity,
-      MarketEntity,
-    ]),
+    TypeOrmModule.forFeature([CashEntity, CashboxHistoryEntity, OrderEntity]),
   ],
   controllers: [CasheBoxController],
   providers: [CashBoxService],

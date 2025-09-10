@@ -23,12 +23,8 @@ import {
 } from 'src/common/enums';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { ProductRepository } from 'src/core/repository/product.repository';
-import { MarketRepository } from 'src/core/repository/market.repository';
 import { ProductEntity } from 'src/core/entity/product.entity';
-import { MarketEntity } from 'src/core/entity/market.entity';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
-import { CustomerEntity } from 'src/core/entity/customer.entity';
-import { CustomerRepository } from 'src/core/repository/customer.repository';
 import { SellCancelOrderDto } from './dto/sellCancel-order.dto';
 import { OrdersArrayDto } from './dto/orders-array.dto';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
@@ -54,12 +50,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
     @InjectRepository(ProductEntity)
     private readonly productRepo: ProductRepository,
-
-    @InjectRepository(MarketEntity)
-    private readonly marketRepo: MarketRepository,
-
-    @InjectRepository(CustomerEntity)
-    private readonly customerInfoRepo: CustomerRepository,
 
     @InjectRepository(CashEntity)
     private readonly cashboxRepo: CashRepository,
@@ -161,7 +151,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       const uniqueMarketIds = Array.from(
-        new Set(allNewOrders.map((order) => order.market_id)),
+        new Set(allNewOrders.map((order) => order.user_id)),
       );
 
       const allUniqueMarkets = await this.userRepo.find({
@@ -184,21 +174,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async newOrdersByMarketId(id: string) {
     try {
-      const market = await this.marketRepo.findOne({ where: { id } });
+      const market = await this.userRepo.findOne({ where: { id } });
       if (!market) {
         throw new NotFoundException('Market not found');
       }
       const allNewOrders = await this.orderRepo.find({
         where: {
-          market_id: id,
+          user_id: id,
           status: Order_status.NEW,
         },
       });
-      return successRes(
-        allNewOrders,
-        200,
-        `${market.market_name}'s new Orders`,
-      );
+      return successRes(allNewOrders, 200, `${market.name}'s new Orders`);
     } catch (error) {
       return catchError(error);
     }
@@ -320,8 +306,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // 2. Fetch related data in bulk
       const customerIds = newOrders.map((o) => o.customer_id);
-      const customers = await queryRunner.manager.find(CustomerEntity, {
-        where: { id: In(customerIds) },
+      const customers = await queryRunner.manager.find(UserEntity, {
+        where: { id: In(customerIds), role: Roles.CUSTOMER },
       });
       const customerMap = new Map(customers.map((c) => [c.id, c]));
 
@@ -423,9 +409,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       const deliveringPlace = order.where_deliver;
-      const marketId = order.market_id;
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: marketId },
+      const marketId = order.user_id;
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: marketId, role: Roles.MARKET },
       });
       if (!market) {
         throw new NotFoundException('This orders owner is not found');
@@ -540,9 +526,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Order not found');
       }
 
-      const marketId = order.market_id;
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: marketId },
+      const marketId = order.user_id;
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: marketId, role: Roles.MARKET },
       });
       if (!market) {
         throw new NotFoundException('This orders owner is not found');
@@ -613,15 +599,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
 
       // 🔎 3. Market + cashbox
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: order.market_id },
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: order.user_id, role: Roles.MARKET },
       });
       if (!market) throw new NotFoundException('Market not found');
 
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: {
           cashbox_type: Cashbox_type.FOR_MARKET,
-          user_id: order.market_id,
+          user_id: order.user_id,
         },
       });
       if (!marketCashbox)
@@ -740,7 +726,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (remainingItems.length > 0) {
         const cancelledOrder = queryRunner.manager.create(OrderEntity, {
-          market_id: order.market_id,
+          market_id: order.user_id,
           customer_id: order.customer_id, // ✅ same customer
           comment: 'Qolgan mahsulotlar bekor qilindi',
           total_price: 0,
