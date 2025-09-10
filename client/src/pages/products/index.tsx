@@ -1,29 +1,27 @@
-import { Edit, FilePlus, Search, Send, Trash, X } from "lucide-react";
-import { memo, useState, useEffect } from "react";
-import ProductImg from "../../shared/assets/profile-image/Image.svg";
+import { FilePlus, Search, Send, X } from "lucide-react";
+import { memo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Spin } from "antd";
-// import { useProductss } from "./service/getProducts";
 import Popup from "../../shared/ui/Popup";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
+import ProductView from "../../shared/components/product-view";
+import { useProduct } from "../../shared/api/hooks/useProduct";
 // import ProductCreate from "./product-create";
 
 const Products = () => {
   const [showMarket, setShowMarket] = useState(false);
 
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
 
   const handleProps = (market:any) => {
     navigate("create", { state: { market } });
-    
   } 
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
-  // const { getProduct } = useProductss();
+  const {getProducts} = useProduct()
+
+  const {data:productData} = getProducts()
+  console.log(productData);
+  
+
   const { getMarkets } = useMarket();
 
   const { data } = getMarkets();
@@ -111,62 +109,10 @@ const Products = () => {
           </Popup>
         </div>
       </div>
-
-      <div className="mt-4 px-4 overflow-x-auto">
-        <Spin spinning={loading} tip="Loading Products...">
-          <table className="w-full min-w-[600px]">
-            <thead className="h-[54px] bg-[#F6F7FB] dark:bg-[#3D3759] text-left">
-              <tr>
-                <th className="p-3">Products</th>
-                <th className="p-3">Remaining</th>
-                <th className="p-3">Total Earning</th>
-                <th className="p-3">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <tr
-                  key={i}
-                  className="border-b border-gray-300 dark:border-gray-600"
-                >
-                  <td className="p-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={ProductImg}
-                        alt="Product"
-                        className="w-10 h-10 object-contain"
-                      />
-                      <div>
-                        <p className="font-medium">
-                          Clothing, Shoes, and jewellery
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Fashion for a wide selection of clothing, shoes,
-                          jewellery and watches.
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="p-3">4,689</td>
-
-                  <td className="p-3">$45,627</td>
-
-                  <td className="p-3 flex items-center gap-3">
-                    <button className="hover:text-[#8C57FF]">
-                      <Edit />
-                    </button>
-                    <button className="hover:text-red-500">
-                      <Trash />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Spin>
+      <div>
+        <ProductView data={productData}/>
       </div>
+
     </div>
   );
 };
