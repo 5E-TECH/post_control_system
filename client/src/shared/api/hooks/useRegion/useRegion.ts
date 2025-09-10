@@ -8,6 +8,8 @@ export const useRegion = () => {
     useQuery({
       queryKey: [region],
       queryFn: () => api.get("region").then((res) => res.data),
+      staleTime: 1000 * 60 * 60 * 24,
+      refetchOnWindowFocus: false,
     });
   return { getRegions };
 };
