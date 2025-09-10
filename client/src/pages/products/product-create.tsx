@@ -43,7 +43,7 @@ const ProductsCreate: FC = () => {
         </div>
         <div className="m-[24px]">
           <AddProduct ref={addProductRef} />
-          <ProductView />
+          <ProductView data={""} />
         </div>
       </div>
       <div></div>
