@@ -10,7 +10,6 @@ const UsersStatistics = () => {
   const { data: allUsers } = getUser();
   const markets = allUsers?.data?.filter((user: any) => user.role === "market");
   const users = allUsers?.data?.filter((user: any) => user.role !== "market");
-  console.log(allUsers)
   return (
     <div className="grid grid-cols-3 max-[1250px]:grid-cols-2 max-[950px]:grid-cols-1 gap-6">
       <NavLink

@@ -29,7 +29,7 @@ const OrderItems = () => {
           </h1>
         </div>
 
-        <div className="overflow-y-auto h-[150px] scroll-order-items">
+        <div className="overflow-y-auto scroll-order-items">
           <div className="flex px-5 relative mt-1">
             <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
               Item 1
@@ -53,39 +53,16 @@ const OrderItems = () => {
             </div>
           </div>
 
-          <div className="flex px-5 relative">
-            <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
-              Item 2
-            </span>
-
-            <div className="flex gap-5">
-              <Form.Item className="">
-                <Select
-                  placeholder="Select item 2"
-                  className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
-                  dropdownClassName="dark-dropdown"
-                ></Select>
-              </Form.Item>
-
-              <Form.Item>
-                <Input
-                  placeholder="Quantity"
-                  className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-                />
-              </Form.Item>
-            </div>
-          </div>
-
           {items.map((item) => (
             <div key={item} className="flex gap-5 px-5 relative">
               <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
-                Item {item + 2}
+                Item {item + 1}
               </span>
 
               <div className="flex gap-5">
                 <Form.Item>
                   <Select
-                    placeholder={`Select item ${item + 2}`}
+                    placeholder={`Select item ${item + 1}`}
                     className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
                     dropdownClassName="dark-dropdown"
                   />
