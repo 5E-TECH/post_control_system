@@ -102,7 +102,10 @@ export class ProductService {
 
   async findAll() {
     try {
-      const products = await this.productRepo.find();
+      const products = await this.productRepo.find({
+        relations: ['user'],
+        order: { created_at: 'ASC' },
+      });
       products.forEach((product) => {
         if (product.image_url) {
           product.image_url = this.buildImageUrl(product.image_url);
@@ -125,6 +128,7 @@ export class ProductService {
 
       const products = await this.productRepo.find({
         where: { user_id: marketId },
+        order: { created_at: 'ASC' },
       });
       products.forEach((product) => {
         if (product.image_url) {
