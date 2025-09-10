@@ -27,7 +27,7 @@ const Sidebar = () => {
 
   return (
     <div className="bg-[var(--color-bg-py)] pt-6 dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]">
-      <ul className="w-65 flex flex-col gap-1.5 mr-4">
+      <ul className="w-61 flex flex-col gap-1.5 mr-4">
         {links.map((link, i) => (
           <li key={i}>
             <SidebarLink {...link} />
@@ -37,5 +37,6 @@ const Sidebar = () => {
     </div>
   );
 };
+
 
 export default memo(Sidebar);
