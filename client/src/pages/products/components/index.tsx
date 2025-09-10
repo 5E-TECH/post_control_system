@@ -1,15 +1,11 @@
-import { memo, useState, forwardRef, useImperativeHandle } from "react";
+import { memo, useState } from "react";
 import upload from "../../../shared/assets/product/upload.png";
 import { Image } from "antd";
 import { useProduct } from "../../../shared/api/hooks/useProduct";
 import { X } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
-export interface AddProductRef {
-  onClear: () => void;
-}
-
-const AddProduct = forwardRef<AddProductRef>((_, ref) => {
+const AddProduct = () => {
   const { createProduct } = useProduct();
 
   const location = useLocation();
@@ -22,12 +18,6 @@ const AddProduct = forwardRef<AddProductRef>((_, ref) => {
   const [productName, setProductName] = useState("");
 
   // 🔑 tashqaridan chaqiriladigan funksiya
-  useImperativeHandle(ref, () => ({
-    onClear() {
-      setProductName("");
-      setFile(null);
-    },
-  }));
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -54,6 +44,11 @@ const AddProduct = forwardRef<AddProductRef>((_, ref) => {
     }
   };
 
+  const handleDiscard =() => {
+      setFile(null)
+      setProductName("")
+    }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -67,9 +62,6 @@ const AddProduct = forwardRef<AddProductRef>((_, ref) => {
     formData.append("market_id", market.id);
     formData.append("image", file);
 
-    console.log(formData);
-    
-
     try {
       await createProduct.mutate(formData);
       setProductName("");
@@ -82,7 +74,9 @@ const AddProduct = forwardRef<AddProductRef>((_, ref) => {
   return (
     <section>
       <div className="w-full bg-white p-5 text-[#2E263DE5] flex gap-5 flex-col rounded-md dark:text-[#E7E3FCE5] dark:bg-[#312d4b]">
-        <h2 className="text-[18px] font-medium opacity-[90%] select-none">Product information</h2>
+        <h2 className="text-[18px] font-medium opacity-[90%] select-none">
+          Product information
+        </h2>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5 h-full">
           <input
@@ -94,8 +88,12 @@ const AddProduct = forwardRef<AddProductRef>((_, ref) => {
           />
 
           <div className="flex justify-between mt-2">
-            <h2 className="text-[18px] font-medium opacity-[90%] select-none">Product Image</h2>
-            <h2 className="text-[15px] font-medium text-[#8C57FF] select-none">Add media from URL</h2>
+            <h2 className="text-[18px] font-medium opacity-[90%] select-none">
+              Product Image
+            </h2>
+            <h2 className="text-[15px] font-medium text-[#8C57FF] select-none">
+              Add media from URL
+            </h2>
           </div>
 
           <div
@@ -131,7 +129,10 @@ const AddProduct = forwardRef<AddProductRef>((_, ref) => {
               </>
             ) : (
               <div className="flex flex-col items-center gap-2 relative">
-                <Image src={URL.createObjectURL(file)} className="max-h-[200px] object-contain" />
+                <Image
+                  src={URL.createObjectURL(file)}
+                  className="max-h-[200px] object-contain"
+                />
                 <p className="text-[14px] font-medium">{file.name}</p>
                 <button
                   type="button"
@@ -144,16 +145,24 @@ const AddProduct = forwardRef<AddProductRef>((_, ref) => {
             )}
           </div>
 
-          <button
-            type="submit"
-            className="bg-[#8C57FF] text-white px-4 py-2 rounded-md font-medium mt-4"
-          >
-            Save Product
-          </button>
+          <div className="flex justify-end gap-4">
+            <button
+                onClick={() => handleDiscard()}
+                className="border px-4 py-2 rounded-md border-[#8A8D93] text-[#8A8D93] font-medium"
+              >
+                Discard
+              </button>
+            <button
+              type="submit"
+              className="bg-[#8C57FF] text-white px-4 py-2 rounded-md font-medium mt-4"
+            >
+              Save Product
+            </button>
+          </div>
         </form>
       </div>
     </section>
   );
-});
+};
 
 export default memo(AddProduct);
