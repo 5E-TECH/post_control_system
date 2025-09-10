@@ -1,13 +1,14 @@
-import React, { useRef, type FC } from 'react';
-import AddProduct, { type AddProductRef } from './components';
-import { useLocation } from 'react-router-dom';
+import React, { useRef, type FC } from "react";
+import AddProduct, { type AddProductRef } from "./components";
+import { useLocation } from "react-router-dom";
+import ProductView from "../../shared/components/product-view";
 // import { useLocation } from 'react-router-dom';
 
 // interface Iprops {
 //   market:any
 // }
 
-const ProductsCreate:FC = () => {
+const ProductsCreate: FC = () => {
   const addProductRef = useRef<AddProductRef>(null);
 
   const location = useLocation();
@@ -15,10 +16,9 @@ const ProductsCreate:FC = () => {
 
   console.log(market);
 
-
   const handleDiscard = () => {
     addProductRef.current?.onClear();
-  };  
+  };
 
   return (
     <section>
@@ -43,8 +43,10 @@ const ProductsCreate:FC = () => {
         </div>
         <div className="m-[24px]">
           <AddProduct ref={addProductRef} />
+          <ProductView data={""} />
         </div>
       </div>
+      <div></div>
     </section>
   );
 };
