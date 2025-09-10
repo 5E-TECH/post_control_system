@@ -1,12 +1,24 @@
-import React, { useRef } from 'react';
+import React, { useRef, type FC } from 'react';
 import AddProduct, { type AddProductRef } from './components';
+import { useLocation } from 'react-router-dom';
+// import { useLocation } from 'react-router-dom';
 
-const ProductsCreate = () => {
+// interface Iprops {
+//   market:any
+// }
+
+const ProductsCreate:FC = () => {
   const addProductRef = useRef<AddProductRef>(null);
+
+  const location = useLocation();
+  const market = location.state?.market; // state'dan olamiz
+
+  console.log(market);
+
 
   const handleDiscard = () => {
     addProductRef.current?.onClear();
-  };
+  };  
 
   return (
     <section>
@@ -14,7 +26,7 @@ const ProductsCreate = () => {
         <div className="mx-[24px]">
           <div className=" flex w-full justify-between">
             <h2 className="text-[24px] font-medium">
-              Add a new product for market ***
+              Add a new product for market {market.name}
             </h2>
             <div className="flex gap-[16px]">
               <button
