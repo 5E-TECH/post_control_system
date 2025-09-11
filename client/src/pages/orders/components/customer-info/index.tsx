@@ -2,20 +2,20 @@ import { Input, Select } from "antd";
 import { Bell } from "lucide-react";
 import { memo, useState, type ChangeEvent } from "react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
-import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
+import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
+import { useDispatch } from "react-redux";
+import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
 
-interface ICustomer {
+export interface ICustomer {
   phone_number: string;
-  region?: string;
-  district?: string;
+  district_id?: string;
   name: string;
   address: string;
 }
 
 const initialState: ICustomer = {
   phone_number: "",
-  region: undefined,
-  district: undefined,
+  district_id: undefined,
   name: "",
   address: "",
 };
@@ -27,10 +27,9 @@ const CustomerInfocomp = () => {
   const { data } = getUser();
   const users = data?.data?.filter((user: any) => user?.role === "registrator");
   console.log(users);
-
-  const { getRegions } = useRegion();
-  const { data: allRegions } = getRegions();
-  const regions = allRegions?.data.map((item: any) => ({
+  const { getDistricts } = useDistrict();
+  const { data: allDistricts } = getDistricts();
+  const districts = allDistricts?.data.map((item: any) => ({
     value: item.id,
     label: item.name,
   }));
@@ -43,14 +42,18 @@ const CustomerInfocomp = () => {
   //       : null
   //   )
   //   .map((user: any) => user?.phone_number);
-
+  const dispatch = useDispatch();
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const updated = { ...formData, [name]: value };
+    setFormData(updated);
+    dispatch(setCustomerData(updated));
   };
 
   const handleSelectChange = (name: keyof ICustomer, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const updated = { ...formData, [name]: value };
+    setFormData(updated);
+    dispatch(setCustomerData(updated));
   };
 
   return (
@@ -81,11 +84,8 @@ const CustomerInfocomp = () => {
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">Region</label>
             <Select
-              value={formData.region}
-              onChange={(value) => handleSelectChange("region", value)}
               placeholder="Viloyat tanlang"
               className="w-full h-[45px]! custom-select-dropdown-bright"
-              options={regions}
               dropdownClassName="dark-dropdown"
             />
           </div>
@@ -93,10 +93,11 @@ const CustomerInfocomp = () => {
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">District</label>
             <Select
-              value={formData.district}
-              onChange={(value) => handleSelectChange("district", value)}
+              value={formData.district_id}
+              onChange={(value) => handleSelectChange("district_id", value)}
               placeholder="Tuman tanlang"
               className="w-full h-[45px]! custom-select-dropdown-bright"
+              options={districts}
               dropdownClassName="dark-dropdown"
             />
           </div>

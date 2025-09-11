@@ -1,6 +1,4 @@
-// import { ArrowRight } from "lucide-react";
 import { memo } from "react";
-// import Success from "../../components/button/success";
 import Filter from "../../components/filter";
 import OrderView from "../../components/order-view";
 

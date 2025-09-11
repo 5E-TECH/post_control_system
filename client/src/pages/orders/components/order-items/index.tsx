@@ -1,16 +1,27 @@
 import { Button, Form, Input, Select } from "antd";
 import { Plus, X } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useState, type ChangeEvent } from "react";
+import { useProduct } from "../../../../shared/api/hooks/useProduct";
+import { useDispatch } from "react-redux";
+import { setOrderItems } from "../../../../shared/lib/features/customer_and_market-id";
+
+export interface IOrderItems {
+  product_id: string | undefined;
+  quantity: number | string;
+}
+
+const initialState: IOrderItems = {
+  product_id: undefined,
+  quantity: "",
+};
 
 const OrderItems = () => {
+  const [formData, setFormData] = useState<IOrderItems>(initialState);
+
   const [items, setItems] = useState<number[]>(() => {
     const saved = localStorage.getItem("orderItems");
     return saved ? JSON.parse(saved) : [];
   });
-
-  useEffect(() => {
-    localStorage.setItem("orderItems", JSON.stringify(items));
-  }, [items]);
 
   const addItem = () => {
     setItems((prev) => [...prev, prev.length + 1]);
@@ -18,6 +29,28 @@ const OrderItems = () => {
 
   const removeItem = (id: number) => {
     setItems((prev) => prev.filter((item) => item !== id));
+  };
+
+  const marketId = localStorage.getItem("marketId");
+  const { getProductsByMarket } = useProduct();
+  const { data } = getProductsByMarket(marketId as string);
+  const productNames = data?.data.map((product: any) => ({
+    value: product.id,
+    label: product.name,
+  }));
+  
+  const dispatch = useDispatch();
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    const updated = { ...formData, [name]: value };
+    setFormData(updated);
+    dispatch(setOrderItems({ ...updated, quantity: Number(updated.quantity) }));
+  };
+
+  const handleSelectChange = (name: keyof IOrderItems, value: string) => {
+    const updated = { ...formData, [name]: value };
+    setFormData(updated);
+    dispatch(setOrderItems({ ...updated, quantity: Number(updated.quantity) }));
   };
 
   return (
@@ -29,7 +62,7 @@ const OrderItems = () => {
           </h1>
         </div>
 
-        <div className="overflow-y-auto h-[150px] scroll-order-items">
+        <div className="overflow-y-auto scroll-order-items">
           <div className="flex px-5 relative mt-1">
             <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
               Item 1
@@ -38,37 +71,21 @@ const OrderItems = () => {
             <div className="flex gap-5">
               <Form.Item className="">
                 <Select
+                  value={formData.product_id}
+                  onChange={(value) => handleSelectChange("product_id", value)}
                   placeholder="Select item 1"
                   className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
+                  options={productNames}
                   dropdownClassName="dark-dropdown"
                 ></Select>
               </Form.Item>
 
               <Form.Item>
                 <Input
-                  placeholder="Quantity"
-                  className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-                />
-              </Form.Item>
-            </div>
-          </div>
-
-          <div className="flex px-5 relative">
-            <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
-              Item 2
-            </span>
-
-            <div className="flex gap-5">
-              <Form.Item className="">
-                <Select
-                  placeholder="Select item 2"
-                  className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
-                  dropdownClassName="dark-dropdown"
-                ></Select>
-              </Form.Item>
-
-              <Form.Item>
-                <Input
+                  name="quantity"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  type="number"
                   placeholder="Quantity"
                   className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                 />
@@ -79,13 +96,13 @@ const OrderItems = () => {
           {items.map((item) => (
             <div key={item} className="flex gap-5 px-5 relative">
               <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
-                Item {item + 2}
+                Item {item + 1}
               </span>
 
               <div className="flex gap-5">
                 <Form.Item>
                   <Select
-                    placeholder={`Select item ${item + 2}`}
+                    placeholder={`Select item ${item + 1}`}
                     className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
                     dropdownClassName="dark-dropdown"
                   />

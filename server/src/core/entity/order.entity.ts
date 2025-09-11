@@ -54,10 +54,16 @@ export class OrderEntity extends BaseEntity {
   @JoinColumn({ name: 'post_id' })
   post: PostEntity;
 
-  // 🟢 Many Orders → One User (Market owner)
-  @ManyToOne(() => UserEntity, (user) => user.orders, {
+  // order.entity.ts
+  @ManyToOne(() => UserEntity, (user) => user.marketOrders, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
-  user: UserEntity;
+  market: UserEntity; // Market egasi
+
+  @ManyToOne(() => UserEntity, (user) => user.customerOrders, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'customer_id' })
+  customer: UserEntity; // Buyurtma beruvchi
 }

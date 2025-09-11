@@ -16,8 +16,6 @@ export const useMarket = () => {
     useQuery({
       queryKey: [market],
       queryFn: () => api.get("user/markets").then((res) => res.data),
-      staleTime: 1000 * 60 * 60 * 24,
-      refetchOnWindowFocus: false,
     });
   return {
     createMarket,
