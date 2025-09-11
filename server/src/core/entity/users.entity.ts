@@ -81,9 +81,6 @@ export class UserEntity extends BaseEntity {
   @JoinColumn({ name: 'region_id' })
   region: RegionEntity;
 
-  @OneToMany(() => DistrictEntity, (district) => district.customer)
-  district: DistrictEntity[];
-
   // 1-N Courier (User) → Posts
   @OneToMany(() => PostEntity, (post) => post.courier)
   posts: PostEntity[];
@@ -109,4 +106,11 @@ export class UserEntity extends BaseEntity {
 
   @OneToMany(() => OrderEntity, (order) => order.customer)
   customerOrders: OrderEntity[];
+
+  // User → District (N-1)
+  @ManyToOne(() => DistrictEntity, (district) => district.users, {
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'district_id' })
+  district: DistrictEntity;
 }
