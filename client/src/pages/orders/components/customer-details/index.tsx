@@ -1,9 +1,11 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { memo } from "react";
+import { useOrder } from "../../../../shared/api/hooks/useOrder";
 
 const CustomerDetails = () => {
-  
-
+  const { getOrderMyMarkets } = useOrder();
+  const { data } = getOrderMyMarkets();
+  console.log(data)
   return (
     <div className="w-full flex flex-col gap-5 py-5 rounded-md bg-[#ffffff] dark:bg-[#312D48] shadow-lg">
       <table>
@@ -142,10 +144,9 @@ const CustomerDetails = () => {
 
 export default memo(CustomerDetails);
 
-
 // Customer name
 // Customer Phone number
 // Customer district
-// Order item, quantity 
+// Order item, quantity
 // Total Price
 // Comment

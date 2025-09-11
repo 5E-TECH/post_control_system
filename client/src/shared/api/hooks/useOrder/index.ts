@@ -19,8 +19,15 @@ export const useOrder = () => {
       refetchOnWindowFocus: false,
       refetchOnMount: false,
     });
+
+  const getOrderMyMarkets = () =>
+    useQuery({
+      queryKey: [order],
+      queryFn: () => api.get("order/market/my-new-orders"),
+    });
   return {
     createOrder,
     getOrders,
+    getOrderMyMarkets,
   };
 };
