@@ -54,15 +54,15 @@ const AddProduct = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // if (!productName || !file) {
-    //   setShowMarket(true); // faqat state ni true qilamiz
-    //   return;
-    // }
+    if (!productName || !file) {
+      // setShowMarket(true); // faqat state ni true qilamiz
+      return;
+    }
 
-    // if (!market) {
-    //   setShowMarket(true);
-    //   return;
-    // }
+    if (!market) {
+      // setShowMarket(true);
+      return;
+    }
 
     const formData = new FormData();
     formData.append("name", productName);
