@@ -1,6 +1,7 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { RegionEntity } from './region.entity';
+import { UserEntity } from './users.entity';
 
 @Entity('district')
 export class DistrictEntity extends BaseEntity {
@@ -26,4 +27,7 @@ export class DistrictEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'assigned_region' })
   assignedRegion: RegionEntity;
+
+  @ManyToOne(() => UserEntity, (user) => user.district)
+  customer: UserEntity;
 }
