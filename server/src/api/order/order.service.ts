@@ -179,10 +179,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const myNewOrders = await this.orderRepo.find({
         where: { status: Order_status.NEW, user_id: user.id },
+        relations: ['customer', 'items', 'items.product'],
       });
-
       return successRes(myNewOrders, 200, 'My new orders');
-    } catch (error) {}
+    } catch (error) {
+      return catchError(error);
+    }
   }
 
   async newOrdersByMarketId(id: string) {
