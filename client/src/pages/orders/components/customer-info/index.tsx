@@ -1,6 +1,6 @@
 import { Input, Select } from "antd";
 import { Bell } from "lucide-react";
-import { memo, useEffect, useState, type ChangeEvent } from "react";
+import { memo, useState, type ChangeEvent } from "react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useDispatch } from "react-redux";
@@ -42,22 +42,19 @@ const CustomerInfocomp = () => {
   //       : null
   //   )
   //   .map((user: any) => user?.phone_number);
-
+  const dispatch = useDispatch();
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const updated = { ...formData, [name]: value };
+    setFormData(updated);
+    dispatch(setCustomerData(updated));
   };
 
   const handleSelectChange = (name: keyof ICustomer, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const updated = { ...formData, [name]: value };
+    setFormData(updated);
+    dispatch(setCustomerData(updated));
   };
-
-  const dispatch = useDispatch();
-  useEffect(() => {
-    if (formData) {
-      dispatch(setCustomerData(formData));
-    }
-  }, [formData]);
 
   return (
     <div className="w-full p-5 rounded-md bg-[#ffffff] dark:bg-[#312D48] shadow-lg">

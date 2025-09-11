@@ -4,11 +4,10 @@ import CustomerDetails from "../../components/customer-details";
 import Discard from "../../components/button/discard";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import CustomerInfo from "../../components/customer-info";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { Button } from "antd";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
-import { setCustomerMarketId } from "../../../../shared/lib/features/customer_and_market-id";
 
 const CustomerInfoOrder = () => {
   const { pathname } = useLocation();
@@ -20,11 +19,9 @@ const CustomerInfoOrder = () => {
   const customerData = useSelector(
     (state: RootState) => state.setCustomerData.customerData
   );
-  const market_id = useSelector(
-    (state: RootState) => state.setCustomerMarketId.marketId
-  );
+  const market_id = localStorage.getItem("marketId") || "";
+
   const { createUser } = useUser("customer");
-  const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const handleClick = () => {
@@ -34,7 +31,7 @@ const CustomerInfoOrder = () => {
     };
     createUser.mutate(customer, {
       onSuccess: (res) => {
-        dispatch(setCustomerMarketId({ customerId: res?.data?.data?.id }));
+        localStorage.setItem("customerId", res?.data?.data?.id);
         navigate("/orders/confirm");
       },
     });
