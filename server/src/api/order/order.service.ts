@@ -161,6 +161,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id: In(uniqueMarketIds), role: Roles.MARKET },
       });
 
+      const todaysOrdersInfos: any[] = allUniqueMarkets.map(async (market) => {
+        const marketsNewOrders = await this.orderRepo.find({
+          where: { status: Order_status.NEW, user_id: market.id },
+        });
+        const orderTotalPrice: object = marketsNewOrders.map((order) => {
+          let total_price: number = 0;
+          total_price = order.total_price;
+        });
+      });
+
       // const marketsNewOrders;
 
       return successRes(
@@ -200,7 +210,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           user_id: id,
           status: Order_status.NEW,
         },
-        relations: ['customer', 'items', 'items.product'],
+        relations: ['customer', 'customer.district', 'items', 'items.product'],
       });
       return successRes(allNewOrders, 200, `${market.name}'s new Orders`);
     } catch (error) {
