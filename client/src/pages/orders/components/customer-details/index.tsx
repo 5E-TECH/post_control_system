@@ -119,8 +119,7 @@ const CustomerDetails = () => {
           </span>
           <select
             className="rounded px-2 py-1 text-[15px] outline-none"
-            defaultValue="10"
-          >
+            defaultValue="10">
             <option value="5">5</option>
             <option value="10">10</option>
             <option value="25">25</option>
