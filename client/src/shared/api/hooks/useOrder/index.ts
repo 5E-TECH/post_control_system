@@ -20,14 +20,15 @@ export const useOrder = () => {
       refetchOnMount: false,
     });
 
-  const getOrderMyMarkets = () =>
+  const getOrderMyMarketsById = (marketId: string) =>
     useQuery({
       queryKey: [order],
-      queryFn: () => api.get("order/market/my-new-orders"),
+      queryFn: () =>
+        api.get(`order/market/${marketId}`).then((res) => res.data),
     });
   return {
     createOrder,
     getOrders,
-    getOrderMyMarkets,
+    getOrderMyMarketsById,
   };
 };
