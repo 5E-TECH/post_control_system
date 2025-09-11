@@ -13,6 +13,7 @@ import { PostModule } from './post/post.module';
 import { OrderModule } from './order/order.module';
 import { BotModule } from './bot/bot.module';
 import { TelegrafModule } from 'nestjs-telegraf';
+import { OrderGateaway } from './socket/order.gateaway';
 
 @Module({
   imports: [
@@ -38,5 +39,6 @@ import { TelegrafModule } from 'nestjs-telegraf';
     OrderModule,
     BotModule,
   ],
+  providers: [OrderGateaway],
 })
 export class AppModule {}

@@ -12,6 +12,7 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { OrderGateaway } from '../socket/order.gateaway';
 
 @Module({
   imports: [
@@ -26,6 +27,12 @@ import { UserEntity } from 'src/core/entity/users.entity';
     CashBoxModule,
   ],
   controllers: [OrderController],
-  providers: [OrderService, ProductService, BcryptEncryption, Token],
+  providers: [
+    OrderService,
+    ProductService,
+    BcryptEncryption,
+    Token,
+    OrderGateaway,
+  ],
 })
 export class OrderModule {}

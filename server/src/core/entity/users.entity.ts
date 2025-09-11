@@ -98,6 +98,11 @@ export class UserEntity extends BaseEntity {
   // users.entity.ts ichida
 
   // ...
-  @OneToMany(() => OrderEntity, (order) => order.user)
-  orders: OrderEntity[];
+  // users.entity.ts
+
+  @OneToMany(() => OrderEntity, (order) => order.market)
+  marketOrders: OrderEntity[];
+
+  @OneToMany(() => OrderEntity, (order) => order.customer)
+  customerOrders: OrderEntity[];
 }
