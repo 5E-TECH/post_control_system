@@ -16,6 +16,7 @@ import { PostEntity } from './post.entity';
 import { CustomerMarketEntity } from './customer-market.entity';
 import { ProductEntity } from './product.entity';
 import { OrderEntity } from './order.entity';
+import { DistrictEntity } from './district.entity';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -79,6 +80,9 @@ export class UserEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'region_id' })
   region: RegionEntity;
+
+  @OneToMany(() => DistrictEntity, (district) => district.customer)
+  district: DistrictEntity[];
 
   // 1-N Courier (User) → Posts
   @OneToMany(() => PostEntity, (post) => post.courier)

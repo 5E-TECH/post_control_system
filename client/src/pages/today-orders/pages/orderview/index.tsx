@@ -4,6 +4,8 @@ import { memo, useState } from "react";
 import { OrderData } from "../../../../shared/static/order";
 import Search from "../../components/search";
 import phone from "../../../../shared/assets/order/detail.svg";
+import { useLocation } from "react-router-dom";
+import { useOrder } from "../../../../shared/api/hooks/useOrder";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -21,8 +23,22 @@ const statusColors: Record<string, string> = {
 const OrderView = () => {
   // const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState("");
-  const [check, setchecked] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+
+  
+  const location = useLocation();
+  const market = location.state?.market;
+  
+  console.log("market_id",market);
+  
+  const {getOrderByMarket} = useOrder()
+  const {data} = getOrderByMarket(market)
+
+  console.log(data);
+  
+
+  
   return (
     <div
       onClick={() => setOpenMenuId("")}
@@ -32,67 +48,79 @@ const OrderView = () => {
       <div className="w-full">
         <table className="w-full">
           <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:text-[#E7E3FCE5] dark:bg-[#3d3759]">
-            <th>
-              <div className="flex items-center gap-10 ml-10">
-                <input onClick={() => setchecked((p) => !p)} type="checkbox" />
-                {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div> */}
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>#</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>CUSTOMER</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>PHONE</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>ADDRESS</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MARKET</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>STATUS</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>PRICE</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>STOCK</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>ACTION</span>
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              </div>
-            </th>
+            <tr>
+              <th>
+                <div className="flex items-center gap-10 ml-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length === OrderData.length}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(OrderData.map((item: any) => item.id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }}
+                  />
+                  {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div> */}
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>#</span>
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>CUSTOMER</span>
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>PHONE</span>
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>ADDRESS</span>
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>MARKET</span>
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>STATUS</span>
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>PRICE</span>
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>STOCK</span>
+                </div>
+              </th>
+              <th>
+                <div className="flex items-center gap-10">
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  <span>ACTION</span>
+                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                </div>
+              </th>
+            </tr>
           </thead>
           <tbody>
             {OrderData?.map((item: any) => (
@@ -102,7 +130,20 @@ const OrderView = () => {
                 onClick={() => setSelectedOrder(item)}
               >
                 <td className="pl-10">
-                  <input checked={check ? true : false} type="checkbox" />
+                  <input
+                    type="checkbox"
+                    onClick={(e) => e.stopPropagation()}
+                    checked={selectedIds.includes(item.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds([...selectedIds, item.id]);
+                      } else {
+                        setSelectedIds(
+                          selectedIds.filter((id) => id !== item.id)
+                        );
+                      }
+                    }}
+                  />
                 </td>
                 <td className="pl-10">{item.id}</td>
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
@@ -188,10 +229,12 @@ const OrderView = () => {
                   <div className="pt-2">
                     <table className="w-full">
                       <thead>
-                        <th className="flex justify-between border-b pb-2">
-                          <td>Product</td>
-                          <td>Miqdori</td>
-                        </th>
+                        <tr>
+                          <th className="flex justify-between border-b pb-2">
+                            <td>Product</td>
+                            <td>Miqdori</td>
+                          </th>
+                        </tr>
                       </thead>
                       <tbody>
                         {Array.from({ length: 3 }).map((_, inx: number) => (
