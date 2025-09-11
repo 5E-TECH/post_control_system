@@ -4,9 +4,11 @@ import { Image } from "antd";
 import { useProduct } from "../../../shared/api/hooks/useProduct";
 import { X } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import Popup from "../../../shared/ui/Popup";
 
 const AddProduct = () => {
   const { createProduct } = useProduct();
+  const [showMarket, setShowMarket] = useState(false);
 
   const location = useLocation();
   const market = location.state?.market; // state'dan olamiz
@@ -44,16 +46,21 @@ const AddProduct = () => {
     }
   };
 
-  const handleDiscard =() => {
-      setFile(null)
-      setProductName("")
-    }
+  const handleDiscard = () => {
+    setFile(null);
+    setProductName("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!productName || !file) {
-      alert("Product name va rasm tanlanishi kerak");
+      setShowMarket(true); // faqat state ni true qilamiz
+      return;
+    }
+
+    if (!market) {
+      setShowMarket(true);
       return;
     }
 
@@ -147,11 +154,11 @@ const AddProduct = () => {
 
           <div className="flex justify-end gap-4">
             <button
-                onClick={() => handleDiscard()}
-                className="border px-4 py-2 rounded-md border-[#8A8D93] text-[#8A8D93] font-medium"
-              >
-                Discard
-              </button>
+              onClick={() => setShowMarket(true)}
+              className="border px-4 py-2 rounded-md border-[#8A8D93] text-[#8A8D93] font-medium mt-4"
+            >
+              Discard
+            </button>
             <button
               type="submit"
               className="bg-[#8C57FF] text-white px-4 py-2 rounded-md font-medium mt-4"
@@ -161,6 +168,30 @@ const AddProduct = () => {
           </div>
         </form>
       </div>
+      {showMarket && (
+        <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
+          <div className="p-4 bg bg-white">
+            <p className="mb-4">Haqiqatan ham formani tozalamoqchimisiz?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded"
+                onClick={() => setShowMarket(false)}
+              >
+                Yo‘q
+              </button>
+              <button
+                className="px-4 py-2 bg-red-500 text-white rounded"
+                onClick={() => {
+                  handleDiscard(); // Tozalash
+                  setShowMarket(false); // Popupni yopish
+                }}
+              >
+                Ha
+              </button>
+            </div>
+          </div>
+        </Popup>
+      )}
     </section>
   );
 };
