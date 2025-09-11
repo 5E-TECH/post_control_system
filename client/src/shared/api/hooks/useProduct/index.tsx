@@ -24,10 +24,10 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getProductsByMarket = (id:string) =>
+  const getProductsByMarket = (marketId:string) =>
     useQuery({
-      queryKey: [product, id],
-      queryFn: () => api.get(`product/market/${id}`).then((res) => res.data),
+      queryKey: [product, marketId],
+      queryFn: () => api.get(`product/market/${marketId}`).then((res) => res.data),
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });

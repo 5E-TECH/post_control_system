@@ -5,8 +5,6 @@ import Discard from "../../components/button/discard";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useNavigate } from "react-router-dom";
 import useNotification from "antd/es/notification/useNotification";
-import { useDispatch } from "react-redux";
-import { setCustomerMarketId } from "../../../../shared/lib/features/customer_and_market-id";
 
 const Context = createContext({ name: "Default" });
 
@@ -18,7 +16,6 @@ const ChooseMarket = () => {
   const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
 
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const [api, contextHolder] = useNotification();
 
   const onClick = () => {
@@ -31,7 +28,7 @@ const ChooseMarket = () => {
       return;
     }
 
-    dispatch(setCustomerMarketId({ marketId: selectedMarketId }));
+    localStorage.setItem("marketId", selectedMarketId);
     navigate(`/orders/customer-info`);
   };
 

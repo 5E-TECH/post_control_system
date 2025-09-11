@@ -3,14 +3,43 @@ import { memo } from "react";
 import OrderItems from "../../components/order-items";
 import ProductInfo from "../../components/product-info";
 import Discard from "../../components/button/discard";
-import Success from "../../components/button/success";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { Button } from "antd";
+import { useOrder } from "../../../../shared/api/hooks/useOrder";
+import { useNavigate } from "react-router-dom";
 
 const CreateOrder = () => {
-  const customer_id = useSelector((state:RootState)=> state.setCustomerMarketId.customerId)
-  console.log(customer_id)
- 
+  const market_id = localStorage.getItem("marketId") || "";
+  const customer_id = localStorage.getItem("customerId") || "";
+
+  const orderItems = useSelector(
+    (state: RootState) => state.setOrderItems.orderItems
+  );
+  const productInfo = useSelector(
+    (state: RootState) => state.setProductInfo.productInfo
+  );
+  const { createOrder } = useOrder();
+
+  const navigate = useNavigate();
+  const handleClick = () => {
+    const newOrder = {
+      market_id,
+      customer_id,
+      order_item_info: orderItems,
+      total_price: productInfo?.total_price,
+      where_deliver: productInfo?.where_deliver,
+      comment: productInfo?.comment,
+    };
+    console.log(newOrder)
+    createOrder.mutate(newOrder, {
+      onSuccess: () => {
+        localStorage.removeItem("marketId");
+        localStorage.removeItem("customerId");
+        navigate("/orders/customer-info");
+      },
+    });
+  };
   return (
     <div className="flex gap-6 p-5">
       <div className="pr-[81px]">
@@ -89,11 +118,12 @@ const CreateOrder = () => {
         <div className="flex justify-end">
           <div className="flex gap-4">
             <Discard children="Discard" />
-            <Success
-              path="#"
-              text="Create order"
-              className="w-[130px]!"
-            ></Success>
+            <Button
+              onClick={handleClick}
+              className="w-[130px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
+            >
+              Create order
+            </Button>
           </div>
         </div>
       </div>
