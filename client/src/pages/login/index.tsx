@@ -1,4 +1,4 @@
-import { Button, Form, Input, type FormProps } from "antd";
+import { Button, Form, Input, message, type FormProps } from "antd";
 import React, { type FC } from "react";
 
 import logo from "../../shared/assets/login/logo.svg";
@@ -13,6 +13,12 @@ import type { ILogin } from "../../shared/types/typesLogin";
 import { useLogin } from "../../shared/api/hooks/useLogin";
 import type { RootState } from "../../app/store";
 
+message.config({
+  maxCount: 5,
+  duration: 3,
+  top: 70,
+});
+
 const Login: FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -24,10 +30,13 @@ const Login: FC = () => {
     signinUser.mutate(values, {
       onSuccess: (res) => {
         dispatch(setToken(res?.data?.data));
-        
         navigate('/')
-                
       },
+      onError: (err: any) => {
+      const errorMsg =
+        err?.response?.data?.message || "Telefon raqam yoki parol noto'g'ri !!!";
+      message.error(errorMsg);
+    },
     });
   };
 
