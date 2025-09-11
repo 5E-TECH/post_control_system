@@ -38,6 +38,7 @@ import { CashboxHistoryRepository } from 'src/core/repository/cashbox-history.re
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
+import { OrderGateaway } from '../socket/order.gateaway';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -61,6 +62,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     private readonly userRepo: UserRepository,
 
     private readonly dataSource: DataSource,
+    private readonly orderGateaway: OrderGateaway,
   ) {
     super(orderRepo);
   }
@@ -96,7 +98,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const qr_code_token = generateCustomToken();
 
       const newOrder = queryRunner.manager.create(OrderEntity, {
-        market_id,
+        user_id: market_id,
         comment,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
@@ -105,10 +107,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         customer_id,
       });
 
+      await queryRunner.manager.save(newOrder);
+
       let product_quantity: number = 0;
       for (const o_item of order_item_info) {
         const isExistProduct = await queryRunner.manager.findOne(
-          OrderItemEntity,
+          ProductEntity,
           {
             where: { id: o_item.product_id },
           },
@@ -128,7 +132,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       Object.assign(newOrder, {
         product_quantity,
       });
-      await queryRunner.manager.save(newOrder);
 
       await queryRunner.commitTransaction();
       return successRes(newOrder, 201, 'New order created');
@@ -508,8 +511,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         },
       );
       await queryRunner.manager.save(courierCashboxHistory);
-
       await queryRunner.commitTransaction();
+
+      this.orderGateaway;
       return successRes({}, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
