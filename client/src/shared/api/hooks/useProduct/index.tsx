@@ -32,9 +32,17 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
+  const deleteProduct = useMutation({
+    mutationFn: (id: number) => api.delete(`product/${id}`),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [product] });
+    },
+  });
+
   return {
     createProduct,
     getProducts,
-    getProductsByMarket
+    getProductsByMarket,
+    deleteProduct
   };
 };
