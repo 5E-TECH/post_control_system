@@ -31,10 +31,8 @@ const CreateOrder = () => {
       where_deliver: productInfo?.where_deliver,
       comment: productInfo?.comment,
     };
-    console.log(newOrder)
     createOrder.mutate(newOrder, {
       onSuccess: () => {
-        localStorage.removeItem("marketId");
         localStorage.removeItem("customerId");
         navigate("/orders/customer-info");
       },
