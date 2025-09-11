@@ -18,14 +18,22 @@ export const useMarket = () => {
       queryFn: () => api.get("user/markets").then((res) => res.data),
     });
 
+  const getMarketByid = (id:string) =>
+    useQuery({
+      queryKey: [market],
+      queryFn: () => api.get(`user/${id}`).then((res) => res.data),
+    });
+
   const getMarketsNewOrder = () =>
     useQuery({
       queryKey: [market],
-      queryFn: () => api.get("order/markets/new-orders").then((res) => res.data),
+      queryFn: () =>
+        api.get("order/markets/new-orders").then((res) => res.data),
     });
   return {
     createMarket,
     getMarkets,
-    getMarketsNewOrder
+    getMarketsNewOrder,
+    getMarketByid
   };
 };

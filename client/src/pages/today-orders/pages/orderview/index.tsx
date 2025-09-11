@@ -6,6 +6,7 @@ import Search from "../../components/search";
 import phone from "../../../../shared/assets/order/detail.svg";
 import { useLocation } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
+import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -26,19 +27,18 @@ const OrderView = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
+  console.log(selectedIds);
   
+
   const location = useLocation();
   const market = location.state?.market;
-  
-  console.log("market_id",market);
-  
-  const {getOrderByMarket} = useOrder()
-  const {data} = getOrderByMarket(market)
 
-  console.log(data);
-  
+  const { getOrderByMarket } = useOrder();
+  const { data } = getOrderByMarket(market);
+  const {} = useMarket()
 
-  
+  console.log(data?.data);
+
   return (
     <div
       onClick={() => setOpenMenuId("")}
@@ -123,9 +123,9 @@ const OrderView = () => {
             </tr>
           </thead>
           <tbody>
-            {OrderData?.map((item: any) => (
+            {data?.data.map((item: any, inx: number) => (
               <tr
-                key={item.id}
+                key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
                 onClick={() => setSelectedOrder(item)}
               >
@@ -136,42 +136,42 @@ const OrderView = () => {
                     checked={selectedIds.includes(item.id)}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds([...selectedIds, item.id]);
+                        setSelectedIds([...selectedIds, item?.id]);
                       } else {
                         setSelectedIds(
-                          selectedIds.filter((id) => id !== item.id)
+                          selectedIds.filter((id) => id !== item?.id)
                         );
                       }
                     }}
                   />
                 </td>
-                <td className="pl-10">{item.id}</td>
+                <td className="pl-10">{inx}</td>
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.customer}
+                  {item?.customer?.name}
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.phone}
+                  {item?.customer?.phone_number}
                 </td>
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.address}
+                  {item?.customer?.address?.split(" ").slice(0, 2).join(" ")}
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.market}
+                  bi1
                 </td>
                 <td className="pl-10">
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2] ${
-                      statusColors[item.status] || "bg-slate-400"
+                      statusColors[item?.status] || "bg-slate-400"
                     }`}
                   >
-                    {item.status.toUpperCase()}
+                    {item?.status?.toUpperCase()}
                   </span>
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.price}
+                  {item?.total_price }  UZS
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.stock}
+                  {item?.product_quantity}
                 </td>
                 <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                   <button

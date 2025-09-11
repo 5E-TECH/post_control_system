@@ -24,7 +24,7 @@ const TodayOrders = () => {
   const { getMarketsNewOrder } = useMarket();
 
   const { data } = getMarketsNewOrder();
-  console.log(data);
+  // console.log(data);
 
   if (pathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
