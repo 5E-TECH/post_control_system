@@ -5,6 +5,7 @@ import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useDispatch } from "react-redux";
 import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
+import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 
 export interface ICustomer {
   phone_number: string;
@@ -26,7 +27,14 @@ const CustomerInfocomp = () => {
   const { getUser } = useUser();
   const { data } = getUser();
   const users = data?.data?.filter((user: any) => user?.role === "registrator");
-  console.log(users);
+  console.log(users)
+  const { getRegions } = useRegion();
+  const { data: allRegions } = getRegions();
+  const regions = allRegions?.data.map((item: any) => ({
+    value: item.id,
+    label: item.name,
+  }));
+
   const { getDistricts } = useDistrict();
   const { data: allDistricts } = getDistricts();
   const districts = allDistricts?.data.map((item: any) => ({
@@ -86,6 +94,7 @@ const CustomerInfocomp = () => {
             <Select
               placeholder="Viloyat tanlang"
               className="w-full h-[45px]! custom-select-dropdown-bright"
+              options={regions}
               dropdownClassName="dark-dropdown"
             />
           </div>
