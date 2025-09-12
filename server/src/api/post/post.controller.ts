@@ -39,7 +39,7 @@ export class PostController {
 
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
-  @Get('courier/:id')
+  @Post('courier/:id')
   getCouriersByPostId(@Param('id') id: string) {
     return this.postService.findAllCouriers(id);
   }
