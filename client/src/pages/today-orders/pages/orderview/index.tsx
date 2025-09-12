@@ -6,6 +6,7 @@ import phone from "../../../../shared/assets/order/detail.svg";
 import { useLocation } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
+import { usePost } from "../../../../shared/api/hooks/usePost";
 
 const OrderView = () => {
   // const navigate = useNavigate();
@@ -19,6 +20,7 @@ const OrderView = () => {
   const market = location.state?.market;
 
   const { getOrderByMarket } = useOrder();
+  const { createPost } = usePost();
   const { data } = getOrderByMarket(market);
   const {} = useMarket();
 
@@ -31,8 +33,12 @@ const OrderView = () => {
   }, [data]);
 
   const handleAccapted = () => {
-    alert("order qabul qilinsinmi")
-  }
+    const newOrder = {
+      order_ids: selectedIds,
+    };
+
+    createPost.mutate(newOrder);
+  };
 
   return (
     <div
@@ -277,7 +283,10 @@ const OrderView = () => {
         )}
 
         <div className="flex justify-end mr-10 mt-5">
-          <button onClick={() => handleAccapted()} className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white">
+          <button
+            onClick={() => handleAccapted()}
+            className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white"
+          >
             Accapted
           </button>
         </div>
