@@ -31,10 +31,10 @@ export class OrderController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get()
   findAll() {
-    return this.orderService.findAllWithPagination();
+    return this.orderService.allOrders();
   }
 
   @UseGuards(JwtGuard, RolesGuard)
