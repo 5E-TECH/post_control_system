@@ -9,9 +9,9 @@ const MailDetail = () => {
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
-  const { getPostById } = usePost();
-  const { data } = getPostById(id as string);
-
+  const { getPostById, sendPost } = usePost();
+  const { data } = getPostById(id as string, "orders");
+  const { mutate: sendToCourier } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -20,8 +20,12 @@ const MailDetail = () => {
     }
   }, [data]);
 
-  const handleClick = () => {
-    
+  const handleClick = (id: string) => {
+    sendToCourier(id as string, {
+      onSuccess: (res) => {
+        console.log(res);
+      },
+    });
   };
 
   return (
@@ -148,8 +152,8 @@ const MailDetail = () => {
 
       <div className="flex justify-end">
         <Button
-          onClick={handleClick}
-          className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none!"
+          onClick={() => handleClick(id as string)}
+          className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
         >
           Po'chtani jo'natish
         </Button>
