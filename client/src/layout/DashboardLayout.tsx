@@ -43,10 +43,12 @@ const DashboardLayout = () => {
       </div>
 
       {/* Sidebar */}
-      <aside className="row-span-1 overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">{sidebar}</aside>
+      <aside className="row-span-1 overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
+        {sidebar}
+      </aside>
 
       {/* Dashboard container */}
-      <div className=" overflow-y-auto pr-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
+      <div className="overflow-y-auto pr-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
         <main className="w-full h-full p-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
           <Outlet />
         </main>

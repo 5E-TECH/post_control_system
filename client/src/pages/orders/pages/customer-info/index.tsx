@@ -122,7 +122,7 @@ const CustomerInfoOrder = () => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-6 w-full">
+        <div className="flex flex-col gap-4.5 w-full">
           <CustomerInfo />
           <CustomerDetails />
           <div className="flex gap-4 justify-end">
