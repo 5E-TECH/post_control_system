@@ -7,7 +7,7 @@ const TodayMails = () => {
 
   const { getAllPosts } = usePost();
   const { data } = getAllPosts();
-  const posts = data?.data;
+  const posts = Array.isArray(data?.data) ? data?.data : [];
   return (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts?.map((post: any) => (

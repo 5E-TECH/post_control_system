@@ -15,14 +15,12 @@ export const usePost = () => {
     useQuery({
       queryKey: [post],
       queryFn: () => api.get("post").then((res) => res.data),
-      staleTime: 1000 * 60 * 60 * 24,
-      refetchOnWindowFocus: false,
     });
 
   const getPostById = (id: string) =>
     useQuery({
       queryKey: [post],
-      queryFn: () => api.get(`post/${id}`).then((res) => res.data),
+      queryFn: () => api.get(`post/orders/${id}`).then((res) => res.data),
     });
   return {
     createPost,
