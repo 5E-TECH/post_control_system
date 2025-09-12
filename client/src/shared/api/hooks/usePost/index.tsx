@@ -8,7 +8,7 @@ export const usePost = () => {
 
   const createPost = useMutation({
     mutationFn: (data: any) => api.post("order/receive", data),
-    onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: [post],refetchType:"active" }),
   });
 
   const getAllPosts = () =>
