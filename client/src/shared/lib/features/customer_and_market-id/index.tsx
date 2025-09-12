@@ -16,7 +16,7 @@ const initialState: ICustomerId = {
     phone_number: "",
     district_id: "",
   },
-  orderItems: [],
+  orderItems: null,
   productInfo: {
     total_price: "",
     where_deliver: "",
