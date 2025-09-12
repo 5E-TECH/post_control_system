@@ -22,9 +22,9 @@ const UsersTableComp: FC<Props> = ({ data }) => {
   }, []);
 
   return (
-    <Spin spinning={loading} tip="Loading Users...">
-      <div className="pt-[21px]">
-        <table>
+    <div className="pt-[21px]">
+      <table>
+        <Spin spinning={loading} tip="Loading Users...">
           <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
             <tr>
               <th className="p-[20px] flex items-center">
@@ -123,36 +123,36 @@ const UsersTableComp: FC<Props> = ({ data }) => {
               </tr>
             ))}
           </tbody>
-        </table>
-        <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
-          <div className="flex items-center">
-            <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-              Rows per page:
-            </span>
-            <select
-              className="rounded px-2 py-1 text-[15px] outline-none"
-              defaultValue="10"
-            >
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-            </select>
-          </div>
+        </Spin>
+      </table>
+      <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
+        <div className="flex items-center">
+          <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
+            Rows per page:
+          </span>
+          <select
+            className="rounded px-2 py-1 text-[15px] outline-none"
+            defaultValue="10"
+          >
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+          </select>
+        </div>
 
-          <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-            <span className="mr-1">1-5</span>
-            <span className="mr-1">of</span>
-            <span className="">13</span>
-          </div>
+        <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+          <span className="mr-1">1-5</span>
+          <span className="mr-1">of</span>
+          <span className="">13</span>
+        </div>
 
-          <div className="flex items-center gap-[23px]">
-            <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-            <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-          </div>
+        <div className="flex items-center gap-[23px]">
+          <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
+          <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
         </div>
       </div>
-    </Spin>
+    </div>
   );
 };
 
