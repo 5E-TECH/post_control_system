@@ -941,6 +941,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   //   }
   // }
 
+  async getStats(filter: { startDate?: string; endDate?: string }) {}
+
   async remove(id: string) {
     try {
       const order = await this.orderRepo.findOne({

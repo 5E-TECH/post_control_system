@@ -44,6 +44,11 @@ export class PostController {
     return this.postService.findAllCouriers(id);
   }
 
+  @Get('orders/:id')
+  getAllOrdersByPostId(@Param('id') id: string) {
+    return this.postService.getPostsOrders(id);
+  }
+
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Patch(':id')

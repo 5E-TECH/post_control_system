@@ -76,6 +76,17 @@ export class PostService {
     }
   }
 
+  async getPostsOrders(id: string) {
+    try {
+      const allOrdersByPostId = await this.orderRepo.find({
+        where: { post_id: id },
+      });
+      return successRes(allOrdersByPostId, 200, 'All orders by post id');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async sendPost(id: string, sendPostDto: SendPostDto): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
