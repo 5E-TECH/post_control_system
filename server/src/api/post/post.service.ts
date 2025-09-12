@@ -70,7 +70,15 @@ export class PostService {
           'There are not any couriers for this region',
         );
       }
-      return successRes(couriers, 200, 'Couriers for this post');
+      const moreThanOneCourier: boolean = couriers.length === 1 ? false : true;
+      return successRes(
+        {
+          moreThanOneCourier,
+          couriers,
+        },
+        200,
+        'Couriers for this post',
+      );
     } catch (error) {
       return catchError(error);
     }
