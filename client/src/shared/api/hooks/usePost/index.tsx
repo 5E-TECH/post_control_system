@@ -8,7 +8,8 @@ export const usePost = () => {
 
   const createPost = useMutation({
     mutationFn: (data: any) => api.post("order/receive", data),
-    onSuccess: () => client.invalidateQueries({ queryKey: [post],refetchType:"active" }),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [post], refetchType: "active" }),
   });
 
   const getAllPosts = () =>
@@ -17,14 +18,21 @@ export const usePost = () => {
       queryFn: () => api.get("post").then((res) => res.data),
     });
 
-  const getPostById = (id: string) =>
+  const getPostById = (id: string, path: string) =>
     useQuery({
-      queryKey: [post],
-      queryFn: () => api.get(`post/orders/${id}`).then((res) => res.data),
+      queryKey: [post, id, path],
+      queryFn: () => api.get(`post/${path}/${id}`).then((res) => res.data),
+    });
+
+  const sendPost = () =>
+    useMutation({
+      mutationFn: (id: string) =>
+        api.post(`/post/courier/${id}`).then((res) => res.data),
     });
   return {
     createPost,
     getAllPosts,
     getPostById,
+    sendPost,
   };
 };
