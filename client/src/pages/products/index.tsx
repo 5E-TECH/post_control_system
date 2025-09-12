@@ -12,15 +12,14 @@ const Products = () => {
 
   const navigate = useNavigate();
 
-  const handleProps = (market:any) => {
+  const handleProps = (market: any) => {
     navigate("create", { state: { market } });
-  } 
+  };
 
-  const {getProducts} = useProduct()
+  const { getProducts } = useProduct();
 
-  const {data:productData} = getProducts()
-  console.log(productData);
-  
+  const { data: productData } = getProducts();
+  // console.log(productData);
 
   const { getMarkets } = useMarket();
 
@@ -91,12 +90,20 @@ const Products = () => {
                   </thead>
 
                   <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                    {data?.data.map((item: any, inx: number) => (
-                      <tr key={item.id} className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal" onClick={() => handleProps(item)}>
-                        <td className="text-[#8C57FF] pr-10 py-3">{inx +1}</td>
-                        <td className="pr-26 py-3">{item.name}</td>
-                      </tr>
-                    ))}
+                    {data?.data &&
+                      Array.isArray(data.data) &&
+                      data.data.map((item: any, inx: number) => (
+                        <tr
+                          key={item?.id}
+                          className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal"
+                          onClick={() => handleProps(item)}
+                        >
+                          <td className="text-[#8C57FF] pr-10 py-3">
+                            {inx + 1}
+                          </td>
+                          <td className="pr-26 py-3">{item?.name}</td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -110,9 +117,8 @@ const Products = () => {
         </div>
       </div>
       <div>
-        <ProductView data={productData}/>
+        <ProductView data={productData} />
       </div>
-
     </div>
   );
 };
