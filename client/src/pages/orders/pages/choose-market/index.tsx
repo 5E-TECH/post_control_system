@@ -11,7 +11,7 @@ const Context = createContext({ name: "Default" });
 const ChooseMarket = () => {
   const { getMarkets } = useMarket();
   const { data } = getMarkets();
-  const markets = data?.data;
+  const markets = Array.isArray(data?.data) ? data?.data : [];
 
   const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
 
@@ -118,8 +118,8 @@ const ChooseMarket = () => {
                 />
               </Form.Item>
             </div>
-            <Spin spinning={loading} tip={"Loading markets..."}>
-              <div className="">
+            <div className="">
+              <Spin spinning={loading} tip={"Loading markets..."}>
                 <table>
                   <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
                     <tr>
@@ -165,35 +165,35 @@ const ChooseMarket = () => {
                     ))}
                   </tbody>
                 </table>
-                <div className="flex justify-end items-center pr-[105px] pt-4 gap-6">
-                  <div className="flex items-center">
-                    <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-                      Rows per page:
-                    </span>
-                    <select
-                      className="rounded px-2 py-1 text-[15px] outline-none"
-                      defaultValue="10"
-                    >
-                      <option value="5">5</option>
-                      <option value="10">10</option>
-                      <option value="25">25</option>
-                      <option value="50">50</option>
-                    </select>
-                  </div>
+              </Spin>
+              <div className="flex justify-end items-center pr-[105px] pt-4 gap-6">
+                <div className="flex items-center">
+                  <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
+                    Rows per page:
+                  </span>
+                  <select
+                    className="rounded px-2 py-1 text-[15px] outline-none"
+                    defaultValue="10"
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                  </select>
+                </div>
 
-                  <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                    <span className="mr-1">1-5</span>
-                    <span className="mr-1">of</span>
-                    <span className="">13</span>
-                  </div>
+                <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+                  <span className="mr-1">1-5</span>
+                  <span className="mr-1">of</span>
+                  <span className="">13</span>
+                </div>
 
-                  <div className="flex items-center gap-[23px]">
-                    <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-                    <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-                  </div>
+                <div className="flex items-center gap-[23px]">
+                  <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
+                  <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
                 </div>
               </div>
-            </Spin>
+            </div>
           </div>
           <div className="flex gap-4 justify-end">
             <Discard children="Discard" />

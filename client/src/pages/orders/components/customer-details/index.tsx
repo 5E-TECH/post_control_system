@@ -151,10 +151,3 @@ const CustomerDetails = () => {
 };
 
 export default memo(CustomerDetails);
-
-// Customer name
-// Customer Phone number
-// Customer district
-// Order item, quantity
-// Total Price
-// Comment
