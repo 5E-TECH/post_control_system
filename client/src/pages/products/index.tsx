@@ -19,7 +19,7 @@ const Products = () => {
   const {getProducts} = useProduct()
 
   const {data:productData} = getProducts()
-  console.log(productData);
+  // console.log(productData);
   
 
   const { getMarkets } = useMarket();
@@ -91,10 +91,10 @@ const Products = () => {
                   </thead>
 
                   <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                    {data?.data.map((item: any, inx: number) => (
-                      <tr key={item.id} className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal" onClick={() => handleProps(item)}>
+                    {data?.data?.map((item: any, inx: number) => (
+                      <tr key={item?.id} className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal" onClick={() => handleProps(item)}>
                         <td className="text-[#8C57FF] pr-10 py-3">{inx +1}</td>
-                        <td className="pr-26 py-3">{item.name}</td>
+                        <td className="pr-26 py-3">{item?.name}</td>
                       </tr>
                     ))}
                   </tbody>

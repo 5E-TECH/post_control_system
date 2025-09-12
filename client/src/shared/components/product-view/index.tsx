@@ -37,28 +37,28 @@ const ProductView:FC<IProps> = ({data}) => {
           </thead>
 
           <tbody>
-            {data?.data.map((item:any, inx:number) => (
+            {data?.data?.map((item:any, inx:number) => (
               <tr
-                key={item.id}
+                key={item?.id}
                 className="border-b border-gray-300 dark:border-gray-600"
               >
                 <td className="p-3">{inx + 1}</td>
                 <td className="p-3">
                   <div className="flex items-center gap-3">
                     <img
-                      src={item.image_url}
+                      src={item?.image_url}
                       alt="Product"
                       className="w-10 h-10 object-contain"
                     />
                     <div>
                       <p className="font-medium">
-                        {item.name}
+                        {item?.name}
                       </p>
                     </div>
                   </div>
                 </td>
 
-                <td className="p-3">{item.user.name}</td>
+                <td className="p-3">{item?.user?.name}</td>
 
 
                 <td className="p-3 flex items-center gap-3">
