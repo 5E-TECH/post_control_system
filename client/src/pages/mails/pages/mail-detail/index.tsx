@@ -1,12 +1,15 @@
 import { memo } from "react";
-import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { Trash } from "lucide-react";
 import SearchInput from "../../../users/components/search-input";
+import { usePost } from "../../../../shared/api/hooks/usePost";
+import { useParams } from "react-router-dom";
 
 const MailDetail = () => {
-  const { getOrders } = useOrder();
-  const { data } = getOrders();
+  const { id } = useParams();
 
+  const { getPostById } = usePost();
+  const { data } = getPostById(id as string);
+  console.log(data)
   return (
     <div className="p-5 h-[800px]">
       <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
