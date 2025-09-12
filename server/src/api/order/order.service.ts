@@ -67,6 +67,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     super(orderRepo);
   }
 
+  async allOrders() {
+    try {
+      const allOrders = await this.orderRepo.find({
+        order: { created_at: 'DESC' },
+        relations: ['customer', 'customer.district', 'market', 'items'],
+      });
+    } catch (error) {}
+  }
+
   async createOrder(createOrderDto: CreateOrderDto): Promise<Object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -941,7 +950,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   //   }
   // }
 
-  async getStats(filter: { startDate?: string; endDate?: string }) {}
+  async getStats(filter: { startDate?: string; endDate?: string }) {
+    try {
+      const qb = this.orderRepo.createQueryBuilder('o');
+
+      if (filter.startDate) {
+        qb.andWhere('o.createdAt >= :startDate', {
+          startDate: filter.startDate,
+        });
+      }
+      if (filter.endDate) {
+        qb.andWhere('o.createdAt <= :endDate', { endDate: filter.endDate });
+      }
+
+      const total = await qb.getCount();
+    } catch (error) {}
+  }
 
   async remove(id: string) {
     try {
