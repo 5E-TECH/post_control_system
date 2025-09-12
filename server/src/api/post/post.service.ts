@@ -35,7 +35,9 @@ export class PostService {
 
   async findAll(): Promise<object> {
     try {
-      const allPosts = await this.postRepo.find();
+      const allPosts = await this.postRepo.find({
+        relations: ['region'],
+      });
       return successRes(allPosts, 200, 'All posts');
     } catch (error) {
       return catchError(error);
