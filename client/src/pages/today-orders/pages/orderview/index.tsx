@@ -1,7 +1,6 @@
 import { EllipsisVertical } from "lucide-react";
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 // import { useNavigate } from "react-router-dom";
-import { OrderData } from "../../../../shared/static/order";
 import Search from "../../components/search";
 import phone from "../../../../shared/assets/order/detail.svg";
 import { useLocation } from "react-router-dom";
@@ -15,16 +14,21 @@ const OrderView = () => {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   console.log(selectedIds);
-  
 
   const location = useLocation();
   const market = location.state?.market;
 
   const { getOrderByMarket } = useOrder();
   const { data } = getOrderByMarket(market);
-  const {} = useMarket()
+  const {} = useMarket();
 
-  console.log(data?.data);
+  console.log();
+
+  useEffect(() => {
+    if (data?.data) {
+      setSelectedIds(data.data.map((item: any) => item.id));
+    }
+  }, [data]);
 
   return (
     <div
@@ -40,12 +44,14 @@ const OrderView = () => {
                 <div className="flex items-center gap-10 ml-10">
                   <input
                     type="checkbox"
-                    checked={selectedIds.length === OrderData.length}
+                    checked={
+                      !!data?.data && selectedIds.length === data.data.length
+                    } // ✅ doim boolean
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds(OrderData.map((item: any) => item.id));
+                        setSelectedIds(data?.data.map((item: any) => item.id)); // 🔄 hamma id yig‘iladi
                       } else {
-                        setSelectedIds([]);
+                        setSelectedIds([]); // 🔄 bo‘shatib yuboriladi
                       }
                     }}
                   />
@@ -119,15 +125,15 @@ const OrderView = () => {
                 <td className="pl-10">
                   <input
                     type="checkbox"
-                    onClick={(e) => e.stopPropagation()}
-                    checked={selectedIds.includes(item.id)}
+                    onClick={(e) => e.stopPropagation()} // modal ochilmasin
+                    checked={item?.id ? selectedIds.includes(item.id) : false} // ✅ doim boolean
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds([...selectedIds, item?.id]);
+                        setSelectedIds([...selectedIds, item.id]); // qo‘shiladi
                       } else {
                         setSelectedIds(
-                          selectedIds.filter((id) => id !== item?.id)
-                        );
+                          selectedIds.filter((id) => id !== item.id)
+                        ); // olib tashlanadi
                       }
                     }}
                   />
@@ -153,7 +159,7 @@ const OrderView = () => {
                   </span>
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.total_price }  UZS
+                  {item?.total_price} UZS
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                   {item?.product_quantity}
@@ -267,7 +273,9 @@ const OrderView = () => {
         )}
 
         <div className="flex justify-end mr-10 mt-5">
-          <button className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white">Accapted</button>
+          <button className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white">
+            Accapted
+          </button>
         </div>
       </div>
     </div>
