@@ -1,5 +1,4 @@
 import { memo } from "react";
-import { OrderData } from "../../../../shared/static/order";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
@@ -22,7 +21,6 @@ const OrderView = () => {
 
   const {getOrders} = useOrder()
   const {data} = getOrders()
-  console.log(data);
   
   return (
     <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
@@ -82,24 +80,24 @@ const OrderView = () => {
           </tr>
         </thead>
         <tbody>
-          {OrderData?.map((item: any) => (
+          {data?.data?.map((item: any, inx:number) => (
             <tr
               key={item.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
               onClick={() => navigate("/orders/order-detail")}
             >
-              <td className="pl-10">{item.id}</td>
+              <td className="pl-10">{inx + 1}</td>
               <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                {item.customer}
+                {item?.customer?.name}
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item.phone}
+                {item?.customer?.phone_number}
               </td>
               <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                {item.address}
+                {item?.customer?.phone_number}
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item.market}
+                {item?.market?.name}
               </td>
               <td className="pl-10">
                 <span
@@ -111,10 +109,10 @@ const OrderView = () => {
                 </span>
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item.price}
+                {item?.total_price}
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item.stock}
+                {item?.items.length}
               </td>
             </tr>
           ))}
