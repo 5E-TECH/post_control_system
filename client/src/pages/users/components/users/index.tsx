@@ -10,7 +10,7 @@ import { Spin } from "antd";
 import superImg from "../../../../shared/assets/users/super.svg";
 
 interface Props {
-  data: any;
+  data: any[];
 }
 
 const UsersTableComp: FC<Props> = ({ data }) => {
@@ -23,8 +23,8 @@ const UsersTableComp: FC<Props> = ({ data }) => {
 
   return (
     <div className="pt-[21px]">
-      <table>
-        <Spin spinning={loading} tip="Loading Users...">
+      <Spin spinning={loading} tip="Loading Users...">
+        <table>
           <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
             <tr>
               <th className="p-[20px] flex items-center">
@@ -123,8 +123,8 @@ const UsersTableComp: FC<Props> = ({ data }) => {
               </tr>
             ))}
           </tbody>
-        </Spin>
-      </table>
+        </table>
+      </Spin>
       <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
         <div className="flex items-center">
           <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">

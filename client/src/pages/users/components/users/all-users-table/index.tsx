@@ -5,8 +5,8 @@ import UsersTableComp from "..";
 const AllUsersTable = () => {
   const { getUser } = useUser();
   const { data } = getUser();
-  const allUsers = data?.data;
-
+  const allUsers = Array.isArray(data?.data) ? data?.data : [];
+  
   return <UsersTableComp data={allUsers} />;
 };
 

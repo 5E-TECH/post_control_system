@@ -11,7 +11,7 @@ const Context = createContext({ name: "Default" });
 const ChooseMarket = () => {
   const { getMarkets } = useMarket();
   const { data } = getMarkets();
-  const markets = data?.data;
+  const markets = Array.isArray(data?.data) ? data?.data : [];
 
   const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
 
@@ -119,8 +119,8 @@ const ChooseMarket = () => {
               </Form.Item>
             </div>
             <div className="">
-              <table>
-                <Spin spinning={loading} tip={"Loading markets..."}>
+              <Spin spinning={loading} tip={"Loading markets..."}>
+                <table>
                   <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
                     <tr>
                       <th className="w-[654px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
@@ -164,8 +164,8 @@ const ChooseMarket = () => {
                       </tr>
                     ))}
                   </tbody>
-                </Spin>
-              </table>
+                </table>
+              </Spin>
               <div className="flex justify-end items-center pr-[105px] pt-4 gap-6">
                 <div className="flex items-center">
                   <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
