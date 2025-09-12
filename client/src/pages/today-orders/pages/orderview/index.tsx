@@ -30,6 +30,10 @@ const OrderView = () => {
     }
   }, [data]);
 
+  const handleAccapted = () => {
+    alert("order qabul qilinsinmi")
+  }
+
   return (
     <div
       onClick={() => setOpenMenuId("")}
@@ -125,15 +129,15 @@ const OrderView = () => {
                 <td className="pl-10">
                   <input
                     type="checkbox"
-                    onClick={(e) => e.stopPropagation()} // modal ochilmasin
-                    checked={item?.id ? selectedIds.includes(item.id) : false} // ✅ doim boolean
+                    onClick={(e) => e.stopPropagation()}
+                    checked={item?.id ? selectedIds.includes(item.id) : false}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds([...selectedIds, item.id]); // qo‘shiladi
+                        setSelectedIds([...selectedIds, item.id]);
                       } else {
                         setSelectedIds(
                           selectedIds.filter((id) => id !== item.id)
-                        ); // olib tashlanadi
+                        );
                       }
                     }}
                   />
@@ -192,11 +196,11 @@ const OrderView = () => {
         {selectedOrder && (
           <div
             className="fixed inset-0 bg-[#f4f5fa79] bg-opacity-80 flex items-center justify-center z-50 dark:bg-[#28243d3b]"
-            onClick={() => setSelectedOrder(null)} // qora joyni bosganda yopiladi
+            onClick={() => setSelectedOrder(null)}
           >
             <div
               className="bg-white rounded-lg shadow-lg p-6 w-[500px] relative dark:bg-[#28243d]"
-              onClick={(e) => e.stopPropagation()} // modal ichida bosganda yopilmasin
+              onClick={(e) => e.stopPropagation()}
             >
               <button
                 className="absolute top-3 right-3 text-gray-600 hover:text-black"
@@ -273,7 +277,7 @@ const OrderView = () => {
         )}
 
         <div className="flex justify-end mr-10 mt-5">
-          <button className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white">
+          <button onClick={() => handleAccapted()} className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white">
             Accapted
           </button>
         </div>
