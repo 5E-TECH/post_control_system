@@ -2,6 +2,7 @@ import { memo } from "react";
 import { OrderData } from "../../../../shared/static/order";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useOrder } from "../../../../shared/api/hooks/useOrder";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -18,6 +19,11 @@ const statusColors: Record<string, string> = {
 
 const OrderView = () => {
   const navigate = useNavigate();
+
+  const {getOrders} = useOrder()
+  const {data} = getOrders()
+  console.log(data);
+  
   return (
     <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
       <table className="w-full">
