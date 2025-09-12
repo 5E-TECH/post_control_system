@@ -8,8 +8,13 @@ import { useUser } from "../../../../shared/api/hooks/useRegister";
 const UsersStatistics = () => {
   const { getUser } = useUser();
   const { data: allUsers } = getUser();
-  const markets = allUsers?.data?.filter((user: any) => user.role === "market");
-  const users = allUsers?.data?.filter((user: any) => user.role !== "market");
+  const markets = Array.isArray(allUsers?.data)
+    ? allUsers.data.filter((user: any) => user.role === "market")
+    : [];
+
+  const users = Array.isArray(allUsers?.data)
+    ? allUsers.data.filter((user: any) => user.role !== "market")
+    : [];
   return (
     <div className="grid grid-cols-3 max-[1250px]:grid-cols-2 max-[950px]:grid-cols-1 gap-6">
       <NavLink
