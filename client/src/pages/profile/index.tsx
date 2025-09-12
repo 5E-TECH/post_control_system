@@ -1,24 +1,30 @@
 import { memo } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { Users } from 'lucide-react';
+import { Outlet } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
+import { useSignOut } from './service/LogOut';
 
 const Profil = () => {
-  const linkClasses = (isActive: boolean) =>
-    `flex items-center gap-2 px-6 py-2 rounded-lg  transition 
-     ${isActive ? 'bg-purple-500  text-white w-[136px] h-[38px]' : ''}`;
+  const {mutate: signOut} = useSignOut()
+
 
   return (
     <div className="">
-      <ul className="flex fixed gap-5 bg-[#f4f5fa] dark:text-white dark:bg-[#28243d] pb-[24px]">
+      <ul className="flex fixed justify-between gap-5 bg-[#f4f5fa] dark:text-white dark:bg-[#28243d] pb-[24px]">
         <li>
-          <NavLink
-            to={''}
-            end
-            className={({ isActive }) => linkClasses(isActive)}
+          <button
+            onClick={() =>signOut() }
+            className="flex items-center gap-2 
+               w-[140px] h-9 px-3
+               border border-red-500 text-red-600 
+               rounded-lg font-medium
+               dark:border-red-500 dark:text-red-500
+               hover:bg-red-50 dark:hover:bg-red-900/20
+               focus:outline-none focus:ring-1 focus:ring-red-400
+               transition-colors  cursor-pointer"
           >
-            <Users className=" w-5 h-5" />
-            Profil
-          </NavLink>
+            <LogOut className="w-5 h-5" />
+            <span>Logout</span>
+          </button>
         </li>
       </ul>
 
