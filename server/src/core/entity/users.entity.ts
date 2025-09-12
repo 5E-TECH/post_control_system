@@ -16,6 +16,7 @@ import { PostEntity } from './post.entity';
 import { CustomerMarketEntity } from './customer-market.entity';
 import { ProductEntity } from './product.entity';
 import { OrderEntity } from './order.entity';
+import { DistrictEntity } from './district.entity';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
@@ -105,4 +106,11 @@ export class UserEntity extends BaseEntity {
 
   @OneToMany(() => OrderEntity, (order) => order.customer)
   customerOrders: OrderEntity[];
+
+  // User → District (N-1)
+  @ManyToOne(() => DistrictEntity, (district) => district.users, {
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'district_id' })
+  district: DistrictEntity;
 }
