@@ -14,7 +14,11 @@ const TodayMails = () => {
         <div
           key={post?.id}
           className="min-h-[250px] shadow-lg rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]"
-          onClick={() => navigate(`/mails/${post?.id}`)}
+          onClick={() =>
+            navigate(`/mails/${post?.id}`, {
+              state: { regionName: post?.region?.name },
+            })
+          }
         >
           <h1 className="text-[30px]">{post?.region?.name}</h1>
           <p className="text-[22px]">
