@@ -73,7 +73,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order: { created_at: 'DESC' },
         relations: ['customer', 'customer.district', 'market', 'items'],
       });
-    } catch (error) {}
+
+      return successRes(allOrders, 200, 'All orders');
+    } catch (error) {
+      return catchError(error);
+    }
   }
 
   async createOrder(createOrderDto: CreateOrderDto): Promise<Object> {
