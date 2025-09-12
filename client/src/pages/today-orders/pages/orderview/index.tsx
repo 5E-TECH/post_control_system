@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, EllipsisVertical } from "lucide-react";
+import { EllipsisVertical } from "lucide-react";
 import { memo, useState } from "react";
 // import { useNavigate } from "react-router-dom";
 import { OrderData } from "../../../../shared/static/order";
@@ -7,19 +7,6 @@ import phone from "../../../../shared/assets/order/detail.svg";
 import { useLocation } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
-
-const statusColors: Record<string, string> = {
-  new: "bg-blue-500",
-  received: "bg-green-500",
-  on_the_road: "bg-yellow-500",
-  waiting: "bg-orange-500",
-  sold: "bg-purple-500",
-  cancelled: "bg-red-500",
-  paid: "bg-cyan-500",
-  partly_paid: "bg-pink-500",
-  cancelled_sent: "bg-gray-500",
-  closed: "bg-black",
-};
 
 const OrderView = () => {
   // const navigate = useNavigate();
@@ -145,7 +132,7 @@ const OrderView = () => {
                     }}
                   />
                 </td>
-                <td className="pl-10">{inx}</td>
+                <td className="pl-10">{inx + 1}</td>
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
                   {item?.customer?.name}
                 </td>
@@ -160,9 +147,7 @@ const OrderView = () => {
                 </td>
                 <td className="pl-10">
                   <span
-                    className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2] ${
-                      statusColors[item?.status] || "bg-slate-400"
-                    }`}
+                    className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}
                   >
                     {item?.status?.toUpperCase()}
                   </span>
@@ -281,32 +266,8 @@ const OrderView = () => {
           </div>
         )}
 
-        <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
-          <div className="flex items-center">
-            <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-              Rows per page:
-            </span>
-            <select
-              className="rounded px-2 py-1 text-[15px] outline-none"
-              defaultValue="10"
-            >
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-            </select>
-          </div>
-
-          <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-            <span className="mr-1">1-5</span>
-            <span className="mr-1">of</span>
-            <span className="">13</span>
-          </div>
-
-          <div className="flex items-center gap-[23px]">
-            <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-            <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-          </div>
+        <div className="flex justify-end mr-10 mt-5">
+          <button className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white">Accapted</button>
         </div>
       </div>
     </div>
