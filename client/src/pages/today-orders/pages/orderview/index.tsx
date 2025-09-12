@@ -5,7 +5,6 @@ import Search from "../../components/search";
 import phone from "../../../../shared/assets/order/detail.svg";
 import { useLocation } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
-import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { usePost } from "../../../../shared/api/hooks/usePost";
 
 const OrderView = () => {
@@ -21,10 +20,8 @@ const OrderView = () => {
 
   const { getOrderByMarket } = useOrder();
   const { createPost } = usePost();
-  const { data } = getOrderByMarket(market);
-  const {} = useMarket();
+  const { data, refetch } = getOrderByMarket(market);
 
-  console.log();
 
   useEffect(() => {
     if (data?.data) {
@@ -37,7 +34,13 @@ const OrderView = () => {
       order_ids: selectedIds,
     };
 
-    createPost.mutate(newOrder);
+    createPost.mutate(newOrder, {
+      onSuccess: () => {
+        setSelectedIds([])
+        refetch()
+        // navigate("/order/markets/new-orders")
+      }
+    });
   };
 
   return (
@@ -126,7 +129,7 @@ const OrderView = () => {
             </tr>
           </thead>
           <tbody>
-            {data?.data.map((item: any, inx: number) => (
+            {data?.data?.map((item: any, inx: number) => (
               <tr
                 key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
@@ -283,7 +286,7 @@ const OrderView = () => {
         )}
 
         <div className="flex justify-end mr-10 mt-5">
-          <button
+          <button type="submit"
             onClick={() => handleAccapted()}
             className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white"
           >

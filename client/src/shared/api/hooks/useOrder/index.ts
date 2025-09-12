@@ -15,9 +15,6 @@ export const useOrder = () => {
     useQuery({
       queryKey: [order],
       queryFn: () => api.get("order").then((res) => res.data),
-      staleTime: Infinity,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
     });
 
   const getOrderByMarket = (marketId: string) =>
@@ -25,8 +22,6 @@ export const useOrder = () => {
       queryKey: [order, marketId],
       queryFn: () =>
         api.get(`order/market/${marketId}`).then((res) => res.data),
-      staleTime: 1000 * 60 * 60 * 24,
-      refetchOnWindowFocus: false,
     });
   return {
     createOrder,

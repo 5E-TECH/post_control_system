@@ -71,22 +71,22 @@ const TodayOrders = () => {
           <tbody className="[&>tr]:odd:bg-white  [&>tr]:odd:dark:bg-[#312d4b] [&>tr]:even:bg-[#f6f7fb6c] [&>tr]:even:dark:bg-[#3d375957] [&>tr:hover]:bg-[#f6f7fb] [&>tr:hover]:dark:bg-[#3d3759]">
             {data?.data?.markets?.map((item: any, inx: number) => (
               <tr
-                key={item.id}
+                key={item?.id}
                 className="h-[56px]"
-                onClick={() => handleProps(item.id)}
+                onClick={() => handleProps(item?.id)}
               >
                 <td className="pl-10">{inx + 1}</td>
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.name}
+                  {item?.name}
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.phone_number}
+                  {item?.phone_number}
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.totalPrice}
+                  {item?.totalPrice}
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item.stock}
+                  {item?.stock}
                 </td>
               </tr>
             ))}
