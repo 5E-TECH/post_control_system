@@ -69,7 +69,7 @@ const TodayOrders = () => {
             </tr>
           </thead>
           <tbody className="[&>tr]:odd:bg-white  [&>tr]:odd:dark:bg-[#312d4b] [&>tr]:even:bg-[#f6f7fb6c] [&>tr]:even:dark:bg-[#3d375957] [&>tr:hover]:bg-[#f6f7fb] [&>tr:hover]:dark:bg-[#3d3759]">
-            {data?.data.markets.map((item: any, inx: number) => (
+            {data?.data?.markets?.map((item: any, inx: number) => (
               <tr
                 key={item.id}
                 className="h-[56px]"
