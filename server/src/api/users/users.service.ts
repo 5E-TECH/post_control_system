@@ -317,7 +317,7 @@ export class UserService {
       if (assignedToMarket) {
         await queryRunner.commitTransaction();
         return successRes(
-          {},
+          isExistClient,
           200,
           'This is your client and you can assign him new order',
         );
