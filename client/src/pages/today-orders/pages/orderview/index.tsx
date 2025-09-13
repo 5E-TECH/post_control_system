@@ -1,6 +1,6 @@
 import { EllipsisVertical } from "lucide-react";
 import { memo, useEffect, useState } from "react";
-// import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Search from "../../components/search";
 import phone from "../../../../shared/assets/order/detail.svg";
 import { useLocation } from "react-router-dom";
@@ -8,7 +8,7 @@ import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { usePost } from "../../../../shared/api/hooks/usePost";
 
 const OrderView = () => {
-  // const navigate = useNavigate();
+  const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -38,7 +38,7 @@ const OrderView = () => {
       onSuccess: () => {
         setSelectedIds([])
         refetch()
-        // navigate("/order/markets/new-orders")
+        navigate("/order/markets/new-orders")
       }
     });
   };
