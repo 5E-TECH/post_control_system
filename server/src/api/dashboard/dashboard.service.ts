@@ -20,6 +20,7 @@ export class DashboardService {
 
       const [orders] = await Promise.all([
         this.orderStats.getStats(startDate, endDate),
+        this.orderStats.getMarketStats(startDate, endDate),
       ]);
 
       return successRes({ orders }, 200, 'Dashboard infos');

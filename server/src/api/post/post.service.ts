@@ -9,7 +9,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { DataSource, In } from 'typeorm';
+import { DataSource, In, Not } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
@@ -36,9 +36,36 @@ export class PostService {
   async findAll(): Promise<object> {
     try {
       const allPosts = await this.postRepo.find({
+        where: { status: Not(Post_status.NEW) },
         relations: ['region'],
       });
       return successRes(allPosts, 200, 'All posts');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async newPosts(): Promise<object> {
+    try {
+      const allPosts = await this.postRepo.find({
+        where: { status: Post_status.NEW },
+        relations: ['region'],
+      });
+      return successRes(allPosts, 200, 'All new posts');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async rejectedPosts(): Promise<object> {
+    try {
+      const allPosts = await this.postRepo.find({
+        where: {
+          status: In([Post_status.CANCELED, Post_status.CANCELED_RECEIVED]),
+        },
+        relations: ['region'],
+      });
+      return successRes(allPosts, 200, 'All new posts');
     } catch (error) {
       return catchError(error);
     }
@@ -107,7 +134,7 @@ export class PostService {
       }
       const { orderIds, courierId } = sendPostDto;
       const isExistCourier = await this.userRepo.findOne({
-        where: { id, role: Roles.COURIER },
+        where: { id: courierId, role: Roles.COURIER },
       });
       if (!isExistCourier) {
         throw new NotFoundException('Courier not found');
