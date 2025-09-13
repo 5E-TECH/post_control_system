@@ -51,6 +51,11 @@ export class PostController {
     return this.postService.onTheRoadPosts(user);
   }
 
+  @Get('courier/old-posts')
+  courierOldPosts(@CurrentUser() user: JwtPayload) {
+    return this.postService.oldPostsForCourier(user);
+  }
+
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
   @Get(':id')
