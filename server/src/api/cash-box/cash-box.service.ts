@@ -28,6 +28,7 @@ import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { UserRepository } from 'src/core/repository/user.repository';
 
 @Injectable()
 export class CashBoxService
@@ -43,6 +44,9 @@ export class CashBoxService
 
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
+
+    @InjectRepository(UserEntity)
+    private readonly userRepo: UserRepository,
 
     private readonly dataSource: DataSource,
   ) {
@@ -60,6 +64,43 @@ export class CashBoxService
         await this.cashboxRepo.save(cashe);
         console.log('Initial cashbox created');
       }
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getCashboxByUserId(id: string) {
+    try {
+      const user = await this.userRepo.findOne({ where: { id } });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      const cashbox = await this.cashboxRepo.findOne({
+        where: { user_id: id },
+      });
+      if (!cashbox) {
+        throw new NotFoundException('Cashbox not found');
+      }
+      const cashboxHistory = await this.cashboxHistoryRepo.find({
+        where: { cashbox_id: cashbox.id },
+      });
+
+      let income: number = 0;
+      let outcome: number = 0;
+
+      for (const history of cashboxHistory) {
+        if (history.operation_type === Operation_type.INCOME) {
+          income += history.amount;
+        } else {
+          outcome += history.amount;
+        }
+      }
+
+      return successRes(
+        { cashbox, cashboxHistory, income, outcome },
+        200,
+        'Cashbox details',
+      );
     } catch (error) {
       return catchError(error);
     }
