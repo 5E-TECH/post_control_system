@@ -272,7 +272,7 @@ export class CashBoxService
 
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: {
-          market_id,
+          user_id: market_id,
           cashbox_type: Cashbox_type.FOR_MARKET,
         },
       });
