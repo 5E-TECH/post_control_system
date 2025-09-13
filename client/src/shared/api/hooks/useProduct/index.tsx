@@ -24,10 +24,19 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getProductsByMarket = (marketId:string) =>
+  const getMyProducts = () =>
+    useQuery({
+      queryKey: [product],
+      queryFn: () => api.get("product/my-products").then((res) => res.data),
+      staleTime: 1000 * 60 * 60 * 24,
+      refetchOnWindowFocus: false,
+    });
+
+  const getProductsByMarket = (marketId: string) =>
     useQuery({
       queryKey: [product, marketId],
-      queryFn: () => api.get(`product/market/${marketId}`).then((res) => res.data),
+      queryFn: () =>
+        api.get(`product/market/${marketId}`).then((res) => res.data),
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
@@ -43,6 +52,7 @@ export const useProduct = () => {
     createProduct,
     getProducts,
     getProductsByMarket,
-    deleteProduct
+    deleteProduct,
+    getMyProducts
   };
 };
