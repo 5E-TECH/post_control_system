@@ -71,6 +71,21 @@ export class PostService {
     }
   }
 
+  async onTheRoadPosts(user: JwtPayload): Promise<object> {
+    try {
+      const allPosts = await this.postRepo.find({
+        where: {
+          status: Post_status.SENT,
+          courier_id: user.id,
+        },
+        relations: ['region'],
+      });
+      return successRes(allPosts, 200, 'All new posts');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async findOne(id: string): Promise<object> {
     try {
       const post = await this.postRepo.findOne({ where: { id } });

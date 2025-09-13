@@ -1110,6 +1110,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getCourierStats(startDate?: string, endDate?: string) {
     try {
+      const allPosts = await this.postRepo
+        .createQueryBuilder('p')
+        .where('p.created_at BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        })
+        .getMany();
+
+      const uniqueCourierIds = Array.from(
+        new Set(allPosts.map((post) => post.courier_id)),
+      );
+      const allPostIds: string[] = allPosts.map((post) => post.id);
     } catch (error) {
       return catchError(error);
     }
