@@ -436,6 +436,27 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  async allCouriersOrders(user: JwtPayload) {
+    try {
+      const allMyPosts = await this.postRepo.find({
+        where: { courier_id: user.id },
+      });
+
+      const allPostIds: string[] = [];
+      for (const post of allMyPosts) {
+        allPostIds.push(post.id);
+      }
+
+      const allOrders = await this.orderRepo.find({
+        where: { post_id: In(allPostIds) },
+      });
+
+      return successRes(allOrders, 200, 'All my orders');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async sellOrder(
     user: JwtPayload,
     id: string,
