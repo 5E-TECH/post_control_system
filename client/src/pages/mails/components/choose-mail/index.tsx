@@ -9,15 +9,15 @@ const ChooseMail: FC<Props> = ({ role }) => {
   const links =
     role === "superadmin"
       ? [
-          { to: "", label: "Bugungi pochtalar" },
-          { to: "refused", label: "Qaytgan pochtalar" },
-          { to: "old", label: "Eski pochtalar" },
+          { to: "/mails", label: "Bugungi pochtalar" },
+          { to: "/mails/refused", label: "Qaytgan pochtalar" },
+          { to: "/mails/old", label: "Eski pochtalar" },
         ]
       : role === "courier"
       ? [
-          { to: "", label: "Yangi pochtalar" },
-          { to: "/courier/refused", label: "Qaytgan pochtalar" },
-          { to: "/courier/old", label: "Eski pochtalar" },
+          { to: "/courier-mails", label: "Yangi pochtalar" },
+          { to: "/courier-mails/refused", label: "Qaytgan pochtalar" },
+          { to: "/courier-mails/old", label: "Eski pochtalar" },
         ]
       : [];
 
@@ -26,8 +26,8 @@ const ChooseMail: FC<Props> = ({ role }) => {
       {links.map((link) => (
         <NavLink
           key={link.to}
-          end={link.to === ""}
           to={link.to}
+          end={link.to === "/mails" || link.to === "/courier-mails"}
           className={({ isActive }) =>
             `${
               isActive

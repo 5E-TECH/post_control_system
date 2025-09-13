@@ -1,11 +1,11 @@
 import { createContext, memo, useEffect, useMemo, useState } from "react";
 import { Check, Trash } from "lucide-react";
-import SearchInput from "../../../users/components/search-input";
-import { usePost } from "../../../../shared/api/hooks/usePost";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "antd";
-import Popup from "../../../../shared/ui/Popup";
-import { notification } from "antd";
+import { usePost } from "../../../../../shared/api/hooks/usePost";
+import SearchInput from "../../../../users/components/search-input";
+import Popup from "../../../../../shared/ui/Popup";
+import useNotification from "antd/es/notification/useNotification";
 
 const Context = createContext({ name: "Default" });
 
@@ -67,7 +67,7 @@ const MailDetail = () => {
     setSelectedCourierId(id);
   };
 
-  const [api, contextHolder] = notification.useNotification();
+  const [api, contextHolder] = useNotification();
   const navigate = useNavigate();
   const handleConfirmCouriers = () => {
     const post = {

@@ -37,11 +37,19 @@ export const usePost = () => {
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
 
+  const receivePost = () =>
+    useMutation({
+      mutationFn: ({ id, data }: { id: string; data: any }) =>
+        api.patch(`post/receive/${id}`, data).then((res) => res.data),
+      onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+    });
+
   return {
     createPost,
     getAllPosts,
     getPostById,
     sendAndGetCouriersByPostId,
     sendPost,
+    receivePost,
   };
 };

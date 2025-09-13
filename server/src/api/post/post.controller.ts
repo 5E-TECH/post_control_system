@@ -71,7 +71,7 @@ export class PostController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
   @Get('orders/:id')
   getAllOrdersByPostId(@Param('id') id: string) {
     return this.postService.getPostsOrders(id);
@@ -86,7 +86,7 @@ export class PostController {
 
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER)
-  @Patch(':id')
+  @Patch('receive/:id')
   receivePost(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
