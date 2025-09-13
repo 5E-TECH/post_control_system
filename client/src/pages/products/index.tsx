@@ -5,29 +5,29 @@ import Popup from "../../shared/ui/Popup";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 import ProductView from "../../shared/components/product-view";
 import { useProduct } from "../../shared/api/hooks/useProduct";
-// import ProductCreate from "./product-create";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 
 const Products = () => {
   const [showMarket, setShowMarket] = useState(false);
 
   const navigate = useNavigate();
 
+  const { id, role } = useSelector((state: RootState) => state.roleSlice);
+
+  console.log(role, id);
+
   const handleProps = (market: any) => {
     navigate("create", { state: { market } });
   };
 
-  const { getProducts } = useProduct();
-
-  const { data: productData } = getProducts();
-  // console.log(productData);
+  const { getProducts, getMyProducts } = useProduct();
+  const { data: productData } =
+  role === "market" ? getMyProducts() : getProducts();
 
   const { getMarkets } = useMarket();
 
-  const { data } = getMarkets();
-  // console.log(data?.data);
-
-  // const { data } = getProduct();
-  // console.log(data);
+  const { data } = getMarkets(role !== "market");
 
   const { pathname } = useLocation();
 
@@ -48,7 +48,14 @@ const Products = () => {
           </button>
 
           <button
-            onClick={() => setShowMarket(true)}
+            onClick={() => {
+              if (role === "market") {
+                // Reduxdan kelgan id va role ni handleProps ga yuboramiz
+                handleProps({ id, role });
+              } else {
+                setShowMarket(true); // popup ochiladi
+              }
+            }}
             className="w-[146px] h-[38px] bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
           >
             <FilePlus size={18} />
