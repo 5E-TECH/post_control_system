@@ -13,6 +13,7 @@ import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { OrderGateaway } from '../socket/order.gateaway';
+import { PostEntity } from 'src/core/entity/post.entity';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { OrderGateaway } from '../socket/order.gateaway';
       CashEntity,
       CashboxHistoryEntity,
       UserEntity,
+      PostEntity,
     ]),
     CashBoxModule,
   ],
