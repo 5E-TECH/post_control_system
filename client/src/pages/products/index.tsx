@@ -19,6 +19,7 @@ const Products = () => {
 
   const handleProps = (market: any) => {
     navigate("create", { state: { market } });
+    setShowMarket(false)
   };
 
   const { getProducts, getMyProducts } = useProduct();
