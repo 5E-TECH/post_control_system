@@ -15,9 +15,6 @@ export class CashEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   user_id: string;
 
-  @Column({ type: 'uuid', nullable: true })
-  market_id: string; // 🟢 Market bilan bog‘lash
-
   // 1-1 Cashbox → User
   @OneToOne(() => UserEntity, (user) => user.cashbox, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })

@@ -260,7 +260,7 @@ export class UserService {
       await queryRunner.manager.save(newMarket);
       const cashbox = queryRunner.manager.create(CashEntity, {
         cashbox_type: Cashbox_type.FOR_MARKET,
-        market_id: newMarket.id,
+        user_id: newMarket.id,
       });
       await queryRunner.manager.save(cashbox);
 
@@ -406,6 +406,7 @@ export class UserService {
       const allMarkets = await this.userRepo.find({
         where: { role: Roles.MARKET },
         select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+        relations: ['cashbox'],
       });
       return successRes(allMarkets, 200, 'All markets');
     } catch (error) {
