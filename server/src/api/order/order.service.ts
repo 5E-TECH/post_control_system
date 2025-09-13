@@ -1108,6 +1108,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  async getCourierStats(startDate?: string, endDate?: string) {
+    try {
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async remove(id: string) {
     try {
       const order = await this.orderRepo.findOne({
