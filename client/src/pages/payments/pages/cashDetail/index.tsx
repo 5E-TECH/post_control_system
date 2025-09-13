@@ -2,12 +2,19 @@ import { memo } from "react";
 import chip from "../../../../shared/assets/payments/chip.svg";
 import { ArrowLeft } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useCashBox } from "../../../../shared/api/hooks/cashbox";
 
 const CashDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const market = location.state?.market;
-  console.log("11111111111111111",market);
+  console.log("11111111111111111",market.selectMarket);
+
+  const {getCashBoxById} = useCashBox()
+  const {data} = getCashBoxById(market.selectMarket)
+
+  console.log(data);
+  
   
 
 
