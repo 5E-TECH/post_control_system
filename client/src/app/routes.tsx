@@ -55,7 +55,12 @@ const RefusedMails = lazy(
 const OldMails = lazy(
   () => import("../pages/mails/components/superadmin/old-mails")
 );
-const MailDetail = lazy(() => import("../pages/mails/pages/mail-detail"));
+const MailDetail = lazy(
+  () => import("../pages/mails/pages/superadmin/mail-detail")
+);
+const CourierMailDetail = lazy(
+  () => import("../pages/mails/pages/kuryer/mail-detail")
+);
 const CourierNewMails = lazy(
   () => import("../pages/mails/components/courier/new-mails")
 );
@@ -151,7 +156,7 @@ const AppRouters = () => {
             },
 
             {
-              path: "courier",
+              path: "courier-mails",
               element: <Mails />,
               children: [
                 { index: true, element: <CourierNewMails /> },
@@ -162,6 +167,10 @@ const AppRouters = () => {
             {
               path: "mails/:id",
               element: <MailDetail />,
+            },
+            {
+              path: "courier-mails/:id",
+              element: <CourierMailDetail />,
             },
             {
               path: "products",
