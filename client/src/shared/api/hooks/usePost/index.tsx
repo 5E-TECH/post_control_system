@@ -24,6 +24,12 @@ export const usePost = () => {
       queryFn: () => api.get(`post/${path}/${id}`).then((res) => res.data),
     });
 
+  const getOldPostsCourier = () =>
+    useQuery({
+      queryKey: [post],
+      queryFn: () => api.get("post/courier/old-posts").then((res) => res.data),
+    });
+
   const sendAndGetCouriersByPostId = () =>
     useMutation({
       mutationFn: (id: string) =>
@@ -49,6 +55,7 @@ export const usePost = () => {
     getAllPosts,
     getPostById,
     sendAndGetCouriersByPostId,
+    getOldPostsCourier,
     sendPost,
     receivePost,
   };
