@@ -1,17 +1,19 @@
 import { memo, useEffect, useState } from "react";
-import { Trash } from "lucide-react";
+import { Check, Trash } from "lucide-react";
 import SearchInput from "../../../users/components/search-input";
 import { usePost } from "../../../../shared/api/hooks/usePost";
 import { useLocation, useParams } from "react-router-dom";
 import { Button } from "antd";
+import Popup from "../../../../shared/ui/Popup";
 
 const MailDetail = () => {
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
-  const { getPostById, sendPost } = usePost();
+  const { getPostById, sendAndGetCouriersByPostId, sendPost } = usePost();
   const { data } = getPostById(id as string, "orders");
-  const { mutate: sendToCourier } = sendPost();
+  const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
+  const { mutate: sendCouriersToPost } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
@@ -20,12 +22,41 @@ const MailDetail = () => {
     }
   }, [data]);
 
+  const [isShow, setIsShow] = useState(false);
+  const [couriers, setCouriers] = useState<any[]>([]);
+
   const handleClick = (id: string) => {
-    sendToCourier(id as string, {
+    sendAndGetCouriers(id as string, {
       onSuccess: (res) => {
-        console.log(res);
+        if (res?.data?.moreThanOneCourier) {
+          setCouriers(res?.data?.couriers || []);
+          setIsShow(true);
+        }
       },
     });
+  };
+
+  const [selectedCourierId, setSelectedCourierId] = useState<string | null>(
+    null
+  );
+  const handleSelectedCourier = (id: string) => {
+    setSelectedCourierId(id);
+  };
+
+  const handleConfirmCouriers = () => {
+    const post = {
+      orderIds: selectedIds,
+      courierId: selectedCourierId,
+    };
+
+    sendCouriersToPost(
+      { id: id as string, data: post },
+      {
+        onSuccess: (res) => {
+          console.log(res);
+        },
+      }
+    );
   };
 
   return (
@@ -158,6 +189,56 @@ const MailDetail = () => {
           Po'chtani jo'natish
         </Button>
       </div>
+
+      {isShow && (
+        <Popup isShow={isShow} onClose={() => setIsShow(false)}>
+          <div className="min-h-[450px] w-[450px] bg-[#ffffff] rounded-md">
+            <h1 className="text-[22px] text-center py-3">Kuryerlar ro'yxati</h1>
+
+            <div className="grid grid-cols-1 gap-3 p-3">
+              {couriers.map((courier: any) => (
+                <div
+                  key={courier?.id}
+                  className="p-4 rounded-xl shadow-md flex items-center justify-between hover:shadow-lg transition cursor-pointer"
+                >
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      {courier?.name}
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      📞 {courier?.phone_number || "Telefon raqami yo‘q"}
+                    </p>
+                  </div>
+
+                  <Button
+                    className={`${
+                      selectedCourierId === courier?.id
+                        ? "bg-[var(--color-bg-sy)]! text-white!"
+                        : ""
+                    }`}
+                    onClick={() => handleSelectedCourier(courier?.id)}
+                  >
+                    {selectedCourierId === courier?.id ? (
+                      <span className="flex items-center gap-1">
+                        Tanlandi <Check className="w-4 h-4 text-green-300" />
+                      </span>
+                    ) : (
+                      "Tanlash"
+                    )}
+                  </Button>
+                </div>
+              ))}
+
+              <Button
+                className="bg-[var(--color-bg-sy)]! text-white!"
+                onClick={handleConfirmCouriers}
+              >
+                Tasdiqlash
+              </Button>
+            </div>
+          </div>
+        </Popup>
+      )}
     </div>
   );
 };
