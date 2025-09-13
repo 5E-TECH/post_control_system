@@ -1,16 +1,30 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { OrderEntity } from 'src/core/entity/order.entity';
-import { OrderRepository } from 'src/core/repository/order.repository';
+import { OrderService } from '../order/order.service';
+import { catchError, successRes } from 'src/infrastructure/lib/response';
 
 @Injectable()
 export class DashboardService {
-  constructor(
-    @InjectRepository(OrderEntity)
-    private readonly orderRepo: OrderRepository,
-  ) {}
-  async findAll() {
+  constructor(private readonly orderStats: OrderService) {}
+  async getOverview(filter: { startDate?: string; endDate?: string }) {
     try {
-    } catch (error) {}
+      let { startDate, endDate } = filter;
+
+      if (!startDate && !endDate) {
+        const today = new Date();
+        const start = new Date(today.setHours(0, 0, 0, 0));
+        const end = new Date(today.setHours(23, 59, 59, 999));
+
+        startDate = start.toISOString();
+        endDate = end.toISOString();
+      }
+
+      const [orders] = await Promise.all([
+        this.orderStats.getStats(startDate, endDate),
+      ]);
+
+      return successRes({ orders }, 200, 'Dashboard infos');
+    } catch (error) {
+      return catchError(error);
+    }
   }
 }

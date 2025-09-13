@@ -39,6 +39,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { OrderGateaway } from '../socket/order.gateaway';
+import { PostRepository } from 'src/core/repository/post.repository';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -60,6 +61,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
     @InjectRepository(UserEntity)
     private readonly userRepo: UserRepository,
+
+    @InjectRepository(PostEntity)
+    private readonly postRepo: PostRepository,
 
     private readonly dataSource: DataSource,
     private readonly orderGateaway: OrderGateaway,
@@ -954,21 +958,154 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   //   }
   // }
 
-  async getStats(filter: { startDate?: string; endDate?: string }) {
+  async getStats(startDate?: string, endDate?: string) {
     try {
       const qb = this.orderRepo.createQueryBuilder('o');
 
-      if (filter.startDate) {
-        qb.andWhere('o.createdAt >= :startDate', {
-          startDate: filter.startDate,
+      const accepedtCount = await qb
+        .where('o.created_at BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        })
+        .getCount();
+
+      const cancelled = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.updated_at BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        })
+        .andWhere('o.status = :status', {
+          status: In([
+            Order_status.CANCELLED,
+            Order_status.CANCELLED_SENT,
+            Order_status.CLOSED,
+          ]),
+        })
+        .getCount();
+
+      const soldAndPaid = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.updated_at BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        })
+        .andWhere('o.status = :status', {
+          status: In([
+            Order_status.SOLD,
+            Order_status.PARTLY_PAID,
+            Order_status.PAID,
+          ]),
+        })
+        .getCount();
+
+      const allSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.updated_at BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        })
+        .andWhere('o.status = :status', {
+          status: In([
+            Order_status.SOLD,
+            Order_status.PAID,
+            Order_status.PARTLY_PAID,
+          ]),
+        })
+        .getMany();
+
+      let profit: number = 0;
+
+      for (const order of allSoldOrders) {
+        const market = await this.userRepo.findOne({
+          where: { id: order.user_id },
         });
-      }
-      if (filter.endDate) {
-        qb.andWhere('o.createdAt <= :endDate', { endDate: filter.endDate });
+
+        let post: any = null;
+        let courier: any = null;
+
+        if (order.post_id) {
+          post = await this.postRepo.findOne({
+            where: { id: order.post_id },
+          });
+          if (post?.user_id) {
+            courier = await this.userRepo.findOne({
+              where: { id: post.user_id },
+            });
+          }
+        }
+        profit +=
+          order.where_deliver === Where_deliver.ADDRESS
+            ? Number(market?.tariff_home) - Number(courier.tariff_home)
+            : Number(market?.tariff_center) - Number(courier.tariff_center);
       }
 
-      const total = await qb.getCount();
-    } catch (error) {}
+      return successRes({
+        accepedtCount,
+        cancelled,
+        soldAndPaid,
+        profit,
+        from: startDate,
+        to: endDate,
+      });
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getMarketStats(startDate?: string, endDate?: string) {
+    try {
+      const allOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.created_at BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        })
+        .getMany();
+
+      const uniqueMarketIds = Array.from(
+        new Set(allOrders.map((order) => order.user_id)),
+      );
+
+      if (uniqueMarketIds.length === 0) {
+        return successRes([], 200, 'No markets found in this period');
+      }
+
+      const allUniqueMarkets = await this.userRepo.find({
+        where: { id: In(uniqueMarketIds), role: Roles.MARKET },
+      });
+
+      const marketWithOrderStats: object[] = [];
+
+      for (const market of allUniqueMarkets) {
+        const marketsOrders = allOrders.filter(
+          (order) => order.user_id === market.id,
+        );
+
+        const marketsSoldOrders = marketsOrders.filter(
+          (order) =>
+            order.status === Order_status.SOLD ||
+            order.status === Order_status.PAID ||
+            order.status === Order_status.PARTLY_PAID,
+        );
+
+        const sellingRate =
+          marketsOrders.length > 0
+            ? (marketsSoldOrders.length * 100) / marketsOrders.length
+            : 0;
+
+        marketWithOrderStats.push({
+          market,
+          totalOrders: marketsOrders.length,
+          soldOrders: marketsSoldOrders.length,
+          sellingRate,
+        });
+      }
+
+      return successRes(marketWithOrderStats, 200, 'Markets stats');
+    } catch (error) {
+      return catchError(error);
+    }
   }
 
   async remove(id: string) {
