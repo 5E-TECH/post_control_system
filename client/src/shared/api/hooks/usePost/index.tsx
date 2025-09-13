@@ -24,15 +24,24 @@ export const usePost = () => {
       queryFn: () => api.get(`post/${path}/${id}`).then((res) => res.data),
     });
 
-  const sendPost = () =>
+  const sendAndGetCouriersByPostId = () =>
     useMutation({
       mutationFn: (id: string) =>
         api.post(`/post/courier/${id}`).then((res) => res.data),
     });
+
+  const sendPost = () =>
+    useMutation({
+      mutationFn: ({ id, data }: { id: string; data: any }) =>
+        api.patch(`post/${id}`, data).then((res) => res.data),
+      onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+    });
+
   return {
     createPost,
     getAllPosts,
     getPostById,
+    sendAndGetCouriersByPostId,
     sendPost,
   };
 };
