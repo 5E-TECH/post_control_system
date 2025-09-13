@@ -1,10 +1,15 @@
 import { memo } from "react";
 import chip from "../../../../shared/assets/payments/chip.svg";
 import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const CashDetail = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const market = location.state?.market;
+  console.log("11111111111111111",market);
+  
+
 
   return (
     <div className="px-5 mt-5 flex gap-24">

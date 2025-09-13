@@ -19,10 +19,11 @@ const Payments = () => {
   const { data } = getMarkets();
 
   const handleNavigate = () => {
-    
+    navigate("cash-detail", { state: { market:{selectMarket}, name:{} } })
+    setSelectMarket("")
+    setShowMarket(false)
   }
 
-  console.log(data?.data);
 
   const { pathname } = useLocation();
 
@@ -59,7 +60,7 @@ const Payments = () => {
               <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
             </div>
             <div className="max-h-[520px] overflow-y-auto">
-              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
+              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto cursor-pointer">
                 <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
                   <tr>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
