@@ -24,7 +24,7 @@ const AdminSidebar = () => {
     { to: "/products", icon: <Apple />, label: "Mahsulotlar" },
     { to: "/all-users", icon: <UserRound />, label: "Foydalanuvchilar" },
     { to: "/payments", icon: <FileText />, label: "To'lovlar" },
-    { to: "/history", icon: <History />, label: "Moliyaviy balans" },
+    { to: "/mbalanse", icon: <History />, label: "Moliyaviy balans" },
   ];
 
   return (

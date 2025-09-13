@@ -52,6 +52,7 @@ const RefusedMails = lazy(
 );
 const OldMails = lazy(() => import("../pages/mails/components/old-mails"));
 const MailDetail = lazy(() => import("../pages/mails/pages/mail-detail"));
+const MoliaviyBalans = lazy(() => import("../pages/moliaviyBalance/moliaviyBal"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -148,6 +149,7 @@ const AppRouters = () => {
             { path: "send-message", element: <SendMessage /> },
             { path: "history", element: <History /> },
             { path: "logs", element: <LogsPage /> },
+            { path: "mbalanse", element: <MoliaviyBalans /> },
             {
               path: "payments",
               element: <Payments />,
