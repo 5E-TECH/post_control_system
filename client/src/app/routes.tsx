@@ -1,6 +1,5 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
-import Orderview from "../pages/today-orders/pages/orderview";
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -46,9 +45,30 @@ const ProductCreate = lazy(() => import("../pages/products/product-create"));
 const ChooseMarket = lazy(() => import("../pages/orders/pages/choose-market"));
 const OrderDetails = lazy(() => import("../pages/orders/pages/order-details"));
 const TodayOrders = lazy(() => import("../pages/today-orders"));
-const TodayMails = lazy(() => import("../pages/mails/components/today-mails"));
+const TodayMails = lazy(
+  () => import("../pages/mails/components/superadmin/today-mails")
+);
+const Orderview = lazy(() => import("../pages/today-orders/pages/orderview"));
 const RefusedMails = lazy(
-  () => import("../pages/mails/components/refused-mails")
+  () => import("../pages/mails/components/superadmin/refused-mails")
+);
+const OldMails = lazy(
+  () => import("../pages/mails/components/superadmin/old-mails")
+);
+const MailDetail = lazy(
+  () => import("../pages/mails/pages/superadmin/mail-detail")
+);
+const CourierMailDetail = lazy(
+  () => import("../pages/mails/pages/kuryer/mail-detail")
+);
+const CourierNewMails = lazy(
+  () => import("../pages/mails/components/courier/new-mails")
+);
+const CourierRefusedMails = lazy(
+  () => import("../pages/mails/components/courier/refused-mails")
+);
+const CourierOldMails = lazy(
+  () => import("../pages/mails/components/courier/old-mails")
 );
 const OldMails = lazy(() => import("../pages/mails/components/old-mails"));
 const MailDetail = lazy(() => import("../pages/mails/pages/mail-detail"));
@@ -72,12 +92,12 @@ const AppRouters = () => {
             {
               path: "order/markets/new-orders",
               element: <TodayOrders />,
-              children:[
+              children: [
                 {
-                  path:"order-view",
-                  element:<Orderview/>
-                }
-              ]
+                  path: "order-view",
+                  element: <Orderview />,
+                },
+              ],
             },
             {
               path: "orders",
@@ -137,9 +157,23 @@ const AppRouters = () => {
                 },
               ],
             },
+
+            {
+              path: "courier-mails",
+              element: <Mails />,
+              children: [
+                { index: true, element: <CourierNewMails /> },
+                { path: "refused", element: <CourierRefusedMails /> },
+                { path: "old", element: <CourierOldMails /> },
+              ],
+            },
             {
               path: "mails/:id",
               element: <MailDetail />,
+            },
+            {
+              path: "courier-mails/:id",
+              element: <CourierMailDetail />,
             },
             {
               path: "products",

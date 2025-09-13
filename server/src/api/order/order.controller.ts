@@ -83,6 +83,13 @@ export class OrderController {
 
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER)
+  @Get('courier/orders')
+  getCouriersOrders(@CurrentUser() user: JwtPayload) {
+    return this.orderService.allCouriersOrders(user);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
   @Post('sell/:id')
   sellOrder(
     @CurrentUser() user: JwtPayload,

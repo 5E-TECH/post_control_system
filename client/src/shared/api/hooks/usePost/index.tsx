@@ -12,16 +12,22 @@ export const usePost = () => {
       client.invalidateQueries({ queryKey: [post], refetchType: "active" }),
   });
 
-  const getAllPosts = () =>
+  const getAllPosts = (path?: string) =>
     useQuery({
-      queryKey: [post],
-      queryFn: () => api.get("post").then((res) => res.data),
+      queryKey: [post, path],
+      queryFn: () => api.get(`post/${path}`).then((res) => res.data),
     });
 
   const getPostById = (id: string, path: string) =>
     useQuery({
       queryKey: [post, id, path],
       queryFn: () => api.get(`post/${path}/${id}`).then((res) => res.data),
+    });
+
+  const getOldPostsCourier = () =>
+    useQuery({
+      queryKey: [post],
+      queryFn: () => api.get("post/courier/old-posts").then((res) => res.data),
     });
 
   const sendAndGetCouriersByPostId = () =>
@@ -37,11 +43,20 @@ export const usePost = () => {
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
 
+  const receivePost = () =>
+    useMutation({
+      mutationFn: ({ id, data }: { id: string; data: any }) =>
+        api.patch(`post/receive/${id}`, data).then((res) => res.data),
+      onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+    });
+
   return {
     createPost,
     getAllPosts,
     getPostById,
     sendAndGetCouriersByPostId,
+    getOldPostsCourier,
     sendPost,
+    receivePost,
   };
 };

@@ -4,17 +4,31 @@ import Select from "../users/components/select";
 import Popup from "../../shared/ui/Popup";
 import { X } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 
 const Payments = () => {
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
 
-  const navigate = useNavigate()
+  const [selectMarket, setSelectMarket] = useState("")
 
-  const {pathname} = useLocation()
+  const navigate = useNavigate();
 
-  if(pathname.startsWith("/payments/cash-detail")) {
-    return <Outlet/>
+  const { getMarkets } = useMarket();
+
+  const { data } = getMarkets();
+
+  const handleNavigate = () => {
+    navigate("cash-detail", { state: { market:{selectMarket}, name:{} } })
+    setSelectMarket("")
+    setShowMarket(false)
+  }
+
+
+  const { pathname } = useLocation();
+
+  if (pathname.startsWith("/payments/cash-detail")) {
+    return <Outlet />;
   }
 
   return (
@@ -46,7 +60,7 @@ const Payments = () => {
               <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
             </div>
             <div className="max-h-[520px] overflow-y-auto">
-              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
+              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto cursor-pointer">
                 <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
                   <tr>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
@@ -64,70 +78,27 @@ const Payments = () => {
                 </thead>
 
                 <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                  </tr>
+                  {data?.data?.map((item: any, inx: number) => (
+                    <tr key={item.id} onClick={() => setSelectMarket(item.id)} className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${item.id == selectMarket ? "bg-gray-100" : ""}`}>
+                      <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
+                      <td className="pr-26 py-3">{item.name}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
             <div className="pl-89 py-2">
-              <button className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer">
+              <button onClick={() => handleNavigate()} className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer">
                 Selected
               </button>
             </div>
           </div>
         </Popup>
 
-        <div onClick={() => navigate("cash-detail")} className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white">
+        <div
+          onClick={() => navigate("cash-detail")}
+          className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
+        >
           <h3>Kassadagi miqdor</h3>
           <strong className="block pt-3">40 000 000 UZS</strong>
         </div>
@@ -428,47 +399,3 @@ const Payments = () => {
 };
 
 export default React.memo(Payments);
-
-
-
-// import { useState } from "react";
-// import PaymentCard from "./components/PaymentCard";
-// import ChooseMarketPopup from "./components/MarketPopup";
-// import OlinishiKerakPopup from "./components/CruierPopup";
-
-// const Payments = () => {
-//   const [showMarket, setShowMarket] = useState(false);
-//   const [showCourier, setShowCourier] = useState(false);
-
-//   return (
-//     <div className="mt-10 grid grid-cols-3 gap-14 text-center text-2xl items-end mx-5">
-//       <PaymentCard
-//         title="Berilishi kerak"
-//         amount="10 000 000 UZS"
-//         onClick={() => setShowMarket(true)}
-//       />
-
-//       <div className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white">
-//         <h3>Kassadagi miqdor</h3>
-//         <strong className="block pt-3">40 000 000 UZS</strong>
-//       </div>
-
-//       <PaymentCard
-//         title="Olinishi kerak"
-//         amount="70 000 000 UZS"
-//         onClick={() => setShowCourier(true)}
-//       />
-
-//       <ChooseMarketPopup
-//         open={showMarket}
-//         onClose={() => setShowMarket(false)}
-//       />
-//       <OlinishiKerakPopup
-//         open={showCourier}
-//         onClose={() => setShowCourier(false)}
-//       />
-//     </div>
-//   );
-// };
-
-// export default Payments;

@@ -1,13 +1,14 @@
 import { memo } from "react";
-import { House, ShoppingBag, MailOpen, FileText, History } from "lucide-react";
+import { House, ShoppingBag, MailOpen, FileText, History, Apple } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 
 const MarketSidebar = () => {
   const links = [
     { to: "/", icon: <House />, label: "Dashboard", end: true },
     { to: "/orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
-    { to: "/mails", icon: <MailOpen />, label: "Mijozlarim" },
-    { to: "/history", icon: <History />, label: "Bugungi buyurtmalar" },
+    { to: "/clients", icon: <MailOpen />, label: "Mijozlarim" },
+    { to: "/order/markets/new-orders", icon: <History />, label: "Bugungi buyurtmalarim" },
+    { to: "/products", icon: <Apple />, label: "Mahsulotlarim" },
     { to: "/payments", icon: <FileText />, label: "To'lovlar" },
   ];
 

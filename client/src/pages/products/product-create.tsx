@@ -3,6 +3,8 @@ import AddProduct from "./components";
 import { useLocation } from "react-router-dom";
 import ProductView from "../../shared/components/product-view";
 import { useProduct } from "../../shared/api/hooks/useProduct";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 // import { useLocation } from 'react-router-dom';
 
 // interface Iprops {
@@ -10,13 +12,16 @@ import { useProduct } from "../../shared/api/hooks/useProduct";
 // }
 
 const ProductsCreate: FC = () => {
-
   const location = useLocation();
   const market = location.state?.market; // state'dan olamiz
 
-  const {getProductsByMarket} = useProduct()
   
-    const {data} = getProductsByMarket(market.id)
+
+  const { role } = useSelector((state: RootState) => state.roleSlice);
+
+  const { getMyProducts, getProductsByMarket } = useProduct();
+  const { data } =
+    role === "market" ? getMyProducts() : getProductsByMarket(market.id);
 
   return (
     <section>

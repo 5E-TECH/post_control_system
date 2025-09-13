@@ -436,6 +436,27 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  async allCouriersOrders(user: JwtPayload) {
+    try {
+      const allMyPosts = await this.postRepo.find({
+        where: { courier_id: user.id },
+      });
+
+      const allPostIds: string[] = [];
+      for (const post of allMyPosts) {
+        allPostIds.push(post.id);
+      }
+
+      const allOrders = await this.orderRepo.find({
+        where: { post_id: In(allPostIds) },
+      });
+
+      return successRes(allOrders, 200, 'All my orders');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async sellOrder(
     user: JwtPayload,
     id: string,
@@ -1110,6 +1131,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getCourierStats(startDate?: string, endDate?: string) {
     try {
+      const allPosts = await this.postRepo
+        .createQueryBuilder('p')
+        .where('p.created_at BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        })
+        .getMany();
+
+      const uniqueCourierIds = Array.from(
+        new Set(allPosts.map((post) => post.courier_id)),
+      );
+      const allPostIds: string[] = allPosts.map((post) => post.id);
     } catch (error) {
       return catchError(error);
     }

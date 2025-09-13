@@ -11,9 +11,7 @@ const AddProduct = () => {
   const [showMarket, setShowMarket] = useState(false);
 
   const location = useLocation();
-  const market = location.state?.market; // state'dan olamiz
-
-  // console.log(market.id);
+  const market = location.state?.market;
 
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState<File | null>(null);

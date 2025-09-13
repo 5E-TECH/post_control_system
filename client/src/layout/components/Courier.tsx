@@ -6,7 +6,7 @@ const CourierSidebar = () => {
   const links = [
     { to: "/", icon: <House />, label: "Dashboard", end: true },
     { to: "/orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
-    { to: "/mails", icon: <MailOpen />, label: "Pochta" },
+    { to: "/courier-mails", icon: <MailOpen />, label: "Pochta" },
     { to: "/payments", icon: <FileText />, label: "To'lovlar" },
     { to: "/history", icon: <History />, label: "Hududlarim" },
   ];
