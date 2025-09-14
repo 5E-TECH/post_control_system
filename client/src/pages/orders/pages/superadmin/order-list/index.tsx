@@ -1,6 +1,7 @@
 import { memo } from "react";
-import Filter from "../../components/filter";
-import OrderView from "../../components/order-view";
+import Filter from "../../../components/filter";
+import OrderView from "../../../components/order-view";
+
 
 const OrderList = () => {
   return (

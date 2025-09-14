@@ -2,11 +2,11 @@ import { memo, type FC, type ReactNode } from "react";
 import { MdOutlineKeyboardArrowDown } from "react-icons/md";
 
 interface Props {
-  name: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  name?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   placeholder: string;
-  children: ReactNode; // options keladi
+  children?: ReactNode; // options keladi
   className?: string;
 }
 

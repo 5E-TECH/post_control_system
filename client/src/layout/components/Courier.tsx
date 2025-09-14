@@ -5,7 +5,7 @@ import SidebarLink from "./SidebarLink";
 const CourierSidebar = () => {
   const links = [
     { to: "/", icon: <House />, label: "Dashboard", end: true },
-    { to: "/orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
+    { to: "/courier-orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
     { to: "/courier-mails", icon: <MailOpen />, label: "Pochta" },
     { to: "/payments", icon: <FileText />, label: "To'lovlar" },
     { to: "/history", icon: <History />, label: "Hududlarim" },

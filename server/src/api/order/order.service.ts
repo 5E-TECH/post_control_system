@@ -449,6 +449,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const allOrders = await this.orderRepo.find({
         where: { post_id: In(allPostIds) },
+        relations: ['items', 'market', 'customer',"customer.district"],
       });
 
       return successRes(allOrders, 200, 'All my orders');
