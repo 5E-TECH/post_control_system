@@ -5,6 +5,7 @@ const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
 const Dashboards = lazy(() => import("../pages/dashboards"));
 const Orders = lazy(() => import("../pages/orders"));
+const CourierOrder = lazy(() => import("../pages/orders/pages/courier"));
 const Regions = lazy(() => import("../pages/regions"));
 const Users = lazy(() => import("../pages/users"));
 const Mails = lazy(() => import("../pages/mails"));
@@ -24,12 +25,16 @@ const Overview = lazy(() => import("../pages/profile/overview/overview"));
 const CreateRegistrator = lazy(
   () => import("../pages/users/pages/create-registrator")
 );
-const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
-const OrderDetail = lazy(() => import("../pages/orders/pages/orderDetail"));
+const CreateOrder = lazy(
+  () => import("../pages/orders/pages/superadmin/create-order")
+);
+const OrderDetail = lazy(
+  () => import("../pages/orders/pages/superadmin/orderDetail")
+);
 const CashDetail = lazy(() => import("../pages/payments/pages/cashDetail"));
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
 const CustomerInfoOrder = lazy(
-  () => import("../pages/orders/pages/customer-info")
+  () => import("../pages/orders/pages/superadmin/customer-info")
 );
 const AllUsersTable = lazy(
   () => import("../pages/users/components/users/all-users-table")
@@ -42,8 +47,12 @@ const UsersTable = lazy(
 );
 
 const ProductCreate = lazy(() => import("../pages/products/product-create"));
-const ChooseMarket = lazy(() => import("../pages/orders/pages/choose-market"));
-const OrderDetails = lazy(() => import("../pages/orders/pages/order-details"));
+const ChooseMarket = lazy(
+  () => import("../pages/orders/pages/superadmin/choose-market")
+);
+const OrderDetails = lazy(
+  () => import("../pages/orders/pages/superadmin/order-details")
+);
 const TodayOrders = lazy(() => import("../pages/today-orders"));
 const TodayMails = lazy(
   () => import("../pages/mails/components/superadmin/today-mails")
@@ -113,6 +122,16 @@ const AppRouters = () => {
                 {
                   path: "order-detail",
                   element: <OrderDetails />,
+                },
+              ],
+            },
+            {
+              path: "courier-orders",
+              element: <Orders />,
+              children: [
+                {
+                  index: true,
+                  element: <CourierOrder />,
                 },
               ],
             },

@@ -11,6 +11,16 @@ export const useOrder = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
+  const sellOrder = useMutation({
+    mutationFn: (id: string, data?: any) =>
+      api.post(`order/sell/${id}`, data).then((res) => res.data),
+  });
+
+  const cancelOrder = useMutation({
+    mutationFn: (id: string, data?: any) =>
+      api.post(`order/cancel/${id}`, data).then((res) => res.data),
+  });
+
   const getOrders = () =>
     useQuery({
       queryKey: [order],
@@ -23,9 +33,19 @@ export const useOrder = () => {
       queryFn: () =>
         api.get(`order/market/${marketId}`).then((res) => res.data),
     });
+
+  const getCourierOrders = () =>
+    useQuery({
+      queryKey: [order],
+      queryFn: () => api.get("order/courier/orders").then((res) => res.data),
+    });
+
   return {
     createOrder,
+    sellOrder,
+    cancelOrder,
     getOrders,
-    getOrderByMarket
+    getOrderByMarket,
+    getCourierOrders,
   };
 };

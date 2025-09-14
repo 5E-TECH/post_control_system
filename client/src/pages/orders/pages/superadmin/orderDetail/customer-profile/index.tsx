@@ -1,5 +1,5 @@
 import { memo } from "react";
-import user from "../../../../../shared/assets/order/user.png";
+import user from "../../../../../../shared/assets/order/user.png";
 import shop from "../../../../../shared/assets/order/shop.svg";
 import usd from "../../../../../shared/assets/order/usd.svg";
 

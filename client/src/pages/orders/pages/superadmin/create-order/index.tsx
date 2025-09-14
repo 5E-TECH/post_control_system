@@ -1,14 +1,15 @@
 import { Check } from "lucide-react";
-import { createContext, memo, useMemo } from "react";
-import OrderItems from "../../components/order-items";
-import ProductInfo from "../../components/product-info";
-import Discard from "../../components/button/discard";
+
 import { useSelector } from "react-redux";
-import type { RootState } from "../../../../app/store";
 import { Button } from "antd";
-import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { useNavigate } from "react-router-dom";
 import useNotification from "antd/es/notification/useNotification";
+import { createContext, memo, useMemo } from "react";
+import type { RootState } from "../../../../../app/store";
+import { useOrder } from "../../../../../shared/api/hooks/useOrder";
+import OrderItems from "../../../components/order-items";
+import ProductInfo from "../../../components/product-info";
+import Discard from "../../../components/button/discard";
 
 const Context = createContext({ name: "Default" });
 

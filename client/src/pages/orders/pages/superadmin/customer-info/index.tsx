@@ -1,14 +1,14 @@
 import { ArrowRight, Check } from "lucide-react";
 import { createContext, memo, useMemo } from "react";
-import CustomerDetails from "../../components/customer-details";
-import Discard from "../../components/button/discard";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import CustomerInfo from "../../components/customer-info";
 import { useSelector } from "react-redux";
-import type { RootState } from "../../../../app/store";
 import { Button } from "antd";
-import { useUser } from "../../../../shared/api/hooks/useRegister";
 import useNotification from "antd/es/notification/useNotification";
+import type { RootState } from "../../../../../app/store";
+import { useUser } from "../../../../../shared/api/hooks/useRegister";
+import CustomerInfo from "../../../components/customer-info";
+import CustomerDetails from "../../../components/customer-details";
+import Discard from "../../../components/button/discard";
 
 const Context = createContext({ name: "Default" });
 
