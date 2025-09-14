@@ -588,7 +588,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { extraCost, comment } = cancelOrderDto;
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
@@ -604,15 +603,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('This orders owner is not found');
       }
 
-      const finalComment = generateComment(order.comment, comment, extraCost);
-      if (extraCost) {
+      const finalComment = generateComment(
+        order.comment,
+        cancelOrderDto.comment,
+        cancelOrderDto.extraCost,
+      );
+      if (cancelOrderDto.extraCost) {
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
           where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
         });
         if (!marketCashbox) {
           throw new NotFoundException('Market cashbox not found');
         }
-        marketCashbox.balance -= extraCost;
+        marketCashbox.balance -= cancelOrderDto.extraCost;
         await queryRunner.manager.save(marketCashbox);
 
         const history = queryRunner.manager.create(CashboxHistoryEntity, {
@@ -620,7 +623,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           cashbox_id: marketCashbox.id,
           source_type: Source_type.CANCEL,
           source_id: order.id,
-          amount: extraCost,
+          amount: cancelOrderDto.extraCost,
           balance_after: marketCashbox.balance,
           comment: finalComment,
           created_by: currentUser.id,
