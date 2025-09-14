@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom";
 import useNotification from "antd/es/notification/useNotification";
 import { useMarket } from "../../../../../shared/api/hooks/useMarket/useMarket";
 import Discard from "../../../components/button/discard";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const Context = createContext({ name: "Default" });
 
@@ -18,6 +20,15 @@ const ChooseMarket = () => {
 
   const navigate = useNavigate();
   const [api, contextHolder] = useNotification();
+
+  const user = useSelector((state: RootState) => state.roleSlice);
+  const role = user.role;
+  useEffect(() => {
+    if (role === "market" && user.id) {
+      localStorage.setItem("marketId", user.id);
+      navigate("/orders/customer-info");
+    }
+  }, [role, user, navigate]);
 
   const onClick = () => {
     if (!selectedMarketId) {
