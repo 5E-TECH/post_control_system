@@ -466,7 +466,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { extraCost, comment } = sellOrderDto;
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
@@ -514,15 +513,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ? courier.tariff_center
           : courier.tariff_home;
 
-      const to_be_paid: number = extraCost
-        ? order.total_price - extraCost - marketTarif
+      const to_be_paid: number = sellOrderDto.extraCost
+        ? order.total_price - sellOrderDto.extraCost - marketTarif
         : order.total_price - marketTarif;
 
-      const courier_to_be_paid: number = extraCost
-        ? order.total_price - extraCost - courierTarif
+      const courier_to_be_paid: number = sellOrderDto.extraCost
+        ? order.total_price - sellOrderDto.extraCost - courierTarif
         : order.total_price - courierTarif;
 
-      const finalComment = generateComment(order.comment, comment, extraCost);
+      const finalComment = generateComment(
+        order.comment,
+        sellOrderDto.comment,
+        sellOrderDto.extraCost,
+      );
 
       Object.assign(order, {
         status: Order_status.SOLD,
