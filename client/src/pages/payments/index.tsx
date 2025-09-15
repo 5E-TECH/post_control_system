@@ -5,25 +5,31 @@ import Popup from "../../shared/ui/Popup";
 import { X } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
+import { useCourier } from "../../shared/api/hooks/useCourier";
 
 const Payments = () => {
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
 
-  const [selectMarket, setSelectMarket] = useState("")
+  const [select, setSelect] = useState("");
+  console.log(select);
+  
 
   const navigate = useNavigate();
 
   const { getMarkets } = useMarket();
+  const { getCourier } = useCourier();
 
   const { data } = getMarkets();
+  const { data: courierData } = getCourier();
+
+  console.log(courierData);
 
   const handleNavigate = () => {
-    navigate("cash-detail", { state: { market:{selectMarket}, name:{} } })
-    setSelectMarket("")
-    setShowMarket(false)
-  }
-
+    navigate("cash-detail", { state: { market: { select }} });
+    setSelect("");
+    setShowMarket(false);
+  };
 
   const { pathname } = useLocation();
 
@@ -79,16 +85,25 @@ const Payments = () => {
 
                 <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
                   {data?.data?.map((item: any, inx: number) => (
-                    <tr key={item.id} onClick={() => setSelectMarket(item.id)} className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${item.id == selectMarket ? "bg-gray-100" : ""}`}>
+                    <tr
+                      key={item?.id}
+                      onClick={() => setSelect(item?.id)}
+                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                        item.id == select ? "bg-gray-100" : ""
+                      }`}
+                    >
                       <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                      <td className="pr-26 py-3">{item.name}</td>
+                      <td className="pr-26 py-3">{item?.name}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="pl-89 py-2">
-              <button onClick={() => handleNavigate()} className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer">
+              <button
+                onClick={() => handleNavigate()}
+                className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
+              >
                 Selected
               </button>
             </div>
@@ -153,76 +168,27 @@ const Payments = () => {
                 </thead>
 
                 <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
-                  <tr className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal">
-                    <td className="text-[#8C57FF] pr-10 py-3">1</td>
-                    <td className="pr-26 py-3">Bahodir</td>
-                    <td className="pr-10 py-3">Tashkent</td>
-                  </tr>
+                  {courierData?.data.map((item: any, inx: number) => (
+                    <tr
+                      key={inx}
+                      onClick={() => setSelect(item?.id)}
+                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                        item.id == select ? "bg-gray-100" : ""
+                      }`}
+                    >
+                      <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                      <td className="pr-26 py-3">{item?.name}</td>
+                      <td className="pr-10 py-3">{item?.name}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
             <div className="pl-89 py-2">
-              <button className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer">
+              <button
+                onClick={() => handleNavigate()}
+                className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
+              >
                 Selected
               </button>
             </div>
