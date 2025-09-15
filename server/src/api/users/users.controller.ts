@@ -65,8 +65,11 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Post('customer')
-  createCustomer(@Body() createCustomerDto: CreateCustomerDto) {
-    return this.userService.createCustomer(createCustomerDto);
+  createCustomer(
+    @CurrentUser() user: JwtPayload,
+    @Body() createCustomerDto: CreateCustomerDto,
+  ) {
+    return this.userService.createCustomer(user, createCustomerDto);
   }
 
   @Post('signin')
@@ -99,6 +102,13 @@ export class UsersController {
   @Get('markets')
   findAllMarkets() {
     return this.userService.allMarkets();
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Get('couriers')
+  findAllCouriers() {
+    return this.userService.allCouriers();
   }
 
   @UseGuards(JwtGuard, RolesGuard)

@@ -534,9 +534,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : order.total_price - courierTarif;
 
       const finalComment = generateComment(
-        order.comment,
-        sellOrderDto.comment,
-        sellOrderDto.extraCost,
+        order.comment || '',
+        sellOrderDto.comment || '',
+        sellOrderDto.extraCost || 0,
       );
 
       Object.assign(order, {
