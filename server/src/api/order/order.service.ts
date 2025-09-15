@@ -988,93 +988,95 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getStats(startDate?: string, endDate?: string) {
     try {
-      const qb = this.orderRepo.createQueryBuilder('o');
-
-      const accepedtCount = await qb
-        .where('o.created_at BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
+      const start = startDate ? new Date(startDate).getTime() : 0;
+      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const acceptedCount = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.created_at BETWEEN :start AND :end', {
+          start,
+          end,
         })
         .getCount();
 
       const cancelled = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.updated_at BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
+        .where('o.updated_at BETWEEN :start AND :end', {
+          start,
+          end,
         })
-        .andWhere('o.status = :status', {
-          status: In([
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [
             Order_status.CANCELLED,
             Order_status.CANCELLED_SENT,
             Order_status.CLOSED,
-          ]),
+          ],
         })
         .getCount();
 
       const soldAndPaid = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.updated_at BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
+        .where('o.updated_at BETWEEN :start AND :end', {
+          start,
+          end,
         })
-        .andWhere('o.status = :status', {
-          status: In([
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [
             Order_status.SOLD,
             Order_status.PARTLY_PAID,
             Order_status.PAID,
-          ]),
+          ],
         })
         .getCount();
 
       const allSoldOrders = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.updated_at BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
+        .where('o.updated_at BETWEEN :start AND :end', {
+          start,
+          end,
         })
-        .andWhere('o.status = :status', {
-          status: In([
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [
             Order_status.SOLD,
             Order_status.PAID,
             Order_status.PARTLY_PAID,
-          ]),
+          ],
         })
         .getMany();
 
-      let profit: number = 0;
+      let profit = 0;
 
       for (const order of allSoldOrders) {
         const market = await this.userRepo.findOne({
           where: { id: order.user_id },
         });
-
-        let post: any = null;
         let courier: any = null;
 
         if (order.post_id) {
-          post = await this.postRepo.findOne({
+          const post = await this.postRepo.findOne({
             where: { id: order.post_id },
           });
-          if (post?.user_id) {
+          if (post?.courier_id) {
             courier = await this.userRepo.findOne({
-              where: { id: post.user_id },
+              where: { id: post.courier_id },
             });
           }
         }
+
         profit +=
           order.where_deliver === Where_deliver.ADDRESS
-            ? Number(market?.tariff_home) - Number(courier.tariff_home)
-            : Number(market?.tariff_center) - Number(courier.tariff_center);
+            ? Number(market?.tariff_home ?? 0) -
+              Number(courier?.tariff_home ?? 0)
+            : Number(market?.tariff_center ?? 0) -
+              Number(courier?.tariff_center ?? 0);
       }
 
       return successRes({
-        accepedtCount,
+        acceptedCount,
         cancelled,
         soldAndPaid,
         profit,
-        from: startDate,
-        to: endDate,
+        from: start,
+        to: end,
       });
     } catch (error) {
       return catchError(error);
@@ -1083,11 +1085,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getMarketStats(startDate?: string, endDate?: string) {
     try {
+      const start = startDate ? new Date(startDate).getTime() : 0;
+      const end = endDate ? new Date(endDate).getTime() : Date.now();
       const allOrders = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.created_at BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
+        .where('o.created_at BETWEEN :start AND :end', {
+          start,
+          end,
         })
         .getMany();
 
@@ -1103,18 +1107,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id: In(uniqueMarketIds), role: Roles.MARKET },
       });
 
-      const marketWithOrderStats: object[] = [];
-
-      for (const market of allUniqueMarkets) {
+      const marketWithOrderStats = allUniqueMarkets.map((market) => {
         const marketsOrders = allOrders.filter(
           (order) => order.user_id === market.id,
         );
 
-        const marketsSoldOrders = marketsOrders.filter(
-          (order) =>
-            order.status === Order_status.SOLD ||
-            order.status === Order_status.PAID ||
-            order.status === Order_status.PARTLY_PAID,
+        const marketsSoldOrders = marketsOrders.filter((order) =>
+          [
+            Order_status.SOLD,
+            Order_status.PAID,
+            Order_status.PARTLY_PAID,
+          ].includes(order.status),
         );
 
         const sellingRate =
@@ -1122,13 +1125,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             ? (marketsSoldOrders.length * 100) / marketsOrders.length
             : 0;
 
-        marketWithOrderStats.push({
+        return {
           market,
           totalOrders: marketsOrders.length,
           soldOrders: marketsSoldOrders.length,
           sellingRate,
-        });
-      }
+        };
+      });
 
       return successRes(marketWithOrderStats, 200, 'Markets stats');
     } catch (error) {
@@ -1138,18 +1141,154 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getCourierStats(startDate?: string, endDate?: string) {
     try {
+      const start = startDate ? new Date(startDate).getTime() : 0;
+      const end = endDate ? new Date(endDate).getTime() : Date.now();
+
+      // Shu davrdagi barcha postlarni olish
       const allPosts = await this.postRepo
         .createQueryBuilder('p')
-        .where('p.created_at BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
-        })
+        .where('p.created_at BETWEEN :start AND :end', { start, end })
         .getMany();
 
       const uniqueCourierIds = Array.from(
-        new Set(allPosts.map((post) => post.courier_id)),
+        new Set(allPosts.map((post) => post.courier_id).filter(Boolean)),
       );
-      const allPostIds: string[] = allPosts.map((post) => post.id);
+
+      if (uniqueCourierIds.length === 0) {
+        return successRes([], 200, 'No couriers found in this period');
+      }
+
+      // Kuryerlarni olish
+      const allCouriers = await this.userRepo.find({
+        where: { id: In(uniqueCourierIds), role: Roles.COURIER },
+      });
+
+      const courierWithStats: object[] = [];
+
+      for (const courier of allCouriers) {
+        // Shu kuryerning postlari
+        const courierPosts = allPosts.filter(
+          (post) => post.courier_id === courier.id,
+        );
+        const postIds = courierPosts.map((p) => p.id);
+
+        if (postIds.length === 0) {
+          courierWithStats.push({
+            courier,
+            totalOrders: 0,
+            deliveredOrders: 0,
+            successRate: 0,
+          });
+          continue;
+        }
+
+        // Shu kuryerga tegishli orderlar
+        const courierOrders = await this.orderRepo.find({
+          where: { post_id: In(postIds) },
+        });
+
+        const deliveredOrders = courierOrders.filter(
+          (order) =>
+            order.status === Order_status.SOLD ||
+            order.status === Order_status.PAID ||
+            order.status === Order_status.PARTLY_PAID,
+        );
+
+        const successRate =
+          courierOrders.length > 0
+            ? (deliveredOrders.length * 100) / courierOrders.length
+            : 0;
+
+        courierWithStats.push({
+          courier,
+          totalOrders: courierOrders.length,
+          deliveredOrders: deliveredOrders.length,
+          successRate,
+        });
+      }
+
+      return successRes(courierWithStats, 200, 'Couriers stats');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getTopMarkets(limit = 10) {
+    try {
+      // Oxirgi 30 kunlik timestamp (millisekund)
+      const lastMonth = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      const result = await this.orderRepo
+        .createQueryBuilder('order')
+        .select('market.id', 'market_id')
+        .addSelect('market.name', 'market_name')
+        .addSelect('COUNT(order.id)', 'total_orders')
+        .addSelect(
+          `SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)`,
+          'successful_orders',
+        )
+        .addSelect(
+          `ROUND(
+          (SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)::decimal
+          / NULLIF(COUNT(order.id), 0)) * 100, 2
+        )`,
+          'success_rate',
+        )
+        .innerJoin('order.market', 'market')
+        .where('market.role = :role', { role: Roles.MARKET })
+        .andWhere('order.created_at >= :lastMonth', { lastMonth })
+        .setParameter('statuses', [
+          Order_status.SOLD,
+          Order_status.PAID,
+          Order_status.PARTLY_PAID,
+        ])
+        .groupBy('market.id')
+        .orderBy('success_rate', 'DESC')
+        .limit(limit)
+        .getRawMany();
+
+      return successRes(result, 200, 'Top Markets (last 30 days)');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getTopCouriers(limit = 10) {
+    try {
+      // Oxirgi 30 kunlik timestamp (millisekund)
+      const lastMonth = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      const result = await this.orderRepo
+        .createQueryBuilder('order')
+        .select('courier.id', 'courier_id')
+        .addSelect('courier.name', 'courier_name')
+        .addSelect('COUNT(order.id)', 'total_orders')
+        .addSelect(
+          `SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)`,
+          'successful_orders',
+        )
+        .addSelect(
+          `ROUND(
+          (SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)::decimal
+          / NULLIF(COUNT(order.id), 0)) * 100, 2
+        )`,
+          'success_rate',
+        )
+        .innerJoin('order.post', 'post')
+        .innerJoin('post.courier', 'courier')
+        .where('courier.role = :role', { role: Roles.COURIER })
+        .andWhere('order.created_at >= :lastMonth', { lastMonth })
+        .setParameter('statuses', [
+          Order_status.SOLD,
+          Order_status.PAID,
+          Order_status.PARTLY_PAID,
+        ])
+        .groupBy('courier.id')
+        .orderBy('success_rate', 'DESC')
+        .limit(limit)
+        .getRawMany();
+
+      return successRes(result, 200, 'Top Couriers (last 30 days)');
     } catch (error) {
       return catchError(error);
     }
