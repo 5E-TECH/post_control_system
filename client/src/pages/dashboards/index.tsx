@@ -24,17 +24,22 @@ const Dashboards = () => {
 
   const dashboard = data?.data?.orders?.data
 
-  console.log(data?.data?.markets)
+  const ordersData = data?.data?.markets?.data?.map((market:any)=>({
+    nomi:market?.market?.name + ` (${market.sellingRate}%)`,
+    buyurtmalar:market?.totalOrders,
+    tugatilgan:market?.soldOrders
+  }))
+
 
   // Dummy data (serverdan fetch qilinishi mumkin)
-  const ordersData = [
-    { name: "Uzum", buyurtmalar: 100, tugatilgan: 80 },
-    { name: "Apelsin", buyurtmalar: 140, tugatilgan: 100 },
-    { name: "Malika", buyurtmalar: 160, tugatilgan: 120 },
-    { name: "Abu", buyurtmalar: 180, tugatilgan: 150 },
-    { name: "Ipodrom", buyurtmalar: 190, tugatilgan: 160 },
-    { name: "E", buyurtmalar: 200, tugatilgan: 170 },
-  ];
+  // const ordersData = [
+  //   { name: "Uzum", buyurtmalar: 100, tugatilgan: 80 },
+  //   { name: "Apelsin", buyurtmalar: 140, tugatilgan: 100 },
+  //   { name: "Malika", buyurtmalar: 160, tugatilgan: 120 },
+  //   { name: "Abu", buyurtmalar: 180, tugatilgan: 150 },
+  //   { name: "Ipodrom", buyurtmalar: 190, tugatilgan: 160 },
+  //   { name: "E", buyurtmalar: 200, tugatilgan: 170 },
+  // ];
 
   // const statusData = [
   //   { name: "Yangi", value: 43 },
@@ -55,33 +60,43 @@ const Dashboards = () => {
   //   { name: "Yak", daromad: 4100 },
   // ];
 
+  const couriersData = data?.data?.couriers?.data?.map((courier:any)=>({
+    nomi: courier?.courier?.name + ` (${courier.successRate}%)`,
+    buyurtmalar:courier?.totalOrders,
+    tugatilgan:courier?.deliveredOrders
+  }))
+  
+  const couriers = data?.data?.topCouriers?.data
+
   // Dummy Top 10 Couriers
-  const couriers = [
-    { id: 1, name: "Kuriyer 1", orders: 250 },
-    { id: 2, name: "Kuriyer 2", orders: 230 },
-    { id: 3, name: "Kuriyer 3", orders: 220 },
-    { id: 4, name: "Kuriyer 4", orders: 210 },
-    { id: 5, name: "Kuriyer 5", orders: 200 },
-    { id: 6, name: "Kuriyer 6", orders: 190 },
-    { id: 7, name: "Kuriyer 7", orders: 185 },
-    { id: 8, name: "Kuriyer 8", orders: 170 },
-    { id: 9, name: "Kuriyer 9", orders: 160 },
-    { id: 10, name: "Kuriyer 10", orders: 150 },
-  ];
+  // const couriers = [
+  //   { id: 1, name: "Kuriyer 1", orders: 250 },
+  //   { id: 2, name: "Kuriyer 2", orders: 230 },
+  //   { id: 3, name: "Kuriyer 3", orders: 220 },
+  //   { id: 4, name: "Kuriyer 4", orders: 210 },
+  //   { id: 5, name: "Kuriyer 5", orders: 200 },
+  //   { id: 6, name: "Kuriyer 6", orders: 190 },
+  //   { id: 7, name: "Kuriyer 7", orders: 185 },
+  //   { id: 8, name: "Kuriyer 8", orders: 170 },
+  //   { id: 9, name: "Kuriyer 9", orders: 160 },
+  //   { id: 10, name: "Kuriyer 10", orders: 150 },
+  // ];
+
+  const markets = data?.data?.topMarkets?.data
 
   // Dummy Top 10 Markets
-  const markets = [
-    { id: 1, name: "Market 1", orders: 300 },
-    { id: 2, name: "Market 2", orders: 280 },
-    { id: 3, name: "Market 3", orders: 270 },
-    { id: 4, name: "Market 4", orders: 250 },
-    { id: 5, name: "Market 5", orders: 240 },
-    { id: 6, name: "Market 6", orders: 230 },
-    { id: 7, name: "Market 7", orders: 220 },
-    { id: 8, name: "Market 8", orders: 210 },
-    { id: 9, name: "Market 9", orders: 200 },
-    { id: 10, name: "Market 10", orders: 190 },
-  ];
+  // const markets = [
+  //   { id: 1, name: "Market 1", orders: 300 },
+  //   { id: 2, name: "Market 2", orders: 280 },
+  //   { id: 3, name: "Market 3", orders: 270 },
+  //   { id: 4, name: "Market 4", orders: 250 },
+  //   { id: 5, name: "Market 5", orders: 240 },
+  //   { id: 6, name: "Market 6", orders: 230 },
+  //   { id: 7, name: "Market 7", orders: 220 },
+  //   { id: 8, name: "Market 8", orders: 210 },
+  //   { id: 9, name: "Market 9", orders: 200 },
+  //   { id: 10, name: "Market 10", orders: 190 },
+  // ];
 
   return (
     <div className="w-full p-6">
@@ -131,7 +146,7 @@ const Dashboards = () => {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={ordersData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
+              <XAxis dataKey="nomi" />
               <YAxis />
               <Tooltip />
               <Legend />
@@ -144,9 +159,9 @@ const Dashboards = () => {
         <div className="bg-white p-4 rounded-2xl shadow">
           <h3 className="text-lg font-semibold mb-4">Kuriyerlar statistikasi</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={ordersData}>
+            <BarChart data={couriersData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
+              <XAxis dataKey="nomi"  />
               <YAxis />
               <Tooltip />
               <Legend />
@@ -208,14 +223,18 @@ const Dashboards = () => {
                 <th className="p-2">#</th>
                 <th className="p-2">Ism</th>
                 <th className="p-2">Buyurtmalar</th>
+                <th className="p-2">Sotilganlar</th>
+                <th className="p-2">Sotilgan foizi</th>
               </tr>
             </thead>
             <tbody>
-              {couriers.map((c) => (
-                <tr key={c.id} className="border-t">
-                  <td className="p-2">{c.id}</td>
-                  <td className="p-2">{c.name}</td>
-                  <td className="p-2">{c.orders}</td>
+              {couriers?.map((c: any,inx:number) => (
+                <tr key={c.courier_id} className="border-t">
+                  <td className="p-2">{inx + 1}</td>
+                  <td className="p-2">{c.courier_name}</td>
+                  <td className="p-2">{c.total_orders}</td>
+                  <td className="p-2">{c.successful_orders}</td>
+                  <td className="p-2">{c.success_rate}</td>
                 </tr>
               ))}
             </tbody>
@@ -233,14 +252,18 @@ const Dashboards = () => {
                 <th className="p-2">#</th>
                 <th className="p-2">Nomi</th>
                 <th className="p-2">Buyurtmalar</th>
+                <th className="p-2">Sotilganlar</th>
+                <th className="p-2">Sotilgan foizi</th>
               </tr>
             </thead>
             <tbody>
-              {markets.map((m) => (
+              {markets.map((m: any, inx: number) => (
                 <tr key={m.id} className="border-t">
-                  <td className="p-2">{m.id}</td>
-                  <td className="p-2">{m.name}</td>
-                  <td className="p-2">{m.orders}</td>
+                  <td className="p-2">{inx + 1}</td>
+                  <td className="p-2">{m.market_name}</td>
+                  <td className="p-2">{m.total_orders}</td>
+                  <td className="p-2">{m.successful_orders}</td>
+                  <td className="p-2">{m.success_rate}</td>
                 </tr>
               ))}
             </tbody>
