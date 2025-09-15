@@ -34,12 +34,12 @@ const Dashboards = () => {
     { name: "E", buyurtmalar: 200, tugatilgan: 170 },
   ];
 
-  const statusData = [
-    { name: "Yangi", value: 43 },
-    { name: "Jarayonda", value: 38 },
-    { name: "Tugatilgan", value: 40 },
-    { name: "Bekor qilingan", value: 15 },
-  ];
+  // const statusData = [
+  //   { name: "Yangi", value: 43 },
+  //   { name: "Jarayonda", value: 38 },
+  //   { name: "Tugatilgan", value: 40 },
+  //   { name: "Bekor qilingan", value: 15 },
+  // ];
 
   const COLORS = ["#0088FE", "#FFBB28", "#00C49F", "#FF8042"];
 
@@ -155,7 +155,7 @@ const Dashboards = () => {
         </div>
 
         {/* Pie Chart */}
-        <div className="bg-white p-4 rounded-2xl shadow">
+        {/* <div className="bg-white p-4 rounded-2xl shadow">
           <h3 className="text-lg font-semibold mb-4">Buyurtma holatlari</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -176,7 +176,7 @@ const Dashboards = () => {
               <Tooltip />
             </PieChart>
           </ResponsiveContainer>
-        </div>
+        </div> */}
       </div>
 
       {/* Line Chart */}
