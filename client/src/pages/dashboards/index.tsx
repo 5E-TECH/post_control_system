@@ -8,9 +8,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
+  // PieChart,
+  // Pie,
+  // Cell,
   // LineChart,
   // Line,
 } from "recharts";
@@ -41,7 +41,7 @@ const Dashboards = () => {
   //   { name: "Bekor qilingan", value: 15 },
   // ];
 
-  const COLORS = ["#0088FE", "#FFBB28", "#00C49F", "#FF8042"];
+  // const COLORS = ["#0088FE", "#FFBB28", "#00C49F", "#FF8042"];
 
   // const revenueData = [
   //   { name: "Dush", daromad: 4200 },
