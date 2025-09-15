@@ -405,7 +405,14 @@ export class UserService {
     try {
       const allMarkets = await this.userRepo.find({
         where: { role: Roles.MARKET },
-        select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+        select: [
+          'id',
+          'name',
+          'phone_number',
+          'status',
+          'created_at',
+          'add_order',
+        ],
         relations: ['cashbox'],
       });
       return successRes(allMarkets, 200, 'All markets');

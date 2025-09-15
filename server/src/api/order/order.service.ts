@@ -436,6 +436,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  async allMarketsOrders(user: JwtPayload) {
+    try {
+      const allMyOrders = await this.orderRepo.find({
+        where: { user_id: user.id },
+      });
+      return successRes(allMyOrders, 200, 'All my orsers');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async allCouriersOrders(user: JwtPayload) {
     try {
       const allMyPosts = await this.postRepo.find({
@@ -449,7 +460,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const allOrders = await this.orderRepo.find({
         where: { post_id: In(allPostIds) },
-        relations: ['items', 'market', 'customer',"customer.district"],
+        relations: ['items', 'market', 'customer', 'customer.district'],
       });
 
       return successRes(allOrders, 200, 'All my orders');
