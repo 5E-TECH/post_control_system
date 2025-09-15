@@ -18,12 +18,20 @@ export class DashboardService {
         endDate = end.toISOString();
       }
 
-      const [orders] = await Promise.all([
-        this.orderStats.getStats(startDate, endDate),
-        this.orderStats.getMarketStats(startDate, endDate),
-      ]);
+      const [orders, markets, couriers, topMarkets, topCouriers] =
+        await Promise.all([
+          this.orderStats.getStats(startDate, endDate),
+          this.orderStats.getMarketStats(startDate, endDate),
+          this.orderStats.getCourierStats(startDate, endDate),
+          this.orderStats.getTopMarkets(),
+          this.orderStats.getTopCouriers(),
+        ]);
 
-      return successRes({ orders }, 200, 'Dashboard infos');
+      return successRes(
+        { orders, markets, couriers, topMarkets, topCouriers },
+        200,
+        'Dashboard infos',
+      );
     } catch (error) {
       return catchError(error);
     }
