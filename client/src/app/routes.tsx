@@ -11,7 +11,6 @@ const Users = lazy(() => import("../pages/users"));
 const Mails = lazy(() => import("../pages/mails"));
 const Products = lazy(() => import("../pages/products"));
 const SendMessage = lazy(() => import("../pages/send-message"));
-const History = lazy(() => import("../pages/history"));
 const LogsPage = lazy(() => import("../pages/logs-page"));
 const Payments = lazy(() => import("../pages/payments"));
 const RolesPermissions = lazy(() => import("../pages/roles-permissions"));
