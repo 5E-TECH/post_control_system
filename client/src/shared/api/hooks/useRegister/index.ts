@@ -17,6 +17,9 @@ export const useUser = (path?: string) => {
       queryKey: [user],
       queryFn: () => api.get("user").then((res) => res.data),
     });
+
+  
+
   return {
     createUser,
     getUser,

@@ -6,6 +6,7 @@ import profileEditSlice from "../shared/lib/features/profile/profileEditSlice";
 import setCustomerData from "../shared/lib/features/customer_and_market-id";
 import setOrderItems from "../shared/lib/features/customer_and_market-id";
 import setProductInfo from "../shared/lib/features/customer_and_market-id";
+import togglePermission from "../shared/lib/features/add-order-permission";
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     setCustomerData,
     setOrderItems,
     setProductInfo,
+    togglePermission,
   },
 });
 

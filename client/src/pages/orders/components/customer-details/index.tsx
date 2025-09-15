@@ -2,10 +2,21 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { Spin } from "antd";
+// import { useSelector } from "react-redux";
+// import type { RootState } from "../../../../app/store";
 
 const CustomerDetails = () => {
   const marketId = localStorage.getItem("marketId") || "";
   const { getOrderByMarket } = useOrder();
+
+  // const user = useSelector((state: RootState) => state.roleSlice);
+  // const role = user.role
+  // useEffect(() => {
+      
+    
+
+  // }, [role,user]);
+
   const { data } = getOrderByMarket(marketId);
   const myNewOrders = data?.data;
 
