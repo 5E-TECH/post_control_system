@@ -13,7 +13,7 @@ const CashDetail = () => {
   const {getCashBoxById} = useCashBox()
   const {data} = getCashBoxById(market.selectMarket)
 
-  console.log(data);
+  console.log(data?.data?.cashbox?.balance);
   
   
 
@@ -28,7 +28,7 @@ const CashDetail = () => {
           </div>
           <div>
             <strong className="block pt-6 font-bold text-[32px]">
-              40 000 000 UZS
+              {data?.data?.cashbox?.balance} UZS
             </strong>
             <p className="pt-8 text-[16px] font-medium">Bahodir Nabijanov</p>
           </div>
@@ -65,12 +65,12 @@ const CashDetail = () => {
         <div className="flex gap-5 mt-10">
           <div className="bg-[#0688221A] px-6 py-5">
             <strong className="text-[#068822] dark:text-green-500 text-[20px]">
-              +100 000 000 UZS
+              + {data?.data?.income} UZS
             </strong>
           </div>
           <div className="bg-[#B80D0D1A] px-6 py-5">
             <strong className="text-[#B80D0D] dark:text-red-500 text-[20px]">
-              -200 000 000 UZS
+              - {data?.data?.outcome} UZS
             </strong>
           </div>
         </div>
