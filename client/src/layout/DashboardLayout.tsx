@@ -36,9 +36,9 @@ const DashboardLayout = () => {
   }
 
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr_auto] grid-cols-[250px_1fr] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5]">
+    <div className="h-screen bg-[#F4F5FA] grid grid-rows-[auto_1fr_auto] grid-cols-[250px_1fr] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5] pr-4">
       {/* Navbar */}
-      <div className="col-span-2 sticky top-0 z-10">
+      <div className="col-span-2">
         <Header />
       </div>
 
@@ -48,16 +48,16 @@ const DashboardLayout = () => {
       </aside>
 
       {/* Dashboard container */}
-      <div className="overflow-y-auto pr-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
-        <main className="w-full h-full p-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
+      <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pb-8">
+        <main className="w-full h-full bg-[#fff] rounded-4xl overflow-y-auto">
           <Outlet />
         </main>
       </div>
 
       {/* Footer */}
-      <footer className="col-span-2 sticky bottom-0 z-10">
+      <div className="col-span-2">
         <Footer />
-      </footer>
+      </div>
     </div>
   );
 };

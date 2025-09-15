@@ -1,10 +1,9 @@
 import { memo } from "react";
 import noDataImg from "../../assets/logo.svg";
 
-
 const EmptyPage = () => {
   return (
-    <div className="flex flex-col justify-center items-center h-[850px]">
+    <div className="flex flex-col justify-center items-center w-full h-full">
       <img
         src={noDataImg}
         alt="No data"

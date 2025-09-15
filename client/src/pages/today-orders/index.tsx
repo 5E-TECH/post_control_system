@@ -23,7 +23,7 @@ const TodayOrders = () => {
 
   const { getMarketsNewOrder } = useMarket();
   const { data, refetch, isLoading } = getMarketsNewOrder();
-  refetch()
+  refetch();
 
   if (pathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
@@ -32,9 +32,8 @@ const TodayOrders = () => {
   const markets = data?.data?.markets || [];
 
   return (
-    <section className="flex justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d4b]">
-
-     {!isLoading && markets.length > 0 && <Search />}
+    <section className="flex items-center justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d4b]">
+      {!isLoading && markets.length > 0 && <Search />}
       {isLoading ? (
         <div className="flex justify-center items-center h-[200px]">
           <p className="text-gray-500 dark:text-gray-300">Loading...</p>
@@ -81,8 +80,7 @@ const TodayOrders = () => {
                 <tr
                   key={item?.id}
                   className="h-[56px]"
-                  onClick={() => handleProps(item?.id)}
-                >
+                  onClick={() => handleProps(item?.id)}>
                   <td className="pl-10">{inx + 1}</td>
                   <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
                     {item?.name}
@@ -102,7 +100,7 @@ const TodayOrders = () => {
           </table>
         </div>
       ) : (
-        <EmptyPage/>
+        <EmptyPage />
       )}
     </section>
   );

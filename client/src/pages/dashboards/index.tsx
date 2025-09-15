@@ -20,16 +20,15 @@ const Dashboards = () => {
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 
-  const {data} = useChart().getChart()
+  const { data } = useChart().getChart();
 
-  const dashboard = data?.data?.orders?.data
+  const dashboard = data?.data?.orders?.data;
 
-  const ordersData = data?.data?.markets?.data?.map((market:any)=>({
-    nomi:market?.market?.name + ` (${market.sellingRate}%)`,
-    buyurtmalar:market?.totalOrders,
-    tugatilgan:market?.soldOrders
-  }))
-
+  const ordersData = data?.data?.markets?.data?.map((market: any) => ({
+    nomi: market?.market?.name + ` (${market.sellingRate}%)`,
+    buyurtmalar: market?.totalOrders,
+    tugatilgan: market?.soldOrders,
+  }));
 
   // Dummy data (serverdan fetch qilinishi mumkin)
   // const ordersData = [
@@ -60,13 +59,13 @@ const Dashboards = () => {
   //   { name: "Yak", daromad: 4100 },
   // ];
 
-  const couriersData = data?.data?.couriers?.data?.map((courier:any)=>({
+  const couriersData = data?.data?.couriers?.data?.map((courier: any) => ({
     nomi: courier?.courier?.name + ` (${courier.successRate}%)`,
-    buyurtmalar:courier?.totalOrders,
-    tugatilgan:courier?.deliveredOrders
-  }))
-  
-  const couriers = data?.data?.topCouriers?.data
+    buyurtmalar: courier?.totalOrders,
+    tugatilgan: courier?.deliveredOrders,
+  }));
+
+  const couriers = data?.data?.topCouriers?.data;
 
   // Dummy Top 10 Couriers
   // const couriers = [
@@ -82,7 +81,8 @@ const Dashboards = () => {
   //   { id: 10, name: "Kuriyer 10", orders: 150 },
   // ];
 
-  const markets = data?.data?.topMarkets?.data
+  const markets = data?.data?.topMarkets?.data;
+  console.log(data);
 
   // Dummy Top 10 Markets
   // const markets = [
@@ -157,11 +157,13 @@ const Dashboards = () => {
         </div>
 
         <div className="bg-white p-4 rounded-2xl shadow">
-          <h3 className="text-lg font-semibold mb-4">Kuriyerlar statistikasi</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            Kuriyerlar statistikasi
+          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={couriersData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nomi"  />
+              <XAxis dataKey="nomi" />
               <YAxis />
               <Tooltip />
               <Legend />
@@ -212,35 +214,6 @@ const Dashboards = () => {
 
       {/* Top 10 Tables */}
       <div className="grid grid-cols-2 gap-6">
-        {/* Top Couriers */}
-        <div className="bg-white p-4 rounded-2xl shadow">
-          <h3 className="text-lg font-semibold mb-4">
-            Top 10 Kuriyerlar (Oxirgi 30 kun)
-          </h3>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100 text-left">
-                <th className="p-2">#</th>
-                <th className="p-2">Ism</th>
-                <th className="p-2">Buyurtmalar</th>
-                <th className="p-2">Sotilganlar</th>
-                <th className="p-2">Sotilgan foizi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {couriers?.map((c: any,inx:number) => (
-                <tr key={c.courier_id} className="border-t">
-                  <td className="p-2">{inx + 1}</td>
-                  <td className="p-2">{c.courier_name}</td>
-                  <td className="p-2">{c.total_orders}</td>
-                  <td className="p-2">{c.successful_orders}</td>
-                  <td className="p-2">{c.success_rate}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
         {/* Top Markets */}
         <div className="bg-white p-4 rounded-2xl shadow">
           <h3 className="text-lg font-semibold mb-4">
@@ -257,13 +230,41 @@ const Dashboards = () => {
               </tr>
             </thead>
             <tbody>
-              {markets.map((m: any, inx: number) => (
-                <tr key={m.id} className="border-t">
+              {markets?.map((m: any, inx: number) => (
+                <tr key={m.id ?? inx} className="border-t">
                   <td className="p-2">{inx + 1}</td>
                   <td className="p-2">{m.market_name}</td>
                   <td className="p-2">{m.total_orders}</td>
                   <td className="p-2">{m.successful_orders}</td>
                   <td className="p-2">{m.success_rate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Top Couriers */}
+        <div className="bg-white p-4 rounded-2xl shadow">
+          <h3 className="text-lg font-semibold mb-4">
+            Top 10 Kuriyerlar (Oxirgi 30 kun)
+          </h3>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100 text-left">
+                <th className="p-2">#</th>
+                <th className="p-2">Ism</th>
+                <th className="p-2">Buyurtmalar</th>
+                <th className="p-2">Sotilganlar</th>
+                <th className="p-2">Sotilgan foizi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {couriers?.map((c: any, inx: number) => (
+                <tr key={c.courier_id ?? inx} className="border-t">
+                  <td className="p-2">{inx + 1}</td>
+                  <td className="p-2">{c.courier_name}</td>
+                  <td className="p-2">{c.total_orders}</td>
+                  <td className="p-2">{c.successful_orders}</td>
+                  <td className="p-2">{c.success_rate}</td>
                 </tr>
               ))}
             </tbody>
