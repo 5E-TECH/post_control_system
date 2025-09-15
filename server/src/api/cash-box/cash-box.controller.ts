@@ -38,9 +38,23 @@ export class CasheBoxController {
 
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('main')
+  getMainCashbox() {
+    return this.cashBoxService.getMainCashbox();
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('user/:id')
   cashboxByUserId(@Param('id') id: string) {
     return this.cashBoxService.getCashboxByUserId(id);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER, Roles.MARKET)
+  @Get('my-cashbox')
+  myCashbox(@CurrentUser() user: JwtPayload) {
+    return this.cashBoxService.myCashbox(user);
   }
 
   @UseGuards(JwtGuard, RolesGuard)

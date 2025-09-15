@@ -69,6 +69,17 @@ export class CashBoxService
     }
   }
 
+  async getMainCashbox() {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      return successRes(mainCashbox, 200, 'Main cashbox');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async getCashboxByUserId(id: string) {
     try {
       const user = await this.userRepo.findOne({ where: { id } });
@@ -102,6 +113,20 @@ export class CashBoxService
         200,
         'Cashbox details',
       );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async myCashbox(user: JwtPayload) {
+    try {
+      const myCashbox = await this.cashboxRepo.findOne({
+        where: { user_id: user.id },
+      });
+      if (!myCashbox) {
+        throw new NotFoundException('Cashbox not found');
+      }
+      return successRes(myCashbox, 200, 'My cashbox');
     } catch (error) {
       return catchError(error);
     }
@@ -358,6 +383,13 @@ export class CashBoxService
       return catchError(error);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async financialBalance() {
+    try {
+    } catch (error) {
+      return catchError(error);
     }
   }
 }
