@@ -79,6 +79,9 @@ const CourierRefusedMails = lazy(
 const CourierOldMails = lazy(
   () => import("../pages/mails/components/courier/old-mails")
 );
+const BalanceDashboard = lazy (
+  () => import("../pages/history")
+)
 
 const AppRouters = () => {
   return useRoutes([
@@ -197,7 +200,7 @@ const AppRouters = () => {
               children: [{ path: "create", element: <ProductCreate /> }],
             },
             { path: "send-message", element: <SendMessage /> },
-            { path: "history", element: <History /> },
+            { path: "m-balance", element: <BalanceDashboard /> },
             { path: "logs", element: <LogsPage /> },
             {
               path: "payments",
