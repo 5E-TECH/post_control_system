@@ -5,6 +5,26 @@ import { useProduct } from "../../../shared/api/hooks/useProduct";
 import { X } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import Popup from "../../../shared/ui/Popup";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+
+// ✅ Yup validation
+const schema = yup.object().shape({
+  name: yup.string().required("Mahsulot nomi majburiy!"),
+  image: yup
+    .mixed<FileList>()
+    .required("Rasm yuklash majburiy!")
+    .test("fileRequired", "Rasm tanlanmagan!", (value) => {
+      const files = value as FileList;
+      return files && files.length > 0;
+    }),
+});
+
+interface FormValues {
+  name: string;
+  image: FileList;
+}
 
 const AddProduct = () => {
   const { createProduct } = useProduct();
@@ -14,63 +34,44 @@ const AddProduct = () => {
   const market = location.state?.market;
 
   const [dragActive, setDragActive] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [productName, setProductName] = useState("");
 
-  // 🔑 tashqaridan chaqiriladigan funksiya
+  // 🔑 react-hook-form
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormValues>({
+    resolver: yupResolver(schema),
+  });
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragActive(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragActive(false);
-  };
+  const file = watch("image")?.[0] || null;
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragActive(false);
-
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+      setValue("image", e.dataTransfer.files as any);
     }
   };
 
   const handleDiscard = () => {
-    setFile(null);
-    setProductName("");
+    reset();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!productName || !file) {
-      // setShowMarket(true); // faqat state ni true qilamiz
-      return;
-    }
-
-    if (!market) {
-      // setShowMarket(true);
-      return;
-    }
+  const onSubmit = async (values: FormValues) => {
+    if (!market) return;
 
     const formData = new FormData();
-    formData.append("name", productName);
+    formData.append("name", values.name);
     formData.append("market_id", market.id);
-    formData.append("image", file);
+    formData.append("image", values.image[0]);
 
     try {
       await createProduct.mutate(formData);
-      setProductName("");
-      setFile(null);
+      reset();
     } catch (err) {
       console.error(err);
     }
@@ -83,15 +84,24 @@ const AddProduct = () => {
           Product information
         </h2>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5 h-full">
-          <input
-            className="w-full border px-4 py-3 rounded-md"
-            type="text"
-            placeholder="Product Name"
-            value={productName}
-            onChange={(e) => setProductName(e.target.value)}
-          />
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 h-full"
+        >
+          {/* Name input */}
+          <div>
+            <input
+              className="w-full border px-4 py-3 rounded-md"
+              type="text"
+              placeholder="Product Name"
+              {...register("name")}
+            />
+            {errors.name && (
+              <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+            )}
+          </div>
 
+          {/* Image input */}
           <div className="flex justify-between mt-2">
             <h2 className="text-[18px] font-medium opacity-[90%] select-none">
               Product Image
@@ -105,9 +115,15 @@ const AddProduct = () => {
             className={`w-full flex-1 border border-dashed rounded-md border-gray-300 flex items-center justify-center flex-col gap-2 transition ${
               dragActive ? "bg-purple-50 border-[#8C57FF]" : ""
             }`}
-            onDragOver={handleDragOver}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActive(true);
+            }}
             onDrop={handleDrop}
-            onDragLeave={handleDragLeave}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              setDragActive(false);
+            }}
           >
             {!file ? (
               <>
@@ -127,10 +143,15 @@ const AddProduct = () => {
                   </button>
                   <input
                     type="file"
+                    {...register("image")}
                     className="absolute top-0 left-0 opacity-0 w-full h-full cursor-pointer"
-                    onChange={handleFileChange}
                   />
                 </div>
+                {errors.image && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.image.message}
+                  </p>
+                )}
               </>
             ) : (
               <div className="flex flex-col items-center gap-2 relative">
@@ -142,7 +163,7 @@ const AddProduct = () => {
                 <button
                   type="button"
                   className="absolute top-1 right-1 bg-red-500 rounded-full text-white"
-                  onClick={() => setFile(null)}
+                  onClick={() => reset({ image: undefined })}
                 >
                   <X className="w-[20px] h-[20px]" />
                 </button>
@@ -150,9 +171,11 @@ const AddProduct = () => {
             )}
           </div>
 
+          {/* Actions */}
           <div className="flex justify-end gap-4">
             <button
               onClick={() => setShowMarket(true)}
+              type="button"
               className="border px-4 py-2 rounded-md border-[#8A8D93] text-[#8A8D93] font-medium mt-4"
             >
               Discard
@@ -166,6 +189,7 @@ const AddProduct = () => {
           </div>
         </form>
       </div>
+
       {showMarket && (
         <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
           <div className="p-4 bg bg-white">
@@ -180,8 +204,8 @@ const AddProduct = () => {
               <button
                 className="px-4 py-2 bg-red-500 text-white rounded"
                 onClick={() => {
-                  handleDiscard(); // Tozalash
-                  setShowMarket(false); // Popupni yopish
+                  handleDiscard();
+                  setShowMarket(false);
                 }}
               >
                 Ha
