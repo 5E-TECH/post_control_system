@@ -112,7 +112,7 @@ const Payments = () => {
         </Popup>
 
         <div
-          onClick={() => navigate("cash-detail")}
+          onClick={() => handleNavigate()}
           className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Kassadagi miqdor</h3>

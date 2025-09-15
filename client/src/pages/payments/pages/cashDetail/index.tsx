@@ -12,7 +12,7 @@ const CashDetail = () => {
   const {getCashBoxById} = useCashBox()
   const {data} = getCashBoxById(market.select)
 
-  console.log(data?.data?.cashbox?.balance);
+  console.log(data?.data?.cashboxHistory);
   
   
 
@@ -75,9 +75,11 @@ const CashDetail = () => {
         </div>
 
         <div className="h-[520px] mt-5 px-8 py-4 bg-[#ede8ff] dark:bg-[#3D3759] shadow-md rounded-lg overflow-y-auto">
-          <div className="flex gap-20 mb-3">
+          {
+            data?.data?.cashboxHistory.map((item:any, inx:number) => (
+              <div key={inx} className="flex gap-20 mb-3">
             <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
+              <h3 className="text-[20px] font-medium">{data?.data?.cashbox?.user?.name}</h3>
               <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
                 <p>16.01.2020</p>
                 <p>16:20</p>
@@ -85,160 +87,12 @@ const CashDetail = () => {
             </div>
             <div>
               <strong className="text-[#068822] dark:text-green-500 text-[22px]">
-                +6 500 000 UZS
+                + {item?.amount}
               </strong>
             </div>
           </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#B80D0D] dark:text-red-500 text-[22px]">
-                -6 500 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#068822] dark:text-green-500 text-[22px]">
-                +6 500 000 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#068822] dark:text-green-500 text-[22px]">
-                +6 500 000 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#B80D0D] dark:text-red-500 text-[22px]">
-                -6 500 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#B80D0D] dark:text-red-500 text-[22px]">
-                -6 500 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#B80D0D] dark:text-red-500 text-[22px]">
-                -6 500 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#068822] dark:text-green-500 text-[22px]">
-                +6 500 000 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#068822] dark:text-green-500 text-[22px]">
-                +6 500 000 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#068822] dark:text-green-500 text-[22px]">
-                +6 500 000 UZS
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex gap-20 mb-3">
-            <div>
-              <h3 className="text-[20px] font-medium">Bahodir Nabijanov</h3>
-              <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                <p>16.01.2020</p>
-                <p>16:20</p>
-              </div>
-            </div>
-            <div>
-              <strong className="text-[#068822] dark:text-green-500 text-[22px]">
-                +6 500 000 UZS
-              </strong>
-            </div>
-          </div>
+          ))
+        }
         </div>
       </div>
     </div>
