@@ -4,9 +4,13 @@ import {
   statusOptions,
   viloyatlar,
 } from "../../../../shared/static/order";
-import Success from "../button/success";
 import { ArrowRight } from "lucide-react";
 import Select from "../select/select"; // shu Select komponentni import qildik
+import { Button } from "antd";
+import { useDispatch } from "react-redux";
+import { useProfile } from "../../../../shared/api/hooks/useProfile";
+import { useNavigate } from "react-router-dom";
+import { togglePermission } from "../../../../shared/lib/features/add-order-permission";
 
 const Filter = () => {
   const [form, setForm] = useState({
@@ -18,13 +22,24 @@ const Filter = () => {
     order: "",
   });
 
-  console.log(form);
-  
   const handleChange = (
     e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const { refetch } = useProfile().getUser();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const handleCheck = async () => {
+    const res = await refetch();
+    const addOrder = res.data.data.add_order;
+
+    if (addOrder) {
+      navigate("/orders/choose-market");
+    }
+    dispatch(togglePermission(true));
   };
 
   const marketOptions = marketlar?.map((item: any) => (
@@ -112,12 +127,12 @@ const Filter = () => {
             placeholder="Search order"
             className="border border-[#E5E7EB] rounded-lg px-3 py-[10px] outline-none"
           />
-          <Success
-            text="Add Order"
-            path="choose-market"
-            icon={<ArrowRight className="h-[13px] w-[13px]" />}
-            className="w-[140px]!"
-          />
+          <Button
+            onClick={handleCheck}
+            className="w-[140px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
+          >
+            Add order <ArrowRight className="w-[13px] h-[13px]" />
+          </Button>
         </div>
       </div>
     </div>

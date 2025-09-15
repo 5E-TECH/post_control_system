@@ -13,7 +13,7 @@ const MarketSidebar = () => {
   const links = [
     { to: "/", icon: <House />, label: "Dashboard", end: true },
     {
-      to: "/orders/choose-market",
+      to: "/orders",
       icon: <ShoppingBag />,
       label: "Buyurtmalar",
     },
