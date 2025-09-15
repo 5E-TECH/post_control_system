@@ -19,9 +19,9 @@ const statusColors: Record<string, string> = {
 const OrderView = () => {
   const navigate = useNavigate();
 
-  const {getOrders} = useOrder()
-  const {data} = getOrders()
-  
+  const { getOrders } = useOrder();
+  const { data } = getOrders();
+
   return (
     <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
       <table className="w-full">
@@ -80,7 +80,7 @@ const OrderView = () => {
           </tr>
         </thead>
         <tbody>
-          {data?.data?.map((item: any, inx:number) => (
+          {data?.data?.map((item: any, inx: number) => (
             <tr
               key={item.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"

@@ -35,7 +35,7 @@ const Filter = () => {
   const handleCheck = async () => {
     const res = await refetch();
     const addOrder = res.data.data.add_order;
-    if (!addOrder && res.data.data.add_order === "market") {
+    if (!addOrder && res.data.data.role === "market") {
       dispatch(togglePermission(true));
       return;
     }
