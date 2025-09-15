@@ -12,13 +12,17 @@ export const useOrder = () => {
   });
 
   const sellOrder = useMutation({
-    mutationFn: (id: string, data?: any) =>
+    mutationFn: ({ id, data }: { id: string; data?: any }) =>
       api.post(`order/sell/${id}`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
   const cancelOrder = useMutation({
-    mutationFn: (id: string, data?: any) =>
+    mutationFn: ({ id, data }: { id: string; data?: any }) =>
       api.post(`order/cancel/${id}`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
   const getOrders = () =>
