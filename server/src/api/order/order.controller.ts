@@ -25,6 +25,8 @@ import { PartlySoldDto } from './dto/partly-sold.dto';
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Post()
   createOrder(@Body() creteOrderDto: CreateOrderDto) {
     return this.orderService.createOrder(creteOrderDto);
@@ -79,6 +81,13 @@ export class OrderController {
   @Post('receive')
   receiveNewOrders(@Body() ordersArray: OrdersArrayDto) {
     return this.orderService.receiveNewOrders(ordersArray);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET)
+  @Get('market/all-orders')
+  allMarketsOrders(@CurrentUser() user: JwtPayload) {
+    return this.orderService.allMarketsOrders(user);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
