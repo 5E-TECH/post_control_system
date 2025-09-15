@@ -38,6 +38,12 @@ export const useOrder = () => {
         api.get(`order/market/${marketId}`).then((res) => res.data),
     });
 
+  const getMarketsByMyNewOrders = () =>
+    useQuery({
+      queryKey: [order],
+      queryFn: () => api.get("order/market/my-new-orders").then((res) => res.data),
+    });
+
   const getCourierOrders = () =>
     useQuery({
       queryKey: [order],
@@ -51,5 +57,6 @@ export const useOrder = () => {
     getOrders,
     getOrderByMarket,
     getCourierOrders,
+    getMarketsByMyNewOrders,
   };
 };
