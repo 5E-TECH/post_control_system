@@ -77,6 +77,7 @@ export class CashBoxService
       }
       const cashbox = await this.cashboxRepo.findOne({
         where: { user_id: id },
+        relations: ['user'],
       });
       if (!cashbox) {
         throw new NotFoundException('Cashbox not found');

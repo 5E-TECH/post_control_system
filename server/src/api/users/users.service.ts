@@ -202,6 +202,13 @@ export class UserService {
           `User with ${phone_number} number already exists`,
         );
       }
+      const isExistRegion = await queryRunner.manager.findOne(RegionEntity, {
+        where: { id: region_id },
+      });
+      if (!isExistRegion) {
+        throw new NotFoundException('Region not found');
+      }
+
       const hashedPassword = await this.bcrypt.encrypt(password);
       const courier = queryRunner.manager.create(UserEntity, {
         name,
@@ -446,7 +453,7 @@ export class UserService {
       const allCouriers = await this.userRepo.find({
         where: { role: Roles.COURIER },
         select: ['id', 'name', 'phone_number', 'status', 'created_at'],
-        relations: ['cashbox'],
+        relations: ['cashbox', 'region'],
       });
       return successRes(allCouriers, 200, 'All markets');
     } catch (error) {

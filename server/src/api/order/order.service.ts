@@ -582,7 +582,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.commitTransaction();
 
       this.orderGateaway;
-      return successRes({}, 200, 'Order sold');
+      return successRes({ id: order.id }, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -650,7 +650,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(order);
 
       await queryRunner.commitTransaction();
-      return successRes({}, 200, 'Order canceled');
+      return successRes({ id: order.id }, 200, 'Order canceled');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       catchError(error);
