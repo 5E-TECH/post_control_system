@@ -35,11 +35,11 @@ const Filter = () => {
   const handleCheck = async () => {
     const res = await refetch();
     const addOrder = res.data.data.add_order;
-
-    if (addOrder) {
-      navigate("/orders/choose-market");
+    if (!addOrder && res.data.data.add_order === "market") {
+      dispatch(togglePermission(true));
+      return;
     }
-    dispatch(togglePermission(true));
+    navigate("/orders/choose-market");
   };
 
   const marketOptions = marketlar?.map((item: any) => (

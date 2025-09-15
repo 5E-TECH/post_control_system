@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { createContext, memo, useMemo } from "react";
+import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { createContext, memo, useMemo, useState } from "react";
 import Select from "../../components/select/select";
 import SearchInput from "../../../users/components/search-input";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
@@ -27,76 +27,89 @@ const CourierOrders = () => {
   const orders = data?.data;
 
   const [api, contextHolder] = useNotification();
+
+  const [showBtnId, setShowBtnId] = useState<string>("");
   const handleSellOrder = (id: string) => {
-    sellOrder.mutate(id, {
-      onSuccess: () => {
-        api.success({
-          message: "✅ Buyurtma muvaffaqiyatli sotildi",
-          placement: "topRight",
-        });
-      },
-      onError: (err: any) => {
-        let description = "Xatolik yuz berdi, keyinroq urinib ko‘ring.";
+    sellOrder.mutate(
+      { id, data: {} },
+      {
+        onSuccess: (res) => {
+          api.success({
+            message: "✅ Buyurtma muvaffaqiyatli sotildi",
+            placement: "topRight",
+          });
+          
+          setShowBtnId(res?.data?.data?.id);
+        },
+        onError: (err: any) => {
+          let description = "Xatolik yuz berdi, keyinroq urinib ko‘ring.";
 
-        if (err?.response?.status === 400) {
-          description = "Noto‘g‘ri so‘rov yuborildi.";
-        } else if (err?.response?.status === 401) {
-          description = "Avtorizatsiya xatosi. Iltimos, qayta tizimga kiring.";
-        } else if (err?.response?.status === 403) {
-          description = "Sizda bu amalni bajarishga ruxsat yo‘q.";
-        } else if (err?.response?.status === 404) {
-          description = "Buyurtma topilmadi.";
-        } else if (err?.response?.status === 409) {
-          description = "Bu buyurtma allaqachon sotilgan yoki mavjud emas.";
-        } else if (err?.response?.status === 500) {
-          description = "Serverda nosozlik, keyinroq urinib ko‘ring.";
-        } else {
-          description = err?.response?.data?.message || description;
-        }
+          if (err?.response?.status === 400) {
+            description = "Noto‘g‘ri so‘rov yuborildi.";
+          } else if (err?.response?.status === 401) {
+            description =
+              "Avtorizatsiya xatosi. Iltimos, qayta tizimga kiring.";
+          } else if (err?.response?.status === 403) {
+            description = "Sizda bu amalni bajarishga ruxsat yo‘q.";
+          } else if (err?.response?.status === 404) {
+            description = "Buyurtma topilmadi.";
+          } else if (err?.response?.status === 409) {
+            description = "Bu buyurtma allaqachon sotilgan yoki mavjud emas.";
+          } else if (err?.response?.status === 500) {
+            description = "Serverda nosozlik, keyinroq urinib ko‘ring.";
+          } else {
+            description = err?.response?.data?.message || description;
+          }
 
-        api.error({
-          message: "Buyurtmani sotishda xatolik",
-          description,
-          placement: "topRight",
-        });
-      },
-    });
+          api.error({
+            message: "Buyurtmani sotishda xatolik",
+            description,
+            placement: "topRight",
+          });
+        },
+      }
+    );
   };
 
   const handleCancelOrder = (id: string) => {
-    cancelOrder.mutate(id, {
-      onSuccess: () => {
-        api.success({
-          message: "✅ Buyurtma muvaffaqiyatli bekor qilindi",
-          placement: "topRight",
-        });
-      },
-      onError: (err: any) => {
-        let description = "Xatolik yuz berdi, keyinroq urinib ko‘ring.";
+    cancelOrder.mutate(
+      { id, data: {} },
+      {
+        onSuccess: (res) => {
+          api.success({
+            message: "✅ Buyurtma muvaffaqiyatli bekor qilindi",
+            placement: "topRight",
+          });
+          setShowBtnId(res?.data?.data?.id);
+        },
+        onError: (err: any) => {
+          let description = "Xatolik yuz berdi, keyinroq urinib ko‘ring.";
 
-        if (err?.response?.status === 400) {
-          description = "Noto‘g‘ri so‘rov yuborildi.";
-        } else if (err?.response?.status === 401) {
-          description = "Avtorizatsiya xatosi. Iltimos, qayta tizimga kiring.";
-        } else if (err?.response?.status === 403) {
-          description = "Sizda bu amalni bajarishga ruxsat yo‘q.";
-        } else if (err?.response?.status === 404) {
-          description = "Buyurtma topilmadi.";
-        } else if (err?.response?.status === 409) {
-          description = "Buyurtma allaqachon bekor qilingan.";
-        } else if (err?.response?.status === 500) {
-          description = "Serverda nosozlik, keyinroq urinib ko‘ring.";
-        } else {
-          description = err?.response?.data?.message || description;
-        }
+          if (err?.response?.status === 400) {
+            description = "Noto‘g‘ri so‘rov yuborildi.";
+          } else if (err?.response?.status === 401) {
+            description =
+              "Avtorizatsiya xatosi. Iltimos, qayta tizimga kiring.";
+          } else if (err?.response?.status === 403) {
+            description = "Sizda bu amalni bajarishga ruxsat yo‘q.";
+          } else if (err?.response?.status === 404) {
+            description = "Buyurtma topilmadi.";
+          } else if (err?.response?.status === 409) {
+            description = "Buyurtma allaqachon bekor qilingan.";
+          } else if (err?.response?.status === 500) {
+            description = "Serverda nosozlik, keyinroq urinib ko‘ring.";
+          } else {
+            description = err?.response?.data?.message || description;
+          }
 
-        api.error({
-          message: "Buyurtmani bekor qilishda xatolik",
-          description,
-          placement: "topRight",
-        });
-      },
-    });
+          api.error({
+            message: "Buyurtmani bekor qilishda xatolik",
+            description,
+            placement: "topRight",
+          });
+        },
+      }
+    );
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
@@ -229,20 +242,28 @@ const CourierOrders = () => {
                   {item?.items.length}
                 </td>
                 <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={() => handleSellOrder(item?.id)}
-                      className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
-                    >
-                      Sotish
-                    </Button>
-                    <Button
-                      onClick={() => handleCancelOrder(item?.id)}
-                      className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
-                    >
-                      Bekor qilish
-                    </Button>
-                  </div>
+                  {showBtnId !== item?.id ? (
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => handleSellOrder(item?.id)}
+                        className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
+                      >
+                        Sotish
+                      </Button>
+                      <Button
+                        onClick={() => handleCancelOrder(item?.id)}
+                        className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
+                      >
+                        Bekor qilish
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Button>
+                        <AlertCircle />
+                      </Button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

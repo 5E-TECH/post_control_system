@@ -26,8 +26,10 @@ const CustomerInfocomp = () => {
 
   const { getUser } = useUser();
   const { data } = getUser();
-  const users = data?.data?.filter((user: any) => user?.role === "registrator");
-  console.log(users)
+  const users = Array.isArray(data?.data)
+    ? data?.data.filter((user: any) => user?.role === "registrator")
+    : [];
+  console.log(users);
   const { getRegions } = useRegion();
   const { data: allRegions } = getRegions();
   const regions = allRegions?.data.map((item: any) => ({
