@@ -8,7 +8,6 @@ const CashDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const market = location.state?.market;
-  console.log("11111111111111111",market.select);
 
   const {getCashBoxById} = useCashBox()
   const {data} = getCashBoxById(market.select)
@@ -30,7 +29,7 @@ const CashDetail = () => {
             <strong className="block pt-6 font-bold text-[32px]">
               {data?.data?.cashbox?.balance} UZS
             </strong>
-            <p className="pt-8 text-[16px] font-medium">Bahodir Nabijanov</p>
+            <p className="pt-8 text-[16px] font-medium">{data?.data?.cashbox?.user?.name}</p>
           </div>
         </div>
 

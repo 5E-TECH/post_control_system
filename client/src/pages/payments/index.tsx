@@ -29,6 +29,7 @@ const Payments = () => {
     navigate("cash-detail", { state: { market: { select }} });
     setSelect("");
     setShowMarket(false);
+    setShowCurier(false)
   };
 
   const { pathname } = useLocation();
@@ -178,7 +179,7 @@ const Payments = () => {
                     >
                       <td className="text-[#8C57FF] pr-10 py-3">1</td>
                       <td className="pr-26 py-3">{item?.name}</td>
-                      <td className="pr-10 py-3">{item?.name}</td>
+                      <td className="pr-10 py-3">{item?.region?.name}</td>
                     </tr>
                   ))}
                 </tbody>
