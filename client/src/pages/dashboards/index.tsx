@@ -22,7 +22,9 @@ const Dashboards = () => {
 
   const {data} = useChart().getChart()
 
-  console.log(data)
+  const dashboard = data?.data?.orders?.data
+
+  console.log(data?.data?.markets)
 
   // Dummy data (serverdan fetch qilinishi mumkin)
   const ordersData = [
@@ -105,19 +107,19 @@ const Dashboards = () => {
       <div className="grid grid-cols-4 gap-6 mb-6">
         <div className="bg-white p-6 rounded-2xl shadow">
           <p className="text-gray-500">Jami buyurtmalar</p>
-          <h2 className="text-2xl font-bold">1,234</h2>
+          <h2 className="text-2xl font-bold">{dashboard?.acceptedCount}</h2>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow">
           <p className="text-gray-500">Tugatilgan</p>
-          <h2 className="text-2xl font-bold">987</h2>
+          <h2 className="text-2xl font-bold">{dashboard?.soldAndPaid}</h2>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow">
-          <p className="text-gray-500">Jarayonda</p>
-          <h2 className="text-2xl font-bold">247</h2>
+          <p className="text-gray-500">Bekor qilinganlar</p>
+          <h2 className="text-2xl font-bold">{dashboard?.cancelled}</h2>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow">
           <p className="text-gray-500">Jami daromad</p>
-          <h2 className="text-2xl font-bold">945,231</h2>
+          <h2 className="text-2xl font-bold">{dashboard?.profit}</h2>
         </div>
       </div>
 

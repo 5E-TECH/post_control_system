@@ -11,7 +11,6 @@ const Users = lazy(() => import("../pages/users"));
 const Mails = lazy(() => import("../pages/mails"));
 const Products = lazy(() => import("../pages/products"));
 const SendMessage = lazy(() => import("../pages/send-message"));
-const History = lazy(() => import("../pages/history"));
 const LogsPage = lazy(() => import("../pages/logs-page"));
 const Payments = lazy(() => import("../pages/payments"));
 const RolesPermissions = lazy(() => import("../pages/roles-permissions"));
@@ -79,6 +78,9 @@ const CourierRefusedMails = lazy(
 const CourierOldMails = lazy(
   () => import("../pages/mails/components/courier/old-mails")
 );
+const BalanceDashboard = lazy (
+  () => import("../pages/history")
+)
 
 const AppRouters = () => {
   return useRoutes([
@@ -197,7 +199,7 @@ const AppRouters = () => {
               children: [{ path: "create", element: <ProductCreate /> }],
             },
             { path: "send-message", element: <SendMessage /> },
-            { path: "history", element: <History /> },
+            { path: "m-balance", element: <BalanceDashboard /> },
             { path: "logs", element: <LogsPage /> },
             {
               path: "payments",
