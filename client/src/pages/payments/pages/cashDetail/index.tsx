@@ -8,10 +8,10 @@ const CashDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const market = location.state?.market;
-  console.log("11111111111111111",market.selectMarket);
+  console.log("11111111111111111",market.select);
 
   const {getCashBoxById} = useCashBox()
-  const {data} = getCashBoxById(market.selectMarket)
+  const {data} = getCashBoxById(market.select)
 
   console.log(data?.data?.cashbox?.balance);
   
