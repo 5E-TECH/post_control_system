@@ -274,17 +274,34 @@ export class UserService {
     }
   }
 
-  async createCustomer(createCustomerDto: CreateCustomerDto): Promise<Object> {
+  async createCustomer(
+    user: JwtPayload,
+    createCustomerDto: CreateCustomerDto,
+  ): Promise<Object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { market_id, name, phone_number, district_id, address } =
-        createCustomerDto;
-
+      const { name, phone_number, district_id, address } = createCustomerDto;
+      if (!createCustomerDto.market_id) {
+        if (user.role !== Roles.MARKET) {
+          throw new BadRequestException('Market not choosen');
+        } else {
+          createCustomerDto.market_id = user.id;
+        }
+      }
       const market = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: market_id, role: Roles.MARKET, status: Status.ACTIVE },
+        where: {
+          id: createCustomerDto.market_id,
+          role: Roles.MARKET,
+          status: Status.ACTIVE,
+        },
       });
+      if (user.role === Roles.MARKET && !market?.add_order) {
+        throw new BadRequestException(
+          'You can not create order. Contact admins',
+        );
+      }
       if (!market) {
         throw new NotFoundException('Market not found');
       }
@@ -306,7 +323,10 @@ export class UserService {
         const isAssignedToMarket = await queryRunner.manager.findOne(
           CustomerMarketEntity,
           {
-            where: { market_id, customer_id: isExistClient.id },
+            where: {
+              market_id: createCustomerDto.market_id,
+              customer_id: isExistClient.id,
+            },
           },
         );
         if (isAssignedToMarket) {
@@ -315,7 +335,7 @@ export class UserService {
       }
 
       if (assignedToMarket) {
-        await queryRunner.commitTransaction();
+        // await queryRunner.commitTransaction();
         return successRes(
           isExistClient,
           200,
@@ -327,7 +347,7 @@ export class UserService {
           CustomerMarketEntity,
           {
             customer_id: isExistClient.id,
-            market_id,
+            market_id: createCustomerDto.market_id,
           },
         );
         await queryRunner.manager.save(newClientForMarket);
@@ -346,7 +366,7 @@ export class UserService {
       await queryRunner.manager.save(customer);
 
       const customerMarket = queryRunner.manager.create(CustomerMarketEntity, {
-        market_id,
+        market_id: createCustomerDto.market_id,
         customer_id: customer.id,
       });
       await queryRunner.manager.save(customerMarket);
@@ -416,6 +436,19 @@ export class UserService {
         relations: ['cashbox'],
       });
       return successRes(allMarkets, 200, 'All markets');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allCouriers(): Promise<object> {
+    try {
+      const allCouriers = await this.userRepo.find({
+        where: { role: Roles.COURIER },
+        select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+        relations: ['cashbox'],
+      });
+      return successRes(allCouriers, 200, 'All markets');
     } catch (error) {
       return catchError(error);
     }

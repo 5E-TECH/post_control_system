@@ -7,9 +7,9 @@ import {
 } from 'class-validator';
 
 export class CreateCustomerDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
-  market_id: string;
+  market_id?: string;
 
   @IsNotEmpty()
   @IsString()
