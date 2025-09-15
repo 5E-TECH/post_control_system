@@ -1,5 +1,5 @@
 import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
-import { createContext, memo, useMemo, useState } from "react";
+import { createContext, memo, useMemo } from "react";
 import Select from "../../components/select/select";
 import SearchInput from "../../../users/components/search-input";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
@@ -28,18 +28,15 @@ const CourierOrders = () => {
 
   const [api, contextHolder] = useNotification();
 
-  const [showBtnId, setShowBtnId] = useState<string>("");
   const handleSellOrder = (id: string) => {
     sellOrder.mutate(
       { id, data: {} },
       {
-        onSuccess: (res) => {
+        onSuccess: () => {
           api.success({
             message: "✅ Buyurtma muvaffaqiyatli sotildi",
             placement: "topRight",
           });
-          
-          setShowBtnId(res?.data?.data?.id);
         },
         onError: (err: any) => {
           let description = "Xatolik yuz berdi, keyinroq urinib ko‘ring.";
@@ -75,12 +72,11 @@ const CourierOrders = () => {
     cancelOrder.mutate(
       { id, data: {} },
       {
-        onSuccess: (res) => {
+        onSuccess: () => {
           api.success({
             message: "✅ Buyurtma muvaffaqiyatli bekor qilindi",
             placement: "topRight",
           });
-          setShowBtnId(res?.data?.data?.id);
         },
         onError: (err: any) => {
           let description = "Xatolik yuz berdi, keyinroq urinib ko‘ring.";
@@ -242,7 +238,11 @@ const CourierOrders = () => {
                   {item?.items.length}
                 </td>
                 <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                  {showBtnId !== item?.id ? (
+                  {item?.status === "sold" || item?.status === "cancelled" ? (
+                    <Button>
+                      <AlertCircle />
+                    </Button>
+                  ) : (
                     <div className="flex gap-3">
                       <Button
                         onClick={() => handleSellOrder(item?.id)}
@@ -255,12 +255,6 @@ const CourierOrders = () => {
                         className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                       >
                         Bekor qilish
-                      </Button>
-                    </div>
-                  ) : (
-                    <div>
-                      <Button>
-                        <AlertCircle />
                       </Button>
                     </div>
                   )}
