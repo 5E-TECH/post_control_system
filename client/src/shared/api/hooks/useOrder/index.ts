@@ -25,10 +25,10 @@ export const useOrder = () => {
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
-  const getOrders = () =>
+  const getOrders = (params?: any) =>
     useQuery({
       queryKey: [order],
-      queryFn: () => api.get("order").then((res) => res.data),
+      queryFn: () => api.get("order", { params }).then((res) => res.data),
     });
 
   const getOrderByMarket = (marketId: string) =>
@@ -41,7 +41,8 @@ export const useOrder = () => {
   const getMarketsByMyNewOrders = () =>
     useQuery({
       queryKey: [order],
-      queryFn: () => api.get("order/market/my-new-orders").then((res) => res.data),
+      queryFn: () =>
+        api.get("order/market/my-new-orders").then((res) => res.data),
     });
 
   const getCourierOrders = () =>
