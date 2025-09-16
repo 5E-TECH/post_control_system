@@ -119,6 +119,13 @@ export class OrderController {
     return this.orderService.cancelOrder(currentUser, id, cancelDto);
   }
 
+  @UseGuards()
+  @AcceptRoles(Roles.COURIER)
+  @Post('rollback/:id')
+  rollbackOrder(@CurrentUser() user: JwtPayload, @Param() id: string) {
+    return this.orderService.rollbackOrderToWaiting(user, id);
+  }
+
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER)
   @Post('partly-sell/:id')
