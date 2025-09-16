@@ -1,5 +1,14 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+const WaitingOrders = lazy(
+  () => import("../pages/orders/components/courier/waiting-orders")
+);
+const AllOrders = lazy(
+  () => import("../pages/orders/components/courier/all-orders")
+);
+const CancelledOrders = lazy(
+  () => import("../pages/orders/components/courier/cancelled-orders")
+);
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -78,9 +87,7 @@ const CourierRefusedMails = lazy(
 const CourierOldMails = lazy(
   () => import("../pages/mails/components/courier/old-mails")
 );
-const BalanceDashboard = lazy (
-  () => import("../pages/history")
-)
+const BalanceDashboard = lazy(() => import("../pages/history"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -134,6 +141,16 @@ const AppRouters = () => {
                 {
                   index: true,
                   element: <CourierOrder />,
+                },
+                {
+                  path: "orders",
+                  element: <CourierOrder />,
+                  children: [
+                    { index: true, element: <WaitingOrders /> },
+                    { path: "waiting", element: <WaitingOrders /> },
+                    { path: "all", element: <AllOrders /> },
+                    { path: "cancelled", element: <CancelledOrders /> },
+                  ],
                 },
               ],
             },

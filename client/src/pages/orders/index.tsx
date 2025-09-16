@@ -3,7 +3,6 @@ import { Outlet, useLocation } from "react-router-dom";
 import OrderList from "./pages/superadmin/order-list";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
-import CourierOrder from "./pages/courier";
 
 const Orders = () => {
   const { pathname } = useLocation();
@@ -21,7 +20,7 @@ const Orders = () => {
   }
 
   if (role === "courier") {
-    return <CourierOrder />;
+    return <Outlet />;
   }
 };
 

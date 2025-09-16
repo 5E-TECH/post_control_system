@@ -49,7 +49,7 @@ const DashboardLayout = () => {
 
       {/* Dashboard container */}
       <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pb-8">
-        <main className="w-full h-full bg-[#fff] rounded-4xl overflow-y-auto">
+        <main className="w-full h-full bg-[#fff] dark:bg-[var(--color-dark-bg-py)] rounded-4xl overflow-y-auto">
           <Outlet />
         </main>
       </div>

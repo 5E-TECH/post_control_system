@@ -1,9 +1,10 @@
-import { memo } from "react";
-import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useOrder } from "../../../../shared/api/hooks/useOrder";
-import type { RootState } from "../../../../app/store";
-import { useSelector } from "react-redux";
+import { Button } from "antd";
+import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { memo, type FC } from "react";
+
+interface Props {
+  data: any[];
+}
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -18,41 +19,17 @@ const statusColors: Record<string, string> = {
   closed: "bg-black",
 };
 
-const OrderView = () => {
-  const navigate = useNavigate();
-
-  const { getOrders, getMarketsByMyNewOrders } = useOrder();
-  const user = useSelector((state: RootState) => state.roleSlice);
-  const role = user.role;
-
-  let query;
-
-  switch (role) {
-    case "superadmin":
-      query = getOrders();
-      break;
-    case "market":
-      query = getMarketsByMyNewOrders();
-      break;
-    default:
-      query = { data: { data: [] } };
-  }
-
-  const { data } = query;
-  const myNewOrders = Array.isArray(data?.data) ? data?.data : [];
-
+const OrderTableComp: FC<Props> = ({ data }) => {
   return (
-    <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
+    <div>
       <table className="w-full">
         <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
           <tr>
             <th>
               <div className="flex items-center gap-10 ml-10">
                 <span>#</span>
-                {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div> */}
               </div>
             </th>
-
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -96,14 +73,19 @@ const OrderView = () => {
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
+            <th>
+              <div className="flex items-center gap-30">
+                <span>ACTIONS</span>
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
           </tr>
         </thead>
         <tbody>
-          {myNewOrders?.map((item: any, inx: number) => (
+          {data?.map((item: any, inx: number) => (
             <tr
-              key={item.id}
-              className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
-              onClick={() => navigate("/orders/order-detail")}
+              key={item?.id}
+              className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >
               <td className="pl-10">{inx + 1}</td>
               <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
@@ -113,7 +95,7 @@ const OrderView = () => {
                 {item?.customer?.phone_number}
               </td>
               <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.phone_number}
+                {item?.customer?.district?.name}
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 {item?.market?.name}
@@ -128,12 +110,26 @@ const OrderView = () => {
                 </span>
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                <span>
-                  {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}{" "}
-                </span>
+                {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 {item?.items.length}
+              </td>
+              <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                {item?.status === "sold" || item?.status === "cancelled" ? (
+                  <Button>
+                    <AlertCircle />
+                  </Button>
+                ) : (
+                  <div className="flex gap-3">
+                    <Button className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80">
+                      Sotish
+                    </Button>
+                    <Button className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80">
+                      Bekor qilish
+                    </Button>
+                  </div>
+                )}
               </td>
             </tr>
           ))}
@@ -170,4 +166,4 @@ const OrderView = () => {
   );
 };
 
-export default memo(OrderView);
+export default memo(OrderTableComp);

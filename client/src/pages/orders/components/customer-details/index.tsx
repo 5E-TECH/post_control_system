@@ -2,26 +2,20 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { Spin } from "antd";
-// import { useSelector } from "react-redux";
-// import type { RootState } from "../../../../app/store";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 
 const CustomerDetails = () => {
-  const marketId = localStorage.getItem("marketId") || "";
-  const { getOrderByMarket } = useOrder();
-
-  // const user = useSelector((state: RootState) => state.roleSlice);
-  // const role = user.role
-  // useEffect(() => {
-      
-    
-
-  // }, [role,user]);
-
-  const { data } = getOrderByMarket(marketId);
-  const myNewOrders = data?.data;
+  const { getOrders, getMarketsByMyNewOrders } = useOrder();
+  const user = useSelector((state: RootState) => state.roleSlice);
+  const role = user.role;
 
   const [loading, setLoading] = useState(true);
 
+  const { data } =
+    role === "superadmin" ? getOrders() : getMarketsByMyNewOrders();
+
+  const myNewOrders = data?.data || [];
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
