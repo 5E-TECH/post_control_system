@@ -60,7 +60,7 @@ const CustomerInfoOrder = () => {
   return (
     <Context.Provider value={contextValue}>
       {contextHolder}
-      <div className="flex gap-6 px-6 pt-6 bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
+      <div className="flex gap-6 px-6 pt-6">
         <div className="w-fit h-fit pr-[81px]">
           <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
             Process
