@@ -126,6 +126,26 @@ export class CashBoxService
       if (!myCashbox) {
         throw new NotFoundException('Cashbox not found');
       }
+      const cashboxHistory = await this.cashboxHistoryRepo.find({
+        where: { cashbox_id: myCashbox.id },
+      });
+
+      let income: number = 0;
+      let outcome: number = 0;
+
+      for (const history of cashboxHistory) {
+        if (history.operation_type === Operation_type.INCOME) {
+          income += history.amount;
+        } else {
+          outcome += history.amount;
+        }
+      }
+
+      return successRes(
+        { myCashbox, cashboxHistory, income, outcome },
+        200,
+        'Cashbox details',
+      );
       return successRes(myCashbox, 200, 'My cashbox');
     } catch (error) {
       return catchError(error);
@@ -388,6 +408,57 @@ export class CashBoxService
 
   async financialBalance() {
     try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+      const mainBalance: object = {
+        cashboxId: mainCashbox?.id,
+        balance: mainCashbox?.balance,
+      };
+      const allCourierCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_COURIER },
+      });
+      let courierBalanses: object[] = [];
+      for(const cashbox of allCourierCashboxes){}
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allCashboxesTotal() {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      const courierCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_COURIER },
+      });
+
+      const marketCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_MARKET },
+      });
+
+      const allCashboxHistories = await this.cashboxHistoryRepo.find({
+        order: { created_at: 'DESC' },
+      });
+
+      let courierCashboxTotal: number = 0;
+      let marketCashboxTotal: number = 0;
+      for (const cashbox of courierCashboxes) {
+        courierCashboxTotal += Number(cashbox.balance);
+      }
+      for (const cashbox of marketCashboxes) {
+        marketCashboxTotal += Number(cashbox.balance);
+      }
+      return successRes({
+        mainCashboxTotal: Number(mainCashbox.balance),
+        courierCashboxTotal,
+        marketCashboxTotal,
+        allCashboxHistories,
+      });
     } catch (error) {
       return catchError(error);
     }

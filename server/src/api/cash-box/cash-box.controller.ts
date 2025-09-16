@@ -76,4 +76,11 @@ export class CasheBoxController {
   ) {
     return this.cashBoxService.paymentsToMarket(user, paymentToMarketDto);
   }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @Get('all-info')
+  allCashboxesInfo() {
+    return this.cashBoxService.allCashboxesTotal();
+  }
 }

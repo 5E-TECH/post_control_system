@@ -36,6 +36,7 @@ export enum Source_type {
   CORRECTION = 'correction',
   SELL = 'sell',
   CANCEL = 'cancel',
+  EXTRA_COST = 'extra_cost',
 }
 
 export enum Order_status {

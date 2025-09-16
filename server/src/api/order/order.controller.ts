@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -35,8 +36,12 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get()
-  findAll() {
-    return this.orderService.allOrders();
+  findAll(
+    @Query('status') status?: string,
+    @Query('marketId') marketId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.orderService.allOrders({ status, marketId, search });
   }
 
   @UseGuards(JwtGuard, RolesGuard)
@@ -117,6 +122,13 @@ export class OrderController {
     @Body() cancelDto: SellCancelOrderDto,
   ) {
     return this.orderService.cancelOrder(currentUser, id, cancelDto);
+  }
+
+  @UseGuards()
+  @AcceptRoles(Roles.COURIER)
+  @Post('rollback/:id')
+  rollbackOrder(@CurrentUser() user: JwtPayload, @Param() id: string) {
+    return this.orderService.rollbackOrderToWaiting(user, id);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
