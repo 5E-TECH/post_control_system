@@ -71,12 +71,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     super(orderRepo);
   }
 
-  async allOrders() {
+  async allOrders(query: {
+    status?: string;
+    marketId?: string;
+    search?: string;
+  }) {
     try {
-      const allOrders = await this.orderRepo.find({
-        order: { created_at: 'DESC' },
-        relations: ['customer', 'customer.district', 'market', 'items'],
-      });
+      const qb = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('order.items', 'items')
+        .orderBy('order.created_at', 'DESC');
+
+      if (query.status) {
+        qb.andWhere('order.status = :status', { status: query.status });
+      }
+
+      if (query.marketId) {
+        qb.andWhere('market.id = :marketId', { marketId: query.marketId });
+      }
+
+      if (query.search) {
+        qb.andWhere(
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          { search: `%${query.search}%` },
+        );
+      }
+
+      const allOrders = await qb.getMany();
 
       return successRes(allOrders, 200, 'All orders');
     } catch (error) {
