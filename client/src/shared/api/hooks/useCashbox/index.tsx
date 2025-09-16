@@ -10,5 +10,11 @@ export const useCashBox = () => {
       queryFn: () => api.get(`cashbox/user/${id}`).then((res) => res.data),
     });
 
-  return { getCashBoxById };
+  const getCashBoxInfo = () =>
+    useQuery({
+      queryKey: [cashbox],
+      queryFn: () => api.get(`cashbox/all-info`).then((res) => res.data),
+    });
+
+  return { getCashBoxById, getCashBoxInfo };
 };

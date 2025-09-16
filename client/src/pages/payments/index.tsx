@@ -6,30 +6,36 @@ import { X } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 import { useCourier } from "../../shared/api/hooks/useCourier";
+import { useCashBox } from "../../shared/api/hooks/useCashbox";
 
 const Payments = () => {
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
 
   const [select, setSelect] = useState("");
-  console.log(select);
-  
 
   const navigate = useNavigate();
 
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
+  const { getCashBoxInfo } = useCashBox();
+
+  const { data: cashBoxData } = getCashBoxInfo();
+  console.log(cashBoxData);
 
   const { data } = getMarkets();
   const { data: courierData } = getCourier();
 
-  console.log(courierData);
-
-  const handleNavigate = () => {
-    navigate("cash-detail", { state: { market: { select }} });
+  const handleNavigate = (role: "market" | "courier" | "pochta") => {
+    navigate("cash-detail", {
+      state: {
+        role,
+        id: select,
+      },
+    });
     setSelect("");
     setShowMarket(false);
-    setShowCurier(false)
+    setShowCurier(false);
   };
 
   const { pathname } = useLocation();
@@ -53,7 +59,7 @@ const Payments = () => {
           <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d]">
             <button
               onClick={() => setShowMarket(false)}
-              className="cursor-pointer bg-red-600 hover:bg-red-700 text-white p-2 rounded- ml-111 flex items-center justify-center shadow-md"
+              className="cursor-pointer hover:bg-red-700 text-white p-2 rounded- ml-111 flex items-center justify-center shadow-md"
             >
               <X size={18} />
             </button>
@@ -102,7 +108,7 @@ const Payments = () => {
             </div>
             <div className="pl-89 py-2">
               <button
-                onClick={() => handleNavigate()}
+                onClick={() => handleNavigate("market")}
                 className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
               >
                 Selected
@@ -112,7 +118,7 @@ const Payments = () => {
         </Popup>
 
         <div
-          onClick={() => handleNavigate()}
+          onClick={() => handleNavigate("pochta")}
           className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Kassadagi miqdor</h3>
@@ -177,7 +183,7 @@ const Payments = () => {
                         item.id == select ? "bg-gray-100" : ""
                       }`}
                     >
-                      <td className="text-[#8C57FF] pr-10 py-3">1</td>
+                      <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
                       <td className="pr-26 py-3">{item?.name}</td>
                       <td className="pr-10 py-3">{item?.region?.name}</td>
                     </tr>
@@ -187,7 +193,7 @@ const Payments = () => {
             </div>
             <div className="pl-89 py-2">
               <button
-                onClick={() => handleNavigate()}
+                onClick={() => handleNavigate("courier")}
                 className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
               >
                 Selected
