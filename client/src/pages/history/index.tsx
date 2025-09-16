@@ -82,7 +82,7 @@ const Dashboard = () => {
                 bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
               }`}
             >
-              Bugungi holat:{" "}
+              Hozirgi holat:{" "}
               {bugungiHolat >= 0 ? `+${bugungiHolat}` : bugungiHolat}
             </h2>
           </div>
@@ -98,7 +98,7 @@ const Dashboard = () => {
                 <ReferenceLine y={0} stroke="#000" />
                 <Bar dataKey="value">
                   {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                    <Cell key={`Cell-${index}`} fill={entry.fill} />
                   ))}
                 </Bar>
               </BarChart>
@@ -107,108 +107,105 @@ const Dashboard = () => {
         </div>
 
         {/* O'ngda bitta umumiy table */}
-        <div className="md:col-span-2 bg-white p-6 rounded-2xl shadow">
-          <h3 className="text-xl font-semibold mb-6">
-            Do'konlar va Kurierlar
-          </h3>
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <table className="w-full border-collapse text-lg relative">
-              <thead>
-                <tr className="border-b text-left bg-gray-50">
-                  <th className="p-3">Do'konlar</th>
-                  <th className="p-3 border-r-2 border-gray-300">Summasi</th>
-                  <th className="p-3">Kurierlar</th>
-                  <th className="p-3">Summasi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({
-                  length: Math.max(markets.length, couriers.length),
-                }).map((_, idx) => (
-                  <tr key={idx} className="border-b">
-                    {/* Do'konlar */}
-                    <td className="p-3">{markets[idx]?.name || ""}</td>
-                    <td
-                      className={`p-3 border-r-2 border-gray-300 ${
-                        markets[idx]?.amount >= 0
-                          ? "text-green-500"
-                          : "text-red-500"
-                      }`}
-                    >
-                      {markets[idx]
-                        ? markets[idx].amount >= 0
-                          ? `+${markets[idx].amount}`
-                          : markets[idx].amount
-                        : ""}
-                    </td>
+        <div className="md:col-span-2 bg-white p-6 rounded-2xl">
+  <h3 className="text-xl font-semibold mb-6">Do'konlar va Kurierlar</h3>
 
-                    {/* Kurierlar */}
-                    <td className="p-3">
-                      {couriers[idx]?.name ? (
-                        <div>
-                          <div>{couriers[idx].name}</div>
-                          <div className="text-sm text-gray-500">
-                            {couriers[idx].region}
-                          </div>
-                        </div>
-                      ) : (
-                        ""
-                      )}
-                    </td>
-                    <td
-                      className={`p-3 ${
-                        couriers[idx]?.amount >= 0
-                          ? "text-green-500"
-                          : "text-red-500"
-                      }`}
-                    >
-                      {couriers[idx]
-                        ? couriers[idx].amount >= 0
-                          ? `+${couriers[idx].amount}`
-                          : couriers[idx].amount
-                        : ""}
-                    </td>
-                  </tr>
-                ))}
+  <div className="grid md:grid-cols-2 gap-6">
+    {/* Do'konlar jadvali */}
+    <div className="bg-white rounded-xl border p-4 flex flex-col">
+      <h4 className="text-lg font-semibold mb-3">Do'konlar</h4>
+      <div className="overflow-y-auto max-h-[400px]">
+        <table className="w-full border-collapse text-lg">
+          <thead>
+            <tr className="border-b text-left bg-gray-50">
+              <th className="p-3">Nomi</th>
+              <th className="p-3">Summasi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {markets.map((m, idx) => (
+              <tr key={idx} className="border-b">
+                <td className="p-3">{m.name}</td>
+                <td
+                  className={`p-3 ${
+                    m.amount >= 0 ? "text-green-500" : "text-red-500"
+                  }`}
+                >
+                  {m.amount >= 0 ? `+${m.amount}` : m.amount}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {/* Total */}
+          <tfoot>
+            <tr className="font-bold bg-gray-100 sticky bottom-0">
+              <td className="p-3">Total</td>
+              <td
+                className={`p-3 ${
+                  totalMarket >= 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {totalMarket}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
 
-                {/* Totallar */}
-                <tr className="font-bold bg-white sticky bottom-12 border-t">
-                  <td className="p-3">Do'konlar Total</td>
-                  <td
-                    className={`p-3 border-r-2 border-gray-300 ${
-                      totalMarket >= 0 ? "text-green-600" : "text-red-600"
-                    }`}
-                  >
-                    {totalMarket}
-                  </td>
-                  <td className="p-3">Kurierlar Total</td>
-                  <td
-                    className={`p-3 ${
-                      totalCourier >= 0 ? "text-green-600" : "text-red-600"
-                    }`}
-                  >
-                    {totalCourier}
-                  </td>
-                </tr>
+    {/* Kurierlar jadvali */}
+    <div className="bg-white rounded-xl border p-4 flex flex-col">
+      <h4 className="text-lg font-semibold mb-3">Kurierlar</h4>
+      <div className="overflow-y-auto max-h-[400px]">
+        <table className="w-full border-collapse text-lg">
+          <thead>
+            <tr className="border-b text-left bg-gray-50">
+              <th className="p-3">Nomi</th>
+              <th className="p-3">Summasi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {couriers.map((c, idx) => (
+              <tr key={idx} className="border-b">
+                <td className="p-3">
+                  <div>{c.name}</div>
+                  <div className="text-sm text-gray-500">{c.region}</div>
+                </td>
+                <td
+                  className={`p-3 ${
+                    c.amount >= 0 ? "text-green-500" : "text-red-500"
+                  }`}
+                >
+                  {c.amount >= 0 ? `+${c.amount}` : c.amount}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {/* Total */}
+          <tfoot>
+            <tr className="font-bold bg-gray-100 sticky bottom-0">
+              <td className="p-3">Total</td>
+              <td
+                className={`p-3 ${
+                  totalCourier >= 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {totalCourier}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
 
-                {/* Balans */}
-                <tr className="font-bold bg-gray-100 sticky bottom-0">
-                  <td colSpan={2} className="p-3 border-r-2 border-gray-300">
-                    Balans
-                  </td>
-                  <td
-                    colSpan={2}
-                    className={`p-3 text-xl ${
-                      balans >= 0 ? "text-green-700" : "text-red-700"
-                    }`}
-                  >
-                    {balans >= 0 ? `+${balans}` : balans}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+  {/* Balans umumiy */}
+  <div className="mt-6 bg-gray-50 p-4 rounded-xl font-bold text-xl text-center sticky bottom-0"> Balans: 
+    <span className={balans >= 0 ? "text-green-700" : "text-red-700"}>
+      {balans >= 0 ? `+${balans}` : balans}
+    </span>
+  </div>
+</div>
       </div>
     </div>
   );
