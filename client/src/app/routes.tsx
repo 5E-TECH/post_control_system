@@ -1,8 +1,14 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
-import WaitingOrders from "../pages/orders/components/courier/waiting-orders";
-import AllOrders from "../pages/orders/components/courier/all-orders";
-import CancelledOrders from "../pages/orders/components/courier/cancelled-orders";
+const WaitingOrders = lazy(
+  () => import("../pages/orders/components/courier/waiting-orders")
+);
+const AllOrders = lazy(
+  () => import("../pages/orders/components/courier/all-orders")
+);
+const CancelledOrders = lazy(
+  () => import("../pages/orders/components/courier/cancelled-orders")
+);
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -137,7 +143,7 @@ const AppRouters = () => {
                   element: <CourierOrder />,
                 },
                 {
-                  path: "orders", 
+                  path: "orders",
                   element: <CourierOrder />,
                   children: [
                     { index: true, element: <WaitingOrders /> },
