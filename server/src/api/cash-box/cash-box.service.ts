@@ -408,6 +408,19 @@ export class CashBoxService
 
   async financialBalance() {
     try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+      const mainBalance: object = {
+        cashboxId: mainCashbox?.id,
+        balance: mainCashbox?.balance,
+      };
+      const allCourierCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_COURIER },
+      });
+      let courierBalanses: object[] = [];
+      for(const cashbox of allCourierCashboxes){}
     } catch (error) {
       return catchError(error);
     }
