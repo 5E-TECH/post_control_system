@@ -30,6 +30,19 @@ export const usePost = () => {
       queryFn: () => api.get("post/courier/old-posts").then((res) => res.data),
     });
 
+  const getRejectedPostsCourier = () =>
+    useQuery({
+      queryKey: [post],
+      queryFn: () => api.get("post/rejected").then((res) => res.data),
+    });
+
+  const getRejectedPostsByPostId = (id: string) =>
+    useQuery({
+      queryKey: [post, id],
+      queryFn: () =>
+        api.get(`post/orders/rejected/${id}`).then((res) => res.data),
+    });
+
   const sendAndGetCouriersByPostId = () =>
     useMutation({
       mutationFn: (id: string) =>
@@ -56,7 +69,7 @@ export const usePost = () => {
         api.post("post/cancel", data).then((res) => res.data),
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
-  
+
   const receiveCanceledPost = () =>
     useMutation({
       mutationFn: ({ id, data }: { id: string; data: any }) =>
@@ -69,6 +82,8 @@ export const usePost = () => {
     getPostById,
     sendAndGetCouriersByPostId,
     getOldPostsCourier,
+    getRejectedPostsCourier,
+    getRejectedPostsByPostId,
     sendPost,
     receivePost,
     canceledPost,
