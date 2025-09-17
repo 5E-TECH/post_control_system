@@ -114,7 +114,7 @@ const AllOrders = () => {
           <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
             <tr>
               <th>
-                <div className="flex items-center gap-10 ml-10">
+                <div className="flex items-center gap-10 pl-10 pr-5">
                   <span>#</span>
                 </div>
               </th>
