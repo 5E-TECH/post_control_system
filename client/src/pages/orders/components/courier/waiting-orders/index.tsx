@@ -1,11 +1,12 @@
 import { memo } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import EmptyPage from "../../../../../shared/components/empty-page";
 
 const WaitingOrders = () => {
   const { getCourierOrders } = useOrder();
   const { data } = getCourierOrders({ status: "waiting" });
-  return (
+  return data?.data?.length > 0 ? (
     <div>
       <table className="w-full">
         <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
@@ -123,6 +124,10 @@ const WaitingOrders = () => {
           <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
         </div>
       </div>
+    </div>
+  ) : (
+    <div className="h-[65vh]">
+      <EmptyPage />
     </div>
   );
 };
