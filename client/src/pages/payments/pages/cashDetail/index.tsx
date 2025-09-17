@@ -7,13 +7,20 @@ import logo from "../../../../shared/assets/logo.svg";
 import { ChevronRight, Eye, EyeOff } from "lucide-react";
 import CountUp from "react-countup";
 // import { Button } from "antd";
+import { useEffect } from "react";
+import { Select } from "antd";
 
 const CashDetail = () => {
   const [form, setForm] = useState({
     from: "",
     to: "",
     order: "",
+    payment: "",
+    summa: "",
+    market: "",
   });
+
+  console.log(form);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -25,13 +32,25 @@ const CashDetail = () => {
   //   // shu yerda API chaqirishingiz yoki filtrni ishlatishingiz mumkin
   // };
 
+  useEffect(() => {
+    if(form.payment != "click_to_market"){
+      setForm((prev) => ({ ...prev, market: "" }));
+    }
+  }, [form.payment])
+
   const location = useLocation();
   const market = location.state;
 
   const [show, setShow] = useState(true);
 
   const { getCashBoxById } = useCashBox();
-  const { data } = getCashBoxById(market.id);
+  const { data, refetch } = getCashBoxById(market.id);
+
+
+  useEffect(() => {
+    refetch();
+  }, []);
+
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
   return (
@@ -64,12 +83,7 @@ const CashDetail = () => {
           <div className="flex items-center gap-3">
             <p className="text-[40px] font-medium w-[300px]">
               {show ? (
-                <CountUp
-                  end={raw}
-                  duration={1.0}
-                  separator=" " 
-                  suffix=" UZS" 
-                />
+                <CountUp end={raw} duration={1.0} separator=" " suffix=" UZS" />
               ) : (
                 "●●●●●●● UZS"
               )}
@@ -85,6 +99,56 @@ const CashDetail = () => {
             </button>
           </div>
         </div>
+        {market.role != "market" && (
+          <div className="mt-5">
+            <h2>Qabul qilish (to'lash) </h2>
+            <div className="flex gap-4 items-center mt-3">
+              <input
+                name="summa"
+                value={form.summa}
+                onChange={handleChange}
+                className="border rounded-md px-2 py-0.75 border-[#d1cfd4] outline-none hover:border-blue-400 w-[150px]"
+                type="number"
+                placeholder="summa"
+              />
+              <Select
+                value={form.payment}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, payment: value }))
+                }
+                placeholder="To'lov turi"
+                className="w-[150px]"
+                options={[
+                  { value: "", label: "to'lov turi", disabled: true },
+                  { value: "cash", label: "cash" },
+                  { value: "click", label: "click" },
+                  { value: "click_to_market", label: "click_to_market" },
+                ]}
+              />
+              {form.payment == "click_to_market" && (
+                <Select
+                  value={form.market}
+                  onChange={(value) =>
+                    setForm((prev) => ({ ...prev, market: value }))
+                  }
+                  placeholder="Kassani tanlang"
+                  className="w-[150px]"
+                  options={[
+                    { value: "", label: "Market tanlang", disabled: true },
+                    ...(market?.data?.data?.map((item: any) => ({
+                      value: item.id,
+                      label: item.name,
+                    })) || []),
+                  ]}
+                />
+              )}
+            </div>
+
+            <button className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0]">
+              Qabul qilish
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="w-[50%]">
@@ -128,27 +192,28 @@ const CashDetail = () => {
         </div>
 
         <div className="h-[520px] mt-5 px-8 py-4 bg-[#ede8ff] dark:bg-[#3D3759] shadow-md rounded-lg overflow-y-auto">
-          {data?.data?.cashboxHistory.map((item: any, inx: number) => (
-            <div
-              key={inx}
-              className="flex gap-20 mb-3 border-b  border-gray-300 justify-between "
-            >
-              <div>
-                <h3 className="text-[25px] font-medium">
-                  {data?.data?.cashbox?.user?.name}
-                </h3>
-                <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
-                  <p>16.01.2020</p>
-                  <p>16:20</p>
+          {data?.data?.cashboxHistory &&
+            data?.data?.cashboxHistory.map((item: any, inx: number) => (
+              <div
+                key={inx}
+                className="flex gap-20 mb-3 border-b  border-gray-300 justify-between "
+              >
+                <div>
+                  <h3 className="text-[25px] font-medium">
+                    {data?.data?.cashbox?.user?.name}
+                  </h3>
+                  <div className="flex gap-3 text-[#787878] text-[14px] dark:text-gray-400">
+                    <p>16.01.2020</p>
+                    <p>16:20</p>
+                  </div>
+                </div>
+                <div>
+                  <strong className="text-[#068822] dark:text-green-500 text-[25px]">
+                    + {item?.amount}
+                  </strong>
                 </div>
               </div>
-              <div>
-                <strong className="text-[#068822] dark:text-green-500 text-[25px]">
-                  + {item?.amount}
-                </strong>
-              </div>
-            </div>
-          ))}
+            ))}
         </div>
       </div>
     </div>

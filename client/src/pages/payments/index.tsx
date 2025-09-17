@@ -7,12 +7,15 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 import { useCourier } from "../../shared/api/hooks/useCourier";
 import { useCashBox } from "../../shared/api/hooks/useCashbox";
+import CountUp from "react-countup";
+import { useEffect } from "react";
 
 const Payments = () => {
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
 
-  const [select, setSelect] = useState("");
+
+  const [select, setSelect] = useState(null);
 
   const navigate = useNavigate();
 
@@ -20,25 +23,32 @@ const Payments = () => {
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
 
-  const { data: cashBoxData } = getCashBoxInfo();
-  console.log(cashBoxData);
+  const { data: cashBoxData, refetch } = getCashBoxInfo();
+  // refetch()
 
   const { data } = getMarkets();
   const { data: courierData } = getCourier();
+
 
   const handleNavigate = (role: "market" | "courier" | "pochta") => {
     navigate("cash-detail", {
       state: {
         role,
         id: select,
+        data:data
       },
     });
-    setSelect("");
+    setSelect(null);
     setShowMarket(false);
+    select;
     setShowCurier(false);
   };
 
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    refetch();
+  }, [pathname]);
 
   if (pathname.startsWith("/payments/cash-detail")) {
     return <Outlet />;
@@ -52,7 +62,14 @@ const Payments = () => {
           className="py-15 rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Berilishi kerak</h3>
-          <strong className="block pt-3">10 000 000 UZS</strong>
+          <strong className="block pt-3 text-4xl">
+            <CountUp
+              end={cashBoxData?.data?.marketCashboxTotal || 0}
+              duration={1.5} // qancha sekundda sanashini belgilaydi
+              separator=" " // mingliklarni bo‘lib beradi
+              suffix=" UZS" // oxiriga UZS qo‘shadi
+            />
+          </strong>
         </div>
 
         <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
@@ -108,8 +125,9 @@ const Payments = () => {
             </div>
             <div className="pl-89 py-2">
               <button
+                disabled={!select ? true : false}
                 onClick={() => handleNavigate("market")}
-                className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
+                className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${!select ? "" : "hover:bg-blue-600"}  text-white rounded-md cursor-pointer ${!select ? "opacity-40" : ""}`}
               >
                 Selected
               </button>
@@ -122,7 +140,14 @@ const Payments = () => {
           className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Kassadagi miqdor</h3>
-          <strong className="block pt-3">40 000 000 UZS</strong>
+          <strong className="block pt-3 text-4xl">
+            <CountUp
+              end={cashBoxData?.data?.mainCashboxTotal || 0}
+              duration={1.5} // qancha sekundda sanashini belgilaydi
+              separator=" " // mingliklarni bo‘lib beradi
+              suffix=" UZS" // oxiriga UZS qo‘shadi
+            />
+          </strong>
         </div>
 
         <div
@@ -130,7 +155,14 @@ const Payments = () => {
           className="py-15 rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Olinishi kerak</h3>
-          <strong className="block pt-3">70 000 000 UZS</strong>
+          <strong className="block pt-3 text-4xl">
+            <CountUp
+              end={cashBoxData?.data?.courierCashboxTotal || 0}
+              duration={1.5} // qancha sekundda sanashini belgilaydi
+              separator=" " // mingliklarni bo‘lib beradi
+              suffix=" UZS" // oxiriga UZS qo‘shadi
+            />
+          </strong>
         </div>
 
         <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>
