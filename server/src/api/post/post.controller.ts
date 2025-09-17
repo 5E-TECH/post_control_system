@@ -97,7 +97,9 @@ export class PostController {
     return this.postService.receivePost(user, id, receivePostDto);
   }
 
-  @Post()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Post('cancel')
   canceledPost(
     @CurrentUser() user: JwtPayload,
     @Body() ordersArrayDto: OrdersArrayDto,
@@ -105,7 +107,9 @@ export class PostController {
     return this.postService.createCanceledPost(user, ordersArrayDto);
   }
 
-  @Post()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Post('cancel/receive/:id')
   receiveCanceledPost(
     @Param('id') id: string,
     @Body() ordersArrayDto: OrdersArrayDto,

@@ -71,3 +71,8 @@ export enum Post_status {
   CANCELED = 'canceled',
   CANCELED_RECEIVED = 'canceled_received',
 }
+
+export enum Manual_payment_methods {
+  CASH = 'cash',
+  CARD = 'card',
+}

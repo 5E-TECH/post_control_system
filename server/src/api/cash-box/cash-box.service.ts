@@ -525,9 +525,18 @@ export class CashBoxService
   }
 
   async spendMoney(user: JwtPayload, updateCashboxDto: UpdateCashBoxDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
     } catch (error) {
+      await queryRunner.rollbackTransaction();
       return catchError(error);
+    } finally {
+      await queryRunner.release();
     }
   }
 }
