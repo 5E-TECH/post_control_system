@@ -444,9 +444,10 @@ export class CashBoxService
       }
 
       const difference: number = couriersTotalBalanse + marketsTotalBalans;
-
+      const currentSituation = Number(mainCashbox.balance) + difference;
       return successRes(
         {
+          currentSituation,
           main: mainCashbox,
           markets: { allMarketCashboxes, marketsTotalBalans },
           couriers: { allCourierCashboxes, couriersTotalBalanse },
