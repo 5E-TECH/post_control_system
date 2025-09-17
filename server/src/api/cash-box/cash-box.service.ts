@@ -416,11 +416,45 @@ export class CashBoxService
         cashboxId: mainCashbox?.id,
         balance: mainCashbox?.balance,
       };
+
       const allCourierCashboxes = await this.cashboxRepo.find({
         where: { cashbox_type: Cashbox_type.FOR_COURIER },
       });
       let courierBalanses: object[] = [];
-      for(const cashbox of allCourierCashboxes){}
+      let couriersTotalBalanse: number = 0;
+      for (const cashbox of allCourierCashboxes) {
+        courierBalanses.push({
+          userId: cashbox.user_id,
+          balance: cashbox.balance,
+        });
+        couriersTotalBalanse += Number(cashbox.balance);
+      }
+
+      const allMarketCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_MARKET },
+      });
+      let marketCashboxes: object[] = [];
+      let marketsTotalBalans: number = 0;
+      for (const cashbox of allMarketCashboxes) {
+        marketCashboxes.push({
+          userId: cashbox.user_id,
+          balance: -Number(cashbox.balance),
+        });
+        marketsTotalBalans -= Number(cashbox.balance);
+      }
+
+      const difference: number = couriersTotalBalanse + marketsTotalBalans;
+
+      return successRes(
+        {
+          main: mainCashbox,
+          markets: { allMarketCashboxes, marketsTotalBalans },
+          couriers: { allCourierCashboxes, couriersTotalBalanse },
+          difference,
+        },
+        200,
+        'Financial balance infos',
+      );
     } catch (error) {
       return catchError(error);
     }
