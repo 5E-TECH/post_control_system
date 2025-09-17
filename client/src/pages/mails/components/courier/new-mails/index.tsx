@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
+import EmptyPage from "../../../../../shared/components/empty-page";
 
 const CourierNewMails = () => {
   const navigate = useNavigate();
@@ -43,8 +44,8 @@ const CourierNewMails = () => {
           </div>
         ))
       ) : (
-        <div className="col-span-4 flex justify-center">
-          <div className="text-[22px]">Yengi buyurtmalar mavjud emas</div>
+        <div className="col-span-4 flex justify-center h-[65vh] items-center">
+          <EmptyPage />
         </div>
       )}
     </div>

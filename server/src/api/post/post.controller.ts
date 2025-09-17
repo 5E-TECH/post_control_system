@@ -38,10 +38,10 @@ export class PostController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('rejected')
-  rejectedPosts(@CurrentUser() user: JwtPayload) {
-    return this.postService.rejectedPostsForCourier(user);
+  rejectedPosts() {
+    return this.postService.rejectedPosts();
   }
 
   @UseGuards(JwtGuard, RolesGuard)

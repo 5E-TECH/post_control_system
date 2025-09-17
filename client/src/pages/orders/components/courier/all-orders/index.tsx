@@ -3,6 +3,7 @@ import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { createContext, memo, useMemo } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import useNotification from "antd/es/notification/useNotification";
+import EmptyPage from "../../../../../shared/components/empty-page";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -106,7 +107,7 @@ const AllOrders = () => {
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
-  return (
+  return data?.data?.length > 0 ? (
     <Context.Provider value={contextValue}>
       {contextHolder}
       <div>
@@ -259,6 +260,10 @@ const AllOrders = () => {
         </div>
       </div>
     </Context.Provider>
+  ) : (
+    <div className="h-[65vh]">
+      <EmptyPage />
+    </div>
   );
 };
 

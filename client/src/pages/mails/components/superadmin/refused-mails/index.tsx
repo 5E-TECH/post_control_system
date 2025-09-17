@@ -1,12 +1,14 @@
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
+import EmptyPage from "../../../../../shared/components/empty-page";
 
 const RefusedMails = () => {
   const navigate = useNavigate();
   const { getAllPosts } = usePost();
   const { data } = getAllPosts("refused");
   const posts = Array.isArray(data?.data) ? data?.data : [];
+  
   return (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts?.length ? (
@@ -33,10 +35,8 @@ const RefusedMails = () => {
           </div>
         ))
       ) : (
-        <div className="col-span-4 flex justify-center">
-          <div className="text-[22px]">
-            Bekor qilingan buyurtmalar mavjud emas
-          </div>
+        <div className="col-span-4 flex justify-center h-[65vh] items-center">
+          <EmptyPage />
         </div>
       )}
     </div>
