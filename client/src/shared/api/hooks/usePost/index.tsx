@@ -36,6 +36,13 @@ export const usePost = () => {
       queryFn: () => api.get("post/rejected").then((res) => res.data),
     });
 
+  const getRejectedPostsByPostId = (id: string) =>
+    useQuery({
+      queryKey: [post, id],
+      queryFn: () =>
+        api.get(`post/orders/rejected/${id}`).then((res) => res.data),
+    });
+
   const sendAndGetCouriersByPostId = () =>
     useMutation({
       mutationFn: (id: string) =>
@@ -76,6 +83,7 @@ export const usePost = () => {
     sendAndGetCouriersByPostId,
     getOldPostsCourier,
     getRejectedPostsCourier,
+    getRejectedPostsByPostId,
     sendPost,
     receivePost,
     canceledPost,
