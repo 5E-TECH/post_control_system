@@ -87,6 +87,13 @@ export class PostController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @Get('orders/rejected/:id')
+  getAllRejectedOrdersByPostId(@Param('id') id: string) {
+    return this.postService.getRejectedPostsOrders(id);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Patch(':id')
   sendPost(@Param('id') id: string, @Body() orderIdsDto: SendPostDto) {
