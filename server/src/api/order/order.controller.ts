@@ -98,8 +98,12 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER)
   @Get('courier/orders')
-  getCouriersOrders(@CurrentUser() user: JwtPayload) {
-    return this.orderService.allCouriersOrders(user);
+  getCouriersOrders(
+    @CurrentUser() user: JwtPayload,
+    @Query('status') status: string,
+    @Query('search') search: string,
+  ) {
+    return this.orderService.allCouriersOrders(user, { status, search });
   }
 
   @UseGuards(JwtGuard, RolesGuard)
