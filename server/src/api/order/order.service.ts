@@ -471,21 +471,42 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async allCouriersOrders(user: JwtPayload) {
+  async allCouriersOrders(
+    user: JwtPayload,
+    query: { status?: string; search?: string },
+  ) {
     try {
       const allMyPosts = await this.postRepo.find({
         where: { courier_id: user.id },
       });
 
-      const allPostIds: string[] = [];
-      for (const post of allMyPosts) {
-        allPostIds.push(post.id);
+      const allPostIds: string[] = allMyPosts.map((post) => post.id);
+
+      if (!allPostIds.length) {
+        return successRes([], 200, 'No posts found for this courier');
       }
 
-      const allOrders = await this.orderRepo.find({
-        where: { post_id: In(allPostIds) },
-        relations: ['items', 'market', 'customer', 'customer.district'],
-      });
+      const qb = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .where('order.post_id IN (:...postIds)', { postIds: allPostIds })
+        .orderBy('order.created_at', 'DESC');
+
+      if (query.status) {
+        qb.andWhere('order.status = :status', { status: query.status });
+      }
+
+      if (query.search) {
+        qb.andWhere(
+          '(customer.name ILIKE :search OR customer.phone ILIKE :search)',
+          { search: `%${query.search}%` },
+        );
+      }
+
+      const allOrders = await qb.getMany();
 
       return successRes(allOrders, 200, 'All my orders');
     } catch (error) {
