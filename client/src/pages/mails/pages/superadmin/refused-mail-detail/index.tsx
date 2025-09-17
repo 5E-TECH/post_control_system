@@ -1,91 +1,44 @@
-import { createContext, memo, useEffect, useMemo, useState } from "react";
-import { Check, Trash } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "antd";
-import { usePost } from "../../../../../shared/api/hooks/usePost";
+import { createContext, memo, useEffect, useMemo, useState } from "react";
 import SearchInput from "../../../../users/components/search-input";
-import Popup from "../../../../../shared/ui/Popup";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { usePost } from "../../../../../shared/api/hooks/usePost";
+import { Trash } from "lucide-react";
 import useNotification from "antd/es/notification/useNotification";
 
 const Context = createContext({ name: "Default" });
 
-const MailDetail = () => {
+const RefusedMailDetail = () => {
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
-  
-  const { getPostById, sendAndGetCouriersByPostId, sendPost } = usePost();
-  const { data } = getPostById(id as string, "orders");
-  const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
-  const { mutate: sendCouriersToPost } = sendPost();
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  const { data } = usePost().getRejectedPostsByPostId(id as string);
   useEffect(() => {
     if (data?.data) {
       setSelectedIds(data.data.map((item: any) => item.id));
     }
   }, [data]);
 
-  const [isShow, setIsShow] = useState(false);
-  const [couriers, setCouriers] = useState<any[]>([]);
-
-  const handleClick = (id: string) => {
-    sendAndGetCouriers(id as string, {
-      onSuccess: (res) => {
-        if (res?.data?.moreThanOneCourier) {
-          setCouriers(res?.data?.couriers || []);
-          setIsShow(true);
-        } else {
-          const courierId = res?.data?.couriers?.[0]?.id;
-          const post = {
-            orderIds: selectedIds,
-            courierId,
-          };
-          sendCouriersToPost(
-            { id, data: post },
-            {
-              onSuccess: () => {
-                api.success({
-                  message: `✅ Pochta kuryerga jo'natildi`,
-                  placement: "topRight",
-                });
-                setTimeout(() => {
-                  navigate("/mails");
-                }, 1500);
-              },
-            }
-          );
-        }
-      },
-    });
-  };
-
-  const [selectedCourierId, setSelectedCourierId] = useState<string | null>(
-    null
-  );
-  const handleSelectedCourier = (id: string) => {
-    setSelectedCourierId(id);
-  };
-
   const [api, contextHolder] = useNotification();
   const navigate = useNavigate();
-  const handleConfirmCouriers = () => {
-    const post = {
-      orderIds: selectedIds,
-      courierId: selectedCourierId,
+  const { mutate: receiveCancelPost } = usePost().receiveCanceledPost();
+  const handleClick = () => {
+    const payload = {
+      order_ids: selectedIds,
     };
-
-    sendCouriersToPost(
-      { id: id as string, data: post },
+    receiveCancelPost(
+      { id: id as string, data: payload },
       {
-        onSuccess: (res) => {
-          const courierName = res?.data?.couriers?.[0]?.name;
+        onSuccess: () => {
           api.success({
-            message: `✅ Pochta ${courierName} kuryerga jo'natildi`,
+            message: "✅ Buyurtmalar muvaffaqiyatli qabul qilindi",
             placement: "topRight",
           });
           setTimeout(() => {
-            navigate("/mails");
+            navigate(-1);
           }, 1500);
         },
       }
@@ -93,10 +46,11 @@ const MailDetail = () => {
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
+
   return (
     <Context.Provider value={contextValue}>
       {contextHolder}
-      <div className="flex flex-col gap-5 p-5 h-[800px]">
+      <div className="flex flex-col gap-5 p-5">
         <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
           <div className="flex justify-between px-5 pt-5">
             <h1 className="text-2xl mt-1">
@@ -127,37 +81,37 @@ const MailDetail = () => {
                       }}
                     />
                   </th>
-                  <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       MIJOZ ISMI
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       TELEFON RAQAMI
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       TUMANI
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       PUL MIQDORI
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       DONA
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       HARAKATLAR
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -221,69 +175,14 @@ const MailDetail = () => {
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button
-            onClick={() => handleClick(id as string)}
-            className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
-          >
-            Po'chtani jo'natish
+        <div className="flex justify-end" onClick={handleClick}>
+          <Button className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!">
+            Po'chtani qabul qilish
           </Button>
         </div>
-
-        {isShow && (
-          <Popup isShow={isShow} onClose={() => setIsShow(false)}>
-            <div className="min-h-[450px] w-[450px] bg-[#ffffff] rounded-md">
-              <h1 className="text-[22px] text-center py-3">
-                Kuryerlar ro'yxati
-              </h1>
-
-              <div className="grid grid-cols-1 gap-3 p-3">
-                {couriers.map((courier: any) => (
-                  <div
-                    key={courier?.id}
-                    className="p-4 rounded-xl shadow-md flex items-center justify-between hover:shadow-lg transition cursor-pointer"
-                  >
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-800">
-                        {courier?.name}
-                      </h2>
-                      <p className="text-sm text-gray-500">
-                        📞 {courier?.phone_number || "Telefon raqami yo‘q"}
-                      </p>
-                    </div>
-
-                    <Button
-                      className={`${
-                        selectedCourierId === courier?.id
-                          ? "bg-[var(--color-bg-sy)]! text-white!"
-                          : ""
-                      }`}
-                      onClick={() => handleSelectedCourier(courier?.id)}
-                    >
-                      {selectedCourierId === courier?.id ? (
-                        <span className="flex items-center gap-1">
-                          Tanlandi <Check className="w-4 h-4 text-green-300" />
-                        </span>
-                      ) : (
-                        "Tanlash"
-                      )}
-                    </Button>
-                  </div>
-                ))}
-
-                <Button
-                  className="bg-[var(--color-bg-sy)]! text-white!"
-                  onClick={handleConfirmCouriers}
-                >
-                  Tasdiqlash
-                </Button>
-              </div>
-            </div>
-          </Popup>
-        )}
       </div>
     </Context.Provider>
   );
 };
 
-export default memo(MailDetail);
+export default memo(RefusedMailDetail);

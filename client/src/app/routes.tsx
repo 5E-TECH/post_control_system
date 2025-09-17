@@ -1,5 +1,6 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+import RefusedMailDetail from "../pages/mails/pages/superadmin/refused-mail-detail";
 const WaitingOrders = lazy(
   () => import("../pages/orders/components/courier/waiting-orders")
 );
@@ -206,6 +207,8 @@ const AppRouters = () => {
               path: "mails/:id",
               element: <MailDetail />,
             },
+            { path: "mails/refused/mails/:id", element: <RefusedMailDetail /> },
+
             {
               path: "courier-mails/:id",
               element: <CourierMailDetail />,

@@ -8,7 +8,6 @@ const RefusedMails = () => {
   const { getAllPosts } = usePost();
   const { data } = getAllPosts("rejected");
   const posts = Array.isArray(data?.data) ? data?.data : [];
-  console.log(posts)
   return (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts?.length ? (
@@ -17,7 +16,7 @@ const RefusedMails = () => {
             key={post?.id}
             className="min-h-[250px] shadow-lg rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]"
             onClick={() =>
-              navigate(`/mails/${post?.id}`, {
+              navigate(`/mails/refused/mails/${post?.id}`, {
                 state: { regionName: post?.region?.name },
               })
             }
