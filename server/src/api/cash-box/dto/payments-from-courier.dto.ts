@@ -35,7 +35,7 @@ export class CreatePaymentsFromCourierDto {
   @ApiProperty({
     type: String,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   payment_date: string;
 

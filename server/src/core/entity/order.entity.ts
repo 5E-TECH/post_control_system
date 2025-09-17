@@ -34,6 +34,9 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   post_id: string | null;
 
+  @Column({ type: 'uuid', nullable: true })
+  canceled_post_id: string | null;
+
   @Column({ type: 'varchar' })
   qr_code_token: string;
 
