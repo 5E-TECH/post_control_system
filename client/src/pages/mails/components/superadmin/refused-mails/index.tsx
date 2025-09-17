@@ -6,9 +6,9 @@ import EmptyPage from "../../../../../shared/components/empty-page";
 const RefusedMails = () => {
   const navigate = useNavigate();
   const { getAllPosts } = usePost();
-  const { data } = getAllPosts("refused");
+  const { data } = getAllPosts("rejected");
   const posts = Array.isArray(data?.data) ? data?.data : [];
-  
+  console.log(posts)
   return (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts?.length ? (
