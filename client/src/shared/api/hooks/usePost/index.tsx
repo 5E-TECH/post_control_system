@@ -52,13 +52,15 @@ export const usePost = () => {
 
   const canceledPost = () =>
     useMutation({
-      mutationFn: (data: any) => api.post("post", data).then((res) => res.data),
+      mutationFn: (data: any) =>
+        api.post("post/cancel", data).then((res) => res.data),
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
-
+  
   const receiveCanceledPost = () =>
     useMutation({
-      mutationFn: () => api.post("receive").then((res) => res.data),
+      mutationFn: ({ id, data }: { id: string; data: any }) =>
+        api.post(`post/cancel/receive/${id}`, data).then((res) => res.data),
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
   return {
