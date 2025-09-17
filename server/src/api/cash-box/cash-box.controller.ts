@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { CashBoxService } from './cash-box.service';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
@@ -19,10 +20,14 @@ import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
 
+@ApiTags('Cash Box')
+@ApiBearerAuth()
 @Controller('cashbox')
 export class CasheBoxController {
   constructor(private readonly cashBoxService: CashBoxService) {}
 
+  @ApiOperation({ summary: 'Get main cashbox summary' })
+  @ApiResponse({ status: 200, description: 'Main cashbox info' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('main')
@@ -30,6 +35,9 @@ export class CasheBoxController {
     return this.cashBoxService.getMainCashbox();
   }
 
+  @ApiOperation({ summary: 'Get cashbox by user ID' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'Cashbox info for user' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('user/:id')
@@ -37,6 +45,8 @@ export class CasheBoxController {
     return this.cashBoxService.getCashboxByUserId(id);
   }
 
+  @ApiOperation({ summary: 'Get my cashbox (courier/market)' })
+  @ApiResponse({ status: 200, description: 'Own cashbox info' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER, Roles.MARKET)
   @Get('my-cashbox')
@@ -44,6 +54,9 @@ export class CasheBoxController {
     return this.cashBoxService.myCashbox(user);
   }
 
+  @ApiOperation({ summary: 'Accept payment from courier' })
+  @ApiBody({ type: CreatePaymentsFromCourierDto })
+  @ApiResponse({ status: 201, description: 'Payment from courier recorded' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('payment/courier')
@@ -54,6 +67,9 @@ export class CasheBoxController {
     return this.cashBoxService.paymentsFromCourier(user, paymentFromCourierDto);
   }
 
+  @ApiOperation({ summary: 'Payment to market' })
+  @ApiBody({ type: PaymentsToMarketDto })
+  @ApiResponse({ status: 201, description: 'Payment to market recorded' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('payment/market')
@@ -64,6 +80,8 @@ export class CasheBoxController {
     return this.cashBoxService.paymentsToMarket(user, paymentToMarketDto);
   }
 
+  @ApiOperation({ summary: 'Get all cashboxes total info' })
+  @ApiResponse({ status: 200, description: 'Totals and aggregates' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get('all-info')
@@ -71,6 +89,8 @@ export class CasheBoxController {
     return this.cashBoxService.allCashboxesTotal();
   }
 
+  @ApiOperation({ summary: 'Get financial balance' })
+  @ApiResponse({ status: 200, description: 'Financial balance info' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('financial-balanse')

@@ -1,8 +1,10 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { CashboxHistoryService } from './cashbox-history.service';
 import { CreateCashboxHistoryDto } from './dto/create-cashbox-history.dto';
 import { UpdateCashboxHistoryDto } from './dto/update-cashbox-history.dto';
 
+@ApiTags('Cashbox History')
 @Controller('cashbox-history')
 export class CashboxHistoryController {
   constructor(private readonly cashboxHistoryService: CashboxHistoryService) {}

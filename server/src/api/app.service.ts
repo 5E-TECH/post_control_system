@@ -36,13 +36,26 @@ export default class Application {
     const api = 'api/v1';
     app.setGlobalPrefix(api);
     const config_swagger = new DocumentBuilder()
-      .setTitle('Base app')
-      .setVersion('1.0')
+      .setTitle('Post Control System API')
+      .setDescription('A comprehensive API for managing post delivery operations, including orders, users, markets, couriers, and post management')
+      .setVersion('1.0.0')
       .addBearerAuth({
         type: 'http',
         scheme: 'Bearer',
         in: 'Header',
+        description: 'JWT Authorization header using the Bearer scheme',
       })
+      .addTag('Users', 'User management endpoints including authentication, admin, courier, market, and customer operations')
+      .addTag('Orders', 'Order management endpoints for creating, tracking, and managing delivery orders')
+      .addTag('Posts', 'Post management endpoints for handling delivery posts and courier assignments')
+      .addTag('Products', 'Product catalog management')
+      .addTag('Regions', 'Geographic region management')
+      .addTag('Districts', 'District management within regions')
+      .addTag('Cash Box', 'Financial operations and cash management')
+      .addTag('Dashboard', 'Dashboard and analytics endpoints')
+      .addTag('Bot', 'Telegram bot integration endpoints')
+      .setContact('Development Team', '', 'dev@postcontrol.com')
+      .setLicense('Private License', '')
       .build();
 
     const documentFactory = () =>
