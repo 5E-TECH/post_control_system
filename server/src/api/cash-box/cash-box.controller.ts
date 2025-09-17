@@ -83,4 +83,11 @@ export class CasheBoxController {
   allCashboxesInfo() {
     return this.cashBoxService.allCashboxesTotal();
   }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('financial-balanse')
+  finacialBalance() {
+    return this.cashBoxService.financialBalance();
+  }
 }
