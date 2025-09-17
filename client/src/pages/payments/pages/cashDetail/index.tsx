@@ -9,6 +9,7 @@ import CountUp from "react-countup";
 // import { Button } from "antd";
 import { useEffect } from "react";
 import { Select } from "antd";
+import TextArea from "antd/es/input/TextArea";
 
 const CashDetail = () => {
   const [form, setForm] = useState({
@@ -18,11 +19,12 @@ const CashDetail = () => {
     payment: "",
     summa: "",
     market: "",
+    comment: "",
   });
 
-  console.log(form);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
@@ -33,19 +35,45 @@ const CashDetail = () => {
   // };
 
   useEffect(() => {
-    if(form.payment != "click_to_market"){
+    if (form.payment != "click_to_market") {
       setForm((prev) => ({ ...prev, market: "" }));
     }
-  }, [form.payment])
+  }, [form.payment]);
 
   const location = useLocation();
   const market = location.state;
 
   const [show, setShow] = useState(true);
 
-  const { getCashBoxById } = useCashBox();
+  const { getCashBoxById, createPaymentCourier } = useCashBox();
   const { data, refetch } = getCashBoxById(market.id);
 
+  const handleSubmit = () => {
+    const data = {
+      courier_id: market?.id, // yoki data?.data?.cashbox?.user?.id bo'lishi mumkin
+      amount: Number(form.summa),
+      payment_method: form.payment,
+      payment_date: new Date().toISOString(), // hozirgi vaqt
+      comment: form.comment,
+      market_id: form.market || null, // click_to_market bo‘lsa keladi
+    };
+
+    createPaymentCourier.mutate(data, {
+      onSuccess: () => {
+        setForm({
+          from: "",
+          to: "",
+          order: "",
+          payment: "",
+          summa: "",
+          market: "",
+          comment: "",
+        });
+
+        refetch();
+      },
+    });
+  };
 
   useEffect(() => {
     refetch();
@@ -143,10 +171,18 @@ const CashDetail = () => {
                 />
               )}
             </div>
-
-            <button className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0]">
-              Qabul qilish
-            </button>
+            <div className="mt-5">
+              <TextArea
+                name="comment"
+                value={form.comment}
+                onChange={handleChange}
+                placeholder="Autosize height based on content lines"
+                autoSize
+              />
+              <button onClick={() => handleSubmit()} className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0]">
+                Qabul qilish
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -208,8 +244,8 @@ const CashDetail = () => {
                   </div>
                 </div>
                 <div>
-                  <strong className="text-[#068822] dark:text-green-500 text-[25px]">
-                    + {item?.amount}
+                  <strong className={`text-[#068822] dark:text-green-500 text-[25px] ${item?.operation_type == "expense" ? "text-red-500" : ""}`}>
+                    {item?.operation_type == "expense" ? "-" : "+"} {item?.amount}
                   </strong>
                 </div>
               </div>
