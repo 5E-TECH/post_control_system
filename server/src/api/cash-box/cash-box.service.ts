@@ -29,6 +29,7 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
+import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 
 @Injectable()
 export class CashBoxService
@@ -74,7 +75,31 @@ export class CashBoxService
       const mainCashbox = await this.cashboxRepo.findOne({
         where: { cashbox_type: Cashbox_type.MAIN },
       });
-      return successRes(mainCashbox, 200, 'Main cashbox');
+
+      if (!mainCashbox) {
+        throw new NotFoundException('Main cashbox not found');
+      }
+
+      const cashboxHistory = await this.cashboxHistoryRepo.find({
+        where: { cashbox_id: mainCashbox.id },
+      });
+
+      let income = 0;
+      let outcome = 0;
+
+      for (const history of cashboxHistory) {
+        if (history.operation_type === Operation_type.INCOME) {
+          income += history.amount;
+        } else {
+          outcome += history.amount;
+        }
+      }
+
+      return successRes(
+        { cashbox: mainCashbox, cashboxHistory, income, outcome },
+        200,
+        'Main cashbox details',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -494,6 +519,13 @@ export class CashBoxService
         marketCashboxTotal,
         allCashboxHistories,
       });
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async spendMoney(user: JwtPayload, updateCashboxDto: UpdateCashBoxDto) {
+    try {
     } catch (error) {
       return catchError(error);
     }

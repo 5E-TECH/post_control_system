@@ -23,19 +23,6 @@ import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
 export class CasheBoxController {
   constructor(private readonly cashBoxService: CashBoxService) {}
 
-  @Get()
-  getBalance() {
-    return this.cashBoxService.findAll();
-  }
-
-  @Patch(':id')
-  updateBalance(
-    @Param('id') id: string,
-    @Body() updateCasheBoxDto: UpdateCashBoxDto,
-  ) {
-    return this.cashBoxService.update(id, updateCasheBoxDto);
-  }
-
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('main')
