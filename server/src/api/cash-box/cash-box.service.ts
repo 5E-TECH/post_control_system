@@ -120,6 +120,7 @@ export class CashBoxService
       }
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: { cashbox_id: cashbox.id },
+        relations: ['createdByUser'],
       });
 
       let income: number = 0;
