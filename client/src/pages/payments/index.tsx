@@ -14,7 +14,6 @@ const Payments = () => {
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
 
-
   const [select, setSelect] = useState(null);
 
   const navigate = useNavigate();
@@ -29,13 +28,12 @@ const Payments = () => {
   const { data } = getMarkets();
   const { data: courierData } = getCourier();
 
-
   const handleNavigate = (role: "market" | "courier" | "pochta") => {
     navigate("cash-detail", {
       state: {
         role,
         id: select,
-        data:data
+        data: data,
       },
     });
     setSelect(null);
@@ -50,7 +48,7 @@ const Payments = () => {
     refetch();
   }, [pathname]);
 
-  if (pathname.startsWith("/payments/cash-detail")) {
+  if (pathname.startsWith("/payments/")) {
     return <Outlet />;
   }
 
@@ -127,7 +125,11 @@ const Payments = () => {
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate("market")}
-                className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${!select ? "" : "hover:bg-blue-600"}  text-white rounded-md cursor-pointer ${!select ? "opacity-40" : ""}`}
+                className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
+                  !select ? "" : "hover:bg-blue-600"
+                }  text-white rounded-md cursor-pointer ${
+                  !select ? "opacity-40" : ""
+                }`}
               >
                 Selected
               </button>
@@ -136,7 +138,13 @@ const Payments = () => {
         </Popup>
 
         <div
-          onClick={() => handleNavigate("pochta")}
+          onClick={() =>
+            navigate("main-cashbox", {
+              state: {
+                role:"pochta"
+              },
+            })
+          }
           className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Kassadagi miqdor</h3>

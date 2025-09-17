@@ -1,5 +1,6 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+import MainDetail from "../pages/payments/pages/mainDetail";
 import RefusedMailDetail from "../pages/mails/pages/superadmin/refused-mail-detail";
 const WaitingOrders = lazy(
   () => import("../pages/orders/components/courier/waiting-orders")
@@ -224,7 +225,10 @@ const AppRouters = () => {
             {
               path: "payments",
               element: <Payments />,
-              children: [{ path: "cash-detail", element: <CashDetail /> }],
+              children: [
+                { path: "cash-detail", element: <CashDetail /> },
+                { path: "main-cashbox", element: <MainDetail/>  }
+              ],
             },
             { path: "roles-permissions", element: <RolesPermissions /> },
             {
