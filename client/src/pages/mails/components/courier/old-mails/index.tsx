@@ -1,13 +1,14 @@
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
+import EmptyPage from "../../../../../shared/components/empty-page";
 
 const CourierOldMails = () => {
   const navigate = useNavigate();
   const { getOldPostsCourier } = usePost();
   const { data } = getOldPostsCourier();
   const posts = Array.isArray(data?.data) ? data?.data : [];
-  return (
+  return posts?.length > 0 ? (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts?.length ? (
         posts?.map((post: any) => (
@@ -47,6 +48,10 @@ const CourierOldMails = () => {
           <div className="text-[22px]">Eski buyurtmalar mavjud emas</div>
         </div>
       )}
+    </div>
+  ) : (
+    <div className="col-span-4 flex justify-center h-[65vh] items-center">
+      <EmptyPage />
     </div>
   );
 };
