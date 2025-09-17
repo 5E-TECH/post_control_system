@@ -8,44 +8,105 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  // PieChart,
-  // Pie,
-  // Cell,
-  // LineChart,
-  // Line,
 } from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
-import { CheckCircle, DollarSign, Medal, ShoppingCart, XCircle } from "lucide-react";
+import {
+  CheckCircle,
+  DollarSign,
+  Medal,
+  ShoppingCart,
+  XCircle,
+} from "lucide-react";
 
 const Dashboards = () => {
   const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+const [toDate, setToDate] = useState<string>("");
 
-  const { data } = useChart().getChart({
-    startDate: fromDate,
-    endDate: toDate,
-  });
+const [showAllMarkets, setShowAllMarkets] = useState(false);
+const [showAllCouriers, setShowAllCouriers] = useState(false);
 
-  const dashboard = data?.data?.orders?.data;
+const { data } = useChart().getChart({
+  startDate: fromDate,
+  endDate: toDate,
+});
 
-  const ordersData = data?.data?.markets?.data?.map((market: any) => ({
+const dashboard = data?.data?.orders?.data;
+
+// const ordersData = [
+//     { nomi: "Market1 (75%)", buyurtmalar: 533, tugatilgan: 400 },
+//     { nomi: "Yandex (65%)", buyurtmalar: 320, tugatilgan: 210 },
+//     { nomi: "Uzum (60%)", buyurtmalar: 700, tugatilgan: 420 },
+//     { nomi: "Asaxiy (80%)", buyurtmalar: 333, tugatilgan: 280 },
+//     { nomi: "AliExpress (70%)", buyurtmalar: 420, tugatilgan: 290 },
+//     { nomi: "Darvoza (55%)", buyurtmalar: 280, tugatilgan: 150 },
+//     { nomi: "Amazon (85%)", buyurtmalar: 600, tugatilgan: 510 },
+//     { nomi: "eBay (50%)", buyurtmalar: 200, tugatilgan: 100 },
+//     { nomi: "Olcha (77%)", buyurtmalar: 310, tugatilgan: 240 },
+//     { nomi: "ZoodMall (68%)", buyurtmalar: 350, tugatilgan: 238 },
+//     { nomi: "Market1 (75%)", buyurtmalar: 533, tugatilgan: 400 },
+//     { nomi: "Yandex (65%)", buyurtmalar: 320, tugatilgan: 210 },
+//     { nomi: "Uzum (60%)", buyurtmalar: 700, tugatilgan: 420 },
+//     { nomi: "Asaxiy (80%)", buyurtmalar: 333, tugatilgan: 280 },
+//     { nomi: "AliExpress (70%)", buyurtmalar: 420, tugatilgan: 290 },
+//     { nomi: "Darvoza (55%)", buyurtmalar: 280, tugatilgan: 150 },
+//     { nomi: "Amazon (85%)", buyurtmalar: 600, tugatilgan: 510 },
+//     { nomi: "eBay (50%)", buyurtmalar: 200, tugatilgan: 100 },
+//     { nomi: "Olcha (77%)", buyurtmalar: 310, tugatilgan: 240 },
+//     { nomi: "ZoodMall (68%)", buyurtmalar: 350, tugatilgan: 238 },
+//   ];
+
+  // Mock Kuriyerlar
+  // const couriersData = [
+  //   { nomi: "Ali (90%)", buyurtmalar: 520, tugatilgan: 468 },
+  //   { nomi: "Vali (85%)", buyurtmalar: 450, tugatilgan: 382 },
+  //   { nomi: "Hasan (78%)", buyurtmalar: 600, tugatilgan: 468 },
+  //   { nomi: "Husan (80%)", buyurtmalar: 300, tugatilgan: 240 },
+  //   { nomi: "Jasur (88%)", buyurtmalar: 350, tugatilgan: 308 },
+  //   { nomi: "Bekzod (82%)", buyurtmalar: 400, tugatilgan: 328 },
+  //   { nomi: "Sherzod (76%)", buyurtmalar: 250, tugatilgan: 190 },
+  //   { nomi: "Umid (84%)", buyurtmalar: 280, tugatilgan: 236 },
+  //   { nomi: "Jamshid (79%)", buyurtmalar: 330, tugatilgan: 260 },
+  //   { nomi: "Anvar (87%)", buyurtmalar: 310, tugatilgan: 270 },
+  //   { nomi: "Market1 (75%)", buyurtmalar: 533, tugatilgan: 400 },
+  //   { nomi: "Yandex (65%)", buyurtmalar: 320, tugatilgan: 210 },
+  //   { nomi: "Uzum (60%)", buyurtmalar: 700, tugatilgan: 420 },
+  //   { nomi: "Asaxiy (80%)", buyurtmalar: 333, tugatilgan: 280 },
+  //   { nomi: "AliExpress (70%)", buyurtmalar: 420, tugatilgan: 290 },
+  //   { nomi: "Darvoza (55%)", buyurtmalar: 280, tugatilgan: 150 },
+  //   { nomi: "Amazon (85%)", buyurtmalar: 600, tugatilgan: 510 },
+  //   { nomi: "eBay (50%)", buyurtmalar: 200, tugatilgan: 100 },
+  //   { nomi: "Olcha (77%)", buyurtmalar: 310, tugatilgan: 240 },
+  //   { nomi: "ZoodMall (68%)", buyurtmalar: 350, tugatilgan: 238 },
+  // ];
+
+// Har doim array qaytishi uchun `?? []` qo‘shamiz
+const ordersData =
+  data?.data?.markets?.data?.map((market: any) => ({
     nomi: market?.market?.name + ` (${market.sellingRate}%)`,
     buyurtmalar: market?.totalOrders,
-    tugatilgan: market?.soldOrders,
-  }));
+    sotilgan: market?.soldOrders,
+  })) ?? [];
 
-  const couriersData = data?.data?.couriers?.data?.map((courier: any) => ({
+const couriersData =
+  data?.data?.couriers?.data?.map((courier: any) => ({
     nomi: courier?.courier?.name + ` (${courier.successRate}%)`,
     buyurtmalar: courier?.totalOrders,
-    tugatilgan: courier?.deliveredOrders,
-  }));
+    sotilgan: courier?.deliveredOrders,
+  })) ?? [];
 
-  // Dummy Top 10 Couriers
-  const couriers = data?.data?.topCouriers?.data;
+// Top 10 from API (ham default bo‘lishi kerak)
+const couriers = data?.data?.topCouriers?.data ?? [];
+const markets = data?.data?.topMarkets?.data ?? [];
 
+// slice endi xavfsiz ishlaydi
+const visibleMarkets = showAllMarkets
+  ? ordersData
+  : ordersData.slice(0, 10);
 
-  // Dummy Top 10 Markets
-  const markets = data?.data?.topMarkets?.data;
+const visibleCouriers = showAllCouriers
+  ? couriersData
+  : couriersData.slice(0, 10);
+
 
   return (
     <div className="w-full p-6">
@@ -68,78 +129,111 @@ const Dashboards = () => {
       </div>
 
       {/* Stat Cards */}
-  <div className="grid grid-cols-4 gap-6 mb-6">
-    <div className="bg-white p-6 rounded-2xl border-b-4 border-gray-400">
-      <p className="flex items-center gap-2 text-gray-500">
-        <ShoppingCart size={20} />
-        Jami buyurtmalar
-      </p>
-      <h2 className="text-2xl font-bold">{dashboard?.acceptedCount}</h2>
-    </div>
-
-    <div className="bg-white p-6 rounded-2xl border-b-4 border-green-500">
-      <p className="flex items-center gap-2 text-green-500">
-        <CheckCircle size={20} />
-        Tugatilgan
-      </p>
-      <h2 className="text-2xl font-bold">{dashboard?.soldAndPaid}</h2>
-    </div>
-
-    <div className="bg-white p-6 rounded-2xl border-b-4 border-red-500">
-      <p className="flex items-center gap-2 text-red-500">
-        <XCircle size={20} />
-        Bekor qilinganlar
-      </p>
-      <h2 className="text-2xl font-bold">{dashboard?.cancelled}</h2>
-    </div>
-
-    <div className="bg-white p-6 rounded-2xl border-b-4 border-yellow-500">
-      <p className="flex items-center gap-2 text-yellow-500">
-        <DollarSign size={20} />
-        Jami daromad
-      </p>
-      <h2 className="text-2xl font-bold">
-        {Number(dashboard?.profit).toLocaleString()} UZS
-      </h2>
-    </div>
-  </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-2 gap-6 mb-6">
-        {/* Bar Chart */}
-        <div className="bg-white p-4 rounded-2xl shadow">
-          <h3 className="text-lg font-semibold mb-4">Marketlar statistikasi</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={ordersData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nomi" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="buyurtmalar" fill="#0088FE" />
-              <Bar dataKey="tugatilgan" fill="#FF8042" />
-            </BarChart>
-          </ResponsiveContainer>
+      <div className="grid grid-cols-4 gap-6 mb-6">
+        <div className="bg-white p-6 rounded-2xl border-b-4 border-gray-400">
+          <p className="flex items-center gap-2 text-gray-500">
+            <ShoppingCart size={20} /> Jami buyurtmalar
+          </p>
+          <h2 className="text-2xl font-bold">{dashboard?.acceptedCount}</h2>
         </div>
-
-        <div className="bg-white p-4 rounded-2xl shadow">
-          <h3 className="text-lg font-semibold mb-4">
-            Kuriyerlar statistikasi
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={couriersData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="nomi" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="buyurtmalar" fill="#0088FE" />
-              <Bar dataKey="tugatilgan" fill="#FF8042" />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="bg-white p-6 rounded-2xl border-b-4 border-green-500">
+          <p className="flex items-center gap-2 text-green-500">
+            <CheckCircle size={20} /> Tugatilgan
+          </p>
+          <h2 className="text-2xl font-bold">{dashboard?.soldAndPaid}</h2>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border-b-4 border-red-500">
+          <p className="flex items-center gap-2 text-red-500">
+            <XCircle size={20} /> Bekor qilinganlar
+          </p>
+          <h2 className="text-2xl font-bold">{dashboard?.cancelled}</h2>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border-b-4 border-yellow-500">
+          <p className="flex items-center gap-2 text-yellow-500">
+            <DollarSign size={20} /> Jami daromad
+          </p>
+          <h2 className="text-2xl font-bold">
+            {Number(dashboard?.profit).toLocaleString()} UZS
+          </h2>
         </div>
       </div>
 
+      {/* Charts Row */}
+      <div className="grid grid-cols-2 gap-6 mb-6">
+        {/* Marketlar Chart */}
+        <div className="bg-white p-4 rounded-2xl shadow overflow-hidden">
+          <h3 className="text-lg font-semibold mb-4 text-center">Marketlar statistikasi</h3>
+          <ResponsiveContainer
+            width="100%"
+            height={Math.max(visibleMarkets.length * 45, 400)}
+          >
+            <BarChart
+              data={visibleMarkets}
+              layout="vertical"
+              margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis type="category" dataKey="nomi" width={200} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="sotilgan" stackId="a" fill="#0047AB" />
+              <Bar
+                dataKey={(d: any) => d.buyurtmalar - d.sotilgan}
+                stackId="a"
+                fill="#66B2FF"
+                name="buyurtmalar"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => setShowAllMarkets(!showAllMarkets)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+            >
+              {showAllMarkets ? "Kamroq ko‘rish" : "Ko‘proq ko‘rish"}
+            </button>
+          </div>
+        </div>
+
+        {/* Kuriyerlar Chart */}
+        <div className="bg-white p-4 rounded-2xl shadow overflow-hidden">
+          <h3 className="text-lg font-semibold mb-4 text-center">Kuriyerlar statistikasi</h3>
+          <ResponsiveContainer
+            width="100%"
+            height={Math.max(visibleCouriers.length * 45, 400)}
+          >
+            <BarChart
+              data={visibleCouriers}
+              layout="vertical"
+              margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis type="category" dataKey="nomi" width={200} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="sotilgan" stackId="a" fill="#0047AB" />
+              <Bar
+                dataKey={(d: any) => d.buyurtmalar - d.sotilgan}
+                stackId="a"
+                fill="#66B2FF"
+                name="buyurtmalar"
+              />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => setShowAllCouriers(!showAllCouriers)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+            >
+              {showAllCouriers ? "Kamroq ko‘rish" : "Ko‘proq ko‘rish"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Top 10 Jadval */}
       <div className="grid grid-cols-2 gap-6">
         {/* Top Marketlar */}
         <div className="bg-white p-4 rounded-2xl shadow">
@@ -153,14 +247,13 @@ const Dashboards = () => {
                 <th className="p-2 border border-gray-200">Nomi</th>
                 <th className="p-2 border border-gray-200">Buyurtmalar</th>
                 <th className="p-2 border border-gray-200">Sotilganlar</th>
-                <th className="p-2 border border-gray-200">Sotilgan foizi</th>
+                <th className="p-2 border border-gray-200">Foiz</th>
               </tr>
             </thead>
             <tbody>
               {markets?.map((m: any, inx: number) => {
                 let medalIcon = null;
-                let rowStyle = "text-gray-700"; // default rang
-              
+                let rowStyle = "text-gray-700";
                 if (inx === 0) {
                   medalIcon = <Medal className="text-yellow-500" size={20} />;
                   rowStyle = "text-yellow-500 font-bold";
@@ -171,7 +264,6 @@ const Dashboards = () => {
                   medalIcon = <Medal className="text-amber-700" size={20} />;
                   rowStyle = "text-amber-700 font-bold";
                 }
-              
                 return (
                   <tr
                     key={m.id ?? inx}
@@ -190,7 +282,7 @@ const Dashboards = () => {
             </tbody>
           </table>
         </div>
-            
+
         {/* Top Kuriyerlar */}
         <div className="bg-white p-4 rounded-2xl shadow">
           <h3 className="text-lg font-semibold mb-4">
@@ -203,14 +295,13 @@ const Dashboards = () => {
                 <th className="p-2 border border-gray-200">Ism</th>
                 <th className="p-2 border border-gray-200">Buyurtmalar</th>
                 <th className="p-2 border border-gray-200">Sotilganlar</th>
-                <th className="p-2 border border-gray-200">Sotilgan foizi</th>
+                <th className="p-2 border border-gray-200">Foiz</th>
               </tr>
             </thead>
             <tbody>
               {couriers?.map((c: any, inx: number) => {
                 let medalIcon = null;
                 let rowStyle = "text-gray-700";
-              
                 if (inx === 0) {
                   medalIcon = <Medal className="text-yellow-500" size={20} />;
                   rowStyle = "text-yellow-500 font-bold";
@@ -221,7 +312,6 @@ const Dashboards = () => {
                   medalIcon = <Medal className="text-amber-700" size={20} />;
                   rowStyle = "text-amber-700 font-bold";
                 }
-              
                 return (
                   <tr
                     key={c.courier_id ?? inx}
@@ -241,7 +331,7 @@ const Dashboards = () => {
           </table>
         </div>
       </div>
-  </div>
+    </div>
   );
 };
 
