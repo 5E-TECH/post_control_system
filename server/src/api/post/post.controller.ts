@@ -59,6 +59,13 @@ export class PostController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Get('courier/rejected')
+  couriersRejectedPosts(@CurrentUser() user: JwtPayload) {
+    return this.postService.rejectedPostsForCourier(user);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
   @Get(':id')
   findOne(@Param('id') id: string) {
