@@ -530,8 +530,17 @@ export class CashBoxService
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const mainCashbox = await this.cashboxRepo.findOne({
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) {
+        throw new NotFoundException('Main cashbox not found');
+      }
+      mainCashbox?.balance - updateCashboxDto.amount;
+      await queryRunner.manager.save(mainCashbox);
+
+      const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
+        amount: updateCashboxDto.amount,
       });
     } catch (error) {
       await queryRunner.rollbackTransaction();
