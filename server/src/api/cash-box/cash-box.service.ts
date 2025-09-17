@@ -82,6 +82,7 @@ export class CashBoxService
 
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: { cashbox_id: mainCashbox.id },
+        relations: ['createdByUser'],
       });
 
       let income = 0;
@@ -541,6 +542,11 @@ export class CashBoxService
 
       const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
         amount: updateCashboxDto.amount,
+        balance_after: mainCashbox.balance,
+        cashbox_id: mainCashbox.id,
+        comment: updateCashboxDto.comment,
+        operation_type: Operation_type.EXPENSE,
+        created_by: user.id,
       });
     } catch (error) {
       await queryRunner.rollbackTransaction();

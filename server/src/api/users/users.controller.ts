@@ -174,13 +174,12 @@ export class UsersController {
 
   @UseGuards(JwtGuard, RolesGuard, SelfGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
-  @Patch('self/:id')
+  @Patch('self')
   selfUpdate(
     @CurrentUser() user: JwtPayload,
-    @Param('id') id: string,
     @Body() updateSelfDto: UpdateSelfDto,
   ) {
-    return this.userService.selfUpdate(user, id, updateSelfDto);
+    return this.userService.selfUpdate(user, updateSelfDto);
   }
 
   @UseGuards(JwtGuard, RolesGuard)

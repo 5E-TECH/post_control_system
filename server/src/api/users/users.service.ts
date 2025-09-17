@@ -707,13 +707,11 @@ export class UserService {
     }
   }
 
-  async selfUpdate(user: JwtPayload, id: string, selfUpdateDto: UpdateSelfDto) {
+  async selfUpdate(user: JwtPayload, selfUpdateDto: UpdateSelfDto) {
     try {
       const { password, ...otherFields } = selfUpdateDto;
-      const me = await this.userRepo.findOne({ where: { id } });
-      if (!me) {
-        throw new NotFoundException('User not found');
-      }
+      const myProfile = await this.userRepo.findOne({ where: { id: user.id } });
+      if (!myProfile) throw new NotFoundException('Your infos not found');
       if (otherFields.phone_number) {
         const phoneNumber = await this.userRepo.findOne({
           where: { phone_number: otherFields.phone_number },
@@ -733,13 +731,15 @@ export class UserService {
       if (password) {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
-      Object.assign(me, {
+      Object.assign(myProfile, {
         ...otherFields,
         ...(password && { password: hashedPassword }),
       });
-      await this.userRepo.save(me);
+      await this.userRepo.save(myProfile);
 
-      const updatedUser = await this.userRepo.findOne({ where: { id } });
+      const updatedUser = await this.userRepo.findOne({
+        where: { id: user.id },
+      });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
