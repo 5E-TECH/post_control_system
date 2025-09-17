@@ -108,7 +108,7 @@ export class PostController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.COURIER)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Post('cancel/receive/:id')
   receiveCanceledPost(
     @Param('id') id: string,

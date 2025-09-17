@@ -101,6 +101,23 @@ export class PostService {
     }
   }
 
+  async rejectedPostsForCourier(user: JwtPayload) {
+    try {
+      const allRejectedPosts = await this.postRepo.find({
+        where: {
+          status: In([Post_status.CANCELED, Post_status.CANCELED_RECEIVED]),
+        },
+      });
+      return successRes(
+        allRejectedPosts,
+        200,
+        'All rejected posts for courier',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async findOne(id: string): Promise<object> {
     try {
       const post = await this.postRepo.findOne({ where: { id } });
@@ -304,7 +321,7 @@ export class PostService {
       await queryRunner.manager.save(canceledPost);
 
       for (const order of orders) {
-        order.post_id = canceledPost.id;
+        order.canceled_post_id = canceledPost.id;
         order.status = Order_status.CANCELLED_SENT;
       }
       await queryRunner.manager.save(orders);
@@ -346,7 +363,7 @@ export class PostService {
       if (canceledOrderIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(canceledOrderIds), post_id: id },
+          { id: In(canceledOrderIds) },
           { status: Order_status.CLOSED },
         );
       }
@@ -361,7 +378,7 @@ export class PostService {
 
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(remainingIds), post_id: id },
+          { id: In(remainingIds) },
           { status: Order_status.CANCELLED },
         );
       }
