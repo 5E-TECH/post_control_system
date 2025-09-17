@@ -61,7 +61,7 @@ export class PostService {
     try {
       const allPosts = await this.postRepo.find({
         where: {
-          status: In([Post_status.CANCELED, Post_status.CANCELED_RECEIVED]),
+          status: In([Post_status.CANCELED]),
         },
         relations: ['region'],
       });
@@ -105,7 +105,7 @@ export class PostService {
     try {
       const allRejectedPosts = await this.postRepo.find({
         where: {
-          status: In([Post_status.CANCELED, Post_status.CANCELED_RECEIVED]),
+          status: In([Post_status.CANCELED]),
         },
       });
       return successRes(
