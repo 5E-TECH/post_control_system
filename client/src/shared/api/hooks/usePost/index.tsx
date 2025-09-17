@@ -50,6 +50,17 @@ export const usePost = () => {
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
 
+  const canceledPost = () =>
+    useMutation({
+      mutationFn: (data: any) => api.post("post", data).then((res) => res.data),
+      onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+    });
+
+  const receiveCanceledPost = () =>
+    useMutation({
+      mutationFn: () => api.post("receive").then((res) => res.data),
+      onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+    });
   return {
     createPost,
     getAllPosts,
@@ -58,5 +69,7 @@ export const usePost = () => {
     getOldPostsCourier,
     sendPost,
     receivePost,
+    canceledPost,
+    receiveCanceledPost,
   };
 };

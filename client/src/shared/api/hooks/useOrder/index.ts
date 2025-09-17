@@ -45,10 +45,11 @@ export const useOrder = () => {
         api.get("order/market/my-new-orders").then((res) => res.data),
     });
 
-  const getCourierOrders = () =>
+  const getCourierOrders = (params?: any) =>
     useQuery({
-      queryKey: [order],
-      queryFn: () => api.get("order/courier/orders").then((res) => res.data),
+      queryKey: [order, params],
+      queryFn: () =>
+        api.get("order/courier/orders", { params }).then((res) => res.data),
     });
 
   return {

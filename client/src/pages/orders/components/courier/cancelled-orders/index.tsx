@@ -2,10 +2,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import { Button } from "antd";
+import { usePost } from "../../../../../shared/api/hooks/usePost";
 
 const CancelledOrders = () => {
   const { getCourierOrders } = useOrder();
-  const { data } = getCourierOrders();
+  const { mutate: cancelPost } = usePost().canceledPost();
+  const { data } = getCourierOrders({ status: "cancelled" });
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -14,6 +16,17 @@ const CancelledOrders = () => {
       setSelectedIds(data.data.map((item: any) => item.id));
     }
   }, [data]);
+
+  const handleClick = () => {
+    const payload = {
+      order_ids: selectedIds,
+    };
+    cancelPost(payload, {
+      onSuccess: (res) => {
+        console.log(res);
+      },
+    });
+  };
   return (
     <div>
       <table className="w-full">
@@ -36,7 +49,7 @@ const CancelledOrders = () => {
               />
             </th>
             <th>
-              <div className="flex items-center gap-10 ml-10">
+              <div className="flex items-center gap-10 pr-7">
                 <span>#</span>
               </div>
             </th>
@@ -108,7 +121,7 @@ const CancelledOrders = () => {
                   }}
                 />
               </td>
-              <td className="pl-10">{inx + 1}</td>
+              <td className="">{inx + 1}</td>
               <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
                 {item?.customer?.name}
               </td>
@@ -123,7 +136,7 @@ const CancelledOrders = () => {
               </td>
               <td className="pl-10">
                 <span
-                  className={`py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500`}
+                  className={`py-2 px-3 rounded-2xl text-[13px] text-white bg-[#FB2C36]`}
                 >
                   {item.status.toUpperCase()}
                 </span>
@@ -167,7 +180,10 @@ const CancelledOrders = () => {
       </div>
 
       <div className="flex justify-end px-5">
-        <Button className="w-[180px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!">
+        <Button
+          onClick={handleClick}
+          className="w-[180px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!"
+        >
           Buyurtmalarni yuborish
         </Button>
       </div>

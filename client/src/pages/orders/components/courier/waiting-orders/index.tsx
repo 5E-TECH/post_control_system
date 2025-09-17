@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const WaitingOrders = () => {
   const { getCourierOrders } = useOrder();
-  const { data } = getCourierOrders();
+  const { data } = getCourierOrders({ status: "waiting" });
   return (
     <div>
       <table className="w-full">
