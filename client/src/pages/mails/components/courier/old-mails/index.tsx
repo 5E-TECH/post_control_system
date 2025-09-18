@@ -16,11 +16,12 @@ const CourierOldMails = () => {
             key={post?.id}
             className="min-h-[250px] shadow-lg rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]"
             onClick={() =>
-              navigate(`/courier-mails/${post?.id}`, {
+              navigate(`/courier-mails/${post?.id}?status=${post?.status}`, {
                 state: { regionName: post?.region?.name },
               })
             }
           >
+            <p>{post?.status}</p>
             <h1 className="text-[30px]">
               {post?.created_at &&
                 new Date(Number(post.created_at)).toLocaleString("uz-UZ", {
