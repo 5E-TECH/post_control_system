@@ -98,7 +98,7 @@ const Dashboard: React.FC = () => {
   const chartMax = maxValue * 1.2;
 
   return (
-    <div className="w-full p-8 space-y-10 bg-gray-50 min-h-screen">
+    <div className="w-full p-8 space-y-10 max-h-[100vh] bg-gray-50">
       {/* Current status, chart, and tables side-by-side */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left side: Status and Chart */}
