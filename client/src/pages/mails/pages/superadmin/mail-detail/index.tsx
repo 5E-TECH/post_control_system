@@ -26,22 +26,24 @@ const MailDetail = () => {
 
   // Dynamic fetching based on status
   const [params] = useSearchParams();
-
   const status = params.get("status");
 
-  const { data } = getPostById(
-    id as string,
-    "",
-    ["received"].includes(status as string)
-  );
+  let endpoint = "";
+  let condition = false;
 
-  const { data: orders } = getPostById(
-    id as string,
-    "rejected/",
-    ["canceled", "canceled_received"].includes(status as string)
-  );
+  if (status === "received") {
+    endpoint = "";
+    condition = true;
+  } else if (["canceled", "canceled_received"].includes(status as string)) {
+    endpoint = "rejected/";
+    condition = true;
+  } else {
+    endpoint = "";
+    condition = true;
+  }
 
-  const postData = data?.data || orders?.data;
+  const { data } = getPostById(id as string, endpoint, condition);
+  const postData = data?.data;
 
   useEffect(() => {
     if (postData) {
