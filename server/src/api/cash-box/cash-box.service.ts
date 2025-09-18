@@ -259,14 +259,21 @@ export class CashBoxService
         payment_method === PaymentMethod.CLICK_TO_MARKET &&
         market_id != null
       ) {
-        const market_cashbox = await this.cashboxRepo.findOne({
+        const market_cashbox = await transaction.manager.findOne(CashEntity, {
           where: { user_id: market_id, cashbox_type: Cashbox_type.FOR_MARKET },
         });
 
         if (!market_cashbox) {
           throw new NotFoundException('Market cashbox topilmadi');
         }
-        // Davom etaman ..........
+
+        const allSoldOrders = await transaction.manager.find(OrderEntity, {
+          where: {
+            status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
+            user_id: market_id,
+          },
+          order: { updated_at: 'ASC' },
+        });
 
         mainCashbox.balance -= amount;
         await transaction.manager.save(mainCashbox);
@@ -305,6 +312,48 @@ export class CashBoxService
           },
         );
         await transaction.manager.save(marketCashboxHistory);
+
+        let paymentInProcess = amount;
+
+        // 1. Avval PARTLY_PAID bo'lgan orderni topamiz (agar bo'lsa)
+        const partlyPaidOrder = allSoldOrders.find(
+          (o) => o.status === Order_status.PARTLY_PAID,
+        );
+
+        if (partlyPaidOrder && paymentInProcess > 0) {
+          const remaining =
+            partlyPaidOrder.to_be_paid - partlyPaidOrder.paid_amount;
+          if (paymentInProcess >= remaining) {
+            paymentInProcess -= remaining;
+            partlyPaidOrder.paid_amount = partlyPaidOrder.to_be_paid;
+            partlyPaidOrder.status = Order_status.PAID;
+          } else {
+            partlyPaidOrder.paid_amount += paymentInProcess;
+            partlyPaidOrder.status = Order_status.PARTLY_PAID;
+            paymentInProcess = 0;
+          }
+          await transaction.manager.save(partlyPaidOrder);
+        }
+
+        // 2. Qolgan SOLD orderlarni ketma-ket to'laymiz
+        const soldOrders = allSoldOrders.filter(
+          (o) => o.status === Order_status.SOLD,
+        );
+
+        for (const order of soldOrders) {
+          if (paymentInProcess <= 0) break;
+
+          if (paymentInProcess >= order.to_be_paid) {
+            paymentInProcess -= order.to_be_paid;
+            order.paid_amount = order.to_be_paid;
+            order.status = Order_status.PAID;
+          } else {
+            order.paid_amount = paymentInProcess;
+            order.status = Order_status.PARTLY_PAID;
+            paymentInProcess = 0;
+          }
+          await transaction.manager.save(order);
+        }
       }
 
       await transaction.commitTransaction();
