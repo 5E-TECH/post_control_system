@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect } from "react";
+import { memo, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -13,16 +13,16 @@ import {
 import { useHistory } from "../../shared/api/hooks/useHistory";
 
 // Data interfaces
-interface Market {
-  name: string;
-  amount: number;
-}
+// interface Market {
+//   name: string;
+//   amount: number;
+// }
 
-interface Courier {
-  name: string;
-  amount: number;
-  region: string;
-}
+// interface Courier {
+//   name: string;
+//   amount: number;
+//   region: string;
+// }
 
 interface ChartData {
   name: string;
@@ -40,62 +40,84 @@ const Dashboard: React.FC = () => {
     };
   }, []);
 
-  const {data} = useHistory().getHistory()
-  console.log(data)
+  const { data } = useHistory().getHistory();
 
-  
+  // const ordersData =
+  // data?.data?.markets?.data?.map((market: any) => ({
+  //   nomi: market?.market?.name + ` (${market.sellingRate}%)`,
+  //   buyurtmalar: market?.totalOrders,
+  //   sotilgan: market?.soldOrders,
+  // })) ?? [];
+
+  // const markets = data?.data?.markets?.map((market: any) => ({
+  //  name
+  //   }))
 
   // Market data
-  const markets: Market[] = [
-    { name: "Market1", amount: -533000 },
-    { name: "Yandex", amount: -187000 },
-    { name: "Uzum", amount: 700000 },
-    { name: "Asaxiy", amount: -333000 },
-    { name: "Asaxiy", amount: -300000 },
-    { name: "Asaxiy", amount: -389000 },
-    { name: "Asaxiy", amount: -389000 },
-    { name: "Asaxiy", amount: -389000 },
-    { name: "Asaxiy", amount: -389000 },
-    { name: "Asaxiy", amount: -389000 },
-    { name: "Asaxiy", amount: -389000 },
-    { name: "Asaxiy", amount: -389000 },
-    { name: "Asaxiy", amount: -3389000 },
-  ];
+  // const markets: Market[] = [
+  //   { name: "Market1", amount: -533000 },
+  //   { name: "Yandex", amount: -187000 },
+  //   { name: "Uzum", amount: 700000 },
+  //   { name: "Asaxiy", amount: -333000 },
+  //   { name: "Asaxiy", amount: -300000 },
+  //   { name: "Asaxiy", amount: -389000 },
+  //   { name: "Asaxiy", amount: -389000 },
+  //   { name: "Asaxiy", amount: -389000 },
+  //   { name: "Asaxiy", amount: -389000 },
+  //   { name: "Asaxiy", amount: -389000 },
+  //   { name: "Asaxiy", amount: -389000 },
+  //   { name: "Asaxiy", amount: -389000 },
+  //   { name: "Asaxiy", amount: -3389000 },
+  // ];
 
+  // const markets = data?.data?.market
+
+  const orders = data?.data?.markets?.allMarketCashboxes;
+  const markets = orders?.map((order: any) => ({
+    name: order?.user?.name,
+    amount: order?.balance,
+  }));
+
+  const tableCouriers = data?.data?.couriers?.allCourierCashboxes;
+  const couriers = tableCouriers?.map((courier: any) => ({
+    name: courier?.user?.name,
+    amount: courier?.balance,
+    region: courier?.user?.region?.name,
+  }));
+
+  const totalMarket = data?.data?.markets?.marketsTotalBalans;
+  const totalCourier = data?.data?.couriers?.couriersTotalBalanse;
   // Courier data with regions
-  const couriers: Courier[] = [
-    { name: "Anvarjon", amount: 930000, region: "Andijon" },
-    { name: "Bekzod", amount: -501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-    { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
-  ];
-
-  // Calculations
-  const totalMarket = useMemo(
-    () => markets.reduce((acc, m) => acc + m.amount, 0),
-    [markets]
-  );
-  const totalCourier = useMemo(
-    () => couriers.reduce((acc, c) => acc + c.amount, 0),
-    [couriers]
-  );
-
+  // const couriers = [
+  //   { name: "Anvarjon", amount: 930000, region: "Andijon" },
+  //   { name: "Bekzod", amount: -501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  //   { name: "Bekzod", amount: 501000, region: "Surxondaryo" },
+  // ];
   // Balance and Cash
-  const balans = totalMarket + totalCourier;
-  const kassa = 146760;
-  const bugungiHolat = balans + kassa;
+  // const balans = totalMarket + totalCourier;
+  const balans = data?.data?.difference;
+  // const kassa = 146760;
+  const kassa = data?.data?.main?.balance;
+
+  // const bugungiHolat = balans + kassa;
+  const bugungiHolat = data?.data?.currentSituation;
 
   const chartData: ChartData[] = [
-    { name: "Balans", value: balans, fill: balans >= 0 ? "#10B981" : "#EF4444" },
+    {
+      name: "Balans",
+      value: balans,
+      fill: balans >= 0 ? "#10B981" : "#EF4444",
+    },
     { name: "Kassa", value: kassa, fill: "#10B981" },
   ];
 
@@ -118,9 +140,7 @@ const Dashboard: React.FC = () => {
                 bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
               }`}
             >
-              {bugungiHolat >= 0
-                ? `+${bugungiHolat.toLocaleString()}`
-                : bugungiHolat.toLocaleString()}
+              {Number(bugungiHolat).toLocaleString()}
             </div>
           </div>
 
@@ -202,9 +222,7 @@ const Dashboard: React.FC = () => {
                       balans >= 0 ? "text-green-600" : "text-red-600"
                     }`}
                   >
-                    {balans >= 0
-                      ? `+${Math.abs(balans).toLocaleString()}`
-                      : `-${Math.abs(balans).toLocaleString()}`}
+                    {Number(balans).toLocaleString()}
                   </div>
                 </div>
                 <div className="text-center">
@@ -212,7 +230,7 @@ const Dashboard: React.FC = () => {
                     Kassa
                   </div>
                   <div className="text-2xl font-bold text-green-600">
-                    {kassa.toLocaleString()}
+                    {String(kassa).toLocaleString()}
                   </div>
                 </div>
               </div>
@@ -244,7 +262,7 @@ const Dashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {markets.map((m, idx) => (
+                      {markets?.map((m: any, idx: number) => (
                         <tr
                           key={idx}
                           className="border-b border-gray-200 hover:bg-white transition-colors"
@@ -254,10 +272,14 @@ const Dashboard: React.FC = () => {
                           </td>
                           <td
                             className={`p-3 text-right font-bold ${
-                              m.amount >= 0 ? "text-green-600" : "text-red-600"
+                              m.amount < 0 || m.amount == 0 ? "text-green-600" : "text-red-600"
                             }`}
                           >
-                            {m.amount.toLocaleString()}
+                            {m.amount > 0
+                              ? `-${m.amount.toLocaleString()}`
+                              : m.amount < 0
+                              ? `+${Math.abs(m.amount).toLocaleString()}`
+                              : m.amount.toLocaleString()}
                           </td>
                         </tr>
                       ))}
@@ -267,12 +289,10 @@ const Dashboard: React.FC = () => {
                         <td className="p-3 font-bold">Jami</td>
                         <td
                           className={`p-3 text-right font-bold ${
-                            totalMarket >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
+                            totalMarket >= 0 ? "text-green-600" : "text-red-600"
                           }`}
                         >
-                          {totalMarket.toLocaleString()}
+                          {Number(totalMarket).toLocaleString()}
                         </td>
                       </tr>
                     </tfoot>
@@ -298,7 +318,7 @@ const Dashboard: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {couriers.map((c, idx) => (
+                      {couriers?.map((c: any, idx: number) => (
                         <tr
                           key={idx}
                           className="border-b border-gray-200 hover:bg-white transition-colors"
@@ -316,9 +336,7 @@ const Dashboard: React.FC = () => {
                               c.amount >= 0 ? "text-green-600" : "text-red-600"
                             }`}
                           >
-                            {c.amount >= 0
-                              ? `+${c.amount.toLocaleString()}`
-                              : c.amount.toLocaleString()}
+                            {Number(c.amount).toLocaleString()}
                           </td>
                         </tr>
                       ))}
@@ -333,9 +351,7 @@ const Dashboard: React.FC = () => {
                               : "text-red-600"
                           }`}
                         >
-                          {totalCourier >= 0
-                            ? `+${totalCourier.toLocaleString()}`
-                            : totalCourier.toLocaleString()}
+                          {Number(totalCourier).toLocaleString()}
                         </td>
                       </tr>
                     </tfoot>
@@ -355,9 +371,7 @@ const Dashboard: React.FC = () => {
                   balans >= 0 ? "text-green-600" : "text-red-600"
                 }`}
               >
-                {balans >= 0
-                  ? `+${balans.toLocaleString()}`
-                  : balans.toLocaleString()}
+                {Number(balans).toLocaleString()} UZS
               </div>
             </div>
           </div>
