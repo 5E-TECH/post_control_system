@@ -584,12 +584,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         sellOrderDto.extraCost || 0,
       );
 
-      Object.assign(order, {
-        status: Order_status.SOLD,
-        to_be_paid,
-        comment: finalComment,
-      });
-      await queryRunner.manager.save(order);
+      if (Number(marketCashbox.balance) < 0) {
+        if (marketCashbox.balance + to_be_paid <= 0) {
+          Object.assign(order, {
+            status: Order_status.PAID,
+            to_be_paid,
+            paid_amount: to_be_paid,
+            comment: finalComment,
+          });
+          await queryRunner.manager.save(order);
+        } else {
+          Object.assign(order, {
+            status: Order_status.PARTLY_PAID,
+            to_be_paid,
+            paid_amount: to_be_paid + marketCashbox.balance,
+            comment: finalComment,
+          });
+          await queryRunner.manager.save(order);
+        }
+      } else {
+        Object.assign(order, {
+          status: Order_status.SOLD,
+          to_be_paid,
+          comment: finalComment,
+        });
+        await queryRunner.manager.save(order);
+      }
 
       marketCashbox.balance += to_be_paid;
       await queryRunner.manager.save(marketCashbox);
@@ -624,9 +644,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         },
       );
       await queryRunner.manager.save(courierCashboxHistory);
-      await queryRunner.commitTransaction();
 
-      this.orderGateaway;
+      await queryRunner.commitTransaction();
       return successRes({ id: order.id }, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
