@@ -596,7 +596,13 @@ export class CashBoxService
         comment: updateCashboxDto.comment,
         operation_type: Operation_type.EXPENSE,
         created_by: user.id,
+        payment_method: updateCashboxDto.type,
+        source_type: Source_type.MANUAL_EXPENSE,
       });
+      await queryRunner.manager.save(cashboxHistory);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Manual expense created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
