@@ -495,12 +495,15 @@ export class CashBoxService
 
       const allCourierCashboxes = await this.cashboxRepo.find({
         where: { cashbox_type: Cashbox_type.FOR_COURIER },
+        relations: ['user', 'user.region'],
       });
       let courierBalanses: object[] = [];
       let couriersTotalBalanse: number = 0;
       for (const cashbox of allCourierCashboxes) {
         courierBalanses.push({
           userId: cashbox.user_id,
+          name: cashbox.user.name,
+          region: cashbox.user.region,
           balance: cashbox.balance,
         });
         couriersTotalBalanse += Number(cashbox.balance);
@@ -508,12 +511,14 @@ export class CashBoxService
 
       const allMarketCashboxes = await this.cashboxRepo.find({
         where: { cashbox_type: Cashbox_type.FOR_MARKET },
+        relations: ['user'],
       });
       let marketCashboxes: object[] = [];
       let marketsTotalBalans: number = 0;
       for (const cashbox of allMarketCashboxes) {
         marketCashboxes.push({
           userId: cashbox.user_id,
+          name: cashbox.user.name,
           balance: -Number(cashbox.balance),
         });
         marketsTotalBalans -= Number(cashbox.balance);
