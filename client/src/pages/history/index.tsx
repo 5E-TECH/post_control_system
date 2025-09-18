@@ -249,8 +249,8 @@ const Dashboard: React.FC = () => {
                 <h4 className="text-lg font-bold text-gray-800 mb-4 text-center">
                   Do'konlar
                 </h4>
-                <div className="overflow-y-scroll max-h-[400px] custom-scrollbar">
-                  <table className="w-full border-collapse">
+                <div className="overflow-y-scroll h-[395px] custom-scrollbar">
+                  <table className="w-full border-collapse relative">
                     <thead className="sticky top-0 bg-white z-10">
                       <tr className="border-b-2 border-gray-300">
                         <th className="p-3 text-left font-bold text-black">
@@ -272,7 +272,9 @@ const Dashboard: React.FC = () => {
                           </td>
                           <td
                             className={`p-3 text-right font-bold ${
-                              m.amount < 0 || m.amount == 0 ? "text-green-600" : "text-red-600"
+                              m.amount < 0 || m.amount == 0
+                                ? "text-green-600"
+                                : "text-red-600"
                             }`}
                           >
                             {m.amount > 0
@@ -284,7 +286,7 @@ const Dashboard: React.FC = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="sticky bottom-0 bg-gray-800 text-white z-10">
+                    <tfoot className="bg-gray-800 text-white sticky bottom-0">
                       <tr>
                         <td className="p-3 font-bold">Jami</td>
                         <td
@@ -305,9 +307,9 @@ const Dashboard: React.FC = () => {
                 <h4 className="text-lg font-bold text-gray-800 mb-4 text-center">
                   Kurierlar
                 </h4>
-                <div className="overflow-y-scroll max-h-[400px] custom-scrollbar">
-                  <table className="w-full border-collapse">
-                    <thead className="sticky top-0 bg-white z-10">
+                <div className="relative h-[395px] overflow-y-scroll custom-scrollbar">
+                  <table className="w-full border-collapse relative">
+                    <thead className="bg-white z-10 sticky top-0">
                       <tr className="border-b-2 border-gray-300">
                         <th className="p-3 text-left font-bold text-black">
                           Nomi
@@ -341,7 +343,9 @@ const Dashboard: React.FC = () => {
                         </tr>
                       ))}
                     </tbody>
-                    <tfoot className="sticky bottom-0 bg-gray-800 text-white z-10">
+
+                    {/* tfoot ni pastga yopishtirish */}
+                    <tfoot className="bg-gray-800 text-white sticky bottom-0">
                       <tr>
                         <td className="p-3 font-bold">Jami</td>
                         <td
