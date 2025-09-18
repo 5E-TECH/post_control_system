@@ -16,11 +16,12 @@ const OldMails = () => {
             key={post?.id}
             className="min-h-[250px] shadow-lg rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]"
             onClick={() =>
-              navigate(`/mails/${post?.id}`, {
-                state: { regionName: post?.region?.name },
+              navigate(`/mails/${post?.id}?status=${post?.status}`, {
+                state: { regionName: post?.region?.name, hideSend: true },
               })
             }
           >
+            <p>{post?.status}</p>
             <h1 className="text-[30px]">{post?.region?.name}</h1>
             <p className="text-[22px]">
               <span>{post?.order_quantity}</span> ta buyurtmalar
@@ -31,6 +32,14 @@ const OldMails = () => {
                 so'm
               </span>
             </p>
+            {post?.created_at &&
+              new Date(Number(post.created_at)).toLocaleString("uz-UZ", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
           </div>
         ))
       ) : (
