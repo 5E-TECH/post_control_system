@@ -104,7 +104,7 @@ const CourierMailDetail = () => {
   const { data: orders } = getPostById(
     id as string,
     "rejected/",
-    ["canceled_received"].includes(status as string)
+    ["canceled", "canceled_received"].includes(status as string)
   );
 
   const postData = data?.data || orders?.data;
