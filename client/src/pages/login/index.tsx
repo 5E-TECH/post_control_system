@@ -1,17 +1,19 @@
-import { Button, Form, Input, message, type FormProps } from "antd";
-import React, { type FC } from "react";
+import { Button, Input, message } from 'antd';
+import React, { type FC } from 'react';
 
-import logo from "../../shared/assets/login/logo.svg";
-import left from "../../shared/assets/login/Frame 1.svg";
-import right from "../../shared/assets/login/Tree.svg";
-import line from "../../shared/assets/login/Mask.svg";
+import logo from '../../shared/assets/login/logo.svg';
+import left from '../../shared/assets/login/Frame 1.svg';
+import right from '../../shared/assets/login/Tree.svg';
+import line from '../../shared/assets/login/Mask.svg';
 
-import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import { setToken } from "../../shared/lib/features/login/authSlice";
-import type { ILogin } from "../../shared/types/typesLogin";
-import { useLogin } from "../../shared/api/hooks/useLogin";
-import type { RootState } from "../../app/store";
+import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { setToken } from '../../shared/lib/features/login/authSlice';
+import type { ILogin } from '../../shared/types/typesLogin';
+import { useLogin } from '../../shared/api/hooks/useLogin';
+
+import { Formik, Form, Field, ErrorMessage, type FormikProps } from 'formik';
+import * as yup from 'yup';
 
 message.config({
   maxCount: 5,
@@ -19,24 +21,41 @@ message.config({
   top: 70,
 });
 
+const validationSchema = yup.object().shape({
+  phone_number: yup
+    .string()
+    .required('Please input your phone!')
+    .min(9, "Iltimos telefon raqamni to'g'ri kiriting!"),
+  password: yup
+    .string()
+    .required('Please input your password!')
+    .min(4, 'Parol kamida 4 ta belgidan iborat bo‘lishi kerak!'),
+});
+
 const Login: FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { signinUser } = useLogin();
 
-  
-  const initialValues = useSelector((state: RootState) => state.signInSlice);
-  const onFinish: FormProps<ILogin>["onFinish"] = (values: any) => {
+  const initialValues: ILogin = {
+    phone_number: '',
+    password: '',
+  };
+
+  const onFinish = (values: ILogin, { setSubmitting }: any) => {
     signinUser.mutate(values, {
       onSuccess: (res) => {
         dispatch(setToken(res?.data?.data));
-        navigate('/')
+        navigate('/');
+        setSubmitting(false); // ✅ Formik loading to‘xtatildi
       },
       onError: (err: any) => {
-      const errorMsg =
-        err?.response?.data?.message || "Telefon raqam yoki parol noto'g'ri !!!";
-      message.error(errorMsg);
-    },
+        const errorMsg =
+          err?.response?.data?.message ||
+          "Telefon raqam yoki parol noto'g'ri !!!";
+        message.error(errorMsg);
+        setSubmitting(false); 
+      },
     });
   };
 
@@ -65,57 +84,64 @@ const Login: FC = () => {
       </div>
 
       <div className="bg-white p-6 sm:p-8 rounded-lg shadow-2xl w-[460px] max-w-full mx-4">
-        <Form
-          name="basic"
-          layout="vertical"
+        <Formik
           initialValues={initialValues}
-          onFinish={onFinish}
-          autoComplete="off"
+          validationSchema={validationSchema}
+          onSubmit={onFinish}
         >
-          <div className="flex items-center justify-center gap-2 text-xl sm:text-2xl mb-6">
-            <img src={logo} alt="" className="h-8 sm:h-10" />
-            <strong className="bold">Beepost</strong>
-          </div>
+          {({ handleSubmit, isSubmitting }: FormikProps<ILogin>) => (
+            <Form onSubmit={handleSubmit}>
+              <div className="flex items-center justify-center gap-2 text-xl sm:text-2xl mb-6">
+                <img src={logo} alt="" className="h-8 sm:h-10" />
+                <strong className="bold">Beepost</strong>
+              </div>
 
-          <div className="mb-5 text-center">
-            <p className="text-lg sm:text-2xl">Welcome to Beepost! 👋🏻</p>
-          </div>
+              <div className="mb-5 text-center">
+                <p className="text-lg sm:text-2xl">Welcome to Beepost! 👋🏻</p>
+              </div>
 
-          <Form.Item<ILogin>
-            name="phone_number"
-            rules={[
-              { required: true, message: "Please input your phone!" },
-              { min: 9, message: "Iltimos telefon raqamni to'g'ri kiriting!" },
-            ]}
-          >
-            <Input size="large" placeholder="Phone number" type="text" />
-          </Form.Item>
+              {/* Phone number */}
+              <div className="mb-4">
+                <Field
+                  as={Input}
+                  name="phone_number"
+                  size="large"
+                  placeholder="Phone number"
+                />
+                <ErrorMessage
+                  name="phone_number"
+                  component="div"
+                  className="text-red-500 text-sm mt-1"
+                />
+              </div>
 
-          <Form.Item<ILogin>
-            name="password"
-            rules={[
-              { required: true, message: "Please input your password!" },
-              {
-                min: 4,
-                message: "Parol kamida 6 ta belgidan iborat bo‘lishi kerak!",
-              },
-            ]}
-          >
-            <Input.Password size="large" placeholder="Password" type="text" />
-          </Form.Item>
+              {/* Password */}
+              <div className="mb-4">
+                <Field
+                  as={Input.Password}
+                  name="password"
+                  size="large"
+                  placeholder="Password"
+                />
+                <ErrorMessage
+                  name="password"
+                  component="div"
+                  className="text-red-500 text-sm mt-1"
+                />
+              </div>
 
-          <Form.Item label={null}>
-            <Button
-              loading={signinUser.isPending}
-              type="primary"
-              htmlType="submit"
-              size="large"
-              className="bg-[#8C57FF]! w-full"
-            >
-              Submit
-            </Button>
-          </Form.Item>
-        </Form>
+              <Button
+                loading={signinUser.isPending || isSubmitting}
+                type="primary"
+                htmlType="submit"
+                size="large"
+                className="bg-[#8C57FF]! w-full"
+              >
+                Submit
+              </Button>
+            </Form>
+          )}
+        </Formik>
       </div>
     </div>
   );
