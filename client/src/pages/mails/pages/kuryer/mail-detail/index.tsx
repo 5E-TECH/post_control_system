@@ -1,5 +1,53 @@
+// import { createContext, memo, useEffect, useMemo, useState } from "react";
+// import {
+//   useLocation,
+//   useNavigate,
+//   useParams,
+//   useSearchParams,
+// } from "react-router-dom";
+// import SearchInput from "../../../../users/components/search-input";
+// import { Trash } from "lucide-react";
+// import { Button } from "antd";
+// import { usePost } from "../../../../../shared/api/hooks/usePost";
+// import useNotification from "antd/es/notification/useNotification";
+
+// const Context = createContext({ name: "Default" });
+
+// const CourierMailDetail = () => {
+//   const { id } = useParams();
+
+//   const [params] = useSearchParams();
+
+//   const status = params.get("status");
+
+//   const { getPostById } = usePost();
+
+//   const { data } = getPostById(
+//     id as string,
+//     "",
+//     ["received"].includes(status as string)
+//   );
+
+//   const { data: orders } = getPostById(
+//     id as string,
+//     "rejected/",
+//     ["canceled_received"].includes(status as string)
+//   );
+
+//   const postData = data || orders;
+
+//   return <div></div>;
+// };
+
+// export default memo(CourierMailDetail);
+
 import { createContext, memo, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import SearchInput from "../../../../users/components/search-input";
 import { Trash } from "lucide-react";
 import { Button } from "antd";
@@ -14,16 +62,9 @@ const CourierMailDetail = () => {
   const regionName = state?.regionName;
 
   const { getPostById, receivePost } = usePost();
-  const { data } = getPostById(id as string, "orders");
   const { mutate: receivePostsByPostId } = receivePost();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (data?.data) {
-      setSelectedIds(data.data.map((item: any) => item.id));
-    }
-  }, [data]);
 
   const [api, contextHolder] = useNotification();
   const navigate = useNavigate();
@@ -49,6 +90,31 @@ const CourierMailDetail = () => {
     );
   };
 
+  // Dynamic fetching based on status
+  const [params] = useSearchParams();
+
+  const status = params.get("status");
+
+  const { data } = getPostById(
+    id as string,
+    "",
+    ["received"].includes(status as string)
+  );
+
+  const { data: orders } = getPostById(
+    id as string,
+    "rejected/",
+    ["canceled_received"].includes(status as string)
+  );
+
+  const postData = data?.data || orders?.data;
+
+  useEffect(() => {
+    if (postData) {
+      setSelectedIds(postData?.map((item: any) => item.id));
+    }
+  }, [postData]);
+
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
   return (
@@ -72,13 +138,11 @@ const CourierMailDetail = () => {
                       type="checkbox"
                       className="w-[18px] h-[18px] rounded-sm"
                       checked={
-                        !!data?.data && selectedIds.length === data.data.length
+                        !!postData && selectedIds.length === postData?.length
                       }
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedIds(
-                            data?.data.map((item: any) => item.id)
-                          );
+                          setSelectedIds(postData?.map((item: any) => item.id));
                         } else {
                           setSelectedIds([]);
                         }
@@ -124,7 +188,7 @@ const CourierMailDetail = () => {
                 </tr>
               </thead>
               <tbody>
-                {data?.data?.map((order: any) => (
+                {postData?.map((order: any) => (
                   <tr key={order?.id}>
                     <td className="p-[20px] flex items-center">
                       {" "}

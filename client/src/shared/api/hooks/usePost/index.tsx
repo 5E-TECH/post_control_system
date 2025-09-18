@@ -18,10 +18,12 @@ export const usePost = () => {
       queryFn: () => api.get(`post/${path}`).then((res) => res.data),
     });
 
-  const getPostById = (id: string, path: string) =>
+  const getPostById = (id: string, path: string, bool: boolean = true) =>
     useQuery({
       queryKey: [post, id, path],
-      queryFn: () => api.get(`post/${path}/${id}`).then((res) => res.data),
+      queryFn: () =>
+        api.get(`post/orders/${path}${id}`).then((res) => res.data),
+      enabled: bool,
     });
 
   const getOldPostsCourier = () =>
@@ -33,7 +35,7 @@ export const usePost = () => {
   const getRejectedPostsCourier = () =>
     useQuery({
       queryKey: [post],
-      queryFn: () => api.get("post/rejected").then((res) => res.data),
+      queryFn: () => api.get("post/courier/rejected").then((res) => res.data),
     });
 
   const getRejectedPostsByPostId = (id: string) =>
