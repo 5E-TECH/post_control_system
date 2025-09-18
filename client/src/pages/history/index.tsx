@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { useHistory } from "../../shared/api/hooks/useHistory";
 
 // Data interfaces
 interface Market {
@@ -38,6 +39,11 @@ const Dashboard: React.FC = () => {
       document.body.style.overflow = "unset";
     };
   }, []);
+
+  const {data} = useHistory().getHistory()
+  console.log(data)
+
+  
 
   // Market data
   const markets: Market[] = [
