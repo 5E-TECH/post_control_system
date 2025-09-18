@@ -495,7 +495,7 @@ export class CashBoxService
 
       const allCourierCashboxes = await this.cashboxRepo.find({
         where: { cashbox_type: Cashbox_type.FOR_COURIER },
-        relations: ['user.name', 'user.region.name'],
+        relations: ['user', 'user.region'],
       });
       let courierBalanses: object[] = [];
       let couriersTotalBalanse: number = 0;
@@ -511,7 +511,7 @@ export class CashBoxService
 
       const allMarketCashboxes = await this.cashboxRepo.find({
         where: { cashbox_type: Cashbox_type.FOR_MARKET },
-        relations: ['user.name'],
+        relations: ['user'],
       });
       let marketCashboxes: object[] = [];
       let marketsTotalBalans: number = 0;
