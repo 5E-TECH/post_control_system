@@ -76,7 +76,7 @@ const MailDetail = () => {
                 });
                 setTimeout(() => {
                   navigate("/mails");
-                }, 1500);
+                }, 1000);
               },
             }
           );
@@ -111,7 +111,7 @@ const MailDetail = () => {
           });
           setTimeout(() => {
             navigate("/mails");
-          }, 1500);
+          }, 1000);
         },
       }
     );
@@ -156,38 +156,38 @@ const MailDetail = () => {
                       />
                     </th>
                   ) : null}
-                  <th className="w-[254px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       MIJOZ ISMI
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       TELEFON RAQAMI
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       TUMANI
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       PUL MIQDORI
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
-                  <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
                       DONA
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
                   {!hideSend ? (
-                    <th className="w-[258px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                    <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                       <div className="flex items-center justify-between pr-[21px]">
                         HARAKATLAR
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
