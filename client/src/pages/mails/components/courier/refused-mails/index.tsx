@@ -17,7 +17,7 @@ const CourierRefusedMails = () => {
             className="min-h-[250px] shadow-lg rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]"
             onClick={() =>
               navigate(`/courier-mails/${post?.id}`, {
-                state: { regionName: post?.region?.name },
+                state: { regionName: post?.region?.name, hideSend: true },
               })
             }
           >
