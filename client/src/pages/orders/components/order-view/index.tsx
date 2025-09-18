@@ -49,7 +49,6 @@ const OrderView = () => {
             <th>
               <div className="flex items-center gap-10 ml-10">
                 <span>#</span>
-                {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div> */}
               </div>
             </th>
 

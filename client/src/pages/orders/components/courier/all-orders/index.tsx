@@ -163,7 +163,7 @@ const AllOrders = () => {
                 </div>
               </th>
               <th>
-                <div className="flex items-center gap-30">
+                <div className="flex items-center justify-center gap-30">
                   <span>ACTIONS</span>
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
@@ -201,7 +201,7 @@ const AllOrders = () => {
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                   {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
                 </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                <td className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                   {item?.items.length}
                 </td>
                 <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
