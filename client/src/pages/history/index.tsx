@@ -246,12 +246,12 @@ const Dashboard: React.FC = () => {
             <div className="grid md:grid-cols-2 gap-6">
               {/* Markets Table */}
               <div className="rounded-xl shadow-lg p-4">
-                <h4 className="text-lg font-bold text-gray-800 mb-4 text-center">
+                <h4 className="text-lg font-bold text-gray-800 mb-4 text-center dark:text-white">
                   Do'konlar
                 </h4>
                 <div className="overflow-y-scroll h-[395px] custom-scrollbar">
                   <table className="w-full border-collapse relative">
-                    <thead className="sticky top-0 bg-white dark:bg-[#312D48] z-10">
+                    <thead className="sticky top-0 bg-white dark:bg-[var(--color-dark-bg-py)] z-10">
                       <tr className="border-b-1 border-gray-300">
                         <th className="p-3 text-left font-bold text-black dark:text-white">
                           Nomi
