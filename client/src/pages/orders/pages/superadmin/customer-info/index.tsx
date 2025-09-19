@@ -1,14 +1,14 @@
 import { ArrowRight, Check } from "lucide-react";
 import { createContext, memo, useMemo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Button } from "antd";
 import useNotification from "antd/es/notification/useNotification";
 import type { RootState } from "../../../../../app/store";
 import { useUser } from "../../../../../shared/api/hooks/useRegister";
-import CustomerInfo from "../../../components/customer-info";
+import CustomerInfo, { initialState } from "../../../components/customer-info";
 import CustomerDetails from "../../../components/customer-details";
-import Discard from "../../../components/button/discard";
+import { setCustomerData } from "../../../../../shared/lib/features/customer_and_market-id";
 
 const Context = createContext({ name: "Default" });
 
@@ -53,6 +53,11 @@ const CustomerInfoOrder = () => {
         navigate("/orders/confirm");
       },
     });
+  };
+
+  const dispatch = useDispatch();
+  const handleDiscard = () => {
+    dispatch(setCustomerData(initialState));
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
@@ -124,9 +129,13 @@ const CustomerInfoOrder = () => {
 
         <div className="flex flex-col gap-4.5 w-full">
           <CustomerInfo />
-          <CustomerDetails />
           <div className="flex gap-4 justify-end">
-            <Discard children="Discard" />
+            <Button
+              onClick={handleDiscard}
+              className="w-[91px]! h-[38px]! bg-[#F4F5FA]! border! border-[#8A8D93]! text-[#8A8D93]! hover:opacity-80! dark:bg-[#28243D]!"
+            >
+              Discard
+            </Button>
             <Button
               onClick={handleClick}
               className="w-[91px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
@@ -135,6 +144,7 @@ const CustomerInfoOrder = () => {
               <ArrowRight className="h-[13px] w-[13px]" />
             </Button>
           </div>
+          <CustomerDetails />
         </div>
       </div>
     </Context.Provider>

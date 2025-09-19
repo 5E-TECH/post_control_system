@@ -30,12 +30,6 @@ const CustomerDetails = () => {
         <table>
           <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
             <tr>
-              <th className="p-[20px] flex items-center">
-                <input
-                  type="checkbox"
-                  className="w-[18px] h-[18px] rounded-sm"
-                />
-              </th>
               <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
                   ISMI
@@ -56,12 +50,6 @@ const CustomerDetails = () => {
               </th>
               <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
-                  BUYURTMA
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                </div>
-              </th>
-              <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                <div className="flex items-center justify-between pr-[21px]">
                   SUMMA
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
@@ -77,13 +65,6 @@ const CustomerDetails = () => {
           <tbody>
             {myNewOrders?.map((order: any) => (
               <tr key={order?.id}>
-                <td className="p-[20px] flex items-center">
-                  {" "}
-                  <input
-                    type="checkbox"
-                    className="w-[18px] h-[18px] rounded-sm"
-                  />
-                </td>
                 <td className="w-[254px] h-[56px] pl-[20px] text-left">
                   <div className="flex items-center gap-4">
                     <span className="font-medium text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
@@ -104,13 +85,10 @@ const CustomerDetails = () => {
 
                 <td className="w-[254px] h-[56px] pl-[20px] text-left">
                   <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
-                    {order?.items?.[0]?.product?.name}
-                  </span>
-                </td>
-
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
-                  <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
-                    {order?.total_price}
+                    {new Intl.NumberFormat("uz-UZ").format(
+                      order?.total_price
+                    )}{" "}
+                    uzs
                   </span>
                 </td>
 
