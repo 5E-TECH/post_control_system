@@ -226,7 +226,7 @@ const AppRouters = () => {
               path: "payments",
               element: <Payments />,
               children: [
-                { path: "cash-detail", element: <CashDetail /> },
+                { path: `cash-detail/:id`, element: <CashDetail /> },
                 { path: "main-cashbox", element: <MainDetail/>  }
               ],
             },

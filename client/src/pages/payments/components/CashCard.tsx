@@ -39,7 +39,7 @@ export const CashboxCard = ({ role, name, raw, show, setShow }: Props) => {
         <div className="flex items-center gap-3">
           <p className="text-[40px] font-medium w-[300px]">
             {show ? (
-              <CountUp end={raw} duration={1.0} separator="," suffix=" UZS" />
+              <CountUp end={raw} duration={0.5} separator="," suffix=" UZS" />
             ) : (
               "●●●●●●● UZS"
             )}
