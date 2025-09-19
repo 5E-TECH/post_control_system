@@ -1,9 +1,10 @@
 import { Button, Form, Input, Select } from "antd";
 import { Plus, X } from "lucide-react";
-import { memo, useState, type ChangeEvent } from "react";
+import { memo, useEffect, useState, type ChangeEvent } from "react";
 import { useProduct } from "../../../../shared/api/hooks/useProduct";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setOrderItems } from "../../../../shared/lib/features/customer_and_market-id";
+import type { RootState } from "../../../../app/store";
 
 export interface IOrderItems {
   product_id: string | undefined;
@@ -36,9 +37,18 @@ const OrderItems = () => {
   const { data } = getProductsByMarket(marketId as string);
   const productNames = data?.data.map((product: any) => ({
     value: product.id,
-    label: product.name,
+    label: (
+      <div className="flex items-center gap-5">
+        <img
+          src={product.image_url}
+          alt={product.name}
+          className="w-10 h-10 object-cover rounded"
+        />
+        <span>{product.name}</span>
+      </div>
+    ),
   }));
-  
+
   const dispatch = useDispatch();
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -52,6 +62,18 @@ const OrderItems = () => {
     setFormData(updated);
     dispatch(setOrderItems({ ...updated, quantity: Number(updated.quantity) }));
   };
+
+  const orderItems = useSelector(
+    (state: RootState) => state.setCustomerData.orderItems
+  );
+
+  useEffect(() => {
+    if (orderItems && orderItems.length > 0) {
+      setFormData(orderItems[0]);
+    } else {
+      setFormData(initialState);
+    }
+  }, [orderItems]);
 
   return (
     <div className="bg-[#ffffff] dark:bg-[#312D48] rounded-md shadow-lg">

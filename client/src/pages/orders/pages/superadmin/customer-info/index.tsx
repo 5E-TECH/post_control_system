@@ -50,7 +50,9 @@ const CustomerInfoOrder = () => {
     createUser.mutate(customer, {
       onSuccess: (res) => {
         localStorage.setItem("customerId", res?.data?.data?.id);
-        navigate("/orders/confirm");
+        navigate("/orders/confirm", {
+          state: { customerData },
+        });
       },
     });
   };
@@ -60,6 +62,9 @@ const CustomerInfoOrder = () => {
     dispatch(setCustomerData(initialState));
   };
 
+  const { state } = useLocation();
+  const market = state?.market;
+  console.log(market);
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
   return (

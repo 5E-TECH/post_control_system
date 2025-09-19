@@ -1,8 +1,8 @@
 import { Check } from "lucide-react";
 
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Button } from "antd";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import useNotification from "antd/es/notification/useNotification";
 import { createContext, memo, useMemo } from "react";
 import type { RootState } from "../../../../../app/store";
@@ -10,6 +10,10 @@ import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import OrderItems from "../../../components/order-items";
 import ProductInfo from "../../../components/product-info";
 import Discard from "../../../components/button/discard";
+import {
+  resetOrderItems,
+  setProductInfo,
+} from "../../../../../shared/lib/features/customer_and_market-id";
 
 const Context = createContext({ name: "Default" });
 
@@ -63,6 +67,15 @@ const CreateOrder = () => {
     });
   };
 
+  const dispatch = useDispatch();
+  const handleDiscard = () => {
+    dispatch(resetOrderItems());
+    dispatch(setProductInfo(null));
+  };
+
+  const { state } = useLocation();
+  const customerData = state?.customerData;
+  console.log(customerData);
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
   return (
@@ -70,9 +83,11 @@ const CreateOrder = () => {
       {contextHolder}
       <div className="flex gap-6 p-5">
         <div className="pr-[81px]">
-          <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
-            Process
-          </h1>
+          <div className="flex items-center gap-1">
+            <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
+              Process
+            </h1>
+          </div>
 
           <div className="flex items-center gap-2 mt-4">
             <div className="flex w-fit rounded-full p-[4px] bg-[var(--color-bg-sy)]">
@@ -134,20 +149,27 @@ const CreateOrder = () => {
           </div>
         </div>
 
-        <div className="flex flex-col flex-1 gap-6">
+        <div className="flex flex-col gap-6">
           <div>
             <OrderItems />
           </div>
+
           <div>
             <ProductInfo />
           </div>
 
           <div className="flex justify-end">
             <div className="flex gap-4">
-              <Discard children="Discard" />
+              <Discard handleDiscard={handleDiscard} type="button">
+                Discard
+              </Discard>
               <Button
                 onClick={handleClick}
-                className="w-[130px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
+                disabled={createOrder.isPending}
+                loading={createOrder.isPending}
+                htmlType="submit"
+                className="w-[130px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! 
+           hover:opacity-85! hover:outline-none! dark:border-none!"
               >
                 Create order
               </Button>

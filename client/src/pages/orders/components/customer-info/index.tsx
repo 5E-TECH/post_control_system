@@ -1,22 +1,22 @@
 import { Input, Select } from "antd";
-import { memo, useState, type ChangeEvent } from "react";
+import { memo, useEffect, useState, type ChangeEvent } from "react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
-import InputMask from "react-input-mask";
+import type { RootState } from "../../../../app/store";
 
 export interface ICustomer {
   phone_number: string;
-  district_id?: string;
+  district_id?: string | null;
   name: string;
   address: string;
 }
 
 export const initialState: ICustomer = {
-  phone_number: "+998",
-  district_id: undefined,
+  phone_number: "+998 ",
+  district_id: null,
   name: "",
   address: "",
 };
@@ -66,26 +66,47 @@ const CustomerInfocomp = () => {
     dispatch(setCustomerData(updated));
   };
 
+  const customerData = useSelector(
+    (state: RootState) => state.setCustomerData.customerData
+  );
+
+  useEffect(() => {
+    setFormData(customerData as ICustomer);
+  }, [customerData]);
   return (
     <div className="w-full p-5 rounded-md dark:bg-[#312D48] shadow-lg">
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
         Customer Info
       </h1>
       <div className="flex flex-col gap-4">
-        <InputMask
-          mask="+998 99 999 99 99"
+        <Input
+          name="phone_number"
           value={formData.phone_number}
-          onChange={handleChange}
-        >
-          {(inputProps: any) => (
-            <Input
-              {...inputProps}
-              name="phone_number"
-              placeholder="+998 90 123 45 67"
-              className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]!"
-            />
-          )}
-        </InputMask>
+          onChange={(e) => {
+            let val = e.target.value.replace(/\D/g, "");
+            if (val.startsWith("998")) {
+              val = val.slice(3);
+            }
+
+            let formatted = "+998 ";
+            if (val.length > 0) {
+              formatted += val
+                .replace(
+                  /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
+                  (_, a, b, c, d) => [a, b, c, d].filter(Boolean).join(" ")
+                )
+                .trim();
+            }
+
+            handleChange({
+              ...e,
+              target: { ...e.target, name: "phone_number", value: formatted },
+            } as any);
+          }}
+          placeholder="+998 90 123 45 67"
+          className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]!"
+        />
+
         {/* {allNumbers?.length ? (
           <div className="grid grid-cols-5 gap-5">
             {allNumbers?.map((number: string, inx: number) => (

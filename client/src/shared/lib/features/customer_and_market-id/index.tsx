@@ -13,8 +13,8 @@ const initialState: ICustomerId = {
   customerData: {
     name: "",
     address: "",
-    phone_number: "",
-    district_id: "",
+    phone_number: "+998 ",
+    district_id: null,
   },
   orderItems: null,
   productInfo: {
@@ -31,19 +31,28 @@ export const customerIdSlice = createSlice({
     setCustomerData: (state, actions: PayloadAction<ICustomer | null>) => {
       state.customerData = actions.payload;
     },
-    setOrderItems: (state, actions: PayloadAction<IOrderItems>) => {
+    setOrderItems: (state, actions: PayloadAction<IOrderItems | null>) => {
+      if (actions.payload === null) {
+        state.orderItems = null;
+        return;
+      }
+
       if (!state.orderItems) {
         state.orderItems = [];
       }
 
       const inx = state.orderItems.findIndex(
-        (item) => item.product_id === actions.payload.product_id
+        (item) => item.product_id === actions.payload!.product_id
       );
 
       if (inx < 0) {
         state.orderItems.push(actions.payload);
+      } else {
+        state.orderItems[inx] = actions.payload;
       }
-      state.orderItems[inx] = actions.payload;
+    },
+    resetOrderItems: (state) => {
+      state.orderItems = null;
     },
     setProductInfo: (state, actions: PayloadAction<IProductInfo | null>) => {
       state.productInfo = actions.payload;
@@ -51,6 +60,10 @@ export const customerIdSlice = createSlice({
   },
 });
 
-export const { setCustomerData, setOrderItems, setProductInfo } =
-  customerIdSlice.actions;
+export const {
+  setCustomerData,
+  setOrderItems,
+  setProductInfo,
+  resetOrderItems,
+} = customerIdSlice.actions;
 export default customerIdSlice.reducer;
