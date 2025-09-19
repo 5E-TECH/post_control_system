@@ -60,7 +60,7 @@ const Header = () => {
           <button
             type="button"
             onClick={() => navigate('/profile')}
-            className="p-2 rounded-full border border-gray-400 dark:border-gray-600 
+            className="p-2 cursor-pointer rounded-full border border-gray-400 dark:border-gray-600 
                bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
                hover:bg-gray-200 dark:hover:bg-gray-700 
                hover:scale-105 shadow-sm hover:shadow-md transition-all duration-200"
@@ -72,7 +72,7 @@ const Header = () => {
         <div className="flex justify-center items-center">
           <button
             onClick={() => signOut()}
-            className="flex items-center justify-center rounded-full border border-red-500 w-10 h-10 text-red-500 transition hover:bg-red-500 hover:text-white"
+            className="flex items-center cursor-pointer justify-center rounded-full border border-red-500 w-10 h-10 text-red-500 transition hover:bg-red-500 hover:text-white"
           >
             <LogOut className="w-5 h-5" />
           </button>
