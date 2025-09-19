@@ -9,14 +9,10 @@ import { setId, setRole } from "../../shared/lib/features/roleSlice";
 const Auth = () => {
   const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.authSlice.token);
-  const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+   
 
     api
       .get("user/profile") // 🔑 backendda token tekshirish
@@ -29,7 +25,7 @@ const Auth = () => {
         dispatch(setToken(null)); // ❌ noto‘g‘ri token → localStorage va reduxdan o‘chir
         setValid(false);
       })
-      .finally(() => setLoading(false));
+      .finally();
   }, [token, dispatch]);
 
   return valid ? <Outlet /> : <Navigate replace to="/login" />;
