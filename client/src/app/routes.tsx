@@ -131,12 +131,12 @@ const AppRouters = () => {
                 {
                   path: "customer/detail",
                   element: <OrderDetail />,
-                }
+                },
+                {
+                  path: "order-detail/:id",
+                  element: <OrderDetails />,
+                },
               ],
-            },
-            {
-              path: "order-detail",
-              element: <OrderDetails />,
             },
             {
               path: "courier-orders",
