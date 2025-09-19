@@ -1,15 +1,16 @@
-import { EllipsisVertical } from "lucide-react";
-import { memo, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Search from "../../components/search";
-import phone from "../../../../shared/assets/order/detail.svg";
-import { useLocation } from "react-router-dom";
-import { useOrder } from "../../../../shared/api/hooks/useOrder";
-import { usePost } from "../../../../shared/api/hooks/usePost";
+import { EllipsisVertical } from 'lucide-react';
+import { memo, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Search from '../../components/search';
+import phone from '../../../../shared/assets/order/detail.svg';
+import { useLocation } from 'react-router-dom';
+import { useOrder } from '../../../../shared/api/hooks/useOrder';
+import { usePost } from '../../../../shared/api/hooks/usePost';
+
 
 const OrderView = () => {
   const navigate = useNavigate();
-  const [openMenuId, setOpenMenuId] = useState("");
+  const [openMenuId, setOpenMenuId] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
@@ -21,7 +22,6 @@ const OrderView = () => {
   const { getOrderByMarket } = useOrder();
   const { createPost } = usePost();
   const { data, refetch } = getOrderByMarket(market);
-
 
   useEffect(() => {
     if (data?.data) {
@@ -36,16 +36,16 @@ const OrderView = () => {
 
     createPost.mutate(newOrder, {
       onSuccess: () => {
-        setSelectedIds([])
-        refetch()
-        navigate("/order/markets/new-orders")
-      }
+        setSelectedIds([]);
+        refetch();
+        navigate('/order/markets/new-orders');
+      },
     });
   };
 
   return (
     <div
-      onClick={() => setOpenMenuId("")}
+      onClick={() => setOpenMenuId('')}
       className="bg-white rounded-md m-5 dark:bg-[#312d4b]"
     >
       <Search />
@@ -145,7 +145,7 @@ const OrderView = () => {
                         setSelectedIds([...selectedIds, item.id]);
                       } else {
                         setSelectedIds(
-                          selectedIds.filter((id) => id !== item.id)
+                          selectedIds.filter((id) => id !== item.id),
                         );
                       }
                     }}
@@ -159,7 +159,7 @@ const OrderView = () => {
                   {item?.customer?.phone_number}
                 </td>
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.customer?.address?.split(" ").slice(0, 2).join(" ")}
+                  {item?.customer?.address?.split(' ').slice(0, 2).join(' ')}
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                   bi1
@@ -286,11 +286,21 @@ const OrderView = () => {
         )}
 
         <div className="flex justify-end mr-10 mt-5">
-          <button type="submit"
-            onClick={() => handleAccapted()}
-            className="px-2 py-1 bg-[#8c57ff] cursor-pointer rounded-md mb-5 text-white"
+          <button
+            type="submit"
+            disabled={
+              !selectedIds ||
+              (Array.isArray(selectedIds) && selectedIds.length === 0)
+            }
+            onClick={handleAccapted}
+            className={`px-2 py-1 ${
+              !selectedIds ||
+              (Array.isArray(selectedIds) && selectedIds.length === 0)
+                ? 'opacity-50 cursor-not-allowed'
+                : 'cursor-pointer'
+            } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}
           >
-            Accapted
+            Qabul qilish
           </button>
         </div>
       </div>
