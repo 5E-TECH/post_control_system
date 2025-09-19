@@ -8,6 +8,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
 import {
@@ -199,15 +200,27 @@ const Dashboards = () => {
               />
               <Tooltip />
               <Legend />
-              <Bar dataKey="sotilgan" stackId="a" fill="#0047AB" />
-              <Bar
-                dataKey={(d: any) => d.buyurtmalar - d.sotilgan}
-                stackId="a"
-                fill="#66B2FF"
-                name="buyurtmalar"
-              />
+
+              {/* Sotilgan */}
+              <Bar dataKey="sotilgan" stackId="a" name="Sotilgan">
+                {visibleMarkets.map((_: any, index: number) => (
+                  <Cell key={`sotilgan-${index}`} fill="#0047AB" />
+                ))}
+              </Bar>
+
+              {/* Buyurtmalar */}
+              <Bar dataKey="buyurtmalar" stackId="a" name="Buyurtmalar">
+                {visibleMarkets.map((entry: any, index: number) => {
+                  const rang =
+                    entry.buyurtmalar === entry.sotilgan
+                      ? "#0047AB"
+                      : "#66B2FF";
+                  return <Cell key={`buyurtmalar-${index}`} fill={rang} />;
+                })}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
+
           <div className="flex justify-center mt-4">
             <button
               onClick={() => setShowAllMarkets(!showAllMarkets)}
@@ -242,13 +255,22 @@ const Dashboards = () => {
               />
               <Tooltip />
               <Legend />
-              <Bar dataKey="sotilgan" stackId="a" fill="#0047AB" />
-              <Bar
-                dataKey={(d: any) => d.buyurtmalar - d.sotilgan}
-                stackId="a"
-                fill="#66B2FF"
-                name="buyurtmalar"
-              />
+              <Bar dataKey="sotilgan" stackId="a" name="Sotilgan">
+                {visibleCouriers.map((_: any, index: number) => (
+                  <Cell key={`sotilgan-${index}`} fill="#0047AB" />
+                ))}
+              </Bar>
+
+              {/* Buyurtmalar */}
+              <Bar dataKey="buyurtmalar" stackId="a" name="Buyurtmalar">
+                {visibleCouriers.map((entry: any, index: number) => {
+                  const rang =
+                    entry.buyurtmalar === entry.sotilgan
+                      ? "#0047AB"
+                      : "#66B2FF";
+                  return <Cell key={`buyurtmalar-${index}`} fill={rang} />;
+                })}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
           <div className="flex justify-center mt-4">
