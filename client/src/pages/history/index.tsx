@@ -86,7 +86,7 @@ const Dashboard: React.FC = () => {
                     bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                  {Number(bugungiHolat).toLocaleString()}
+                  {Number(bugungiHolat).toLocaleString()} UZS
                 </div>
               </>
             )}
@@ -156,7 +156,7 @@ const Dashboard: React.FC = () => {
                           balans >= 0 ? "text-green-600" : "text-red-600"
                         }`}
                       >
-                        {Number(balans).toLocaleString()}
+                        {Number(balans).toLocaleString()} UZS
                       </div>
                     </div>
                     <div className="text-center">
@@ -164,7 +164,7 @@ const Dashboard: React.FC = () => {
                         Kassa
                       </div>
                       <div className="text-2xl font-bold text-green-600">
-                        {String(kassa).toLocaleString()}
+                        {String(kassa).toLocaleString()} UZS
                       </div>
                     </div>
                   </div>
@@ -221,6 +221,7 @@ const Dashboard: React.FC = () => {
                                 : m.amount < 0
                                 ? `+${Math.abs(m.amount).toLocaleString()}`
                                 : m.amount.toLocaleString()}
+                              UZS
                             </td>
                           </tr>
                         ))}
@@ -235,7 +236,7 @@ const Dashboard: React.FC = () => {
                                 : "text-red-600"
                             }`}
                           >
-                            {Number(totalMarket).toLocaleString()}
+                            {Number(totalMarket).toLocaleString()} UZS
                           </td>
                         </tr>
                       </tfoot>
@@ -284,7 +285,7 @@ const Dashboard: React.FC = () => {
                                   : "text-red-600"
                               }`}
                             >
-                              {Number(c.amount).toLocaleString()}
+                              {Number(c.amount).toLocaleString()} UZS
                             </td>
                           </tr>
                         ))}
@@ -299,7 +300,7 @@ const Dashboard: React.FC = () => {
                                 : "text-red-600"
                             }`}
                           >
-                            {Number(totalCourier).toLocaleString()}
+                            {Number(totalCourier).toLocaleString()} UZS
                           </td>
                         </tr>
                       </tfoot>
