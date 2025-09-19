@@ -14,10 +14,6 @@ type Props = {
 export const CashboxCard = ({ raw, show, setShow }: Props) => {
   return (
     <div>
-      <h2 className="text-[20px] mb-5 flex items-center">
-        <span className="text-[22px] font-bold">Asosiy Kassa</span>
-      </h2>
-
       <div className="w-[500px] h-[250px] px-6 py-6 text-2xl flex flex-col rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white justify-between relative">
         <div className="flex gap-3">
           <img src={logo} alt="" />
