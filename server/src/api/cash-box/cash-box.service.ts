@@ -83,6 +83,7 @@ export class CashBoxService
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: { cashbox_id: mainCashbox.id },
         relations: ['createdByUser'],
+        order: { created_at: 'DESC' },
       });
 
       let income = 0;
@@ -122,6 +123,7 @@ export class CashBoxService
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: { cashbox_id: cashbox.id },
         relations: ['createdByUser'],
+        order: { created_at: 'DESC' },
       });
 
       let income: number = 0;
@@ -155,6 +157,7 @@ export class CashBoxService
       }
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: { cashbox_id: myCashbox.id },
+        order: { created_at: 'DESC' },
       });
 
       let income: number = 0;
@@ -171,9 +174,8 @@ export class CashBoxService
       return successRes(
         { myCashbox, cashboxHistory, income, outcome },
         200,
-        'Cashbox details',
+        'My cashbox details',
       );
-      return successRes(myCashbox, 200, 'My cashbox');
     } catch (error) {
       return catchError(error);
     }
@@ -456,7 +458,7 @@ export class CashBoxService
       marketCashbox.balance -= amount;
       await queryRunner.manager.save(marketCashbox);
 
-      const marketCashboxHistory = await queryRunner.manager.create(
+      const marketCashboxHistory = queryRunner.manager.create(
         CashboxHistoryEntity,
         {
           operation_type: Operation_type.EXPENSE,
