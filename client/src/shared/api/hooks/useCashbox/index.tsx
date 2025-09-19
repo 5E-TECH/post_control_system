@@ -34,11 +34,20 @@ export const useCashBox = () => {
       queryFn: () => api.get(`cashbox/main`).then((res) => res.data),
     });
 
+  const cashboxSpand = useMutation({
+    mutationFn: ({ data }: { data: any }) =>
+      api.patch(`cashbox/spend`, data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [cashbox] });
+    },
+  });
+
   return {
     getCashBoxById,
     getCashBoxInfo,
     createPaymentCourier,
     createPaymentMarket,
-    getCashBoxMain
+    getCashBoxMain,
+    cashboxSpand
   };
 };

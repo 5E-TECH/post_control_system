@@ -1,4 +1,4 @@
-import { Eye, EyeOff, ChevronRight } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import CountUp from "react-countup";
 import logo from "../../../shared/assets/logo.svg";
 
@@ -11,12 +11,11 @@ type Props = {
   setShow: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export const CashboxCard = ({ role, name, raw, show, setShow }: Props) => {
+export const CashboxCard = ({ raw, show, setShow }: Props) => {
   return (
     <div>
       <h2 className="text-[20px] mb-5 flex items-center">
-        {role === "market" ? "Market" : "Courier"} <ChevronRight />{" "}
-        <span className="text-[22px] font-bold">{name}</span>
+        <span className="text-[22px] font-bold">Asosiy Kassa</span>
       </h2>
 
       <div className="w-[500px] h-[250px] px-6 py-6 text-2xl flex flex-col rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white justify-between relative">
