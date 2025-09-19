@@ -25,8 +25,8 @@ const Payments = () => {
   const { data: cashBoxData, refetch } = getCashBoxInfo();
   // refetch()
 
-  const { data } = getMarkets();
-  const { data: courierData } = getCourier();
+  const { data } = getMarkets(showMarket);
+  const { data: courierData } = getCourier(showCurier);
 
   const handleNavigate = () => {
     navigate(`cash-detail/${select}`, {

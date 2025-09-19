@@ -5,10 +5,11 @@ export const courier = "courier";
 
 export const useCourier = () => {
 
-  const getCourier = () =>
+  const getCourier = (enabled = true) =>
     useQuery({
       queryKey: [courier],
       queryFn: () => api.get("user/couriers").then((res) => res.data),
+      enabled
     });
   return {
     getCourier,
