@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, MoreVertical, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import React, { useState } from "react";
 import Select from "../users/components/select";
 import Popup from "../../shared/ui/Popup";
@@ -23,18 +23,13 @@ const Payments = () => {
   const { getCashBoxInfo } = useCashBox();
 
   const { data: cashBoxData, refetch } = getCashBoxInfo();
-  // refetch()
+
 
   const { data } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
 
   const handleNavigate = () => {
-    navigate(`cash-detail/${select}`, {
-      state: {
-        market: data?.data || [],
-        selectedMarketId: select,
-      },
-    });
+    navigate(`cash-detail/${select}`);
     setSelect(null);
     setShowMarket(false);
     select;
@@ -293,86 +288,24 @@ const Payments = () => {
                 </thead>
 
                 <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-                  <tr className="border-t border-[#E7E3FC1F] text-[15px] font-normal">
-                    <td className="px-4 py-3 text-[#8C57FF]">#4910</td>
-                    <td className="px-4 py-3">Aug 17, 2020</td>
-                    <td className="px-4 py-3">
-                      <span className="px-[12px] py-[2px] text-[#16B1FF] bg-[#16B1FF29] rounded-full text-[13px]">
-                        Ready to Pickup
-                      </span>
-                    </td>
+                  {cashBoxData?.data?.allCashboxHistories?.map(
+                    (item: any, inx: number) => (
+                      <tr key={item.id} className="border-t border-[#E7E3FC1F] text-[15px] font-normal">
+                        <td className="px-4 py-3 text-[#8C57FF]">{inx + 1}</td>
+                        <td className="px-4 py-3"></td>
+                        <td className="px-4 py-3">
+                          <span className="px-[12px] py-[2px] text-[#16B1FF] bg-[#16B1FF29] rounded-full text-[13px]">
+                            {item?.payment_method}
+                          </span>
+                        </td>
 
-                    <td className="px-4 py-3">$256.39</td>
-                    <td className="px-13 py-3">
-                      <MoreVertical />
-                    </td>
-                  </tr>
-                  <tr className="border-t border-[#2E263D1F] dark:border-[#E7E3FC1F] text-[15px] font-normal">
-                    <td className="px-4 py-3 text-[#8C57FF]">#4910</td>
-                    <td className="px-4 py-3">Aug 17, 2020</td>
-                    <td className="px-4 py-3">
-                      <span className="px-[12px] py-[2px] text-[#FFB400] bg-[#FFB40029] rounded-full text-[13px]">
-                        Dispatched
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">$256.39</td>
-                    <td className="px-13 py-3">
-                      <MoreVertical />
-                    </td>
-                  </tr>
-                  <tr className="border-t border-[#2E263D1F] dark:border-[#E7E3FC1F] text-[15px] font-normal">
-                    <td className="px-4 py-3 text-[#8C57FF]">#4910</td>
-                    <td className="px-4 py-3">Aug 17, 2020</td>
-                    <td className="px-4 py-3">
-                      <span className="px-[12px] py-[2px] text-[#56CA00] bg-[#56CA0029] rounded-full text-[13px]">
-                        Delivered
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">$256.39</td>
-                    <td className="px-13 py-3">
-                      <MoreVertical />
-                    </td>
-                  </tr>
-                  <tr className="border-t border-[#2E263D1F] dark:border-[#E7E3FC1F] text-[15px] font-normal">
-                    <td className="px-4 py-3 text-[#8C57FF]">#4910</td>
-                    <td className="px-4 py-3">Aug 17, 2020</td>
-                    <td className="px-4 py-3">
-                      <span className="px-[12px] py-[2px] text-[#8C57FF] bg-[#8C57FF29] rounded-full text-[13px]">
-                        Out for delivery
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">$256.39</td>
-                    <td className="px-13 py-3">
-                      <MoreVertical />
-                    </td>
-                  </tr>
-                  <tr className="border-t border-[#2E263D1F] dark:border-[#E7E3FC1F] text-[15px] font-normal">
-                    <td className="px-4 py-3 text-[#8C57FF]">#4910</td>
-                    <td className="px-4 py-3">Aug 17, 2020</td>
-                    <td className="px-4 py-3">
-                      <span className="px-[12px] py-[2px] text-[#16B1FF] bg-[#16B1FF29] rounded-full text-[13px]">
-                        Ready to Pickup
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3">$256.39</td>
-                    <td className="px-13 py-3">
-                      <MoreVertical />
-                    </td>
-                  </tr>
-                  <tr className="border-t border-[#2E263D1F] dark:border-[#E7E3FC1F] text-[15px] font-normal">
-                    <td className="px-4 py-3 text-[#8C57FF]">#4910</td>
-                    <td className="px-4 py-3">Aug 17, 2020</td>
-                    <td className="px-4 py-3">
-                      <span className="px-[12px] py-[2px] text-[#56CA00] bg-[#56CA0029] rounded-full text-[13px]">
-                        Delivered
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">$256.39</td>
-                    <td className="px-13 py-3">
-                      <MoreVertical />
-                    </td>
-                  </tr>
+                        <td className="px-4 py-3">{item?.operation_type}</td>
+                        <td className="px-13 py-3">
+                          {item?.amount}
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
               <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">

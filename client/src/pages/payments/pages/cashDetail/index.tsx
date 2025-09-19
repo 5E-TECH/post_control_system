@@ -1,23 +1,16 @@
 import { memo, useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
-
+import { ChevronRight } from "lucide-react";
 import { useEffect } from "react";
 import { Select } from "antd";
 import TextArea from "antd/es/input/TextArea";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
-
+import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 
 const CashDetail = () => {
   const { id } = useParams();
-
-  const location = useLocation();
-
-  const market = location.state?.market;
-  console.log(market);
-  
-  
 
   const [form, setForm] = useState({
     from: "",
@@ -35,7 +28,6 @@ const CashDetail = () => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
-  
 
   // const handleCheck = () => {
   //   console.log("Filter values:", form);
@@ -52,7 +44,11 @@ const CashDetail = () => {
 
   const { getCashBoxById, createPaymentMarket, createPaymentCourier } =
     useCashBox();
+
+  const { getMarkets } = useMarket();
+
   const { data, refetch } = getCashBoxById(id);
+  const { data: marketData } = getMarkets(form.payment == "click_to_market" ? true : false);
 
   const handleSubmit = () => {
     const dataCourier = {
@@ -116,6 +112,12 @@ const CashDetail = () => {
   return (
     <div className="px-5 mt-5 flex gap-24">
       <div>
+        <h2 className="flex items-center mb-5 text-[20px] capitalize">
+          {data?.data?.cashbox?.user?.role} <ChevronRight />
+          <span className="text-[22px] font-bold">
+            {data?.data?.cashbox?.user?.name}
+          </span>
+        </h2>
         <CashboxCard
           role={"market"}
           name={data?.data?.cashbox?.user?.name}
@@ -160,7 +162,7 @@ const CashDetail = () => {
                 className="w-[150px]"
                 options={[
                   { value: "", label: "Market tanlang", disabled: true },
-                  ...(market?.map((item: any) => ({
+                  ...(marketData?.data?.map((item: any) => ({
                     value: item.id,
                     label: item.name,
                   })) || []),
