@@ -1,7 +1,5 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
-import MainDetail from "../pages/payments/pages/mainDetail";
-import RefusedMailDetail from "../pages/mails/pages/superadmin/refused-mail-detail";
 const WaitingOrders = lazy(
   () => import("../pages/orders/components/courier/waiting-orders")
 );
@@ -31,6 +29,10 @@ const CreateAdmin = lazy(() => import("../pages/users/pages/create-admin"));
 const CreateCourier = lazy(() => import("../pages/users/pages/create-courier"));
 const CreateMarket = lazy(() => import("../pages/users/pages/create-market"));
 const Overview = lazy(() => import("../pages/profile/overview/overview"));
+const MainDetail = lazy(() => import("../pages/payments/pages/mainDetail"));
+const RefusedMailDetail = lazy(
+  () => import("../pages/mails/pages/superadmin/refused-mail-detail")
+);
 
 const CreateRegistrator = lazy(
   () => import("../pages/users/pages/create-registrator")
@@ -129,12 +131,12 @@ const AppRouters = () => {
                 {
                   path: "customer/detail",
                   element: <OrderDetail />,
-                },
-                {
-                  path: "order-detail",
-                  element: <OrderDetails />,
-                },
+                }
               ],
+            },
+            {
+              path: "order-detail",
+              element: <OrderDetails />,
             },
             {
               path: "courier-orders",
@@ -227,7 +229,7 @@ const AppRouters = () => {
               element: <Payments />,
               children: [
                 { path: `cash-detail/:id`, element: <CashDetail /> },
-                { path: "main-cashbox", element: <MainDetail/>  }
+                { path: "main-cashbox", element: <MainDetail /> },
               ],
             },
             { path: "roles-permissions", element: <RolesPermissions /> },
