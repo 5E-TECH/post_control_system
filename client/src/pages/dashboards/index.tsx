@@ -113,19 +113,37 @@ const visibleCouriers = showAllCouriers
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
 
       {/* Date Filters */}
-      <div className="flex gap-4 mb-6">
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="border p-2 rounded"
-        />
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          className="border p-2 rounded"
-        />
+      <div className="flex flex-wrap gap-4 mb-6">
+        <div className="flex flex-col">
+          <label
+            htmlFor="fromDate"
+            className="mb-1 text-sm font-medium text-gray-700"
+          >
+            Boshlanish sanasi
+          </label>
+          <input
+            id="fromDate"
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="border border-gray-300 rounded-md px-4 py-2 text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          />
+        </div>
+        <div className="flex flex-col">
+          <label
+            htmlFor="toDate"
+            className="mb-1 text-sm font-medium text-gray-700"
+          >
+            Tugash sanasi
+          </label>
+          <input
+            id="toDate"
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="border border-gray-300 rounded-md px-4 py-2 text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+          />
+        </div>
       </div>
 
       {/* Stat Cards */}
@@ -138,7 +156,7 @@ const visibleCouriers = showAllCouriers
         </div>
         <div className="bg-white p-6 rounded-2xl border-b-4 border-green-500">
           <p className="flex items-center gap-2 text-green-500">
-            <CheckCircle size={20} /> Tugatilgan
+            <CheckCircle size={20} /> Sotilgan
           </p>
           <h2 className="text-2xl font-bold">{dashboard?.soldAndPaid}</h2>
         </div>
@@ -162,7 +180,9 @@ const visibleCouriers = showAllCouriers
       <div className="grid grid-cols-2 gap-6 mb-6">
         {/* Marketlar Chart */}
         <div className="bg-white p-4 rounded-2xl shadow overflow-hidden">
-          <h3 className="text-lg font-semibold mb-4 text-center">Marketlar statistikasi</h3>
+          <h3 className="text-lg font-semibold mb-4 text-center">
+            Marketlar statistikasi
+          </h3>
           <ResponsiveContainer
             width="100%"
             height={Math.max(visibleMarkets.length * 45, 400)}
@@ -198,7 +218,9 @@ const visibleCouriers = showAllCouriers
 
         {/* Kuriyerlar Chart */}
         <div className="bg-white p-4 rounded-2xl shadow overflow-hidden">
-          <h3 className="text-lg font-semibold mb-4 text-center">Kuriyerlar statistikasi</h3>
+          <h3 className="text-lg font-semibold mb-4 text-center">
+            Kuriyerlar statistikasi
+          </h3>
           <ResponsiveContainer
             width="100%"
             height={Math.max(visibleCouriers.length * 45, 400)}
@@ -272,10 +294,18 @@ const visibleCouriers = showAllCouriers
                     <td className="p-2 border border-gray-200 text-center">
                       {medalIcon ? medalIcon : inx + 1}
                     </td>
-                    <td className="p-2 border border-gray-200">{m.market_name}</td>
-                    <td className="p-2 border border-gray-200">{m.total_orders}</td>
-                    <td className="p-2 border border-gray-200">{m.successful_orders}</td>
-                    <td className="p-2 border border-gray-200">{m.success_rate}%</td>
+                    <td className="p-2 border border-gray-200">
+                      {m.market_name}
+                    </td>
+                    <td className="p-2 border border-gray-200">
+                      {m.total_orders}
+                    </td>
+                    <td className="p-2 border border-gray-200">
+                      {m.successful_orders}
+                    </td>
+                    <td className="p-2 border border-gray-200">
+                      {m.success_rate}%
+                    </td>
                   </tr>
                 );
               })}
@@ -320,10 +350,18 @@ const visibleCouriers = showAllCouriers
                     <td className="p-2 border border-gray-200 text-center">
                       {medalIcon ? medalIcon : inx + 1}
                     </td>
-                    <td className="p-2 border border-gray-200">{c.courier_name}</td>
-                    <td className="p-2 border border-gray-200">{c.total_orders}</td>
-                    <td className="p-2 border border-gray-200">{c.successful_orders}</td>
-                    <td className="p-2 border border-gray-200">{c.success_rate}%</td>
+                    <td className="p-2 border border-gray-200">
+                      {c.courier_name}
+                    </td>
+                    <td className="p-2 border border-gray-200">
+                      {c.total_orders}
+                    </td>
+                    <td className="p-2 border border-gray-200">
+                      {c.successful_orders}
+                    </td>
+                    <td className="p-2 border border-gray-200">
+                      {c.success_rate}%
+                    </td>
                   </tr>
                 );
               })}

@@ -126,13 +126,13 @@ const Dashboard: React.FC = () => {
   const chartMax = maxValue * 1.2;
 
   return (
-    <div className="w-full p-8 space-y-10 max-h-[100vh] bg-gray-50">
+    <div className="w-full p-8 space-y-10 max-h-[100vh]">
       {/* Current status, chart, and tables side-by-side */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left side: Status and Chart */}
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-2xl shadow-lg border text-center">
-            <h2 className="text-lg font-medium text-gray-600 mb-2">
+          <div className="p-6 rounded-2xl shadow-lg text-center dark:bg-[#312D48]">
+            <h2 className="text-lg font-medium text-gray-600 mb-2 dark:text-white">
               Hozirgi holat
             </h2>
             <div
@@ -144,8 +144,8 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-lg border">
-            <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">
+          <div className="p-6 rounded-2xl shadow-lg dark:bg-[#312D48]">
+            <h3 className="text-xl font-bold text-gray-800 mb-6 text-center dark:text-white">
               Moliyaviy holat
             </h3>
             <ResponsiveContainer width="100%" height={350}>
@@ -211,10 +211,10 @@ const Dashboard: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
 
-            <div className="mt-6 pt-6 border-t-2 border-gray-200 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-4">
+            <div className="mt-6 pt-6 rounded-xl p-4 dark:bg-[#312D48]">
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center">
-                  <div className="text-sm font-medium text-gray-600 mb-1">
+                  <div className="text-sm font-medium text-gray-600 mb-1 dark:text-white">
                     Balans
                   </div>
                   <div
@@ -226,7 +226,7 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm font-medium text-gray-600 mb-1">
+                  <div className="text-sm font-medium text-gray-600 mb-1 dark:text-white">
                     Kassa
                   </div>
                   <div className="text-2xl font-bold text-green-600">
@@ -239,24 +239,24 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 rounded-2xl shadow-lg border">
-            <h3 className="text-xl font-bold text-gray-800 mb-6">
+          <div className=" p-6 rounded-2xl shadow-lg dark:bg-[#312D48]">
+            <h3 className="text-xl font-bold text-gray-800 mb-6 dark:text-white">
               Do'konlar va Kurierlar
             </h3>
             <div className="grid md:grid-cols-2 gap-6">
               {/* Markets Table */}
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
+              <div className="rounded-xl shadow-lg p-4">
                 <h4 className="text-lg font-bold text-gray-800 mb-4 text-center">
                   Do'konlar
                 </h4>
                 <div className="overflow-y-scroll h-[395px] custom-scrollbar">
                   <table className="w-full border-collapse relative">
-                    <thead className="sticky top-0 bg-white z-10">
-                      <tr className="border-b-2 border-gray-300">
-                        <th className="p-3 text-left font-bold text-black">
+                    <thead className="sticky top-0 bg-white dark:bg-[#312D48] z-10">
+                      <tr className="border-b-1 border-gray-300">
+                        <th className="p-3 text-left font-bold text-black dark:text-white">
                           Nomi
                         </th>
-                        <th className="p-3 text-right font-bold text-black">
+                        <th className="p-3 text-right font-bold text-black dark:text-white">
                           Summasi
                         </th>
                       </tr>
@@ -267,7 +267,7 @@ const Dashboard: React.FC = () => {
                           key={idx}
                           className="border-b border-gray-200 hover:bg-white transition-colors"
                         >
-                          <td className="p-3 font-semibold text-gray-600">
+                          <td className="p-3 font-semibold text-gray-600 dark:text-white">
                             {m.name}
                           </td>
                           <td
@@ -303,18 +303,18 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Couriers Table */}
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                <h4 className="text-lg font-bold text-gray-800 mb-4 text-center">
+              <div className="rounded-xl shadow-lg p-4">
+                <h4 className="text-lg font-bold text-gray-800 mb-4 text-center dark:text-white">
                   Kurierlar
                 </h4>
                 <div className="relative h-[395px] overflow-y-scroll custom-scrollbar">
                   <table className="w-full border-collapse relative">
-                    <thead className="bg-white z-10 sticky top-0">
+                    <thead className="bg-white dark:bg-[var(--color-dark-bg-py)] z-10 sticky top-0">
                       <tr className="border-b-2 border-gray-300">
-                        <th className="p-3 text-left font-bold text-black">
+                        <th className="p-3 text-left font-bold text-black dark:text-white">
                           Nomi
                         </th>
-                        <th className="p-3 text-right font-bold text-black">
+                        <th className="p-3 text-right font-bold text-black dark:text-white">
                           Summasi
                         </th>
                       </tr>
@@ -326,10 +326,10 @@ const Dashboard: React.FC = () => {
                           className="border-b border-gray-200 hover:bg-white transition-colors"
                         >
                           <td className="p-3">
-                            <div className="font-semibold text-gray-600">
+                            <div className="font-semibold text-gray-600 dark:text-white">
                               {c.name}
                             </div>
-                            <div className="text-sm text-gray-500 mt-1">
+                            <div className="text-sm text-gray-500 mt-1 dark:text-white">
                               {c.region}
                             </div>
                           </td>
@@ -365,9 +365,9 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           {/* Total Balance block placed directly below the tables block */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200">
+          <div className="p-6 rounded-xl shadow-lg dark:bg-[#312D48]">
             <div className="text-center">
-              <h4 className="text-lg font-medium text-gray-600 mb-2">
+              <h4 className="text-lg font-medium text-gray-600 mb-2 dark:text-white">
                 Umumiy Balans
               </h4>
               <div
