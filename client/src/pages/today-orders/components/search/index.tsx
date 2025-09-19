@@ -2,7 +2,7 @@ import { memo } from 'react';
 
 const Search = () => {
   return (
-    <div className="flex justify-between p-10">
+    <div className="flex justify-between w-full items-center p-10">
         <h2 className='text-[20px] font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5]'>Today Orders</h2>
       <form action="">
         <div className='border border-[#d1cfd4] rounded-md'>

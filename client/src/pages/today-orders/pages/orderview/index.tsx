@@ -128,7 +128,7 @@ const OrderView = () => {
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="cursor-pointer">
             {data?.data?.map((item: any, inx: number) => (
               <tr
                 key={item?.id}
@@ -288,7 +288,7 @@ const OrderView = () => {
         <div className="flex justify-end mr-10 mt-5">
           <button type="submit"
             onClick={() => handleAccapted()}
-            className="px-2 py-1 bg-[#8c57ff] rounded-md mb-5 text-white"
+            className="px-2 py-1 bg-[#8c57ff] cursor-pointer rounded-md mb-5 text-white"
           >
             Accapted
           </button>
