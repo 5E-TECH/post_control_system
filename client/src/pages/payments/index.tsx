@@ -24,7 +24,6 @@ const Payments = () => {
 
   const { data: cashBoxData, refetch } = getCashBoxInfo();
 
-
   const { data } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
 
@@ -168,14 +167,14 @@ const Payments = () => {
         </div>
 
         <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>
-          <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d]">
+          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
             <button
               onClick={() => setShowCurier(false)}
-              className="cursor-pointer bg-red-600 hover:bg-red-700 text-white p-2 rounded- ml-111 flex items-center justify-center shadow-md"
+              className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
             >
-              <X size={18} />
+              <X size={30} />
             </button>
-            <h1 className="font-bold text-left">Olinishi kerak</h1>
+            <h1 className="font-bold text-left pt-10">Olinishi kerak</h1>
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
                 type="text"
@@ -186,11 +185,11 @@ const Payments = () => {
             </div>
             <div className="max-h-[520px] overflow-y-auto">
               <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
-                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB] sticky top-[-2px]">
                   <tr>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        # ID
+                        #
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
@@ -205,10 +204,26 @@ const Payments = () => {
                         REGION
                       </div>
                     </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        Olinishi kerak summa
+                      </div>
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
+                  {Array.from({ length: 20 }).map((item: any, inx: number) => (
+                    <tr
+                      key={inx}
+                      // onClick={() => setSelect(item?.id)}
+                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal`}
+                    >
+                      <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
+                      <td className="pr-26 py-3">Diyorbek</td>
+                      <td className="pr-10 py-3">{item?.region?.name}</td>
+                    </tr>
+                  ))}
                   {courierData?.data.map((item: any, inx: number) => (
                     <tr
                       key={inx}
@@ -225,12 +240,12 @@ const Payments = () => {
                 </tbody>
               </table>
             </div>
-            <div className="pl-89 py-2">
+            <div className="absolute py-2 bottom-0,1 right-4">
               <button
                 onClick={() => handleNavigate()}
                 className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
               >
-                Selected
+                Tanlash
               </button>
             </div>
           </div>
@@ -254,13 +269,13 @@ const Payments = () => {
               <table className="w-full border-collapse">
                 <thead className="dark:bg-[#3D3759] text-[13px] bg-[#F6F7FB] border-4 border-white dark:border-[#3D3759]">
                   <tr>
-                    <th className="h-[56px] font-medium  text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        # ID
+                    <th className="h-[56px] font-medium  text-left pl-4">
+                      <div className="flex items-center justify-between">
+                        #
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
-                    <th className="h-[56px] font-medium text-left px-4">
+                    <th className="h-[56px] font-medium text-left">
                       <div className="flex items-center justify-between pr-[21px]">
                         CREATED BY
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -284,37 +299,103 @@ const Payments = () => {
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        Payment Date
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
 
                 <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2]">
                   {cashBoxData?.data?.allCashboxHistories?.map(
                     (item: any, inx: number) => (
-                      <tr key={item.id} className="border-t border-[#E7E3FC1F] text-[15px] font-normal">
-                        <td className="px-4 py-3 text-[#8C57FF]">{inx + 1}</td>
-                        <td className="px-4 py-3"></td>
+                      <tr
+                        key={item.id}
+                        className="border-t border-[#E7E3FC1F] text-[15px] font-normal"
+                      >
+                        <td className="pl-4 py-3 text-[#8C57FF]">{inx + 1}</td>
+                        <td className=" py-3 flex flex-col">
+                          {item?.createdByUser?.name}
+                          <span
+                            className={`text-[13px] ${
+                              item?.createdByUser?.role == "superadmin"
+                                ? "text-green-500"
+                                : "text-blue-500"
+                            }`}
+                          >
+                            {item?.createdByUser?.role}
+                          </span>
+                        </td>
                         <td className="px-4 py-3">
-                          <span className="px-[12px] py-[2px] text-[#16B1FF] bg-[#16B1FF29] rounded-full text-[13px]">
+                          <span
+                            className={`
+                                px-[12px] py-[2px] rounded-full text-[13px]
+                                ${
+                                  item?.payment_method === "click_to_market"
+                                    ? "text-[#16B1FF] bg-[#16B1FF29]" // ko'k
+                                    : item?.payment_method === "cash"
+                                    ? "text-[#16C75F] bg-[#16C75F29]" // yashil
+                                    : item?.payment_method === "click"
+                                    ? "text-[#FFC107] bg-[#FFC10729]" // sariq
+                                    : "text-gray-500 bg-gray-200" // default rang
+                                }
+                              `}
+                          >
                             {item?.payment_method}
                           </span>
                         </td>
-
-                        <td className="px-4 py-3">{item?.operation_type}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`
+                                  px-[12px] py-[2px] rounded-full text-[13px]
+                                  ${
+                                    item?.operation_type === "income"
+                                      ? "text-[#16C75F] bg-[#16C75F29]" // yashil
+                                      : item?.operation_type === "expense"
+                                      ? "text-[#FF4D4F] bg-[#FF4D4F29]" // qizil
+                                      : "text-gray-500 bg-gray-200" // default rang
+                                  }
+                                `}
+                          >
+                            {item?.operation_type}
+                          </span>
+                        </td>
+                        <td
+                          className={`px-13 py-3 text-[16px] ${
+                            item?.operation_type === "income"
+                              ? "text-[#16C75F]" // yashil
+                              : item?.operation_type === "expense"
+                              ? "text-[#FF4D4F]" // qizil
+                              : "text-gray-500" // default rang
+                          }`}
+                        >
+                          {item?.operation_type === "income"
+                            ? "+"
+                            : item?.operation_type === "expense"
+                            ? "-"
+                            : ""}
+                          {Number(item?.amount || 0).toLocaleString("uz-UZ")}{" "}
+                          UZS
+                        </td>
                         <td className="px-13 py-3">
-                          {item?.amount}
+                          {new Date(Number(item?.created_at)).toLocaleString(
+                            "uz-UZ"
+                          )}
                         </td>
                       </tr>
                     )
                   )}
                 </tbody>
               </table>
-              <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
+              <div className="flex justify-end  pr-[105px] pt-4 gap-6 pb-[16px]">
                 <div className="flex items-center">
-                  <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
+                  <span className="font-normal dark:text-[#E7E3FCB2]">
                     Rows per page:
                   </span>
                   <select
-                    className="rounded px-2 py-1 text-[15px] outline-none"
+                    className="rounded px-2 py-1  outline-none"
                     defaultValue="10"
                   >
                     <option value="5">5</option>
@@ -324,15 +405,15 @@ const Payments = () => {
                   </select>
                 </div>
 
-                <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+                <div className="flex font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
                   <span className="mr-1">1-5</span>
                   <span className="mr-1">of</span>
                   <span className="">13</span>
                 </div>
 
                 <div className="flex items-center gap-[23px]">
-                  <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 hover:text-black dark:text-[#E7E3FCE5]" />
-                  <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 hover:text-black dark:text-[#E7E3FCE5]" />
+                  <ChevronLeft className="w-5 dark:text-[#E7E3FCE5]" />
+                  <ChevronRight className="w-5 dark:text-[#E7E3FCE5]" />
                 </div>
               </div>
             </div>
