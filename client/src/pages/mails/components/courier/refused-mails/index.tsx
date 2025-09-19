@@ -3,6 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 
+const borderColorsByStatus = {
+  new: "border-gray-400",
+  received: "border-blue-500",
+  "on the road": "border-indigo-500",
+  waiting: "border-yellow-500",
+  sold: "border-green-600",
+  cancelled: "border-red-500",
+  paid: "border-emerald-600",
+  partly_paid: "border-teal-500",
+  "cancelled (sent)": "border-orange-500",
+  closed: "border-gray-600",
+};
+
 const CourierRefusedMails = () => {
   const navigate = useNavigate();
   const { getRejectedPostsCourier } = usePost();
@@ -14,7 +27,11 @@ const CourierRefusedMails = () => {
         posts?.map((post: any) => (
           <div
             key={post?.id}
-            className="min-h-[250px] shadow-lg rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]"
+            className={`min-h-[250px] border ${
+              borderColorsByStatus[
+                post?.status as keyof typeof borderColorsByStatus
+              ]
+            } shadow-sm rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]`}
             onClick={() =>
               navigate(`/courier-mails/${post?.id}`, {
                 state: { regionName: post?.region?.name, hideSend: true },
