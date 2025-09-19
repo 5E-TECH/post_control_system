@@ -5,14 +5,19 @@ import type { RootState } from "../../app/store";
 import { api } from "../../shared/api";
 import { setToken } from "../../shared/lib/features/login/authSlice";
 import { setId, setRole } from "../../shared/lib/features/roleSlice";
+import Suspensee from "../../shared/ui/Suspensee";
 
 const Auth = () => {
   const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.authSlice.token);
+  const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
 
   useEffect(() => {
-   
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
     api
       .get("user/profile") // 🔑 backendda token tekshirish
@@ -25,8 +30,10 @@ const Auth = () => {
         dispatch(setToken(null)); // ❌ noto‘g‘ri token → localStorage va reduxdan o‘chir
         setValid(false);
       })
-      .finally();
+      .finally(() => setLoading(false));
   }, [token, dispatch]);
+
+  if (loading) return <div><Suspensee/></div>;
 
   return valid ? <Outlet /> : <Navigate replace to="/login" />;
 };
