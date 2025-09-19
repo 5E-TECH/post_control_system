@@ -29,12 +29,12 @@ const TodayOrders = () => {
     return <Outlet />;
   }
 
-  const markets = data?.data?.markets || [];
+  const markets = data?.data || [];
   console.log('market:', markets);
 
   return (
     <section className="flex items-center justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d4b]">
-      {!isLoading && markets.length > 0 && <Search />}
+      {!isLoading && markets?.length > 0 && <Search />}
       {isLoading ? (
         <div className="flex justify-center items-center h-[200px]">
           <p className="text-gray-500 dark:text-gray-300">Loading...</p>
@@ -76,25 +76,24 @@ const TodayOrders = () => {
               </tr>
             </thead>
             <tbody className="[&>tr]:odd:bg-white  [&>tr]:odd:dark:bg-[#312d4b] [&>tr]:even:bg-[#f6f7fb6c] [&>tr]:even:dark:bg-[#3d375957] [&>tr:hover]:bg-[#f6f7fb] [&>tr:hover]:dark:bg-[#3d3759]">
-              {markets.map((item: any, inx: number) => (
+              {markets?.map((item: any, inx: number) => (
                 <tr
-                
-                  key={item?.id}
+                  key={item?.market?.id}
                   className="h-[56px] cursor-pointer"
-                  onClick={() => handleProps(item?.id)}
+                  onClick={() => handleProps(item?.market?.id)}
                 >
                   <td className="pl-10">{inx + 1}</td>
                   <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.name}
+                    {item?.market?.name}
                   </td>
                   <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.phone_number}
+                    {item?.market?.phone_number}
                   </td>
                   <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.totalPrice}
+                    {item?.orderTotalPrice}
                   </td>
                   <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.stock}
+                    {item?.length}
                   </td>
                 </tr>
               ))}
