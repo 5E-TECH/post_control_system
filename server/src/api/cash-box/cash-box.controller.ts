@@ -8,7 +8,14 @@ import {
   Delete,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
 import { CashBoxService } from './cash-box.service';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
@@ -96,5 +103,17 @@ export class CasheBoxController {
   @Get('financial-balanse')
   finacialBalance() {
     return this.cashBoxService.financialBalance();
+  }
+
+  @ApiOperation({ summary: 'Spend money' })
+  @ApiResponse({ status: 200, description: 'Spend money' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Patch('spend')
+  spendMoney(
+    @CurrentUser() user: JwtPayload,
+    @Body() updateCashboxDto: UpdateCashBoxDto,
+  ) {
+    return this.cashBoxService.spendMoney(user, updateCashboxDto);
   }
 }
