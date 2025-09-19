@@ -28,12 +28,11 @@ const Payments = () => {
   const { data } = getMarkets();
   const { data: courierData } = getCourier();
 
-  const handleNavigate = (role: "market" | "courier" | "pochta") => {
-    navigate("cash-detail", {
+  const handleNavigate = () => {
+    navigate(`cash-detail/${select}`, {
       state: {
-        role,
-        id: select,
-        data: data,
+        market: data?.data || [],
+        selectedMarketId: select,
       },
     });
     setSelect(null);
@@ -124,7 +123,7 @@ const Payments = () => {
             <div className="pl-89 py-2">
               <button
                 disabled={!select ? true : false}
-                onClick={() => handleNavigate("market")}
+                onClick={() => handleNavigate()}
                 className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
                   !select ? "" : "hover:bg-blue-600"
                 }  text-white rounded-md cursor-pointer ${
@@ -141,7 +140,7 @@ const Payments = () => {
           onClick={() =>
             navigate("main-cashbox", {
               state: {
-                role:"pochta"
+                role: "pochta",
               },
             })
           }
@@ -233,7 +232,7 @@ const Payments = () => {
             </div>
             <div className="pl-89 py-2">
               <button
-                onClick={() => handleNavigate("courier")}
+                onClick={() => handleNavigate()}
                 className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
               >
                 Selected

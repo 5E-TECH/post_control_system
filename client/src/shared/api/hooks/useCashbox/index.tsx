@@ -16,9 +16,9 @@ export const useCashBox = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [cashbox] }),
   });
 
-  const getCashBoxById = (id: string) =>
+  const getCashBoxById = (id: string | undefined) =>
     useQuery({
-      queryKey: [cashbox],
+      queryKey: [cashbox, id],
       queryFn: () => api.get(`cashbox/user/${id}`).then((res) => res.data),
     });
 

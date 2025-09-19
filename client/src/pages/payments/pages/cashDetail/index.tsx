@@ -1,17 +1,24 @@
 import { memo, useState } from "react";
-// import chip from "../../../../shared/assets/payments/chip.svg";
-// import { ArrowLeft } from "lucide-react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
 
-// import { Button } from "antd";
 import { useEffect } from "react";
 import { Select } from "antd";
 import TextArea from "antd/es/input/TextArea";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
 
+
 const CashDetail = () => {
+  const { id } = useParams();
+
+  const location = useLocation();
+
+  const market = location.state?.market;
+  console.log(market);
+  
+  
+
   const [form, setForm] = useState({
     from: "",
     to: "",
@@ -28,6 +35,7 @@ const CashDetail = () => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
+  
 
   // const handleCheck = () => {
   //   console.log("Filter values:", form);
@@ -40,18 +48,15 @@ const CashDetail = () => {
     }
   }, [form.payment]);
 
-  const location = useLocation();
-  const market = location.state;
-
   const [show, setShow] = useState(true);
 
-  const { getCashBoxById, createPaymentCourier, createPaymentMarket } =
+  const { getCashBoxById, createPaymentMarket, createPaymentCourier } =
     useCashBox();
-  const { data, refetch } = getCashBoxById(market.id);
+  const { data, refetch } = getCashBoxById(id);
 
   const handleSubmit = () => {
-    const data = {
-      courier_id: market?.id,
+    const dataCourier = {
+      courier_id: id,
       amount: Number(form.summa),
       payment_method: form.payment,
       payment_date: new Date().toISOString(),
@@ -59,13 +64,13 @@ const CashDetail = () => {
       market_id: form.market || null,
     };
     const dataMarket = {
-      market_id: market?.id,
+      market_id: id,
       amount: Number(form.summa),
       payment_method: form.payment,
       payment_date: new Date().toISOString(),
       comment: form.comment,
     };
-    if (market.role === "market") {
+    if (data?.data?.cashbox?.user?.role === "market") {
       createPaymentMarket.mutate(dataMarket, {
         onSuccess: () => {
           setForm({
@@ -85,7 +90,7 @@ const CashDetail = () => {
       });
     } else {
       // Courier bo‘lsa
-      createPaymentCourier.mutate(data, {
+      createPaymentCourier.mutate(dataCourier, {
         onSuccess: () => {
           setForm({
             from: "",
@@ -104,7 +109,7 @@ const CashDetail = () => {
 
   useEffect(() => {
     refetch();
-  }, []);
+  }, [id]);
 
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
@@ -112,7 +117,7 @@ const CashDetail = () => {
     <div className="px-5 mt-5 flex gap-24">
       <div>
         <CashboxCard
-          role={market.role}
+          role={"market"}
           name={data?.data?.cashbox?.user?.name}
           raw={raw}
           show={show}
@@ -140,8 +145,8 @@ const CashDetail = () => {
                 { value: "", label: "to'lov turi", disabled: true },
                 { value: "cash", label: "cash" },
                 { value: "click", label: "click" },
-                ...(market?.role === "market"
-                  ? [] // agar market bo‘lsa, qo‘shmaymiz
+                ...(data?.data?.cashbox?.user?.role === "market"
+                  ? []
                   : [{ value: "click_to_market", label: "click_to_market" }]),
               ]}
             />
@@ -155,7 +160,7 @@ const CashDetail = () => {
                 className="w-[150px]"
                 options={[
                   { value: "", label: "Market tanlang", disabled: true },
-                  ...(market?.data?.data?.map((item: any) => ({
+                  ...(market?.map((item: any) => ({
                     value: item.id,
                     label: item.name,
                   })) || []),
