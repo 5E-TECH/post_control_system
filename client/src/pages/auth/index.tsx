@@ -32,8 +32,6 @@ const Auth = () => {
       .finally(() => setLoading(false));
   }, [token, dispatch]);
 
-  if (loading) return <div>Loading...</div>;
-
   return valid ? <Outlet /> : <Navigate replace to="/login" />;
 };
 
