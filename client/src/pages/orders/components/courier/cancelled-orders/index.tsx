@@ -205,7 +205,7 @@ const CancelledOrders = () => {
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                   {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
                 </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                <td className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                   {item?.items.length}
                 </td>
               </tr>
