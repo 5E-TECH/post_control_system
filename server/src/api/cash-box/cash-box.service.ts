@@ -591,7 +591,7 @@ export class CashBoxService
       if (!mainCashbox) {
         throw new NotFoundException('Main cashbox not found');
       }
-      mainCashbox?.balance - updateCashboxDto.amount;
+      mainCashbox.balance -= updateCashboxDto.amount;
       await queryRunner.manager.save(mainCashbox);
 
       const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
