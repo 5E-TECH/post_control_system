@@ -560,6 +560,7 @@ export class CashBoxService
       });
 
       const allCashboxHistories = await this.cashboxHistoryRepo.find({
+        relations: ['createdByUser'],
         order: { created_at: 'DESC' },
       });
 
