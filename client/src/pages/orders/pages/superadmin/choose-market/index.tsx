@@ -5,7 +5,6 @@ import { createContext, memo, useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useNotification from "antd/es/notification/useNotification";
 import { useMarket } from "../../../../../shared/api/hooks/useMarket/useMarket";
-import Discard from "../../../components/button/discard";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 
@@ -208,7 +207,6 @@ const ChooseMarket = () => {
             </div>
           </div>
           <div className="flex gap-4 justify-end">
-            <Discard children="Discard" />
             <Button
               onClick={onClick}
               className="w-[91px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"

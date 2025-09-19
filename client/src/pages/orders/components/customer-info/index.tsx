@@ -1,11 +1,11 @@
 import { Input, Select } from "antd";
-import { Bell } from "lucide-react";
 import { memo, useState, type ChangeEvent } from "react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useDispatch } from "react-redux";
 import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
+import InputMask from "react-input-mask";
 
 export interface ICustomer {
   phone_number: string;
@@ -14,8 +14,8 @@ export interface ICustomer {
   address: string;
 }
 
-const initialState: ICustomer = {
-  phone_number: "",
+export const initialState: ICustomer = {
+  phone_number: "+998",
   district_id: undefined,
   name: "",
   address: "",
@@ -72,13 +72,20 @@ const CustomerInfocomp = () => {
         Customer Info
       </h1>
       <div className="flex flex-col gap-4">
-        <Input
-          name="phone_number"
+        <InputMask
+          mask="+998 99 999 99 99"
           value={formData.phone_number}
           onChange={handleChange}
-          placeholder="Phone Number"
-          className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-        />
+        >
+          {(inputProps: any) => (
+            <Input
+              {...inputProps}
+              name="phone_number"
+              placeholder="+998 90 123 45 67"
+              className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]!"
+            />
+          )}
+        </InputMask>
         {/* {allNumbers?.length ? (
           <div className="grid grid-cols-5 gap-5">
             {allNumbers?.map((number: string, inx: number) => (
@@ -131,9 +138,6 @@ const CustomerInfocomp = () => {
         />
 
         <div className="w-full h-[62px] rounded-md bg-[#FFF9EB] dark:bg-[#413745] flex items-center gap-4 px-4">
-          <div className="p-1 rounded-md bg-[#FFB400]">
-            <Bell className="text-[#ffffff]" />
-          </div>
           <span
             className="font-medium text-[19px] text-[#FFB400]"
             style={{ wordSpacing: 1 }}
