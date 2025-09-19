@@ -17,7 +17,7 @@ export class UpdateCashBoxDto {
   @IsNotEmpty()
   @IsNumber()
   @Min(1)
-  balance: number;
+  amount: number;
 
   @ApiProperty({
     enum: Manual_payment_methods,

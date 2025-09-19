@@ -38,10 +38,10 @@ export class PostController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('rejected')
   rejectedPosts() {
-    return this.postService.newPosts();
+    return this.postService.rejectedPosts();
   }
 
   @UseGuards(JwtGuard, RolesGuard)
@@ -84,6 +84,13 @@ export class PostController {
   @Get('orders/:id')
   getAllOrdersByPostId(@Param('id') id: string) {
     return this.postService.getPostsOrders(id);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @Get('orders/rejected/:id')
+  getAllRejectedOrdersByPostId(@Param('id') id: string) {
+    return this.postService.getRejectedPostsOrders(id);
   }
 
   @UseGuards(JwtGuard, RolesGuard)

@@ -61,7 +61,7 @@ export class PostService {
     try {
       const allPosts = await this.postRepo.find({
         where: {
-          status: In([Post_status.CANCELED, Post_status.CANCELED_RECEIVED]),
+          status: In([Post_status.CANCELED]),
         },
         relations: ['region'],
       });
@@ -105,7 +105,7 @@ export class PostService {
     try {
       const allRejectedPosts = await this.postRepo.find({
         where: {
-          status: In([Post_status.CANCELED, Post_status.CANCELED_RECEIVED]),
+          status: In([Post_status.CANCELED]),
         },
       });
       return successRes(
@@ -162,6 +162,18 @@ export class PostService {
     try {
       const allOrdersByPostId = await this.orderRepo.find({
         where: { post_id: id },
+        relations: ['customer', 'customer.district', 'items', 'items.product'],
+      });
+      return successRes(allOrdersByPostId, 200, 'All orders by post id');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getRejectedPostsOrders(id: string) {
+    try {
+      const allOrdersByPostId = await this.orderRepo.find({
+        where: { canceled_post_id: id },
         relations: ['customer', 'customer.district', 'items', 'items.product'],
       });
       return successRes(allOrdersByPostId, 200, 'All orders by post id');
