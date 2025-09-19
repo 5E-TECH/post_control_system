@@ -102,7 +102,7 @@ const OrderView = () => {
             <tr
               key={item.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
-              onClick={() => navigate("/orders/order-detail")}
+              onClick={() => navigate(`/order-detail`)}
             >
               <td className="pl-10">{inx + 1}</td>
               <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
