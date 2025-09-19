@@ -1,7 +1,6 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
 import MainDetail from "../pages/payments/pages/mainDetail";
-import { market } from "../shared/api/hooks/useMarket/useMarket";
 const WaitingOrders = lazy(
   () => import("../pages/orders/components/courier/waiting-orders")
 );
