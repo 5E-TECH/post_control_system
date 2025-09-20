@@ -63,6 +63,7 @@ export class UserService {
     private readonly token: Token,
     private readonly dataSource: DataSource,
   ) {}
+  // Hammasiga promise qo'yish kerak
 
   async onModuleInit() {
     try {
