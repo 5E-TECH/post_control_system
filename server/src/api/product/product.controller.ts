@@ -12,7 +12,17 @@ import {
   HttpStatus,
   ValidationPipe,
   UseGuards,
+  Query,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+  ApiParam,
+} from '@nestjs/swagger';
 import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -43,10 +53,35 @@ const storage = diskStorage({
   },
 });
 
+@ApiTags('Products')
+@ApiBearerAuth()
 @Controller('product')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
+  @ApiOperation({ summary: 'Create product with image (multipart/form-data)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'Product image file',
+        },
+        name: { type: 'string', example: 'Pepsi' },
+        market_id: {
+          type: 'string',
+          format: 'uuid',
+          example: 'a79f9f6a-dc32-4fcb-a3c1-8dabc1c51e9b',
+        },
+        image_url: { type: 'string', example: '17123456789', nullable: true },
+      },
+      required: ['name'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Product created' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Post()
@@ -82,20 +117,37 @@ export class ProductController {
     }
   }
 
+  @ApiOperation({ summary: 'List all products' })
+  @ApiResponse({ status: 200, description: 'Products list' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get()
-  async findAll() {
-    return this.productService.findAll();
+  async findAll(
+    @Query('search') search?: string,
+    @Query('marketId') marketId?: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    return this.productService.findAll(
+      search,
+      marketId,
+      Number(page),
+      Number(limit),
+    );
   }
 
-  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
+  @ApiOperation({ summary: 'Get products by market id' })
+  @ApiParam({ name: 'marketId', description: 'Market ID' })
+  @ApiResponse({ status: 200, description: 'Products for market' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get('market/:marketId')
   async findByMarketId(@Param('marketId') marketId: string) {
     return this.productService.findByMarketId(marketId);
   }
 
+  @ApiOperation({ summary: 'Get my products (market role)' })
+  @ApiResponse({ status: 200, description: 'Products for current market' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   @Get('/my-products')
@@ -103,13 +155,36 @@ export class ProductController {
     return this.productService.getMyProducts(user);
   }
 
+  @ApiOperation({ summary: 'Get product by id' })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiResponse({ status: 200, description: 'Product data' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET, Roles.REGISTRATOR)
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.productService.findOne(id);
+  async findOne(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.productService.findOne(user, id);
   }
 
+  @ApiOperation({
+    summary: 'Update product (admin/registrator) with optional image',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'New product image (optional)',
+        },
+        name: { type: 'string', example: 'Pepsi Max 1L', nullable: true },
+        image_url: { type: 'string', example: '17123456789', nullable: true },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Product updated' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Patch(':id')
@@ -145,6 +220,24 @@ export class ProductController {
     }
   }
 
+  @ApiOperation({ summary: 'Update own product (market) with optional image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'New product image (optional)',
+        },
+        name: { type: 'string', nullable: true },
+        image_url: { type: 'string', nullable: true },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Own product updated' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   @Patch(':id')
@@ -180,6 +273,9 @@ export class ProductController {
     }
   }
 
+  @ApiOperation({ summary: 'Delete product by id' })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiResponse({ status: 200, description: 'Product deleted' })
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Delete(':id')
   async remove(@Param('id') id: string) {

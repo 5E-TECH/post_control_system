@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
-import { MarketEntity } from 'src/core/entity/market.entity';
+import { UserEntity } from 'src/core/entity/users.entity';
 
 @Module({
   imports: [
@@ -13,7 +13,7 @@ import { MarketEntity } from 'src/core/entity/market.entity';
       CashEntity,
       CashboxHistoryEntity,
       OrderEntity,
-      MarketEntity,
+      UserEntity,
     ]),
   ],
   controllers: [CasheBoxController],

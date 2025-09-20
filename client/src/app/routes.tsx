@@ -1,16 +1,25 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+const WaitingOrders = lazy(
+  () => import("../pages/orders/components/courier/waiting-orders")
+);
+const AllOrders = lazy(
+  () => import("../pages/orders/components/courier/all-orders")
+);
+const CancelledOrders = lazy(
+  () => import("../pages/orders/components/courier/cancelled-orders")
+);
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
 const Dashboards = lazy(() => import("../pages/dashboards"));
 const Orders = lazy(() => import("../pages/orders"));
+const CourierOrder = lazy(() => import("../pages/orders/pages/courier"));
 const Regions = lazy(() => import("../pages/regions"));
 const Users = lazy(() => import("../pages/users"));
 const Mails = lazy(() => import("../pages/mails"));
 const Products = lazy(() => import("../pages/products"));
 const SendMessage = lazy(() => import("../pages/send-message"));
-const History = lazy(() => import("../pages/history"));
 const LogsPage = lazy(() => import("../pages/logs-page"));
 const Payments = lazy(() => import("../pages/payments"));
 const RolesPermissions = lazy(() => import("../pages/roles-permissions"));
@@ -19,35 +28,76 @@ const CreateUser = lazy(() => import("../pages/users/create-user"));
 const CreateAdmin = lazy(() => import("../pages/users/pages/create-admin"));
 const CreateCourier = lazy(() => import("../pages/users/pages/create-courier"));
 const CreateMarket = lazy(() => import("../pages/users/pages/create-market"));
-const ProfileOrders = lazy(() => import("../pages/profile/orders/orders"));
 const Overview = lazy(() => import("../pages/profile/overview/overview"));
-const Maosh = lazy(() => import("../pages/profile/maosh/maosh"));
-const ProfilLogs = lazy(
-  () => import("../pages/profile/profil-logs/profil-logs")
+const MainDetail = lazy(() => import("../pages/payments/pages/mainDetail"));
+const RefusedMailDetail = lazy(
+  () => import("../pages/mails/pages/superadmin/refused-mail-detail")
 );
+
 const CreateRegistrator = lazy(
   () => import("../pages/users/pages/create-registrator")
 );
-const SelectRole = lazy(() => import("../pages/select-role"));
-const AuthRole = lazy(() => import("../pages/auth/authRole"));
-const CreateOrder = lazy(() => import("../pages/orders/pages/create-order"));
+const CreateOrder = lazy(
+  () => import("../pages/orders/pages/superadmin/create-order")
+);
+const OrderDetail = lazy(
+  () => import("../pages/orders/pages/superadmin/orderDetail")
+);
+const CashDetail = lazy(() => import("../pages/payments/pages/cashDetail"));
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
+const CustomerInfoOrder = lazy(
+  () => import("../pages/orders/pages/superadmin/customer-info")
+);
+const AllUsersTable = lazy(
+  () => import("../pages/users/components/users/all-users-table")
+);
+const AllMarketsTable = lazy(
+  () => import("../pages/users/components/users/all-markets-table")
+);
+const UsersTable = lazy(
+  () => import("../pages/users/components/users/users-table")
+);
+
+const ProductCreate = lazy(() => import("../pages/products/product-create"));
+const ChooseMarket = lazy(
+  () => import("../pages/orders/pages/superadmin/choose-market")
+);
+const OrderDetails = lazy(
+  () => import("../pages/orders/pages/superadmin/order-details")
+);
+const TodayOrders = lazy(() => import("../pages/today-orders"));
+const TodayMails = lazy(
+  () => import("../pages/mails/components/superadmin/today-mails")
+);
+const Orderview = lazy(() => import("../pages/today-orders/pages/orderview"));
+const RefusedMails = lazy(
+  () => import("../pages/mails/components/superadmin/refused-mails")
+);
+const OldMails = lazy(
+  () => import("../pages/mails/components/superadmin/old-mails")
+);
+const MailDetail = lazy(
+  () => import("../pages/mails/pages/superadmin/mail-detail")
+);
+const CourierMailDetail = lazy(
+  () => import("../pages/mails/pages/kuryer/mail-detail")
+);
+const CourierNewMails = lazy(
+  () => import("../pages/mails/components/courier/new-mails")
+);
+const CourierRefusedMails = lazy(
+  () => import("../pages/mails/components/courier/refused-mails")
+);
+const CourierOldMails = lazy(
+  () => import("../pages/mails/components/courier/old-mails")
+);
+const BalanceDashboard = lazy(() => import("../pages/history"));
 
 const AppRouters = () => {
   return useRoutes([
     {
-      path: "/select-role",
-      element: <SelectRole />,
-    },
-    {
       path: "/login",
-      element: <AuthRole />,
-      children: [
-        {
-          index: true,
-          element: <Login />,
-        },
-      ],
+      element: <Login />,
     },
     {
       path: "/",
@@ -59,20 +109,63 @@ const AppRouters = () => {
           children: [
             { index: true, element: <Dashboards /> },
             {
+              path: "order/markets/new-orders",
+              element: <TodayOrders />,
+              children: [
+                {
+                  path: "order-view",
+                  element: <Orderview />,
+                },
+              ],
+            },
+            {
               path: "orders",
               element: <Orders />,
               children: [
+                { path: "choose-market", element: <ChooseMarket /> },
                 {
-                  path: "confirm",
-                  element: <CreateOrder />,
+                  path: "customer-info",
+                  element: <CustomerInfoOrder />,
+                },
+                { path: "confirm", element: <CreateOrder /> },
+                {
+                  path: "customer/detail",
+                  element: <OrderDetail />,
+                },
+                {
+                  path: "order-detail/:id",
+                  element: <OrderDetails />,
+                },
+              ],
+            },
+            {
+              path: "courier-orders",
+              element: <Orders />,
+              children: [
+                {
+                  index: true,
+                  element: <CourierOrder />,
+                },
+                {
+                  path: "orders",
+                  element: <CourierOrder />,
+                  children: [
+                    { index: true, element: <WaitingOrders /> },
+                    { path: "waiting", element: <WaitingOrders /> },
+                    { path: "all", element: <AllOrders /> },
+                    { path: "cancelled", element: <CancelledOrders /> },
+                  ],
                 },
               ],
             },
             { path: "regions", element: <Regions /> },
             {
-              path: "users",
+              path: "all-users",
               element: <Users />,
               children: [
+                { index: true, element: <AllUsersTable /> },
+                { path: "markets", element: <AllMarketsTable /> },
+                { path: "users", element: <UsersTable /> },
                 {
                   path: "create-user",
                   element: <CreateUser />,
@@ -85,22 +178,65 @@ const AppRouters = () => {
                 },
               ],
             },
-            { path: "mails", element: <Mails /> },
-            { path: "products", element: <Products /> },
+            {
+              path: "mails",
+              element: <Mails />,
+              children: [
+                {
+                  index: true,
+                  element: <TodayMails />,
+                },
+                {
+                  path: "refused",
+                  element: <RefusedMails />,
+                },
+                {
+                  path: "old",
+                  element: <OldMails />,
+                },
+              ],
+            },
+
+            {
+              path: "courier-mails",
+              element: <Mails />,
+              children: [
+                { index: true, element: <CourierNewMails /> },
+                { path: "refused", element: <CourierRefusedMails /> },
+                { path: "old", element: <CourierOldMails /> },
+              ],
+            },
+            {
+              path: "mails/:id",
+              element: <MailDetail />,
+            },
+            { path: "mails/refused/mails/:id", element: <RefusedMailDetail /> },
+
+            {
+              path: "courier-mails/:id",
+              element: <CourierMailDetail />,
+            },
+            {
+              path: "products",
+              element: <Products />,
+              children: [{ path: "create/:id", element: <ProductCreate /> }],
+            },
             { path: "send-message", element: <SendMessage /> },
-            { path: "history", element: <History /> },
+            { path: "m-balance", element: <BalanceDashboard /> },
             { path: "logs", element: <LogsPage /> },
-            { path: "payments", element: <Payments /> },
+            {
+              path: "payments",
+              element: <Payments />,
+              children: [
+                { path: `cash-detail/:id`, element: <CashDetail /> },
+                { path: "main-cashbox", element: <MainDetail /> },
+              ],
+            },
             { path: "roles-permissions", element: <RolesPermissions /> },
             {
               path: "profile",
               element: <Profile />,
-              children: [
-                { index: true, element: <Overview /> },
-                { path: "profil-orders", element: <ProfileOrders /> },
-                { path: "profil-maosh", element: <Maosh /> },
-                { path: "profil-logs", element: <ProfilLogs /> },
-              ],
+              children: [{ index: true, element: <Overview /> }],
             },
           ],
         },

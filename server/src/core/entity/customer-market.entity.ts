@@ -1,8 +1,8 @@
+// customer-market.entity.ts
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
-import { CustomerEntity } from './customer.entity';
-import { MarketEntity } from './market.entity';
-// customer_market.entity.ts
+import { UserEntity } from './users.entity';
+
 @Entity('customer_market')
 export class CustomerMarketEntity extends BaseEntity {
   @Column({ type: 'uuid' })
@@ -11,15 +11,17 @@ export class CustomerMarketEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   market_id: string;
 
-  @ManyToOne(() => CustomerEntity, (customer) => customer.customerMarkets, {
+  // Customer → User (role = CUSTOMER bo‘lishi kerak)
+  @ManyToOne(() => UserEntity, (user) => user.customerLinks, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'customer_id' })
-  customer: CustomerEntity;
+  customer: UserEntity;
 
-  @ManyToOne(() => MarketEntity, (market) => market.customerMarkets, {
+  // Market → User (role = MARKET bo‘lishi kerak)
+  @ManyToOne(() => UserEntity, (user) => user.marketLinks, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'market_id' })
-  market: MarketEntity;
+  market: UserEntity;
 }

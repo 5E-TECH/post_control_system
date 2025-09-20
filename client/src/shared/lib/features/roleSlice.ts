@@ -1,10 +1,12 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 interface IState {
+  id: string | null,
   role: string | null
 }
 
 const initialState: IState = {
+  id: null,
   role: null
 };
 
@@ -16,10 +18,14 @@ export const roleSlice = createSlice({
       state.role = action.payload;
     },
     removeRole: (state) => {
+      state.id = null;
       state.role = null;
+    },
+    setId: (state, action: PayloadAction<string>) => {
+      state.id = action.payload;
     },
   },
 });
 
-export const { setRole, removeRole} = roleSlice.actions;
+export const { setRole, removeRole, setId} = roleSlice.actions;
 export default roleSlice.reducer;

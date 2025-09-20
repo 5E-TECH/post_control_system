@@ -1,12 +1,28 @@
-import React, { useRef } from 'react';
-import AddProduct, { type AddProductRef } from './components';
+import React, { type FC } from "react";
+import AddProduct from "./components";
+import { useParams } from "react-router-dom";
+import ProductView from "../../shared/components/product-view";
+import { useProduct } from "../../shared/api/hooks/useProduct";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
+// import { useLocation } from 'react-router-dom';
 
-const ProductsCreate = () => {
-  const addProductRef = useRef<AddProductRef>(null);
+// interface Iprops {
+//   market:any
+// }
 
-  const handleDiscard = () => {
-    addProductRef.current?.onClear();
-  };
+const ProductsCreate: FC = () => {
+  const {id} = useParams()
+  // const location = useLocation();
+
+  console.log("createeeee",id);
+  
+
+  const { role } = useSelector((state: RootState) => state.roleSlice);
+
+  const { getMyProducts, getProductsByMarket } = useProduct();
+  const { data } =
+    role === "market" ? getMyProducts() : getProductsByMarket(id);    
 
   return (
     <section>
@@ -14,25 +30,16 @@ const ProductsCreate = () => {
         <div className="mx-[24px]">
           <div className=" flex w-full justify-between">
             <h2 className="text-[24px] font-medium">
-              Add a new product for market ***
+              Add a new product for market {data?.data[0]?.user?.name}
             </h2>
-            <div className="flex gap-[16px]">
-              <button
-                onClick={handleDiscard}
-                className="border px-[18px] py-[8px] rounded-md border-[#8A8D93] text-[#8A8D93] font-medium"
-              >
-                Discard
-              </button>
-              <button className="px-[18px] py-[8px] rounded-md bg-[#8c57ff] text-white font-medium">
-                Publish Product
-              </button>
-            </div>
           </div>
         </div>
         <div className="m-[24px]">
-          <AddProduct ref={addProductRef} />
+          <AddProduct />
+          <ProductView data={data} />
         </div>
       </div>
+      <div></div>
     </section>
   );
 };

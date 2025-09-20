@@ -16,6 +16,7 @@ import {
   Operation_type,
   Order_status,
   PaymentMethod,
+  Roles,
   Source_type,
 } from 'src/common/enums';
 import { successRes } from 'src/infrastructure/lib/response';
@@ -26,8 +27,9 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { MarketEntity } from 'src/core/entity/market.entity';
-import { MarketRepository } from 'src/core/repository/market.repository';
+import { UserEntity } from 'src/core/entity/users.entity';
+import { UserRepository } from 'src/core/repository/user.repository';
+import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 
 @Injectable()
 export class CashBoxService
@@ -44,8 +46,8 @@ export class CashBoxService
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
 
-    @InjectRepository(MarketEntity)
-    private readonly marketRepo: MarketRepository,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: UserRepository,
 
     private readonly dataSource: DataSource,
   ) {
@@ -63,6 +65,117 @@ export class CashBoxService
         await this.cashboxRepo.save(cashe);
         console.log('Initial cashbox created');
       }
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getMainCashbox() {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+
+      if (!mainCashbox) {
+        throw new NotFoundException('Main cashbox not found');
+      }
+
+      const cashboxHistory = await this.cashboxHistoryRepo.find({
+        where: { cashbox_id: mainCashbox.id },
+        relations: ['createdByUser'],
+        order: { created_at: 'DESC' },
+      });
+
+      let income = 0;
+      let outcome = 0;
+
+      for (const history of cashboxHistory) {
+        if (history.operation_type === Operation_type.INCOME) {
+          income += history.amount;
+        } else {
+          outcome += history.amount;
+        }
+      }
+
+      return successRes(
+        { cashbox: mainCashbox, cashboxHistory, income, outcome },
+        200,
+        'Main cashbox details',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getCashboxByUserId(id: string) {
+    try {
+      const user = await this.userRepo.findOne({ where: { id } });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      const cashbox = await this.cashboxRepo.findOne({
+        where: { user_id: id },
+        relations: ['user'],
+      });
+      if (!cashbox) {
+        throw new NotFoundException('Cashbox not found');
+      }
+      const cashboxHistory = await this.cashboxHistoryRepo.find({
+        where: { cashbox_id: cashbox.id },
+        relations: ['createdByUser'],
+        order: { created_at: 'DESC' },
+      });
+
+      let income: number = 0;
+      let outcome: number = 0;
+
+      for (const history of cashboxHistory) {
+        if (history.operation_type === Operation_type.INCOME) {
+          income += history.amount;
+        } else {
+          outcome += history.amount;
+        }
+      }
+
+      return successRes(
+        { cashbox, cashboxHistory, income, outcome },
+        200,
+        'Cashbox details',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async myCashbox(user: JwtPayload) {
+    try {
+      const myCashbox = await this.cashboxRepo.findOne({
+        where: { user_id: user.id },
+      });
+      if (!myCashbox) {
+        throw new NotFoundException('Cashbox not found');
+      }
+      const cashboxHistory = await this.cashboxHistoryRepo.find({
+        where: { cashbox_id: myCashbox.id },
+        order: { created_at: 'DESC' },
+      });
+
+      let income: number = 0;
+      let outcome: number = 0;
+
+      for (const history of cashboxHistory) {
+        if (history.operation_type === Operation_type.INCOME) {
+          income += history.amount;
+        } else {
+          outcome += history.amount;
+        }
+      }
+
+      return successRes(
+        { myCashbox, cashboxHistory, income, outcome },
+        200,
+        'My cashbox details',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -92,7 +205,7 @@ export class CashBoxService
       }
 
       const courierCashbox = await transaction.manager.findOne(CashEntity, {
-        where: { user_id: courier_id },
+        where: { user_id: courier_id, cashbox_type: Cashbox_type.FOR_COURIER },
       });
       if (!courierCashbox) {
         throw new NotFoundException('Courier cashbox not found');
@@ -121,7 +234,7 @@ export class CashBoxService
           payment_date,
           payment_method,
         },
-      ); // Davom etaman ......
+      );
 
       await transaction.manager.save(courierCashboxHistory);
 
@@ -148,14 +261,21 @@ export class CashBoxService
         payment_method === PaymentMethod.CLICK_TO_MARKET &&
         market_id != null
       ) {
-        const market_cashbox = await this.cashboxRepo.findOne({
-          where: { user_id: market_id },
+        const market_cashbox = await transaction.manager.findOne(CashEntity, {
+          where: { user_id: market_id, cashbox_type: Cashbox_type.FOR_MARKET },
         });
 
         if (!market_cashbox) {
           throw new NotFoundException('Market cashbox topilmadi');
         }
-        // Davom etaman ..........
+
+        const allSoldOrders = await transaction.manager.find(OrderEntity, {
+          where: {
+            status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
+            user_id: market_id,
+          },
+          order: { updated_at: 'ASC' },
+        });
 
         mainCashbox.balance -= amount;
         await transaction.manager.save(mainCashbox);
@@ -179,7 +299,7 @@ export class CashBoxService
         market_cashbox.balance -= amount;
         await transaction.manager.save(market_cashbox);
 
-        const marketCashboxHistory = await transaction.manager.create(
+        const marketCashboxHistory = transaction.manager.create(
           CashboxHistoryEntity,
           {
             operation_type: Operation_type.EXPENSE,
@@ -194,13 +314,54 @@ export class CashBoxService
           },
         );
         await transaction.manager.save(marketCashboxHistory);
+
+        let paymentInProcess = amount;
+
+        // 1. Avval PARTLY_PAID bo'lgan orderni topamiz (agar bo'lsa)
+        const partlyPaidOrder = allSoldOrders.find(
+          (o) => o.status === Order_status.PARTLY_PAID,
+        );
+
+        if (partlyPaidOrder && paymentInProcess > 0) {
+          const remaining =
+            partlyPaidOrder.to_be_paid - partlyPaidOrder.paid_amount;
+          if (paymentInProcess >= remaining) {
+            paymentInProcess -= remaining;
+            partlyPaidOrder.paid_amount = partlyPaidOrder.to_be_paid;
+            partlyPaidOrder.status = Order_status.PAID;
+          } else {
+            partlyPaidOrder.paid_amount += paymentInProcess;
+            partlyPaidOrder.status = Order_status.PARTLY_PAID;
+            paymentInProcess = 0;
+          }
+          await transaction.manager.save(partlyPaidOrder);
+        }
+
+        // 2. Qolgan SOLD orderlarni ketma-ket to'laymiz
+        const soldOrders = allSoldOrders.filter(
+          (o) => o.status === Order_status.SOLD,
+        );
+
+        for (const order of soldOrders) {
+          if (paymentInProcess <= 0) break;
+
+          if (paymentInProcess >= order.to_be_paid) {
+            paymentInProcess -= order.to_be_paid;
+            order.paid_amount = order.to_be_paid;
+            order.status = Order_status.PAID;
+          } else {
+            order.paid_amount = paymentInProcess;
+            order.status = Order_status.PARTLY_PAID;
+            paymentInProcess = 0;
+          }
+          await transaction.manager.save(order);
+        }
       }
 
       await transaction.commitTransaction();
       return successRes({}, 201, "To'lov qabul qilindi !!! ");
     } catch (error) {
       await transaction.rollbackTransaction();
-      console.error('Xatolik:', error);
       return catchError(error.message);
     } finally {
       await transaction.release();
@@ -219,8 +380,8 @@ export class CashBoxService
         paymentToMarketDto;
       let paymentInProcess = amount;
 
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: market_id },
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: market_id, role: Roles.MARKET },
       });
       if (!market) {
         throw new NotFoundException('Market you choose is not exist');
@@ -235,7 +396,8 @@ export class CashBoxService
 
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: {
-          market_id,
+          user_id: market_id,
+          cashbox_type: Cashbox_type.FOR_MARKET,
         },
       });
       if (!marketCashbox) {
@@ -251,7 +413,7 @@ export class CashBoxService
       const allSoldOrders = await queryRunner.manager.find(OrderEntity, {
         where: {
           status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
-          market_id,
+          user_id: market_id,
         },
         order: { updated_at: 'ASC' },
       });
@@ -296,7 +458,7 @@ export class CashBoxService
       marketCashbox.balance -= amount;
       await queryRunner.manager.save(marketCashbox);
 
-      const marketCashboxHistory = await queryRunner.manager.create(
+      const marketCashboxHistory = queryRunner.manager.create(
         CashboxHistoryEntity,
         {
           operation_type: Operation_type.EXPENSE,
@@ -314,6 +476,141 @@ export class CashBoxService
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, `Marketga ${amount} so'm to'landi`);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async financialBalance() {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+      const mainBalance: object = {
+        cashboxId: mainCashbox?.id,
+        balance: mainCashbox?.balance,
+      };
+
+      const allCourierCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_COURIER },
+        relations: ['user', 'user.region'],
+      });
+      let courierBalanses: object[] = [];
+      let couriersTotalBalanse: number = 0;
+      for (const cashbox of allCourierCashboxes) {
+        courierBalanses.push({
+          userId: cashbox.user_id,
+          name: cashbox.user.name,
+          region: cashbox.user.region,
+          balance: cashbox.balance,
+        });
+        couriersTotalBalanse += Number(cashbox.balance);
+      }
+
+      const allMarketCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_MARKET },
+        relations: ['user'],
+      });
+      let marketCashboxes: object[] = [];
+      let marketsTotalBalans: number = 0;
+      for (const cashbox of allMarketCashboxes) {
+        marketCashboxes.push({
+          userId: cashbox.user_id,
+          name: cashbox.user.name,
+          balance: -Number(cashbox.balance),
+        });
+        marketsTotalBalans -= Number(cashbox.balance);
+      }
+
+      const difference: number = couriersTotalBalanse + marketsTotalBalans;
+      const currentSituation = Number(mainCashbox.balance) + difference;
+      return successRes(
+        {
+          currentSituation,
+          main: mainCashbox,
+          markets: { allMarketCashboxes, marketsTotalBalans },
+          couriers: { allCourierCashboxes, couriersTotalBalanse },
+          difference,
+        },
+        200,
+        'Financial balance infos',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allCashboxesTotal() {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      const courierCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_COURIER },
+      });
+
+      const marketCashboxes = await this.cashboxRepo.find({
+        where: { cashbox_type: Cashbox_type.FOR_MARKET },
+      });
+
+      const allCashboxHistories = await this.cashboxHistoryRepo.find({
+        relations: ['createdByUser'],
+        order: { created_at: 'DESC' },
+      });
+
+      let courierCashboxTotal: number = 0;
+      let marketCashboxTotal: number = 0;
+      for (const cashbox of courierCashboxes) {
+        courierCashboxTotal += Number(cashbox.balance);
+      }
+      for (const cashbox of marketCashboxes) {
+        marketCashboxTotal += Number(cashbox.balance);
+      }
+      return successRes({
+        mainCashboxTotal: Number(mainCashbox.balance),
+        courierCashboxTotal,
+        marketCashboxTotal,
+        allCashboxHistories,
+      });
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async spendMoney(user: JwtPayload, updateCashboxDto: UpdateCashBoxDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) {
+        throw new NotFoundException('Main cashbox not found');
+      }
+      mainCashbox.balance -= updateCashboxDto.amount;
+      await queryRunner.manager.save(mainCashbox);
+
+      const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
+        amount: updateCashboxDto.amount,
+        balance_after: mainCashbox.balance,
+        cashbox_id: mainCashbox.id,
+        comment: updateCashboxDto.comment,
+        operation_type: Operation_type.EXPENSE,
+        created_by: user.id,
+        payment_method: updateCashboxDto.type,
+        source_type: Source_type.MANUAL_EXPENSE,
+      });
+      await queryRunner.manager.save(cashboxHistory);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Manual expense created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

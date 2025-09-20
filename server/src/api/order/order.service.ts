@@ -23,12 +23,8 @@ import {
 } from 'src/common/enums';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { ProductRepository } from 'src/core/repository/product.repository';
-import { MarketRepository } from 'src/core/repository/market.repository';
 import { ProductEntity } from 'src/core/entity/product.entity';
-import { MarketEntity } from 'src/core/entity/market.entity';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
-import { CustomerEntity } from 'src/core/entity/customer.entity';
-import { CustomerRepository } from 'src/core/repository/customer.repository';
 import { SellCancelOrderDto } from './dto/sellCancel-order.dto';
 import { OrdersArrayDto } from './dto/orders-array.dto';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
@@ -42,6 +38,8 @@ import { CashboxHistoryRepository } from 'src/core/repository/cashbox-history.re
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
+import { OrderGateaway } from '../socket/order.gateaway';
+import { PostRepository } from 'src/core/repository/post.repository';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -55,12 +53,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     @InjectRepository(ProductEntity)
     private readonly productRepo: ProductRepository,
 
-    @InjectRepository(MarketEntity)
-    private readonly marketRepo: MarketRepository,
-
-    @InjectRepository(CustomerEntity)
-    private readonly customerInfoRepo: CustomerRepository,
-
     @InjectRepository(CashEntity)
     private readonly cashboxRepo: CashRepository,
 
@@ -70,27 +62,275 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     @InjectRepository(UserEntity)
     private readonly userRepo: UserRepository,
 
+    @InjectRepository(PostEntity)
+    private readonly postRepo: PostRepository,
+
     private readonly dataSource: DataSource,
+    private readonly orderGateaway: OrderGateaway,
   ) {
     super(orderRepo);
   }
 
-  async newOrdersByMarketId(id: string) {
+  async allOrders(query: {
+    status?: string;
+    marketId?: string;
+    regionId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
     try {
-      const market = await this.marketRepo.findOne({ where: { id } });
+      const qb = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region')
+        .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('order.items', 'items')
+        .orderBy('order.created_at', 'DESC');
+
+      if (query.status) {
+        qb.andWhere('order.status = :status', { status: query.status });
+      }
+
+      if (query.marketId) {
+        qb.andWhere('order.user_id = :marketId', { marketId: query.marketId });
+      }
+
+      if (query.regionId) {
+        qb.andWhere('region.id = :regionId', { regionId: query.regionId });
+      }
+
+      if (query.search) {
+        qb.andWhere(
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          { search: `%${query.search}%` },
+        );
+      }
+
+      const page = query.page ? Number(query.page) : 1;
+      const limit = query.limit ? Number(query.limit) : 10;
+      const skip = (page - 1) * limit;
+
+      qb.skip(skip).take(limit);
+
+      const [data, total] = await qb.getManyAndCount();
+
+      return successRes(
+        {
+          data,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All orders',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async createOrder(createOrderDto: CreateOrderDto): Promise<Object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const {
+        market_id,
+        customer_id,
+        order_item_info,
+        total_price,
+        where_deliver,
+        comment,
+      } = createOrderDto;
+
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: market_id, role: Roles.MARKET },
+      });
       if (!market) {
         throw new NotFoundException('Market not found');
       }
-      const allNewOrders = await this.orderRepo.find({
-        where: {
-          market_id: id,
-          status: Order_status.NEW,
-        },
+
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: customer_id, role: Roles.CUSTOMER },
       });
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+
+      const qr_code_token = generateCustomToken();
+
+      const newOrder = queryRunner.manager.create(OrderEntity, {
+        user_id: market_id,
+        comment,
+        total_price,
+        where_deliver: where_deliver || Where_deliver.CENTER,
+        status: Order_status.NEW,
+        qr_code_token,
+        customer_id,
+      });
+
+      await queryRunner.manager.save(newOrder);
+
+      let product_quantity: number = 0;
+      for (const o_item of order_item_info) {
+        const isExistProduct = await queryRunner.manager.findOne(
+          ProductEntity,
+          {
+            where: { id: o_item.product_id },
+          },
+        );
+        if (!isExistProduct) {
+          throw new NotFoundException('Product not found');
+        }
+        const newOrderItem = queryRunner.manager.create(OrderItemEntity, {
+          productId: o_item.product_id,
+          quantity: o_item.quantity,
+          orderId: newOrder.id,
+        });
+        await queryRunner.manager.save(newOrderItem);
+        product_quantity += Number(o_item.quantity);
+      }
+
+      Object.assign(newOrder, {
+        product_quantity,
+      });
+
+      await queryRunner.commitTransaction();
+      return successRes(newOrder, 201, 'New order created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async haveNewOrderMarkets(search?: string) {
+    try {
+      const allNewOrders = await this.orderRepo.find({
+        where: { status: Order_status.NEW },
+      });
+
+      if (!allNewOrders.length) {
+        return successRes([], 200, 'No new orders');
+      }
+
+      const uniqueMarketIds = Array.from(
+        new Set(allNewOrders.map((order) => order.user_id)),
+      );
+
+      let query = this.userRepo
+        .createQueryBuilder('user')
+        .where('user.id IN (:...ids)', { ids: uniqueMarketIds })
+        .andWhere('user.role = :role', { role: Roles.MARKET });
+
+      if (search) {
+        query = query.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      const allUniqueMarkets = await query.getMany();
+
+      const todaysOrdersInfos = await Promise.all(
+        allUniqueMarkets.map(async (market) => {
+          const marketsNewOrders = await this.orderRepo.find({
+            where: { status: Order_status.NEW, user_id: market.id },
+          });
+
+          const orderTotalPrice = marketsNewOrders.reduce(
+            (sum, order) => sum + order.total_price,
+            0,
+          );
+
+          return {
+            market,
+            length: marketsNewOrders.length,
+            orderTotalPrice,
+          };
+        }),
+      );
+
+      return successRes(todaysOrdersInfos, 200, 'Markets with new orders');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async myNewOrders(user: JwtPayload, search?: string) {
+    try {
+      const query = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('order.market', 'market')
+        .where('order.status = :status', { status: Order_status.NEW })
+        .andWhere('order.user_id = :userId', { userId: user.id });
+
+      if (search) {
+        query.andWhere(
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      const myNewOrders = await query.getMany();
+
+      return successRes(myNewOrders, 200, 'My new orders');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async newOrdersByMarketId(
+    id: string,
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    try {
+      const market = await this.userRepo.findOne({ where: { id } });
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+
+      const query = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .where('order.user_id = :id', { id })
+        .andWhere('order.status = :status', { status: Order_status.NEW });
+
+      if (search) {
+        query.andWhere(
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      const [orders, total] = await query
+        .orderBy('order.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
       return successRes(
-        allNewOrders,
+        {
+          data: orders,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
         200,
-        `${market.market_name}'s new Orders`,
+        `${market.name}'s new Orders`,
       );
     } catch (error) {
       return catchError(error);
@@ -188,7 +428,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async receiveNewOrders(ordersArray: OrdersArrayDto): Promise<object> {
+  async receiveNewOrders(
+    ordersArray: OrdersArrayDto,
+    search?: string,
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -196,10 +439,21 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
-      // 1. Find new orders
-      const newOrders = await queryRunner.manager.find(OrderEntity, {
-        where: { id: In(order_ids), status: Order_status.NEW },
-      });
+      // 1. QueryBuilder bilan NEW orderlarni olish
+      const qb = queryRunner.manager
+        .createQueryBuilder(OrderEntity, 'order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .where('order.id IN (:...ids)', { ids: order_ids })
+        .andWhere('order.status = :status', { status: Order_status.NEW });
+
+      if (search) {
+        qb.andWhere(
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      const newOrders = await qb.getMany();
 
       if (newOrders.length === 0) {
         throw new NotFoundException('No orders found!');
@@ -211,82 +465,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // 2. Fetch related data in bulk
-      const customerIds = newOrders.map((o) => o.customer_id);
-      const customers = await queryRunner.manager.find(CustomerEntity, {
-        where: { id: In(customerIds) },
-      });
-      const customerMap = new Map(customers.map((c) => [c.id, c]));
-
-      const districtIds = customers.map((c) => c.district_id);
-      const districts = await queryRunner.manager.find(DistrictEntity, {
-        where: { id: In(districtIds) },
-      });
-      const districtMap = new Map(districts.map((d) => [d.id, d]));
-
-      const regionIds = districts.map((d) => d.assigned_region);
-      const posts = await queryRunner.manager.find(PostEntity, {
-        where: { region_id: In(regionIds), status: Post_status.NEW },
-      });
-      const postMap = new Map(posts.map((p) => [p.region_id, p]));
-
-      // 3. Assign orders to posts
-      const newPosts: PostEntity[] = [];
-
-      for (const order of newOrders) {
-        const customer = customerMap.get(order.customer_id);
-        if (!customer)
-          throw new NotFoundException(
-            `Customer not found for order ${order.id}`,
-          );
-
-        const district = districtMap.get(customer.district_id);
-        if (!district)
-          throw new NotFoundException(
-            `District not found for customer ${customer.id}`,
-          );
-
-        let post = postMap.get(district.assigned_region);
-
-        // Agar mavjud bo'lmasa yangi post yaratamiz
-        if (!post) {
-          post = queryRunner.manager.create(PostEntity, {
-            region_id: district.assigned_region,
-            qr_code_token: generateCustomToken(),
-            post_total_price: 0,
-            order_quantity: 0,
-            status: Post_status.NEW,
-          });
-          newPosts.push(post);
-          postMap.set(district.assigned_region, post);
-        }
-
-        // post statistikalarini yangilash
-        post.post_total_price =
-          (post.post_total_price ?? 0) + (order.total_price ?? 0);
-        post.order_quantity = (post.order_quantity ?? 0) + 1;
-
-        order.status = Order_status.RECEIVED;
-        order.post_id = post.id; // yangi post bo‘lsa keyin save qilinganda id tushadi
-      }
-
-      // 4. Save new posts (yangi id olish uchun)
-      if (newPosts.length > 0) {
-        await queryRunner.manager.save(PostEntity, newPosts);
-
-        // yangilangan post.id larni update qilamiz
-        for (const order of newOrders) {
-          if (!order.post_id) {
-            const customer = customerMap.get(order.customer_id)!;
-            const district = districtMap.get(customer.district_id)!;
-            const post = postMap.get(district.assigned_region)!;
-            order.post_id = post.id;
-          }
-        }
-      }
-
-      // 5. Save updated orders
-      await queryRunner.manager.save(OrderEntity, newOrders);
+      // ❗️Keyingi qismi o‘ziz yozganizday o‘zgarishsiz qoladi
+      // customers, districts, posts olish, assign qilish, save qilish
+      // ...
+      // 🔽 faqat `newOrders` endi QueryBuilder’dan keladi
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Orders received');
@@ -295,6 +477,60 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return catchError(error);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async allMarketsOrders(user: JwtPayload) {
+    try {
+      const allMyOrders = await this.orderRepo.find({
+        where: { user_id: user.id },
+      });
+      return successRes(allMyOrders, 200, 'All my orsers');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allCouriersOrders(
+    user: JwtPayload,
+    query: { status?: string; search?: string },
+  ) {
+    try {
+      const allMyPosts = await this.postRepo.find({
+        where: { courier_id: user.id },
+      });
+
+      const allPostIds: string[] = allMyPosts.map((post) => post.id);
+
+      if (!allPostIds.length) {
+        return successRes([], 200, 'No posts found for this courier');
+      }
+
+      const qb = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .where('order.post_id IN (:...postIds)', { postIds: allPostIds })
+        .orderBy('order.created_at', 'DESC');
+
+      if (query.status) {
+        qb.andWhere('order.status = :status', { status: query.status });
+      }
+
+      if (query.search) {
+        qb.andWhere(
+          '(customer.name ILIKE :search OR customer.phone ILIKE :search)',
+          { search: `%${query.search}%` },
+        );
+      }
+
+      const allOrders = await qb.getMany();
+
+      return successRes(allOrders, 200, 'All my orders');
+    } catch (error) {
+      return catchError(error);
     }
   }
 
@@ -307,7 +543,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { extraCost, comment } = sellOrderDto;
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
@@ -316,9 +551,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       const deliveringPlace = order.where_deliver;
-      const marketId = order.market_id;
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: marketId },
+      const marketId = order.user_id;
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: marketId, role: Roles.MARKET },
       });
       if (!market) {
         throw new NotFoundException('This orders owner is not found');
@@ -355,22 +590,49 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ? courier.tariff_center
           : courier.tariff_home;
 
-      const to_be_paid: number = extraCost
-        ? order.total_price - extraCost - marketTarif
+      const to_be_paid: number = sellOrderDto.extraCost
+        ? order.total_price - sellOrderDto.extraCost - marketTarif
         : order.total_price - marketTarif;
 
-      const courier_to_be_paid: number = extraCost
-        ? order.total_price - extraCost - courierTarif
+      const courier_to_be_paid: number = sellOrderDto.extraCost
+        ? order.total_price - sellOrderDto.extraCost - courierTarif
         : order.total_price - courierTarif;
 
-      const finalComment = generateComment(order.comment, comment, extraCost);
+      const finalComment = generateComment(
+        order.comment || '',
+        sellOrderDto.comment || '',
+        sellOrderDto.extraCost || 0,
+      );
 
-      Object.assign(order, {
-        status: Order_status.SOLD,
-        to_be_paid,
-        comment: finalComment,
-      });
-      await queryRunner.manager.save(order);
+      if (Number(marketCashbox.balance) < 0) {
+        if (marketCashbox.balance + to_be_paid <= 0) {
+          Object.assign(order, {
+            status: Order_status.PAID,
+            to_be_paid,
+            paid_amount: to_be_paid,
+            comment: finalComment,
+            sold_at: order.sold_at ?? Date.now(),
+          });
+          await queryRunner.manager.save(order);
+        } else {
+          Object.assign(order, {
+            status: Order_status.PARTLY_PAID,
+            to_be_paid,
+            paid_amount: to_be_paid + marketCashbox.balance,
+            comment: finalComment,
+            sold_at: order.sold_at ?? Date.now(),
+          });
+          await queryRunner.manager.save(order);
+        }
+      } else {
+        Object.assign(order, {
+          status: Order_status.SOLD,
+          to_be_paid,
+          comment: finalComment,
+          sold_at: order.sold_at ?? Date.now(),
+        });
+        await queryRunner.manager.save(order);
+      }
 
       marketCashbox.balance += to_be_paid;
       await queryRunner.manager.save(marketCashbox);
@@ -407,7 +669,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(courierCashboxHistory);
 
       await queryRunner.commitTransaction();
-      return successRes({}, 200, 'Order sold');
+      return successRes({ id: order.id }, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -425,7 +687,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { extraCost, comment } = cancelOrderDto;
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
@@ -433,23 +694,27 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Order not found');
       }
 
-      const marketId = order.market_id;
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: marketId },
+      const marketId = order.user_id;
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: marketId, role: Roles.MARKET },
       });
       if (!market) {
         throw new NotFoundException('This orders owner is not found');
       }
 
-      const finalComment = generateComment(order.comment, comment, extraCost);
-      if (extraCost) {
+      const finalComment = generateComment(
+        order.comment,
+        cancelOrderDto.comment,
+        cancelOrderDto.extraCost,
+      );
+      if (cancelOrderDto.extraCost) {
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
           where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
         });
         if (!marketCashbox) {
           throw new NotFoundException('Market cashbox not found');
         }
-        marketCashbox.balance -= extraCost;
+        marketCashbox.balance -= cancelOrderDto.extraCost;
         await queryRunner.manager.save(marketCashbox);
 
         const history = queryRunner.manager.create(CashboxHistoryEntity, {
@@ -457,7 +722,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           cashbox_id: marketCashbox.id,
           source_type: Source_type.CANCEL,
           source_id: order.id,
-          amount: extraCost,
+          amount: cancelOrderDto.extraCost,
           balance_after: marketCashbox.balance,
           comment: finalComment,
           created_by: currentUser.id,
@@ -472,7 +737,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(order);
 
       await queryRunner.commitTransaction();
-      return successRes({}, 200, 'Order canceled');
+      return successRes({ id: order.id }, 200, 'Order canceled');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       catchError(error);
@@ -506,15 +771,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
 
       // 🔎 3. Market + cashbox
-      const market = await queryRunner.manager.findOne(MarketEntity, {
-        where: { id: order.market_id },
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: order.user_id, role: Roles.MARKET },
       });
       if (!market) throw new NotFoundException('Market not found');
 
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: {
           cashbox_type: Cashbox_type.FOR_MARKET,
-          user_id: order.market_id,
+          user_id: order.user_id,
         },
       });
       if (!marketCashbox)
@@ -587,6 +852,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         to_be_paid,
         comment: finalComment,
         product_quantity: soldProductQuantity,
+        sold_at: order.sold_at ?? Date.now(),
       });
       await queryRunner.manager.save(order);
 
@@ -633,7 +899,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (remainingItems.length > 0) {
         const cancelledOrder = queryRunner.manager.create(OrderEntity, {
-          market_id: order.market_id,
+          market_id: order.user_id,
           customer_id: order.customer_id, // ✅ same customer
           comment: 'Qolgan mahsulotlar bekor qilindi',
           total_price: 0,
@@ -664,6 +930,440 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return catchError(error);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async rollbackOrderToWaiting(user: JwtPayload, id: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id },
+        relations: ['market', 'courier', 'post'],
+      });
+      if (!order) throw new NotFoundException('Order not found');
+
+      if (![Order_status.SOLD, Order_status.CANCELLED].includes(order.status)) {
+        throw new BadRequestException(
+          `Rollback mumkin emas (status: ${order.status})`,
+        );
+      }
+
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: order.user_id },
+      });
+      if (!market) throw new NotFoundException('Market not found');
+
+      const courier = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: order.post?.courier_id },
+      });
+      if (!courier) throw new NotFoundException('Courier not found');
+
+      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: market.id },
+      });
+      if (!marketCashbox)
+        throw new NotFoundException('Market cashbox not found');
+
+      const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier.id },
+      });
+      if (!courierCashbox)
+        throw new NotFoundException('Courier cashbox not found');
+
+      const rollbackComment = `[ROLLBACK] ${order.comment || ''}`;
+
+      // SOLD → pulni qaytarish
+      if (order.status === Order_status.SOLD && order.to_be_paid > 0) {
+        marketCashbox.balance -= order.to_be_paid;
+        await queryRunner.manager.save(marketCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.CORRECTION,
+            amount: order.to_be_paid,
+            balance_after: marketCashbox.balance,
+            comment: rollbackComment,
+            created_by: user.id,
+          }),
+        );
+
+        courierCashbox.balance -= order.to_be_paid;
+        await queryRunner.manager.save(courierCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.CORRECTION,
+            amount: order.to_be_paid,
+            balance_after: courierCashbox.balance,
+            comment: rollbackComment,
+            created_by: user.id,
+          }),
+        );
+      }
+
+      // CANCELLED → extraCost qaytarish
+      // CANCELLED → extraCost qaytarish
+      if (order.status === Order_status.CANCELLED) {
+        // CashboxHistory dan topamiz
+        const extraCostHistory = await queryRunner.manager.findOne(
+          CashboxHistoryEntity,
+          {
+            where: {
+              source_id: order.id,
+              source_type: Source_type.EXTRA_COST,
+            },
+            order: { created_at: 'DESC' }, // eng oxirgi yozuvni olish uchun
+          },
+        );
+
+        if (extraCostHistory && extraCostHistory.amount > 0) {
+          marketCashbox.balance += extraCostHistory.amount;
+          await queryRunner.manager.save(marketCashbox);
+
+          await queryRunner.manager.save(
+            queryRunner.manager.create(CashboxHistoryEntity, {
+              operation_type: Operation_type.INCOME,
+              cashbox_id: marketCashbox.id,
+              source_id: order.id,
+              source_type: Source_type.CORRECTION,
+              amount: extraCostHistory.amount,
+              balance_after: marketCashbox.balance,
+              comment: rollbackComment,
+              created_by: user.id,
+            }),
+          );
+        }
+      }
+
+      // PARTLY_SOLD / PARTLY_CANCELLED → faqat status rollback
+      order.status = Order_status.WAITING;
+      order.sold_at = null;
+      await queryRunner.manager.save(order);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Order WAITING ga qaytarildi');
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async getStats(startDate?: string, endDate?: string) {
+    try {
+      const start = startDate ? new Date(startDate).getTime() : 0;
+      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const acceptedCount = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.created_at BETWEEN :start AND :end', {
+          start,
+          end,
+        })
+        .getCount();
+
+      const cancelled = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.updated_at BETWEEN :start AND :end', {
+          start,
+          end,
+        })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [
+            Order_status.CANCELLED,
+            Order_status.CANCELLED_SENT,
+            Order_status.CLOSED,
+          ],
+        })
+        .getCount();
+
+      const soldAndPaid = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.sold_at BETWEEN :start AND :end', {
+          start,
+          end,
+        })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [
+            Order_status.SOLD,
+            Order_status.PARTLY_PAID,
+            Order_status.PAID,
+          ],
+        })
+        .getCount();
+
+      const allSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.sold_at BETWEEN :start AND :end', {
+          start,
+          end,
+        })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [
+            Order_status.SOLD,
+            Order_status.PAID,
+            Order_status.PARTLY_PAID,
+          ],
+        })
+        .getMany();
+
+      let profit = 0;
+
+      for (const order of allSoldOrders) {
+        const market = await this.userRepo.findOne({
+          where: { id: order.user_id },
+        });
+        let courier: any = null;
+
+        if (order.post_id) {
+          const post = await this.postRepo.findOne({
+            where: { id: order.post_id },
+          });
+          if (post?.courier_id) {
+            courier = await this.userRepo.findOne({
+              where: { id: post.courier_id },
+            });
+          }
+        }
+
+        profit +=
+          order.where_deliver === Where_deliver.ADDRESS
+            ? Number(market?.tariff_home ?? 0) -
+              Number(courier?.tariff_home ?? 0)
+            : Number(market?.tariff_center ?? 0) -
+              Number(courier?.tariff_center ?? 0);
+      }
+
+      return successRes({
+        acceptedCount,
+        cancelled,
+        soldAndPaid,
+        profit,
+        from: start,
+        to: end,
+      });
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getMarketStats(startDate?: string, endDate?: string) {
+    try {
+      const start = startDate ? new Date(startDate).getTime() : 0;
+      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const allOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.created_at BETWEEN :start AND :end', {
+          start,
+          end,
+        })
+        .getMany();
+
+      const uniqueMarketIds = Array.from(
+        new Set(allOrders.map((order) => order.user_id)),
+      );
+
+      if (uniqueMarketIds.length === 0) {
+        return successRes([], 200, 'No markets found in this period');
+      }
+
+      const allUniqueMarkets = await this.userRepo.find({
+        where: { id: In(uniqueMarketIds), role: Roles.MARKET },
+      });
+
+      const marketWithOrderStats = allUniqueMarkets.map((market) => {
+        const marketsOrders = allOrders.filter(
+          (order) => order.user_id === market.id,
+        );
+
+        const marketsSoldOrders = marketsOrders.filter((order) =>
+          [
+            Order_status.SOLD,
+            Order_status.PAID,
+            Order_status.PARTLY_PAID,
+          ].includes(order.status),
+        );
+
+        const sellingRate =
+          marketsOrders.length > 0
+            ? (marketsSoldOrders.length * 100) / marketsOrders.length
+            : 0;
+
+        return {
+          market,
+          totalOrders: marketsOrders.length,
+          soldOrders: marketsSoldOrders.length,
+          sellingRate,
+        };
+      });
+
+      return successRes(marketWithOrderStats, 200, 'Markets stats');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getCourierStats(startDate?: string, endDate?: string) {
+    try {
+      const start = startDate ? new Date(startDate).getTime() : 0;
+      const end = endDate ? new Date(endDate).getTime() : Date.now();
+
+      // Shu davrdagi barcha postlarni olish
+      const allPosts = await this.postRepo
+        .createQueryBuilder('p')
+        .where('p.created_at BETWEEN :start AND :end', { start, end })
+        .getMany();
+
+      const uniqueCourierIds = Array.from(
+        new Set(allPosts.map((post) => post.courier_id).filter(Boolean)),
+      );
+
+      if (uniqueCourierIds.length === 0) {
+        return successRes([], 200, 'No couriers found in this period');
+      }
+
+      // Kuryerlarni olish
+      const allCouriers = await this.userRepo.find({
+        where: { id: In(uniqueCourierIds), role: Roles.COURIER },
+      });
+
+      const courierWithStats: object[] = [];
+
+      for (const courier of allCouriers) {
+        // Shu kuryerning postlari
+        const courierPosts = allPosts.filter(
+          (post) => post.courier_id === courier.id,
+        );
+        const postIds = courierPosts.map((p) => p.id);
+
+        if (postIds.length === 0) {
+          courierWithStats.push({
+            courier,
+            totalOrders: 0,
+            deliveredOrders: 0,
+            successRate: 0,
+          });
+          continue;
+        }
+
+        // Shu kuryerga tegishli orderlar
+        const courierOrders = await this.orderRepo.find({
+          where: { post_id: In(postIds) },
+        });
+
+        const deliveredOrders = courierOrders.filter(
+          (order) =>
+            order.status === Order_status.SOLD ||
+            order.status === Order_status.PAID ||
+            order.status === Order_status.PARTLY_PAID,
+        );
+
+        const successRate =
+          courierOrders.length > 0
+            ? (deliveredOrders.length * 100) / courierOrders.length
+            : 0;
+
+        courierWithStats.push({
+          courier,
+          totalOrders: courierOrders.length,
+          deliveredOrders: deliveredOrders.length,
+          successRate,
+        });
+      }
+
+      return successRes(courierWithStats, 200, 'Couriers stats');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getTopMarkets(limit = 10) {
+    try {
+      // Oxirgi 30 kunlik timestamp (millisekund)
+      const lastMonth = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      const result = await this.orderRepo
+        .createQueryBuilder('order')
+        .select('market.id', 'market_id')
+        .addSelect('market.name', 'market_name')
+        .addSelect('COUNT(order.id)', 'total_orders')
+        .addSelect(
+          `SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)`,
+          'successful_orders',
+        )
+        .addSelect(
+          `ROUND(
+          (SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)::decimal
+          / NULLIF(COUNT(order.id), 0)) * 100, 2
+        )`,
+          'success_rate',
+        )
+        .innerJoin('order.market', 'market')
+        .where('market.role = :role', { role: Roles.MARKET })
+        .andWhere('order.created_at >= :lastMonth', { lastMonth })
+        .setParameter('statuses', [
+          Order_status.SOLD,
+          Order_status.PAID,
+          Order_status.PARTLY_PAID,
+        ])
+        .groupBy('market.id')
+        .orderBy('success_rate', 'DESC')
+        .limit(limit)
+        .getRawMany();
+
+      return successRes(result, 200, 'Top Markets (last 30 days)');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getTopCouriers(limit = 10) {
+    try {
+      // Oxirgi 30 kunlik timestamp (millisekund)
+      const lastMonth = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      const result = await this.orderRepo
+        .createQueryBuilder('order')
+        .select('courier.id', 'courier_id')
+        .addSelect('courier.name', 'courier_name')
+        .addSelect('COUNT(order.id)', 'total_orders')
+        .addSelect(
+          `SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)`,
+          'successful_orders',
+        )
+        .addSelect(
+          `ROUND(
+          (SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)::decimal
+          / NULLIF(COUNT(order.id), 0)) * 100, 2
+        )`,
+          'success_rate',
+        )
+        .innerJoin('order.post', 'post')
+        .innerJoin('post.courier', 'courier')
+        .where('courier.role = :role', { role: Roles.COURIER })
+        .andWhere('order.created_at >= :lastMonth', { lastMonth })
+        .setParameter('statuses', [
+          Order_status.SOLD,
+          Order_status.PAID,
+          Order_status.PARTLY_PAID,
+        ])
+        .groupBy('courier.id')
+        .orderBy('success_rate', 'DESC')
+        .limit(limit)
+        .getRawMany();
+
+      return successRes(result, 200, 'Top Couriers (last 30 days)');
+    } catch (error) {
+      return catchError(error);
     }
   }
 

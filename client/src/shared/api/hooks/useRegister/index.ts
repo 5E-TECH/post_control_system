@@ -8,7 +8,8 @@ export const useUser = (path?: string) => {
 
   const createUser = useMutation({
     mutationFn: (data: any) => api.post(`user/${path}`, data),
-    onSuccess: () => client.invalidateQueries({ queryKey: [user] }),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
   });
 
   const getUser = () =>
@@ -16,6 +17,9 @@ export const useUser = (path?: string) => {
       queryKey: [user],
       queryFn: () => api.get("user").then((res) => res.data),
     });
+
+  
+
   return {
     createUser,
     getUser,

@@ -9,7 +9,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { DataSource, In } from 'typeorm';
+import { DataSource, In, Not } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
@@ -35,8 +35,90 @@ export class PostService {
 
   async findAll(): Promise<object> {
     try {
-      const allPosts = await this.postRepo.find();
+      const allPosts = await this.postRepo.find({
+        where: { status: Not(Post_status.NEW) },
+        relations: ['region'],
+        order: { created_at: 'DESC' },
+      });
       return successRes(allPosts, 200, 'All posts');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async newPosts(): Promise<object> {
+    try {
+      const allPosts = await this.postRepo.find({
+        where: { status: Post_status.NEW },
+        relations: ['region'],
+        order: { created_at: 'DESC' },
+      });
+      return successRes(allPosts, 200, 'All new posts');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async rejectedPosts(): Promise<object> {
+    try {
+      const allPosts = await this.postRepo.find({
+        where: {
+          status: In([Post_status.CANCELED]),
+        },
+        relations: ['region'],
+        order: { created_at: 'DESC' },
+      });
+      return successRes(allPosts, 200, 'All new posts');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async onTheRoadPosts(user: JwtPayload): Promise<object> {
+    try {
+      const allPosts = await this.postRepo.find({
+        where: {
+          status: Post_status.SENT,
+          courier_id: user.id,
+        },
+        relations: ['region'],
+        order: { created_at: 'DESC' },
+      });
+      return successRes(allPosts, 200, 'All new posts');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async oldPostsForCourier(user: JwtPayload): Promise<object> {
+    try {
+      const allOldPosts = await this.postRepo.find({
+        where: {
+          status: Not(In([Post_status.SENT, Post_status.NEW])),
+          courier_id: user.id,
+        },
+        relations: ['region'],
+        order: { created_at: 'DESC' },
+      });
+      return successRes(allOldPosts, 200, 'All old posts');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async rejectedPostsForCourier(user: JwtPayload) {
+    try {
+      const allRejectedPosts = await this.postRepo.find({
+        where: {
+          status: In([Post_status.CANCELED]),
+        },
+        order: { created_at: 'DESC' },
+      });
+      return successRes(
+        allRejectedPosts,
+        200,
+        'All rejected posts for courier',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -68,7 +150,39 @@ export class PostService {
           'There are not any couriers for this region',
         );
       }
-      return successRes(couriers, 200, 'Couriers for this post');
+      const moreThanOneCourier: boolean = couriers.length === 1 ? false : true;
+      return successRes(
+        {
+          moreThanOneCourier,
+          couriers,
+        },
+        200,
+        'Couriers for this post',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getPostsOrders(id: string) {
+    try {
+      const allOrdersByPostId = await this.orderRepo.find({
+        where: { post_id: id },
+        relations: ['customer', 'customer.district', 'items', 'items.product'],
+      });
+      return successRes(allOrdersByPostId, 200, 'All orders by post id');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getRejectedPostsOrders(id: string) {
+    try {
+      const allOrdersByPostId = await this.orderRepo.find({
+        where: { canceled_post_id: id },
+        relations: ['customer', 'customer.district', 'items', 'items.product'],
+      });
+      return successRes(allOrdersByPostId, 200, 'All orders by post id');
     } catch (error) {
       return catchError(error);
     }
@@ -85,7 +199,7 @@ export class PostService {
       }
       const { orderIds, courierId } = sendPostDto;
       const isExistCourier = await this.userRepo.findOne({
-        where: { id, role: Roles.COURIER },
+        where: { id: courierId, role: Roles.COURIER },
       });
       if (!isExistCourier) {
         throw new NotFoundException('Courier not found');
@@ -225,7 +339,7 @@ export class PostService {
       await queryRunner.manager.save(canceledPost);
 
       for (const order of orders) {
-        order.post_id = canceledPost.id;
+        order.canceled_post_id = canceledPost.id;
         order.status = Order_status.CANCELLED_SENT;
       }
       await queryRunner.manager.save(orders);
@@ -267,7 +381,7 @@ export class PostService {
       if (canceledOrderIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(canceledOrderIds), post_id: id },
+          { id: In(canceledOrderIds) },
           { status: Order_status.CLOSED },
         );
       }
@@ -282,8 +396,8 @@ export class PostService {
 
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(remainingIds), post_id: id },
-          { status: Order_status.CANCELLED },
+          { id: In(remainingIds) },
+          { status: Order_status.CANCELLED, canceled_post_id: null },
         );
       }
 

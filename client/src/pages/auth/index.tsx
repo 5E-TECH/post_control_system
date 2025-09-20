@@ -4,6 +4,8 @@ import { Navigate, Outlet } from "react-router-dom";
 import type { RootState } from "../../app/store";
 import { api } from "../../shared/api";
 import { setToken } from "../../shared/lib/features/login/authSlice";
+import { setId, setRole } from "../../shared/lib/features/roleSlice";
+import Suspensee from "../../shared/ui/Suspensee";
 
 const Auth = () => {
   const dispatch = useDispatch();
@@ -19,8 +21,10 @@ const Auth = () => {
 
     api
       .get("user/profile") // 🔑 backendda token tekshirish
-      .then(() => {
+      .then((res) => {
         setValid(true); // token to‘g‘ri bo‘lsa
+        dispatch(setRole(res.data.data.role))
+        dispatch(setId(res.data.data.id))
       })
       .catch(() => {
         dispatch(setToken(null)); // ❌ noto‘g‘ri token → localStorage va reduxdan o‘chir
@@ -29,7 +33,7 @@ const Auth = () => {
       .finally(() => setLoading(false));
   }, [token, dispatch]);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div><Suspensee/></div>;
 
   return valid ? <Outlet /> : <Navigate replace to="/login" />;
 };

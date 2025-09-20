@@ -25,7 +25,7 @@ const CreateAdmin = () => {
     };
     createUser.mutate(newAdmin, {
       onSuccess: () => {
-        navigate("/users");
+        navigate("/all-users");
       },
     });
   };
@@ -40,22 +40,12 @@ const CreateAdmin = () => {
       </span>
       <Form onFinish={onFinish} className="pt-5!">
         <Form.Item
-          name="first_name"
+          name="name"
           rules={[{ required: true, message: "Ismni kiriting" }]}
         >
           <Input
             className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
             placeholder="Ismni kiriting"
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="last_name"
-          rules={[{ required: true, message: "Familiyani kiriting" }]}
-        >
-          <Input
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-            placeholder="Familiyani kiriting"
           />
         </Form.Item>
 

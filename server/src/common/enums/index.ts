@@ -4,6 +4,7 @@ export enum Roles {
   COURIER = 'courier',
   REGISTRATOR = 'registrator',
   MARKET = 'market',
+  CUSTOMER = 'customer',
 }
 
 export enum Status {
@@ -35,6 +36,8 @@ export enum Source_type {
   CORRECTION = 'correction',
   SELL = 'sell',
   CANCEL = 'cancel',
+  EXTRA_COST = 'extra_cost',
+  BILLS = 'bills',
 }
 
 export enum Order_status {
@@ -67,4 +70,9 @@ export enum Post_status {
   RECEIVED = 'received',
   CANCELED = 'canceled',
   CANCELED_RECEIVED = 'canceled_received',
+}
+
+export enum Manual_payment_methods {
+  CASH = 'cash',
+  CARD = 'card',
 }

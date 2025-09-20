@@ -15,11 +15,11 @@ import config from 'src/config';
 import { ProductRepository } from 'src/core/repository/product.repository';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Order_status, Roles } from 'src/common/enums';
-import { MarketRepository } from 'src/core/repository/market.repository';
-import { MarketEntity } from 'src/core/entity/market.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { In } from 'typeorm';
+import { UserEntity } from 'src/core/entity/users.entity';
+import { UserRepository } from 'src/core/repository/user.repository';
 
 @Injectable()
 export class ProductService {
@@ -27,8 +27,8 @@ export class ProductService {
     @InjectRepository(ProductEntity)
     private readonly productRepo: ProductRepository,
 
-    @InjectRepository(MarketEntity)
-    private readonly marketRepo: MarketRepository,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: UserRepository,
 
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
@@ -58,16 +58,18 @@ export class ProductService {
       if (!market_id) {
         throw new BadRequestException('Market ID is required');
       }
-      const isExistMarket = await this.marketRepo.findOne({
-        where: { id: market_id },
+
+      const isExistMarket = await this.userRepo.findOne({
+        where: { id: market_id, role: Roles.MARKET },
       });
       if (!isExistMarket) {
         throw new NotFoundException('Market not found');
       }
+
       const exists = await this.productRepo.findOne({
         where: {
           name,
-          market_id,
+          user_id: market_id,
         },
       });
 
@@ -75,13 +77,19 @@ export class ProductService {
         throw new ConflictException('Product name already exists');
       }
 
+      let imageFileName: string | null = null;
       if (file) {
-        createProductDto.image_url = file.filename;
+        imageFileName = file.filename;
       }
 
-      const product = this.productRepo.create(createProductDto);
+      const product = this.productRepo.create({
+        name,
+        user_id: market_id,
+        image_url: imageFileName,
+      });
       await this.productRepo.save(product);
 
+      // 🔧 Save qilinganidan keyin pathni qayta yozamiz
       if (product.image_url) {
         product.image_url = this.buildImageUrl(product.image_url);
       }
@@ -92,63 +100,73 @@ export class ProductService {
     }
   }
 
-  async findAll() {
+  // product.service.ts
+  async findAll(search?: string, marketId?: string, page = 1, limit = 10) {
     try {
-      const products = await this.productRepo.find();
+      const query = this.productRepo
+        .createQueryBuilder('product')
+        .leftJoinAndSelect('product.user', 'user')
+        .orderBy('product.created_at', 'ASC')
+        .skip((page - 1) * limit)
+        .take(limit);
+
+      // 🔍 search by product name
+      if (search) {
+        query.andWhere('product.name ILIKE :search', {
+          search: `%${search}%`,
+        });
+      }
+
+      // 🏪 filter by market_id (user_id)
+      if (marketId) {
+        query.andWhere('product.user_id = :marketId', { marketId });
+      }
+
+      const [products, total] = await query.getManyAndCount();
+
+      // rasm url ni build qilish
       products.forEach((product) => {
         if (product.image_url) {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products);
+
+      return successRes(
+        {
+          items: products,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All products',
+      );
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async haveNewOrderMarkets() {
-    try {
-      const allNewOrders = await this.orderRepo.find({
-        where: { status: Order_status.NEW },
-      });
-
-      if (!allNewOrders.length) {
-        return successRes([], 200, 'No new orders');
-      }
-
-      const uniqueMarketIds = Array.from(
-        new Set(allNewOrders.map((order) => order.market_id)),
-      );
-
-      const allUniqueMarkets = await this.marketRepo.find({
-        where: { id: In(uniqueMarketIds) },
-      });
-
-      return successRes(
-        {
-          count: allUniqueMarkets.length,
-          markets: allUniqueMarkets,
-        },
-        200,
-        'Markets with new orders',
-      );
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
   async findByMarketId(marketId: string) {
     try {
+      const market = await this.userRepo.findOne({
+        where: { id: marketId, role: Roles.MARKET },
+      });
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+
       const products = await this.productRepo.find({
-        where: { market_id: marketId },
+        where: { user_id: marketId },
+        relations: ['user'],
+        order: { created_at: 'ASC' },
       });
       products.forEach((product) => {
         if (product.image_url) {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products);
+      return successRes(products, 200, `All products of ${market.name}`);
     } catch (error) {
       return catchError(error);
     }
@@ -157,25 +175,25 @@ export class ProductService {
   async getMyProducts(user: JwtPayload) {
     try {
       const products = await this.productRepo.find({
-        where: { market_id: user.id },
+        where: { user_id: user.id },
       });
       products.forEach((product) => {
         if (product.image_url) {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products);
+      return successRes(products, 200, 'All my products');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async findOne(id: string) {
+  async findOne(user: JwtPayload, id: string) {
     try {
       const product = await this.productRepo.findOne({ where: { id } });
-      if (!product)
+      if (!product || product.user_id !== user.id) {
         throw new NotFoundException(`Product not found by id: ${id}`);
-
+      }
       if (product.image_url) {
         product.image_url = this.buildImageUrl(product.image_url);
       }
@@ -206,7 +224,7 @@ export class ProductService {
 
       // ✅ Boshqa mahsulotda bu name + market_id mavjudmi?
       const exists = await this.productRepo.findOne({
-        where: { name, market_id: product.market_id },
+        where: { name, user_id: product.user_id },
       });
 
       if (exists) {
@@ -256,7 +274,7 @@ export class ProductService {
   ) {
     try {
       const product = await this.productRepo.findOne({
-        where: { id, market_id: currentUser.id },
+        where: { id, user_id: currentUser.id },
       });
       if (!product) throw new NotFoundException('Product not found');
 
@@ -270,7 +288,7 @@ export class ProductService {
 
       // ✅ Boshqa mahsulotda bu name + market_id mavjudmi?
       const exists = await this.productRepo.findOne({
-        where: { name, market_id: currentUser.id },
+        where: { name, user_id: currentUser.id },
       });
 
       if (exists) {

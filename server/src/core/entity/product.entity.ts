@@ -7,28 +7,28 @@ import {
   ManyToOne,
   OneToMany,
 } from 'typeorm';
-import { MarketEntity } from './market.entity';
+import { UserEntity } from './users.entity';
 import { OrderItemEntity } from './order-item.entity';
 
 // 🟢 ProductEntity
 @Entity('product')
-@Index(['name', 'market_id'], { unique: true })
+@Index(['name', 'user_id'], { unique: true }) // endi name + user_id unique
 export class ProductEntity extends BaseEntity {
   @Column({ type: 'varchar', name: 'name' })
   name: string;
 
   @Column({ type: 'uuid' })
-  market_id: string;
+  user_id: string;
 
   @Column({ type: 'varchar', nullable: true, name: 'image_url' })
-  image_url: string;
+  image_url: string | null;
 
-  // Many Products → One Market
-  @ManyToOne(() => MarketEntity, (market) => market.products, {
+  // Many Products → One User (Market owner)
+  @ManyToOne(() => UserEntity, (user) => user.products, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'market_id' })
-  market: MarketEntity;
+  @JoinColumn({ name: 'user_id' })
+  user: UserEntity;
 
   // One Product → Many OrderItems
   @OneToMany(() => OrderItemEntity, (orderItem) => orderItem.product)

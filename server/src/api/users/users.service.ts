@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,7 +19,7 @@ import { Response } from 'express';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
-import { DataSource, DeepPartial, Not } from 'typeorm';
+import { DataSource, DeepPartial, In, Not } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
@@ -29,6 +28,15 @@ import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
 import { UserSalaryRepository } from 'src/core/repository/user-salary.repository';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { RegionRepository } from 'src/core/repository/region.repository';
+import { CreateMarketDto } from './dto/create-market.dto';
+import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import { CreateCustomerDto } from './dto/create-customer.dto';
+import { DistrictEntity } from 'src/core/entity/district.entity';
+import { DistrictRepository } from 'src/core/repository/district.repository';
+import { CustomerMarketEntity } from 'src/core/entity/customer-market.entity';
+import { CustomerMarketReository } from 'src/core/repository/customer-market.repository';
+import { UpdateMarketDto } from './dto/update-market.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @Injectable()
 export class UserService {
@@ -45,6 +53,12 @@ export class UserService {
     @InjectRepository(RegionEntity)
     private readonly regionRepo: RegionRepository,
 
+    @InjectRepository(DistrictEntity)
+    private readonly districtRepo: DistrictRepository,
+
+    @InjectRepository(CustomerMarketEntity)
+    private readonly customerMarketRepo: CustomerMarketReository,
+
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
     private readonly dataSource: DataSource,
@@ -59,8 +73,7 @@ export class UserService {
       if (!isSuperAdmin) {
         const hashedPassword = await this.bcrypt.encrypt(config.ADMIN_PASSWORD);
         const superAdminthis = this.userRepo.create({
-          first_name: config.ADMIN_FIRSTNAME,
-          last_name: config.ADMIN_LASTNAME,
+          name: config.ADMIN_NAME,
           phone_number: config.ADMIN_PHONE_NUMBER,
           password: hashedPassword,
           role: Roles.SUPERADMIN,
@@ -77,8 +90,7 @@ export class UserService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { password, phone_number, first_name, last_name, salary } =
-        createAdminDto;
+      const { password, phone_number, name, salary } = createAdminDto;
       let { payment_day } = createAdminDto;
       const existAdmin = await queryRunner.manager.findOne(UserEntity, {
         where: { phone_number },
@@ -89,20 +101,16 @@ export class UserService {
         );
       }
       if (!payment_day) {
-        const dayToPay = Number(
-          new Date(Date.now()).toLocaleDateString('uz-UZ').split('.')[0],
-        );
-
-        payment_day = dayToPay;
+        payment_day = new Date(Date.now()).getDate();
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
       const admin = queryRunner.manager.create(UserEntity, {
-        first_name,
-        last_name,
+        name,
         phone_number,
         password: hashedPassword,
         role: Roles.ADMIN,
       });
+      console.log('payment date: ', payment_day);
       await queryRunner.manager.save(admin);
       const adminSalary = queryRunner.manager.create(UserSalaryEntity, {
         user_id: admin.id,
@@ -115,6 +123,8 @@ export class UserService {
       await queryRunner.commitTransaction();
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
+      console.log(error);
+
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
@@ -127,8 +137,7 @@ export class UserService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { password, phone_number, first_name, last_name, salary } =
-        createAdminDto;
+      const { password, phone_number, name, salary } = createAdminDto;
       let { payment_day } = createAdminDto;
       const existUser = await queryRunner.manager.findOne(UserEntity, {
         where: { phone_number },
@@ -146,8 +155,7 @@ export class UserService {
       }
       const hashedPassword = await this.bcrypt.encrypt(password);
       const user = queryRunner.manager.create(UserEntity, {
-        first_name,
-        last_name,
+        name,
         phone_number,
         password: hashedPassword,
         role: Roles.REGISTRATOR,
@@ -180,8 +188,7 @@ export class UserService {
       const {
         password,
         phone_number,
-        first_name,
-        last_name,
+        name,
         region_id,
         tariff_center,
         tariff_home,
@@ -195,15 +202,22 @@ export class UserService {
           `User with ${phone_number} number already exists`,
         );
       }
+      const isExistRegion = await queryRunner.manager.findOne(RegionEntity, {
+        where: { id: region_id },
+      });
+      if (!isExistRegion) {
+        throw new NotFoundException('Region not found');
+      }
+
       const hashedPassword = await this.bcrypt.encrypt(password);
       const courier = queryRunner.manager.create(UserEntity, {
-        first_name,
-        last_name,
+        name,
         phone_number,
         password: hashedPassword,
         region_id,
         tariff_center,
         tariff_home,
+        role: Roles.COURIER,
       } as DeepPartial<UserEntity>);
       await queryRunner.manager.save(courier);
 
@@ -223,13 +237,286 @@ export class UserService {
     }
   }
 
-  async allUsers(): Promise<object> {
+  async createMarket(createMarketDto: CreateMarketDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     try {
-      const allUsers = await this.userRepo.find({
-        where: { role: Not(Roles.SUPERADMIN) },
-        relations:['region']
+      const { name, phone_number, tariff_center, tariff_home, password } =
+        createMarketDto;
+      const existMarket = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number },
       });
-      return successRes(allUsers, 200, 'All users');
+      if (existMarket) {
+        throw new ConflictException(
+          'User with this phone number already exist',
+        );
+      }
+      const telegram_token = 'group_token-' + generateCustomToken();
+
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const newMarket = queryRunner.manager.create(UserEntity, {
+        name,
+        phone_number,
+        role: Roles.MARKET,
+        tariff_center,
+        tariff_home,
+        password: hashedPassword,
+        telegram_token,
+      });
+      await queryRunner.manager.save(newMarket);
+      const cashbox = queryRunner.manager.create(CashEntity, {
+        cashbox_type: Cashbox_type.FOR_MARKET,
+        user_id: newMarket.id,
+      });
+      await queryRunner.manager.save(cashbox);
+
+      await queryRunner.commitTransaction();
+      return successRes(newMarket, 201, 'New market created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createCustomer(
+    user: JwtPayload,
+    createCustomerDto: CreateCustomerDto,
+  ): Promise<Object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { name, phone_number, district_id, address } = createCustomerDto;
+      if (!createCustomerDto.market_id) {
+        if (user.role !== Roles.MARKET) {
+          throw new BadRequestException('Market not choosen');
+        } else {
+          createCustomerDto.market_id = user.id;
+        }
+      }
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: {
+          id: createCustomerDto.market_id,
+          role: Roles.MARKET,
+          status: Status.ACTIVE,
+        },
+      });
+      if (user.role === Roles.MARKET && !market?.add_order) {
+        throw new BadRequestException(
+          'You can not create order. Contact admins',
+        );
+      }
+      if (!market) {
+        throw new NotFoundException('Market not found');
+      }
+
+      const district = await queryRunner.manager.findOne(DistrictEntity, {
+        where: { id: district_id },
+      });
+      if (!district) {
+        throw new NotFoundException('District not found');
+      }
+
+      const isExistClient = await queryRunner.manager.findOne(UserEntity, {
+        where: {
+          phone_number,
+          role: Roles.CUSTOMER,
+          district_id: createCustomerDto.district_id,
+        },
+        relations: ['customerLinks', 'customerLinks.market'],
+      });
+
+      let assignedToMarket: boolean = false;
+      if (isExistClient) {
+        const isAssignedToMarket = await queryRunner.manager.findOne(
+          CustomerMarketEntity,
+          {
+            where: {
+              market_id: createCustomerDto.market_id,
+              customer_id: isExistClient.id,
+            },
+          },
+        );
+        if (isAssignedToMarket) {
+          assignedToMarket = true;
+        }
+      }
+
+      if (assignedToMarket) {
+        // await queryRunner.commitTransaction();
+        return successRes(
+          isExistClient,
+          200,
+          'This is your client and you can assign him new order',
+        );
+      }
+      if (isExistClient && !assignedToMarket) {
+        const newClientForMarket = queryRunner.manager.create(
+          CustomerMarketEntity,
+          {
+            customer_id: isExistClient.id,
+            market_id: createCustomerDto.market_id,
+          },
+        );
+        await queryRunner.manager.save(newClientForMarket);
+
+        await queryRunner.commitTransaction();
+        return successRes(isExistClient, 200, 'Client assigned to market');
+      }
+
+      const customer = queryRunner.manager.create(UserEntity, {
+        name,
+        phone_number,
+        role: Roles.CUSTOMER,
+        district_id,
+        address,
+      });
+      await queryRunner.manager.save(customer);
+
+      const customerMarket = queryRunner.manager.create(CustomerMarketEntity, {
+        market_id: createCustomerDto.market_id,
+        customer_id: customer.id,
+      });
+      await queryRunner.manager.save(customerMarket);
+
+      await queryRunner.commitTransaction();
+      return successRes(customer, 201, 'New Customer created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async allUsers(filters: {
+    search?: string;
+    status?: string;
+    role?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<object> {
+    try {
+      const { search, status, role, page = 1, limit = 10 } = filters;
+
+      const qb = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.region', 'region')
+        .where('user.role NOT IN (:...excludedRoles)', {
+          excludedRoles: [Roles.CUSTOMER],
+        });
+
+      // 🔎 Search: name yoki phone_number bo‘yicha qisman qidirish
+      if (search) {
+        qb.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🎯 Status filter
+      if (status) {
+        qb.andWhere('user.status = :status', { status });
+      }
+
+      // 🎯 Role filter
+      if (role) {
+        qb.andWhere('user.role = :role', { role });
+      }
+
+      const [users, total] = await qb
+        .orderBy('user.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return successRes(
+        {
+          data: users,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All users',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allMarkets(
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<object> {
+    try {
+      const query = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.cashbox', 'cashbox')
+        .where('user.role = :role', { role: Roles.MARKET })
+        .select([
+          'user.id',
+          'user.name',
+          'user.phone_number',
+          'user.status',
+          'user.created_at',
+          'user.add_order',
+          'cashbox', // cashboxni to‘liq olish uchun
+        ]);
+
+      if (search) {
+        query.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🟢 Pagination
+      const skip = (page - 1) * limit;
+      query.skip(skip).take(limit);
+
+      const [data, total] = await query.getManyAndCount();
+
+      return successRes(
+        {
+          data,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All markets',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allCouriers(): Promise<object> {
+    try {
+      const allCouriers = await this.userRepo.find({
+        where: { role: Roles.COURIER },
+        select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+        relations: ['cashbox', 'region'],
+      });
+      return successRes(allCouriers, 200, 'All markets');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allEmployees() {
+    try {
+      const allEmployees = await this.userRepo.find({
+        where: { role: In([Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR]) },
+      });
+      return successRes(allEmployees, 200, 'Barcha xodimlar');
     } catch (error) {
       return catchError(error);
     }
@@ -397,13 +684,84 @@ export class UserService {
     }
   }
 
-  async selfUpdate(id: string, selfUpdateDto: UpdateSelfDto) {
+  async updateMarket(
+    id: string,
+    updateMarketDto: UpdateMarketDto,
+  ): Promise<object> {
+    try {
+      const { password, ...otherFields } = updateMarketDto;
+      const market = await this.userRepo.findOne({ where: { id } });
+      if (!market) {
+        throw new NotFoundException('Market nottt found');
+      }
+
+      if (otherFields.phone_number) {
+        const isExistPhoneNumber = await this.userRepo.findOne({
+          where: { phone_number: otherFields.phone_number },
+        });
+        if (isExistPhoneNumber) {
+          throw new ConflictException(
+            'User with this phone number already exist',
+          );
+        }
+      }
+
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+
+      Object.assign(market, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+
+      const updatedMarket = await this.userRepo.save(market);
+
+      return successRes(updatedMarket, 200, 'Market updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateCustomer(id: string, updateCustomerDto: UpdateCustomerDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id, role: Roles.CUSTOMER },
+      });
+
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+      const { market_id, name, phone_number, district_id, address } =
+        updateCustomerDto;
+
+      if (market_id) {
+        const isRelatedToMarket = await queryRunner.manager.find(
+          CustomerMarketEntity,
+          {
+            where: { market_id },
+          },
+        );
+        if (isRelatedToMarket.length > 1) {
+        }
+      }
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async selfUpdate(user: JwtPayload, selfUpdateDto: UpdateSelfDto) {
     try {
       const { password, ...otherFields } = selfUpdateDto;
-      const user = await this.userRepo.findOne({ where: { id } });
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
+      const myProfile = await this.userRepo.findOne({ where: { id: user.id } });
+      if (!myProfile) throw new NotFoundException('Your infos not found');
       if (otherFields.phone_number) {
         const phoneNumber = await this.userRepo.findOne({
           where: { phone_number: otherFields.phone_number },
@@ -414,19 +772,28 @@ export class UserService {
           );
         }
       }
+      if (user.role === Roles.MARKET && otherFields.name) {
+        throw new BadRequestException(
+          'Markets can not change their names by themselves',
+        );
+      }
       let hashedPassword: string | undefined;
       if (password) {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
-      Object.assign(user, {
+      Object.assign(myProfile, {
         ...otherFields,
-        ...(hashedPassword && { hashedPassword: password }),
+        ...(password && { password: hashedPassword }),
       });
-      await this.userRepo.save(user);
+      await this.userRepo.save(myProfile);
 
-      const updatedUser = await this.userRepo.findOne({ where: { id } });
+      const updatedUser = await this.userRepo.findOne({
+        where: { id: user.id },
+      });
       return successRes(updatedUser, 200, 'User updated');
-    } catch (error) {}
+    } catch (error) {
+      return catchError(error);
+    }
   }
 
   async remove(id: string): Promise<object> {
@@ -449,7 +816,9 @@ export class UserService {
     try {
       const { phone_number, password } = signInDto;
 
-      const user = await this.userRepo.findOne({ where: { phone_number } });
+      const user = await this.userRepo.findOne({
+        where: { phone_number, role: Not(Roles.CUSTOMER) },
+      });
       if (!user) {
         throw new BadRequestException('Phone number or password incorrect');
       }
