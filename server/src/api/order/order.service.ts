@@ -74,13 +74,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async allOrders(query: {
     status?: string;
     marketId?: string;
+    regionId?: string;
     search?: string;
+    page?: number;
+    limit?: number;
   }) {
     try {
       const qb = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.items', 'items')
         .orderBy('order.created_at', 'DESC');
@@ -90,7 +94,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       if (query.marketId) {
-        qb.andWhere('market.id = :marketId', { marketId: query.marketId });
+        qb.andWhere('order.user_id = :marketId', { marketId: query.marketId });
+      }
+
+      if (query.regionId) {
+        qb.andWhere('region.id = :regionId', { regionId: query.regionId });
       }
 
       if (query.search) {
@@ -100,9 +108,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const allOrders = await qb.getMany();
+      const page = query.page ? Number(query.page) : 1;
+      const limit = query.limit ? Number(query.limit) : 10;
+      const skip = (page - 1) * limit;
 
-      return successRes(allOrders, 200, 'All orders');
+      qb.skip(skip).take(limit);
+
+      const [data, total] = await qb.getManyAndCount();
+
+      return successRes(
+        {
+          data,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All orders',
+      );
     } catch (error) {
       return catchError(error);
     }

@@ -397,7 +397,7 @@ export class PostService {
         await queryRunner.manager.update(
           OrderEntity,
           { id: In(remainingIds) },
-          { status: Order_status.CANCELLED },
+          { status: Order_status.CANCELLED, canceled_post_id: null },
         );
       }
 
