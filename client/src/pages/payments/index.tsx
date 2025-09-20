@@ -31,7 +31,6 @@ const Payments = () => {
     navigate(`cash-detail/${select}`);
     setSelect(null);
     setShowMarket(false);
-    select;
     setShowCurier(false);
   };
 
