@@ -20,7 +20,6 @@ const OrderView = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  console.log(selectedIds);
 
   const location = useLocation();
   const market = location.state?.market;
@@ -28,11 +27,10 @@ const OrderView = () => {
   const { getOrderByMarket } = useOrder();
   const { createPost } = usePost();
   const { data, refetch } = getOrderByMarket(market);
-  console.log('market1', data);
 
   useEffect(() => {
-    if (data?.data) {
-      setSelectedIds(data.data.map((item: any) => item.id));
+    if (data?.data?.data) {
+      setSelectedIds(data?.data?.data?.map((item: any) => item.id));
     }
   }, [data]);
 
@@ -62,11 +60,11 @@ const OrderView = () => {
                   <input
                     type="checkbox"
                     checked={
-                      !!data?.data && selectedIds.length === data.data.length
+                      !!data?.data?.data && selectedIds.length === data?.data?.data?.length
                     } // ✅ doim boolean
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds(data?.data.map((item: any) => item.id)); // 🔄 hamma id yig‘iladi
+                        setSelectedIds(data?.data?.data?.map((item: any) => item?.id)); // 🔄 hamma id yig‘iladi
                       } else {
                         setSelectedIds([]); // 🔄 bo‘shatib yuboriladi
                       }
@@ -126,7 +124,7 @@ const OrderView = () => {
             </tr>
           </thead>
           <tbody className="cursor-pointer">
-            {data?.data?.map((item: any, inx: number) => (
+            {data?.data?.data?.map((item: any, inx: number) => (
               <tr
                 key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
@@ -139,10 +137,10 @@ const OrderView = () => {
                     checked={item?.id ? selectedIds.includes(item.id) : false}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds([...selectedIds, item.id]);
+                        setSelectedIds([...selectedIds, item?.id]);
                       } else {
                         setSelectedIds(
-                          selectedIds.filter((id) => id !== item.id),
+                          selectedIds.filter((id) => id !== item?.id),
                         );
                       }
                     }}
