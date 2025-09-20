@@ -105,7 +105,7 @@ const AddProduct = () => {
     <Context.Provider value={contextValue}>
       {contextHolder}
       <section>
-        <div className="w-full bg-white p-5 text-[#2E263DE5] flex gap-5 flex-col rounded-md dark:text-[#E7E3FCE5] dark:bg-[#312d4b]">
+        <div className="w-full bg-white p-5 text-[#2E263DE5] flex gap-5 flex-col rounded-md dark:text-[#E7E3FCE5] dark:bg-[#312d4b] shadow-md">
           <h2 className="text-[18px] font-medium opacity-[90%] select-none">
             Product information
           </h2>

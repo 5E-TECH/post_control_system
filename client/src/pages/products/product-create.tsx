@@ -22,11 +22,13 @@ const ProductsCreate: FC = () => {
 
   const { getMyProducts, getProductsByMarket } = useProduct();
   const { data } =
-    role === "market" ? getMyProducts() : getProductsByMarket(id);    
+    role === "market" ? getMyProducts() : getProductsByMarket(id);   
+    
+    
 
   return (
     <section>
-      <div className="bg-[#f4f5fa] dark:bg-[#28243d] w-full">
+      <div className="bg-white mt-5 dark:bg-[#28243d] w-full">
         <div className="mx-[24px]">
           <div className=" flex w-full justify-between">
             <h2 className="text-[24px] font-medium">
@@ -36,7 +38,7 @@ const ProductsCreate: FC = () => {
         </div>
         <div className="m-[24px]">
           <AddProduct />
-          <ProductView data={data} />
+          <ProductView data={data?.data} />
         </div>
       </div>
       <div></div>
