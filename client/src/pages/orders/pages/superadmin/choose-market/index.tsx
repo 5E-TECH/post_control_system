@@ -12,12 +12,12 @@ import { debounce } from "../../../../../shared/helpers/DebounceFunc";
 const Context = createContext({ name: "Default" });
 
 const ChooseMarket = () => {
-  // API get 
+  // API get
   const { getMarkets } = useMarket();
   const [searchMarket, setSearchMarket] = useState<any>(null);
-  const { data } = getMarkets({ search: searchMarket });
+  const { data } = getMarkets(true, { search: searchMarket });
   const markets = Array.isArray(data?.data) ? data?.data : [];
-  
+
   // Debounce Func for search
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
   const debouncedSearch = useMemo(
@@ -30,7 +30,7 @@ const ChooseMarket = () => {
 
   const navigate = useNavigate();
   const [api, contextHolder] = useNotification();
-  
+
   // Navigate to page based on role
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
