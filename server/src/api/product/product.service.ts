@@ -100,18 +100,48 @@ export class ProductService {
     }
   }
 
-  async findAll() {
+  // product.service.ts
+  async findAll(search?: string, marketId?: string, page = 1, limit = 10) {
     try {
-      const products = await this.productRepo.find({
-        relations: ['user'],
-        order: { created_at: 'ASC' },
-      });
+      const query = this.productRepo
+        .createQueryBuilder('product')
+        .leftJoinAndSelect('product.user', 'user')
+        .orderBy('product.created_at', 'ASC')
+        .skip((page - 1) * limit)
+        .take(limit);
+
+      // 🔍 search by product name
+      if (search) {
+        query.andWhere('product.name ILIKE :search', {
+          search: `%${search}%`,
+        });
+      }
+
+      // 🏪 filter by market_id (user_id)
+      if (marketId) {
+        query.andWhere('product.user_id = :marketId', { marketId });
+      }
+
+      const [products, total] = await query.getManyAndCount();
+
+      // rasm url ni build qilish
       products.forEach((product) => {
         if (product.image_url) {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products, 200, 'All products');
+
+      return successRes(
+        {
+          items: products,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All products',
+      );
     } catch (error) {
       return catchError(error);
     }
