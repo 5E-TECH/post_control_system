@@ -1,7 +1,8 @@
 import { Form, Input, Select } from "antd";
 import { memo, useEffect, useState, type ChangeEvent } from "react";
 import { setProductInfo } from "../../../../shared/lib/features/customer_and_market-id";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 
 export interface IProductInfo {
   total_price: number | string;
@@ -30,16 +31,23 @@ const ProductInfo = () => {
   };
 
   const dispatch = useDispatch();
-  useEffect(() => {
-    const productInfo = {
-      ...formData,
-      total_price: Number(formData.total_price),
-    };
+  const productInfo = useSelector(
+    (state: RootState) => state.setCustomerData.productInfo
+  );
 
-    if (productInfo) {
-      dispatch(setProductInfo(productInfo));
-    }
+  useEffect(() => {
+    const data = {
+      ...formData,
+      total_price: Number(formData.total_price) || 0,
+    };
+    dispatch(setProductInfo(data));
   }, [formData]);
+
+  useEffect(() => {
+    if (productInfo === null) {
+      setFormData(initialState);
+    }
+  }, [productInfo]);
 
   return (
     <div className="bg-[#ffffff] shadow-lg rounded-md dark:bg-[#312D48] ">
@@ -55,19 +63,35 @@ const ProductInfo = () => {
             <Input
               name="total_price"
               value={formData.total_price}
-              onChange={handleChange}
-              type="number"
+              onChange={(e) => {
+                const rawValue = e.target.value.replace(/\D/g, "");
+                const formatted = new Intl.NumberFormat("uz-UZ").format(
+                  Number(rawValue || 0)
+                );
+
+                handleChange({
+                  ...e,
+                  target: {
+                    ...e.target,
+                    name: "total_price",
+                    value: formatted,
+                  },
+                } as any);
+              }}
+              type="text"
               placeholder="Total Price"
-              className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+              className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! 
+               dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
             />
           </Form.Item>
 
-          <Form.Item className="">
+          <Form.Item>
             <Select
               value={formData.where_deliver}
               onChange={(value) => handleSelectChange("where_deliver", value)}
               placeholder="Select delivery place"
               className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
+              defaultValue={"center"}
               dropdownClassName="dark-dropdown"
             >
               <Select.Option value="center">center</Select.Option>
@@ -85,7 +109,7 @@ const ProductInfo = () => {
               name="comment"
               value={formData.comment}
               onChange={handleChange}
-              className="!flex-1 !pb-[200px] !pt-5 !pl-5 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
+              className="!flex-1 !pb-[150px] !pt-3 !pl-4 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
               placeholder="Keep your account secure with authentication step"
             />
           </Form.Item>

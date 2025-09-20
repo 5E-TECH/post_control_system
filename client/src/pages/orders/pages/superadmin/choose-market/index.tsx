@@ -15,7 +15,7 @@ const ChooseMarket = () => {
   const { data } = getMarkets();
   const markets = Array.isArray(data?.data) ? data?.data : [];
 
-  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
+  const [selectedMarket, setSelectedMarket] = useState<any>(null);
 
   const navigate = useNavigate();
   const [api, contextHolder] = useNotification();
@@ -30,7 +30,7 @@ const ChooseMarket = () => {
   }, [role, user, navigate]);
 
   const onClick = () => {
-    if (!selectedMarketId) {
+    if (!selectedMarket) {
       api.warning({
         message: "Market tanlanmagan!",
         description: "Iltimos, davom etishdan oldin marketni tanlang.",
@@ -39,8 +39,10 @@ const ChooseMarket = () => {
       return;
     }
 
-    localStorage.setItem("marketId", selectedMarketId);
-    navigate(`/orders/customer-info`);
+    localStorage.setItem("marketId", selectedMarket?.id);
+    navigate(`/orders/customer-info`, {
+      state: { market: selectedMarket },
+    });
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
@@ -152,10 +154,10 @@ const ChooseMarket = () => {
                     {markets?.map((market: any) => (
                       <tr
                         key={market?.id}
-                        onClick={() => setSelectedMarketId(market?.id)}
-                        onDoubleClick={() => setSelectedMarketId(null)}
+                        onClick={() => setSelectedMarket(market)}
+                        onDoubleClick={() => setSelectedMarket(null)}
                         className={`cursor-pointer ${
-                          selectedMarketId === market.id
+                          selectedMarket?.id === market.id
                             ? "bg-[#E3DCFB] dark:bg-[#524B6C]"
                             : "hover:bg-[#F6F7FB] dark:hover:bg-[#3D3759]"
                         }`}
