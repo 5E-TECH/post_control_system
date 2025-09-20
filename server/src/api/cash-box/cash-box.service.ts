@@ -10,7 +10,7 @@ import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { catchError } from 'src/infrastructure/lib/response';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
-import { DataSource, DeepPartial, In } from 'typeorm';
+import { Between, DataSource, DeepPartial, In } from 'typeorm';
 import {
   Cashbox_type,
   Operation_type,
@@ -70,7 +70,7 @@ export class CashBoxService
     }
   }
 
-  async getMainCashbox() {
+  async getMainCashbox(filters?: { fromDate?: string; toDate?: string }) {
     try {
       const mainCashbox = await this.cashboxRepo.findOne({
         where: { cashbox_type: Cashbox_type.MAIN },
@@ -80,8 +80,23 @@ export class CashBoxService
         throw new NotFoundException('Main cashbox not found');
       }
 
+      let fromDate: number;
+      let toDate: number;
+
+      if (filters?.fromDate && filters?.toDate) {
+        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
+        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+      } else {
+        const today = new Date();
+        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
+        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+      }
+
       const cashboxHistory = await this.cashboxHistoryRepo.find({
-        where: { cashbox_id: mainCashbox.id },
+        where: {
+          cashbox_id: mainCashbox.id,
+          created_at: Between(fromDate, toDate), // bigint timestamp
+        },
         relations: ['createdByUser'],
         order: { created_at: 'DESC' },
       });
@@ -107,12 +122,16 @@ export class CashBoxService
     }
   }
 
-  async getCashboxByUserId(id: string) {
+  async getCashboxByUserId(
+    id: string,
+    filters?: { fromDate?: string; toDate?: string },
+  ) {
     try {
       const user = await this.userRepo.findOne({ where: { id } });
       if (!user) {
         throw new NotFoundException('User not found');
       }
+
       const cashbox = await this.cashboxRepo.findOne({
         where: { user_id: id },
         relations: ['user'],
@@ -120,14 +139,31 @@ export class CashBoxService
       if (!cashbox) {
         throw new NotFoundException('Cashbox not found');
       }
+
+      // vaqt oralig‘ini hisoblash (bigint timestamp)
+      let fromDate: number;
+      let toDate: number;
+
+      if (filters?.fromDate && filters?.toDate) {
+        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
+        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+      } else {
+        const today = new Date();
+        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
+        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+      }
+
       const cashboxHistory = await this.cashboxHistoryRepo.find({
-        where: { cashbox_id: cashbox.id },
+        where: {
+          cashbox_id: cashbox.id,
+          created_at: Between(fromDate, toDate), // bigint timestamp filter
+        },
         relations: ['createdByUser'],
         order: { created_at: 'DESC' },
       });
 
-      let income: number = 0;
-      let outcome: number = 0;
+      let income = 0;
+      let outcome = 0;
 
       for (const history of cashboxHistory) {
         if (history.operation_type === Operation_type.INCOME) {
@@ -147,7 +183,10 @@ export class CashBoxService
     }
   }
 
-  async myCashbox(user: JwtPayload) {
+  async myCashbox(
+    user: JwtPayload,
+    filters?: { fromDate?: string; toDate?: string },
+  ) {
     try {
       const myCashbox = await this.cashboxRepo.findOne({
         where: { user_id: user.id },
@@ -155,13 +194,30 @@ export class CashBoxService
       if (!myCashbox) {
         throw new NotFoundException('Cashbox not found');
       }
+
+      // vaqt oralig‘ini aniqlash
+      let fromDate: number;
+      let toDate: number;
+
+      if (filters?.fromDate && filters?.toDate) {
+        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
+        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+      } else {
+        const today = new Date();
+        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
+        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+      }
+
       const cashboxHistory = await this.cashboxHistoryRepo.find({
-        where: { cashbox_id: myCashbox.id },
+        where: {
+          cashbox_id: myCashbox.id,
+          created_at: Between(fromDate, toDate), // bigint timestamp
+        },
         order: { created_at: 'DESC' },
       });
 
-      let income: number = 0;
-      let outcome: number = 0;
+      let income = 0;
+      let outcome = 0;
 
       for (const history of cashboxHistory) {
         if (history.operation_type === Operation_type.INCOME) {
@@ -544,7 +600,12 @@ export class CashBoxService
     }
   }
 
-  async allCashboxesTotal() {
+  async allCashboxesTotal(filters?: {
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
     try {
       const mainCashbox = await this.cashboxRepo.findOne({
         where: { cashbox_type: Cashbox_type.MAIN },
@@ -559,24 +620,57 @@ export class CashBoxService
         where: { cashbox_type: Cashbox_type.FOR_MARKET },
       });
 
-      const allCashboxHistories = await this.cashboxHistoryRepo.find({
-        relations: ['createdByUser'],
-        order: { created_at: 'DESC' },
-      });
+      // vaqt oralig‘i
+      let fromDate: number;
+      let toDate: number;
+      if (filters?.fromDate && filters?.toDate) {
+        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
+        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+      } else {
+        const today = new Date();
+        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
+        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+      }
 
-      let courierCashboxTotal: number = 0;
-      let marketCashboxTotal: number = 0;
+      // pagination parametrlari
+      const page = filters?.page && filters.page > 0 ? filters.page : 1;
+      const limit = filters?.limit && filters.limit > 0 ? filters.limit : 20;
+      const skip = (page - 1) * limit;
+
+      // tarixlarni pagination bilan olish
+      const [allCashboxHistories, total] =
+        await this.cashboxHistoryRepo.findAndCount({
+          where: { created_at: Between(fromDate, toDate) },
+          relations: ['createdByUser'],
+          order: { created_at: 'DESC' },
+          skip,
+          take: limit,
+        });
+
+      let courierCashboxTotal = 0;
+      let marketCashboxTotal = 0;
       for (const cashbox of courierCashboxes) {
         courierCashboxTotal += Number(cashbox.balance);
       }
       for (const cashbox of marketCashboxes) {
         marketCashboxTotal += Number(cashbox.balance);
       }
+
       return successRes({
         mainCashboxTotal: Number(mainCashbox.balance),
         courierCashboxTotal,
         marketCashboxTotal,
         allCashboxHistories,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        filter: {
+          fromDate,
+          toDate,
+        },
       });
     } catch (error) {
       return catchError(error);
