@@ -101,9 +101,9 @@ const Products = () => {
                   </thead>
 
                   <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                    {data?.data &&
-                      Array.isArray(data.data) &&
-                      data.data.map((item: any, inx: number) => (
+                    {data?.data?.data &&
+                      Array.isArray(data?.data?.data) &&
+                      data?.data?.data?.map((item: any, inx: number) => (
                         <tr
                           key={item?.id}
                           onClick={() => setSelect(item?.id)}
