@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 
 import { useDispatch, useSelector } from "react-redux";
 import { Button } from "antd";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import useNotification from "antd/es/notification/useNotification";
 import { createContext, memo, useMemo } from "react";
 import type { RootState } from "../../../../../app/store";
@@ -12,14 +12,18 @@ import ProductInfo from "../../../components/product-info";
 import Discard from "../../../components/button/discard";
 import {
   resetOrderItems,
+  setCustomerData,
   setProductInfo,
 } from "../../../../../shared/lib/features/customer_and_market-id";
 
 const Context = createContext({ name: "Default" });
 
 const CreateOrder = () => {
-  const market_id = localStorage.getItem("marketId") || "";
-  const customer_id = localStorage.getItem("customerId") || "";
+  const market = JSON.parse(localStorage.getItem("market") ?? "null");
+  const customer = JSON.parse(localStorage.getItem("customer") ?? "null");
+
+  const market_id = market?.id;
+  const customer_id = customer?.id;
 
   const orderItems = useSelector(
     (state: RootState) => state.setOrderItems.orderItems
@@ -41,7 +45,6 @@ const CreateOrder = () => {
       });
       return;
     }
-
     if (!productInfo?.total_price || !productInfo?.where_deliver) {
       api.warning({
         message: "Mahsulot malumotlari to'liq emas",
@@ -61,7 +64,9 @@ const CreateOrder = () => {
     };
     createOrder.mutate(newOrder, {
       onSuccess: () => {
-        localStorage.removeItem("customerId");
+        dispatch(setCustomerData(null));
+        dispatch(resetOrderItems());
+        dispatch(setProductInfo(null));
         navigate("/orders/customer-info");
       },
     });
@@ -73,9 +78,6 @@ const CreateOrder = () => {
     dispatch(setProductInfo(null));
   };
 
-  const { state } = useLocation();
-  const marketData = state?.market;
-  const customerData = state?.customerData;
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
   return (
@@ -100,10 +102,10 @@ const CreateOrder = () => {
 
             <div className="flex flex-col">
               <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5] capitalize">
-                {marketData?.name}
+                {market?.name}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap dark:text-[#AEAAC2]">
-                {marketData?.phone_number}
+                {market?.phone_number}
               </span>
             </div>
           </div>
@@ -121,10 +123,10 @@ const CreateOrder = () => {
 
             <div className="flex flex-col">
               <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5] capitalize">
-                {customerData?.name}
+                {customer?.name}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
-                {customerData?.phone_number.split(" ")}
+                {customer?.phone_number.split(" ")}
               </span>
             </div>
           </div>

@@ -22,15 +22,13 @@ const CustomerInfoOrder = () => {
   const customerData = useSelector(
     (state: RootState) => state.setCustomerData.customerData
   );
-  const market_id = localStorage.getItem("marketId") || "";
-
+  const market = JSON.parse(localStorage.getItem("market") ?? "null");
+  const market_id = market?.id;
   const { createUser } = useUser("customer");
   const navigate = useNavigate();
 
   const [api, contextHolder] = useNotification();
 
-  const { state } = useLocation();
-  const market = state?.market;
   const handleClick = () => {
     if (
       !customerData?.name ||
@@ -55,10 +53,8 @@ const CustomerInfoOrder = () => {
     };
     createUser.mutate(customer, {
       onSuccess: (res) => {
-        localStorage.setItem("customerId", res?.data?.data?.id);
-        navigate("/orders/confirm", {
-          state: { customerData, market },
-        });
+        localStorage.setItem("customer", JSON.stringify(res?.data?.data));
+        navigate("/orders/confirm");
       },
     });
   };
@@ -88,7 +84,7 @@ const CustomerInfoOrder = () => {
             </span>
 
             <div className="flex flex-col">
-              <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
+              <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5] capitalize">
                 {market?.name}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap dark:text-[#AEAAC2]">
