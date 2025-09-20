@@ -219,7 +219,7 @@ const AppRouters = () => {
             {
               path: "products",
               element: <Products />,
-              children: [{ path: "create", element: <ProductCreate /> }],
+              children: [{ path: "create/:id", element: <ProductCreate /> }],
             },
             { path: "send-message", element: <SendMessage /> },
             { path: "m-balance", element: <BalanceDashboard /> },

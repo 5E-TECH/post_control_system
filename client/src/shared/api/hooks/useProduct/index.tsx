@@ -32,7 +32,7 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getProductsByMarket = (marketId: string) =>
+  const getProductsByMarket = (marketId: string | undefined) =>
     useQuery({
       queryKey: [product, marketId],
       queryFn: () =>
@@ -42,7 +42,7 @@ export const useProduct = () => {
     });
 
   const deleteProduct = useMutation({
-    mutationFn: (id: number) => api.delete(`product/${id}`),
+    mutationFn: (id: string | undefined) => api.delete(`product/${id}`),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: [product] });
     },

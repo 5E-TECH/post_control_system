@@ -1,6 +1,6 @@
 import React, { type FC } from "react";
 import AddProduct from "./components";
-import { useLocation } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import ProductView from "../../shared/components/product-view";
 import { useProduct } from "../../shared/api/hooks/useProduct";
 import { useSelector } from "react-redux";
@@ -12,16 +12,17 @@ import type { RootState } from "../../app/store";
 // }
 
 const ProductsCreate: FC = () => {
-  const location = useLocation();
-  const market = location.state?.market; // state'dan olamiz
+  const {id} = useParams()
+  // const location = useLocation();
 
+  console.log("createeeee",id);
   
 
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { getMyProducts, getProductsByMarket } = useProduct();
   const { data } =
-    role === "market" ? getMyProducts() : getProductsByMarket(market.id);
+    role === "market" ? getMyProducts() : getProductsByMarket(id);    
 
   return (
     <section>
@@ -29,7 +30,7 @@ const ProductsCreate: FC = () => {
         <div className="mx-[24px]">
           <div className=" flex w-full justify-between">
             <h2 className="text-[24px] font-medium">
-              Add a new product for market {market.name}
+              Add a new product for market {data?.data[0]?.user?.name}
             </h2>
           </div>
         </div>
