@@ -428,7 +428,11 @@ export class UserService {
     }
   }
 
-  async allMarkets(search?: string): Promise<object> {
+  async allMarkets(
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<object> {
     try {
       const query = this.userRepo
         .createQueryBuilder('user')
@@ -451,9 +455,23 @@ export class UserService {
         );
       }
 
-      const allMarkets = await query.getMany();
+      // 🟢 Pagination
+      const skip = (page - 1) * limit;
+      query.skip(skip).take(limit);
 
-      return successRes(allMarkets, 200, 'All markets');
+      const [data, total] = await query.getManyAndCount();
+
+      return successRes(
+        {
+          data,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All markets',
+      );
     } catch (error) {
       return catchError(error);
     }
