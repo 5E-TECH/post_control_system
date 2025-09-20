@@ -12,14 +12,15 @@ export const useMarket = () => {
       client.invalidateQueries({ queryKey: [market], refetchType: "active" }),
   });
 
-  const getMarkets = (enabled = true) =>
+  const getMarkets = (params?: { search: string }, enabled = true) =>
     useQuery({
-      queryKey: [market],
-      queryFn: () => api.get("user/markets").then((res) => res.data),
+      queryKey: [market, params],
+      queryFn: () =>
+        api.get("user/markets", { params }).then((res) => res.data),
       enabled,
     });
 
-  const getMarketByid = (id:string) =>
+  const getMarketByid = (id: string) =>
     useQuery({
       queryKey: [market],
       queryFn: () => api.get(`user/${id}`).then((res) => res.data),
@@ -35,6 +36,6 @@ export const useMarket = () => {
     createMarket,
     getMarkets,
     getMarketsNewOrder,
-    getMarketByid
+    getMarketByid,
   };
 };
