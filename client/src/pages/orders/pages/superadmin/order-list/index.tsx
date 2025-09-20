@@ -19,7 +19,7 @@ const OrderList = () => {
 
   return !permission ? (
     <div className="dark:bg-[#29253e]">
-      <h2 className="text-[25px] pb-5 bg-[#ffffff]">Order List</h2>
+      <h2 className="text-[25px] pb-5 bg-[#ffffff] dark:bg-[var(--color-dark-bg-py)]">Order List</h2>
       <div className="bg-white p-5 rounded-md dark:bg-[#312d4b]">
         <Filter />
       </div>

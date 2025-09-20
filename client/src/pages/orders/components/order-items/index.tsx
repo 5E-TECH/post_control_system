@@ -78,13 +78,13 @@ const OrderItems = () => {
   return (
     <div className="bg-[#ffffff] dark:bg-[#312D48] rounded-md shadow-lg">
       <div className="">
-        <div className="p-5">
+        <div className="px-5 pt-5 pb-3">
           <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#CBC7E1]">
             Order Items
           </h1>
         </div>
 
-        <div className="overflow-y-auto scroll-order-items">
+        <div className="scroll-order-items">
           <div className="flex px-5 relative mt-1">
             <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
               Item 1
@@ -96,7 +96,7 @@ const OrderItems = () => {
                   value={formData.product_id}
                   onChange={(value) => handleSelectChange("product_id", value)}
                   placeholder="Select item 1"
-                  className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
+                  className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
                   options={productNames}
                   dropdownClassName="dark-dropdown"
                 ></Select>
@@ -109,31 +109,40 @@ const OrderItems = () => {
                   onChange={handleChange}
                   type="number"
                   placeholder="Quantity"
-                  className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+                  className="!w-[639px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                 />
               </Form.Item>
             </div>
           </div>
 
           {items.map((item) => (
-            <div key={item} className="flex gap-5 px-5 relative">
-              <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
+            <div key={item} className="flex flex-col px-5 relative">
+              <span className="absolute -top-[6px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
                 Item {item + 1}
               </span>
 
               <div className="flex gap-5">
-                <Form.Item>
+                <Form.Item className="">
                   <Select
-                    placeholder={`Select item ${item + 1}`}
-                    className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
+                    value={formData.product_id}
+                    onChange={(value) =>
+                      handleSelectChange("product_id", value)
+                    }
+                    placeholder="Select item 1"
+                    className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
+                    options={productNames}
                     dropdownClassName="dark-dropdown"
-                  />
+                  ></Select>
                 </Form.Item>
 
                 <Form.Item>
                   <Input
+                    name="quantity"
+                    value={formData.quantity}
+                    onChange={handleChange}
+                    type="number"
                     placeholder="Quantity"
-                    className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+                    className="!w-[639px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                   />
                 </Form.Item>
               </div>
