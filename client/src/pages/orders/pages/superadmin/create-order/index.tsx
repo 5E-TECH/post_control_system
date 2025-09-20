@@ -74,14 +74,14 @@ const CreateOrder = () => {
   };
 
   const { state } = useLocation();
+  const marketData = state?.market;
   const customerData = state?.customerData;
-  console.log(customerData);
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
   return (
     <Context.Provider value={contextValue}>
       {contextHolder}
-      <div className="flex gap-6 p-5">
+      <div className="flex gap-6 px-6 pt-6">
         <div className="pr-[81px]">
           <div className="flex items-center gap-1">
             <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
@@ -99,11 +99,11 @@ const CreateOrder = () => {
             </span>
 
             <div className="flex flex-col">
-              <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
-                Market details
+              <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5] capitalize">
+                {marketData?.name}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap dark:text-[#AEAAC2]">
-                Enter your Market Details
+                {marketData?.phone_number}
               </span>
             </div>
           </div>
@@ -120,11 +120,11 @@ const CreateOrder = () => {
             </span>
 
             <div className="flex flex-col">
-              <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
-                Customer Info
+              <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5] capitalize">
+                {customerData?.name}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
-                Setup information{" "}
+                {customerData?.phone_number.split(" ")}
               </span>
             </div>
           </div>
@@ -149,7 +149,7 @@ const CreateOrder = () => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col flex-1 gap-6">
           <div>
             <OrderItems />
           </div>
