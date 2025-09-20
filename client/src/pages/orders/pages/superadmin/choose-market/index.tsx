@@ -16,7 +16,7 @@ const ChooseMarket = () => {
   const { getMarkets } = useMarket();
   const [searchMarket, setSearchMarket] = useState<any>(null);
   const { data } = getMarkets(true, { search: searchMarket });
-  const markets = Array.isArray(data?.data) ? data?.data : [];
+  const markets = Array.isArray(data?.data?.data) ? data?.data?.data : [];
 
   // Debounce Func for search
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
