@@ -1,10 +1,11 @@
 import { Button, Form, Input, Select } from "antd";
 import { Plus, X } from "lucide-react";
-import { memo, useEffect, useState, type ChangeEvent } from "react";
+import { memo, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useProduct } from "../../../../shared/api/hooks/useProduct";
 import { useDispatch, useSelector } from "react-redux";
 import { setOrderItems } from "../../../../shared/lib/features/customer_and_market-id";
 import type { RootState } from "../../../../app/store";
+import { debounce } from "../../../../shared/helpers/DebounceFunc";
 
 export interface IOrderItems {
   product_id: string | undefined;
@@ -18,7 +19,14 @@ const initialState: IOrderItems = {
 
 const OrderItems = () => {
   const [formData, setFormData] = useState<IOrderItems>(initialState);
-
+  const [searchItem, setSearchItem] = useState<string | null>(null);
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSearchItem(value);
+      }, 500),
+    []
+  );
   const [items, setItems] = useState<number[]>(() => {
     const saved = localStorage.getItem("orderItems");
     return saved ? JSON.parse(saved) : [];
@@ -33,9 +41,24 @@ const OrderItems = () => {
   };
 
   const marketId = localStorage.getItem("marketId");
-  const { getProductsByMarket } = useProduct();
+  const { getProductsByMarket, getProducts } = useProduct();
   const { data } = getProductsByMarket(marketId as string);
   const productNames = data?.data.map((product: any) => ({
+    value: product.id,
+    label: (
+      <div className="flex items-center gap-5">
+        <img
+          src={product.image_url}
+          alt={product.name}
+          className="w-10 h-10 object-cover rounded"
+        />
+        <span>{product.name}</span>
+      </div>
+    ),
+  }));
+  const { data: products } = getProducts({ search: searchItem, marketId });
+  const allProducts = products?.data?.items;
+  const searchedProducts = allProducts?.map((product: any) => ({
     value: product.id,
     label: (
       <div className="flex items-center gap-5">
@@ -94,13 +117,14 @@ const OrderItems = () => {
               <Form.Item>
                 <Select
                   value={formData.product_id}
+                  onSearch={debouncedSearch}
                   onChange={(value) => handleSelectChange("product_id", value)}
                   placeholder="Select or type item"
-                  className="!w-[639px] !h-[48px] custom-select-dropdown-bright placeholder:pt-2!"
-                  options={productNames}
+                  className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
+                  options={searchItem ? searchedProducts : productNames}
                   dropdownClassName="dark-dropdown"
                   showSearch
-                  mode="tags"
+                  filterOption={false}
                 />
               </Form.Item>
 
