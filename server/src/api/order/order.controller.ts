@@ -53,7 +53,10 @@ export class OrderController {
   @ApiOperation({ summary: 'List orders with filters' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'marketId', required: false })
+  @ApiQuery({ name: 'regionId', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Orders list' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -63,9 +66,19 @@ export class OrderController {
   findAll(
     @Query('status') status?: string,
     @Query('marketId') marketId?: string,
+    @Query('regionId') regionId?: string,
     @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.orderService.allOrders({ status, marketId, search });
+    return this.orderService.allOrders({
+      status,
+      marketId,
+      regionId,
+      search,
+      page,
+      limit,
+    });
   }
 
   @ApiOperation({ summary: 'Markets with new orders' })
@@ -78,7 +91,10 @@ export class OrderController {
   }
 
   @ApiOperation({ summary: 'My new orders (market)' })
-  @ApiResponse({ status: 200, description: 'List of new orders for current market' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of new orders for current market',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   @Get('market/my-new-orders')
