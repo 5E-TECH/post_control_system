@@ -6,7 +6,7 @@ const UsersTable = () => {
   const { getUser } = useUser();
   const { data } = getUser();
   const users =
-    data?.data?.filter((user: any) => user?.role !== "market") || [];
+    data?.data?.data?.filter((user: any) => user?.role !== "market") || [];
   return <UsersTableComp data={users} />;
 };
 
