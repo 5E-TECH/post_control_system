@@ -280,12 +280,19 @@ export class UsersController {
   }
 
   @ApiOperation({ summary: 'List all markets' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Markets retrieved successfully' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('markets')
-  findAllMarkets(@Query('search') search?: string) {
-    return this.userService.allMarkets(search);
+  findAllMarkets(
+    @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.userService.allMarkets(search, page, limit);
   }
 
   @ApiOperation({ summary: 'List all couriers' })
