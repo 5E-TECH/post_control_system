@@ -73,19 +73,19 @@
 }
 
 .custom-select-dropdown-bright .ant-select-selection-placeholder {
-  line-height: 40px;
+  line-height: 30px;
   padding: 0 !important;
 }
 
 .custom-select-dropdown-bright .ant-select-selection-item {
-  line-height: 40px;
+  line-height: 30px;
   display: flex;
   align-items: center;
 }
 
 .custom-select-dropdown-bright .ant-select-selection-search-input {
-  height: 40px !important;
-  line-height: 40px !important;
+  height: 30px !important;
+  line-height: 30px !important;
 }
 
 .dark .dark-dropdown {
