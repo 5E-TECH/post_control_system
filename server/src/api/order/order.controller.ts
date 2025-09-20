@@ -114,8 +114,10 @@ export class OrderController {
   newOrdersByMarketId(
     @Param('id') id: string,
     @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
   ) {
-    return this.orderService.newOrdersByMarketId(id, search);
+    return this.orderService.newOrdersByMarketId(id, search, page, limit);
   }
 
   @ApiOperation({ summary: 'Get order by id' })

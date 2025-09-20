@@ -287,7 +287,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async newOrdersByMarketId(id: string, search?: string) {
+  async newOrdersByMarketId(
+    id: string,
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     try {
       const market = await this.userRepo.findOne({ where: { id } });
       if (!market) {
@@ -310,9 +315,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const allNewOrders = await query.getMany();
+      const [orders, total] = await query
+        .orderBy('order.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
 
-      return successRes(allNewOrders, 200, `${market.name}'s new Orders`);
+      return successRes(
+        {
+          data: orders,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        `${market.name}'s new Orders`,
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -409,7 +428,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  // order.service.ts
   async receiveNewOrders(
     ordersArray: OrdersArrayDto,
     search?: string,
