@@ -38,6 +38,7 @@ export class PostService {
       const allPosts = await this.postRepo.find({
         where: { status: Not(Post_status.NEW) },
         relations: ['region'],
+        order: { created_at: 'DESC' },
       });
       return successRes(allPosts, 200, 'All posts');
     } catch (error) {
@@ -50,6 +51,7 @@ export class PostService {
       const allPosts = await this.postRepo.find({
         where: { status: Post_status.NEW },
         relations: ['region'],
+        order: { created_at: 'DESC' },
       });
       return successRes(allPosts, 200, 'All new posts');
     } catch (error) {
@@ -64,6 +66,7 @@ export class PostService {
           status: In([Post_status.CANCELED]),
         },
         relations: ['region'],
+        order: { created_at: 'DESC' },
       });
       return successRes(allPosts, 200, 'All new posts');
     } catch (error) {
@@ -79,6 +82,7 @@ export class PostService {
           courier_id: user.id,
         },
         relations: ['region'],
+        order: { created_at: 'DESC' },
       });
       return successRes(allPosts, 200, 'All new posts');
     } catch (error) {
@@ -94,6 +98,7 @@ export class PostService {
           courier_id: user.id,
         },
         relations: ['region'],
+        order: { created_at: 'DESC' },
       });
       return successRes(allOldPosts, 200, 'All old posts');
     } catch (error) {
@@ -107,6 +112,7 @@ export class PostService {
         where: {
           status: In([Post_status.CANCELED]),
         },
+        order: { created_at: 'DESC' },
       });
       return successRes(
         allRejectedPosts,

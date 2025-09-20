@@ -45,10 +45,16 @@ import { UpdateMarketDto } from './dto/update-market.dto';
 export class UsersController {
   constructor(private readonly userService: UserService) {}
 
-  @ApiOperation({ summary: 'Create admin user', description: 'Create a new admin user (SuperAdmin only)' })
+  @ApiOperation({
+    summary: 'Create admin user',
+    description: 'Create a new admin user (SuperAdmin only)',
+  })
   @ApiResponse({ status: 201, description: 'Admin user created successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - SuperAdmin role required' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - SuperAdmin role required',
+  })
   @ApiResponse({ status: 422, description: 'Validation error' })
   @ApiBody({ type: CreateAdminDto })
   @ApiResponse({
@@ -76,8 +82,14 @@ export class UsersController {
     return this.userService.createAdmin(createAdminDto);
   }
 
-  @ApiOperation({ summary: 'Create registrator user', description: 'Create a new registrator user (SuperAdmin/Admin only)' })
-  @ApiResponse({ status: 201, description: 'Registrator user created successfully' })
+  @ApiOperation({
+    summary: 'Create registrator user',
+    description: 'Create a new registrator user (SuperAdmin/Admin only)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Registrator user created successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   @ApiResponse({ status: 422, description: 'Validation error' })
@@ -89,8 +101,14 @@ export class UsersController {
     return this.userService.createRegistrator(createRegistratorDto);
   }
 
-  @ApiOperation({ summary: 'Create courier user', description: 'Create a new courier user (SuperAdmin/Admin only)' })
-  @ApiResponse({ status: 201, description: 'Courier user created successfully' })
+  @ApiOperation({
+    summary: 'Create courier user',
+    description: 'Create a new courier user (SuperAdmin/Admin only)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Courier user created successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   @ApiResponse({ status: 422, description: 'Validation error' })
@@ -183,7 +201,10 @@ export class UsersController {
     return this.userService.createCustomer(user, createCustomerDto);
   }
 
-  @ApiOperation({ summary: 'User sign in', description: 'Authenticate user and return JWT token' })
+  @ApiOperation({
+    summary: 'User sign in',
+    description: 'Authenticate user and return JWT token',
+  })
   @ApiResponse({ status: 200, description: 'User signed in successfully' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @ApiResponse({ status: 422, description: 'Validation error' })
@@ -211,7 +232,10 @@ export class UsersController {
     return this.userService.signInUser(signInuser, res);
   }
 
-  @ApiOperation({ summary: 'User sign out', description: 'Sign out user and clear JWT token' })
+  @ApiOperation({
+    summary: 'User sign out',
+    description: 'Sign out user and clear JWT token',
+  })
   @ApiResponse({ status: 200, description: 'User signed out successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiBearerAuth()
@@ -221,10 +245,25 @@ export class UsersController {
     return this.userService.signOut(res);
   }
 
-  @ApiOperation({ summary: 'Get all users', description: 'Retrieve all users with optional filtering' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search users by name or phone' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by user status' })
-  @ApiQuery({ name: 'role', required: false, description: 'Filter by user role' })
+  @ApiOperation({
+    summary: 'Get all users',
+    description: 'Retrieve all users with optional filtering',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search users by name or phone',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by user status',
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    description: 'Filter by user role',
+  })
   @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
@@ -245,8 +284,8 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('markets')
-  findAllMarkets() {
-    return this.userService.allMarkets();
+  findAllMarkets(@Query('search') search?: string) {
+    return this.userService.allMarkets(search);
   }
 
   @ApiOperation({ summary: 'List all couriers' })
@@ -258,7 +297,10 @@ export class UsersController {
     return this.userService.allCouriers();
   }
 
-  @ApiOperation({ summary: 'Get user profile', description: 'Get current user profile information' })
+  @ApiOperation({
+    summary: 'Get user profile',
+    description: 'Get current user profile information',
+  })
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiBearerAuth()

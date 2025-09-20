@@ -428,20 +428,31 @@ export class UserService {
     }
   }
 
-  async allMarkets(): Promise<object> {
+  async allMarkets(search?: string): Promise<object> {
     try {
-      const allMarkets = await this.userRepo.find({
-        where: { role: Roles.MARKET },
-        select: [
-          'id',
-          'name',
-          'phone_number',
-          'status',
-          'created_at',
-          'add_order',
-        ],
-        relations: ['cashbox'],
-      });
+      const query = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.cashbox', 'cashbox')
+        .where('user.role = :role', { role: Roles.MARKET })
+        .select([
+          'user.id',
+          'user.name',
+          'user.phone_number',
+          'user.status',
+          'user.created_at',
+          'user.add_order',
+          'cashbox', // cashboxni to‘liq olish uchun
+        ]);
+
+      if (search) {
+        query.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      const allMarkets = await query.getMany();
+
       return successRes(allMarkets, 200, 'All markets');
     } catch (error) {
       return catchError(error);
