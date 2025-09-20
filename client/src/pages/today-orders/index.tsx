@@ -29,8 +29,7 @@ const TodayOrders = () => {
     return <Outlet />;
   }
 
-  const markets = data?.data || [];
-  console.log('market:', markets);
+  const markets = data?.data|| [];
 
   return (
     <section className="flex items-center justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d4b]">
