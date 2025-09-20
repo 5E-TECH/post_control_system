@@ -31,25 +31,8 @@ export const customerIdSlice = createSlice({
     setCustomerData: (state, actions: PayloadAction<ICustomer | null>) => {
       state.customerData = actions.payload;
     },
-    setOrderItems: (state, actions: PayloadAction<IOrderItems | null>) => {
-      if (actions.payload === null) {
-        state.orderItems = null;
-        return;
-      }
-
-      if (!state.orderItems) {
-        state.orderItems = [];
-      }
-
-      const inx = state.orderItems.findIndex(
-        (item) => item.product_id === actions.payload!.product_id
-      );
-
-      if (inx < 0) {
-        state.orderItems.push(actions.payload);
-      } else {
-        state.orderItems[inx] = actions.payload;
-      }
+    setOrderItems: (state, actions: PayloadAction<IOrderItems[]>) => {
+      state.orderItems = actions.payload;
     },
     resetOrderItems: (state) => {
       state.orderItems = null;

@@ -12,7 +12,8 @@ const CustomerDetails = () => {
 
   const [loading, setLoading] = useState(true);
 
-  const marketId = localStorage.getItem("marketId") || "";
+  const market = JSON.parse(localStorage.getItem("market") ?? "null");
+  const marketId = market?.id;
   const { data } =
     role === "superadmin"
       ? getOrderByMarket(marketId)
