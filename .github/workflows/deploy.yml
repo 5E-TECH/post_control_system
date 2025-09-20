@@ -20,7 +20,7 @@ jobs:
       with:
         app_id: ${{ secrets.GH_APP_ID }}
         private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-        repository: organization/repo
+        repository: 5E-TECH/post_control_system
 
     - name: Deploy to server
       run: |
