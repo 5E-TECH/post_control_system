@@ -247,7 +247,7 @@ export class UsersController {
 
   @ApiOperation({
     summary: 'Get all users',
-    description: 'Retrieve all users with optional filtering',
+    description: 'Retrieve all users with optional filtering and pagination',
   })
   @ApiQuery({
     name: 'search',
@@ -264,6 +264,18 @@ export class UsersController {
     required: false,
     description: 'Filter by user role',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (default: 10)',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
@@ -275,8 +287,10 @@ export class UsersController {
     @Query('search') search?: string,
     @Query('status') status?: string,
     @Query('role') role?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
   ) {
-    return this.userService.allUsers({ search, status, role });
+    return this.userService.allUsers({ search, status, role, page, limit });
   }
 
   @ApiOperation({ summary: 'List all markets' })

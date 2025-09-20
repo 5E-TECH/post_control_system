@@ -392,9 +392,11 @@ export class UserService {
     search?: string;
     status?: string;
     role?: string;
+    page?: number;
+    limit?: number;
   }): Promise<object> {
     try {
-      const { search, status, role } = filters;
+      const { search, status, role, page = 1, limit = 10 } = filters;
 
       const qb = this.userRepo
         .createQueryBuilder('user')
@@ -421,8 +423,23 @@ export class UserService {
         qb.andWhere('user.role = :role', { role });
       }
 
-      const allUsers = await qb.getMany();
-      return successRes(allUsers, 200, 'All users');
+      const [users, total] = await qb
+        .orderBy('user.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return successRes(
+        {
+          data: users,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All users',
+      );
     } catch (error) {
       return catchError(error);
     }
