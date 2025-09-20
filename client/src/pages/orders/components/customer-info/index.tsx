@@ -9,6 +9,7 @@ import type { RootState } from "../../../../app/store";
 
 export interface ICustomer {
   phone_number: string;
+  region_id?: string | null;
   district_id?: string | null;
   name: string;
   address: string;
@@ -16,6 +17,7 @@ export interface ICustomer {
 
 export const initialState: ICustomer = {
   phone_number: "+998 ",
+  region_id: null,
   district_id: null,
   name: "",
   address: "",
@@ -73,6 +75,9 @@ const CustomerInfocomp = () => {
   useEffect(() => {
     setFormData(customerData as ICustomer);
   }, [customerData]);
+
+
+  
   return (
     <div className="w-full p-5 rounded-md dark:bg-[#312D48] shadow-lg">
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
@@ -122,6 +127,8 @@ const CustomerInfocomp = () => {
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">Region</label>
             <Select
+              value={formData.region_id}
+              onChange={(value) => handleSelectChange("region_id", value)}
               placeholder="Viloyat tanlang"
               className="w-full h-[45px]! custom-select-dropdown-bright"
               options={regions}

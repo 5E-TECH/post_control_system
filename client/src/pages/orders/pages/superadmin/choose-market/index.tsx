@@ -7,19 +7,31 @@ import useNotification from "antd/es/notification/useNotification";
 import { useMarket } from "../../../../../shared/api/hooks/useMarket/useMarket";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import { debounce } from "../../../../../shared/helpers/DebounceFunc";
 
 const Context = createContext({ name: "Default" });
 
 const ChooseMarket = () => {
+  // API get
   const { getMarkets } = useMarket();
-  const { data } = getMarkets();
+  const [searchMarket, setSearchMarket] = useState<any>(null);
+  const { data } = getMarkets(true, { search: searchMarket });
   const markets = Array.isArray(data?.data) ? data?.data : [];
 
+  // Debounce Func for search
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSearchMarket(value);
+      }, 800),
+    []
+  );
 
   const navigate = useNavigate();
   const [api, contextHolder] = useNotification();
 
+  // Navigate to page based on role
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
   useEffect(() => {
@@ -126,6 +138,7 @@ const ChooseMarket = () => {
 
               <Form.Item>
                 <Input
+                  onChange={(e) => debouncedSearch(e.target.value)}
                   placeholder="Search..."
                   className="h-[40px]! min-w-[350px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                 />

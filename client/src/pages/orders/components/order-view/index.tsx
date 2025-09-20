@@ -39,7 +39,7 @@ const OrderView = () => {
   }
 
   const { data } = query;
-  const myNewOrders = Array.isArray(data?.data) ? data?.data : [];
+  const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
 
   return (
     <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
