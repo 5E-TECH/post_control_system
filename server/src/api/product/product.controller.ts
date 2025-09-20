@@ -151,8 +151,18 @@ export class ProductController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   @Get('/my-products')
-  async myProducts(@CurrentUser() user: JwtPayload) {
-    return this.productService.getMyProducts(user);
+  async myProducts(
+    @CurrentUser() user: JwtPayload,
+    @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.productService.getMyProducts(
+      user,
+      search,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @ApiOperation({ summary: 'Get product by id' })

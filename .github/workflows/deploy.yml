@@ -1,0 +1,33 @@
+name: CI/CD Deploy via GitHub App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: Production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Setup GitHub App token
+      uses: tibdex/github-app-token@v1
+      id: generate_token
+      with:
+        app_id: ${{ secrets.GH_APP_ID }}
+        private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+        repository: organization/repo
+
+    - name: Deploy to server
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+        cd ${{ secrets.APP_PATH }} &&
+        git reset --hard &&
+        git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/organization/repo.git main &&
+        npm install &&
+        pm2 restart myproject
+        "

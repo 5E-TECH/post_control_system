@@ -6,13 +6,13 @@ import type { RootState } from "../../../../app/store";
 
 export interface IProductInfo {
   total_price: number | string;
-  where_deliver: string | undefined;
+  where_deliver: string;
   comment?: string;
 }
 
 const initialState: IProductInfo = {
   total_price: "",
-  where_deliver: undefined,
+  where_deliver: "center",
   comment: "",
 };
 
@@ -36,12 +36,15 @@ const ProductInfo = () => {
   );
 
   useEffect(() => {
+    const cleanedPrice = Number(
+      String(formData.total_price).split(",").join("")
+    );
     const data = {
       ...formData,
-      total_price: Number(formData.total_price) || 0,
+      total_price: Number(cleanedPrice) || 0,
     };
     dispatch(setProductInfo(data));
-  }, [formData]);
+  }, [formData, dispatch]);
 
   useEffect(() => {
     if (productInfo === null) {

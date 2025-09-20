@@ -100,7 +100,6 @@ export class ProductService {
     }
   }
 
-  // product.service.ts
   async findAll(search?: string, marketId?: string, page = 1, limit = 10) {
     try {
       const query = this.productRepo
@@ -172,17 +171,42 @@ export class ProductService {
     }
   }
 
-  async getMyProducts(user: JwtPayload) {
+  async getMyProducts(user: JwtPayload, search?: string, page = 1, limit = 10) {
     try {
-      const products = await this.productRepo.find({
-        where: { user_id: user.id },
-      });
+      const qb = this.productRepo
+        .createQueryBuilder('product')
+        .where('product.user_id = :userId', { userId: user.id });
+
+      if (search) {
+        qb.andWhere(
+          '(product.name ILIKE :search OR product.description ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      qb.orderBy('product.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit);
+
+      const [products, total] = await qb.getManyAndCount();
+
       products.forEach((product) => {
         if (product.image_url) {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products, 200, 'All my products');
+
+      return successRes(
+        {
+          data: products,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All my products',
+      );
     } catch (error) {
       return catchError(error);
     }

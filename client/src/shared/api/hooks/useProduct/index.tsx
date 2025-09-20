@@ -16,10 +16,10 @@ export const useProduct = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [product] }),
   });
 
-  const getProducts = () =>
+  const getProducts = (params?: any) =>
     useQuery({
-      queryKey: [product],
-      queryFn: () => api.get("product").then((res) => res.data),
+      queryKey: [product, params],
+      queryFn: () => api.get("product", { params }).then((res) => res.data),
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
@@ -53,6 +53,6 @@ export const useProduct = () => {
     getProducts,
     getProductsByMarket,
     deleteProduct,
-    getMyProducts
+    getMyProducts,
   };
 };
