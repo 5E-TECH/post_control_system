@@ -60,10 +60,10 @@ const Products = () => {
                 setShowMarket(true); // popup ochiladi
               }
             }}
-            className="w-[146px] h-[38px] bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
+            className="px-4 py-2 bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
           >
             <FilePlus size={18} />
-            Add Product
+            Mahsulot qo'shish
           </button>
           <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
             <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d] relative">
