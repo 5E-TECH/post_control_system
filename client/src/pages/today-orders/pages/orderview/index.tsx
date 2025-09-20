@@ -1,4 +1,4 @@
-import { EllipsisVertical } from 'lucide-react';
+import { SquarePen, Trash } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Search from '../../components/search';
@@ -7,10 +7,16 @@ import { useLocation } from 'react-router-dom';
 import { useOrder } from '../../../../shared/api/hooks/useOrder';
 import { usePost } from '../../../../shared/api/hooks/usePost';
 
-
 const OrderView = () => {
+  const handlerUpdate = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+  };
+
+  const handlerDelete = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+  };
   const navigate = useNavigate();
-  const [openMenuId, setOpenMenuId] = useState('');
+  // const [openMenuId, setOpenMenuId] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
@@ -22,8 +28,7 @@ const OrderView = () => {
   const { getOrderByMarket } = useOrder();
   const { createPost } = usePost();
   const { data, refetch } = getOrderByMarket(market);
-  console.log( 'market1',data);
-  
+  console.log('market1', data);
 
   useEffect(() => {
     if (data?.data) {
@@ -46,10 +51,7 @@ const OrderView = () => {
   };
 
   return (
-    <div
-      onClick={() => setOpenMenuId('')}
-      className="bg-white rounded-md m-5 dark:bg-[#312d4b]"
-    >
+    <div className="bg-white rounded-md m-5 dark:bg-[#312d4b]">
       <Search />
       <div className="w-full">
         <table className="w-full">
@@ -70,7 +72,6 @@ const OrderView = () => {
                       }
                     }}
                   />
-                  {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div> */}
                 </div>
               </th>
               <th>
@@ -97,12 +98,7 @@ const OrderView = () => {
                   <span>ADDRESS</span>
                 </div>
               </th>
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>MARKET</span>
-                </div>
-              </th>
+
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -125,7 +121,6 @@ const OrderView = () => {
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   <span>ACTION</span>
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
             </tr>
@@ -163,9 +158,7 @@ const OrderView = () => {
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
                   {item?.customer?.address?.split(' ').slice(0, 2).join(' ')}
                 </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  kelsa yozamn
-                </td>
+
                 <td className="pl-10">
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}
@@ -179,26 +172,13 @@ const OrderView = () => {
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                   {item?.items?.length}
                 </td>
-                <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenMenuId(openMenuId === item.id ? null : item.id);
-                    }}
-                  >
-                    <EllipsisVertical />
+                <td className=" pl-10 gap-3 flex mt-4   text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                  <button onClick={handlerDelete} className="hover:bg-red-600">
+                    <Trash />
                   </button>
-
-                  {openMenuId === item.id && (
-                    <div className="absolute right-0 mt-2 w-28 bg-white border shadow-md rounded-md z-10">
-                      <button className="block w-full text-left px-4 py-2 hover:bg-gray-100">
-                        Edit
-                      </button>
-                      <button className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-red-500">
-                        Delete
-                      </button>
-                    </div>
-                  )}
+                  <button onClick={handlerUpdate}>
+                    <SquarePen />
+                  </button>
                 </td>
               </tr>
             ))}
