@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,6 +16,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CashBoxService } from './cash-box.service';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
@@ -38,27 +40,62 @@ export class CasheBoxController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('main')
-  getMainCashbox() {
-    return this.cashBoxService.getMainCashbox();
+  getMainCashbox(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.cashBoxService.getMainCashbox({ fromDate, toDate });
   }
 
   @ApiOperation({ summary: 'Get cashbox by user ID' })
   @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+  })
   @ApiResponse({ status: 200, description: 'Cashbox info for user' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('user/:id')
-  cashboxByUserId(@Param('id') id: string) {
-    return this.cashBoxService.getCashboxByUserId(id);
+  cashboxByUserId(
+    @Param('id') id: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.cashBoxService.getCashboxByUserId(id, { fromDate, toDate });
   }
 
   @ApiOperation({ summary: 'Get my cashbox (courier/market)' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+  })
   @ApiResponse({ status: 200, description: 'Own cashbox info' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER, Roles.MARKET)
   @Get('my-cashbox')
-  myCashbox(@CurrentUser() user: JwtPayload) {
-    return this.cashBoxService.myCashbox(user);
+  myCashbox(
+    @CurrentUser() user: JwtPayload,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.cashBoxService.myCashbox(user, { fromDate, toDate });
   }
 
   @ApiOperation({ summary: 'Accept payment from courier' })
@@ -88,12 +125,49 @@ export class CasheBoxController {
   }
 
   @ApiOperation({ summary: 'Get all cashboxes total info' })
-  @ApiResponse({ status: 200, description: 'Totals and aggregates' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 20)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Totals and aggregates with pagination',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get('all-info')
-  allCashboxesInfo() {
-    return this.cashBoxService.allCashboxesTotal();
+  allCashboxesInfo(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.allCashboxesTotal({
+      fromDate,
+      toDate,
+      page,
+      limit,
+    });
   }
 
   @ApiOperation({ summary: 'Get financial balance' })
