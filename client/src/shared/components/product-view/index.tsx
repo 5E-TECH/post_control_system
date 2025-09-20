@@ -62,15 +62,35 @@ const ProductView: FC<IProps> = ({ data }) => {
           <table className="w-full min-w-[600px] cursor-pointer">
             <thead className="h-[54px] bg-[#F6F7FB] dark:bg-[#3D3759] text-left">
               <tr>
-                <th className="p-3">#</th>
-                <th className="p-3">Products</th>
-                <th className="p-3">Market</th>
-                <th className="p-3">Actions</th>
+                <th className="w-[50px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    #
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    PRODUCT NAME
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="w-[1100px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    MARKET
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    ACTION
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>{" "}
               </tr>
             </thead>
 
             <tbody>
-              {data?.data?.items?.map((item: any, inx: number) => (
+              {data?.map((item: any, inx: number) => (
                 <tr
                   key={item?.id}
                   className="border-b border-gray-300 dark:border-gray-600"

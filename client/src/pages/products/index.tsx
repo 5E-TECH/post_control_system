@@ -34,6 +34,7 @@ const Products = () => {
   const { data: productData } =
     role === "market" ? getMyProducts() : getProducts();
 
+    
   const { getMarkets } = useMarket();
 
   const { data } = getMarkets(role !== "market");
@@ -43,6 +44,7 @@ const Products = () => {
   if (pathname.startsWith("/products/create")) return <Outlet />;
   return (
     <div className="mt-6">
+      <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
       <div className="flex flex-col md:flex-row gap-3 md:gap-0 md:items-center md:justify-between px-4">
         <input
           className="rounded-[7px] w-full md:w-[280px] h-[40px] border border-[#2E263D38] px-3"
@@ -54,10 +56,9 @@ const Products = () => {
           <button
             onClick={() => {
               if (role === "market") {
-                // Reduxdan kelgan id va role ni handleProps ga yuboramiz
                 handleNavigate()
               } else {
-                setShowMarket(true); // popup ochiladi
+                setShowMarket(true);
               }
             }}
             className="px-4 py-2 bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
@@ -133,7 +134,7 @@ const Products = () => {
         </div>
       </div>
       <div>
-        <ProductView data={productData} />
+        <ProductView data={productData?.data?.items} />
       </div>
     </div>
   );
