@@ -86,8 +86,8 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('markets/new-orders')
-  haveNewOrdersMarket() {
-    return this.orderService.haveNewOrderMarkets();
+  haveNewOrdersMarket(@Query('search') search?: string) {
+    return this.orderService.haveNewOrderMarkets(search);
   }
 
   @ApiOperation({ summary: 'My new orders (market)' })
@@ -98,8 +98,11 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   @Get('market/my-new-orders')
-  myNewOrders(@CurrentUser() user: JwtPayload) {
-    return this.orderService.myNewOrders(user);
+  myNewOrders(
+    @CurrentUser() user: JwtPayload,
+    @Query('search') search?: string,
+  ) {
+    return this.orderService.myNewOrders(user, search);
   }
 
   @ApiOperation({ summary: 'New orders by market id' })
@@ -108,8 +111,11 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('market/:id')
-  newOrdersByMarketId(@Param('id') id: string) {
-    return this.orderService.newOrdersByMarketId(id);
+  newOrdersByMarketId(
+    @Param('id') id: string,
+    @Query('search') search?: string,
+  ) {
+    return this.orderService.newOrdersByMarketId(id, search);
   }
 
   @ApiOperation({ summary: 'Get order by id' })
@@ -137,12 +143,16 @@ export class OrderController {
 
   @ApiOperation({ summary: 'Receive new orders' })
   @ApiBody({ type: OrdersArrayDto })
+  @ApiQuery({ name: 'search', required: false })
   @ApiResponse({ status: 200, description: 'Orders received' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('receive')
-  receiveNewOrders(@Body() ordersArray: OrdersArrayDto) {
-    return this.orderService.receiveNewOrders(ordersArray);
+  receiveNewOrders(
+    @Body() ordersArray: OrdersArrayDto,
+    @Query('search') search?: string,
+  ) {
+    return this.orderService.receiveNewOrders(ordersArray, search);
   }
 
   @ApiOperation({ summary: 'All orders for market' })
