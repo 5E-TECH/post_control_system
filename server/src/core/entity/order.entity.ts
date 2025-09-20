@@ -46,6 +46,9 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   customer_id: string;
 
+  @Column({ type: 'bigint', nullable: true })
+  sold_at: number | null;
+
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order, { cascade: true })
   items: OrderItemEntity[];
