@@ -27,7 +27,7 @@ jobs:
         ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
         cd ${{ secrets.APP_PATH }} &&
         git reset --hard &&
-        git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/organization/repo.git main &&
+        git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main &&
         npm install &&
-        pm2 restart myproject
+        pm2 restart post_control_system
         "
