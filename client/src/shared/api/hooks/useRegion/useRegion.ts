@@ -12,10 +12,11 @@ export const useRegion = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getRegionsById = (id: string) =>
+  const getRegionsById = (id: string, bool?:boolean) =>
     useQuery({
       queryKey: [region, id],
       queryFn: () => api.get(`region/${id}`).then((res) => res.data),
+      enabled: bool,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });

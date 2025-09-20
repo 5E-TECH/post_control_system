@@ -6,16 +6,19 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 
 const CustomerDetails = () => {
-  const { getOrders, getMarketsByMyNewOrders } = useOrder();
+  const { getOrderByMarket, getMarketsByMyNewOrders } = useOrder();
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
 
   const [loading, setLoading] = useState(true);
 
+  const marketId = localStorage.getItem("marketId") || "";
   const { data } =
-    role === "superadmin" ? getOrders() : getMarketsByMyNewOrders();
+    role === "superadmin"
+      ? getOrderByMarket(marketId)
+      : getMarketsByMyNewOrders();
 
-  const myNewOrders = data?.data || [];
+  const myNewOrders = data?.data?.data || [];
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
@@ -85,9 +88,7 @@ const CustomerDetails = () => {
 
                 <td className="w-[254px] h-[56px] pl-[20px] text-left">
                   <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
-                    {new Intl.NumberFormat("uz-UZ").format(
-                      order?.total_price
-                    )}{" "}
+                    {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}{" "}
                     uzs
                   </span>
                 </td>

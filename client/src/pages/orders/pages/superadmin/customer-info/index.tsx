@@ -47,7 +47,10 @@ const CustomerInfoOrder = () => {
     }
 
     const customer = {
-      ...customerData,
+      phone_number: customerData?.phone_number,
+      district_id: customerData?.district_id,
+      name: customerData?.name,
+      address: customerData.address,
       market_id,
     };
     createUser.mutate(customer, {

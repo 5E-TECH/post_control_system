@@ -1,6 +1,5 @@
 import { Input, Select } from "antd";
 import { memo, useEffect, useState, type ChangeEvent } from "react";
-import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useDispatch, useSelector } from "react-redux";
 import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
@@ -26,13 +25,7 @@ export const initialState: ICustomer = {
 const CustomerInfocomp = () => {
   const [formData, setFormData] = useState<ICustomer>(initialState);
 
-  const { getUser } = useUser();
-  const { data } = getUser();
-  const users = Array.isArray(data?.data)
-    ? data?.data.filter((user: any) => user?.role === "registrator")
-    : [];
-  console.log(users);
-  const { getRegions } = useRegion();
+  const { getRegions, getRegionsById } = useRegion();
   const { data: allRegions } = getRegions();
   const regions = allRegions?.data.map((item: any) => ({
     value: item.id,
@@ -76,8 +69,17 @@ const CustomerInfocomp = () => {
     setFormData(customerData as ICustomer);
   }, [customerData]);
 
+  const { data } = getRegionsById(
+    formData?.region_id as string,
+    formData?.region_id ? true : false
+  );
+  const specificDistrictsByRegion = data?.data?.districts?.map(
+    (district: any) => ({
+      value: district?.id,
+      label: district?.name,
+    })
+  );
 
-  
   return (
     <div className="w-full p-5 rounded-md dark:bg-[#312D48] shadow-lg">
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
@@ -143,36 +145,34 @@ const CustomerInfocomp = () => {
               onChange={(value) => handleSelectChange("district_id", value)}
               placeholder="Tuman tanlang"
               className="w-full h-[45px]! custom-select-dropdown-bright"
-              options={districts}
+              options={
+                formData?.region_id ? specificDistrictsByRegion : districts
+              }
               dropdownClassName="dark-dropdown"
             />
           </div>
         </div>
 
-        <Input
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder="Name"
-          className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-        />
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Name</label>
+          <Input
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="Name"
+            className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+          />
+        </div>
 
-        <Input
-          name="address"
-          value={formData.address}
-          onChange={handleChange}
-          placeholder="Address"
-          className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-        />
-
-        <div className="w-full h-[62px] rounded-md bg-[#FFF9EB] dark:bg-[#413745] flex items-center gap-4 px-4">
-          <span
-            className="font-medium text-[19px] text-[#FFB400]"
-            style={{ wordSpacing: 1 }}
-          >
-            Confirm that you have access to johndoe@gmail.com in sender email
-            settings.
-          </span>
+        <div className="pb-1">
+          <label className="block text-xs text-gray-500 mb-1">Address</label>
+          <Input
+            name="address"
+            value={formData.address}
+            onChange={handleChange}
+            placeholder="Address"
+            className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+          />
         </div>
       </div>
     </div>
