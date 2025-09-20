@@ -22,6 +22,8 @@ const OrderView = () => {
   const { getOrderByMarket } = useOrder();
   const { createPost } = usePost();
   const { data, refetch } = getOrderByMarket(market);
+  console.log( 'market1',data);
+  
 
   useEffect(() => {
     if (data?.data) {
@@ -162,7 +164,7 @@ const OrderView = () => {
                   {item?.customer?.address?.split(' ').slice(0, 2).join(' ')}
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  bi1
+                  kelsa yozamn
                 </td>
                 <td className="pl-10">
                   <span
@@ -175,7 +177,7 @@ const OrderView = () => {
                   {item?.total_price} UZS
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.product_quantity}
+                  {item?.items?.length}
                 </td>
                 <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                   <button
