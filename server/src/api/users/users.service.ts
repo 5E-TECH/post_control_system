@@ -321,7 +321,11 @@ export class UserService {
       }
 
       const isExistClient = await queryRunner.manager.findOne(UserEntity, {
-        where: { phone_number, role: Roles.CUSTOMER },
+        where: {
+          phone_number,
+          role: Roles.CUSTOMER,
+          district_id: createCustomerDto.district_id,
+        },
         relations: ['customerLinks', 'customerLinks.market'],
       });
 
