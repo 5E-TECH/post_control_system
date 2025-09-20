@@ -91,15 +91,17 @@ const OrderItems = () => {
             </span>
 
             <div className="flex gap-5">
-              <Form.Item className="">
+              <Form.Item>
                 <Select
                   value={formData.product_id}
                   onChange={(value) => handleSelectChange("product_id", value)}
-                  placeholder="Select item 1"
-                  className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
+                  placeholder="Select or type item"
+                  className="!w-[639px] !h-[48px] custom-select-dropdown-bright placeholder:pt-2!"
                   options={productNames}
                   dropdownClassName="dark-dropdown"
-                ></Select>
+                  showSearch
+                  mode="tags"
+                />
               </Form.Item>
 
               <Form.Item>
@@ -122,17 +124,17 @@ const OrderItems = () => {
               </span>
 
               <div className="flex gap-5">
-                <Form.Item className="">
+                <Form.Item>
                   <Select
                     value={formData.product_id}
                     onChange={(value) =>
                       handleSelectChange("product_id", value)
                     }
-                    placeholder="Select item 1"
+                    placeholder="Select or type item"
                     className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
                     options={productNames}
                     dropdownClassName="dark-dropdown"
-                  ></Select>
+                  />
                 </Form.Item>
 
                 <Form.Item>
