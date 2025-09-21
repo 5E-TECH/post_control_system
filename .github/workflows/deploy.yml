@@ -11,7 +11,7 @@ jobs:
     environment: Production
 
     steps:
-    # 1️⃣ Repo checkout
+    # 1️⃣ Checkout repository
     - name: Checkout repository
       uses: actions/checkout@v3
 
@@ -33,7 +33,7 @@ jobs:
 
         # Serverga ulanish va deploy
         ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-          
+
           # Root katalogga o'tish
           cd ${{ secrets.APP_PATH }}
 
@@ -41,13 +41,25 @@ jobs:
           git reset --hard
           git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
+          # -------------------------
           # 4️⃣ Client build
           cd client
+
+          # dist katalog huquqlarini to‘g‘rilash
+          if [ -d dist ]; then
+            sudo chown -R $USER:$USER dist || true
+            rm -rf dist
+          fi
+
           npm install
           npm run build
 
-          # 5️⃣ Server build
+          # -------------------------
+          # 5️⃣ Server build va pm2 deploy
           cd ../server
           npm install
-          pm2 restart post_control_system
+
+          # Agar pm2 process mavjud bo‘lsa restart, yo‘q bo‘lsa start
+          pm2 describe post_control_system || pm2 start npm --name post_control_system -- run start
+          pm2 restart post_control_system || true
         "
