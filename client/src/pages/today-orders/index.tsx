@@ -23,11 +23,13 @@ const TodayOrders = () => {
   
 
   const { getMarketsNewOrder } = useMarket();
-  const { data, refetch, isLoading } = getMarketsNewOrder(role.role !== "market");
+  const { data, refetch, isLoading } = getMarketsNewOrder(false);
   
-  if(role.role !== "market"){
-    refetch();
-  }
+  useEffect(() => {
+    if(role.role !== "market" && pathname === "/order/markets/new-orders"){
+      refetch();
+    }
+  }, [pathname])
 
   if (pathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
