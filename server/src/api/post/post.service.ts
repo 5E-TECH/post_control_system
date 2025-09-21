@@ -9,7 +9,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { DataSource, In, Not } from 'typeorm';
+import { DataSource, In, IsNull, Not } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
@@ -47,15 +47,74 @@ export class PostService {
   }
 
   async newPosts(): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
+      // 1️⃣ RECEIVED statusida va post_id null bo‘lgan orderlarni olish
+      const orphanOrders = await queryRunner.manager.find(OrderEntity, {
+        where: { status: Order_status.RECEIVED, post_id: IsNull() },
+        relations: ['customer', 'customer.district'],
+      });
+
+      const newPosts: PostEntity[] = [];
+      const regionPostMap = new Map<string, PostEntity>();
+
+      // 2️⃣ Har bir orderni region bo‘yicha grouping
+      for (const order of orphanOrders) {
+        const district = order.customer?.district;
+        if (!district) {
+          throw new NotFoundException(
+            `District not found for order ${order.id}`,
+          );
+        }
+
+        const regionId = district.assigned_region;
+        let post = regionPostMap.get(regionId);
+
+        if (!post) {
+          post = queryRunner.manager.create(PostEntity, {
+            region_id: regionId,
+            qr_code_token: generateCustomToken(),
+            post_total_price: 0,
+            order_quantity: 0,
+            status: Post_status.NEW,
+          });
+          newPosts.push(post);
+          regionPostMap.set(regionId, post);
+        }
+
+        // Post statistikasi
+        post.post_total_price =
+          (post.post_total_price ?? 0) + (order.total_price ?? 0);
+        post.order_quantity = (post.order_quantity ?? 0) + 1;
+
+        // Orderni shu postga biriktirish
+        order.post = post;
+        order.status = Order_status.RECEIVED; // statusini saqlab qolish
+      }
+
+      // 3️⃣ Yangi postlarni saqlash va orderlarni update qilish
+      if (newPosts.length > 0) {
+        await queryRunner.manager.save(PostEntity, newPosts);
+        await queryRunner.manager.save(OrderEntity, orphanOrders);
+      }
+
+      // 4️⃣ Mavjud + yangi yaratilgan NEW postlarni olish
       const allPosts = await this.postRepo.find({
         where: { status: Post_status.NEW },
         relations: ['region'],
         order: { created_at: 'DESC' },
       });
+
+      await queryRunner.commitTransaction();
       return successRes(allPosts, 200, 'All new posts');
     } catch (error) {
+      await queryRunner.rollbackTransaction();
       return catchError(error);
+    } finally {
+      await queryRunner.release();
     }
   }
 
