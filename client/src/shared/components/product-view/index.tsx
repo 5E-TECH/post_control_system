@@ -85,10 +85,9 @@ const ProductView: FC<IProps> = ({ data }) => {
                     ACTION
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
-                </th>{" "}
+                </th>
               </tr>
             </thead>
-
             <tbody>
               {data?.map((item: any, inx: number) => (
                 <tr

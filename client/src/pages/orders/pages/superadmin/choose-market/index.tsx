@@ -1,4 +1,4 @@
-import { Button, Form, Input, Spin } from "antd";
+import { Button, Form, Input } from "antd";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { createContext, memo, useState, useMemo, useEffect } from "react";
 
@@ -8,6 +8,7 @@ import { useMarket } from "../../../../../shared/api/hooks/useMarket/useMarket";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { debounce } from "../../../../../shared/helpers/DebounceFunc";
+import TableSkeleton from "../../../components/ordersTabelSkeleton/ordersTableSkeleton";
 
 const Context = createContext({ name: "Default" });
 
@@ -15,7 +16,7 @@ const ChooseMarket = () => {
   // API get
   const { getMarkets } = useMarket();
   const [searchMarket, setSearchMarket] = useState<any>(null);
-  const { data } = getMarkets(true, { search: searchMarket });
+  const { data, isLoading } = getMarkets(true, { search: searchMarket });
   const markets = Array.isArray(data?.data?.data) ? data?.data?.data : [];
 
   // Debounce Func for search
@@ -56,13 +57,6 @@ const ChooseMarket = () => {
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
-
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
 
   return (
     <Context.Provider value={contextValue}>
@@ -143,24 +137,26 @@ const ChooseMarket = () => {
               </Form.Item>
             </div>
             <div className="">
-              <Spin spinning={loading} tip={"Loading markets..."}>
-                <table>
-                  <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
-                    <tr>
-                      <th className="w-[654px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                        <div className="flex items-center justify-between pr-[21px]">
-                          MARKET NOMI
-                          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                        </div>
-                      </th>
-                      <th className="w-[654px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                        <div className="flex items-center justify-between pr-[21px]">
-                          TELEFON NOMERI
-                          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
+              <table>
+                <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
+                  <tr>
+                    <th className="w-[654px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        MARKET NOMI
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="w-[654px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        TELEFON NOMERI
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                {isLoading ? (
+                  <TableSkeleton rows={5} columns={2} />
+                ) : (
                   <tbody>
                     {markets?.map((market: any) => (
                       <tr
@@ -188,8 +184,8 @@ const ChooseMarket = () => {
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </Spin>
+                )}
+              </table>
               <div className="flex justify-end items-center pr-[105px] pt-4 gap-6">
                 <div className="flex items-center">
                   <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">

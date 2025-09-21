@@ -1,5 +1,5 @@
 import { FilePlus, Search, X } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Popup from "../../shared/ui/Popup";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
@@ -7,34 +7,44 @@ import ProductView from "../../shared/components/product-view";
 import { useProduct } from "../../shared/api/hooks/useProduct";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { debounce } from "../../shared/helpers/DebounceFunc";
 
 const Products = () => {
   const [showMarket, setShowMarket] = useState(false);
-  const [select, setSelect] = useState<string | null>("")
+  const [select, setSelect] = useState<string | null>("");
+  const [searchProduct, setSearchProduct] = useState<any>(null);
+
+  console.log("search input   ",searchProduct);
+  
 
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
   useEffect(() => {
-    if(role === "market"){
-      setSelect(id)
+    if (role === "market") {
+      setSelect(id);
     }
-  }, [role, id])
+  }, [role, id]);
 
   const navigate = useNavigate();
 
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSearchProduct(value);
+      }, 800),
+    []
+  );
 
-  console.log(role, id);
 
   const handleNavigate = () => {
     navigate(`create/${select}`);
-    setSelect("")
+    setSelect("");
     setShowMarket(false);
   };
 
   const { getProducts, getMyProducts } = useProduct();
   const { data: productData } =
-    role === "market" ? getMyProducts() : getProducts();
+    role === "market" ? getMyProducts({ search: searchProduct }) : getProducts({ search: searchProduct });
 
-    
   const { getMarkets } = useMarket();
 
   const { data } = getMarkets(role !== "market");
@@ -47,6 +57,7 @@ const Products = () => {
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
       <div className="flex flex-col md:flex-row gap-3 md:gap-0 md:items-center md:justify-between px-4">
         <input
+          onChange={(e) => debouncedSearch(e.target.value)}
           className="rounded-[7px] w-full md:w-[280px] h-[40px] border border-[#2E263D38] px-3"
           placeholder="Search"
           type="text"
@@ -56,7 +67,7 @@ const Products = () => {
           <button
             onClick={() => {
               if (role === "market") {
-                handleNavigate()
+                handleNavigate();
               } else {
                 setShowMarket(true);
               }
