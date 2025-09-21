@@ -31,6 +31,7 @@ const OrderView = () => {
   const { getParam, setParam, removeParam } = useParamsHook();
   const page = Number(getParam("page") || 1);
   const limit = Number(getParam("limit") || 10);
+
   switch (role) {
     case "superadmin":
       query = getOrders({ page, limit });
@@ -60,13 +61,14 @@ const OrderView = () => {
       setParam("limit", limit);
     }
   };
+
   return (
-    <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
+    <div className="w-full bg-white py-1 dark:bg-[#312d4b]">
       <table className="w-full">
         <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
           <tr>
             <th>
-              <div className="flex items-center gap-10 ml-10">
+              <div className="flex items-center ml-10">
                 <span>#</span>
               </div>
             </th>
@@ -123,7 +125,7 @@ const OrderView = () => {
             {myNewOrders?.map((item: any, inx: number) => (
               <tr
                 key={item.id}
-                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
+                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
                 onClick={() => navigate(`order-detail/${item.id}`)}
               >
                 <td className="pl-10">{inx + 1}</td>

@@ -16,6 +16,13 @@ const OrderList = () => {
       dispatch(togglePermission(false));
     };
   }, [dispatch]);
+  
+   useEffect(() => {
+      return () => {
+        localStorage.removeItem("market");
+        localStorage.removeItem("customer");
+      };
+    }, []);  
 
   return !permission ? (
     <div className="dark:bg-[#29253e]">
