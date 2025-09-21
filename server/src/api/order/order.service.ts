@@ -458,7 +458,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
-      // 1️⃣ QueryBuilder bilan NEW orderlarni olish va search qo‘llash
+      // 1️⃣ Faqat NEW statusdagi orderlarni olish
       const qb = queryRunner.manager
         .createQueryBuilder(OrderEntity, 'order')
         .leftJoinAndSelect('order.customer', 'customer')
@@ -484,7 +484,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // 2️⃣ Customers, districts, posts ni bulk fetch qilish
+      // 2️⃣ Kerakli customers, districts va posts
       const customerIds = newOrders.map((o) => o.customer_id);
       const customers = await queryRunner.manager.find(UserEntity, {
         where: { id: In(customerIds), role: Roles.CUSTOMER },
@@ -498,14 +498,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const districtMap = new Map(districts.map((d) => [d.id, d]));
 
       const regionIds = districts.map((d) => d.assigned_region);
-      const posts = await queryRunner.manager.find(PostEntity, {
+      const existingPosts = await queryRunner.manager.find(PostEntity, {
         where: { region_id: In(regionIds), status: Post_status.NEW },
       });
-      const postMap = new Map(posts.map((p) => [p.region_id, p]));
+      const postMap = new Map(existingPosts.map((p) => [p.region_id, p]));
 
-      // 3️⃣ Orders ni posts ga assign qilish
       const newPosts: PostEntity[] = [];
+      const postsToUpdate: PostEntity[] = [];
 
+      // 3️⃣ Ordersni postlarga bog‘lash
       for (const order of newOrders) {
         const customer = customerMap.get(order.customer_id);
         if (!customer)
@@ -521,7 +522,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         let post = postMap.get(district.assigned_region);
 
-        // Agar post mavjud bo‘lmasa yangi post yaratish
+        // Yangi post yaratish kerak bo‘lsa
         if (!post) {
           post = queryRunner.manager.create(PostEntity, {
             region_id: district.assigned_region,
@@ -534,32 +535,33 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           postMap.set(district.assigned_region, post);
         }
 
-        // Post statistikalarini yangilash
+        // Orderni shu postga bog‘lash
+        order.status = Order_status.RECEIVED;
+        order.post = post;
+
+        // Statistikalarni vaqtincha yangilash
         post.post_total_price =
           (post.post_total_price ?? 0) + (order.total_price ?? 0);
         post.order_quantity = (post.order_quantity ?? 0) + 1;
 
-        // Orderni update qilish
-        order.status = Order_status.RECEIVED;
-        order.post_id = post.id; // yangi post bo‘lsa keyin save qilgandan so‘ng id tushadi
-      }
-
-      // 4️⃣ Yangi postlarni saqlash va post_idlarni update qilish
-      if (newPosts.length > 0) {
-        await queryRunner.manager.save(PostEntity, newPosts);
-
-        for (const order of newOrders) {
-          if (!order.post_id) {
-            const customer = customerMap.get(order.customer_id)!;
-            const district = districtMap.get(customer.district_id)!;
-            const post = postMap.get(district.assigned_region)!;
-            order.post_id = post.id;
-          }
+        // Agar bu post oldindan mavjud bo‘lsa → keyinroq saqlash uchun update ro‘yxatiga qo‘shamiz
+        if (!newPosts.includes(post) && !postsToUpdate.includes(post)) {
+          postsToUpdate.push(post);
         }
       }
 
-      // 5️⃣ Orders ni saqlash
+      // 4️⃣ Avval yangi postlarni saqlash → id generatsiya bo‘ladi
+      if (newPosts.length > 0) {
+        await queryRunner.manager.save(PostEntity, newPosts);
+      }
+
+      // 5️⃣ Ordersni saqlash
       await queryRunner.manager.save(OrderEntity, newOrders);
+
+      // 6️⃣ Mavjud postlarni yangilash
+      if (postsToUpdate.length > 0) {
+        await queryRunner.manager.save(PostEntity, postsToUpdate);
+      }
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Orders received');
