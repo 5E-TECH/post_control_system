@@ -27,7 +27,7 @@ export const useOrder = () => {
 
   const getOrders = (params?: any) =>
     useQuery({
-      queryKey: [order],
+      queryKey: [order, params],
       queryFn: () => api.get("order", { params }).then((res) => res.data),
     });
 
