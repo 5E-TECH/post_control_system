@@ -15,16 +15,25 @@ export default class Application {
       bufferLogs: true,
     });
 
+    // Logger
     app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
 
-    console.log(join(process.cwd(), 'uploads'));
-
+    // Uploads static files
     app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+
+    // Frontend build fayllari (Vite build)
+    app.use(express.static(join(process.cwd(), 'public')));
+
+    // Global filters
     app.useGlobalFilters(new AllExceptionsFilter());
+
+    // Cookies va CORS
     app.use(cookieParser());
     app.enableCors({
-      origin: '*',
+      origin: '*', // productionda origin ni aniq belgilash tavsiya etiladi
     });
+
+    // Validation
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -33,11 +42,16 @@ export default class Application {
       }),
     );
 
+    // API prefix
     const api = 'api/v1';
     app.setGlobalPrefix(api);
+
+    // Swagger konfiguratsiya
     const config_swagger = new DocumentBuilder()
       .setTitle('Post Control System API')
-      .setDescription('A comprehensive API for managing post delivery operations, including orders, users, markets, couriers, and post management')
+      .setDescription(
+        'A comprehensive API for managing post delivery operations, including orders, users, markets, couriers, and post management',
+      )
       .setVersion('1.0.0')
       .addBearerAuth({
         type: 'http',
@@ -45,9 +59,18 @@ export default class Application {
         in: 'Header',
         description: 'JWT Authorization header using the Bearer scheme',
       })
-      .addTag('Users', 'User management endpoints including authentication, admin, courier, market, and customer operations')
-      .addTag('Orders', 'Order management endpoints for creating, tracking, and managing delivery orders')
-      .addTag('Posts', 'Post management endpoints for handling delivery posts and courier assignments')
+      .addTag(
+        'Users',
+        'User management endpoints including authentication, admin, courier, market, and customer operations',
+      )
+      .addTag(
+        'Orders',
+        'Order management endpoints for creating, tracking, and managing delivery orders',
+      )
+      .addTag(
+        'Posts',
+        'Post management endpoints for handling delivery posts and courier assignments',
+      )
       .addTag('Products', 'Product catalog management')
       .addTag('Regions', 'Geographic region management')
       .addTag('Districts', 'District management within regions')
@@ -62,6 +85,7 @@ export default class Application {
       SwaggerModule.createDocument(app, config_swagger);
     SwaggerModule.setup(api, app, documentFactory());
 
+    // Serverni ishga tushirish
     await app.listen(config.PORT, () => {
       const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
       logger.log('info', `Server running on http://localhost:${config.PORT}`);
