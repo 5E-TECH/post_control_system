@@ -19,7 +19,7 @@ const OrderView = () => {
 
   const { getOrderByMarket, getMarketsByMyNewOrders } = useOrder();
   const { createPost } = usePost();
-  const { data } = user.role === "market" ? getMarketsByMyNewOrders(id) : getOrderByMarket(id);
+  const { data, refetch } = user.role === "market" ? getMarketsByMyNewOrders(id) : getOrderByMarket(id);
 
   useEffect(() => {
     if (data?.data?.data) {
@@ -43,6 +43,7 @@ const OrderView = () => {
 
     createPost.mutate(newOrder, {
       onSuccess: () => {
+        refetch()
         setSelectedIds([]);
         navigate('/order/markets/new-orders');
       },
