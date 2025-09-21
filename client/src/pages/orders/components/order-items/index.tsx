@@ -8,12 +8,12 @@ import type { RootState } from "../../../../app/store";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 
 export interface IOrderItems {
-  product_id: string | undefined;
+  product_id: string | null;
   quantity: number | string;
 }
 
 const initialState: IOrderItems = {
-  product_id: undefined,
+  product_id: null,
   quantity: "",
 };
 
