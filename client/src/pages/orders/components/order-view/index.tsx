@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import type { RootState } from "../../../../app/store";
 import { useSelector } from "react-redux";
+import TableSkeleton from "../ordersTabelSkeleton/ordersTableSkeleton";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -38,9 +39,8 @@ const OrderView = () => {
       query = { data: { data: [] } };
   }
 
-  const { data } = query;
+  const { data, isLoading } = query;
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
-
   return (
     <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
       <table className="w-full">
@@ -97,46 +97,50 @@ const OrderView = () => {
             </th>
           </tr>
         </thead>
-        <tbody>
-          {myNewOrders?.map((item: any, inx: number) => (
-            <tr
-              key={item.id}
-              className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
-              onClick={() => navigate(`order-detail/${item.id}`)}
-            >
-              <td className="pl-10">{inx + 1}</td>
-              <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.name}
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.phone_number}
-              </td>
-              <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.phone_number}
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.market?.name}
-              </td>
-              <td className="pl-10">
-                <span
-                  className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                    statusColors[item.status] || "bg-slate-400"
-                  }`}
-                >
-                  {item.status.toUpperCase()}
-                </span>
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                <span>
-                  {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}{" "}
-                </span>
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.items.length}
-              </td>
-            </tr>
-          ))}
-        </tbody>
+        {isLoading ? (
+          <TableSkeleton rows={10} columns={8} />
+        ) : (
+          <tbody>
+            {myNewOrders?.map((item: any, inx: number) => (
+              <tr
+                key={item.id}
+                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
+                onClick={() => navigate(`order-detail/${item.id}`)}
+              >
+                <td className="pl-10">{inx + 1}</td>
+                <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.customer?.name}
+                </td>
+                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.customer?.phone_number}
+                </td>
+                <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.customer?.phone_number}
+                </td>
+                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.market?.name}
+                </td>
+                <td className="pl-10">
+                  <span
+                    className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
+                      statusColors[item.status] || "bg-slate-400"
+                    }`}
+                  >
+                    {item.status.toUpperCase()}
+                  </span>
+                </td>
+                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  <span>
+                    {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}{" "}
+                  </span>
+                </td>
+                <td className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.items.length}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        )}
       </table>
       <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
         <div className="flex items-center">
