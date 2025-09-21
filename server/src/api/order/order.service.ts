@@ -439,7 +439,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
-      // 1. QueryBuilder bilan NEW orderlarni olish
+      // 1️⃣ QueryBuilder bilan NEW orderlarni olish va search qo‘llash
       const qb = queryRunner.manager
         .createQueryBuilder(OrderEntity, 'order')
         .leftJoinAndSelect('order.customer', 'customer')
@@ -465,10 +465,82 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // ❗️Keyingi qismi o‘ziz yozganizday o‘zgarishsiz qoladi
-      // customers, districts, posts olish, assign qilish, save qilish
-      // ...
-      // 🔽 faqat `newOrders` endi QueryBuilder’dan keladi
+      // 2️⃣ Customers, districts, posts ni bulk fetch qilish
+      const customerIds = newOrders.map((o) => o.customer_id);
+      const customers = await queryRunner.manager.find(UserEntity, {
+        where: { id: In(customerIds), role: Roles.CUSTOMER },
+      });
+      const customerMap = new Map(customers.map((c) => [c.id, c]));
+
+      const districtIds = customers.map((c) => c.district_id);
+      const districts = await queryRunner.manager.find(DistrictEntity, {
+        where: { id: In(districtIds) },
+      });
+      const districtMap = new Map(districts.map((d) => [d.id, d]));
+
+      const regionIds = districts.map((d) => d.assigned_region);
+      const posts = await queryRunner.manager.find(PostEntity, {
+        where: { region_id: In(regionIds), status: Post_status.NEW },
+      });
+      const postMap = new Map(posts.map((p) => [p.region_id, p]));
+
+      // 3️⃣ Orders ni posts ga assign qilish
+      const newPosts: PostEntity[] = [];
+
+      for (const order of newOrders) {
+        const customer = customerMap.get(order.customer_id);
+        if (!customer)
+          throw new NotFoundException(
+            `Customer not found for order ${order.id}`,
+          );
+
+        const district = districtMap.get(customer.district_id);
+        if (!district)
+          throw new NotFoundException(
+            `District not found for customer ${customer.id}`,
+          );
+
+        let post = postMap.get(district.assigned_region);
+
+        // Agar post mavjud bo‘lmasa yangi post yaratish
+        if (!post) {
+          post = queryRunner.manager.create(PostEntity, {
+            region_id: district.assigned_region,
+            qr_code_token: generateCustomToken(),
+            post_total_price: 0,
+            order_quantity: 0,
+            status: Post_status.NEW,
+          });
+          newPosts.push(post);
+          postMap.set(district.assigned_region, post);
+        }
+
+        // Post statistikalarini yangilash
+        post.post_total_price =
+          (post.post_total_price ?? 0) + (order.total_price ?? 0);
+        post.order_quantity = (post.order_quantity ?? 0) + 1;
+
+        // Orderni update qilish
+        order.status = Order_status.RECEIVED;
+        order.post_id = post.id; // yangi post bo‘lsa keyin save qilgandan so‘ng id tushadi
+      }
+
+      // 4️⃣ Yangi postlarni saqlash va post_idlarni update qilish
+      if (newPosts.length > 0) {
+        await queryRunner.manager.save(PostEntity, newPosts);
+
+        for (const order of newOrders) {
+          if (!order.post_id) {
+            const customer = customerMap.get(order.customer_id)!;
+            const district = districtMap.get(customer.district_id)!;
+            const post = postMap.get(district.assigned_region)!;
+            order.post_id = post.id;
+          }
+        }
+      }
+
+      // 5️⃣ Orders ni saqlash
+      await queryRunner.manager.save(OrderEntity, newOrders);
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Orders received');
