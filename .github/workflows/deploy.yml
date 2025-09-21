@@ -1,4 +1,4 @@
-name: CI/CD Deploy via GitHub App
+name: CI/CD Deploy Monorepo
 
 on:
   push:
@@ -11,9 +11,11 @@ jobs:
     environment: Production
 
     steps:
-    - name: Checkout
+    # 1️⃣ Repo checkout
+    - name: Checkout repository
       uses: actions/checkout@v3
 
+    # 2️⃣ GitHub App token setup
     - name: Setup GitHub App token
       uses: tibdex/github-app-token@v1
       id: generate_token
@@ -22,15 +24,30 @@ jobs:
         private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
         repository: 5E-TECH/post_control_system
 
+    # 3️⃣ Deploy to server
     - name: Deploy to server
       run: |
+        # SSH kalitni yaratish
         echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
         chmod 600 server_key.pem
-        ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-        cd ${{ secrets.APP_PATH }} &&
-        git reset --hard &&
-        git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main &&
-        npm install &&
-        pm2 restart post_control_system
-        "
 
+        # Serverga ulanish va deploy
+        ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+          
+          # Root katalogga o'tish
+          cd ${{ secrets.APP_PATH }}
+
+          # Git pull orqali main branch yangilash
+          git reset --hard
+          git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
+
+          # 4️⃣ Client build
+          cd client
+          npm install
+          npm run build
+
+          # 5️⃣ Server build
+          cd ../server
+          npm install
+          pm2 restart post_control_system
+        "
