@@ -1,13 +1,15 @@
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
 import { ChevronRight } from "lucide-react";
-import { useEffect } from "react";
-import { Select } from "antd";
+import { Select, DatePicker } from "antd";
 import TextArea from "antd/es/input/TextArea";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
+import dayjs from "dayjs";
+
+const { RangePicker } = DatePicker;
 
 const CashDetail = () => {
   const { id } = useParams();
@@ -29,11 +31,6 @@ const CashDetail = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // const handleCheck = () => {
-  //   console.log("Filter values:", form);
-  //   // shu yerda API chaqirishingiz yoki filtrni ishlatishingiz mumkin
-  // };
-
   useEffect(() => {
     if (form.payment != "click_to_market") {
       setForm((prev) => ({ ...prev, market: "" }));
@@ -44,11 +41,12 @@ const CashDetail = () => {
 
   const { getCashBoxById, createPaymentMarket, createPaymentCourier } =
     useCashBox();
-
   const { getMarkets } = useMarket();
 
   const { data, refetch } = getCashBoxById(id);
-  const { data: marketData } = getMarkets(form.payment == "click_to_market" ? true : false);
+  const { data: marketData } = getMarkets(
+    form.payment == "click_to_market" ? true : false
+  );
 
   const handleSubmit = () => {
     const dataCourier = {
@@ -85,7 +83,6 @@ const CashDetail = () => {
         },
       });
     } else {
-      // Courier bo‘lsa
       createPaymentCourier.mutate(dataCourier, {
         onSuccess: () => {
           setForm({
@@ -187,13 +184,40 @@ const CashDetail = () => {
           </div>
         </div>
       </div>
-      <CashboxHistory
-        form={form}
-        handleChange={handleChange}
-        income={data?.data?.income}
-        outcome={data?.data?.outcome}
-        cashboxHistory={data?.data?.cashboxHistory}
-      />
+      <div className="grid w-full">
+        <div className="flex flex-row items-center gap-7">
+          <h2 className="text-[20px] font-medium mb-2">Filters:</h2>
+          <div className="w-full flex justify-between">
+            <div className="flex gap-5">
+              {/* RangePicker bilan custom */}
+              <RangePicker
+                value={[
+                  form.from ? dayjs(form.from) : null,
+                  form.to ? dayjs(form.to) : null,
+                ]}
+                onChange={(dates) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                    to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                  }));
+                }}
+                placeholder={["From", "To"]}
+                format="YYYY-MM-DD"
+                className="w-[340px] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+              />
+            </div>
+          </div>
+        </div>
+        <div>
+          <CashboxHistory
+            form={form}
+            income={data?.data?.income}
+            outcome={data?.data?.outcome}
+            cashboxHistory={data?.data?.cashboxHistory}
+          />
+        </div>
+      </div>
     </div>
   );
 };

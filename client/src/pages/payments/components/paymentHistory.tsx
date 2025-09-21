@@ -2,45 +2,19 @@ import React from "react";
 
 type Props = {
   form: { from: string; to: string };
-  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   income: number;
   outcome: number;
   cashboxHistory: any[];
 };
 
 const CashboxHistoryComponent: React.FC<Props> = ({
-  form,
-  handleChange,
   income,
   outcome,
   cashboxHistory,
 }) => {
   return (
-    <div className="w-[50%]">
+    <div className="w-[80%]">
       {/* Filter qismi */}
-      <div className="flex flex-row items-center gap-7">
-        <h2 className="text-[20px] font-medium mb-2">Filters:</h2>
-        <div className="w-full flex justify-between">
-          <div className="flex gap-5">
-            <input
-              type="date"
-              name="from"
-              value={form.from}
-              onChange={handleChange}
-              placeholder="From"
-              className="w-[150px] border border-[#E5E7EB] rounded-lg px-3 py-[10px] outline-none"
-            />
-            <input
-              type="date"
-              name="to"
-              value={form.to}
-              onChange={handleChange}
-              placeholder="To"
-              className="w-[180px] border border-[#E5E7EB] rounded-lg px-3 py-[10px] outline-none"
-            />
-          </div>
-        </div>
-      </div>
 
       {/* Income va Outcome qismlari */}
       <div className="flex gap-5 mt-10 justify-between">
