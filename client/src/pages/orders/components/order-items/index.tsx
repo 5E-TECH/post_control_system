@@ -8,12 +8,12 @@ import type { RootState } from "../../../../app/store";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 
 export interface IOrderItems {
-  product_id: string | null;
+  product_id: string | undefined;
   quantity: number | string;
 }
 
 const initialState: IOrderItems = {
-  product_id: null,
+  product_id: undefined,
   quantity: "",
 };
 
@@ -146,7 +146,7 @@ const OrderItems = () => {
               <div className="flex gap-5">
                 <Form.Item>
                   <Select
-                    value={formData.product_id}
+                    value={formData.product_id ?? undefined}
                     onSearch={debouncedSearch}
                     onChange={(value) =>
                       handleSelectChange(index, "product_id", value)
