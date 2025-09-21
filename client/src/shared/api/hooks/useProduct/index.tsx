@@ -16,18 +16,18 @@ export const useProduct = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [product] }),
   });
 
-  const getProducts = () =>
+  const getProducts = (params?: { search: string }) =>
     useQuery({
-      queryKey: [product],
-      queryFn: () => api.get("product").then((res) => res.data),
+      queryKey: [product, params],
+      queryFn: () => api.get("product", { params }).then((res) => res.data),
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
 
-  const getMyProducts = () =>
+  const getMyProducts = (params?: { search: string }) =>
     useQuery({
-      queryKey: [product],
-      queryFn: () => api.get("product/my-products").then((res) => res.data),
+      queryKey: [product, params],
+      queryFn: () => api.get("product/my-products", { params }).then((res) => res.data),
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
