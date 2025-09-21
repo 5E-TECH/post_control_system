@@ -64,6 +64,8 @@ export class UserService {
     private readonly dataSource: DataSource,
   ) {}
 
+  // Test for CI/CD
+
   async onModuleInit() {
     try {
       const isSuperAdmin = await this.userRepo.findOne({
