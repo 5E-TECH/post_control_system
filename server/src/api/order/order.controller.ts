@@ -101,8 +101,10 @@ export class OrderController {
   myNewOrders(
     @CurrentUser() user: JwtPayload,
     @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
   ) {
-    return this.orderService.myNewOrders(user, search);
+    return this.orderService.myNewOrders(user, search, page, limit);
   }
 
   @ApiOperation({ summary: 'New orders by market id' })
