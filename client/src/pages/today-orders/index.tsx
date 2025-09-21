@@ -20,17 +20,14 @@ const TodayOrders = () => {
   const handleProps = (id: string) => {
     navigate(`${id}`);
   };
-  console.log(role.role);
   
 
   const { getMarketsNewOrder } = useMarket();
   const { data, refetch, isLoading } = getMarketsNewOrder(role.role !== "market");
   
-  useEffect(() => {
-    if(role.role !== "market"){
-      refetch();
-    }
-  }, []);
+  if(role.role !== "market"){
+    refetch();
+  }
 
   if (pathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
