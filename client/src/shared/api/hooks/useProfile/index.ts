@@ -14,8 +14,8 @@ export const useProfile = () => {
   };
 
   const updateProfil = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      api.patch(`user/self/${id}`, data),
+    mutationFn: ({data }: { id: string; data: any }) =>
+      api.patch(`user/self`, data),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: [user] });
     },
