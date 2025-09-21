@@ -146,7 +146,7 @@ const OrderItems = () => {
               <div className="flex gap-5">
                 <Form.Item>
                   <Select
-                    value={formData.product_id}
+                    value={formData.product_id ?? undefined}
                     onSearch={debouncedSearch}
                     onChange={(value) =>
                       handleSelectChange(index, "product_id", value)

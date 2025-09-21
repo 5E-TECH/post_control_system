@@ -1,10 +1,10 @@
-import { memo, useEffect } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import Search from './components/search';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../../app/store';
-import { useMarket } from '../../shared/api/hooks/useMarket/useMarket';
-import EmptyPage from '../../shared/components/empty-page';
+import { memo, useEffect } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import Search from "./components/search";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
+import EmptyPage from "../../shared/components/empty-page";
+import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 
 const TodayOrders = () => {
   const navigate = useNavigate();
@@ -12,24 +12,28 @@ const TodayOrders = () => {
   const role = useSelector((state: RootState) => state.roleSlice);
 
   useEffect(() => {
-    if (role.role === 'market') {
-      navigate('order-view', { state: { market: role.id } });
+    if (role.role === "market") {
+      navigate(`${role.id}`);
     }
-  }, [role]);
+  }, []);
 
   const handleProps = (id: string) => {
-    navigate('order-view', { state: { market: id } });
+    navigate(`${id}`);
   };
+  
 
   const { getMarketsNewOrder } = useMarket();
-  const { data, refetch, isLoading } = getMarketsNewOrder();
-  refetch();
+  const { data, refetch, isLoading } = getMarketsNewOrder(role.role !== "market");
+  
+  if(role.role !== "market"){
+    refetch();
+  }
 
-  if (pathname.startsWith('/order/markets/new-orders/')) {
+  if (pathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
   }
 
-  const markets = data?.data|| [];
+  const markets = data?.data || [];
 
   return (
     <section className="flex items-center justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d4b]">

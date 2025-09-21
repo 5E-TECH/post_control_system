@@ -13,7 +13,10 @@ import { Search, X } from "lucide-react";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useCourier } from "../../../../shared/api/hooks/useCourier";
 import TextArea from "antd/es/input/TextArea";
-import { Select } from "antd";
+import { Select, DatePicker } from "antd"; 
+import dayjs from "dayjs";                  
+
+const { RangePicker } = DatePicker; 
 
 const MainDetail = () => {
   const [showMarket, setShowMarket] = useState(false);
@@ -50,15 +53,14 @@ const MainDetail = () => {
   const { getCourier } = useCourier();
   const { getCashBoxMain, cashboxSpand } = useCashBox();
 
-  
   const { data, refetch } = getCashBoxMain();
   const { data: marketData } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
-  
+
   useEffect(() => {
     refetch();
   }, []);
-  
+
   const handleNavigate = () => {
     navigate(`/payments/cash-detail/${select}`, {
       state: {
@@ -71,20 +73,21 @@ const MainDetail = () => {
     select;
     setShowCurier(false);
   };
-  
-  
+
   const handleSubmit = () => {
     const data = {
-      amount:Number(form.summa),
-      type:form.payment,
-      comment:form.comment
-    }
-    cashboxSpand.mutate({ data }, {
-      onSuccess: () => {
-        refetch()
+      amount: Number(form.summa),
+      type: form.payment,
+      comment: form.comment,
+    };
+    cashboxSpand.mutate(
+      { data },
+      {
+        onSuccess: () => {
+          refetch();
+        },
       }
-    })
-
+    );
   };
 
   const raw = Number(data?.data?.cashbox?.balance || 0);
@@ -92,6 +95,9 @@ const MainDetail = () => {
   return (
     <div className="px-5 mt-5 flex gap-24">
       <div>
+        <h2 className="flex items-center mb-5 text-[30px] font-medium capitalize">
+          Asosiy kassa
+        </h2>
         <CashboxCard
           role={"superadmin"}
           name={data?.data?.cashbox?.user?.name}
@@ -195,13 +201,38 @@ const MainDetail = () => {
           </div>
         </div>
       </div>
-      <CashboxHistory
-        form={form}
-        handleChange={handleChange}
-        income={data?.data?.income}
-        outcome={data?.data?.outcome}
-        cashboxHistory={data?.data?.cashboxHistory}
-      />
+      <div>
+        <div className="flex flex-row items-center gap-7">
+          <h2 className="text-[20px] font-medium mb-2">Filters:</h2>
+          <div className="w-full flex justify-between">
+            <div className="flex gap-5">
+              <RangePicker
+                value={[
+                  form.from ? dayjs(form.from) : null,
+                  form.to ? dayjs(form.to) : null,
+                ]}
+                onChange={(dates) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                    to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                  }));
+                }}
+                placeholder={["From", "To"]}
+                format="YYYY-MM-DD"
+                 separator={<span className="mx-2 text-xl flex items-center">→</span>} 
+                className="w-[340px] border border-[#E5E7EB] rounded-lg px-5 py-[6px] outline-none"
+              />
+            </div>
+          </div>
+        </div>
+        <CashboxHistory
+          form={form}
+          income={data?.data?.income}
+          outcome={data?.data?.outcome}
+          cashboxHistory={data?.data?.cashboxHistory}
+        />
+      </div>
       <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
         <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d]">
           <button
