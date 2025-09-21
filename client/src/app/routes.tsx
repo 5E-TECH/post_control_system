@@ -113,7 +113,7 @@ const AppRouters = () => {
               element: <TodayOrders />,
               children: [
                 {
-                  path: "order-view",
+                  path: ":id",
                   element: <Orderview />,
                 },
               ],
