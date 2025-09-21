@@ -23,7 +23,7 @@ const MailDetail = () => {
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
   const { mutate: sendCouriersToPost } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
+  const [initialized, setInitialized] = useState(false);
   // Dynamic fetching based on status
   const [params] = useSearchParams();
   const status = params.get("status");
@@ -46,15 +46,25 @@ const MailDetail = () => {
   const postData = data?.data;
 
   useEffect(() => {
-    if (postData) {
-      setSelectedIds(postData?.map((item: any) => item.id));
+    if (postData && !initialized) {
+      setSelectedIds(postData.map((item: any) => item.id));
+      setInitialized(true);
     }
-  }, [postData]);
+  }, [postData, initialized]);
 
   const [isShow, setIsShow] = useState(false);
   const [couriers, setCouriers] = useState<any[]>([]);
 
   const handleClick = (id: string) => {
+    if (selectedIds.length === 0) {
+      api.warning({
+        message: "Buyurtma tanlanmagan",
+        description: "Buyurtmani tanlab keyin jo'nata olasiz",
+        placement: "topRight",
+      });
+      return;
+    }
+
     sendAndGetCouriers(id as string, {
       onSuccess: (res) => {
         if (res?.data?.moreThanOneCourier) {
@@ -99,7 +109,6 @@ const MailDetail = () => {
       orderIds: selectedIds,
       courierId: selectedCourierId,
     };
-
     sendCouriersToPost(
       { id: id as string, data: post },
       {
