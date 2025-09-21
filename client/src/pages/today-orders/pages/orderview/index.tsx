@@ -1,25 +1,27 @@
-import { Edit, Trash } from 'lucide-react';
-import { memo, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import Search from '../../components/search';
-import phone from '../../../../shared/assets/order/detail.svg';
-import { useOrder } from '../../../../shared/api/hooks/useOrder';
-import { usePost } from '../../../../shared/api/hooks/usePost';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../../../../app/store';
+import { Edit, Trash } from "lucide-react";
+import { memo, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import Search from "../../components/search";
+import phone from "../../../../shared/assets/order/detail.svg";
+import { useOrder } from "../../../../shared/api/hooks/useOrder";
+import { usePost } from "../../../../shared/api/hooks/usePost";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 
 const OrderView = () => {
-  const {id} = useParams()
+  const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
   const navigate = useNavigate();
-  const [_, setOpenMenuId] = useState('');
+  const [_, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
+  console.log(user.role);
 
   const { getOrderByMarket, getMarketsByMyNewOrders } = useOrder();
   const { createPost } = usePost();
-  const { data, refetch } = user.role === "market" ? getMarketsByMyNewOrders(id) : getOrderByMarket(id);
+  const { data, refetch } =
+    user.role === "market" ? getMarketsByMyNewOrders() : getOrderByMarket(id);
 
   useEffect(() => {
     if (data?.data?.data) {
@@ -31,28 +33,29 @@ const OrderView = () => {
     e.stopPropagation();
   };
 
-    const hanlerDelet = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const hanlerDelet = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
   };
   const handleAccapted = () => {
-    console.log(selectedIds);
-    
     const newOrder = {
       order_ids: selectedIds,
     };
 
     createPost.mutate(newOrder, {
       onSuccess: () => {
-        refetch()
-        setSelectedIds([]);
-        navigate('/order/markets/new-orders');
+        if (selectedIds.length !== data?.data?.data.length) {
+          refetch();
+        } else {
+          setSelectedIds([]);
+          navigate("/order/markets/new-orders");
+        }
       },
     });
   };
 
   return (
     <div
-      onClick={() => setOpenMenuId('')}
+      onClick={() => setOpenMenuId("")}
       className="bg-white rounded-md m-5 dark:bg-[#312d4b]"
     >
       <Search />
@@ -60,26 +63,28 @@ const OrderView = () => {
         <table className="w-full">
           <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:text-[#E7E3FCE5] dark:bg-[#3d3759]">
             <tr>
-              <th>
-                <div className="flex items-center gap-10 ml-10">
-                  <input
-                    type="checkbox"
-                    checked={
-                      !!data?.data?.data &&
-                      selectedIds.length === data.data?.data?.length
-                    } // ✅ doim boolean
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedIds(
-                          data?.data?.data?.map((item: any) => item.id),
-                        ); // 🔄 hamma id yig‘iladi
-                      } else {
-                        setSelectedIds([]); // 🔄 bo‘shatib yuboriladi
-                      }
-                    }}
-                  />
-                </div>
-              </th>
+              {user.role !== "market" && (
+                <th>
+                  <div className="flex items-center gap-10 ml-10">
+                    <input
+                      type="checkbox"
+                      checked={
+                        !!data?.data?.data &&
+                        selectedIds.length === data.data?.data?.length
+                      } // ✅ doim boolean
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(
+                            data?.data?.data?.map((item: any) => item.id)
+                          ); // 🔄 hamma id yig‘iladi
+                        } else {
+                          setSelectedIds([]); // 🔄 bo‘shatib yuboriladi
+                        }
+                      }}
+                    />
+                  </div>
+                </th>
+              )}
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -149,7 +154,7 @@ const OrderView = () => {
                         setSelectedIds([...selectedIds, item.id]);
                       } else {
                         setSelectedIds(
-                          selectedIds.filter((id) => id !== item.id),
+                          selectedIds.filter((id) => id !== item.id)
                         );
                       }
                     }}
@@ -163,7 +168,7 @@ const OrderView = () => {
                   {item?.customer?.phone_number}
                 </td>
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.customer?.address?.split(' ').slice(0, 2).join(' ')}
+                  {item?.customer?.address?.split(" ").slice(0, 2).join(" ")}
                 </td>
 
                 <td className="pl-10">
@@ -180,8 +185,18 @@ const OrderView = () => {
                   {item?.items?.length}
                 </td>
                 <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    <button className='hover:text-red-600 cursor-pointer' onClick={hanlerDelet}><Trash/></button>
-                    <button className='hover:text-[#396ebe] cursor-pointer' onClick={hanlerUpdate}><Edit/></button>
+                  <button
+                    className="hover:text-red-600 cursor-pointer"
+                    onClick={hanlerDelet}
+                  >
+                    <Trash />
+                  </button>
+                  <button
+                    className="hover:text-[#396ebe] cursor-pointer"
+                    onClick={hanlerUpdate}
+                  >
+                    <Edit />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -281,8 +296,8 @@ const OrderView = () => {
             className={`px-2 py-1 ${
               !selectedIds ||
               (Array.isArray(selectedIds) && selectedIds.length === 0)
-                ? 'opacity-50 cursor-not-allowed'
-                : 'cursor-pointer'
+                ? "opacity-50 cursor-not-allowed"
+                : "cursor-pointer"
             } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}
           >
             Qabul qilish
