@@ -1,27 +1,25 @@
 import { Edit, Trash } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Search from '../../components/search';
 import phone from '../../../../shared/assets/order/detail.svg';
-import { useLocation } from 'react-router-dom';
 import { useOrder } from '../../../../shared/api/hooks/useOrder';
 import { usePost } from '../../../../shared/api/hooks/usePost';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../../app/store';
 
 const OrderView = () => {
+  const {id} = useParams()
+  const user = useSelector((state: RootState) => state.roleSlice);
   const navigate = useNavigate();
   const [_, setOpenMenuId] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  console.log(selectedIds);
 
-  const location = useLocation();
-  const market = location.state?.market;
-
-  const { getOrderByMarket } = useOrder();
+  const { getOrderByMarket, getMarketsByMyNewOrders } = useOrder();
   const { createPost } = usePost();
-  const { data, refetch } = getOrderByMarket(market);
-  console.log('market1', data);
+  const { data } = user.role === "market" ? getMarketsByMyNewOrders(id) : getOrderByMarket(id);
 
   useEffect(() => {
     if (data?.data?.data) {
@@ -37,6 +35,8 @@ const OrderView = () => {
     e.stopPropagation();
   };
   const handleAccapted = () => {
+    console.log(selectedIds);
+    
     const newOrder = {
       order_ids: selectedIds,
     };
@@ -44,7 +44,6 @@ const OrderView = () => {
     createPost.mutate(newOrder, {
       onSuccess: () => {
         setSelectedIds([]);
-        refetch();
         navigate('/order/markets/new-orders');
       },
     });

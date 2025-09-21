@@ -26,12 +26,13 @@ export const useMarket = () => {
       queryFn: () => api.get(`user/${id}`).then((res) => res.data),
     });
 
-  const getMarketsNewOrder = () =>
-    useQuery({
-      queryKey: [market],
-      queryFn: () =>
-        api.get("order/markets/new-orders").then((res) => res.data),
-    });
+  const getMarketsNewOrder = (enabled = true) =>
+  useQuery({
+    queryKey: [market],
+    queryFn: () =>
+      api.get("order/markets/new-orders").then((res) => res.data),
+    enabled,
+  });
   return {
     createMarket,
     getMarkets,

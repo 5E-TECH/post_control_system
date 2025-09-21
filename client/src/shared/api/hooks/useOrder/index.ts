@@ -31,7 +31,7 @@ export const useOrder = () => {
       queryFn: () => api.get("order", { params }).then((res) => res.data),
     });
 
-  const getOrderByMarket = (marketId: string, params?: any) =>
+  const getOrderByMarket = (marketId: string | undefined, params?: any) =>
     useQuery({
       queryKey: [order, marketId, params],
       queryFn: () =>
