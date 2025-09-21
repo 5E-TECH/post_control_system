@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
@@ -19,8 +19,12 @@ const borderColorsByStatus = {
 const TodayMails = () => {
   const navigate = useNavigate();
   const { getAllPosts } = usePost();
-  const { data } = getAllPosts("new");
+  const { data, refetch } = getAllPosts("new");
   const posts = Array.isArray(data?.data) ? data?.data : [];
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
   return (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts?.length ? (
