@@ -541,8 +541,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         // Statistikalarni vaqtincha yangilash
         post.post_total_price =
-          (post.post_total_price ?? 0) + (order.total_price ?? 0);
-        post.order_quantity = (post.order_quantity ?? 0) + 1;
+          Number(post.post_total_price ?? 0) + Number(order.total_price ?? 0);
+        post.order_quantity = Number(post.order_quantity ?? 0) + 1;
 
         // Agar bu post oldindan mavjud bo‘lsa → keyinroq saqlash uchun update ro‘yxatiga qo‘shamiz
         if (!newPosts.includes(post) && !postsToUpdate.includes(post)) {
