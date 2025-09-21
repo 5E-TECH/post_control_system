@@ -1,55 +1,61 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { Modal, Form, Input, Button, message } from 'antd';
 import { useProfile } from '../../../shared/api/hooks/useProfile';
-import { useDispatch, useSelector } from 'react-redux';
-import type { RootState } from '../../../app/store';
+import { useDispatch } from 'react-redux';
+// import type { RootState } from '../../../app/store';
 import { setEditing } from '../../../shared/lib/features/profile/profileEditSlice';
 
 interface EditProfileModalProps {
   open: boolean;
   onClose: () => void;
   user: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    phone_number: string;
+    name?: string;
+    password?: string;
+    phone_number?: string;
   };
   refetch: () => void;
 }
 
 interface FormValues {
-  first_name: string;
-  last_name: string;
-  phone_number: string;
+  name?: string;
+  phone_number?: string;
   password?: string;
 }
 
 const EditProfileModal = ({
   open,
   onClose,
-  user,
   refetch,
 }: EditProfileModalProps) => {
   const [form] = Form.useForm<FormValues>();
   const { updateProfil } = useProfile();
 
-  const data = useSelector((state: RootState) => state.profileEditSlice.value);
+  // const data = useSelector((state: RootState) => state.profileEditSlice.value);
   const dispatch = useDispatch();
+
   const handleSubmit = async (values: FormValues) => {
     try {
       await updateProfil.mutateAsync({
-        id: user.id,
         data: values,
+        id: '', // self update bo‘lsa backendda id kerak emas
       });
       message.success('Profil muvaffaqiyatli yangilandi!');
       dispatch(setEditing(null));
       refetch();
       onClose();
+      form.resetFields();
     } catch (error) {
       message.error('Xatolik yuz berdi, qayta urinib ko‘ring!');
       console.error(error);
     }
   };
+
+  // Modal ochilganda inputlarni bo‘shlab qo‘yish
+  useEffect(() => {
+    if (open) {
+      form.resetFields();
+    }
+  }, [open, form]);
 
   return (
     <Modal
@@ -58,21 +64,33 @@ const EditProfileModal = ({
       onCancel={onClose}
       footer={null}
       centered
-      destroyOnHidden
+      destroyOnClose
     >
       <Form
         form={form}
         layout="vertical"
         onFinish={handleSubmit}
         preserve={false}
-        initialValues={data || user}
       >
         <Form.Item
           label="Phone Number"
           name="phone_number"
-          rules={[{ required: true, message: 'Phone number majburiy!' }]}
         >
           <Input placeholder="Phone number" />
+        </Form.Item>
+
+        <Form.Item
+          label="Name"
+          name="name"
+        >
+          <Input placeholder="Name" />
+        </Form.Item>
+
+        <Form.Item
+          label="Password"
+          name="password"
+        >
+          <Input.Password placeholder="Password" />
         </Form.Item>
 
         <Form.Item>
