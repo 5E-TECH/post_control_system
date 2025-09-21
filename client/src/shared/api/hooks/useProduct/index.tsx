@@ -16,7 +16,7 @@ export const useProduct = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [product] }),
   });
 
-  const getProducts = (params?: { search: string }) =>
+  const getProducts = (params?: any) =>
     useQuery({
       queryKey: [product, params],
       queryFn: () => api.get("product", { params }).then((res) => res.data),
