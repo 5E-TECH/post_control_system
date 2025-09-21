@@ -51,10 +51,8 @@ const ChooseMarket = () => {
       return;
     }
 
-    localStorage.setItem("marketId", selectedMarket?.id);
-    navigate(`/orders/customer-info`, {
-      state: { market: selectedMarket },
-    });
+    localStorage.setItem("market", JSON.stringify(selectedMarket));
+    navigate(`/orders/customer-info`);
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);

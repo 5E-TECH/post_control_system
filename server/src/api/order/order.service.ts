@@ -611,6 +611,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             to_be_paid,
             paid_amount: to_be_paid,
             comment: finalComment,
+            sold_at: order.sold_at ?? Date.now(),
           });
           await queryRunner.manager.save(order);
         } else {
@@ -619,6 +620,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             to_be_paid,
             paid_amount: to_be_paid + marketCashbox.balance,
             comment: finalComment,
+            sold_at: order.sold_at ?? Date.now(),
           });
           await queryRunner.manager.save(order);
         }
@@ -627,6 +629,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           status: Order_status.SOLD,
           to_be_paid,
           comment: finalComment,
+          sold_at: order.sold_at ?? Date.now(),
         });
         await queryRunner.manager.save(order);
       }
@@ -849,6 +852,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         to_be_paid,
         comment: finalComment,
         product_quantity: soldProductQuantity,
+        sold_at: order.sold_at ?? Date.now(),
       });
       await queryRunner.manager.save(order);
 
@@ -1042,6 +1046,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // PARTLY_SOLD / PARTLY_CANCELLED → faqat status rollback
       order.status = Order_status.WAITING;
+      order.sold_at = null;
       await queryRunner.manager.save(order);
 
       await queryRunner.commitTransaction();
@@ -1083,7 +1088,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const soldAndPaid = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.updated_at BETWEEN :start AND :end', {
+        .where('o.sold_at BETWEEN :start AND :end', {
           start,
           end,
         })
@@ -1098,7 +1103,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const allSoldOrders = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.updated_at BETWEEN :start AND :end', {
+        .where('o.sold_at BETWEEN :start AND :end', {
           start,
           end,
         })

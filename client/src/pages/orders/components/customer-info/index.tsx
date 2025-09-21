@@ -66,7 +66,11 @@ const CustomerInfocomp = () => {
   );
 
   useEffect(() => {
-    setFormData(customerData as ICustomer);
+    if (customerData) {
+      setFormData(customerData as ICustomer);
+    } else {
+      setFormData(initialState);
+    }
   }, [customerData]);
 
   const { data } = getRegionsById(

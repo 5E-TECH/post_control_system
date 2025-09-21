@@ -53,6 +53,6 @@ export const useProduct = () => {
     getProducts,
     getProductsByMarket,
     deleteProduct,
-    getMyProducts
+    getMyProducts,
   };
 };

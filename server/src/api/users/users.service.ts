@@ -64,6 +64,8 @@ export class UserService {
     private readonly dataSource: DataSource,
   ) {}
 
+  // Test for CI/CD
+
   async onModuleInit() {
     try {
       const isSuperAdmin = await this.userRepo.findOne({
@@ -321,7 +323,11 @@ export class UserService {
       }
 
       const isExistClient = await queryRunner.manager.findOne(UserEntity, {
-        where: { phone_number, role: Roles.CUSTOMER },
+        where: {
+          phone_number,
+          role: Roles.CUSTOMER,
+          district_id: createCustomerDto.district_id,
+        },
         relations: ['customerLinks', 'customerLinks.market'],
       });
 
