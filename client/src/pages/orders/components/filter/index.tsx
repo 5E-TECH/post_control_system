@@ -6,7 +6,7 @@ import {
 } from "../../../../shared/static/order";
 import { ArrowRight } from "lucide-react";
 import Select from "../select/select"; // shu Select komponentni import qildik
-import { Button } from "antd";
+import { Button, DatePicker, Space } from "antd";
 import { useDispatch } from "react-redux";
 import { useProfile } from "../../../../shared/api/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -59,6 +59,14 @@ const Filter = () => {
       {item.label}
     </option>
   ));
+  
+
+  // const [range, setRange] = useState<[string, string] | null>(null);
+
+  // const onChange = (_: null, dateStrings: [string, string]) => {
+  //   setRange(dateStrings);
+  // };
+  // console.log(range);
 
   return (
     <div>
@@ -95,28 +103,10 @@ const Filter = () => {
         </Select>
       </div>
 
-      <div className="border-t w-full mt-5 flex pt-5 justify-between border-[#F6F7FB] dark:border-[#595572]">
-        <div className="flex gap-5">
-          <Select
-            name="from"
-            value={form.from}
-            onChange={handleChange}
-            placeholder="From"
-            className="w-[150px]"
-          >
-            {marketOptions}
-          </Select>
-
-          <Select
-            name="to"
-            value={form.to}
-            onChange={handleChange}
-            placeholder="To"
-            className="w-[180px]"
-          >
-            {regionOptions}
-          </Select>
-        </div>
+      <div className="border-t w-full flex pt-5 justify-between items-center border-[#F6F7FB] dark:border-[#595572]">
+        <Space direction="vertical" size={10}>
+          <DatePicker.RangePicker format="YYYY-MM-DD" />
+        </Space>
 
         <div className="flex items-center gap-3">
           <input
