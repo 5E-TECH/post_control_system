@@ -43,7 +43,7 @@ export default class Application {
     );
 
     // API prefix
-    const api = 'api/v1';
+    const api = 'v1';
     app.setGlobalPrefix(api);
 
     // Swagger konfiguratsiya
