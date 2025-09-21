@@ -22,12 +22,13 @@ const CustomerInfoOrder = () => {
   const customerData = useSelector(
     (state: RootState) => state.setCustomerData.customerData
   );
-  const market_id = localStorage.getItem("marketId") || "";
-
+  const market = JSON.parse(localStorage.getItem("market") ?? "null");
+  const market_id = market?.id;
   const { createUser } = useUser("customer");
   const navigate = useNavigate();
 
   const [api, contextHolder] = useNotification();
+
   const handleClick = () => {
     if (
       !customerData?.name ||
@@ -44,15 +45,16 @@ const CustomerInfoOrder = () => {
     }
 
     const customer = {
-      ...customerData,
+      phone_number: customerData?.phone_number,
+      district_id: customerData?.district_id,
+      name: customerData?.name,
+      address: customerData.address,
       market_id,
     };
     createUser.mutate(customer, {
       onSuccess: (res) => {
-        localStorage.setItem("customerId", res?.data?.data?.id);
-        navigate("/orders/confirm", {
-          state: { customerData },
-        });
+        localStorage.setItem("customer", JSON.stringify(res?.data?.data));
+        navigate("/orders/confirm");
       },
     });
   };
@@ -61,10 +63,6 @@ const CustomerInfoOrder = () => {
   const handleDiscard = () => {
     dispatch(setCustomerData(initialState));
   };
-
-  const { state } = useLocation();
-  const market = state?.market;
-  console.log(market);
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
   return (
@@ -86,11 +84,11 @@ const CustomerInfoOrder = () => {
             </span>
 
             <div className="flex flex-col">
-              <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
-                Market details
+              <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5] capitalize">
+                {market?.name}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap dark:text-[#AEAAC2]">
-                Enter your Market Details
+                {market?.phone_number}
               </span>
             </div>
           </div>
@@ -108,8 +106,8 @@ const CustomerInfoOrder = () => {
               <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
                 Customer Info
               </span>
-              <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
-                Setup information{" "}
+              <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2] text-nowrap">
+                Setup information
               </span>
             </div>
           </div>

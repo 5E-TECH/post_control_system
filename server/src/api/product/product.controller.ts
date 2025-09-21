@@ -12,6 +12,7 @@ import {
   HttpStatus,
   ValidationPipe,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -64,9 +65,17 @@ export class ProductController {
     schema: {
       type: 'object',
       properties: {
-        image: { type: 'string', format: 'binary', description: 'Product image file' },
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'Product image file',
+        },
         name: { type: 'string', example: 'Pepsi' },
-        market_id: { type: 'string', format: 'uuid', example: 'a79f9f6a-dc32-4fcb-a3c1-8dabc1c51e9b' },
+        market_id: {
+          type: 'string',
+          format: 'uuid',
+          example: 'a79f9f6a-dc32-4fcb-a3c1-8dabc1c51e9b',
+        },
         image_url: { type: 'string', example: '17123456789', nullable: true },
       },
       required: ['name'],
@@ -113,8 +122,18 @@ export class ProductController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get()
-  async findAll() {
-    return this.productService.findAll();
+  async findAll(
+    @Query('search') search?: string,
+    @Query('marketId') marketId?: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    return this.productService.findAll(
+      search,
+      marketId,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @ApiOperation({ summary: 'Get products by market id' })
@@ -132,8 +151,18 @@ export class ProductController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   @Get('/my-products')
-  async myProducts(@CurrentUser() user: JwtPayload) {
-    return this.productService.getMyProducts(user);
+  async myProducts(
+    @CurrentUser() user: JwtPayload,
+    @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.productService.getMyProducts(
+      user,
+      search,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @ApiOperation({ summary: 'Get product by id' })
@@ -146,14 +175,20 @@ export class ProductController {
     return this.productService.findOne(user, id);
   }
 
-  @ApiOperation({ summary: 'Update product (admin/registrator) with optional image' })
+  @ApiOperation({
+    summary: 'Update product (admin/registrator) with optional image',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'id', description: 'Product ID' })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        image: { type: 'string', format: 'binary', description: 'New product image (optional)' },
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'New product image (optional)',
+        },
         name: { type: 'string', example: 'Pepsi Max 1L', nullable: true },
         image_url: { type: 'string', example: '17123456789', nullable: true },
       },
@@ -202,7 +237,11 @@ export class ProductController {
     schema: {
       type: 'object',
       properties: {
-        image: { type: 'string', format: 'binary', description: 'New product image (optional)' },
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'New product image (optional)',
+        },
         name: { type: 'string', nullable: true },
         image_url: { type: 'string', nullable: true },
       },

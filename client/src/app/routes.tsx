@@ -131,12 +131,12 @@ const AppRouters = () => {
                 {
                   path: "customer/detail",
                   element: <OrderDetail />,
-                }
+                },
+                {
+                  path: "order-detail/:id",
+                  element: <OrderDetails />,
+                },
               ],
-            },
-            {
-              path: "order-detail",
-              element: <OrderDetails />,
             },
             {
               path: "courier-orders",
@@ -219,7 +219,7 @@ const AppRouters = () => {
             {
               path: "products",
               element: <Products />,
-              children: [{ path: "create", element: <ProductCreate /> }],
+              children: [{ path: "create/:id", element: <ProductCreate /> }],
             },
             { path: "send-message", element: <SendMessage /> },
             { path: "m-balance", element: <BalanceDashboard /> },

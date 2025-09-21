@@ -53,7 +53,10 @@ export class OrderController {
   @ApiOperation({ summary: 'List orders with filters' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'marketId', required: false })
+  @ApiQuery({ name: 'regionId', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Orders list' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -63,9 +66,19 @@ export class OrderController {
   findAll(
     @Query('status') status?: string,
     @Query('marketId') marketId?: string,
+    @Query('regionId') regionId?: string,
     @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.orderService.allOrders({ status, marketId, search });
+    return this.orderService.allOrders({
+      status,
+      marketId,
+      regionId,
+      search,
+      page,
+      limit,
+    });
   }
 
   @ApiOperation({ summary: 'Markets with new orders' })
@@ -73,17 +86,23 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('markets/new-orders')
-  haveNewOrdersMarket() {
-    return this.orderService.haveNewOrderMarkets();
+  haveNewOrdersMarket(@Query('search') search?: string) {
+    return this.orderService.haveNewOrderMarkets(search);
   }
 
   @ApiOperation({ summary: 'My new orders (market)' })
-  @ApiResponse({ status: 200, description: 'List of new orders for current market' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of new orders for current market',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   @Get('market/my-new-orders')
-  myNewOrders(@CurrentUser() user: JwtPayload) {
-    return this.orderService.myNewOrders(user);
+  myNewOrders(
+    @CurrentUser() user: JwtPayload,
+    @Query('search') search?: string,
+  ) {
+    return this.orderService.myNewOrders(user, search);
   }
 
   @ApiOperation({ summary: 'New orders by market id' })
@@ -92,8 +111,13 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('market/:id')
-  newOrdersByMarketId(@Param('id') id: string) {
-    return this.orderService.newOrdersByMarketId(id);
+  newOrdersByMarketId(
+    @Param('id') id: string,
+    @Query('search') search?: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.orderService.newOrdersByMarketId(id, search, page, limit);
   }
 
   @ApiOperation({ summary: 'Get order by id' })
@@ -121,12 +145,16 @@ export class OrderController {
 
   @ApiOperation({ summary: 'Receive new orders' })
   @ApiBody({ type: OrdersArrayDto })
+  @ApiQuery({ name: 'search', required: false })
   @ApiResponse({ status: 200, description: 'Orders received' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('receive')
-  receiveNewOrders(@Body() ordersArray: OrdersArrayDto) {
-    return this.orderService.receiveNewOrders(ordersArray);
+  receiveNewOrders(
+    @Body() ordersArray: OrdersArrayDto,
+    @Query('search') search?: string,
+  ) {
+    return this.orderService.receiveNewOrders(ordersArray, search);
   }
 
   @ApiOperation({ summary: 'All orders for market' })

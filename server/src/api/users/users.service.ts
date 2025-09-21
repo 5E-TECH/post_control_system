@@ -64,6 +64,8 @@ export class UserService {
     private readonly dataSource: DataSource,
   ) {}
 
+  // Test for CI/CD
+
   async onModuleInit() {
     try {
       const isSuperAdmin = await this.userRepo.findOne({
@@ -321,7 +323,11 @@ export class UserService {
       }
 
       const isExistClient = await queryRunner.manager.findOne(UserEntity, {
-        where: { phone_number, role: Roles.CUSTOMER },
+        where: {
+          phone_number,
+          role: Roles.CUSTOMER,
+          district_id: createCustomerDto.district_id,
+        },
         relations: ['customerLinks', 'customerLinks.market'],
       });
 
@@ -392,9 +398,11 @@ export class UserService {
     search?: string;
     status?: string;
     role?: string;
+    page?: number;
+    limit?: number;
   }): Promise<object> {
     try {
-      const { search, status, role } = filters;
+      const { search, status, role, page = 1, limit = 10 } = filters;
 
       const qb = this.userRepo
         .createQueryBuilder('user')
@@ -421,28 +429,72 @@ export class UserService {
         qb.andWhere('user.role = :role', { role });
       }
 
-      const allUsers = await qb.getMany();
-      return successRes(allUsers, 200, 'All users');
+      const [users, total] = await qb
+        .orderBy('user.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return successRes(
+        {
+          data: users,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All users',
+      );
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async allMarkets(): Promise<object> {
+  async allMarkets(
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<object> {
     try {
-      const allMarkets = await this.userRepo.find({
-        where: { role: Roles.MARKET },
-        select: [
-          'id',
-          'name',
-          'phone_number',
-          'status',
-          'created_at',
-          'add_order',
-        ],
-        relations: ['cashbox'],
-      });
-      return successRes(allMarkets, 200, 'All markets');
+      const query = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.cashbox', 'cashbox')
+        .where('user.role = :role', { role: Roles.MARKET })
+        .select([
+          'user.id',
+          'user.name',
+          'user.phone_number',
+          'user.status',
+          'user.created_at',
+          'user.add_order',
+          'cashbox', // cashboxni to‘liq olish uchun
+        ]);
+
+      if (search) {
+        query.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🟢 Pagination
+      const skip = (page - 1) * limit;
+      query.skip(skip).take(limit);
+
+      const [data, total] = await query.getManyAndCount();
+
+      return successRes(
+        {
+          data,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All markets',
+      );
     } catch (error) {
       return catchError(error);
     }

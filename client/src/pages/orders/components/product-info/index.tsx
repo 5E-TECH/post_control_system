@@ -6,13 +6,13 @@ import type { RootState } from "../../../../app/store";
 
 export interface IProductInfo {
   total_price: number | string;
-  where_deliver: string | undefined;
+  where_deliver: string;
   comment?: string;
 }
 
 const initialState: IProductInfo = {
   total_price: "",
-  where_deliver: undefined,
+  where_deliver: "center",
   comment: "",
 };
 
@@ -36,12 +36,15 @@ const ProductInfo = () => {
   );
 
   useEffect(() => {
+    const cleanedPrice = Number(
+      String(formData.total_price).split(",").join("")
+    );
     const data = {
       ...formData,
-      total_price: Number(formData.total_price) || 0,
+      total_price: Number(cleanedPrice) || 0,
     };
     dispatch(setProductInfo(data));
-  }, [formData]);
+  }, [formData, dispatch]);
 
   useEffect(() => {
     if (productInfo === null) {
@@ -52,57 +55,67 @@ const ProductInfo = () => {
   return (
     <div className="bg-[#ffffff] shadow-lg rounded-md dark:bg-[#312D48] ">
       <div className="">
-        <div className="p-5">
+        <div className="px-5 pt-6 pb-3">
           <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#CBC7E1]">
             Product Information
           </h1>
         </div>
 
         <div className="flex gap-5 px-5">
-          <Form.Item>
-            <Input
-              name="total_price"
-              value={formData.total_price}
-              onChange={(e) => {
-                const rawValue = e.target.value.replace(/\D/g, "");
-                const formatted = new Intl.NumberFormat("uz-UZ").format(
-                  Number(rawValue || 0)
-                );
+          <div className="flex flex-col">
+            <span className="font-normal text-[14px] text-[#2E263DB2] dark:text-[#B1ADC7]">
+              Umumiy summa
+            </span>
+            <Form.Item className="!mt-1">
+              <Input
+                name="total_price"
+                value={formData.total_price}
+                onChange={(e) => {
+                  const rawValue = e.target.value.replace(/\D/g, "");
+                  const formatted = new Intl.NumberFormat("uz-UZ").format(
+                    Number(rawValue || 0)
+                  );
 
-                handleChange({
-                  ...e,
-                  target: {
-                    ...e.target,
-                    name: "total_price",
-                    value: formatted,
-                  },
-                } as any);
-              }}
-              type="text"
-              placeholder="Total Price"
-              className="!w-[615px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! 
-               dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
-            />
-          </Form.Item>
+                  handleChange({
+                    ...e,
+                    target: {
+                      ...e.target,
+                      name: "total_price",
+                      value: formatted,
+                    },
+                  } as any);
+                }}
+                type="text"
+                placeholder="Total Price"
+                className="!w-[639px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! 
+         dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+              />
+            </Form.Item>
+          </div>
 
-          <Form.Item>
-            <Select
-              value={formData.where_deliver}
-              onChange={(value) => handleSelectChange("where_deliver", value)}
-              placeholder="Select delivery place"
-              className="!w-[615px] !h-[48px] custom-select-dropdown-bright"
-              defaultValue={"center"}
-              dropdownClassName="dark-dropdown"
-            >
-              <Select.Option value="center">center</Select.Option>
-              <Select.Option value="address">address</Select.Option>
-            </Select>
-          </Form.Item>
+          <div className="flex flex-col">
+            <span className="font-normal text-[14px] text-[#2E263DB2] dark:text-[#B1ADC7]">
+              Yetkazib berish
+            </span>
+            <Form.Item className="!mt-1">
+              <Select
+                value={formData.where_deliver}
+                onChange={(value) => handleSelectChange("where_deliver", value)}
+                placeholder="Select delivery place"
+                className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
+                defaultValue={"center"}
+                dropdownClassName="dark-dropdown"
+              >
+                <Select.Option value="center">center</Select.Option>
+                <Select.Option value="address">address</Select.Option>
+              </Select>
+            </Form.Item>
+          </div>
         </div>
 
         <div className="px-5 pb-1.5">
           <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
-            Comment (Optional)
+            Izoh (ixtiyoriy)
           </span>
           <Form.Item className="!mt-1">
             <Input.TextArea

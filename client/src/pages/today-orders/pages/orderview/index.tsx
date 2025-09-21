@@ -1,4 +1,4 @@
-import { EllipsisVertical } from 'lucide-react';
+import { Edit, Trash } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Search from '../../components/search';
@@ -7,10 +7,9 @@ import { useLocation } from 'react-router-dom';
 import { useOrder } from '../../../../shared/api/hooks/useOrder';
 import { usePost } from '../../../../shared/api/hooks/usePost';
 
-
 const OrderView = () => {
   const navigate = useNavigate();
-  const [openMenuId, setOpenMenuId] = useState('');
+  const [_, setOpenMenuId] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
@@ -22,13 +21,21 @@ const OrderView = () => {
   const { getOrderByMarket } = useOrder();
   const { createPost } = usePost();
   const { data, refetch } = getOrderByMarket(market);
+  console.log('market1', data);
 
   useEffect(() => {
-    if (data?.data) {
-      setSelectedIds(data.data.map((item: any) => item.id));
+    if (data?.data?.data) {
+      setSelectedIds(data.data?.data?.map((item: any) => item.id));
     }
   }, [data]);
 
+  const hanlerUpdate = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+  };
+
+    const hanlerDelet = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+  };
   const handleAccapted = () => {
     const newOrder = {
       order_ids: selectedIds,
@@ -58,17 +65,19 @@ const OrderView = () => {
                   <input
                     type="checkbox"
                     checked={
-                      !!data?.data && selectedIds.length === data.data.length
+                      !!data?.data?.data &&
+                      selectedIds.length === data.data?.data?.length
                     } // ✅ doim boolean
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds(data?.data.map((item: any) => item.id)); // 🔄 hamma id yig‘iladi
+                        setSelectedIds(
+                          data?.data?.data?.map((item: any) => item.id),
+                        ); // 🔄 hamma id yig‘iladi
                       } else {
                         setSelectedIds([]); // 🔄 bo‘shatib yuboriladi
                       }
                     }}
                   />
-                  {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div> */}
                 </div>
               </th>
               <th>
@@ -95,12 +104,7 @@ const OrderView = () => {
                   <span>ADDRESS</span>
                 </div>
               </th>
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>MARKET</span>
-                </div>
-              </th>
+
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -129,7 +133,7 @@ const OrderView = () => {
             </tr>
           </thead>
           <tbody className="cursor-pointer">
-            {data?.data?.map((item: any, inx: number) => (
+            {data?.data?.data?.map((item: any, inx: number) => (
               <tr
                 key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
@@ -161,9 +165,7 @@ const OrderView = () => {
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
                   {item?.customer?.address?.split(' ').slice(0, 2).join(' ')}
                 </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  bi1
-                </td>
+
                 <td className="pl-10">
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}
@@ -175,28 +177,11 @@ const OrderView = () => {
                   {item?.total_price} UZS
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.product_quantity}
+                  {item?.items?.length}
                 </td>
                 <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenMenuId(openMenuId === item.id ? null : item.id);
-                    }}
-                  >
-                    <EllipsisVertical />
-                  </button>
-
-                  {openMenuId === item.id && (
-                    <div className="absolute right-0 mt-2 w-28 bg-white border shadow-md rounded-md z-10">
-                      <button className="block w-full text-left px-4 py-2 hover:bg-gray-100">
-                        Edit
-                      </button>
-                      <button className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-red-500">
-                        Delete
-                      </button>
-                    </div>
-                  )}
+                    <button className='hover:text-red-600 cursor-pointer' onClick={hanlerDelet}><Trash/></button>
+                    <button className='hover:text-[#396ebe] cursor-pointer' onClick={hanlerUpdate}><Edit/></button>
                 </td>
               </tr>
             ))}

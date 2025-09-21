@@ -5,66 +5,59 @@ import {
   Eye,
   Trash,
 } from "lucide-react";
-import { memo, type FC, useState, useEffect } from "react";
-import { Spin } from "antd";
+import { memo, type FC } from "react";
 import superImg from "../../../../shared/assets/users/super.svg";
+import TableSkeleton from "../../../orders/components/ordersTabelSkeleton/ordersTableSkeleton";
 
 interface Props {
   data: any[];
+  isLoading: boolean;
 }
 
-const UsersTableComp: FC<Props> = ({ data }) => {
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
+const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
   return (
     <div className="pt-[21px]">
-      <Spin spinning={loading} tip="Loading Users...">
-        <table>
-          <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
-            <tr>
-              <th className="p-[20px] flex items-center">
-                <input
-                  type="checkbox"
-                  className="w-[18px] h-[18px] rounded-sm"
-                />
-              </th>
-              <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                <div className="flex items-center justify-between pr-[21px]">
-                  NAME
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                </div>
-              </th>
-              <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                <div className="flex items-center justify-between pr-[21px]">
-                  PHONE
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                </div>
-              </th>
-              <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                <div className="flex items-center justify-between pr-[21px]">
-                  ROLE
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                </div>
-              </th>
-              <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                <div className="flex items-center justify-between pr-[21px]">
-                  STATUS
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                </div>
-              </th>
-              <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                <div className="flex items-center justify-between pr-[21px]">
-                  ACTION
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                </div>
-              </th>
-            </tr>
-          </thead>
+      <table>
+        <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
+          <tr>
+            <th className="p-[20px] flex items-center">
+              <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
+            </th>
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <div className="flex items-center justify-between pr-[21px]">
+                NAME
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <div className="flex items-center justify-between pr-[21px]">
+                PHONE
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <div className="flex items-center justify-between pr-[21px]">
+                ROLE
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <div className="flex items-center justify-between pr-[21px]">
+                STATUS
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
+            <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+              <div className="flex items-center justify-between pr-[21px]">
+                ACTION
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        {isLoading ? (
+          <TableSkeleton rows={10} columns={5} />
+        ) : (
           <tbody>
             {data?.map((user: any) => (
               <tr key={user?.id}>
@@ -123,8 +116,8 @@ const UsersTableComp: FC<Props> = ({ data }) => {
               </tr>
             ))}
           </tbody>
-        </table>
-      </Spin>
+        )}
+      </table>
       <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
         <div className="flex items-center">
           <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">

@@ -1,5 +1,5 @@
-import { FilePlus, Search, Send, X } from "lucide-react";
-import { memo, useState } from "react";
+import { FilePlus, Search, X } from "lucide-react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Popup from "../../shared/ui/Popup";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
@@ -7,24 +7,43 @@ import ProductView from "../../shared/components/product-view";
 import { useProduct } from "../../shared/api/hooks/useProduct";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { debounce } from "../../shared/helpers/DebounceFunc";
 
 const Products = () => {
   const [showMarket, setShowMarket] = useState(false);
+  const [select, setSelect] = useState<string | null>("");
+  const [searchProduct, setSearchProduct] = useState<any>(null);
+
+  console.log("search input   ",searchProduct);
+  
+
+  const { id, role } = useSelector((state: RootState) => state.roleSlice);
+  useEffect(() => {
+    if (role === "market") {
+      setSelect(id);
+    }
+  }, [role, id]);
 
   const navigate = useNavigate();
 
-  const { id, role } = useSelector((state: RootState) => state.roleSlice);
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSearchProduct(value);
+      }, 800),
+    []
+  );
 
-  console.log(role, id);
 
-  const handleProps = (market: any) => {
-    navigate("create", { state: { market } });
-    setShowMarket(false)
+  const handleNavigate = () => {
+    navigate(`create/${select}`);
+    setSelect("");
+    setShowMarket(false);
   };
 
   const { getProducts, getMyProducts } = useProduct();
   const { data: productData } =
-  role === "market" ? getMyProducts() : getProducts();
+    role === "market" ? getMyProducts({ search: searchProduct }) : getProducts({ search: searchProduct });
 
   const { getMarkets } = useMarket();
 
@@ -35,42 +54,38 @@ const Products = () => {
   if (pathname.startsWith("/products/create")) return <Outlet />;
   return (
     <div className="mt-6">
+      <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
       <div className="flex flex-col md:flex-row gap-3 md:gap-0 md:items-center md:justify-between px-4">
         <input
+          onChange={(e) => debouncedSearch(e.target.value)}
           className="rounded-[7px] w-full md:w-[280px] h-[40px] border border-[#2E263D38] px-3"
           placeholder="Search"
           type="text"
         />
 
         <div className="flex items-center gap-3">
-          <button className="flex items-center justify-center gap-2 border w-[104px] h-[38px] border-[#8A8D93] rounded">
-            <Send size={16} />
-            Export
-          </button>
-
           <button
             onClick={() => {
               if (role === "market") {
-                // Reduxdan kelgan id va role ni handleProps ga yuboramiz
-                handleProps({ id, role });
+                handleNavigate();
               } else {
-                setShowMarket(true); // popup ochiladi
+                setShowMarket(true);
               }
             }}
-            className="w-[146px] h-[38px] bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
+            className="px-4 py-2 bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
           >
             <FilePlus size={18} />
-            Add Product
+            Mahsulot qo'shish
           </button>
           <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
-            <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d]">
+            <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d] relative">
               <button
                 onClick={() => setShowMarket(false)}
-                className="cursor-pointer bg-red-600 hover:bg-red-700 text-white p-2 rounded- ml-111 flex items-center justify-center shadow-md"
+                className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
               >
-                <X size={18} />
+                <X size={30} />
               </button>
-              <h1 className="font-bold text-left">Choose Market</h1>
+              <h1 className="font-bold text-left pt-8">Choose Market</h1>
               <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
                 <input
                   type="text"
@@ -98,13 +113,15 @@ const Products = () => {
                   </thead>
 
                   <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                    {data?.data &&
-                      Array.isArray(data.data) &&
-                      data.data.map((item: any, inx: number) => (
+                    {data?.data?.data &&
+                      Array.isArray(data?.data?.data) &&
+                      data?.data?.data?.map((item: any, inx: number) => (
                         <tr
                           key={item?.id}
-                          className="border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal"
-                          onClick={() => handleProps(item)}
+                          onClick={() => setSelect(item?.id)}
+                          className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                            item.id == select ? "bg-gray-100" : ""
+                          }`}
                         >
                           <td className="text-[#8C57FF] pr-10 py-3">
                             {inx + 1}
@@ -115,9 +132,12 @@ const Products = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="pl-89 py-2">
-                <button className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer">
-                  Selected
+              <div className="absolute bottom-4 right-4">
+                <button
+                  onClick={() => handleNavigate()}
+                  className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
+                >
+                  Tanlash
                 </button>
               </div>
             </div>
@@ -125,7 +145,7 @@ const Products = () => {
         </div>
       </div>
       <div>
-        <ProductView data={productData} />
+        <ProductView data={productData?.data?.items} />
       </div>
     </div>
   );

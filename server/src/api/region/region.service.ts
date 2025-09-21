@@ -39,7 +39,10 @@ export class RegionService implements OnModuleInit {
 
   async findOneById(id: string) {
     try {
-      const region = await this.regionRepository.findOne({ where: { id } });
+      const region = await this.regionRepository.findOne({
+        where: { id },
+        relations: ['districts'],
+      });
       if (!region) {
         throw new NotFoundException('Region topilmadi');
       }

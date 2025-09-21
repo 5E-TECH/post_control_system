@@ -27,22 +27,24 @@ export const useOrder = () => {
 
   const getOrders = (params?: any) =>
     useQuery({
-      queryKey: [order],
+      queryKey: [order, params],
       queryFn: () => api.get("order", { params }).then((res) => res.data),
     });
 
-  const getOrderByMarket = (marketId: string) =>
+  const getOrderByMarket = (marketId: string, params?: any) =>
     useQuery({
-      queryKey: [order, marketId],
+      queryKey: [order, marketId, params],
       queryFn: () =>
-        api.get(`order/market/${marketId}`).then((res) => res.data),
+        api.get(`order/market/${marketId}`, { params }).then((res) => res.data),
     });
 
-  const getMarketsByMyNewOrders = () =>
+  const getMarketsByMyNewOrders = (params?: any) =>
     useQuery({
-      queryKey: [order],
+      queryKey: [order, params],
       queryFn: () =>
-        api.get("order/market/my-new-orders").then((res) => res.data),
+        api
+          .get("order/market/my-new-orders", { params })
+          .then((res) => res.data),
     });
 
   const getCourierOrders = (params?: any) =>
@@ -52,13 +54,29 @@ export const useOrder = () => {
         api.get("order/courier/orders", { params }).then((res) => res.data),
     });
 
+  const deleteOrders = useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`order/${id}`).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
+  const updateOrders = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      api.patch(`order/${id}`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
   return {
     createOrder,
+    updateOrders,
     sellOrder,
     cancelOrder,
     getOrders,
     getOrderByMarket,
     getCourierOrders,
     getMarketsByMyNewOrders,
+    deleteOrders,
   };
 };

@@ -16,23 +16,23 @@ export const useProduct = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [product] }),
   });
 
-  const getProducts = () =>
+  const getProducts = (params?: any) =>
     useQuery({
-      queryKey: [product],
-      queryFn: () => api.get("product").then((res) => res.data),
+      queryKey: [product, params],
+      queryFn: () => api.get("product", { params }).then((res) => res.data),
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
 
-  const getMyProducts = () =>
+  const getMyProducts = (params?: { search: string }) =>
     useQuery({
-      queryKey: [product],
-      queryFn: () => api.get("product/my-products").then((res) => res.data),
+      queryKey: [product, params],
+      queryFn: () => api.get("product/my-products", { params }).then((res) => res.data),
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
 
-  const getProductsByMarket = (marketId: string) =>
+  const getProductsByMarket = (marketId: string | undefined) =>
     useQuery({
       queryKey: [product, marketId],
       queryFn: () =>
@@ -42,7 +42,7 @@ export const useProduct = () => {
     });
 
   const deleteProduct = useMutation({
-    mutationFn: (id: number) => api.delete(`product/${id}`),
+    mutationFn: (id: string | undefined) => api.delete(`product/${id}`),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: [product] });
     },
@@ -53,6 +53,6 @@ export const useProduct = () => {
     getProducts,
     getProductsByMarket,
     deleteProduct,
-    getMyProducts
+    getMyProducts,
   };
 };

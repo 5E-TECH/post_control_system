@@ -31,7 +31,6 @@ const Payments = () => {
     navigate(`cash-detail/${select}`);
     setSelect(null);
     setShowMarket(false);
-    select;
     setShowCurier(false);
   };
 
@@ -99,7 +98,7 @@ const Payments = () => {
                 </thead>
 
                 <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                  {data?.data?.map((item: any, inx: number) => (
+                  {data?.data?.data?.map((item: any, inx: number) => (
                     <tr
                       key={item?.id}
                       onClick={() => setSelect(item?.id)}
@@ -213,17 +212,6 @@ const Payments = () => {
                 </thead>
 
                 <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                  {Array.from({ length: 20 }).map((item: any, inx: number) => (
-                    <tr
-                      key={inx}
-                      // onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal`}
-                    >
-                      <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                      <td className="pr-26 py-3">Diyorbek</td>
-                      <td className="pr-10 py-3">{item?.region?.name}</td>
-                    </tr>
-                  ))}
                   {courierData?.data.map((item: any, inx: number) => (
                     <tr
                       key={inx}
