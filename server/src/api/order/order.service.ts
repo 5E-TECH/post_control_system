@@ -261,7 +261,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async myNewOrders(user: JwtPayload, search?: string) {
+  async myNewOrders(
+    user: JwtPayload,
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     try {
       const query = this.orderRepo
         .createQueryBuilder('order')
@@ -279,9 +284,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const myNewOrders = await query.getMany();
+      const [orders, total] = await query
+        .orderBy('order.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
 
-      return successRes(myNewOrders, 200, 'My new orders');
+      return successRes(
+        {
+          data: orders,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'My new orders',
+      );
     } catch (error) {
       return catchError(error);
     }

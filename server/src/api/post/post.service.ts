@@ -192,32 +192,60 @@ export class PostService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     try {
-      const post = await this.postRepo.findOne({ where: { id } }); // Berilgan id bo'yicha post mavjudligini tekshiramiz
-      if (!post) {
-        throw new NotFoundException('Post not found');
-      }
+      const post = await this.postRepo.findOne({ where: { id } });
+      if (!post) throw new NotFoundException('Post not found');
+
       const { orderIds, courierId } = sendPostDto;
+
       const isExistCourier = await this.userRepo.findOne({
         where: { id: courierId, role: Roles.COURIER },
       });
-      if (!isExistCourier) {
-        throw new NotFoundException('Courier not found');
-      }
-      let total_price = post.post_total_price; // agar orderIds berilmasa, oldingi qiymatlarni saqlab turamiz
-      let quantity = post.order_quantity;
-      const orders = await this.orderRepo.findBy({ id: In(orderIds) });
-      if (orderIds.length > 0 && orders.length !== quantity) {
-        total_price = orders.reduce((acc, o) => acc + o.total_price, 0);
-        quantity = orders.length;
-      }
-      if (orderIds.length === 0) {
+      if (!isExistCourier) throw new NotFoundException('Courier not found');
+
+      if (!orderIds || orderIds.length === 0) {
         throw new BadRequestException('You can not send empty post');
       }
-      for (const order of orders) {
-        order.status = Order_status.ON_THE_ROAD; // Har bir orderni shu postga bo'glash
+
+      // 1. Post ichidagi barcha orderlarni olish
+      const oldOrders = await this.orderRepo.find({
+        where: { post_id: id },
+      });
+
+      // 2. DTO dan kelgan orderlarni olish
+      const newOrders = await this.orderRepo.findBy({ id: In(orderIds) });
+
+      if (newOrders.length !== orderIds.length) {
+        throw new BadRequestException('Some orders not found');
+      }
+
+      // 3. Eski post ichidagi, lekin DTO da bo‘lmagan orderlarni ajratib olish
+      const removedOrders = oldOrders.filter((o) => !orderIds.includes(o.id));
+
+      // 4. DTO ichidagi orderlarni update qilish
+      for (const order of newOrders) {
+        order.status = Order_status.ON_THE_ROAD;
         await queryRunner.manager.save(order);
       }
+
+      // 5. DTO ichida bo‘lmagan orderlarni null qilish
+      for (const order of removedOrders) {
+        order.post_id = null;
+        order.status = Order_status.RECEIVED; // yoki siz xohlagan default status
+        await queryRunner.manager.save(order);
+      }
+
+      // 6. Post ichidagi jami narx va quantity qaytadan hisoblash
+      const updatedOrders = await this.orderRepo.find({
+        where: { post: { id: post.id } },
+      });
+
+      const total_price = updatedOrders.reduce(
+        (acc, o) => acc + o.total_price,
+        0,
+      );
+      const quantity = updatedOrders.length;
 
       Object.assign(post, {
         courier_id: courierId,
@@ -225,10 +253,11 @@ export class PostService {
         order_quantity: quantity,
         status: Post_status.SENT,
       });
+
       const updatedPost = await queryRunner.manager.save(post);
 
       await queryRunner.commitTransaction();
-      return successRes(updatedPost, 200, 'Post updated');
+      return successRes(updatedPost, 200, 'Post updated successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
