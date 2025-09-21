@@ -55,7 +55,11 @@ export const usePost = () => {
     useMutation({
       mutationFn: ({ id, data }: { id: string; data: any }) =>
         api.patch(`post/${id}`, data).then((res) => res.data),
-      onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+      onSuccess: () =>
+        client.invalidateQueries({
+          queryKey: [post],
+          refetchType: "active",
+        }),
     });
 
   const receivePost = () =>
