@@ -10,7 +10,7 @@ const Context = createContext({ name: "Default" });
 
 const CancelledOrders = () => {
   const { getCourierOrders } = useOrder();
-  const { mutate: cancelPost } = usePost().canceledPost();
+  const { mutate: cancelPost, isPending } = usePost().canceledPost();
   const { data, refetch } = getCourierOrders({ status: "cancelled" });
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -91,11 +91,14 @@ const CancelledOrders = () => {
                     type="checkbox"
                     className="w-[18px] h-[18px] rounded-sm"
                     checked={
-                      !!data?.data?.data && selectedIds.length === data?.data?.data?.length
+                      !!data?.data?.data &&
+                      selectedIds.length === data?.data?.data?.length
                     }
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds(data?.data?.data?.map((item: any) => item.id));
+                        setSelectedIds(
+                          data?.data?.data?.map((item: any) => item.id)
+                        );
                       } else {
                         setSelectedIds([]);
                       }
@@ -242,6 +245,8 @@ const CancelledOrders = () => {
 
         <div className="flex justify-end px-5">
           <Button
+            disabled={isPending}
+            loading={isPending}
             onClick={handleClick}
             className="w-[180px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!"
           >

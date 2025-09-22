@@ -5,12 +5,21 @@ import { NavLink, Outlet } from "react-router-dom";
 const CreateUser = () => {
   return (
     <div className="flex max-[1500px]:flex-col dark:bg-[#312D4B]">
-      <div className="w-[50%] px-[60px] py-[40px] overflow-y-auto max-h-screen max-[1500px]:w-full max-[1500px]:max-h-none max-[1500px]:overflow-visible">
-        <h1 className="font-medium text-[24px] text-[#000000] text-center mt-[20px] dark:text-[#ffffff] max-[1500px]:text-center max-lg:text-[20px]">
+      <div
+        className="w-[50%] px-[60px] py-[90px] overflow-y-auto max-h-screen 
+                  max-[1500px]:w-full max-[1500px]:max-h-none max-[1500px]:overflow-visible"
+      >
+        <h1
+          className="font-medium text-[24px] text-[#000000] text-center mt-[20px] 
+                   dark:text-[#ffffff] max-[1500px]:text-center max-lg:text-[20px]"
+        >
           Foydalanuvchi rolini tanlang
         </h1>
 
-        <div className="flex flex-col items-center gap-[30px] mt-[60px] max-[1500px]:flex-row max-[1500px]:flex-wrap max-[1500px]:justify-center">
+        <div
+          className="flex flex-col items-center gap-[30px] mt-[60px] 
+                    max-[1500px]:flex-row max-[1500px]:flex-wrap max-[1500px]:justify-center"
+        >
           <NavLink
             end
             className={({ isActive }) =>
@@ -67,8 +76,14 @@ const CreateUser = () => {
         </div>
       </div>
 
-      <div className="w-[50%] px-[60px] py-[180px] sticky top-0 max-h-screen overflow-y-auto max-[1500px]:w-full max-[1500px]:top-auto max-[1500px]:py-[40px]">
-        <Outlet />
+      <div
+        className="w-[50%] px-[60px] py-[180px] sticky top-0 max-h-screen overflow-y-auto 
+                  max-[1500px]:w-full max-[1500px]:top-auto max-[1500px]:py-[40px] 
+                  flex max-[1500px]:justify-center"
+      >
+        <div className="w-full max-w-[400px]">
+          <Outlet />
+        </div>
       </div>
     </div>
   );

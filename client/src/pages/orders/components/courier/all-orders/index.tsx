@@ -208,12 +208,16 @@ const AllOrders = () => {
                   {item?.status === "waiting" ? (
                     <div className="flex gap-3">
                       <Button
+                        disabled={sellOrder.isPending}
+                        loading={sellOrder.isPending}
                         onClick={() => handleSellOrder(item?.id)}
                         className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                       >
                         Sotish
                       </Button>
                       <Button
+                        disabled={cancelOrder.isPending}
+                        loading={cancelOrder.isPending}
                         onClick={() => handleCancelOrder(item?.id)}
                         className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                       >

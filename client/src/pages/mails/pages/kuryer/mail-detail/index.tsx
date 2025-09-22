@@ -19,7 +19,7 @@ const CourierMailDetail = () => {
   const regionName = state?.regionName;
 
   const { getPostById, receivePost } = usePost();
-  const { mutate: receivePostsByPostId } = receivePost();
+  const { mutate: receivePostsByPostId, isPending } = receivePost();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -217,6 +217,8 @@ const CourierMailDetail = () => {
         {!hideSend ? (
           <div className="flex justify-end">
             <Button
+              disabled={isPending}
+              loading={isPending}
               onClick={handleClick}
               className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
             >

@@ -24,7 +24,8 @@ const RefusedMailDetail = () => {
 
   const [api, contextHolder] = useNotification();
   const navigate = useNavigate();
-  const { mutate: receiveCancelPost } = usePost().receiveCanceledPost();
+  const { mutate: receiveCancelPost, isPending } =
+    usePost().receiveCanceledPost();
   const handleClick = () => {
     const payload = {
       order_ids: selectedIds,
@@ -176,7 +177,11 @@ const RefusedMailDetail = () => {
         </div>
 
         <div className="flex justify-end" onClick={handleClick}>
-          <Button className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!">
+          <Button
+            disabled={isPending}
+            loading={isPending}
+            className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
+          >
             Po'chtani qabul qilish
           </Button>
         </div>
