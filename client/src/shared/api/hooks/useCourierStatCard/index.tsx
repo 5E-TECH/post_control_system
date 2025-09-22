@@ -14,7 +14,7 @@ export const useCourierStatCard = () => {
       queryKey: [chart, params],
       queryFn: () =>
         api
-          .get("dashboard/overview", { params: { ...params } })
+          .get("dashboard/overview/courier", { params: { ...params } })
           .then((res) => res.data),
     });
   };
