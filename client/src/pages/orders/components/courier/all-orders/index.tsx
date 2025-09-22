@@ -205,8 +205,9 @@ const AllOrders = () => {
                   {item?.items.length}
                 </td>
                 <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                  {item?.status === "cancelled (sent)" ? null : item?.status ===
-                      "sold" || item?.status === "cancelled" ? (
+                  {item?.status === "cancelled (sent)" ||
+                  item?.status === "waiting" ? null : item?.status === "sold" ||
+                    item?.status === "cancelled" ? (
                     <div className="ml-9">
                       <Button>
                         <AlertCircle />
