@@ -20,18 +20,18 @@ const CashboxHistoryComponent: React.FC<Props> = ({
       <div className="flex gap-5 mt-10 justify-between">
         <div className="bg-[#0688221A] px-6 py-5 w-[50%]">
           <strong className="text-[#068822] dark:text-green-500 text-[20px]">
-            + {(income ?? 100).toLocaleString("uz-UZ")} UZS
+            + {(income ?? 0).toLocaleString("uz-UZ")} UZS
           </strong>
         </div>
         <div className="bg-[#B80D0D1A] px-6 py-5 w-[50%]">
-          <strong className="text-[#B80D0D] dark:text-red-500 text-[20px]">
-            - {(outcome ?? 100).toLocaleString("uz-UZ")} UZS
+          <strong className="text-[#B80D0D] dark:text-red-500 line-clamp-1 text-[20px]">
+            - {(outcome ?? 0).toLocaleString("uz-UZ")} UZS
           </strong>
         </div>
       </div>
 
       {/* Tarix ro‘yxati */}
-      <div className="h-[520px] mt-5 px-8 py-4 bg-[#ede8ff] dark:bg-[#3D3759] shadow-md rounded-lg overflow-y-auto">
+      <div className="h-[520px] w-[700px] mt-5 px-8 py-4 bg-[#ede8ff] dark:bg-[#3D3759] shadow-md rounded-lg overflow-y-auto">
         {cashboxHistory?.map((item: any, inx: number) => (
           <div
             key={inx}
@@ -70,5 +70,4 @@ const CashboxHistoryComponent: React.FC<Props> = ({
   );
 };
 
-// memo bilan o‘rab export qilish
 export const CashboxHistory = React.memo(CashboxHistoryComponent);

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -107,3 +107,78 @@
 .scroll-order-items::-webkit-scrollbar {
   display: none;
 }
+
+.dark .toFROM {
+  background-color: #312d4b !important;
+}
+
+
+.dark .toFROM .ant-picker {
+  background-color: #312d4b !important;
+  border-color: #4b5563 !important;
+}
+
+.dark .toFROM .ant-picker-input > input {
+  color: #fff !important; /* ichki text oq */
+}
+
+.dark .toFROM .ant-picker-input > input::placeholder {
+  color: #9ca3af !important; /* placeholder kulrang */
+}
+
+.dark .toFROM .ant-picker-suffix {
+  color: #fff !important; /* calendar icon oq */
+}
+
+
+
+
+.dark .ant-select-selector {
+  background-color: #312d4b !important; /* fon */
+  color: #9ca3af !important; /* text oq */
+  border-color: #4b5563 !important; /* border */
+}
+
+.dark .ant-select-selection-placeholder {
+  color: #aeb2b8 !important; /* placeholder rang */
+}
+
+.dark .ant-select-arrow {
+  color: #fff !important; /* pastga tushadigan icon */
+}
+
+
+.dark .ant-select-dropdown {
+  background-color: #312d4b !important;
+}
+
+.dark .ant-select-item-option {
+  color: #fff !important;
+}
+
+.dark .ant-select-item-option-active {
+  background-color: #433d64 !important; /* hover */
+}
+
+.dark .ant-select-item-option-selected {
+  background-color: #4c4470 !important; /* tanlangan option */
+}
+
+
+
+
+
+
+
+
+
+.dark .myTextArea.ant-input {
+  background-color: #312d4b !important;
+  color: #fff !important;
+}
+
+.dark .myTextArea.ant-input::placeholder {
+  color: #9ca3af !important;
+}
+
+
