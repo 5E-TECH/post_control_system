@@ -11,6 +11,8 @@ import {
   Cell,
 } from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
+import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
+import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import {
@@ -36,10 +38,25 @@ const Dashboards = () => {
 
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
-  const { data, isLoading } = useChart().getChart({
-    startDate: fromDate,
-    endDate: toDate,
-  });
+  let data: any;
+  let isLoading: boolean = false;
+
+  if (role === "superadmin" || role === "admin") {
+    ({ data, isLoading } = useChart().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  } else if (role === "courier") {
+    ({ data, isLoading } = useCourierStatCard().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  } else if (role === "market") {
+    ({ data, isLoading } = useMarketStatCard().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  }
 
   const dashboard = data?.data?.orders?.data;
 
@@ -164,25 +181,25 @@ const Dashboards = () => {
       {(role === "superadmin" ||
         role === "admin" ||
         role === "registrator") && (
-        <>
-          <div className="grid grid-cols-2 gap-6 mb-6">
-            {renderMarketsChart(
-              visibleMarkets,
-              showAllMarkets,
-              setShowAllMarkets
-            )}
-            {renderCouriersChart(
-              visibleCouriers,
-              showAllCouriers,
-              setShowAllCouriers
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-6">
-            {renderMarketsTable(markets)}
-            {renderCouriersTable(couriers)}
-          </div>
-        </>
-      )}
+          <>
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              {renderMarketsChart(
+                visibleMarkets,
+                showAllMarkets,
+                setShowAllMarkets
+              )}
+              {renderCouriersChart(
+                visibleCouriers,
+                showAllCouriers,
+                setShowAllCouriers
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              {renderMarketsTable(markets)}
+              {renderCouriersTable(couriers)}
+            </div>
+          </>
+        )}
 
       {role === "market" && (
         <>

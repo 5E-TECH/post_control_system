@@ -8,7 +8,7 @@ interface IParams {
 
 export const chart = "chart";
 
-export const useChart = () => {
+export const useMarketStatCard = () => {
   const getChart = (params: IParams) => {
     return useQuery({
       queryKey: [chart, params],
