@@ -1,7 +1,6 @@
 import React from "react";
 import UsersStatistics from "./components/users-statistics";
 import Select from "./components/select";
-import Export from "./components/export";
 import SearchInput from "./components/search-input";
 import Button from "./components/button";
 import { Outlet, useLocation } from "react-router-dom";
@@ -29,12 +28,8 @@ const Users = () => {
 
         <div className="w-full border border-[#E9E8EA] my-[20px] dark:border-[#E7E3FC38]"></div>
 
-        <div className="flex flex-wrap items-center justify-between pl-[20px] pr-[20px] max-[900px]:gap-5">
-          <div>
-            <Export text="Export" />
-          </div>
-
-          <div className="flex gap-4 flex-wrap">
+        <div className="flex flex-wrap items-center justify-end pl-[20px] pr-[20px] max-[900px]:gap-5">
+          <div className="flex gap-4 flex-wrap justify-end">
             <SearchInput placeholder="Search User" />
             <Button text="Add New User" />
           </div>
