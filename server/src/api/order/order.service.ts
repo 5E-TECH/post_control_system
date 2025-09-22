@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -71,6 +72,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     super(orderRepo);
   }
 
+  private readonly logger = new Logger(OrderService.name);
+
   async allOrders(query: {
     status?: string;
     marketId?: string;
@@ -79,6 +82,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     page?: number;
     limit?: number;
   }) {
+    this.logger.log(`allOrders API was called`);
     try {
       const qb = this.orderRepo
         .createQueryBuilder('order')
@@ -458,7 +462,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
-      console.log(`${new Date()} receiveNewOrders: ${order_ids}`);
+      this.logger.log(`receiveNewOrders: ${order_ids}`);
+
       // 1️⃣ Faqat NEW statusdagi orderlarni olish
       const qb = queryRunner.manager
         .createQueryBuilder(OrderEntity, 'order')
@@ -539,8 +544,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // Orderni shu postga bog‘lash
         order.status = Order_status.RECEIVED;
         order.post = post;
-
-        console.log(`order status updated: ${order.status}`, order);
+        this.logger.log(`order status updated: ${order.status}`);
 
         // Statistikalarni vaqtincha yangilash
         post.post_total_price =
