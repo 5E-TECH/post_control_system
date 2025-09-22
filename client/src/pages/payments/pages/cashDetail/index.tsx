@@ -161,7 +161,7 @@ const CashDetail = () => {
                 className="w-[150px]"
                 options={[
                   { value: "", label: "Market tanlang", disabled: true },
-                  ...(marketData?.data?.map((item: any) => ({
+                  ...(marketData?.data?.data?.map((item: any) => ({
                     value: item.id,
                     label: item.name,
                   })) || []),
