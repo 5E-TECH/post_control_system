@@ -99,7 +99,7 @@ const WaitingOrders = () => {
     <Context.Provider value={contextValue}>
       {contextHolder}
 
-      {data?.data?.length > 0 ? (
+      {data?.data?.data?.length > 0 ? (
         <div>
           <table className="w-full">
             <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
@@ -161,7 +161,7 @@ const WaitingOrders = () => {
               </tr>
             </thead>
             <tbody>
-              {data?.data?.map((item: any, inx: number) => (
+              {data?.data?.data?.map((item: any, inx: number) => (
                 <tr
                   key={item?.id}
                   className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
