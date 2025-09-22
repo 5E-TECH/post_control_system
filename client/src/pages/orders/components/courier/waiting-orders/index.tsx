@@ -193,12 +193,16 @@ const WaitingOrders = () => {
                   <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                     <div className="flex gap-3">
                       <Button
+                        disabled={sellOrder.isPending}
+                        loading={sellOrder.isPending}
                         onClick={() => handleSellOrder(item?.id)}
                         className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                       >
                         Sotish
                       </Button>
                       <Button
+                        disabled={cancelOrder.isPending}
+                        loading={cancelOrder.isPending}
                         onClick={() => handleCancelOrder(item?.id)}
                         className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                       >
@@ -211,7 +215,6 @@ const WaitingOrders = () => {
             </tbody>
           </table>
 
-          {/* Pagination */}
           <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
             <div className="flex items-center">
               <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">

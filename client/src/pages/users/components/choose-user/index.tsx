@@ -10,7 +10,7 @@ interface Props {
 const ChooseUser: FC<Props> = ({ title, body }) => {
   return (
     <div
-      className={`flex flex-col items-center justify-center rounded-[6px] select-none`}
+      className={`flex justify-between items-center rounded-[6px] select-none`}
     >
       <div>
         <img src={admin} alt="" />
