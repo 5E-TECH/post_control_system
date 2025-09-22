@@ -35,7 +35,7 @@ export class ProductService {
   ) {}
 
   private buildImageUrl(filename: string): string {
-    return `${config.HOST_URL}${config.PORT}/uploads/${filename}`;
+    return `${config.HOST_URL}/uploads/${filename}`;
   }
 
   private normalizeName(name: string): string {
