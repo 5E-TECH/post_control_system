@@ -439,33 +439,23 @@ export class CashBoxService
       const market = await queryRunner.manager.findOne(UserEntity, {
         where: { id: market_id, role: Roles.MARKET },
       });
-      if (!market) {
-        throw new NotFoundException('Market you choose is not exist');
-      }
+      if (!market) throw new NotFoundException('Market not found');
 
       const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: { cashbox_type: Cashbox_type.MAIN },
       });
-      if (!mainCashbox) {
-        throw new NotFoundException('Main cashbox not found');
-      }
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
 
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: {
-          user_id: market_id,
-          cashbox_type: Cashbox_type.FOR_MARKET,
-        },
+        where: { user_id: market_id, cashbox_type: Cashbox_type.FOR_MARKET },
       });
-      if (!marketCashbox) {
+      if (!marketCashbox)
         throw new NotFoundException('Market cashbox not found');
-      }
 
-      // Asosiy kassadagi mablag' kiritilgan qiymatdan ko'p bo'lsa jarayonga ruxsat berilmaydi
       if (Number(mainCashbox.balance) < Number(amount)) {
         throw new BadRequestException(`Asosiy kassada mablag' yetarli emas`);
       }
 
-      // Barcha sotilgan yoki yarim sotilgan mahsulotlarni topish
       const allSoldOrders = await queryRunner.manager.find(OrderEntity, {
         where: {
           status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
@@ -474,13 +464,12 @@ export class CashBoxService
         order: { updated_at: 'ASC' },
       });
 
-      // Main cashboxdan pul ayirish va history yozish
+      // ✅ Main cashboxdan pul ayirish
       mainCashbox.balance -= amount;
       await queryRunner.manager.save(mainCashbox);
 
-      const mainCashboxHistory = queryRunner.manager.create(
-        CashboxHistoryEntity,
-        {
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.EXPENSE,
           cashbox_id: mainCashbox.id,
           source_type: Source_type.MARKET_PAYMENT,
@@ -490,33 +479,35 @@ export class CashBoxService
           created_by: user.id,
           payment_date,
           payment_method,
-        },
+        }),
       );
-      await queryRunner.manager.save(mainCashboxHistory);
 
-      // Pul yetgan barcha sotilgan mahsulotlarni paid yoki paryli_paid statusiga o'zgartirish
-      for (let i = 0; i < allSoldOrders.length; i++) {
-        if (paymentInProcess >= allSoldOrders[i].to_be_paid) {
-          paymentInProcess -= allSoldOrders[i].to_be_paid;
-          allSoldOrders[i].paid_amount = allSoldOrders[i].to_be_paid;
-          allSoldOrders[i].status = Order_status.PAID;
-          await queryRunner.manager.save(allSoldOrders[i]);
+      // ✅ Orderlarni yopish
+      for (let i = 0; i < allSoldOrders.length && paymentInProcess > 0; i++) {
+        const order = allSoldOrders[i];
+        const remaining = order.to_be_paid - order.paid_amount;
+
+        if (paymentInProcess >= remaining) {
+          // To‘liq yopiladi
+          order.paid_amount += remaining;
+          order.status = Order_status.PAID;
+          paymentInProcess -= remaining;
         } else {
-          (allSoldOrders[i].paid_amount = paymentInProcess),
-            (allSoldOrders[i].status = Order_status.PARTLY_PAID);
-          await queryRunner.manager.save(allSoldOrders[i]);
+          // Qisman yopiladi
+          order.paid_amount += paymentInProcess;
+          order.status = Order_status.PARTLY_PAID;
           paymentInProcess = 0;
-          break;
         }
+
+        await queryRunner.manager.save(order);
       }
 
-      // Market Cashboxdan pul ayirish va uni hisyoryga yozib quyish
+      // ✅ Market cashboxdan pul ayirish
       marketCashbox.balance -= amount;
       await queryRunner.manager.save(marketCashbox);
 
-      const marketCashboxHistory = queryRunner.manager.create(
-        CashboxHistoryEntity,
-        {
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.EXPENSE,
           cashbox_id: marketCashbox.id,
           source_type: Source_type.MARKET_PAYMENT,
@@ -526,9 +517,8 @@ export class CashBoxService
           created_by: user.id,
           payment_date,
           payment_method,
-        },
+        }),
       );
-      await queryRunner.manager.save(marketCashboxHistory);
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, `Marketga ${amount} so'm to'landi`);
