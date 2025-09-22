@@ -38,9 +38,7 @@ const RefusedMailDetail = () => {
             message: "✅ Buyurtmalar muvaffaqiyatli qabul qilindi",
             placement: "topRight",
           });
-          setTimeout(() => {
-            navigate(-1);
-          }, 1500);
+          navigate(-1);
         },
       }
     );

@@ -85,9 +85,7 @@ const MailDetail = () => {
                   message: `✅ Pochta ${courierName} kuryerga jo'natildi`,
                   placement: "topRight",
                 });
-                setTimeout(() => {
-                  navigate("/mails");
-                }, 1000);
+                navigate("/mails");
               },
             }
           );
@@ -126,9 +124,7 @@ const MailDetail = () => {
             message: `✅ Pochta ${courierName} kuryerga jo'natildi`,
             placement: "topRight",
           });
-          setTimeout(() => {
-            navigate("/mails");
-          }, 1000);
+          navigate("/mails");
         },
       }
     );

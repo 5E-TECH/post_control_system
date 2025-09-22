@@ -39,9 +39,7 @@ const CourierMailDetail = () => {
             placement: "topRight",
           });
 
-          setTimeout(() => {
-            navigate("/courier-mails");
-          }, 1000);
+          navigate("/courier-mails");
         },
       }
     );
