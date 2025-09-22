@@ -10,26 +10,19 @@ import { debounce } from "../../../../shared/helpers/DebounceFunc";
 export interface IOrderItems {
   product_id: string | undefined;
   quantity: number | string;
+  search?: string;
 }
 
-const initialState: IOrderItems = {
+const createInitialState = (): IOrderItems => ({
   product_id: undefined,
   quantity: "",
-};
+  search: "",
+});
 
 const OrderItems = () => {
   const [formDataList, setFormDataList] = useState<IOrderItems[]>([
-    initialState,
+    createInitialState(),
   ]);
-  const [searchItem, setSearchItem] = useState<string | null>(null);
-
-  const debouncedSearch = useMemo(
-    () =>
-      debounce((value: string) => {
-        setSearchItem(value);
-      }, 500),
-    []
-  );
 
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const marketId = market?.id;
@@ -49,7 +42,18 @@ const OrderItems = () => {
     ),
   }));
 
-  const { data: products } = getProducts({ search: searchItem, marketId });
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((callback: (val: string) => void, value: string) => {
+        callback(value);
+      }, 500),
+    []
+  );
+
+  const { data: products } = getProducts({
+    search: formDataList.find((item) => item.search)?.search,
+    marketId,
+  });
   const allProducts = products?.data?.items;
   const searchedProducts = allProducts?.map((product: any) => ({
     value: product.id,
@@ -88,7 +92,7 @@ const OrderItems = () => {
     value: string
   ) => {
     const updatedList = [...formDataList];
-    updatedList[index] = { ...updatedList[index], [name]: value };
+    updatedList[index] = { ...updatedList[index], [name]: value, search: "" };
     setFormDataList(updatedList);
     dispatch(
       setOrderItems(
@@ -101,7 +105,7 @@ const OrderItems = () => {
   };
 
   const addItem = () => {
-    setFormDataList((prev) => [...prev, initialState]);
+    setFormDataList((prev) => [...prev, createInitialState()]);
   };
 
   const removeItem = (index: number) => {
@@ -147,13 +151,22 @@ const OrderItems = () => {
                 <Form.Item>
                   <Select
                     value={formData.product_id ?? undefined}
-                    onSearch={debouncedSearch}
+                    onSearch={(value) =>
+                      debouncedSearch((searchValue: string) => {
+                        const updatedList = [...formDataList];
+                        updatedList[index] = {
+                          ...updatedList[index],
+                          search: searchValue,
+                        };
+                        setFormDataList(updatedList);
+                      }, value)
+                    }
                     onChange={(value) =>
                       handleSelectChange(index, "product_id", value)
                     }
                     placeholder="Select or type item"
                     className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
-                    options={searchItem ? searchedProducts : productNames}
+                    options={formData.search ? searchedProducts : productNames}
                     dropdownClassName="dark-dropdown"
                     showSearch
                     filterOption={false}

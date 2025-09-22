@@ -37,10 +37,14 @@ const CreateOrder = () => {
 
   const [api, contextHolder] = useNotification();
   const handleClick = () => {
-    if (!orderItems || orderItems.length == 0) {
+    if (
+      !orderItems ||
+      orderItems.length === 0 ||
+      orderItems.some((item) => !item.quantity || item.quantity === 0)
+    ) {
       api.warning({
-        message: "Buyurtma malumotlari to'liq emas",
-        description: "Iltimos buyurtmaning barcha maydonlarini kiriting",
+        message: "Buyurtma ma'lumotlari to'liq emas",
+        description: "Iltimos, buyurtmadagi barcha maydonlarni to'ldiring",
         placement: "topRight",
       });
       return;
