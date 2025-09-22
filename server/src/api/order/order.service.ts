@@ -1289,6 +1289,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         })
         .getMany();
 
+      const marketsSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.sold_at BETWEEN :start AND :end', {
+          start,
+          end,
+        })
+        .getMany();
+
       const uniqueMarketIds = Array.from(
         new Set(allOrders.map((order) => order.user_id)),
       );
@@ -1304,14 +1312,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const marketWithOrderStats = allUniqueMarkets.map((market) => {
         const marketsOrders = allOrders.filter(
           (order) => order.user_id === market.id,
-        );
-
-        const marketsSoldOrders = marketsOrders.filter((order) =>
-          [
-            Order_status.SOLD,
-            Order_status.PAID,
-            Order_status.PARTLY_PAID,
-          ].includes(order.status),
         );
 
         const sellingRate =
@@ -1370,33 +1370,35 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           courierWithStats.push({
             courier,
             totalOrders: 0,
-            deliveredOrders: 0,
+            soldOrders: 0,
             successRate: 0,
           });
           continue;
         }
 
-        // Shu kuryerga tegishli orderlar
-        const courierOrders = await this.orderRepo.find({
-          where: { post_id: In(postIds) },
-        });
+        // 1️⃣ Shu kuryerga tegishli VA shu davrda yaratilgan orderlar
+        const allCourierOrders = await this.orderRepo
+          .createQueryBuilder('o')
+          .where('o.post_id IN (:...postIds)', { postIds })
+          .andWhere('o.created_at BETWEEN :start AND :end', { start, end })
+          .getMany();
 
-        const deliveredOrders = courierOrders.filter(
-          (order) =>
-            order.status === Order_status.SOLD ||
-            order.status === Order_status.PAID ||
-            order.status === Order_status.PARTLY_PAID,
-        );
+        // 2️⃣ Shu kuryerga tegishli VA shu davrda sotilgan orderlar
+        const courierSoldOrders = await this.orderRepo
+          .createQueryBuilder('o')
+          .where('o.post_id IN (:...postIds)', { postIds })
+          .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+          .getMany();
 
         const successRate =
-          courierOrders.length > 0
-            ? (deliveredOrders.length * 100) / courierOrders.length
+          allCourierOrders.length > 0
+            ? (courierSoldOrders.length * 100) / allCourierOrders.length
             : 0;
 
         courierWithStats.push({
           courier,
-          totalOrders: courierOrders.length,
-          deliveredOrders: deliveredOrders.length,
+          totalOrders: allCourierOrders.length,
+          soldOrders: courierSoldOrders.length,
           successRate,
         });
       }
