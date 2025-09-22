@@ -222,7 +222,7 @@ const CourierMailDetail = () => {
               onClick={handleClick}
               className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
             >
-              Po'chtani jo'natish
+              Po'chtani qabul qilish
             </Button>
           </div>
         ) : null}

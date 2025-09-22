@@ -79,9 +79,10 @@ const MailDetail = () => {
           sendCouriersToPost(
             { id, data: post },
             {
-              onSuccess: () => {
+              onSuccess: (res) => {
+                const courierName = res?.data?.courier?.name;
                 api.success({
-                  message: `✅ Pochta kuryerga jo'natildi`,
+                  message: `✅ Pochta ${courierName} kuryerga jo'natildi`,
                   placement: "topRight",
                 });
                 setTimeout(() => {
@@ -120,7 +121,7 @@ const MailDetail = () => {
       { id: id as string, data: post },
       {
         onSuccess: (res) => {
-          const courierName = res?.data?.couriers?.[0]?.name;
+          const courierName = res?.data?.courier?.name;
           api.success({
             message: `✅ Pochta ${courierName} kuryerga jo'natildi`,
             placement: "topRight",
