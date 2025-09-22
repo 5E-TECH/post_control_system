@@ -255,7 +255,6 @@ export class PostService {
     try {
       const post = await this.postRepo.findOne({
         where: { id },
-        relations: ['courier'],
       });
       if (!post) throw new NotFoundException('Post not found');
 
@@ -316,7 +315,11 @@ export class PostService {
         status: Post_status.SENT,
       });
 
-      const updatedPost = await queryRunner.manager.save(post);
+      await queryRunner.manager.save(post);
+      const updatedPost = await queryRunner.manager.findOne(PostEntity, {
+        where: { id },
+        relations: ['courier'],
+      });
 
       await queryRunner.commitTransaction();
       return successRes(updatedPost, 200, 'Post updated successfully');
