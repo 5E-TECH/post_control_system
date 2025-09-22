@@ -586,7 +586,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async allCouriersOrders(
     user: JwtPayload,
-    query: { status?: string; search?: string },
+    query: {
+      status?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
   ) {
     try {
       const allMyPosts = await this.postRepo.find({
@@ -599,19 +604,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         return successRes([], 200, 'No posts found for this courier');
       }
 
-      const qb = this.orderRepo
-        .createQueryBuilder('order')
-        .leftJoinAndSelect('order.items', 'items')
-        .leftJoinAndSelect('order.market', 'market')
-        .leftJoinAndSelect('order.customer', 'customer')
-        .leftJoinAndSelect('customer.district', 'district')
-        .where('order.post_id IN (:...postIds)', { postIds: allPostIds })
-        .orderBy('order.created_at', 'DESC');
+      // pagination params
+      const page = query.page && query.page > 0 ? query.page : 1;
+      const limit = query.limit && query.limit > 0 ? query.limit : 10;
+      const offset = (page - 1) * limit;
 
+      const qb = this.orderRepo
+        .createQueryBuilder('o')
+        .leftJoinAndSelect('o.items', 'items')
+        .leftJoinAndSelect('o.market', 'market')
+        .leftJoinAndSelect('o.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .where('o.post_id IN (:...postIds)', { postIds: allPostIds })
+        .orderBy('o.created_at', 'DESC')
+        .skip(offset)
+        .take(limit);
+
+      // status filter
       if (query.status) {
-        qb.andWhere('order.status = :status', { status: query.status });
+        qb.andWhere('o.status = :status', { status: query.status });
+      } else {
+        qb.andWhere('o.status NOT IN (:...excluded)', {
+          excluded: [
+            Order_status.NEW,
+            Order_status.RECEIVED,
+            Order_status.ON_THE_ROAD,
+          ],
+        });
       }
 
+      // search filter
       if (query.search) {
         qb.andWhere(
           '(customer.name ILIKE :search OR customer.phone ILIKE :search)',
@@ -619,9 +641,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const allOrders = await qb.getMany();
+      const [allOrders, total] = await qb.getManyAndCount();
 
-      return successRes(allOrders, 200, 'All my orders');
+      return successRes(
+        {
+          data: allOrders,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All my orders',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -1171,11 +1203,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           end,
         })
         .andWhere('o.status IN (:...statuses)', {
-          statuses: [
-            Order_status.CANCELLED,
-            Order_status.CANCELLED_SENT,
-            Order_status.CLOSED,
-          ],
+          statuses: [Order_status.CANCELLED],
         })
         .getCount();
 
@@ -1455,6 +1483,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .getRawMany();
 
       return successRes(result, 200, 'Top Couriers (last 30 days)');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async courierStat(startDate?: string, endDate?: string) {
+    try {
     } catch (error) {
       return catchError(error);
     }
