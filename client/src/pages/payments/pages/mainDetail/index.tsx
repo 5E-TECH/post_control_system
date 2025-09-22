@@ -1,22 +1,22 @@
-import { memo, useState } from "react";
+import { memo, useState } from 'react';
 // import chip from "../../../../shared/assets/payments/chip.svg";
 // import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 
 // import { Button } from "antd";
-import { useEffect } from "react";
-import { CashboxCard } from "../../components/CashCard";
-import { CashboxHistory } from "../../components/paymentHistory";
-import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
-import Popup from "../../../../shared/ui/Popup";
-import { Search, X } from "lucide-react";
-import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
-import { useCourier } from "../../../../shared/api/hooks/useCourier";
-import TextArea from "antd/es/input/TextArea";
-import { Select, DatePicker } from "antd"; 
-import dayjs from "dayjs";                  
+import { useEffect } from 'react';
+import { CashboxCard } from '../../components/CashCard';
+import { CashboxHistory } from '../../components/paymentHistory';
+import { useCashBox } from '../../../../shared/api/hooks/useCashbox';
+import Popup from '../../../../shared/ui/Popup';
+import { Search, X } from 'lucide-react';
+import { useMarket } from '../../../../shared/api/hooks/useMarket/useMarket';
+import { useCourier } from '../../../../shared/api/hooks/useCourier';
+import TextArea from 'antd/es/input/TextArea';
+import { Select, DatePicker } from 'antd';
+import dayjs from 'dayjs';
 
-const { RangePicker } = DatePicker; 
+const { RangePicker } = DatePicker;
 
 const MainDetail = () => {
   const [showMarket, setShowMarket] = useState(false);
@@ -27,17 +27,17 @@ const MainDetail = () => {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
-    from: "",
-    to: "",
-    order: "",
-    payment: "",
-    summa: "",
-    market: "",
-    comment: "",
+    from: '',
+    to: '',
+    order: '',
+    payment: '',
+    summa: '',
+    market: '',
+    comment: '',
   });
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -86,7 +86,7 @@ const MainDetail = () => {
         onSuccess: () => {
           refetch();
         },
-      }
+      },
     );
   };
 
@@ -99,7 +99,7 @@ const MainDetail = () => {
           Asosiy kassa
         </h2>
         <CashboxCard
-          role={"superadmin"}
+          role={'superadmin'}
           name={data?.data?.cashbox?.user?.name}
           raw={raw}
           show={show}
@@ -159,15 +159,15 @@ const MainDetail = () => {
                     placeholder="To'lov turi"
                     className="w-[150px]"
                     options={[
-                      { value: "", label: "to'lov turi", disabled: true },
-                      { value: "cash", label: "cash" },
-                      { value: "click", label: "click" },
-                      ...(data?.data?.cashbox?.user?.role === "market"
+                      { value: '', label: "to'lov turi", disabled: true },
+                      { value: 'cash', label: 'cash' },
+                      { value: 'click', label: 'click' },
+                      ...(data?.data?.cashbox?.user?.role === 'market'
                         ? []
                         : [
                             {
-                              value: "click_to_market",
-                              label: "click_to_market",
+                              value: 'click_to_market',
+                              label: 'click_to_market',
                             },
                           ]),
                     ]}
@@ -214,13 +214,15 @@ const MainDetail = () => {
                 onChange={(dates) => {
                   setForm((prev) => ({
                     ...prev,
-                    from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
-                    to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                    from: dates?.[0] ? dates[0].format('YYYY-MM-DD') : '',
+                    to: dates?.[1] ? dates[1].format('YYYY-MM-DD') : '',
                   }));
                 }}
-                placeholder={["From", "To"]}
+                placeholder={['From', 'To']}
                 format="YYYY-MM-DD"
-                 separator={<span className="mx-2 text-xl flex items-center">→</span>} 
+                separator={
+                  <span className="mx-2 text-xl flex items-center">→</span>
+                }
                 className="w-[340px] border border-[#E5E7EB] rounded-lg px-5 py-[6px] outline-none"
               />
             </div>
@@ -269,18 +271,19 @@ const MainDetail = () => {
               </thead>
 
               <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                {marketData?.data?.map((item: any, inx: number) => (
-                  <tr
-                    key={item?.id}
-                    onClick={() => setSelect(item?.id)}
-                    className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                      item.id == select ? "bg-gray-100" : ""
-                    }`}
-                  >
-                    <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                    <td className="pr-26 py-3">{item?.name}</td>
-                  </tr>
-                ))}
+                {Array.isArray(marketData?.data?.items) &&
+                  marketData.data.items.map((item: any, inx: number) => (
+                    <tr
+                      key={item?.id}
+                      onClick={() => setSelect(item?.id)}
+                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                        item.id == select ? 'bg-gray-100' : ''
+                      }`}
+                    >
+                      <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
+                      <td className="pr-26 py-3">{item?.name}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -289,9 +292,9 @@ const MainDetail = () => {
               disabled={!select ? true : false}
               onClick={() => handleNavigate()}
               className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
-                !select ? "" : "hover:bg-blue-600"
+                !select ? '' : 'hover:bg-blue-600'
               }  text-white rounded-md cursor-pointer ${
-                !select ? "opacity-40" : ""
+                !select ? 'opacity-40' : ''
               }`}
             >
               Selected
@@ -346,7 +349,7 @@ const MainDetail = () => {
                     key={inx}
                     onClick={() => setSelect(item?.id)}
                     className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                      item.id == select ? "bg-gray-100" : ""
+                      item.id == select ? 'bg-gray-100' : ''
                     }`}
                   >
                     <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
@@ -362,7 +365,7 @@ const MainDetail = () => {
               onClick={() => handleNavigate()}
               className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
             >
-              Selected
+              Tanlash
             </button>
           </div>
         </div>
