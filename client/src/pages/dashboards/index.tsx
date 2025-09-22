@@ -11,6 +11,10 @@ import {
   Cell,
 } from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
+import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
+import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 import {
   CheckCircle,
   DollarSign,
@@ -32,10 +36,27 @@ const Dashboards = () => {
   const [showAllMarkets, setShowAllMarkets] = useState(false);
   const [showAllCouriers, setShowAllCouriers] = useState(false);
 
-  const { data, isLoading } = useChart().getChart({
-    startDate: fromDate,
-    endDate: toDate,
-  });
+  const role = useSelector((state: RootState) => state.roleSlice.role);
+
+  let data: any;
+  let isLoading: boolean = false;
+
+  if (role === "superadmin" || role === "admin") {
+    ({ data, isLoading } = useChart().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  } else if (role === "courier") {
+    ({ data, isLoading } = useCourierStatCard().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  } else if (role === "market") {
+    ({ data, isLoading } = useMarketStatCard().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  }
 
   const dashboard = data?.data?.orders?.data;
 
@@ -61,7 +82,6 @@ const Dashboards = () => {
     ? couriersData
     : couriersData.slice(0, 10);
 
-  // 📊 Sarlavha uchun dinamik matn
   let titleText = "📊 Bugungi statistika";
   if (fromDate && toDate) {
     titleText = `📊 ${fromDate} - ${toDate} statistikasi`;
@@ -73,9 +93,8 @@ const Dashboards = () => {
 
   return (
     <div className="w-full p-6 dark:bg-[#312D48] min-h-screen transition">
-      {/* Header qismi */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-6 relative">
-        {/* Chapda filterlar */}
         <div className="flex flex-wrap gap-6">
           {isLoading ? (
             <>
@@ -85,10 +104,7 @@ const Dashboards = () => {
           ) : (
             <>
               <div className="flex flex-col">
-                <label
-                  htmlFor="fromDate"
-                  className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
+                <label htmlFor="fromDate" className="mb-1 text-sm font-medium">
                   Boshlanish sanasi
                 </label>
                 <input
@@ -96,14 +112,11 @@ const Dashboards = () => {
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="border border-gray-300 dark:border-gray-600 rounded-md px-4 py-2 text-gray-700 dark:text-white bg-white dark:bg-[#2A263D] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition cursor-pointer"
+                  className="border rounded-md px-4 py-2 bg-white dark:bg-[#2A263D]"
                 />
               </div>
               <div className="flex flex-col">
-                <label
-                  htmlFor="toDate"
-                  className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
+                <label htmlFor="toDate" className="mb-1 text-sm font-medium">
                   Tugash sanasi
                 </label>
                 <input
@@ -111,15 +124,13 @@ const Dashboards = () => {
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="border border-gray-300 dark:border-gray-600 rounded-md px-4 py-2 text-gray-700 dark:text-white bg-white dark:bg-[#2A263D] shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition cursor-pointer"
+                  className="border rounded-md px-4 py-2 bg-white dark:bg-[#2A263D]"
                 />
               </div>
             </>
           )}
         </div>
-
-        {/* O‘rtada sarlavha */}
-        <h2 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-bold text-gray-900 dark:text-white">
+        <h2 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-bold">
           {titleText}
         </h2>
       </div>
@@ -128,262 +139,271 @@ const Dashboards = () => {
       <div className="grid grid-cols-4 gap-6 mb-6">
         {isLoading ? (
           [...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-[#2A263D] p-6 rounded-2xl shadow"
-            >
+            <div key={i} className="bg-white dark:bg-[#2A263D] p-6 rounded-2xl">
               <SkeletonBox className="w-24 h-4 mb-3" />
               <SkeletonBox className="w-16 h-6" />
             </div>
           ))
         ) : (
           <>
-            <div className="bg-white dark:bg-[#2A263D] p-6 rounded-2xl border-b-4 border-gray-400 dark:border-gray-500">
-              <p className="flex items-center gap-2 text-gray-500 dark:text-gray-300">
-                <ShoppingCart size={20} /> Jami buyurtmalar
-              </p>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {dashboard?.acceptedCount}
-              </h2>
-            </div>
-            <div className="bg-white dark:bg-[#2A263D] p-6 rounded-2xl border-b-4 border-green-500">
-              <p className="flex items-center gap-2 text-green-500">
-                <CheckCircle size={20} /> Sotilgan
-              </p>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {dashboard?.soldAndPaid}
-              </h2>
-            </div>
-            <div className="bg-white dark:bg-[#2A263D] p-6 rounded-2xl border-b-4 border-red-500">
-              <p className="flex items-center gap-2 text-red-500">
-                <XCircle size={20} /> Bekor qilinganlar
-              </p>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {dashboard?.cancelled}
-              </h2>
-            </div>
-            <div className="bg-white dark:bg-[#2A263D] p-6 rounded-2xl border-b-4 border-yellow-500">
-              <p className="flex items-center gap-2 text-yellow-500">
-                <DollarSign size={20} /> Jami daromad
-              </p>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {Number(dashboard?.profit).toLocaleString()} UZS
-              </h2>
-            </div>
+            <StatCard
+              icon={<ShoppingCart size={20} />}
+              label="Jami buyurtmalar"
+              value={dashboard?.acceptedCount}
+              borderColor="border-gray-400"
+            />
+            <StatCard
+              icon={<CheckCircle size={20} />}
+              label="Sotilgan"
+              value={dashboard?.soldAndPaid}
+              borderColor="border-green-500"
+              textColor="text-green-500"
+            />
+            <StatCard
+              icon={<XCircle size={20} />}
+              label="Bekor qilinganlar"
+              value={dashboard?.cancelled}
+              borderColor="border-red-500"
+              textColor="text-red-500"
+            />
+            <StatCard
+              icon={<DollarSign size={20} />}
+              label="Jami daromad"
+              value={`${Number(dashboard?.profit).toLocaleString()} UZS`}
+              borderColor="border-yellow-500"
+              textColor="text-yellow-500"
+            />
           </>
         )}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-2 gap-6 mb-6">
-        {/* Marketlar Chart */}
-        <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow overflow-hidden">
-          <h3 className="text-lg font-semibold mb-4 text-center text-gray-900 dark:text-white">
-            Marketlar statistikasi
-          </h3>
-          <ResponsiveContainer
-            width="100%"
-            height={Math.max(visibleMarkets.length * 45, 400)}
-          >
-            <BarChart
-              data={visibleMarkets}
-              layout="vertical"
-              margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#D1D5DB" />
-              <XAxis type="number" stroke="#6B7280" />
-              <YAxis
-                type="category"
-                dataKey="nomi"
-                width={200}
-                stroke="#6B7280"
-              />
-              <Tooltip />
-              <Legend />
+      {/* Role-based Rendering */}
+      {(role === "superadmin" ||
+        role === "admin" ||
+        role === "registrator") && (
+          <>
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              {renderMarketsChart(
+                visibleMarkets,
+                showAllMarkets,
+                setShowAllMarkets
+              )}
+              {renderCouriersChart(
+                visibleCouriers,
+                showAllCouriers,
+                setShowAllCouriers
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+              {renderMarketsTable(markets)}
+              {renderCouriersTable(couriers)}
+            </div>
+          </>
+        )}
 
-              {/* Sotilgan */}
-              <Bar dataKey="sotilgan" stackId="a" name="Sotilgan">
-                {visibleMarkets.map((_: any, index: number) => (
-                  <Cell key={`sotilgan-${index}`} fill="#0047AB" />
-                ))}
-              </Bar>
+      {role === "market" && (
+        <>
+          {renderMarketsChart(
+            visibleMarkets,
+            showAllMarkets,
+            setShowAllMarkets
+          )}
+          {renderMarketsTable(markets)}
+        </>
+      )}
 
-              {/* Buyurtmalar */}
-              <Bar dataKey="buyurtmalar" stackId="a" name="Buyurtmalar">
-                {visibleMarkets.map((entry: any, index: number) => {
-                  const rang =
-                    entry.buyurtmalar === entry.sotilgan
-                      ? "#0047AB"
-                      : "#66B2FF";
-                  return <Cell key={`buyurtmalar-${index}`} fill={rang} />;
-                })}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-
-          <div className="flex justify-center mt-4">
-            <button
-              onClick={() => setShowAllMarkets(!showAllMarkets)}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer"
-            >
-              {showAllMarkets ? "Kamroq ko‘rish" : "Ko‘proq ko‘rish"}
-            </button>
-          </div>
-        </div>
-
-        {/* Kuriyerlar Chart */}
-        <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow overflow-hidden">
-          <h3 className="text-lg font-semibold mb-4 text-center text-gray-900 dark:text-white">
-            Kuriyerlar statistikasi
-          </h3>
-          <ResponsiveContainer
-            width="100%"
-            height={Math.max(visibleCouriers.length * 45, 400)}
-          >
-            <BarChart
-              data={visibleCouriers}
-              layout="vertical"
-              margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#D1D5DB" />
-              <XAxis type="number" stroke="#6B7280" />
-              <YAxis
-                type="category"
-                dataKey="nomi"
-                width={200}
-                stroke="#6B7280"
-              />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="sotilgan" stackId="a" name="Sotilgan">
-                {visibleCouriers.map((_: any, index: number) => (
-                  <Cell key={`sotilgan-${index}`} fill="#0047AB" />
-                ))}
-              </Bar>
-
-              {/* Buyurtmalar */}
-              <Bar dataKey="buyurtmalar" stackId="a" name="Buyurtmalar">
-                {visibleCouriers.map((entry: any, index: number) => {
-                  const rang =
-                    entry.buyurtmalar === entry.sotilgan
-                      ? "#0047AB"
-                      : "#66B2FF";
-                  return <Cell key={`buyurtmalar-${index}`} fill={rang} />;
-                })}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="flex justify-center mt-4">
-            <button
-              onClick={() => setShowAllCouriers(!showAllCouriers)}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer"
-            >
-              {showAllCouriers ? "Kamroq ko‘rish" : "Ko‘proq ko‘rish"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Top 10 Jadval */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Top Marketlar */}
-        <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Top 10 Marketlar (Oxirgi 30 kun)
-          </h3>
-          <table className="w-full border border-gray-200 dark:border-gray-700">
-            <thead>
-              <tr className="bg-gray-100 dark:bg-[#3B3656] text-left">
-                <th className="p-2 border">#</th>
-                <th className="p-2 border">Nomi</th>
-                <th className="p-2 border">Buyurtmalar</th>
-                <th className="p-2 border">Sotilganlar</th>
-                <th className="p-2 border">Foiz</th>
-              </tr>
-            </thead>
-            <tbody>
-              {markets?.map((m: any, inx: number) => {
-                let medalIcon = null;
-                let rowStyle = "text-gray-700 dark:text-gray-200";
-                if (inx === 0) {
-                  medalIcon = <Medal className="text-yellow-500" size={20} />;
-                  rowStyle = "text-yellow-500 font-bold";
-                } else if (inx === 1) {
-                  medalIcon = <Medal className="text-gray-400" size={20} />;
-                  rowStyle = "text-gray-500 dark:text-gray-300 font-bold";
-                } else if (inx === 2) {
-                  medalIcon = <Medal className="text-amber-700" size={20} />;
-                  rowStyle = "text-amber-700 font-bold";
-                }
-                return (
-                  <tr
-                    key={m.id ?? inx}
-                    className={`hover:bg-gray-50 dark:hover:bg-[#3B3656] transition ${rowStyle}`}
-                  >
-                    <td className="p-2 border text-center">
-                      {medalIcon ? medalIcon : inx + 1}
-                    </td>
-                    <td className="p-2 border">{m.market_name}</td>
-                    <td className="p-2 border">{m.total_orders}</td>
-                    <td className="p-2 border">{m.successful_orders}</td>
-                    <td className="p-2 border">{m.success_rate}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Top Kuriyerlar */}
-        <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Top 10 Kuriyerlar (Oxirgi 30 kun)
-          </h3>
-          <table className="w-full border border-gray-200 dark:border-gray-700">
-            <thead>
-              <tr className="bg-gray-100 dark:bg-[#3B3656] text-left">
-                <th className="p-2 border">#</th>
-                <th className="p-2 border">Ism</th>
-                <th className="p-2 border">Buyurtmalar</th>
-                <th className="p-2 border">Sotilganlar</th>
-                <th className="p-2 border">Foiz</th>
-              </tr>
-            </thead>
-            <tbody>
-              {couriers?.map((c: any, inx: number) => {
-                let medalIcon = null;
-                let rowStyle = "text-gray-700 dark:text-gray-200";
-                if (inx === 0) {
-                  medalIcon = <Medal className="text-yellow-500" size={20} />;
-                  rowStyle = "text-yellow-500 font-bold";
-                } else if (inx === 1) {
-                  medalIcon = <Medal className="text-gray-400" size={20} />;
-                  rowStyle = "text-gray-500 dark:text-gray-300 font-bold";
-                } else if (inx === 2) {
-                  medalIcon = <Medal className="text-amber-700" size={20} />;
-                  rowStyle = "text-amber-700 font-bold";
-                }
-                return (
-                  <tr
-                    key={c.courier_id ?? inx}
-                    className={`hover:bg-gray-50 dark:hover:bg-[#3B3656] transition ${rowStyle}`}
-                  >
-                    <td className="p-2 border text-center">
-                      {medalIcon ? medalIcon : inx + 1}
-                    </td>
-                    <td className="p-2 border">{c.courier_name}</td>
-                    <td className="p-2 border">{c.total_orders}</td>
-                    <td className="p-2 border">{c.successful_orders}</td>
-                    <td className="p-2 border">{c.success_rate}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {role === "courier" && (
+        <>
+          {renderCouriersChart(
+            visibleCouriers,
+            showAllCouriers,
+            setShowAllCouriers
+          )}
+          {renderCouriersTable(couriers)}
+        </>
+      )}
     </div>
   );
 };
+
+// 🔹 Stat Card Component
+const StatCard = ({
+  icon,
+  label,
+  value,
+  borderColor,
+  textColor,
+}: {
+  icon: any;
+  label: string;
+  value: any;
+  borderColor: string;
+  textColor?: string;
+}) => (
+  <div
+    className={`bg-white dark:bg-[#2A263D] p-6 rounded-2xl border-b-4 ${borderColor}`}
+  >
+    <p className={`flex items-center gap-2 ${textColor ?? "text-gray-500"}`}>
+      {icon} {label}
+    </p>
+    <h2 className="text-2xl font-bold">{value}</h2>
+  </div>
+);
+
+// 🔹 Helper Components (Charts & Tables)
+const renderMarketsChart = (
+  visibleMarkets: any[],
+  showAllMarkets: boolean,
+  setShowAllMarkets: (v: boolean) => void
+) => (
+  <ChartWrapper
+    title="Marketlar statistikasi"
+    data={visibleMarkets}
+    showAll={showAllMarkets}
+    setShowAll={setShowAllMarkets}
+  />
+);
+
+const renderCouriersChart = (
+  visibleCouriers: any[],
+  showAllCouriers: boolean,
+  setShowAllCouriers: (v: boolean) => void
+) => (
+  <ChartWrapper
+    title="Kuriyerlar statistikasi"
+    data={visibleCouriers}
+    showAll={showAllCouriers}
+    setShowAll={setShowAllCouriers}
+  />
+);
+
+const ChartWrapper = ({
+  title,
+  data,
+  showAll,
+  setShowAll,
+}: {
+  title: string;
+  data: any[];
+  showAll: boolean;
+  setShowAll: (v: boolean) => void;
+}) => (
+  <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow overflow-hidden">
+    <h3 className="text-lg font-semibold mb-4 text-center">{title}</h3>
+    <ResponsiveContainer width="100%" height={Math.max(data.length * 45, 400)}>
+      <BarChart
+        data={data}
+        layout="vertical"
+        margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis type="number" />
+        <YAxis type="category" dataKey="nomi" width={200} />
+        <Tooltip />
+        <Legend />
+        <Bar dataKey="sotilgan" stackId="a" name="Sotilgan">
+          {data.map((_: any, index: number) => (
+            <Cell key={`sotilgan-${index}`} fill="#0047AB" />
+          ))}
+        </Bar>
+        <Bar dataKey="buyurtmalar" stackId="a" name="Buyurtmalar">
+          {data.map((entry: any, index: number) => {
+            const rang =
+              entry.buyurtmalar === entry.sotilgan ? "#0047AB" : "#66B2FF";
+            return <Cell key={`buyurtmalar-${index}`} fill={rang} />;
+          })}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+    <div className="flex justify-center mt-4">
+      <button
+        onClick={() => setShowAll(!showAll)}
+        className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+      >
+        {showAll ? "Kamroq ko‘rish" : "Ko‘proq ko‘rish"}
+      </button>
+    </div>
+  </div>
+);
+
+// 🔹 Top Markets Table
+const renderMarketsTable = (markets: any[]) => (
+  <TableWrapper
+    title="Top 10 Marketlar (Oxirgi 30 kun)"
+    data={markets}
+    nameKey="market_name"
+    ordersKey="total_orders"
+    soldKey="successful_orders"
+    rateKey="success_rate"
+  />
+);
+
+// 🔹 Top Couriers Table
+const renderCouriersTable = (couriers: any[]) => (
+  <TableWrapper
+    title="Top 10 Kuriyerlar (Oxirgi 30 kun)"
+    data={couriers}
+    nameKey="courier_name"
+    ordersKey="total_orders"
+    soldKey="successful_orders"
+    rateKey="success_rate"
+  />
+);
+
+const TableWrapper = ({
+  title,
+  data,
+  nameKey,
+  ordersKey,
+  soldKey,
+  rateKey,
+}: {
+  title: string;
+  data: any[];
+  nameKey: string;
+  ordersKey: string;
+  soldKey: string;
+  rateKey: string;
+}) => (
+  <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow">
+    <h3 className="text-lg font-semibold mb-4">{title}</h3>
+    <table className="w-full border">
+      <thead>
+        <tr className="bg-gray-100 dark:bg-[#3B3656] text-left">
+          <th className="p-2 border">#</th>
+          <th className="p-2 border">Nomi</th>
+          <th className="p-2 border">Buyurtmalar</th>
+          <th className="p-2 border">Sotilganlar</th>
+          <th className="p-2 border">Foiz</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data?.map((item: any, inx: number) => {
+          let medalIcon = null;
+          let rowStyle = "";
+          if (inx === 0) {
+            medalIcon = <Medal className="text-yellow-500" size={20} />;
+            rowStyle = "text-yellow-500 font-bold";
+          } else if (inx === 1) {
+            medalIcon = <Medal className="text-gray-400" size={20} />;
+            rowStyle = "text-gray-500 font-bold";
+          } else if (inx === 2) {
+            medalIcon = <Medal className="text-amber-700" size={20} />;
+            rowStyle = "text-amber-700 font-bold";
+          }
+          return (
+            <tr key={item.id ?? inx} className={`hover:bg-gray-50 ${rowStyle}`}>
+              <td className="p-2 border text-center">{medalIcon ?? inx + 1}</td>
+              <td className="p-2 border">{item[nameKey]}</td>
+              <td className="p-2 border">{item[ordersKey]}</td>
+              <td className="p-2 border">{item[soldKey]}</td>
+              <td className="p-2 border">{item[rateKey]}%</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+);
 
 export default memo(Dashboards);

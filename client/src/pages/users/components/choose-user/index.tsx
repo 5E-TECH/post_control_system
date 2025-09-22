@@ -4,13 +4,13 @@ import admin from "../../../../shared/assets/users/choose-admin.svg";
 interface Props {
   className?: string;
   title: string;
-  body: string;
+  body?: string;
 }
 
 const ChooseUser: FC<Props> = ({ title, body }) => {
   return (
     <div
-      className={`flex flex-col items-center justify-center w-[364px] h-[194px] rounded-[6px] select-none`}
+      className={`flex justify-between items-center rounded-[6px] select-none`}
     >
       <div>
         <img src={admin} alt="" />

@@ -136,7 +136,7 @@ const OrderView = () => {
                   {item?.customer?.phone_number}
                 </td>
                 <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                  {item?.customer?.phone_number}
+                  {item?.customer?.district?.name}
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                   {item?.market?.name}

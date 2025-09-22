@@ -261,7 +261,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async myNewOrders(user: JwtPayload, search?: string) {
+  async myNewOrders(
+    user: JwtPayload,
+    search?: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     try {
       const query = this.orderRepo
         .createQueryBuilder('order')
@@ -279,9 +284,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const myNewOrders = await query.getMany();
+      const [orders, total] = await query
+        .orderBy('order.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
 
-      return successRes(myNewOrders, 200, 'My new orders');
+      return successRes(
+        {
+          data: orders,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'My new orders',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -439,7 +458,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
-      // 1️⃣ QueryBuilder bilan NEW orderlarni olish va search qo‘llash
+      // 1️⃣ Faqat NEW statusdagi orderlarni olish
       const qb = queryRunner.manager
         .createQueryBuilder(OrderEntity, 'order')
         .leftJoinAndSelect('order.customer', 'customer')
@@ -465,7 +484,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // 2️⃣ Customers, districts, posts ni bulk fetch qilish
+      // 2️⃣ Kerakli customers, districts va posts
       const customerIds = newOrders.map((o) => o.customer_id);
       const customers = await queryRunner.manager.find(UserEntity, {
         where: { id: In(customerIds), role: Roles.CUSTOMER },
@@ -479,14 +498,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const districtMap = new Map(districts.map((d) => [d.id, d]));
 
       const regionIds = districts.map((d) => d.assigned_region);
-      const posts = await queryRunner.manager.find(PostEntity, {
+      const existingPosts = await queryRunner.manager.find(PostEntity, {
         where: { region_id: In(regionIds), status: Post_status.NEW },
       });
-      const postMap = new Map(posts.map((p) => [p.region_id, p]));
+      const postMap = new Map(existingPosts.map((p) => [p.region_id, p]));
 
-      // 3️⃣ Orders ni posts ga assign qilish
       const newPosts: PostEntity[] = [];
+      const postsToUpdate: PostEntity[] = [];
 
+      // 3️⃣ Ordersni postlarga bog‘lash
       for (const order of newOrders) {
         const customer = customerMap.get(order.customer_id);
         if (!customer)
@@ -502,7 +522,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         let post = postMap.get(district.assigned_region);
 
-        // Agar post mavjud bo‘lmasa yangi post yaratish
+        // Yangi post yaratish kerak bo‘lsa
         if (!post) {
           post = queryRunner.manager.create(PostEntity, {
             region_id: district.assigned_region,
@@ -515,32 +535,33 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           postMap.set(district.assigned_region, post);
         }
 
-        // Post statistikalarini yangilash
-        post.post_total_price =
-          (post.post_total_price ?? 0) + (order.total_price ?? 0);
-        post.order_quantity = (post.order_quantity ?? 0) + 1;
-
-        // Orderni update qilish
+        // Orderni shu postga bog‘lash
         order.status = Order_status.RECEIVED;
-        order.post_id = post.id; // yangi post bo‘lsa keyin save qilgandan so‘ng id tushadi
-      }
+        order.post = post;
 
-      // 4️⃣ Yangi postlarni saqlash va post_idlarni update qilish
-      if (newPosts.length > 0) {
-        await queryRunner.manager.save(PostEntity, newPosts);
+        // Statistikalarni vaqtincha yangilash
+        post.post_total_price =
+          Number(post.post_total_price ?? 0) + Number(order.total_price ?? 0);
+        post.order_quantity = Number(post.order_quantity ?? 0) + 1;
 
-        for (const order of newOrders) {
-          if (!order.post_id) {
-            const customer = customerMap.get(order.customer_id)!;
-            const district = districtMap.get(customer.district_id)!;
-            const post = postMap.get(district.assigned_region)!;
-            order.post_id = post.id;
-          }
+        // Agar bu post oldindan mavjud bo‘lsa → keyinroq saqlash uchun update ro‘yxatiga qo‘shamiz
+        if (!newPosts.includes(post) && !postsToUpdate.includes(post)) {
+          postsToUpdate.push(post);
         }
       }
 
-      // 5️⃣ Orders ni saqlash
+      // 4️⃣ Avval yangi postlarni saqlash → id generatsiya bo‘ladi
+      if (newPosts.length > 0) {
+        await queryRunner.manager.save(PostEntity, newPosts);
+      }
+
+      // 5️⃣ Ordersni saqlash
       await queryRunner.manager.save(OrderEntity, newOrders);
+
+      // 6️⃣ Mavjud postlarni yangilash
+      if (postsToUpdate.length > 0) {
+        await queryRunner.manager.save(PostEntity, postsToUpdate);
+      }
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Orders received');
@@ -565,7 +586,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async allCouriersOrders(
     user: JwtPayload,
-    query: { status?: string; search?: string },
+    query: {
+      status?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
   ) {
     try {
       const allMyPosts = await this.postRepo.find({
@@ -578,19 +604,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         return successRes([], 200, 'No posts found for this courier');
       }
 
-      const qb = this.orderRepo
-        .createQueryBuilder('order')
-        .leftJoinAndSelect('order.items', 'items')
-        .leftJoinAndSelect('order.market', 'market')
-        .leftJoinAndSelect('order.customer', 'customer')
-        .leftJoinAndSelect('customer.district', 'district')
-        .where('order.post_id IN (:...postIds)', { postIds: allPostIds })
-        .orderBy('order.created_at', 'DESC');
+      // pagination params
+      const page = query.page && query.page > 0 ? query.page : 1;
+      const limit = query.limit && query.limit > 0 ? query.limit : 10;
+      const offset = (page - 1) * limit;
 
+      const qb = this.orderRepo
+        .createQueryBuilder('o')
+        .leftJoinAndSelect('o.items', 'items')
+        .leftJoinAndSelect('o.market', 'market')
+        .leftJoinAndSelect('o.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .where('o.post_id IN (:...postIds)', { postIds: allPostIds })
+        .orderBy('o.created_at', 'DESC')
+        .skip(offset)
+        .take(limit);
+
+      // status filter
       if (query.status) {
-        qb.andWhere('order.status = :status', { status: query.status });
+        qb.andWhere('o.status = :status', { status: query.status });
+      } else {
+        qb.andWhere('o.status NOT IN (:...excluded)', {
+          excluded: [
+            Order_status.NEW,
+            Order_status.RECEIVED,
+            Order_status.ON_THE_ROAD,
+          ],
+        });
       }
 
+      // search filter
       if (query.search) {
         qb.andWhere(
           '(customer.name ILIKE :search OR customer.phone ILIKE :search)',
@@ -598,9 +641,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const allOrders = await qb.getMany();
+      const [allOrders, total] = await qb.getManyAndCount();
 
-      return successRes(allOrders, 200, 'All my orders');
+      return successRes(
+        {
+          data: allOrders,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All my orders',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -618,55 +671,46 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
+      if (!order) throw new NotFoundException('Order not found');
 
-      const deliveringPlace = order.where_deliver;
       const marketId = order.user_id;
       const market = await queryRunner.manager.findOne(UserEntity, {
         where: { id: marketId, role: Roles.MARKET },
       });
-      if (!market) {
-        throw new NotFoundException('This orders owner is not found');
-      }
+      if (!market) throw new NotFoundException('Market not found');
+
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
       });
-      if (!marketCashbox) {
+      if (!marketCashbox)
         throw new NotFoundException('Market cashbox not found');
-      }
 
       const courier = await queryRunner.manager.findOne(UserEntity, {
         where: { id: user.id },
       });
-      if (!courier) {
-        throw new NotFoundException('Courier not found');
-      }
+      if (!courier) throw new NotFoundException('Courier not found');
 
       const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier?.id },
+        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier.id },
       });
-
-      if (!courierCashbox) {
+      if (!courierCashbox)
         throw new NotFoundException('Courier cashbox not found');
-      }
 
-      const marketTarif: number =
-        deliveringPlace === Where_deliver.CENTER
+      const marketTarif =
+        order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
           : market.tariff_home;
 
-      const courierTarif: number =
-        deliveringPlace === Where_deliver.CENTER
+      const courierTarif =
+        order.where_deliver === Where_deliver.CENTER
           ? courier.tariff_center
           : courier.tariff_home;
 
-      const to_be_paid: number = sellOrderDto.extraCost
+      const to_be_paid = sellOrderDto.extraCost
         ? order.total_price - sellOrderDto.extraCost - marketTarif
         : order.total_price - marketTarif;
 
-      const courier_to_be_paid: number = sellOrderDto.extraCost
+      const courier_to_be_paid = sellOrderDto.extraCost
         ? order.total_price - sellOrderDto.extraCost - courierTarif
         : order.total_price - courierTarif;
 
@@ -676,41 +720,47 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         sellOrderDto.extraCost || 0,
       );
 
-      if (Number(marketCashbox.balance) < 0) {
-        if (marketCashbox.balance + to_be_paid <= 0) {
+      // ✅ Order status va balans
+      if (marketCashbox.balance < 0) {
+        // Qarz mavjud
+        const qoplash = marketCashbox.balance + to_be_paid;
+        if (qoplash <= 0) {
+          // To‘liq yopildi
           Object.assign(order, {
             status: Order_status.PAID,
             to_be_paid,
             paid_amount: to_be_paid,
-            comment: finalComment,
-            sold_at: order.sold_at ?? Date.now(),
           });
-          await queryRunner.manager.save(order);
         } else {
+          // Qisman yopildi
           Object.assign(order, {
             status: Order_status.PARTLY_PAID,
             to_be_paid,
-            paid_amount: to_be_paid + marketCashbox.balance,
-            comment: finalComment,
-            sold_at: order.sold_at ?? Date.now(),
+            paid_amount: to_be_paid + marketCashbox.balance, // salbiy balansni hisobga oladi
           });
-          await queryRunner.manager.save(order);
         }
       } else {
+        // Hali to‘lanmagan
         Object.assign(order, {
           status: Order_status.SOLD,
           to_be_paid,
-          comment: finalComment,
-          sold_at: order.sold_at ?? Date.now(),
+          paid_amount: 0,
         });
-        await queryRunner.manager.save(order);
       }
 
+      Object.assign(order, {
+        comment: finalComment,
+        sold_at: order.sold_at ?? Date.now(),
+      });
+
+      await queryRunner.manager.save(order);
+
+      // ✅ Market cashbox update
       marketCashbox.balance += to_be_paid;
       await queryRunner.manager.save(marketCashbox);
-      const marketCashboxHistory = queryRunner.manager.create(
-        CashboxHistoryEntity,
-        {
+
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.INCOME,
           cashbox_id: marketCashbox.id,
           source_id: order.id,
@@ -719,15 +769,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           balance_after: marketCashbox.balance,
           comment: finalComment,
           created_by: courier.id,
-        },
+        }),
       );
-      await queryRunner.manager.save(marketCashboxHistory);
 
+      // ✅ Courier cashbox update
       courierCashbox.balance += courier_to_be_paid;
       await queryRunner.manager.save(courierCashbox);
-      const courierCashboxHistory = queryRunner.manager.create(
-        CashboxHistoryEntity,
-        {
+
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.INCOME,
           cashbox_id: courierCashbox.id,
           source_type: Source_type.SELL,
@@ -736,9 +786,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           balance_after: courierCashbox.balance,
           comment: finalComment,
           created_by: courier.id,
-        },
+        }),
       );
-      await queryRunner.manager.save(courierCashboxHistory);
 
       await queryRunner.commitTransaction();
       return successRes({ id: order.id }, 200, 'Order sold');
@@ -1150,11 +1199,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           end,
         })
         .andWhere('o.status IN (:...statuses)', {
-          statuses: [
-            Order_status.CANCELLED,
-            Order_status.CANCELLED_SENT,
-            Order_status.CLOSED,
-          ],
+          statuses: [Order_status.CANCELLED],
         })
         .getCount();
 
@@ -1215,14 +1260,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               Number(courier?.tariff_center ?? 0);
       }
 
-      return successRes({
-        acceptedCount,
-        cancelled,
-        soldAndPaid,
-        profit,
-        from: start,
-        to: end,
-      });
+      return successRes(
+        {
+          acceptedCount,
+          cancelled,
+          soldAndPaid,
+          profit,
+          from: start,
+          to: end,
+        },
+        200,
+        'Overall statistics',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -1232,48 +1281,74 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const start = startDate ? new Date(startDate).getTime() : 0;
       const end = endDate ? new Date(endDate).getTime() : Date.now();
-      const allOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.created_at BETWEEN :start AND :end', {
-          start,
-          end,
-        })
-        .getMany();
 
+      // 1) totalOrders: created_at oralig'ida yaratilgan buyurtmalar soni per market
+      const totalsRaw = await this.orderRepo
+        .createQueryBuilder('o')
+        .select('o.user_id', 'user_id')
+        .addSelect('COUNT(*)', 'total')
+        .where('o.created_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.user_id IS NOT NULL')
+        .groupBy('o.user_id')
+        .getRawMany();
+
+      // 2) soldOrders: shu davrda yaratilgan AND shu davrda sotilgan AND status IN (...)
+      const statuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ];
+
+      const soldsRaw = await this.orderRepo
+        .createQueryBuilder('o')
+        .select('o.user_id', 'user_id')
+        .addSelect('COUNT(*)', 'sold')
+        .where('o.created_at BETWEEN :start AND :end', { start, end }) // yaratilgan davr
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end }) // sotilgan davr
+        .andWhere('o.status IN (:...statuses)', { statuses }) // kerakli statuslar
+        .andWhere('o.user_id IS NOT NULL')
+        .groupBy('o.user_id')
+        .getRawMany();
+
+      // 3) Raw natijalarni Map ga aylantirish (fast lookup)
+      const totalsMap = new Map<string, number>();
+      totalsRaw.forEach((r) => {
+        totalsMap.set(String(r.user_id), Number(r.total));
+      });
+
+      const soldsMap = new Map<string, number>();
+      soldsRaw.forEach((r) => {
+        soldsMap.set(String(r.user_id), Number(r.sold));
+      });
+
+      // 4) unique market id lar (yaratilgan yoki sotilgan bo'lsa)
       const uniqueMarketIds = Array.from(
-        new Set(allOrders.map((order) => order.user_id)),
+        new Set([...totalsMap.keys(), ...soldsMap.keys()]),
       );
 
       if (uniqueMarketIds.length === 0) {
         return successRes([], 200, 'No markets found in this period');
       }
 
+      // 5) Market ma'lumotlarini olish
+      // NOTE: agar user.id UUID bo'lsa, In(...) stringlarni qabul qiladi; agar raqam bo'lsa ham ishlaydi.
       const allUniqueMarkets = await this.userRepo.find({
         where: { id: In(uniqueMarketIds), role: Roles.MARKET },
       });
 
+      // 6) Final statistikani tayyorlash
       const marketWithOrderStats = allUniqueMarkets.map((market) => {
-        const marketsOrders = allOrders.filter(
-          (order) => order.user_id === market.id,
-        );
-
-        const marketsSoldOrders = marketsOrders.filter((order) =>
-          [
-            Order_status.SOLD,
-            Order_status.PAID,
-            Order_status.PARTLY_PAID,
-          ].includes(order.status),
-        );
-
+        const totalOrders = totalsMap.get(String(market.id)) ?? 0;
+        const soldOrders = soldsMap.get(String(market.id)) ?? 0;
         const sellingRate =
-          marketsOrders.length > 0
-            ? (marketsSoldOrders.length * 100) / marketsOrders.length
+          totalOrders > 0
+            ? Number(((soldOrders * 100) / totalOrders).toFixed(2))
             : 0;
 
         return {
           market,
-          totalOrders: marketsOrders.length,
-          soldOrders: marketsSoldOrders.length,
+          totalOrders,
+          soldOrders,
           sellingRate,
         };
       });
@@ -1289,7 +1364,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const start = startDate ? new Date(startDate).getTime() : 0;
       const end = endDate ? new Date(endDate).getTime() : Date.now();
 
-      // Shu davrdagi barcha postlarni olish
+      // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
         .createQueryBuilder('p')
         .where('p.created_at BETWEEN :start AND :end', { start, end })
@@ -1303,13 +1378,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         return successRes([], 200, 'No couriers found in this period');
       }
 
-      // Kuryerlarni olish
+      // 2️⃣ Kuryerlarni olish
       const allCouriers = await this.userRepo.find({
         where: { id: In(uniqueCourierIds), role: Roles.COURIER },
       });
 
       const courierWithStats: object[] = [];
+      const validStatuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ];
 
+      // 3️⃣ Har bir kuryer uchun hisoblash
       for (const courier of allCouriers) {
         // Shu kuryerning postlari
         const courierPosts = allPosts.filter(
@@ -1321,33 +1402,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           courierWithStats.push({
             courier,
             totalOrders: 0,
-            deliveredOrders: 0,
+            soldOrders: 0,
             successRate: 0,
           });
           continue;
         }
 
-        // Shu kuryerga tegishli orderlar
-        const courierOrders = await this.orderRepo.find({
-          where: { post_id: In(postIds) },
-        });
+        // 🔹 Shu kuryerning berilgan davrdagi barcha orderlari
+        const totalOrders = await this.orderRepo
+          .createQueryBuilder('o')
+          .where('o.post_id IN (:...postIds)', { postIds })
+          .andWhere('o.created_at BETWEEN :start AND :end', { start, end })
+          .getCount();
 
-        const deliveredOrders = courierOrders.filter(
-          (order) =>
-            order.status === Order_status.SOLD ||
-            order.status === Order_status.PAID ||
-            order.status === Order_status.PARTLY_PAID,
-        );
+        // 🔹 Shu kuryerning sotilgan orderlari
+        const soldOrders = await this.orderRepo
+          .createQueryBuilder('o')
+          .where('o.post_id IN (:...postIds)', { postIds })
+          .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+          .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+          .getCount();
 
         const successRate =
-          courierOrders.length > 0
-            ? (deliveredOrders.length * 100) / courierOrders.length
+          totalOrders > 0
+            ? Number(((soldOrders * 100) / totalOrders).toFixed(2))
             : 0;
 
         courierWithStats.push({
           courier,
-          totalOrders: courierOrders.length,
-          deliveredOrders: deliveredOrders.length,
+          totalOrders,
+          soldOrders,
           successRate,
         });
       }
@@ -1434,6 +1518,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .getRawMany();
 
       return successRes(result, 200, 'Top Couriers (last 30 days)');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async courierStat(startDate?: string, endDate?: string) {
+    try {
     } catch (error) {
       return catchError(error);
     }

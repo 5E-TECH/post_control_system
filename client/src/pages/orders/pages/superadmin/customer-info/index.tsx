@@ -140,6 +140,8 @@ const CustomerInfoOrder = () => {
               Discard
             </Button>
             <Button
+              disabled={createUser.isPending}
+              loading={createUser.isPending}
               onClick={handleClick}
               className="w-[91px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
             >

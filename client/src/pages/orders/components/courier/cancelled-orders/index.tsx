@@ -10,14 +10,14 @@ const Context = createContext({ name: "Default" });
 
 const CancelledOrders = () => {
   const { getCourierOrders } = useOrder();
-  const { mutate: cancelPost } = usePost().canceledPost();
+  const { mutate: cancelPost, isPending } = usePost().canceledPost();
   const { data, refetch } = getCourierOrders({ status: "cancelled" });
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (data?.data) {
-      setSelectedIds(data.data.map((item: any) => item.id));
+    if (data?.data?.data) {
+      setSelectedIds(data?.data?.data?.map((item: any) => item.id));
     }
   }, [data]);
   const [api, contextHolder] = useNotification();
@@ -78,24 +78,27 @@ const CancelledOrders = () => {
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
-  return data?.data?.length > 0 ? (
+  return data?.data?.data?.length > 0 ? (
     <Context.Provider value={contextValue}>
       {contextHolder}
       <div>
         <table className="w-full">
           <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
             <tr>
-              {data?.data?.length ? (
+              {data?.data?.data?.length ? (
                 <th className="p-[20px] flex items-center">
                   <input
                     type="checkbox"
                     className="w-[18px] h-[18px] rounded-sm"
                     checked={
-                      !!data?.data && selectedIds.length === data?.data?.length
+                      !!data?.data?.data &&
+                      selectedIds.length === data?.data?.data?.length
                     }
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedIds(data?.data.map((item: any) => item.id));
+                        setSelectedIds(
+                          data?.data?.data?.map((item: any) => item.id)
+                        );
                       } else {
                         setSelectedIds([]);
                       }
@@ -108,7 +111,7 @@ const CancelledOrders = () => {
               <th>
                 <div
                   className={`flex items-center gap-10 pr-7 ${
-                    !data?.data?.length ? "pl-7" : ""
+                    !data?.data?.data?.length ? "pl-7" : ""
                   }`}
                 >
                   <span>#</span>
@@ -160,7 +163,7 @@ const CancelledOrders = () => {
             </tr>
           </thead>
           <tbody>
-            {data?.data?.map((item: any, inx: number) => (
+            {data?.data?.data?.map((item: any, inx: number) => (
               <tr
                 key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
@@ -242,6 +245,8 @@ const CancelledOrders = () => {
 
         <div className="flex justify-end px-5">
           <Button
+            disabled={isPending}
+            loading={isPending}
             onClick={handleClick}
             className="w-[180px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!"
           >

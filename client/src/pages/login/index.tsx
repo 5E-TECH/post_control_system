@@ -42,7 +42,6 @@ const Login: FC = () => {
   const dispatch = useDispatch();
   const { signinUser } = useLogin();
 
-
   const [showOnline, setShowOnline] = useState(false);
 
   const network = useNetworkState();
@@ -58,7 +57,6 @@ const Login: FC = () => {
       return () => clearTimeout(timer);
     }
   }, [network.online, prevOnline]);
-
 
   // Default qiymatni +998 bilan boshlash foydalanuvchiga qulay:
   const initialValues: ILogin = {
@@ -100,25 +98,18 @@ const Login: FC = () => {
         )}
       </div>
 
-      <div className="flex items-center justify-center min-h-[90vh] bg-gray-100 relative px-4 sm:px-10">
+      <div className="flex items-center justify-center min-h-[100vh] bg-gray-100 relative px-4 sm:px-10">
         <div className="absolute bottom-0 left-0 w-full">
           <img
             src={line}
             alt="line"
             className="w-full absolute bottom-0 left-0"
           />
+          <div className="w-full flex justify-between items-center h-[30vh] px-6">
+            <img src={left} alt="Left plant" className=" w-[200px]" />
 
-          <img
-            src={left}
-            alt="Left plant"
-            className="absolute bottom-0 left-6 sm:left-12 h-[180px] w-[80px] z-10"
-          />
-
-          <img
-            src={right}
-            alt="Right plant"
-            className="absolute bottom-0 right-6 sm:right-12 h-[180px] w-[80px] z-10"
-          />
+            <img src={right} alt="Right plant" className=" w-[80px]" />
+          </div>
         </div>
 
         <div className="bg-white p-6 sm:p-8 rounded-lg shadow-2xl w-[460px] max-w-full mx-4">
@@ -148,20 +139,14 @@ const Login: FC = () => {
                         {...field}
                         mask="+\9\9\8 99 999 99 99"
                         maskChar={null}
-                        value={field.value}
+                        value={field.value.replace(
+                          /^(\+998)(\d{2})(\d{3})(\d{2})(\d{2})$/,
+                          "+998 $2 $3 $4 $5"
+                        )}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const digitsOnly = e.target.value.replace(/\D/g, ""); // faqat raqamlar
+                          const digitsOnly = e.target.value.replace(/\D/g, "");
                           const formatted = `+${digitsOnly}`;
                           form.setFieldValue("phone_number", formatted);
-
-                          // agar raqam to'liq bo'lsa → password inputiga focus
-                          if (formatted.length === 13) {
-                            const passwordInput =
-                              document.querySelector<HTMLInputElement>(
-                                "input[name='password']"
-                              );
-                            passwordInput?.focus();
-                          }
                         }}
                       >
                         {(inputProps: any) => (

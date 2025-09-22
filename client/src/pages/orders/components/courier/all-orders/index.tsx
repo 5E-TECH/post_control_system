@@ -107,7 +107,7 @@ const AllOrders = () => {
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
-  return data?.data?.length > 0 ? (
+  return data?.data?.data?.length > 0 ? (
     <Context.Provider value={contextValue}>
       {contextHolder}
       <div>
@@ -171,7 +171,7 @@ const AllOrders = () => {
             </tr>
           </thead>
           <tbody>
-            {data?.data?.map((item: any, inx: number) => (
+            {data?.data?.data?.map((item: any, inx: number) => (
               <tr
                 key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
@@ -205,29 +205,33 @@ const AllOrders = () => {
                   {item?.items.length}
                 </td>
                 <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                  {item?.status === "cancelled (sent)" ? null : item?.status ===
-                      "sold" || item?.status === "cancelled" ? (
-                    <div className="ml-9">
-                      <Button>
-                        <AlertCircle />
-                      </Button>
-                    </div>
-                  ) : (
+                  {item?.status === "waiting" ? (
                     <div className="flex gap-3">
                       <Button
+                        disabled={sellOrder.isPending}
+                        loading={sellOrder.isPending}
                         onClick={() => handleSellOrder(item?.id)}
                         className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                       >
                         Sotish
                       </Button>
                       <Button
+                        disabled={cancelOrder.isPending}
+                        loading={cancelOrder.isPending}
                         onClick={() => handleCancelOrder(item?.id)}
                         className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                       >
                         Bekor qilish
                       </Button>
                     </div>
-                  )}
+                  ) : item?.status === "sold" ||
+                    item?.status === "cancelled" ? (
+                    <div className="ml-9">
+                      <Button>
+                        <AlertCircle />
+                      </Button>
+                    </div>
+                  ) : null}
                 </td>
               </tr>
             ))}

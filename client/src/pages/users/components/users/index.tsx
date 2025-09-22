@@ -20,9 +20,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
       <table>
         <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
           <tr>
-            <th className="p-[20px] flex items-center">
-              <input type="checkbox" className="w-[18px] h-[18px] rounded-sm" />
-            </th>
+            <th className="p-[20px] flex items-center">#</th>
             <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
                 NAME
@@ -59,14 +57,9 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
           <TableSkeleton rows={10} columns={5} />
         ) : (
           <tbody>
-            {data?.map((user: any) => (
+            {data?.map((user: any, inx: number) => (
               <tr key={user?.id}>
-                <td className="p-[20px] flex items-center">
-                  <input
-                    type="checkbox"
-                    className="w-[18px] h-[18px] rounded-sm"
-                  />
-                </td>
+                <td className="p-[20px] flex items-center">{inx + 1}</td>
                 <td className="w-[254px] h-[56px] pl-[20px] text-left">
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col">

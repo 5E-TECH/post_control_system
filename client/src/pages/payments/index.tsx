@@ -1,14 +1,14 @@
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import React, { useState } from "react";
-import Select from "../users/components/select";
-import Popup from "../../shared/ui/Popup";
-import { X } from "lucide-react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
-import { useCourier } from "../../shared/api/hooks/useCourier";
-import { useCashBox } from "../../shared/api/hooks/useCashbox";
-import CountUp from "react-countup";
-import { useEffect } from "react";
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import React, { useState } from 'react';
+import Select from '../users/components/select';
+import Popup from '../../shared/ui/Popup';
+import { X } from 'lucide-react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useMarket } from '../../shared/api/hooks/useMarket/useMarket';
+import { useCourier } from '../../shared/api/hooks/useCourier';
+import { useCashBox } from '../../shared/api/hooks/useCashbox';
+import CountUp from 'react-countup';
+import { useEffect } from 'react';
 
 const Payments = () => {
   const [showMarket, setShowMarket] = useState(false);
@@ -40,7 +40,7 @@ const Payments = () => {
     refetch();
   }, [pathname]);
 
-  if (pathname.startsWith("/payments/")) {
+  if (pathname.startsWith('/payments/')) {
     return <Outlet />;
   }
 
@@ -49,7 +49,7 @@ const Payments = () => {
       <div className="grid grid-cols-3 gap-14 text-center text-2xl items-end mx-5 ">
         <div
           onClick={() => setShowMarket(true)}
-          className="py-15 rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
+          className="py-15 cursor-pointer rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Berilishi kerak</h3>
           <strong className="block pt-3 text-4xl">
@@ -63,10 +63,10 @@ const Payments = () => {
         </div>
 
         <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
-          <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d]">
+          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d]">
             <button
               onClick={() => setShowMarket(false)}
-              className="cursor-pointer hover:bg-red-700 text-white p-2 rounded- ml-111 flex items-center justify-center shadow-md"
+              className="cursor-pointer hover:bg-red-700 text-white p-2 rounded- ml-160 flex items-center justify-center shadow-md"
             >
               <X size={18} />
             </button>
@@ -85,13 +85,19 @@ const Payments = () => {
                   <tr>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        # ID
+                        #
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
                         MARKET NAME
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        Berilishi kerak summa
                       </div>
                     </th>
                   </tr>
@@ -102,28 +108,29 @@ const Payments = () => {
                     <tr
                       key={item?.id}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                        item.id == select ? "bg-gray-100" : ""
+                      className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                        item.id == select ? 'bg-gray-300 text-black' : ''
                       }`}
                     >
                       <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                      <td className="pr-26 py-3">{item?.name}</td>
+                      <td className="pr-26 py-3 ">{item?.name}</td>
+                      <td className="pr-26 py-3">{item?.cashbox?.balance}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="pl-89 py-2">
+            <div className="flex justify-end py-2">
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
-                className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
-                  !select ? "" : "hover:bg-blue-600"
+                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
+                  !select ? '' : 'hover:bg-blue-600'
                 }  text-white rounded-md cursor-pointer ${
-                  !select ? "opacity-40" : ""
+                  !select ? 'opacity-40' : ''
                 }`}
               >
-                Selected
+                Tanlash
               </button>
             </div>
           </div>
@@ -131,13 +138,13 @@ const Payments = () => {
 
         <div
           onClick={() =>
-            navigate("main-cashbox", {
+            navigate('main-cashbox', {
               state: {
-                role: "pochta",
+                role: 'pochta',
               },
             })
           }
-          className="h-[250px] flex flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
+          className="h-[250px] flex cursor-pointer flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Kassadagi miqdor</h3>
           <strong className="block pt-3 text-4xl">
@@ -152,7 +159,7 @@ const Payments = () => {
 
         <div
           onClick={() => setShowCurier(true)}
-          className="py-15 rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
+          className="py-15 cursor-pointer rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
           <h3>Olinishi kerak</h3>
           <strong className="block pt-3 text-4xl">
@@ -216,13 +223,14 @@ const Payments = () => {
                     <tr
                       key={inx}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                        item.id == select ? "bg-gray-100" : ""
+                      className={`border-b-2 border-[#c3c5ce] dark:border-[#E7E3FCB2]  text-[15px] font-normal ${
+                        item.id == select ? 'bg-gray-100 text-black' : ''
                       }`}
                     >
                       <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
                       <td className="pr-26 py-3">{item?.name}</td>
                       <td className="pr-10 py-3">{item?.region?.name}</td>
+                      <td className="pr-10 py-3">{item?.cashbox?.balance}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -308,9 +316,9 @@ const Payments = () => {
                           {item?.createdByUser?.name}
                           <span
                             className={`text-[13px] ${
-                              item?.createdByUser?.role == "superadmin"
-                                ? "text-green-500"
-                                : "text-blue-500"
+                              item?.createdByUser?.role == 'superadmin'
+                                ? 'text-green-500'
+                                : 'text-blue-500'
                             }`}
                           >
                             {item?.createdByUser?.role}
@@ -321,13 +329,13 @@ const Payments = () => {
                             className={`
                                 px-[12px] py-[2px] rounded-full text-[13px]
                                 ${
-                                  item?.payment_method === "click_to_market"
-                                    ? "text-[#16B1FF] bg-[#16B1FF29]" // ko'k
-                                    : item?.payment_method === "cash"
-                                    ? "text-[#16C75F] bg-[#16C75F29]" // yashil
-                                    : item?.payment_method === "click"
-                                    ? "text-[#FFC107] bg-[#FFC10729]" // sariq
-                                    : "text-gray-500 bg-gray-200" // default rang
+                                  item?.payment_method === 'click_to_market'
+                                    ? 'text-[#16B1FF] bg-[#16B1FF29]' // ko'k
+                                    : item?.payment_method === 'cash'
+                                    ? 'text-[#16C75F] bg-[#16C75F29]' // yashil
+                                    : item?.payment_method === 'click'
+                                    ? 'text-[#FFC107] bg-[#FFC10729]' // sariq
+                                    : 'text-gray-500 bg-gray-200' // default rang
                                 }
                               `}
                           >
@@ -339,11 +347,11 @@ const Payments = () => {
                             className={`
                                   px-[12px] py-[2px] rounded-full text-[13px]
                                   ${
-                                    item?.operation_type === "income"
-                                      ? "text-[#16C75F] bg-[#16C75F29]" // yashil
-                                      : item?.operation_type === "expense"
-                                      ? "text-[#FF4D4F] bg-[#FF4D4F29]" // qizil
-                                      : "text-gray-500 bg-gray-200" // default rang
+                                    item?.operation_type === 'income'
+                                      ? 'text-[#16C75F] bg-[#16C75F29]' // yashil
+                                      : item?.operation_type === 'expense'
+                                      ? 'text-[#FF4D4F] bg-[#FF4D4F29]' // qizil
+                                      : 'text-gray-500 bg-gray-200' // default rang
                                   }
                                 `}
                           >
@@ -352,28 +360,28 @@ const Payments = () => {
                         </td>
                         <td
                           className={`px-13 py-3 text-[16px] ${
-                            item?.operation_type === "income"
-                              ? "text-[#16C75F]" // yashil
-                              : item?.operation_type === "expense"
-                              ? "text-[#FF4D4F]" // qizil
-                              : "text-gray-500" // default rang
+                            item?.operation_type === 'income'
+                              ? 'text-[#16C75F]' // yashil
+                              : item?.operation_type === 'expense'
+                              ? 'text-[#FF4D4F]' // qizil
+                              : 'text-gray-500' // default rang
                           }`}
                         >
-                          {item?.operation_type === "income"
-                            ? "+"
-                            : item?.operation_type === "expense"
-                            ? "-"
-                            : ""}
-                          {Number(item?.amount || 0).toLocaleString("uz-UZ")}{" "}
+                          {item?.operation_type === 'income'
+                            ? '+'
+                            : item?.operation_type === 'expense'
+                            ? '-'
+                            : ''}
+                          {Number(item?.amount || 0).toLocaleString('uz-UZ')}{' '}
                           UZS
                         </td>
                         <td className="px-13 py-3">
                           {new Date(Number(item?.created_at)).toLocaleString(
-                            "uz-UZ"
+                            'uz-UZ',
                           )}
                         </td>
                       </tr>
-                    )
+                    ),
                   )}
                 </tbody>
               </table>
