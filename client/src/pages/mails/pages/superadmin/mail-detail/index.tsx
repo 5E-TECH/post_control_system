@@ -21,8 +21,7 @@ const MailDetail = () => {
 
   const { getPostById, sendAndGetCouriersByPostId, sendPost } = usePost();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
-  const { mutate: sendCouriersToPost, isPending: sendPostIsLoading } =
-    sendPost();
+  const { mutate: sendCouriersToPost, isPending } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
   // Dynamic fetching based on status
@@ -106,6 +105,13 @@ const MailDetail = () => {
   const [api, contextHolder] = useNotification();
   const navigate = useNavigate();
   const handleConfirmCouriers = () => {
+    if (!selectedCourierId) {
+      api.warning({
+        message: "Kuryer tanlanmagan",
+        placement: "topRight",
+      });
+      return;
+    }
     const post = {
       orderIds: selectedIds,
       courierId: selectedCourierId,
@@ -269,8 +275,8 @@ const MailDetail = () => {
         {!hideSend ? (
           <div className="flex justify-end">
             <Button
-              disabled={sendPostIsLoading}
-              loading={sendPostIsLoading}
+              disabled={isPending}
+              loading={isPending}
               onClick={() => handleClick(id as string)}
               className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
             >
@@ -321,8 +327,8 @@ const MailDetail = () => {
                 ))}
 
                 <Button
-                  disabled={sendPostIsLoading}
-                  loading={sendPostIsLoading}
+                  disabled={isPending}
+                  loading={isPending}
                   className="bg-[var(--color-bg-sy)]! text-white!"
                   onClick={handleConfirmCouriers}
                 >

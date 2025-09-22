@@ -176,10 +176,11 @@ const RefusedMailDetail = () => {
           </div>
         </div>
 
-        <div className="flex justify-end" onClick={handleClick}>
+        <div className="flex justify-end">
           <Button
             disabled={isPending}
             loading={isPending}
+            onClick={handleClick}
             className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
           >
             Po'chtani qabul qilish
