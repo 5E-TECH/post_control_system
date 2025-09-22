@@ -458,6 +458,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
+      console.log(`${new Date()} receiveNewOrders: ${order_ids}`);
       // 1️⃣ Faqat NEW statusdagi orderlarni olish
       const qb = queryRunner.manager
         .createQueryBuilder(OrderEntity, 'order')
@@ -538,6 +539,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // Orderni shu postga bog‘lash
         order.status = Order_status.RECEIVED;
         order.post = post;
+
+        console.log(`order status updated: ${order.status}`, order);
 
         // Statistikalarni vaqtincha yangilash
         post.post_total_price =
