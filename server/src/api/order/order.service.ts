@@ -1264,14 +1264,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               Number(courier?.tariff_center ?? 0);
       }
 
-      return successRes({
-        acceptedCount,
-        cancelled,
-        soldAndPaid,
-        profit,
-        from: start,
-        to: end,
-      });
+      return successRes(
+        {
+          acceptedCount,
+          cancelled,
+          soldAndPaid,
+          profit,
+          from: start,
+          to: end,
+        },
+        200,
+        'Overall statistics',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -1281,48 +1285,74 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const start = startDate ? new Date(startDate).getTime() : 0;
       const end = endDate ? new Date(endDate).getTime() : Date.now();
-      const allOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.created_at BETWEEN :start AND :end', {
-          start,
-          end,
-        })
-        .getMany();
 
-      const marketsSoldOrders = await this.orderRepo
+      // 1) totalOrders: created_at oralig'ida yaratilgan buyurtmalar soni per market
+      const totalsRaw = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.sold_at BETWEEN :start AND :end', {
-          start,
-          end,
-        })
-        .getMany();
+        .select('o.user_id', 'user_id')
+        .addSelect('COUNT(*)', 'total')
+        .where('o.created_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.user_id IS NOT NULL')
+        .groupBy('o.user_id')
+        .getRawMany();
 
+      // 2) soldOrders: shu davrda yaratilgan AND shu davrda sotilgan AND status IN (...)
+      const statuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ];
+
+      const soldsRaw = await this.orderRepo
+        .createQueryBuilder('o')
+        .select('o.user_id', 'user_id')
+        .addSelect('COUNT(*)', 'sold')
+        .where('o.created_at BETWEEN :start AND :end', { start, end }) // yaratilgan davr
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end }) // sotilgan davr
+        .andWhere('o.status IN (:...statuses)', { statuses }) // kerakli statuslar
+        .andWhere('o.user_id IS NOT NULL')
+        .groupBy('o.user_id')
+        .getRawMany();
+
+      // 3) Raw natijalarni Map ga aylantirish (fast lookup)
+      const totalsMap = new Map<string, number>();
+      totalsRaw.forEach((r) => {
+        totalsMap.set(String(r.user_id), Number(r.total));
+      });
+
+      const soldsMap = new Map<string, number>();
+      soldsRaw.forEach((r) => {
+        soldsMap.set(String(r.user_id), Number(r.sold));
+      });
+
+      // 4) unique market id lar (yaratilgan yoki sotilgan bo'lsa)
       const uniqueMarketIds = Array.from(
-        new Set(allOrders.map((order) => order.user_id)),
+        new Set([...totalsMap.keys(), ...soldsMap.keys()]),
       );
 
       if (uniqueMarketIds.length === 0) {
         return successRes([], 200, 'No markets found in this period');
       }
 
+      // 5) Market ma'lumotlarini olish
+      // NOTE: agar user.id UUID bo'lsa, In(...) stringlarni qabul qiladi; agar raqam bo'lsa ham ishlaydi.
       const allUniqueMarkets = await this.userRepo.find({
         where: { id: In(uniqueMarketIds), role: Roles.MARKET },
       });
 
+      // 6) Final statistikani tayyorlash
       const marketWithOrderStats = allUniqueMarkets.map((market) => {
-        const marketsOrders = allOrders.filter(
-          (order) => order.user_id === market.id,
-        );
-
+        const totalOrders = totalsMap.get(String(market.id)) ?? 0;
+        const soldOrders = soldsMap.get(String(market.id)) ?? 0;
         const sellingRate =
-          marketsOrders.length > 0
-            ? (marketsSoldOrders.length * 100) / marketsOrders.length
+          totalOrders > 0
+            ? Number(((soldOrders * 100) / totalOrders).toFixed(2))
             : 0;
 
         return {
           market,
-          totalOrders: marketsOrders.length,
-          soldOrders: marketsSoldOrders.length,
+          totalOrders,
+          soldOrders,
           sellingRate,
         };
       });
@@ -1338,7 +1368,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const start = startDate ? new Date(startDate).getTime() : 0;
       const end = endDate ? new Date(endDate).getTime() : Date.now();
 
-      // Shu davrdagi barcha postlarni olish
+      // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
         .createQueryBuilder('p')
         .where('p.created_at BETWEEN :start AND :end', { start, end })
@@ -1352,13 +1382,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         return successRes([], 200, 'No couriers found in this period');
       }
 
-      // Kuryerlarni olish
+      // 2️⃣ Kuryerlarni olish
       const allCouriers = await this.userRepo.find({
         where: { id: In(uniqueCourierIds), role: Roles.COURIER },
       });
 
       const courierWithStats: object[] = [];
+      const validStatuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ];
 
+      // 3️⃣ Har bir kuryer uchun hisoblash
       for (const courier of allCouriers) {
         // Shu kuryerning postlari
         const courierPosts = allPosts.filter(
@@ -1376,29 +1412,30 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           continue;
         }
 
-        // 1️⃣ Shu kuryerga tegishli VA shu davrda yaratilgan orderlar
-        const allCourierOrders = await this.orderRepo
+        // 🔹 Shu kuryerning berilgan davrdagi barcha orderlari
+        const totalOrders = await this.orderRepo
           .createQueryBuilder('o')
           .where('o.post_id IN (:...postIds)', { postIds })
           .andWhere('o.created_at BETWEEN :start AND :end', { start, end })
-          .getMany();
+          .getCount();
 
-        // 2️⃣ Shu kuryerga tegishli VA shu davrda sotilgan orderlar
-        const courierSoldOrders = await this.orderRepo
+        // 🔹 Shu kuryerning sotilgan orderlari
+        const soldOrders = await this.orderRepo
           .createQueryBuilder('o')
           .where('o.post_id IN (:...postIds)', { postIds })
           .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
-          .getMany();
+          .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+          .getCount();
 
         const successRate =
-          allCourierOrders.length > 0
-            ? (courierSoldOrders.length * 100) / allCourierOrders.length
+          totalOrders > 0
+            ? Number(((soldOrders * 100) / totalOrders).toFixed(2))
             : 0;
 
         courierWithStats.push({
           courier,
-          totalOrders: allCourierOrders.length,
-          soldOrders: courierSoldOrders.length,
+          totalOrders,
+          soldOrders,
           successRate,
         });
       }
