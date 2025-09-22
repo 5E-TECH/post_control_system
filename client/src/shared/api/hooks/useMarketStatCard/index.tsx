@@ -14,7 +14,7 @@ export const useChart = () => {
       queryKey: [chart, params],
       queryFn: () =>
         api
-          .get("dashboard/overview", { params: { ...params } })
+          .get("dashboard/overview/market", { params: { ...params } })
           .then((res) => res.data),
     });
   };
