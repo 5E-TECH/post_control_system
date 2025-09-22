@@ -253,7 +253,10 @@ export class PostService {
     await queryRunner.startTransaction();
 
     try {
-      const post = await this.postRepo.findOne({ where: { id } });
+      const post = await this.postRepo.findOne({
+        where: { id },
+        relations: ['courier'],
+      });
       if (!post) throw new NotFoundException('Post not found');
 
       const { orderIds, courierId } = sendPostDto;
