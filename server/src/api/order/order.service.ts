@@ -671,55 +671,46 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
+      if (!order) throw new NotFoundException('Order not found');
 
-      const deliveringPlace = order.where_deliver;
       const marketId = order.user_id;
       const market = await queryRunner.manager.findOne(UserEntity, {
         where: { id: marketId, role: Roles.MARKET },
       });
-      if (!market) {
-        throw new NotFoundException('This orders owner is not found');
-      }
+      if (!market) throw new NotFoundException('Market not found');
+
       const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
       });
-      if (!marketCashbox) {
+      if (!marketCashbox)
         throw new NotFoundException('Market cashbox not found');
-      }
 
       const courier = await queryRunner.manager.findOne(UserEntity, {
         where: { id: user.id },
       });
-      if (!courier) {
-        throw new NotFoundException('Courier not found');
-      }
+      if (!courier) throw new NotFoundException('Courier not found');
 
       const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier?.id },
+        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier.id },
       });
-
-      if (!courierCashbox) {
+      if (!courierCashbox)
         throw new NotFoundException('Courier cashbox not found');
-      }
 
-      const marketTarif: number =
-        deliveringPlace === Where_deliver.CENTER
+      const marketTarif =
+        order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
           : market.tariff_home;
 
-      const courierTarif: number =
-        deliveringPlace === Where_deliver.CENTER
+      const courierTarif =
+        order.where_deliver === Where_deliver.CENTER
           ? courier.tariff_center
           : courier.tariff_home;
 
-      const to_be_paid: number = sellOrderDto.extraCost
+      const to_be_paid = sellOrderDto.extraCost
         ? order.total_price - sellOrderDto.extraCost - marketTarif
         : order.total_price - marketTarif;
 
-      const courier_to_be_paid: number = sellOrderDto.extraCost
+      const courier_to_be_paid = sellOrderDto.extraCost
         ? order.total_price - sellOrderDto.extraCost - courierTarif
         : order.total_price - courierTarif;
 
@@ -729,41 +720,47 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         sellOrderDto.extraCost || 0,
       );
 
-      if (Number(marketCashbox.balance) < 0) {
-        if (marketCashbox.balance + to_be_paid <= 0) {
+      // ✅ Order status va balans
+      if (marketCashbox.balance < 0) {
+        // Qarz mavjud
+        const qoplash = marketCashbox.balance + to_be_paid;
+        if (qoplash <= 0) {
+          // To‘liq yopildi
           Object.assign(order, {
             status: Order_status.PAID,
             to_be_paid,
             paid_amount: to_be_paid,
-            comment: finalComment,
-            sold_at: order.sold_at ?? Date.now(),
           });
-          await queryRunner.manager.save(order);
         } else {
+          // Qisman yopildi
           Object.assign(order, {
             status: Order_status.PARTLY_PAID,
             to_be_paid,
-            paid_amount: to_be_paid + marketCashbox.balance,
-            comment: finalComment,
-            sold_at: order.sold_at ?? Date.now(),
+            paid_amount: to_be_paid + marketCashbox.balance, // salbiy balansni hisobga oladi
           });
-          await queryRunner.manager.save(order);
         }
       } else {
+        // Hali to‘lanmagan
         Object.assign(order, {
           status: Order_status.SOLD,
           to_be_paid,
-          comment: finalComment,
-          sold_at: order.sold_at ?? Date.now(),
+          paid_amount: 0,
         });
-        await queryRunner.manager.save(order);
       }
 
+      Object.assign(order, {
+        comment: finalComment,
+        sold_at: order.sold_at ?? Date.now(),
+      });
+
+      await queryRunner.manager.save(order);
+
+      // ✅ Market cashbox update
       marketCashbox.balance += to_be_paid;
       await queryRunner.manager.save(marketCashbox);
-      const marketCashboxHistory = queryRunner.manager.create(
-        CashboxHistoryEntity,
-        {
+
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.INCOME,
           cashbox_id: marketCashbox.id,
           source_id: order.id,
@@ -772,15 +769,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           balance_after: marketCashbox.balance,
           comment: finalComment,
           created_by: courier.id,
-        },
+        }),
       );
-      await queryRunner.manager.save(marketCashboxHistory);
 
+      // ✅ Courier cashbox update
       courierCashbox.balance += courier_to_be_paid;
       await queryRunner.manager.save(courierCashbox);
-      const courierCashboxHistory = queryRunner.manager.create(
-        CashboxHistoryEntity,
-        {
+
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.INCOME,
           cashbox_id: courierCashbox.id,
           source_type: Source_type.SELL,
@@ -789,9 +786,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           balance_after: courierCashbox.balance,
           comment: finalComment,
           created_by: courier.id,
-        },
+        }),
       );
-      await queryRunner.manager.save(courierCashboxHistory);
 
       await queryRunner.commitTransaction();
       return successRes({ id: order.id }, 200, 'Order sold');
