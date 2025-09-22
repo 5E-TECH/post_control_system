@@ -205,15 +205,7 @@ const AllOrders = () => {
                   {item?.items.length}
                 </td>
                 <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                  {item?.status === "cancelled (sent)" ||
-                  item?.status === "waiting" ? null : item?.status === "sold" ||
-                    item?.status === "cancelled" ? (
-                    <div className="ml-9">
-                      <Button>
-                        <AlertCircle />
-                      </Button>
-                    </div>
-                  ) : (
+                  {item?.status === "waiting" ? (
                     <div className="flex gap-3">
                       <Button
                         onClick={() => handleSellOrder(item?.id)}
@@ -228,7 +220,14 @@ const AllOrders = () => {
                         Bekor qilish
                       </Button>
                     </div>
-                  )}
+                  ) : item?.status === "sold" ||
+                    item?.status === "cancelled" ? (
+                    <div className="ml-9">
+                      <Button>
+                        <AlertCircle />
+                      </Button>
+                    </div>
+                  ) : null}
                 </td>
               </tr>
             ))}
