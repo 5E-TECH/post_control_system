@@ -1,4 +1,4 @@
-import { Injectable, Scope, Inject } from '@nestjs/common';
+import { Injectable, Scope, Inject, LoggerService } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 
@@ -6,11 +6,11 @@ import { Logger } from 'winston';
 export class MyLogger {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
-    private readonly logger: Logger,
+    private readonly logger: LoggerService,
   ) {}
 
   log(context: string, message: string) {
-    this.logger.info(message, { context });
+    this.logger.log(message, { context });
   }
 
   error(context: string, message: string, trace?: string) {
@@ -19,9 +19,5 @@ export class MyLogger {
 
   warn(context: string, message: string) {
     this.logger.warn(message, { context });
-  }
-
-  debug(context: string, message: string) {
-    this.logger.debug(message, { context });
   }
 }

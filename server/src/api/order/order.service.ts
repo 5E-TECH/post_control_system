@@ -41,6 +41,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { OrderGateaway } from '../socket/order.gateaway';
 import { PostRepository } from 'src/core/repository/post.repository';
+import { MyLogger } from 'src/logger/logger.service';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -66,13 +67,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     @InjectRepository(PostEntity)
     private readonly postRepo: PostRepository,
 
+    private readonly logger: MyLogger,
     private readonly dataSource: DataSource,
     private readonly orderGateaway: OrderGateaway,
   ) {
     super(orderRepo);
   }
-
-  private readonly logger = new Logger(OrderService.name);
 
   async allOrders(query: {
     status?: string;
@@ -82,7 +82,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     page?: number;
     limit?: number;
   }) {
-    this.logger.log(`allOrders API was called`);
+    this.logger.log(OrderService.name, `allOrders API was called`);
     try {
       const qb = this.orderRepo
         .createQueryBuilder('order')
@@ -462,7 +462,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
-      this.logger.log(`receiveNewOrders: ${order_ids}`);
+      this.logger.log(OrderService.name, `receiveNewOrders: ${order_ids}`);
 
       // 1️⃣ Faqat NEW statusdagi orderlarni olish
       const qb = queryRunner.manager
@@ -544,7 +544,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // Orderni shu postga bog‘lash
         order.status = Order_status.RECEIVED;
         order.post = post;
-        this.logger.log(`order status updated: ${order.status}`);
+        this.logger.log(
+          OrderService.name,
+          `order status updated: ${order.status}`,
+        );
 
         // Statistikalarni vaqtincha yangilash
         post.post_total_price =
