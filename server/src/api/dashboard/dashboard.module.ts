@@ -11,6 +11,7 @@ import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
 import { OrderGateaway } from '../socket/order.gateaway';
+import { MyLogger } from 'src/logger/logger.service';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { OrderGateaway } from '../socket/order.gateaway';
     ]),
   ],
   controllers: [DashboardController],
-  providers: [DashboardService, OrderService, OrderGateaway],
+  providers: [DashboardService, OrderService, OrderGateaway, MyLogger],
+  exports: [MyLogger],
 })
 export class DashboardModule {}
