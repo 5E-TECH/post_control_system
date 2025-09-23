@@ -17,6 +17,7 @@ import { MyLogger } from './logger.service';
         }),
       ),
       transports: [
+        // Console transport
         new transports.Console({
           format: format.combine(
             format.colorize({ all: true }),
@@ -28,14 +29,16 @@ import { MyLogger } from './logger.service';
           ),
         }),
 
+        // Faqat errorlarni yozish
         new transports.File({
           filename: 'logs/app-error.log',
           level: 'error',
         }),
 
+        // Barcha loglarni yozish (info va undan yuqori)
         new transports.File({
           filename: 'logs/app-combined.log',
-          level: 'warn',
+          level: 'info',
         }),
       ],
     }),
