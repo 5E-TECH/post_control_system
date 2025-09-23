@@ -82,7 +82,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     page?: number;
     limit?: number;
   }) {
-    this.logger.log(OrderService.name, `allOrders API was called`);
+    this.logger.log('TEST: receiveNewOrders called', 'OrderService');
+    this.logger.warn('TEST warning', 'OrderService');
+    this.logger.error('TEST error', 'stacktrace sample', 'OrderService');
     try {
       const qb = this.orderRepo
         .createQueryBuilder('order')
