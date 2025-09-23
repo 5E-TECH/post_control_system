@@ -462,7 +462,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
-      this.logger.log(OrderService.name, `receiveNewOrders: ${order_ids}`);
+      this.logger.log(`receiveNewOrders: ${order_ids}`, 'Order service');
 
       // 1️⃣ Faqat NEW statusdagi orderlarni olish
       const qb = queryRunner.manager
@@ -545,8 +545,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order.status = Order_status.RECEIVED;
         order.post = post;
         this.logger.log(
-          OrderService.name,
           `order status updated: ${order.status}`,
+          'Order service',
         );
 
         // Statistikalarni vaqtincha yangilash
