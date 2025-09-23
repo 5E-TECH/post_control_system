@@ -7,7 +7,7 @@ import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.except
 import config from 'src/config';
 import * as express from 'express';
 import { join } from 'path';
-import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { MyLogger } from 'src/logger/logger.service';
 
 export default class Application {
   public static async main(): Promise<void> {
@@ -16,7 +16,7 @@ export default class Application {
     });
 
     // Logger
-    app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+    app.useLogger(app.get(MyLogger));
 
     // Uploads static files
     app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
@@ -49,36 +49,13 @@ export default class Application {
     // Swagger konfiguratsiya
     const config_swagger = new DocumentBuilder()
       .setTitle('Post Control System API')
-      .setDescription(
-        'A comprehensive API for managing post delivery operations, including orders, users, markets, couriers, and post management',
-      )
+      .setDescription('API for post delivery management')
       .setVersion('1.0.0')
       .addBearerAuth({
         type: 'http',
         scheme: 'Bearer',
         in: 'Header',
-        description: 'JWT Authorization header using the Bearer scheme',
       })
-      .addTag(
-        'Users',
-        'User management endpoints including authentication, admin, courier, market, and customer operations',
-      )
-      .addTag(
-        'Orders',
-        'Order management endpoints for creating, tracking, and managing delivery orders',
-      )
-      .addTag(
-        'Posts',
-        'Post management endpoints for handling delivery posts and courier assignments',
-      )
-      .addTag('Products', 'Product catalog management')
-      .addTag('Regions', 'Geographic region management')
-      .addTag('Districts', 'District management within regions')
-      .addTag('Cash Box', 'Financial operations and cash management')
-      .addTag('Dashboard', 'Dashboard and analytics endpoints')
-      .addTag('Bot', 'Telegram bot integration endpoints')
-      .setContact('Development Team', '', 'dev@postcontrol.com')
-      .setLicense('Private License', '')
       .build();
 
     const documentFactory = () =>
@@ -87,8 +64,11 @@ export default class Application {
 
     // Serverni ishga tushirish
     await app.listen(config.PORT, () => {
-      const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
-      logger.log('info', `Server running on http://localhost:${config.PORT}`);
+      const logger = app.get(MyLogger);
+      logger.log(
+        `Server running on http://localhost:${config.PORT}`,
+        'Bootstrap',
+      );
     });
   }
 }

@@ -1,23 +1,34 @@
 import { Injectable, Scope, Inject, LoggerService } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { Logger } from 'winston';
 
 @Injectable({ scope: Scope.TRANSIENT })
-export class MyLogger {
+export class MyLogger implements LoggerService {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
   ) {}
 
-  log(context: string, message: string) {
-    this.logger.log(message, { context });
+  log(message: any, context?: string) {
+    this.logger.log(message, context);
   }
 
-  error(context: string, message: string, trace?: string) {
-    this.logger.error(message, { context, trace });
+  error(message: any, trace?: string, context?: string) {
+    this.logger.error(message, trace, context);
   }
 
-  warn(context: string, message: string) {
-    this.logger.warn(message, { context });
+  warn(message: any, context?: string) {
+    this.logger.warn(message, context);
+  }
+
+  debug?(message: any, context?: string) {
+    if (this.logger.debug) {
+      this.logger.debug(message, context);
+    }
+  }
+
+  verbose?(message: any, context?: string) {
+    if (this.logger.verbose) {
+      this.logger.verbose(message, context);
+    }
   }
 }
