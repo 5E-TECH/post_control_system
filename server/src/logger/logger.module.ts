@@ -9,33 +9,29 @@ import { MyLogger } from './logger.service';
     WinstonModule.forRoot({
       format: format.combine(
         format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        format.ms(),
         format.errors({ stack: true }),
         format.splat(),
-        format.printf(({ level, message, timestamp, context, ms }) => {
+        format.printf(({ timestamp, level, message, context, ms }) => {
           return `[${timestamp}] ${level} [${context || 'NestApp'}]: ${message} ${ms || ''}`;
         }),
       ),
       transports: [
-        // Console transport
+        // Console uchun
         new transports.Console({
           format: format.combine(
-            format.colorize({ all: true }),
+            format.colorize(),
             format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-            format.ms(),
-            format.printf(({ level, message, timestamp, context, ms }) => {
-              return `[${timestamp}] ${level} [${context || 'NestApp'}]: ${message} ${ms || ''}`;
+            format.printf(({ timestamp, level, message, context }) => {
+              return `[${timestamp}] ${level} [${context || 'NestApp'}]: ${message}`;
             }),
           ),
         }),
-
-        // Faqat errorlarni yozish
+        // Faqat errorlar
         new transports.File({
           filename: 'logs/app-error.log',
           level: 'error',
         }),
-
-        // Barcha loglarni yozish (info va undan yuqori)
+        // Barcha info va undan yuqori darajadagi loglar
         new transports.File({
           filename: 'logs/app-combined.log',
           level: 'info',

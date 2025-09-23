@@ -6,6 +6,7 @@ import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { MyLogger } from 'src/logger/logger.service';
 
 @Module({
   imports: [
