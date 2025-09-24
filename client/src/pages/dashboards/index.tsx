@@ -8,7 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  Cell,
+  // Cell,
 } from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
 import { useSelector } from "react-redux";
@@ -29,7 +29,7 @@ const SkeletonBox = ({ className }: { className?: string }) => (
 
 const Dashboards = () => {
   // default bugungi kun sanasi
-  const today = new Date().toISOString().split("T")[0];
+  // const today = new Date().toISOString().split("T")[0];
   const [fromDate, setFromDate] = useState<string>();
   const [toDate, setToDate] = useState<string>();
 
