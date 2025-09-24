@@ -64,6 +64,7 @@ const Dashboards = () => {
 
   const dashboard = data?.data?.orders?.data;
   const aboutCourier = data?.data?.myStat?.data;
+  const aboutMarket = data?.data?.myStat?.data;
 
   console.log(aboutCourier)
 
@@ -152,12 +153,12 @@ const Dashboards = () => {
           ))
         ) : (
           <>
-            {role === "courier" ? (
+            {role === "courier" && (
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
                   label="Jami buyurtmalar"
-                  value={aboutCourier?.totalOrders}
+                  value={aboutCourier?.totalOrder}
                   borderColor="border-gray-400"
                 />
                 <StatCard
@@ -184,7 +185,45 @@ const Dashboards = () => {
                   textColor="text-yellow-500"
                 />
               </>
-            ) : (
+            )}
+
+            {role === "market" && (
+              <>
+                <StatCard
+                  icon={<ShoppingCart size={20} />}
+                  label="Jami buyurtmalar"
+                  value={aboutMarket?.totalOrders}
+                  borderColor="border-gray-400"
+                />
+                <StatCard
+                  icon={<CheckCircle size={20} />}
+                  label="Sotilgan"
+                  value={aboutMarket?.soldOrders}
+                  borderColor="border-green-500"
+                  textColor="text-green-500"
+                />
+                <StatCard
+                  icon={<XCircle size={20} />}
+                  label="Bekor qilinganlar"
+                  value={aboutMarket?.canceledOrders}
+                  borderColor="border-red-500"
+                  textColor="text-red-500"
+                />
+                <StatCard
+                  icon={<DollarSign size={20} />}
+                  label="Jami daromad"
+                  value={`${Number(
+                    aboutMarket?.profit || 0
+                  ).toLocaleString()} UZS`}
+                  borderColor="border-yellow-500"
+                  textColor="text-yellow-500"
+                />
+              </>
+            )}
+
+            {(role === "superadmin" ||
+              role === "admin" ||
+              role === "registrator") && (
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
