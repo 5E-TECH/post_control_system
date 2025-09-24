@@ -71,9 +71,13 @@ export class DashboardController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   getStatsForMarket(
+    @CurrentUser() user: JwtPayload,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.dashboardService.getStatsForMarket({ startDate, endDate });
+    return this.dashboardService.getStatsForMarket(user, {
+      startDate,
+      endDate,
+    });
   }
 }
