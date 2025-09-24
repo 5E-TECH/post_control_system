@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { House, ShoppingBag, MailOpen, FileText, Apple } from "lucide-react";
+import { House, ShoppingBag, MailOpen, FileText, Apple,History } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 
