@@ -70,7 +70,7 @@ const Filter = () => {
   return (
     <div className="">
       <h2 className="text-[18px] mb-2">Filters</h2>
-      <div className="w-full grid grid-cols-3 gap-5 max-[800px]:grid-cols-1">
+      <div className="w-full grid grid-cols-3 gap-5 max-[900px]:grid-cols-2 max-[750px]:grid-cols-1">
         <Select
           name="market"
           value={form.market}
@@ -102,15 +102,12 @@ const Filter = () => {
         </Select>
       </div>
 
-      <div className="w-full flex flex-wrap  pt-5 gap-5 justify-between items-center border-[#F6F7FB] dark:border-[#595572]">
-        <Space direction="vertical" size={10} style={{ width: "100%" }}>
-          <DatePicker.RangePicker
-            format="YYYY-MM-DD"
-            className="max-[800px]:w-full"
-          />
+      <div className="w-full flex flex-wrap gap-4 justify-between items-center pt-5 border-[#F6F7FB] dark:border-[#595572] max-[800px]:flex-col max-[800px]:gap-5">
+        <Space direction="vertical" size={10} className="max-[800px]:w-full">
+          <DatePicker.RangePicker format="YYYY-MM-DD" className="w-full" />
         </Space>
 
-        <div className="flex items-center gap-5 flex-wrap w-full">
+        <div className="flex items-center gap-5 flex-wrap max-[800px]:w-full">
           <input
             type="text"
             name="order"

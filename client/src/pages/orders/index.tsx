@@ -8,7 +8,7 @@ const Orders = () => {
   const { pathname } = useLocation();
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
-  if (role === "superadmin" || role === "admin" || role === "market") {
+  if (role === "superadmin" || role === "admin" || role === "market" || role === "registrator") {
     if (pathname.startsWith("/orders/")) {
       return <Outlet />;
     }
