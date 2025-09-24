@@ -12,34 +12,35 @@ import { LoggerModule } from 'src/logger/logger.module';
 import { PostModule } from './post/post.module';
 import { OrderModule } from './order/order.module';
 import { BotModule } from './bot/bot.module';
-import { TelegrafModule } from 'nestjs-telegraf';
 import { OrderGateaway } from './socket/order.gateaway';
 import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
-    // TelegrafModule.forRoot({
-    //   token: config.BOT_TOKEN,
-    // }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: config.DB_URL,
-      entities: ['dist/core/entity/*.entity{.ts,.js}'],
+      // universal path: src yoki dist uchun ishlaydi
+      entities: [__dirname + '/../core/entity/*.entity{.ts,.js}'],
       synchronize: true,
       autoLoadEntities: true,
     }),
+    JwtModule.register({ global: true }),
+
+    // biznes modullar
     UsersModule,
     ProductModule,
-    JwtModule.register({ global: true }),
     CashBoxModule,
     RegionModule,
     DistrictModule,
     CashboxHistoryModule,
-    LoggerModule,
     PostModule,
     OrderModule,
     BotModule,
     DashboardModule,
+
+    // loggerni oxirida yoki avvaliga qo'yish muammo bo'lmaydi — global ekan ishlaydi
+    LoggerModule,
   ],
   providers: [OrderGateaway],
 })

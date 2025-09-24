@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -40,6 +41,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { OrderGateaway } from '../socket/order.gateaway';
 import { PostRepository } from 'src/core/repository/post.repository';
+import { MyLogger } from 'src/logger/logger.service';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -65,6 +67,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     @InjectRepository(PostEntity)
     private readonly postRepo: PostRepository,
 
+    private readonly logger: MyLogger,
     private readonly dataSource: DataSource,
     private readonly orderGateaway: OrderGateaway,
   ) {
@@ -79,6 +82,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     page?: number;
     limit?: number;
   }) {
+    this.logger.log('TEST: receiveNewOrders called', 'OrderService');
+    this.logger.warn('TEST warning', 'OrderService');
+    this.logger.error('TEST error', 'stacktrace sample', 'OrderService');
     try {
       const qb = this.orderRepo
         .createQueryBuilder('order')
@@ -458,6 +464,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
+      this.logger.log(`receiveNewOrders: ${order_ids}`, 'Order service');
+
       // 1️⃣ Faqat NEW statusdagi orderlarni olish
       const qb = queryRunner.manager
         .createQueryBuilder(OrderEntity, 'order')
@@ -538,6 +546,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // Orderni shu postga bog‘lash
         order.status = Order_status.RECEIVED;
         order.post = post;
+        this.logger.log(
+          `order status updated: ${order.status}`,
+          'Order service',
+        );
 
         // Statistikalarni vaqtincha yangilash
         post.post_total_price =
