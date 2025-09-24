@@ -1558,6 +1558,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const postIds = allPosts.map((p) => p.id);
 
+      if (postIds.length === 0) {
+        return successRes(
+          {
+            totalOrders: 0,
+            soldOrders: 0,
+            canceledOrders: 0,
+            profit: 0,
+            successRate: 0,
+          },
+          200,
+          'Couriers stats',
+        );
+      }
+
       // 🔹 Shu kuryerning berilgan davrdagi barcha orderlari
       const totalOrders = await this.orderRepo
         .createQueryBuilder('o')
@@ -1584,7 +1598,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const allSoldOrders = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.post_id IN (postIds)', {
+        .where('o.post_id IN (:...postIds)', {
           postIds,
         })
         .getMany();
