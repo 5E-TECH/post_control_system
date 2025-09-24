@@ -11,11 +11,11 @@ export class DashboardService {
 
       if (!startDate && !endDate) {
         const today = new Date();
-        const start = new Date(today.setHours(0, 0, 0, 0));
-        const end = new Date(today.setHours(23, 59, 59, 999));
+        const start = new Date(today.setHours(0, 0, 0, 0)).getTime();
+        const end = new Date(today.setHours(23, 59, 59, 999)).getTime();
 
-        startDate = start.toISOString();
-        endDate = end.toISOString();
+        startDate = String(start);
+        endDate = String(end);
       }
 
       const [orders, markets, couriers, topMarkets, topCouriers] =
