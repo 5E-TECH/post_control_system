@@ -63,6 +63,9 @@ const Dashboards = () => {
   }
 
   const dashboard = data?.data?.orders?.data;
+  const aboutCourier = data?.data?.myStat?.data;
+
+  console.log(aboutCourier)
 
   const ordersData =
     data?.data?.markets?.data?.map((market: any) => ({
@@ -107,30 +110,30 @@ const Dashboards = () => {
             </>
           ) : (
             <>
-                {/* Agar RangePicker ishlatmoqchi bo‘lsangiz */}
-                <div className="flex gap-6">
-                  {/* Sana oralig‘i (RangePicker bilan) */}
-                  <div className="flex flex-col">
-                    <label className="mb-1 text-sm font-medium">
-                      Sana oralig‘i
-                    </label>
-                    <RangePicker
-                      value={[
-                        fromDate ? dayjs(fromDate) : null,
-                        toDate ? dayjs(toDate) : null,
-                      ]}
-                      onChange={(dates) => {
-                        setFromDate(
-                          dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
-                        );
-                        setToDate(
-                          dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
-                        );
-                      }}
-                      className="w-full"
-                    />
-                  </div>
+              {/* Agar RangePicker ishlatmoqchi bo‘lsangiz */}
+              <div className="flex gap-6">
+                {/* Sana oralig‘i (RangePicker bilan) */}
+                <div className="flex flex-col">
+                  <label className="mb-1 text-sm font-medium">
+                    Sana oralig‘i
+                  </label>
+                  <RangePicker
+                    value={[
+                      fromDate ? dayjs(fromDate) : null,
+                      toDate ? dayjs(toDate) : null,
+                    ]}
+                    onChange={(dates) => {
+                      setFromDate(
+                        dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
+                      );
+                      setToDate(
+                        dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
+                      );
+                    }}
+                    className="w-full"
+                  />
                 </div>
+              </div>
             </>
           )}
         </div>
@@ -138,7 +141,6 @@ const Dashboards = () => {
           {titleText}
         </h2>
       </div>
-
       {/* Stat Cards */}
       <div className="grid grid-cols-4 gap-6 mb-6">
         {isLoading ? (
@@ -150,37 +152,74 @@ const Dashboards = () => {
           ))
         ) : (
           <>
-            <StatCard
-              icon={<ShoppingCart size={20} />}
-              label="Jami buyurtmalar"
-              value={dashboard?.acceptedCount}
-              borderColor="border-gray-400"
-            />
-            <StatCard
-              icon={<CheckCircle size={20} />}
-              label="Sotilgan"
-              value={dashboard?.soldAndPaid}
-              borderColor="border-green-500"
-              textColor="text-green-500"
-            />
-            <StatCard
-              icon={<XCircle size={20} />}
-              label="Bekor qilinganlar"
-              value={dashboard?.cancelled}
-              borderColor="border-red-500"
-              textColor="text-red-500"
-            />
-            <StatCard
-              icon={<DollarSign size={20} />}
-              label="Jami daromad"
-              value={`${Number(dashboard?.profit).toLocaleString()} UZS`}
-              borderColor="border-yellow-500"
-              textColor="text-yellow-500"
-            />
+            {role === "courier" ? (
+              <>
+                <StatCard
+                  icon={<ShoppingCart size={20} />}
+                  label="Jami buyurtmalar"
+                  value={aboutCourier?.totalOrders}
+                  borderColor="border-gray-400"
+                />
+                <StatCard
+                  icon={<CheckCircle size={20} />}
+                  label="Sotilgan"
+                  value={aboutCourier?.soldOrders}
+                  borderColor="border-green-500"
+                  textColor="text-green-500"
+                />
+                <StatCard
+                  icon={<XCircle size={20} />}
+                  label="Bekor qilinganlar"
+                  value={aboutCourier?.canceledOrders}
+                  borderColor="border-red-500"
+                  textColor="text-red-500"
+                />
+                <StatCard
+                  icon={<DollarSign size={20} />}
+                  label="Jami daromad"
+                  value={`${Number(
+                    aboutCourier?.profit || 0
+                  ).toLocaleString()} UZS`}
+                  borderColor="border-yellow-500"
+                  textColor="text-yellow-500"
+                />
+              </>
+            ) : (
+              <>
+                <StatCard
+                  icon={<ShoppingCart size={20} />}
+                  label="Jami buyurtmalar"
+                  value={dashboard?.acceptedCount}
+                  borderColor="border-gray-400"
+                />
+                <StatCard
+                  icon={<CheckCircle size={20} />}
+                  label="Sotilgan"
+                  value={dashboard?.soldAndPaid}
+                  borderColor="border-green-500"
+                  textColor="text-green-500"
+                />
+                <StatCard
+                  icon={<XCircle size={20} />}
+                  label="Bekor qilinganlar"
+                  value={dashboard?.cancelled}
+                  borderColor="border-red-500"
+                  textColor="text-red-500"
+                />
+                <StatCard
+                  icon={<DollarSign size={20} />}
+                  label="Jami daromad"
+                  value={`${Number(
+                    dashboard?.profit || 0
+                  ).toLocaleString()} UZS`}
+                  borderColor="border-yellow-500"
+                  textColor="text-yellow-500"
+                />
+              </>
+            )}
           </>
         )}
       </div>
-
       {/* Role-based Rendering */}
       {(role === "superadmin" ||
         role === "admin" ||
@@ -204,7 +243,6 @@ const Dashboards = () => {
           </div>
         </>
       )}
-
       {role === "market" && (
         <>
           {renderMarketsChart(
@@ -215,7 +253,6 @@ const Dashboards = () => {
           {renderMarketsTable(markets)}
         </>
       )}
-
       {role === "courier" && (
         <>
           {renderCouriersChart(
