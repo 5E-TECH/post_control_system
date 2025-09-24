@@ -1635,7 +1635,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const end = Number(endDate) || Date.now();
 
       // 1️⃣ Shu davrdagi barcha postlar
-      const allOrders = await this.postRepo
+      const allOrders = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.created_at BETWEEN :start AND :end', { start, end })
         .andWhere('o.user_id = :marketId', { marketId: user.id })
