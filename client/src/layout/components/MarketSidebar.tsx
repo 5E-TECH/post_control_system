@@ -8,23 +8,26 @@ import {
   Apple,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
+import { useTranslation } from "react-i18next";
 
 const MarketSidebar = () => {
+  const { t } = useTranslation(['sidebar'])
+
   const links = [
-    { to: "/", icon: <House />, label: "Dashboard", end: true },
+    { to: "/", icon: <House />, label: t("dashboard"), end: true },
     {
       to: "/orders",
       icon: <ShoppingBag />,
-      label: "Buyurtmalar",
+      label: t("orders"),
     },
-    { to: "/clients", icon: <MailOpen />, label: "Mijozlarim" },
+    { to: "/clients", icon: <MailOpen />, label: t("clients") },
     {
       to: "/order/markets/new-orders",
       icon: <History />,
-      label: "Bugungi buyurtmalarim",
+      label: t("new_orders"),
     },
-    { to: "/products", icon: <Apple />, label: "Mahsulotlarim" },
-    { to: "/payments", icon: <FileText />, label: "To'lovlar" },
+    { to: "/products", icon: <Apple />, label: t("products") },
+    { to: "/payments", icon: <FileText />, label: t("payments") },
   ];
 
   return (

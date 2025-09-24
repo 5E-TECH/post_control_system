@@ -22,6 +22,8 @@ import {
   ShoppingCart,
   XCircle,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { t } from "i18next";
 
 const SkeletonBox = ({ className }: { className?: string }) => (
   <div
@@ -30,6 +32,7 @@ const SkeletonBox = ({ className }: { className?: string }) => (
 );
 
 const Dashboards = () => {
+  const { t } = useTranslation(["dashboard"]);
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 
@@ -82,7 +85,7 @@ const Dashboards = () => {
     ? couriersData
     : couriersData.slice(0, 10);
 
-  let titleText = "📊 Bugungi statistika";
+  let titleText = `📊 ${t("title")}`;
   if (fromDate && toDate) {
     titleText = `📊 ${fromDate} - ${toDate} statistikasi`;
   } else if (fromDate && !toDate) {
@@ -105,7 +108,7 @@ const Dashboards = () => {
             <>
               <div className="flex flex-col">
                 <label htmlFor="fromDate" className="mb-1 text-sm font-medium">
-                  Boshlanish sanasi
+                  {t("startDate")}
                 </label>
                 <input
                   id="fromDate"
@@ -117,7 +120,7 @@ const Dashboards = () => {
               </div>
               <div className="flex flex-col">
                 <label htmlFor="toDate" className="mb-1 text-sm font-medium">
-                  Tugash sanasi
+                  {t("endDate")}
                 </label>
                 <input
                   id="toDate"
@@ -148,27 +151,27 @@ const Dashboards = () => {
           <>
             <StatCard
               icon={<ShoppingCart size={20} />}
-              label="Jami buyurtmalar"
+              label={t("totalOrders")}
               value={dashboard?.acceptedCount}
               borderColor="border-gray-400"
             />
             <StatCard
               icon={<CheckCircle size={20} />}
-              label="Sotilgan"
+              label={t("solded")}
               value={dashboard?.soldAndPaid}
               borderColor="border-green-500"
               textColor="text-green-500"
             />
             <StatCard
               icon={<XCircle size={20} />}
-              label="Bekor qilinganlar"
+              label={t("cancelled")}
               value={dashboard?.cancelled}
               borderColor="border-red-500"
               textColor="text-red-500"
             />
             <StatCard
               icon={<DollarSign size={20} />}
-              label="Jami daromad"
+              label={t("profit")}
               value={`${Number(dashboard?.profit).toLocaleString()} UZS`}
               borderColor="border-yellow-500"
               textColor="text-yellow-500"
@@ -257,7 +260,7 @@ const renderMarketsChart = (
   setShowAllMarkets: (v: boolean) => void
 ) => (
   <ChartWrapper
-    title="Marketlar statistikasi"
+    title={t("marketStatistics")}
     data={visibleMarkets}
     showAll={showAllMarkets}
     setShowAll={setShowAllMarkets}
@@ -270,7 +273,7 @@ const renderCouriersChart = (
   setShowAllCouriers: (v: boolean) => void
 ) => (
   <ChartWrapper
-    title="Kuriyerlar statistikasi"
+    title={t("courierStatistics")}
     data={visibleCouriers}
     showAll={showAllCouriers}
     setShowAll={setShowAllCouriers}
@@ -301,12 +304,12 @@ const ChartWrapper = ({
         <YAxis type="category" dataKey="nomi" width={200} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="sotilgan" stackId="a" name="Sotilgan">
+        <Bar dataKey="sotilgan" stackId="a" name={t("solded")}>
           {data.map((_: any, index: number) => (
             <Cell key={`sotilgan-${index}`} fill="#0047AB" />
           ))}
         </Bar>
-        <Bar dataKey="buyurtmalar" stackId="a" name="Buyurtmalar">
+        <Bar dataKey="buyurtmalar" stackId="a" name={t("orders")}>
           {data.map((entry: any, index: number) => {
             const rang =
               entry.buyurtmalar === entry.sotilgan ? "#0047AB" : "#66B2FF";
@@ -320,7 +323,7 @@ const ChartWrapper = ({
         onClick={() => setShowAll(!showAll)}
         className="px-4 py-2 bg-blue-500 text-white rounded-lg"
       >
-        {showAll ? "Kamroq ko‘rish" : "Ko‘proq ko‘rish"}
+        {showAll ? t("showLess") : t("showMore")}
       </button>
     </div>
   </div>
@@ -329,7 +332,7 @@ const ChartWrapper = ({
 // 🔹 Top Markets Table
 const renderMarketsTable = (markets: any[]) => (
   <TableWrapper
-    title="Top 10 Marketlar (Oxirgi 30 kun)"
+    title={t("topMarkets")}
     data={markets}
     nameKey="market_name"
     ordersKey="total_orders"
@@ -341,7 +344,7 @@ const renderMarketsTable = (markets: any[]) => (
 // 🔹 Top Couriers Table
 const renderCouriersTable = (couriers: any[]) => (
   <TableWrapper
-    title="Top 10 Kuriyerlar (Oxirgi 30 kun)"
+    title={t("topCouriers")}
     data={couriers}
     nameKey="courier_name"
     ordersKey="total_orders"
@@ -371,10 +374,10 @@ const TableWrapper = ({
       <thead>
         <tr className="bg-gray-100 dark:bg-[#3B3656] text-left">
           <th className="p-2 border">#</th>
-          <th className="p-2 border">Nomi</th>
-          <th className="p-2 border">Buyurtmalar</th>
-          <th className="p-2 border">Sotilganlar</th>
-          <th className="p-2 border">Foiz</th>
+          <th className="p-2 border">{t("name")}</th>
+          <th className="p-2 border">{t("orders")}</th>
+          <th className="p-2 border">{t("solded")}</th>
+          <th className="p-2 border">{t("rate")}</th>
         </tr>
       </thead>
       <tbody>
