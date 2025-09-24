@@ -7,7 +7,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { Manual_payment_methods, PaymentMethod } from 'src/common/enums';
+import { PaymentMethod } from 'src/common/enums';
 
 export class UpdateCashBoxDto {
   @ApiProperty({
@@ -23,8 +23,8 @@ export class UpdateCashBoxDto {
     enum: PaymentMethod,
     example: PaymentMethod.CASH,
   })
-  @IsNotEmpty()
-  @IsIn(Object.values(PaymentMethod))
+  @IsOptional()
+  @IsIn(Object.values([PaymentMethod.CASH, PaymentMethod.CLICK]))
   type: PaymentMethod;
 
   @ApiProperty({
