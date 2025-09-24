@@ -6,13 +6,11 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  Cell,
+  Legend,
+  // Cell,
 } from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
-import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
-import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import {
@@ -30,33 +28,20 @@ const SkeletonBox = ({ className }: { className?: string }) => (
 );
 
 const Dashboards = () => {
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  // default bugungi kun sanasi
+  // const today = new Date().toISOString().split("T")[0];
+  const [fromDate, setFromDate] = useState<string>();
+  const [toDate, setToDate] = useState<string>();
 
   const [showAllMarkets, setShowAllMarkets] = useState(false);
   const [showAllCouriers, setShowAllCouriers] = useState(false);
 
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
-  let data: any;
-  let isLoading: boolean = false;
-
-  if (role === "superadmin" || role === "admin") {
-    ({ data, isLoading } = useChart().getChart({
-      startDate: fromDate,
-      endDate: toDate,
-    }));
-  } else if (role === "courier") {
-    ({ data, isLoading } = useCourierStatCard().getChart({
-      startDate: fromDate,
-      endDate: toDate,
-    }));
-  } else if (role === "market") {
-    ({ data, isLoading } = useMarketStatCard().getChart({
-      startDate: fromDate,
-      endDate: toDate,
-    }));
-  }
+  const { data, isLoading } = useChart().getChart({
+    startDate: fromDate,
+    endDate: toDate,
+  });
 
   const dashboard = data?.data?.orders?.data;
 
@@ -83,7 +68,7 @@ const Dashboards = () => {
     : couriersData.slice(0, 10);
 
   let titleText = "📊 Bugungi statistika";
-  if (fromDate && toDate) {
+  if (fromDate && toDate && fromDate !== toDate) {
     titleText = `📊 ${fromDate} - ${toDate} statistikasi`;
   } else if (fromDate && !toDate) {
     titleText = `📊 ${fromDate} dan boshlab statistikasi`;
@@ -181,25 +166,25 @@ const Dashboards = () => {
       {(role === "superadmin" ||
         role === "admin" ||
         role === "registrator") && (
-          <>
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              {renderMarketsChart(
-                visibleMarkets,
-                showAllMarkets,
-                setShowAllMarkets
-              )}
-              {renderCouriersChart(
-                visibleCouriers,
-                showAllCouriers,
-                setShowAllCouriers
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              {renderMarketsTable(markets)}
-              {renderCouriersTable(couriers)}
-            </div>
-          </>
-        )}
+        <>
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            {renderMarketsChart(
+              visibleMarkets,
+              showAllMarkets,
+              setShowAllMarkets
+            )}
+            {renderCouriersChart(
+              visibleCouriers,
+              showAllCouriers,
+              setShowAllCouriers
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            {renderMarketsTable(markets)}
+            {renderCouriersTable(couriers)}
+          </div>
+        </>
+      )}
 
       {role === "market" && (
         <>
@@ -295,24 +280,32 @@ const ChartWrapper = ({
         data={data}
         layout="vertical"
         margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
+        barCategoryGap={20}
       >
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis type="number" />
         <YAxis type="category" dataKey="nomi" width={200} />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="sotilgan" stackId="a" name="Sotilgan">
-          {data.map((_: any, index: number) => (
-            <Cell key={`sotilgan-${index}`} fill="#0047AB" />
-          ))}
-        </Bar>
-        <Bar dataKey="buyurtmalar" stackId="a" name="Buyurtmalar">
-          {data.map((entry: any, index: number) => {
-            const rang =
-              entry.buyurtmalar === entry.sotilgan ? "#0047AB" : "#66B2FF";
-            return <Cell key={`buyurtmalar-${index}`} fill={rang} />;
-          })}
-        </Bar>
+        <Tooltip
+          contentStyle={{ backgroundColor: "#000", color: "#fff" }}
+          cursor={{ fill: "rgba(0,0,0,0.1)" }}
+        />
+        <Legend
+          wrapperStyle={{ color: "black" }}
+          formatter={(value) => (
+            <span style={{ color: "inherit", fontWeight: "bold" }}>
+              {value}
+            </span>
+          )}
+        />
+
+        {/* 🔹 Ustma-ust barlar */}
+        <Bar
+          dataKey="buyurtmalar"
+          name="Buyurtmalar"
+          fill="#66B2FF"
+          stackId="a"
+        />
+        <Bar dataKey="sotilgan" name="Sotilgan" fill="#0047AB" stackId="a" />
       </BarChart>
     </ResponsiveContainer>
     <div className="flex justify-center mt-4">
@@ -325,6 +318,7 @@ const ChartWrapper = ({
     </div>
   </div>
 );
+
 
 // 🔹 Top Markets Table
 const renderMarketsTable = (markets: any[]) => (

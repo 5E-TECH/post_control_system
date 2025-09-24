@@ -1182,8 +1182,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getStats(startDate?: string, endDate?: string) {
     try {
-      const start = startDate ? new Date(startDate).getTime() : 0;
-      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
       const acceptedCount = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.created_at BETWEEN :start AND :end', {
@@ -1279,8 +1279,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getMarketStats(startDate?: string, endDate?: string) {
     try {
-      const start = startDate ? new Date(startDate).getTime() : 0;
-      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
 
       // 1) totalOrders: created_at oralig'ida yaratilgan buyurtmalar soni per market
       const totalsRaw = await this.orderRepo
@@ -1361,8 +1361,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getCourierStats(startDate?: string, endDate?: string) {
     try {
-      const start = startDate ? new Date(startDate).getTime() : 0;
-      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
 
       // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
