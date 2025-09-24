@@ -2,8 +2,8 @@ import { useQuery} from '@tanstack/react-query';
 import { api } from '../..';
 
 interface IParams {
-    startDate?: string
-    endDate?: string
+    startDate?: string | undefined
+    endDate?: string | undefined
 }
 
 export const chart = 'chart';

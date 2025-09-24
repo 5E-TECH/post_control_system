@@ -1,14 +1,17 @@
 import { memo } from "react";
 import { House, ShoppingBag, MailOpen, FileText, History } from "lucide-react";
 import SidebarLink from "./SidebarLink";
+import { useTranslation } from "react-i18next";
 
 const RegistratorSidebar = () => {
+  const { t } = useTranslation(["sidebar"]);
+
   const links = [
-    { to: "/", icon: <House />, label: "Dashboard", end: true },
-    { to: "/orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
-    { to: "/history", icon: <History />, label: "Bugungi buyurtmalar" },
-    { to: "/mails", icon: <MailOpen />, label: "Pochta" },
-    { to: "/payments", icon: <FileText />, label: "Mahsulotlar" },
+    { to: "/", icon: <House />, label: t("dashboard"), end: true },
+    { to: "/orders", icon: <ShoppingBag />, label: t("orders") },
+    { to: "/history", icon: <History />, label: t("new_orders") },
+    { to: "/mails", icon: <MailOpen />, label: t("mails") },
+    { to: "/payments", icon: <FileText />, label: t("products") },
   ];
 
   return (

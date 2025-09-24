@@ -10,21 +10,24 @@ import {
   History,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
+import { useTranslation } from "react-i18next";
 
 const AdminSidebar = () => {
+  const { t } = useTranslation(['sidebar'])
+
   const links = [
-    { to: "/", icon: <House />, label: "Dashboard", end: true },
-    { to: "/orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
+    { to: "/", icon: <House />, label: t("dashboard"), end: true },
+    { to: "/orders", icon: <ShoppingBag />, label: t("orders") },
     {
       to: "/order/markets/new-orders",
       icon: <CarFront />,
-      label: "Bugungi buyurtmalar",
+      label: t("new_orders"),
     },
-    { to: "/mails", icon: <MailOpen />, label: "Pochta" },
-    { to: "/products", icon: <Apple />, label: "Mahsulotlar" },
-    { to: "/all-users", icon: <UserRound />, label: "Foydalanuvchilar" },
-    { to: "/payments", icon: <FileText />, label: "To'lovlar" },
-    { to: "/m-balance", icon: <History />, label: "Moliyaviy balans" },
+    { to: "/mails", icon: <MailOpen />, label: t("mails") },
+    { to: "/products", icon: <Apple />, label: t("products") },
+    { to: "/all-users", icon: <UserRound />, label: t("users") },
+    { to: "/payments", icon: <FileText />, label: t("payments") },
+    { to: "/m-balance", icon: <History />, label: t("balance") },
   ];
 
   return (

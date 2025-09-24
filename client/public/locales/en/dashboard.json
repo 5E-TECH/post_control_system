@@ -1,0 +1,18 @@
+{
+    "title": "Today's Statistics",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "totalOrders": "Total Orders",
+    "solded": "Sold",
+    "cancelled": "Cancelled",
+    "profit": "Profit",
+    "marketStatistics": "Market Statistics",
+    "courierStatistics": "Courier Statistics",
+    "orders": "Orders",
+    "showMore": "Show More",
+    "showLess": "Show Less",
+    "topMarkets": "Top 10 Markets (Last 30 Days)",
+    "topCouriers": "Top 10 Couriers (Last 30 Days)",
+    "name": "Name",
+    "rate": "Rate"
+}

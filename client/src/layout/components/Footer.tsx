@@ -7,7 +7,7 @@ const Footer = () => {
   const navigate = useNavigate();
 
   return (
-    <footer className="px-6 fixed bottom-0 w-full left-0 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)] flex items-center justify-between shadow-md">
+    <footer className="px-6 fixed bottom-0 w-full left-0 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)] flex items-center justify-between shadow-md max-[650px]:py-4 max-[650px]:hidden">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -26,7 +26,7 @@ const Footer = () => {
         </button>
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
+      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 max-[1050px]:hidden">
         <span>
           © 2025, Made with ❤️ by{' '}
           <span className="font-semibold">Ye77i grup</span>

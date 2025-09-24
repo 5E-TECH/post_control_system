@@ -702,4 +702,40 @@ export class CashBoxService
       await queryRunner.release();
     }
   }
+
+  async fillTheCashbox(user: JwtPayload, updateCashboxDto: UpdateCashBoxDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) {
+        throw new NotFoundException('Main cashbox not found');
+      }
+      mainCashbox.balance += updateCashboxDto.amount;
+      await queryRunner.manager.save(mainCashbox);
+
+      const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
+        amount: updateCashboxDto.amount,
+        balance_after: mainCashbox.balance,
+        cashbox_id: mainCashbox.id,
+        comment: updateCashboxDto.comment,
+        operation_type: Operation_type.EXPENSE,
+        created_by: user.id,
+        payment_method: updateCashboxDto.type,
+        source_type: Source_type.MANUAL_EXPENSE,
+      });
+      await queryRunner.manager.save(cashboxHistory);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Cashbox filled');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
 }
