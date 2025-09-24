@@ -63,9 +63,9 @@ const OrderView = () => {
   };
 
   return (
-    <div className="w-full bg-white py-1 dark:bg-[#312d4b]">
-      <table className="w-full">
-        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
+    <div className="w-full bg-white py-1 dark:bg-[#312d4b] min-[650px]:overflow-x-auto">
+      <table className="w-full border border-gray-200 shadow-sm">
+        <thead className="bg-[#f6f7fb] min-[900px]:h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
           <tr>
             <th>
               <div className="flex items-center ml-10">
@@ -128,20 +128,34 @@ const OrderView = () => {
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
                 onClick={() => navigate(`order-detail/${item.id}`)}
               >
-                <td className="pl-10">{inx + 1}</td>
-                <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
+                <td className="data-cell pl-10" data-cell="#">
+                  {inx + 1}
+                </td>
+                <td
+                  className="data-cell pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell="CUSTOMER"
+                >
                   {item?.customer?.name}
                 </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                <td
+                  className="data-cell pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell="PHONE"
+                >
                   {item?.customer?.phone_number}
                 </td>
-                <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
+                <td
+                  className="data-cell pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell="ADDRESS"
+                >
                   {item?.customer?.district?.name}
                 </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                <td
+                  className="data-cell pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell="MARKET"
+                >
                   {item?.market?.name}
                 </td>
-                <td className="pl-10">
+                <td className="data-cell pl-10" data-cell="STATUS">
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
                       statusColors[item.status] || "bg-slate-400"
@@ -150,12 +164,18 @@ const OrderView = () => {
                     {item.status.toUpperCase()}
                   </span>
                 </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                <td
+                  className="data-cell pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell="PRICE"
+                >
                   <span>
                     {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}{" "}
                   </span>
                 </td>
-                <td className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                <td
+                  className="data-cell pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell="STOCK"
+                >
                   {item?.items.length}
                 </td>
               </tr>

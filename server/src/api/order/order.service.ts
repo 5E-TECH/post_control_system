@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -40,6 +41,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { OrderGateaway } from '../socket/order.gateaway';
 import { PostRepository } from 'src/core/repository/post.repository';
+import { MyLogger } from 'src/logger/logger.service';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -65,6 +67,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     @InjectRepository(PostEntity)
     private readonly postRepo: PostRepository,
 
+    private readonly logger: MyLogger,
     private readonly dataSource: DataSource,
     private readonly orderGateaway: OrderGateaway,
   ) {
@@ -79,6 +82,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     page?: number;
     limit?: number;
   }) {
+    this.logger.log('TEST: receiveNewOrders called', 'OrderService');
+    this.logger.warn('TEST warning', 'OrderService');
+    this.logger.error('TEST error', 'stacktrace sample', 'OrderService');
     try {
       const qb = this.orderRepo
         .createQueryBuilder('order')
@@ -458,6 +464,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
+      this.logger.log(`receiveNewOrders: ${order_ids}`, 'Order service');
+
       // 1️⃣ Faqat NEW statusdagi orderlarni olish
       const qb = queryRunner.manager
         .createQueryBuilder(OrderEntity, 'order')
@@ -538,6 +546,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // Orderni shu postga bog‘lash
         order.status = Order_status.RECEIVED;
         order.post = post;
+        this.logger.log(
+          `order status updated: ${order.status}`,
+          'Order service',
+        );
 
         // Statistikalarni vaqtincha yangilash
         post.post_total_price =
@@ -1182,8 +1194,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getStats(startDate?: string, endDate?: string) {
     try {
-      const start = startDate ? new Date(startDate).getTime() : 0;
-      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
       const acceptedCount = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.created_at BETWEEN :start AND :end', {
@@ -1279,8 +1291,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getMarketStats(startDate?: string, endDate?: string) {
     try {
-      const start = startDate ? new Date(startDate).getTime() : 0;
-      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
 
       // 1) totalOrders: created_at oralig'ida yaratilgan buyurtmalar soni per market
       const totalsRaw = await this.orderRepo
@@ -1361,8 +1373,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getCourierStats(startDate?: string, endDate?: string) {
     try {
-      const start = startDate ? new Date(startDate).getTime() : 0;
-      const end = endDate ? new Date(endDate).getTime() : Date.now();
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
 
       // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
@@ -1523,8 +1535,165 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async courierStat(startDate?: string, endDate?: string) {
+  async courierStat(user: JwtPayload, startDate?: string, endDate?: string) {
     try {
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
+
+      // 1️⃣ Shu davrdagi barcha postlar
+      const allPosts = await this.postRepo
+        .createQueryBuilder('p')
+        .where('p.created_at BETWEEN :start AND :end', { start, end })
+        .andWhere('p.courier_id = :courierId', { courierId: user.id })
+        .getMany();
+
+      const validStatuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ];
+
+      // 3️⃣ Har bir kuryer uchun hisoblash
+      // for (const post of allPosts) {
+
+      const postIds = allPosts.map((p) => p.id);
+
+      if (postIds.length === 0) {
+        return successRes(
+          {
+            totalOrders: 0,
+            soldOrders: 0,
+            canceledOrders: 0,
+            profit: 0,
+            successRate: 0,
+          },
+          200,
+          'Couriers stats',
+        );
+      }
+
+      // 🔹 Shu kuryerning berilgan davrdagi barcha orderlari
+      const totalOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (:...postIds)', { postIds })
+        .andWhere('o.created_at BETWEEN :start AND :end', { start, end })
+        .getCount();
+
+      // 🔹 Shu kuryerning sotilgan orderlari
+      const soldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (:...postIds)', { postIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+        .getCount();
+
+      const canceledOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (:...postIds)', { postIds })
+        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [Order_status.CANCELLED],
+        })
+        .getCount();
+
+      const allSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (:...postIds)', { postIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+        .getMany();
+
+      let profit: number = 0;
+
+      const courier = await this.userRepo.findOne({ where: { id: user.id } });
+
+      for (const order of allSoldOrders) {
+        profit +=
+          order.where_deliver === Where_deliver.ADDRESS
+            ? Number(courier?.tariff_home ?? 0)
+            : Number(courier?.tariff_center ?? 0);
+      }
+
+      const successRate =
+        totalOrders > 0
+          ? Number(((soldOrders * 100) / totalOrders).toFixed(2))
+          : 0;
+
+      return successRes(
+        { totalOrders, soldOrders, canceledOrders, profit, successRate },
+        200,
+        'Couriers stats',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async marketStat(user: JwtPayload, startDate?: string, endDate?: string) {
+    try {
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
+
+      // 1️⃣ Shu davrdagi barcha postlar
+      const allOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.created_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.user_id = :marketId', { marketId: user.id })
+        .getMany();
+
+      const validStatuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ];
+
+      const orderIds = allOrders.map((o) => o.id);
+
+      // 🔹 Shu marketning sotilgan orderlari
+      const soldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.id IN (:...orderIds)', { orderIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+        .getCount();
+
+      const canceledOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.id IN (:...orderIds)', { orderIds })
+        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [Order_status.CANCELLED],
+        })
+        .getCount();
+
+      const allSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.id IN (:...orderIds)', { orderIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+        .getMany();
+
+      let profit: number = 0;
+      for (const order of allSoldOrders) {
+        profit += order.to_be_paid;
+      }
+
+      const successRate =
+        allOrders.length > 0
+          ? Number(((soldOrders * 100) / allOrders.length).toFixed(2))
+          : 0;
+
+      return successRes(
+        {
+          totalOrders: allOrders.length,
+          soldOrders,
+          canceledOrders,
+          profit,
+          successRate,
+        },
+        200,
+        'Couriers stats',
+      );
     } catch (error) {
       return catchError(error);
     }

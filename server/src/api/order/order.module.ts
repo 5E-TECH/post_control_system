@@ -14,6 +14,7 @@ import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { OrderGateaway } from '../socket/order.gateaway';
 import { PostEntity } from 'src/core/entity/post.entity';
+import { MyLogger } from 'src/logger/logger.service';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
     BcryptEncryption,
     Token,
     OrderGateaway,
+    MyLogger,
   ],
 })
 export class OrderModule {}

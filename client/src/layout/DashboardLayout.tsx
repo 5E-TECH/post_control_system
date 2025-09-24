@@ -10,9 +10,11 @@ import Courier from "./components/Courier";
 import MarketSidebar from "./components/MarketSidebar";
 import RegistratorSidebar from "./components/RegistratorSidebar";
 import type { UserRole } from "../shared/enums/Roles";
+import RenderMediaSidebar from "../shared/components/render-media-sidebar/RenderMediaSidebar";
 
 const DashboardLayout = () => {
   const role = useSelector((state: RootState) => state.roleSlice.role);
+
   let sidebar;
 
   switch (role as UserRole) {
@@ -36,26 +38,27 @@ const DashboardLayout = () => {
   }
 
   return (
-    <div className="h-screen bg-[#F4F5FA] grid grid-rows-[auto_1fr_auto] grid-cols-[250px_1fr] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5] pr-4">
+    <div className="h-screen grid grid-rows-[auto_1fr_auto] grid-cols-[250px_1fr] max-[650px]:grid-cols-[1fr] bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5] pr-4">
       {/* Navbar */}
       <div className="col-span-2">
         <Header />
       </div>
 
       {/* Sidebar */}
-      <aside className="row-span-1 overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)]">
+      <aside className="row-span-1 overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] max-[650px]:hidden">
         {sidebar}
       </aside>
 
       {/* Dashboard container */}
-      <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pb-8">
+      <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pl-4 pb-8">
         <main className="w-full h-full bg-[#fff] dark:bg-[var(--color-dark-bg-py)] rounded-4xl overflow-y-auto">
           <Outlet />
         </main>
       </div>
 
+      <RenderMediaSidebar role={role as string} />
       {/* Footer */}
-      <div className="col-span-2">
+      <div className="col-span-2 py-3">
         <Footer />
       </div>
     </div>
