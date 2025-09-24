@@ -1,11 +1,14 @@
+import { Languages, LogOut, Menu, Moon, Search, Sun, User, X } from 'lucide-react';
+import logo from '../../shared/assets/logo.svg';
+import { useSignOut } from '../../pages/profile/service/LogOut';
+import { useTranslation } from 'react-i18next';
+import { Select, Space } from 'antd';
 import { memo, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Menu, Moon, Search, Sun, User, X } from "lucide-react";
-import logo from "../../shared/assets/logo.svg";
-import { useSignOut } from "../../pages/profile/service/LogOut";
 import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
 
 const Header = () => {
+  const { t, i18n } = useTranslation(['header'])
   const [dark, setDark] = useState(() => {
     const stored = localStorage.getItem("darkMode");
     return stored ? JSON.parse(stored) : false;
@@ -25,6 +28,10 @@ const Header = () => {
   const navigate = useNavigate();
 
   const [burger, setBurger] = useState(false);
+
+  const handleChange = (value: string) => {
+    i18n.changeLanguage(value);
+  };
 
   return (
     <div className="w-full h-16 pl-8 pr-3 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
@@ -48,11 +55,25 @@ const Header = () => {
           className="w-full bg-white dark:bg-gray-800 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
           type="text"
           id="search"
-          placeholder="Search"
+          placeholder={t('search.placeholder')}
         />
       </label>
 
       {/* Actions */}
+      <div className="flex gap-6 max-[960px]:hidden">
+        <Space wrap>
+          <Select
+            defaultValue={localStorage.getItem('i18nextLng')}
+            style={{ width: 98 }}
+            onChange={handleChange}
+            options={[
+              { value: 'uz', label: "O'zb" },
+              { value: 'ru', label: 'Рус' },
+              { value: 'en', label: 'Eng' },
+            ]}
+            prefix={<Languages />}
+          />
+        </Space>
       <div className="flex gap-6 max-[1050px]:hidden">
         <button onClick={() => setDark(!dark)} className="cursor-pointer">
           {dark ? <Sun /> : <Moon />}
