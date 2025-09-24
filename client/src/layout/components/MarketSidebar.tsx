@@ -1,12 +1,5 @@
 import { memo } from "react";
-import {
-  House,
-  ShoppingBag,
-  MailOpen,
-  FileText,
-  History,
-  Apple,
-} from "lucide-react";
+import { House, ShoppingBag, MailOpen, FileText, Apple } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 
 const MarketSidebar = () => {
@@ -20,7 +13,7 @@ const MarketSidebar = () => {
     { to: "/clients", icon: <MailOpen />, label: "Mijozlarim" },
     {
       to: "/order/markets/new-orders",
-      icon: <History />,
+      icon: <ShoppingBag />,
       label: "Bugungi buyurtmalarim",
     },
     { to: "/products", icon: <Apple />, label: "Mahsulotlarim" },
