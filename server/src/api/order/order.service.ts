@@ -1638,7 +1638,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const allOrders = await this.postRepo
         .createQueryBuilder('o')
         .where('o.created_at BETWEEN :start AND :end', { start, end })
-        .andWhere('o.market_id = :marketId', { marketId: user.id })
+        .andWhere('o.user_id = :marketId', { marketId: user.id })
         .getMany();
 
       const validStatuses = [
