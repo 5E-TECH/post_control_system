@@ -60,6 +60,6 @@ jobs:
             # -------------------------
             # 6️⃣ Reload systemd service for NestJS
             sudo systemctl daemon-reload
-            sudo systemctl restart nest.app
-            sudo systemctl status nest.app --no-pager
+            sudo systemctl restart nestapp.service
+            sudo systemctl status nestapp --no-pager
           "
