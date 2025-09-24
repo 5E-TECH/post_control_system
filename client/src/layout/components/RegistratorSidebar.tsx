@@ -1,14 +1,14 @@
 import { memo } from "react";
-import { House, ShoppingBag, MailOpen, FileText, History } from "lucide-react";
+import { House, ShoppingBag, MailOpen, FileText, CarFront } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 
 const RegistratorSidebar = () => {
   const links = [
     { to: "/", icon: <House />, label: "Dashboard", end: true },
     { to: "/orders", icon: <ShoppingBag />, label: "Buyurtmalar" },
-    { to: "/history", icon: <History />, label: "Bugungi buyurtmalar" },
+    { to: "/order/markets/new-orders", icon: <CarFront />, label: "Bugungi buyurtmalar" },
     { to: "/mails", icon: <MailOpen />, label: "Pochta" },
-    { to: "/payments", icon: <FileText />, label: "Mahsulotlar" },
+    { to: "/products", icon: <FileText />, label: "Mahsulotlar" },
   ];
 
   return (
