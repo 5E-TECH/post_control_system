@@ -1,6 +1,6 @@
 import { memo } from "react";
 import Sidebar from "./components/Sidebar";
-import { NavLink, Outlet } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { useSelector } from "react-redux";
@@ -10,17 +10,11 @@ import Courier from "./components/Courier";
 import MarketSidebar from "./components/MarketSidebar";
 import RegistratorSidebar from "./components/RegistratorSidebar";
 import type { UserRole } from "../shared/enums/Roles";
-import {
-  FileText,
-  History,
-  House,
-  ShoppingBag,
-  SquareDashedMousePointer,
-  UserRound,
-} from "lucide-react";
+import RenderMediaSidebar from "../shared/components/render-media-sidebar/RenderMediaSidebar";
 
 const DashboardLayout = () => {
   const role = useSelector((state: RootState) => state.roleSlice.role);
+
   let sidebar;
 
   switch (role as UserRole) {
@@ -62,94 +56,8 @@ const DashboardLayout = () => {
         </main>
       </div>
 
+      <RenderMediaSidebar role={role as string} />
       {/* Footer */}
-
-      <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
-        <NavLink
-          to={"/"}
-          className={({ isActive }) =>
-            `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-          }
-        >
-          <House/>
-        </NavLink>
-
-        <NavLink
-          to={"/orders"}
-          className={({ isActive }) =>
-            `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-          }
-        >
-          <ShoppingBag />
-        </NavLink>
-
-        <NavLink
-          to={"/all-users"}
-          className={({ isActive }) =>
-            `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-          }
-        >
-          <UserRound />
-        </NavLink>
-
-        <NavLink
-          to={"/payments"}
-          className={({ isActive }) =>
-            `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-          }
-        >
-          <FileText />
-        </NavLink>
-
-        <NavLink
-          to={"/m-balance"}
-          className={({ isActive }) =>
-            `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-          }
-        >
-          <History />
-        </NavLink>
-
-        <NavLink
-          to={"/logs"}
-          className={({ isActive }) =>
-            `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-          }
-        >
-          <SquareDashedMousePointer />
-        </NavLink>
-      </div>
-
       <div className="col-span-2 py-3">
         <Footer />
       </div>

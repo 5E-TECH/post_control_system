@@ -99,7 +99,6 @@ const Header = () => {
             >
               <X className="absolute top-4 right-4 w-[20px] h-[20px] dark:text-[var(--color-py)] dark:transition-all transition-all" />
             </button>
-            <div></div>
             <div className="flex flex-col h-[93vh] justify-between ">
               <div className="flex flex-col gap-4">
                 <button
