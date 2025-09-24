@@ -1,12 +1,13 @@
-import { memo, useEffect, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, Menu, Moon, Search, Sun, User, X } from 'lucide-react';
-import logo from '../../shared/assets/logo.svg';
-import { useSignOut } from '../../pages/profile/service/LogOut';
+import { memo, useEffect, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { LogOut, Menu, Moon, Search, Sun, User, X } from "lucide-react";
+import logo from "../../shared/assets/logo.svg";
+import { useSignOut } from "../../pages/profile/service/LogOut";
+import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
 
 const Header = () => {
   const [dark, setDark] = useState(() => {
-    const stored = localStorage.getItem('darkMode');
+    const stored = localStorage.getItem("darkMode");
     return stored ? JSON.parse(stored) : false;
   });
 
@@ -14,11 +15,11 @@ const Header = () => {
 
   useEffect(() => {
     if (dark) {
-      document.documentElement.classList.add('dark');
+      document.documentElement.classList.add("dark");
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove("dark");
     }
-    localStorage.setItem('darkMode', JSON.stringify(dark));
+    localStorage.setItem("darkMode", JSON.stringify(dark));
   }, [dark]);
 
   const navigate = useNavigate();
@@ -26,10 +27,10 @@ const Header = () => {
   const [burger, setBurger] = useState(false);
 
   return (
-    <div className="w-full h-16 px-8 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
+    <div className="w-full h-16 pl-8 pr-3 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
       {/* Logo */}
       <div className="h-16 flex items-center gap-3">
-        <NavLink to={'/'} className="flex items-center gap-3">
+        <NavLink to={"/"} className="flex items-center gap-3">
           <div>
             <img src={logo} alt="logo" className="h-8" />
           </div>
@@ -40,7 +41,7 @@ const Header = () => {
       {/* Search */}
       <label
         htmlFor="search"
-        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[960px]:hidden"
+        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1050px]:hidden"
       >
         <Search className="text-gray-500" />
         <input
@@ -52,18 +53,18 @@ const Header = () => {
       </label>
 
       {/* Actions */}
-      <div className="flex gap-6 max-[960px]:hidden">
+      <div className="flex gap-6 max-[1050px]:hidden">
         <button onClick={() => setDark(!dark)} className="cursor-pointer">
           {dark ? <Sun /> : <Moon />}
         </button>
         <div className="flex items-center">
           <button
             type="button"
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate("/profile")}
             className="p-2 cursor-pointer rounded-full border border-gray-400 dark:border-gray-600 
                bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
                hover:bg-gray-200 dark:hover:bg-gray-700 
-               hover:scale-105 shadow-sm hover:shadow-md transition-all duration-200"
+                shadow-sm hover:shadow-md transition-all duration-200"
           >
             <User size={20} />
           </button>
@@ -78,8 +79,9 @@ const Header = () => {
           </button>
         </div>
       </div>
+
       <Menu
-        className="min-[960px]:hidden transition-all"
+        className="min-[1050px]:hidden transition-all"
         onClick={() => setBurger((p) => !p)}
       />
 
@@ -90,13 +92,90 @@ const Header = () => {
             onClick={() => setBurger(false)}
           ></div>
 
-          <div className="fixed top-0 right-0 w-[350px] h-screen bg-white transition-all dark:bg-[#000000] z-50 min-[960px]:hidden p-6 shadow-lg">
+          <div className="fixed top-0 right-0 w-[250px] h-screen bg-white transition-all dark:bg-[#28243D] min-[1050px]:hidden z-50 p-6 shadow-lg">
             <button
               className="mb-4 text-right w-full text-gray-800 dark:text-gray-200"
               onClick={() => setBurger(false)}
             >
               <X className="absolute top-4 right-4 w-[20px] h-[20px] dark:text-[var(--color-py)] dark:transition-all transition-all" />
             </button>
+            <div></div>
+            <div className="flex flex-col h-[93vh] justify-between ">
+              <div className="flex flex-col gap-4">
+                <button
+                  type="button"
+                  onClick={() => navigate("/profile")}
+                  className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-400 dark:border-gray-600
+       bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
+       hover:bg-gray-200 dark:hover:bg-gray-700 
+        shadow-sm hover:shadow-md transition-all duration-200"
+                >
+                  <User className="w-5 h-5" />
+                  <span className="text-sm font-medium">Profile</span>
+                </button>
+                <button
+                  onClick={() => setDark(!dark)}
+                  className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-400 dark:border-gray-600
+       bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
+       hover:bg-gray-200 dark:hover:bg-gray-700 
+        shadow-sm hover:shadow-md transition-all duration-200"
+                >
+                  {dark ? (
+                    <Sun className="w-5 h-5" />
+                  ) : (
+                    <Moon className="w-5 h-5" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {dark ? "Light Mode" : "Dark Mode"}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => signOut()}
+                  className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-red-500 
+       text-red-500 hover:bg-red-500 hover:text-white 
+        shadow-sm hover:shadow-md transition-all duration-200"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span className="text-sm font-medium">Logout</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-4 justify-end">
+                <div className="flex items-center gap-7 text-sm text-gray-600 dark:text-gray-300">
+                  <a
+                    href="https://instagram.com/faxriddin_maripov"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-pink-500"
+                  >
+                    <FaInstagram size={20} />
+                  </a>
+                  <a
+                    href="https://t.me/faxriddin_maripov"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-sky-500"
+                  >
+                    <FaTelegram size={20} />
+                  </a>
+                  <a
+                    href="https://linkedin.com/in/faxriddin_maripov"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-blue-600"
+                  >
+                    <FaLinkedin size={20} />
+                  </a>
+                </div>
+                <div className="">
+                  <span className="">
+                    © 2025, Made with ❤️ by{" "}
+                    <span className="font-semibold">Ye77i grup</span>
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}

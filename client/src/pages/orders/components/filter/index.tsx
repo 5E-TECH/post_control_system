@@ -59,7 +59,6 @@ const Filter = () => {
       {item.label}
     </option>
   ));
-  
 
   // const [range, setRange] = useState<[string, string] | null>(null);
 
@@ -69,15 +68,15 @@ const Filter = () => {
   // console.log(range);
 
   return (
-    <div>
+    <div className="">
       <h2 className="text-[18px] mb-2">Filters</h2>
-      <div className="w-full flex gap-5">
+      <div className="w-full grid grid-cols-3 gap-5 max-[800px]:grid-cols-1">
         <Select
           name="market"
           value={form.market}
           onChange={handleChange}
           placeholder="Select market"
-          className="w-[180px] flex-1"
+          className="w-full"
         >
           {marketOptions}
         </Select>
@@ -87,7 +86,7 @@ const Filter = () => {
           value={form.region}
           onChange={handleChange}
           placeholder="Select region"
-          className="w-[180px] flex-1"
+          className="w-full"
         >
           {regionOptions}
         </Select>
@@ -97,29 +96,32 @@ const Filter = () => {
           value={form.status}
           onChange={handleChange}
           placeholder="Select status"
-          className="w-[180px] flex-1"
+          className="w-full"
         >
           {statusOpts}
         </Select>
       </div>
 
-      <div className="border-t w-full flex pt-5 justify-between items-center border-[#F6F7FB] dark:border-[#595572]">
-        <Space direction="vertical" size={10}>
-          <DatePicker.RangePicker format="YYYY-MM-DD" />
+      <div className="w-full flex flex-wrap  pt-5 gap-5 justify-between items-center border-[#F6F7FB] dark:border-[#595572]">
+        <Space direction="vertical" size={10} style={{ width: "100%" }}>
+          <DatePicker.RangePicker
+            format="YYYY-MM-DD"
+            className="max-[800px]:w-full"
+          />
         </Space>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-5 flex-wrap w-full">
           <input
             type="text"
             name="order"
             value={form.order}
             onChange={handleChange}
             placeholder="Search order"
-            className="border border-[#E5E7EB] rounded-lg px-3 py-[10px] outline-none"
+            className="border border-[#E5E7EB] rounded-lg px-3 py-[10px] outline-none max-[800px]:w-full"
           />
           <Button
             onClick={handleCheck}
-            className="w-[140px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
+            className="w-[140px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none! max-[800px]:w-full!"
           >
             Add order <ArrowRight className="w-[13px] h-[13px]" />
           </Button>
