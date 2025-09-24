@@ -7,8 +7,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  // Cell,
 } from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
 import { useSelector } from "react-redux";
@@ -20,6 +18,14 @@ import {
   ShoppingCart,
   XCircle,
 } from "lucide-react";
+import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
+import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
+
+import { DatePicker} from "antd";
+
+import dayjs from "dayjs";
+
+const { RangePicker } = DatePicker;
 
 const SkeletonBox = ({ className }: { className?: string }) => (
   <div
@@ -28,20 +34,33 @@ const SkeletonBox = ({ className }: { className?: string }) => (
 );
 
 const Dashboards = () => {
-  // default bugungi kun sanasi
-  // const today = new Date().toISOString().split("T")[0];
-  const [fromDate, setFromDate] = useState<string>();
-  const [toDate, setToDate] = useState<string>();
-
+  const [fromDate, setFromDate] = useState<string | undefined>(undefined);
+  const [toDate, setToDate] = useState<string | undefined>(undefined);
   const [showAllMarkets, setShowAllMarkets] = useState(false);
   const [showAllCouriers, setShowAllCouriers] = useState(false);
 
+  // Redux'dan role olish
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
-  const { data, isLoading } = useChart().getChart({
-    startDate: fromDate,
-    endDate: toDate,
-  });
+  let data: any;
+  let isLoading: boolean = false;
+
+  if (role === "superadmin" || role === "admin") {
+    ({ data, isLoading } = useChart().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  } else if (role === "courier") {
+    ({ data, isLoading } = useCourierStatCard().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  } else if (role === "market") {
+    ({ data, isLoading } = useMarketStatCard().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  }
 
   const dashboard = data?.data?.orders?.data;
 
@@ -56,7 +75,7 @@ const Dashboards = () => {
     data?.data?.couriers?.data?.map((courier: any) => ({
       nomi: courier?.courier?.name + ` (${courier.successRate}%)`,
       buyurtmalar: courier?.totalOrders,
-      sotilgan: courier?.deliveredOrders,
+      sotilgan: courier?.soldOrders,
     })) ?? [];
 
   const couriers = data?.data?.topCouriers?.data ?? [];
@@ -88,30 +107,30 @@ const Dashboards = () => {
             </>
           ) : (
             <>
-              <div className="flex flex-col">
-                <label htmlFor="fromDate" className="mb-1 text-sm font-medium">
-                  Boshlanish sanasi
-                </label>
-                <input
-                  id="fromDate"
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="border rounded-md px-4 py-2 bg-white dark:bg-[#2A263D]"
-                />
-              </div>
-              <div className="flex flex-col">
-                <label htmlFor="toDate" className="mb-1 text-sm font-medium">
-                  Tugash sanasi
-                </label>
-                <input
-                  id="toDate"
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="border rounded-md px-4 py-2 bg-white dark:bg-[#2A263D]"
-                />
-              </div>
+                {/* Agar RangePicker ishlatmoqchi bo‘lsangiz */}
+                <div className="flex gap-6">
+                  {/* Sana oralig‘i (RangePicker bilan) */}
+                  <div className="flex flex-col">
+                    <label className="mb-1 text-sm font-medium">
+                      Sana oralig‘i
+                    </label>
+                    <RangePicker
+                      value={[
+                        fromDate ? dayjs(fromDate) : null,
+                        toDate ? dayjs(toDate) : null,
+                      ]}
+                      onChange={(dates) => {
+                        setFromDate(
+                          dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
+                        );
+                        setToDate(
+                          dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
+                        );
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
             </>
           )}
         </div>
@@ -235,6 +254,24 @@ const StatCard = ({
   </div>
 );
 
+// 🔹 Custom Bar for Buyurtmalar + Sotilgan
+const CustomBar = (props: any) => {
+  const { x, y, width, height, payload } = props;
+  const buyurtmalar = payload.buyurtmalar;
+  const sotilgan = payload.sotilgan;
+
+  const soldWidth = buyurtmalar ? (sotilgan / buyurtmalar) * width : 0;
+
+  return (
+    <g>
+      {/* Fon - Buyurtmalar */}
+      <rect x={x} y={y} width={width} height={height} fill="#66B2FF" />
+      {/* Ustiga - Sotilgan */}
+      <rect x={x} y={y} width={soldWidth} height={height} fill="#0047AB" />
+    </g>
+  );
+};
+
 // 🔹 Helper Components (Charts & Tables)
 const renderMarketsChart = (
   visibleMarkets: any[],
@@ -285,29 +322,45 @@ const ChartWrapper = ({
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis type="number" />
         <YAxis type="category" dataKey="nomi" width={200} />
+
         <Tooltip
-          contentStyle={{ backgroundColor: "#000", color: "#fff" }}
-          cursor={{ fill: "rgba(0,0,0,0.1)" }}
-        />
-        <Legend
-          wrapperStyle={{ color: "black" }}
-          formatter={(value) => (
-            <span style={{ color: "inherit", fontWeight: "bold" }}>
-              {value}
-            </span>
-          )}
+          cursor={{ fill: "rgba(0,0,0,0.05)" }}
+          content={({ payload }) => {
+            if (!payload || !payload.length) return null;
+            const item = payload[0].payload;
+            return (
+              <div className="p-2 bg-black text-white rounded text-sm">
+                <p>{item.nomi}</p>
+                <p>Buyurtmalar: {item.buyurtmalar}</p>
+                <p>Sotilgan: {item.sotilgan}</p>
+              </div>
+            );
+          }}
         />
 
-        {/* 🔹 Ustma-ust barlar */}
-        <Bar
-          dataKey="buyurtmalar"
-          name="Buyurtmalar"
-          fill="#66B2FF"
-          stackId="a"
-        />
-        <Bar dataKey="sotilgan" name="Sotilgan" fill="#0047AB" stackId="a" />
+        {/* 🔹 Custom bar */}
+        <Bar dataKey="buyurtmalar" name="Buyurtmalar" shape={<CustomBar />} />
       </BarChart>
     </ResponsiveContainer>
+
+    {/* 🔹 Legend qo'lda */}
+    <div className="flex justify-center gap-6 mt-3">
+      <div className="flex items-center gap-2">
+        <span
+          className="w-4 h-4 rounded-sm"
+          style={{ background: "#66B2FF" }}
+        />
+        <span>Buyurtmalar</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span
+          className="w-4 h-4 rounded-sm"
+          style={{ background: "#0047AB" }}
+        />
+        <span>Sotilganlar</span>
+      </div>
+    </div>
+
     <div className="flex justify-center mt-4">
       <button
         onClick={() => setShowAll(!showAll)}
@@ -318,7 +371,6 @@ const ChartWrapper = ({
     </div>
   </div>
 );
-
 
 // 🔹 Top Markets Table
 const renderMarketsTable = (markets: any[]) => (
