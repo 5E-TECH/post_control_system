@@ -1,10 +1,10 @@
 import { memo } from "react";
-import { House, ShoppingBag, MailOpen, FileText, CarFront } from "lucide-react";
+import { House, ShoppingBag, MailOpen, FileText, History } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 
 const RegistratorSidebar = () => {
-  const { t } = useTranslation(['sidebar'])
+  const { t } = useTranslation(["sidebar"]);
 
   const links = [
     { to: "/", icon: <House />, label: t("dashboard"), end: true },
