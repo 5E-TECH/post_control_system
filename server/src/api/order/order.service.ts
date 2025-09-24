@@ -1590,7 +1590,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const canceledOrders = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.post_id IN (:...postIds)', { postIds })
-        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
         .andWhere('o.status IN (:...statuses)', {
           statuses: [Order_status.CANCELLED],
         })
@@ -1598,20 +1598,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const allSoldOrders = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.post_id IN (:...postIds)', {
-          postIds,
-        })
+        .where('o.post_id IN (:...postIds)', { postIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
         .getMany();
 
       let profit: number = 0;
 
+      const courier = await this.userRepo.findOne({ where: { id: user.id } });
+
       for (const order of allSoldOrders) {
-        const market = await this.userRepo.findOne({
-          where: { id: order.user_id },
-        });
-
-        const courier = await this.userRepo.findOne({ where: { id: user.id } });
-
         profit +=
           order.where_deliver === Where_deliver.ADDRESS
             ? Number(courier?.tariff_home ?? 0)
@@ -1625,6 +1621,76 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       return successRes(
         { totalOrders, soldOrders, canceledOrders, profit, successRate },
+        200,
+        'Couriers stats',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async marketStat(user: JwtPayload, startDate?: string, endDate?: string) {
+    try {
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
+
+      // 1️⃣ Shu davrdagi barcha postlar
+      const allOrders = await this.postRepo
+        .createQueryBuilder('o')
+        .where('o.created_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.market_id = :marketId', { marketId: user.id })
+        .getMany();
+
+      const validStatuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ];
+
+      const orderIds = allOrders.map((o) => o.id);
+
+      // 🔹 Shu marketning sotilgan orderlari
+      const soldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.id IN (:...orderIds)', { orderIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+        .getCount();
+
+      const canceledOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.id IN (:...orderIds)', { orderIds })
+        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [Order_status.CANCELLED],
+        })
+        .getCount();
+
+      const allSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.id IN (:...orderIds)', { orderIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+        .getMany();
+
+      let profit: number = 0;
+      for (const order of allSoldOrders) {
+        profit += order.to_be_paid;
+      }
+
+      const successRate =
+        allOrders.length > 0
+          ? Number(((soldOrders * 100) / allOrders.length).toFixed(2))
+          : 0;
+
+      return successRes(
+        {
+          totalOrders: allOrders.length,
+          soldOrders,
+          canceledOrders,
+          profit,
+          successRate,
+        },
         200,
         'Couriers stats',
       );

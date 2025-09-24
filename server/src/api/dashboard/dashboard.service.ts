@@ -70,7 +70,10 @@ export class DashboardService {
     }
   }
 
-  async getStatsForMarket(filter: { startDate?: string; endDate?: string }) {
+  async getStatsForMarket(
+    user: JwtPayload,
+    filter: { startDate?: string; endDate?: string },
+  ) {
     try {
       let { startDate, endDate } = filter;
 
@@ -83,12 +86,17 @@ export class DashboardService {
         endDate = String(end);
       }
 
-      const [markets, topMarkets] = await Promise.all([
+      const [myStat, markets, topMarkets] = await Promise.all([
+        this.orderStats.marketStat(user, startDate, endDate),
         this.orderStats.getMarketStats(startDate, endDate),
         this.orderStats.getTopMarkets(),
       ]);
 
-      return successRes({ markets, topMarkets }, 200, 'Dashboard infos');
+      return successRes(
+        { myStat, markets, topMarkets },
+        200,
+        'Dashboard infos',
+      );
     } catch (error) {
       return catchError(error);
     }
