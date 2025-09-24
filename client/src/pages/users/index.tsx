@@ -28,8 +28,11 @@ const Users = () => {
 
         <div className="w-full border border-[#E9E8EA] my-[20px] dark:border-[#E7E3FC38]"></div>
 
-        <div className="flex flex-wrap items-center justify-end pl-[20px] pr-[20px] max-[900px]:gap-5">
-          <div className="flex gap-4 flex-wrap justify-end">
+        <div
+          className="flex flex-wrap items-center justify-end pl-[20px] pr-[20px] 
+                max-[900px]:gap-5 max-[900px]:w-full"
+        >
+          <div className="flex gap-4 flex-wrap justify-end max-[900px]:justify-center w-full">
             <SearchInput placeholder="Search User" />
             <Button text="Add New User" />
           </div>

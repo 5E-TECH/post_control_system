@@ -1,18 +1,21 @@
 import { memo } from "react";
 import { House, ShoppingBag, MailOpen, FileText, History } from "lucide-react";
 import SidebarLink from "./SidebarLink";
+import { useTranslation } from "react-i18next";
 
 const CourierSidebar = () => {
+  const { t } = useTranslation(['sidebar'])
+
   const links = [
-    { to: "/", icon: <House />, label: "Dashboard", end: true },
+    { to: "/", icon: <House />, label: t("dashboard"), end: true },
     {
       to: "/courier-orders/orders",
       icon: <ShoppingBag />,
-      label: "Buyurtmalar",
+      label: t("orders"),
     },
-    { to: "/courier-mails", icon: <MailOpen />, label: "Pochta" },
-    { to: "/payments", icon: <FileText />, label: "To'lovlar" },
-    { to: "/history", icon: <History />, label: "Hududlarim" },
+    { to: "/courier-mails", icon: <MailOpen />, label: t("mails") },
+    { to: "/payments", icon: <FileText />, label: t("payments") },
+    { to: "/history", icon: <History />, label: t("balance") },
   ];
 
   return (

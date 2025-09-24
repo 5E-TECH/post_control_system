@@ -17,7 +17,7 @@ interface Props {
 const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
   return (
     <div className="pt-[21px]">
-      <table>
+      <table className="w-full">
         <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
           <tr>
             <th className="p-[20px] flex items-center">#</th>
@@ -59,8 +59,16 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
           <tbody>
             {data?.map((user: any, inx: number) => (
               <tr key={user?.id}>
-                <td className="p-[20px] flex items-center">{inx + 1}</td>
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                <td
+                  className="data-cell p-[20px] flex items-center"
+                  data-cell="#"
+                >
+                  {inx + 1}
+                </td>
+                <td
+                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                  data-cell="NAME"
+                >
                   <div className="flex items-center gap-4">
                     <div className="flex flex-col">
                       <span className="font-medium text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
@@ -69,12 +77,18 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
                     </div>
                   </div>
                 </td>
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                <td
+                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                  data-cell="PHONE"
+                >
                   <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
                     {user?.phone_number}
                   </span>
                 </td>
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                <td
+                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                  data-cell="ROLE"
+                >
                   <div className="flex gap-2.5 items-center">
                     <div>
                       <img src={superImg} alt="" />
@@ -87,19 +101,28 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
                 </td>
 
                 {user?.status === "active" ? (
-                  <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                  <td
+                    className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                    data-cell="STATUS"
+                  >
                     <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
                       {user?.status}
                     </span>
                   </td>
                 ) : (
-                  <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                  <td
+                    className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                    data-cell="STATUS"
+                  >
                     <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
                       {user?.status}
                     </span>
                   </td>
                 )}
-                <td className="w-[254px] h-[56px] pl-[19px] text-left">
+                <td
+                  className="data-cell w-[254px] h-[56px] pl-[19px] text-left max-[900px]:w-full"
+                  data-cell="ACTIONS"
+                >
                   <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
                     <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
                     <Eye className="w-[22px] h-[22px] ml-1 cursor-pointer hover:opacity-80" />

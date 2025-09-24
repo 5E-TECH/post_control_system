@@ -18,6 +18,8 @@ import {
   ShoppingCart,
   XCircle,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { t } from "i18next";
 import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
 import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
 
@@ -34,6 +36,7 @@ const SkeletonBox = ({ className }: { className?: string }) => (
 );
 
 const Dashboards = () => {
+  const { t } = useTranslation(["dashboard"]);
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
   const [toDate, setToDate] = useState<string | undefined>(undefined);
   const [showAllMarkets, setShowAllMarkets] = useState(false);
@@ -90,7 +93,7 @@ const Dashboards = () => {
     ? couriersData
     : couriersData.slice(0, 10);
 
-  let titleText = "📊 Bugungi statistika";
+  let titleText = `📊 ${t("title")}`;
   if (fromDate && toDate && fromDate !== toDate) {
     titleText = `📊 ${fromDate} - ${toDate} statistikasi`;
   } else if (fromDate && !toDate) {
@@ -355,7 +358,7 @@ const renderMarketsChart = (
   setShowAllMarkets: (v: boolean) => void
 ) => (
   <ChartWrapper
-    title="Marketlar statistikasi"
+    title={t("marketStatistics")}
     data={visibleMarkets}
     showAll={showAllMarkets}
     setShowAll={setShowAllMarkets}
@@ -368,7 +371,7 @@ const renderCouriersChart = (
   setShowAllCouriers: (v: boolean) => void
 ) => (
   <ChartWrapper
-    title="Kuriyerlar statistikasi"
+    title={t("courierStatistics")}
     data={visibleCouriers}
     showAll={showAllCouriers}
     setShowAll={setShowAllCouriers}
@@ -398,7 +401,6 @@ const ChartWrapper = ({
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis type="number" />
         <YAxis type="category" dataKey="nomi" width={200} />
-
         <Tooltip
           cursor={{ fill: "rgba(0,0,0,0.05)" }}
           content={({ payload }) => {
@@ -442,7 +444,7 @@ const ChartWrapper = ({
         onClick={() => setShowAll(!showAll)}
         className="px-4 py-2 bg-blue-500 text-white rounded-lg"
       >
-        {showAll ? "Kamroq ko‘rish" : "Ko‘proq ko‘rish"}
+        {showAll ? t("showLess") : t("showMore")}
       </button>
     </div>
   </div>
@@ -451,7 +453,7 @@ const ChartWrapper = ({
 // 🔹 Top Markets Table
 const renderMarketsTable = (markets: any[]) => (
   <TableWrapper
-    title="Top 10 Marketlar (Oxirgi 30 kun)"
+    title={t("topMarkets")}
     data={markets}
     nameKey="market_name"
     ordersKey="total_orders"
@@ -463,7 +465,7 @@ const renderMarketsTable = (markets: any[]) => (
 // 🔹 Top Couriers Table
 const renderCouriersTable = (couriers: any[]) => (
   <TableWrapper
-    title="Top 10 Kuriyerlar (Oxirgi 30 kun)"
+    title={t("topCouriers")}
     data={couriers}
     nameKey="courier_name"
     ordersKey="total_orders"
@@ -493,10 +495,10 @@ const TableWrapper = ({
       <thead>
         <tr className="bg-gray-100 dark:bg-[#3B3656] text-left">
           <th className="p-2 border">#</th>
-          <th className="p-2 border">Nomi</th>
-          <th className="p-2 border">Buyurtmalar</th>
-          <th className="p-2 border">Sotilganlar</th>
-          <th className="p-2 border">Foiz</th>
+          <th className="p-2 border">{t("name")}</th>
+          <th className="p-2 border">{t("orders")}</th>
+          <th className="p-2 border">{t("solded")}</th>
+          <th className="p-2 border">{t("rate")}</th>
         </tr>
       </thead>
       <tbody>

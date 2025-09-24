@@ -1,0 +1,11 @@
+{
+    "dashboard": "Dashboard",
+    "orders": "Orders",
+    "new_orders": "Today's Orders",
+    "mails": "Mail",
+    "products": "Products",
+    "users": "Users",
+    "payments": "Payments",
+    "balance": "Financial Balance",
+    "logs": "Logs"
+}
