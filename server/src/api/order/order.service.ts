@@ -1614,10 +1614,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         profit +=
           order.where_deliver === Where_deliver.ADDRESS
-            ? Number(market?.tariff_home ?? 0) -
-              Number(courier?.tariff_home ?? 0)
-            : Number(market?.tariff_center ?? 0) -
-              Number(courier?.tariff_center ?? 0);
+            ? Number(courier?.tariff_home ?? 0)
+            : Number(courier?.tariff_center ?? 0);
       }
 
       const successRate =
