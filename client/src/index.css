@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -112,7 +112,6 @@
   background-color: #312d4b !important;
 }
 
-
 .dark .toFROM .ant-picker {
   background-color: #312d4b !important;
   border-color: #4b5563 !important;
@@ -130,9 +129,6 @@
   color: #fff !important; /* calendar icon oq */
 }
 
-
-
-
 .dark .ant-select-selector {
   background-color: #312d4b !important; /* fon */
   color: #9ca3af !important; /* text oq */
@@ -147,7 +143,6 @@
   color: #fff !important; /* pastga tushadigan icon */
 }
 
-
 .dark .ant-select-dropdown {
   background-color: #312d4b !important;
 }
@@ -157,20 +152,12 @@
 }
 
 .dark .ant-select-item-option-active {
-  background-color: #433d64 !important; /* hover */
+  background-color: #433d64 !important;
 }
 
 .dark .ant-select-item-option-selected {
-  background-color: #4c4470 !important; /* tanlangan option */
+  background-color: #4c4470 !important;
 }
-
-
-
-
-
-
-
-
 
 .dark .myTextArea.ant-input {
   background-color: #312d4b !important;
@@ -181,4 +168,39 @@
   color: #9ca3af !important;
 }
 
+@media (max-width: 900px) {
+  table {
+    border-collapse: collapse;
+    border-spacing: 0;
+    width: 100%;
+  }
 
+  th {
+    display: none;
+  }
+
+  td {
+    display: grid;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    grid-template-columns: 15ch auto;
+    padding: 1rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+     color: #475569;
+  }
+
+  td::before {
+    content: attr(data-cell);
+    color: #374151;
+    font-weight: 600;
+  }
+
+  tr {
+    border-bottom: 10px solid #e5e7eb;
+  }
+
+  tr:last-child {
+    border-bottom: 0;
+  }
+}
