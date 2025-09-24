@@ -1535,8 +1535,87 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async courierStat(startDate?: string, endDate?: string) {
+  async courierStat(user: JwtPayload, startDate?: string, endDate?: string) {
     try {
+      const start = Number(startDate) || 0;
+      const end = Number(endDate) || Date.now();
+
+      // 1️⃣ Shu davrdagi barcha postlar
+      const allPosts = await this.postRepo
+        .createQueryBuilder('p')
+        .where('p.created_at BETWEEN :start AND :end', { start, end })
+        .andWhere('p.courier_id = :courierId', { courierId: user.id })
+        .getMany();
+
+      const validStatuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ];
+
+      // 3️⃣ Har bir kuryer uchun hisoblash
+      // for (const post of allPosts) {
+
+      const postIds = allPosts.map((p) => p.id);
+
+      // 🔹 Shu kuryerning berilgan davrdagi barcha orderlari
+      const totalOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (:...postIds)', { postIds })
+        .andWhere('o.created_at BETWEEN :start AND :end', { start, end })
+        .getCount();
+
+      // 🔹 Shu kuryerning sotilgan orderlari
+      const soldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (:...postIds)', { postIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+        .getCount();
+
+      const canceledOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (:...postIds)', { postIds })
+        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [Order_status.CANCELLED],
+        })
+        .getCount();
+
+      const allSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (postIds)', {
+          postIds,
+        })
+        .getMany();
+
+      let profit: number = 0;
+
+      for (const order of allSoldOrders) {
+        const market = await this.userRepo.findOne({
+          where: { id: order.user_id },
+        });
+
+        const courier = await this.userRepo.findOne({ where: { id: user.id } });
+
+        profit +=
+          order.where_deliver === Where_deliver.ADDRESS
+            ? Number(market?.tariff_home ?? 0) -
+              Number(courier?.tariff_home ?? 0)
+            : Number(market?.tariff_center ?? 0) -
+              Number(courier?.tariff_center ?? 0);
+      }
+
+      const successRate =
+        totalOrders > 0
+          ? Number(((soldOrders * 100) / totalOrders).toFixed(2))
+          : 0;
+
+      return successRes(
+        { totalOrders, soldOrders, canceledOrders, profit, successRate },
+        200,
+        'Couriers stats',
+      );
     } catch (error) {
       return catchError(error);
     }
