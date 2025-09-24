@@ -18,7 +18,7 @@ const Mails = () => {
     );
   }
 
-  if (role === "superadmin" || role === "admin") {
+  if (role === "superadmin" || role === "admin" || role === "registrator") {
     return (
       <div className="p-5 flex flex-col gap-12">
         <ChooseMail role="superadmin" />
