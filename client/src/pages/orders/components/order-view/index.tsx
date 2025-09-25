@@ -6,6 +6,7 @@ import { useSelector } from "react-redux";
 import TableSkeleton from "../ordersTabelSkeleton/ordersTableSkeleton";
 import { Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../../../shared/hooks/useParams";
+import { useTranslation } from "react-i18next";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -21,6 +22,7 @@ const statusColors: Record<string, string> = {
 };
 
 const OrderView = () => {
+  const { t } = useTranslation("orderList");
   const navigate = useNavigate();
 
   const { getOrders, getMarketsByMyNewOrders } = useOrder();
@@ -76,43 +78,43 @@ const OrderView = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>CUSTOMER</span>
+                <span>{t("customer")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>PHONE</span>
+                <span>{t("phone")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>ADDRESS</span>
+                <span>{t("address")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MARKET</span>
+                <span>{t("market")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>STATUS</span>
+                <span>{t("status")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>PRICE</span>
+                <span>{t("price")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>STOCK</span>
+                <span>{t("stock")}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
@@ -157,9 +159,8 @@ const OrderView = () => {
                 </td>
                 <td className="data-cell pl-10" data-cell="STATUS">
                   <span
-                    className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                      statusColors[item.status] || "bg-slate-400"
-                    }`}
+                    className={`py-2 px-3 rounded-2xl text-[13px] text-white ${statusColors[item.status] || "bg-slate-400"
+                      }`}
                   >
                     {item.status.toUpperCase()}
                   </span>
