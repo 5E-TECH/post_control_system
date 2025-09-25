@@ -57,7 +57,7 @@
         "item": "Товар",
         "selectProduct": "Выберите или введите товар",
         "quantity": "Количество",
-        "addAnotherItem": "Добавить еще товар"
+        "addAnotherItem": "Добавить товар"
     },
     "productInfo": {
         "title": "Информация о продукте",

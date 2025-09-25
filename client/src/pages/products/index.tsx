@@ -16,9 +16,6 @@ const Products = () => {
   const [select, setSelect] = useState<string | null>("");
   const [searchProduct, setSearchProduct] = useState<any>(null);
 
-  console.log("search input   ",searchProduct);
-  
-
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
   useEffect(() => {
     if (role === "market") {
@@ -60,7 +57,9 @@ const Products = () => {
 
   const { getProducts, getMyProducts } = useProduct();
   const { data: productData } =
-    role === "market" ? getMyProducts({ search: searchProduct }) : getProducts({ search: searchProduct });
+    role === "market"
+      ? getMyProducts({ search: searchProduct })
+      : getProducts({ search: searchProduct });
 
   const { getMarkets } = useMarket();
 
@@ -77,7 +76,7 @@ const Products = () => {
 
   if (pathname.startsWith("/products/create")) return <Outlet />;
   return (
-    <div className="mt-6">
+    <div className="mt-6 w-full">
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4">
         {/* Chap taraf - Filter */}
@@ -90,11 +89,10 @@ const Products = () => {
         >
           {marketOptions}
         </Select>
-
-        {/* O‘ng taraf - Search + Button */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* Search */}
-          <div className="relative w-full md:w-[280px]">
+          {/* Yangi mahsulot qo‘shish */}
+      <div className="flex flex-col px-4">
+        <div className="flex justify-between max-[800px]:flex-col max-[800px]:gap-4">
+        <div className="relative w-full md:w-[280px]">
             <input
               onChange={(e) => debouncedSearch(e.target.value)}
               className="rounded-[7px] w-full h-[40px] border border-[#2E263D38] px-3 pr-10"
@@ -103,8 +101,6 @@ const Products = () => {
             />
             <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
           </div>
-
-          {/* Yangi mahsulot qo‘shish */}
           <button
             onClick={() => {
               if (role === "market") {
@@ -141,43 +137,61 @@ const Products = () => {
             </div>
 
             <div className="max-h-[520px] overflow-y-auto">
-              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 cursor-pointer">
-                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
-                  <tr>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      # ID
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      MARKET NAME
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                  {data?.data?.data &&
-                    Array.isArray(data?.data?.data) &&
-                    data?.data?.data?.map((item: any, inx: number) => (
-                      <tr
-                        key={item?.id}
-                        onClick={() => setSelect(item?.id)}
-                        className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                          item.id == select ? "bg-gray-100" : ""
-                        }`}
-                      >
-                        <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                        <td className="pr-26 py-3">{item?.name}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+  <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 cursor-pointer">
+    <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+      <tr>
+        <th className="h-[56px] font-medium text-[13px] text-left px-4">
+          <div className="flex items-center justify-between pr-[21px]">
+            # ID
+            <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+          </div>
+        </th>
+        <th className="h-[56px] font-medium text-[13px] text-left px-4">
+          <div className="flex items-center justify-between pr-[21px]">
+            MARKET NAME
+          </div>
+        </th>
+      </tr>
+    </thead>
 
-            <div className="absolute bottom-4 right-4">
+    <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
+      {data?.data?.data &&
+        Array.isArray(data?.data?.data) &&
+        data?.data?.data?.map((item: any, inx: number) => (
+          <tr
+            key={item?.id}
+            onClick={() => setSelect(item?.id)}
+            className={`data-cell border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+              item.id == select ? "bg-gray-100" : ""
+            }`}
+            data-cell="#"
+          >
+            <td
+              className="data-cell text-[#8C57FF] pr-10 py-3"
+              data-cell="# ID"
+            >
+              {inx + 1}
+            </td>
+            <td
+              className="data-cell pr-26 py-3"
+              data-cell="MARKET NAME"
+            >
+              {item?.name}
+            </td>
+          </tr>
+        ))}
+    </tbody>
+  </table>
+</div>
+
               <button
                 onClick={() => handleNavigate()}
                 className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
               >
                 Tanlash
               </button>
+            
+             
             </div>
           </div>
         </Popup>

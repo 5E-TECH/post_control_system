@@ -150,7 +150,7 @@ const OrderItems = () => {
               </span>
 
               <div className="flex gap-5">
-                <Form.Item>
+                <Form.Item className="w-1/2">
                   <Select
                     value={formData.product_id ?? undefined}
                     onSearch={(value) =>
@@ -167,7 +167,7 @@ const OrderItems = () => {
                       handleSelectChange(index, "product_id", value)
                     }
                     placeholder={t("orderItems.selectProduct")}
-                    className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
+                    className="!h-[48px] custom-select-dropdown-bright"
                     options={formData.search ? searchedProducts : productNames}
                     dropdownClassName="dark-dropdown"
                     showSearch
@@ -175,14 +175,14 @@ const OrderItems = () => {
                   />
                 </Form.Item>
 
-                <Form.Item>
+                <Form.Item className="w-1/2">
                   <Input
                     name="quantity"
                     value={formData.quantity}
                     onChange={(e) => handleChange(index, e)}
                     type="number"
                     placeholder={t("orderItems.quantity")}
-                    className="!w-[639px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+                    className=" !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                   />
                 </Form.Item>
               </div>

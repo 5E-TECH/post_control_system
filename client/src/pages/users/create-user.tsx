@@ -1,8 +1,10 @@
 import { memo } from "react";
 import ChooseUser from "./components/choose-user";
 import { NavLink, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const CreateUser = () => {
+  const { t } = useTranslation("users");
   return (
     <div className="flex max-[1500px]:flex-col dark:bg-[#312D4B]">
       <div
@@ -13,7 +15,7 @@ const CreateUser = () => {
           className="font-medium text-[24px] text-[#000000] text-center mt-[20px] 
                    dark:text-[#ffffff] max-[1500px]:text-center max-lg:text-[20px]"
         >
-          Foydalanuvchi rolini tanlang
+          {t("selectUserRole")}
         </h1>
 
         <div
@@ -31,7 +33,7 @@ const CreateUser = () => {
             }
             to={""}
           >
-            <ChooseUser title="Admin" />
+            <ChooseUser title={t("admin")} />
           </NavLink>
 
           <NavLink
@@ -45,7 +47,7 @@ const CreateUser = () => {
             }
             to={"registrator"}
           >
-            <ChooseUser title="Ro’yxatchi" />
+            <ChooseUser title={t("registrator")} />
           </NavLink>
 
           <NavLink
@@ -58,7 +60,7 @@ const CreateUser = () => {
             }
             to={"courier"}
           >
-            <ChooseUser title="Kurier" />
+            <ChooseUser title={t("courier")} />
           </NavLink>
 
           <NavLink
@@ -71,7 +73,7 @@ const CreateUser = () => {
             }
             to={"market"}
           >
-            <ChooseUser title="Market" />
+            <ChooseUser title={t("market")} />
           </NavLink>
         </div>
       </div>

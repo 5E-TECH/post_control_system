@@ -4,8 +4,10 @@ import market from "../../../../shared/assets/users/markets.svg";
 import employers from "../../../../shared/assets/users/employer.svg";
 import { NavLink } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
+import { useTranslation } from "react-i18next";
 
 const UsersStatistics = () => {
+  const { t } = useTranslation("users")
   const { getUser } = useUser();
   const { data: allUsers } = getUser();
   const markets = Array.isArray(allUsers?.data?.data)
@@ -28,7 +30,7 @@ const UsersStatistics = () => {
           <div className="flex items-center">
             <div className="flex flex-col gap-1">
               <p className="font-normal text-[16px] dark:text-[#E7E3FCE5]">
-                Barcha Foydalanuvchilar
+                {t("allUsers")}
               </p>
               <div className="flex gap-2">
                 <span className="font-medium text-2xl text-[#2E263DE5] dark:text-[#E7E3FCE5]">
@@ -56,7 +58,7 @@ const UsersStatistics = () => {
           <div className="flex items-center">
             <div className="flex flex-col gap-1">
               <p className="font-normal text-[16px] dark:text-[#E7E3FCE5]">
-                Marketlar
+                {t("markets")}
               </p>
               <div className="flex gap-2">
                 <span className="font-medium text-2xl text-[#2E263DE5] dark:text-[#E7E3FCE5]">
@@ -84,7 +86,7 @@ const UsersStatistics = () => {
           <div className="flex items-center">
             <div className="flex flex-col gap-1">
               <p className="font-normal text-[16px] dark:text-[#E7E3FCE5]">
-                Xodimlar
+                {t("employees")}
               </p>
               <div className="flex gap-2">
                 <span className="font-medium text-2xl text-[#2E263DE5] dark:text-[#E7E3FCE5]">
