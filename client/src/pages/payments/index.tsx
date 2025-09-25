@@ -36,6 +36,13 @@ const Payments = () => {
 
   const { pathname } = useLocation();
 
+  const hendlerClose = ()=>{
+    setShowCurier(false)
+    setShowMarket(false)
+    setSelect(null)
+
+  }
+
   useEffect(() => {
     refetch();
   }, [pathname]);
@@ -62,7 +69,7 @@ const Payments = () => {
           </strong>
         </div>
 
-        <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
+        <Popup isShow={showMarket} onClose={() => hendlerClose()}>
           <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d]">
             <button
               onClick={() => setShowMarket(false)}
@@ -172,7 +179,7 @@ const Payments = () => {
           </strong>
         </div>
 
-        <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>
+        <Popup isShow={showCurier} onClose={() => hendlerClose()}>
           <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
             <button
               onClick={() => setShowCurier(false)}
