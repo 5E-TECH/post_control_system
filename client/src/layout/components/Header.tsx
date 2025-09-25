@@ -57,7 +57,7 @@ const Header = () => {
       {/* Search */}
       <label
         htmlFor="search"
-        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1050px]:hidden"
+        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1150px]:hidden"
       >
         <Search className="text-gray-500" />
         <input
@@ -69,21 +69,23 @@ const Header = () => {
       </label>
 
       {/* Actions */}
-      <div className="flex gap-6 max-[960px]:hidden">
-        <Space wrap>
-          <Select
-            defaultValue={localStorage.getItem("i18nextLng")}
-            style={{ width: 98 }}
-            onChange={handleChange}
-            options={[
-              { value: "uz", label: "O'zb" },
-              { value: "ru", label: "Рус" },
-              { value: "en", label: "Eng" },
-            ]}
-            prefix={<Languages />}
-          />
-        </Space>
-        <div className="flex gap-6 max-[1050px]:hidden">
+      <div className="flex gap-6 items-center">
+        <div className="max-[350px]:hidden">
+          <Space wrap>
+            <Select
+              defaultValue={localStorage.getItem("i18nextLng")}
+              style={{ width: 98 }}
+              onChange={handleChange}
+              options={[
+                { value: "uz", label: "O'zb" },
+                { value: "ru", label: "Рус" },
+                { value: "en", label: "Eng" },
+              ]}
+              prefix={<Languages />}
+            />
+          </Space>
+        </div>
+        <div className="flex gap-6 max-[650px]:hidden">
           <button onClick={() => setDark(!dark)} className="cursor-pointer">
             {dark ? <Sun /> : <Moon />}
           </button>
@@ -111,7 +113,7 @@ const Header = () => {
         </div>
 
         <Menu
-          className="min-[1050px]:hidden transition-all"
+          className="min-[650px]:hidden transition-all"
           onClick={() => setBurger((p) => !p)}
         />
 
@@ -122,7 +124,7 @@ const Header = () => {
               onClick={() => setBurger(false)}
             ></div>
 
-            <div className="fixed top-0 right-0 w-[250px] h-screen bg-white transition-all dark:bg-[#28243D] min-[1050px]:hidden z-50 p-6 shadow-lg">
+            <div className="fixed top-0 right-0 w-[300px] h-screen bg-white transition-all dark:bg-[#28243D] min-[650px]:hidden z-50 p-6 shadow-lg">
               <button
                 className="mb-4 text-right w-full text-gray-800 dark:text-gray-200"
                 onClick={() => setBurger(false)}
