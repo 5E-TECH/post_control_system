@@ -138,28 +138,37 @@ const Login: FC = () => {
                 <div className="mb-4">
                   <Field name="phone_number">
                     {({ field, form }: any) => (
-                      <InputMask
+                      <Input
                         {...field}
-                        mask="+\9\9\8 99 999 99 99"
-                        maskChar={null}
-                        value={field.value.replace(
-                          /^(\+998)(\d{2})(\d{3})(\d{2})(\d{2})$/,
-                          "+998 $2 $3 $4 $5"
-                        )}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const digitsOnly = e.target.value.replace(/\D/g, "");
-                          const formatted = `+${digitsOnly}`;
-                          form.setFieldValue("phone_number", formatted);
+                        size="large"
+                        placeholder="+998 90 123 45 67"
+                        value={(function () {
+                          if (!field.value) return "+998 ";
+                          let digits = field.value.replace(/\D/g, "");
+                          if (digits.startsWith("998")) {
+                            digits = digits.slice(3);
+                          }
+
+                          let formatted = "+998 ";
+                          if (digits.length > 0) {
+                            formatted += digits
+                              .replace(
+                                /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
+                                (_, a: any, b: any, c: any, d: any) =>
+                                  [a, b, c, d].filter(Boolean).join(" ")
+                              )
+                              .trim();
+                          }
+                          return formatted;
+                        })()}
+                        onChange={(e) => {
+                          let val = e.target.value.replace(/\D/g, ""); // faqat raqamlar
+                          if (val.startsWith("998")) {
+                            val = val.slice(3);
+                          }
+                          form.setFieldValue("phone_number", "+998" + val);
                         }}
-                      >
-                        {(inputProps: any) => (
-                          <Input
-                            {...inputProps}
-                            size="large"
-                            placeholder="+998 90 123 45 67"
-                          />
-                        )}
-                      </InputMask>
+                      />
                     )}
                   </Field>
 
