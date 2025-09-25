@@ -1,12 +1,12 @@
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
-import type { RootState } from "../../../../app/store";
 import { useSelector } from "react-redux";
 import TableSkeleton from "../ordersTabelSkeleton/ordersTableSkeleton";
 import { Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../../../shared/hooks/useParams";
 import { useTranslation } from "react-i18next";
+import type { RootState } from "../../../../app/store";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -27,6 +27,11 @@ const OrderView = () => {
 
   const { getOrders, getMarketsByMyNewOrders } = useOrder();
   const user = useSelector((state: RootState) => state.roleSlice);
+  const filters = useSelector((state: RootState) => state.setFilter);
+
+  // console.log(filters);
+  
+
   const role = user.role;
   let query;
 
@@ -36,10 +41,10 @@ const OrderView = () => {
 
   switch (role) {
     case "superadmin":
-      query = getOrders({ page, limit });
+      query = getOrders({ page, limit, ...filters });
       break;
     case "market":
-      query = getMarketsByMyNewOrders({ page, limit });
+      query = getMarketsByMyNewOrders({ page, limit, ...filters });
       break;
     default:
       query = { data: { data: [] } };
@@ -67,7 +72,7 @@ const OrderView = () => {
   return (
     <div className="w-full bg-white py-1 dark:bg-[#312d4b] min-[650px]:overflow-x-auto">
       <table className="w-full border border-gray-200 shadow-sm">
-        <thead className="bg-[#f6f7fb] min-[900px]:h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
+        <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
           <tr>
             <th>
               <div className="flex items-center ml-10">
@@ -127,54 +132,49 @@ const OrderView = () => {
             {myNewOrders?.map((item: any, inx: number) => (
               <tr
                 key={item.id}
-                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
+                className={`h-[56px] cursor-pointer hover:bg-[#f6f7fb9f] dark:hover:bg-[#3d3759] font-medium dark:text-[#d5d1eb] text-[#2E263DE5] text-[16px]
+                  ${
+                    inx % 2 === 0
+                      ? "bg-white dark:bg-[#2a243a]"
+                      : "bg-[#aa85f818] dark:bg-[#342d4a]"
+                  }
+                `}
                 onClick={() => navigate(`order-detail/${item.id}`)}
               >
                 <td className="data-cell pl-10" data-cell="#">
                   {inx + 1}
                 </td>
                 <td
-                  className="data-cell pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
+                  className="data-cell pl-10  dark:text-[#d5d1eb]"
                   data-cell="CUSTOMER"
                 >
                   {item?.customer?.name}
                 </td>
-                <td
-                  className="data-cell pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell="PHONE"
-                >
+                <td className="data-cell pl-10" data-cell="PHONE">
                   {item?.customer?.phone_number}
                 </td>
-                <td
-                  className="data-cell pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell="ADDRESS"
-                >
+                <td className="data-cell pl-10 " data-cell="ADDRESS">
                   {item?.customer?.district?.name}
                 </td>
-                <td
-                  className="data-cell pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell="MARKET"
-                >
+                <td className="data-cell pl-10" data-cell="MARKET">
                   {item?.market?.name}
                 </td>
                 <td className="data-cell pl-10" data-cell="STATUS">
                   <span
-                    className={`py-2 px-3 rounded-2xl text-[13px] text-white ${statusColors[item.status] || "bg-slate-400"
-                      }`}
+                    className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
+                      statusColors[item.status] || "bg-slate-400"
+                    }`}
                   >
                     {item.status.toUpperCase()}
                   </span>
                 </td>
-                <td
-                  className="data-cell pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell="PRICE"
-                >
+                <td className="data-cell pl-10" data-cell="PRICE">
                   <span>
                     {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}{" "}
                   </span>
                 </td>
                 <td
-                  className="data-cell pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  className="data-cell pl-15 text-[#2E263DB2]"
                   data-cell="STOCK"
                 >
                   {item?.items.length}
