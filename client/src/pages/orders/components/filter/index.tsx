@@ -11,8 +11,10 @@ import { useDispatch } from "react-redux";
 import { useProfile } from "../../../../shared/api/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
 import { togglePermission } from "../../../../shared/lib/features/add-order-permission";
+import { useTranslation } from "react-i18next";
 
 const Filter = () => {
+  const { t } = useTranslation("orderList");
   const [form, setForm] = useState({
     market: "",
     region: "",
@@ -75,7 +77,7 @@ const Filter = () => {
           name="market"
           value={form.market}
           onChange={handleChange}
-          placeholder="Select market"
+          placeholder={t("placeholder.selectMarket")}
           className="w-full"
         >
           {marketOptions}
@@ -85,7 +87,7 @@ const Filter = () => {
           name="region"
           value={form.region}
           onChange={handleChange}
-          placeholder="Select region"
+          placeholder={t("placeholder.selectRegion")}
           className="w-full"
         >
           {regionOptions}
@@ -95,7 +97,7 @@ const Filter = () => {
           name="status"
           value={form.status}
           onChange={handleChange}
-          placeholder="Select status"
+          placeholder={t("placeholder.selectStatus")}
           className="w-full"
         >
           {statusOpts}
@@ -113,14 +115,14 @@ const Filter = () => {
             name="order"
             value={form.order}
             onChange={handleChange}
-            placeholder="Search order"
+            placeholder={t("placeholder.searchOrder")}
             className="border border-[#E5E7EB] rounded-lg px-3 py-[10px] outline-none max-[800px]:w-full"
           />
           <Button
             onClick={handleCheck}
             className="w-[140px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none! max-[800px]:w-full!"
           >
-            Add order <ArrowRight className="w-[13px] h-[13px]" />
+            {t("button.addOrder")} <ArrowRight className="w-[13px] h-[13px]" />
           </Button>
         </div>
       </div>

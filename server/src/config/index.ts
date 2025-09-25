@@ -3,6 +3,7 @@ config();
 
 export default {
   PORT: Number(process.env.PORT),
+  PROD_HOST: String(process.env.PROD_HOST),
   DB_URL: String(process.env.DB_URL),
   HOST_URL: String(process.env.HOST_URL),
   ADMIN_NAME: String(process.env.SUPERADMIN_NAME),

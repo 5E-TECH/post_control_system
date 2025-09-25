@@ -1,0 +1,17 @@
+{
+    "title": "Bugungi statistika",
+    "dateRange": "Sana oralig‘i",
+    "totalOrders": "Jami buyurtmalar",
+    "solded": "Sotilgan",
+    "cancelled": "Bekor qilinganlar",
+    "profit": "Jami daromad",
+    "marketStatistics": "Marketlar statistikasi",
+    "courierStatistics": "Kuryerlar statistikasi",
+    "orders": "Buyurtmalar",
+    "showMore": "Ko‘proq ko‘rish",
+    "showLess": "Kamroq ko‘rish",
+    "topMarkets": "Top 10 Marketlar (Oxirgi 30 kun)",
+    "topCouriers": "Top 10 Kuryerlar (Oxirgi 30 kun)",
+    "name": "Nomi",
+    "rate": "Foiz"
+}

@@ -53,9 +53,9 @@ export default class Application {
     SwaggerModule.setup(api, app, documentFactory());
 
     // Start
-    await app.listen(config.PORT);
+    await app.listen(config.PORT, config.PROD_HOST);
     myLogger.log(
-      `🚀 Server running on http://localhost:${config.PORT}`,
+      `🚀 Server running on http://${config.PROD_HOST}:${config.PORT}`,
       'Bootstrap',
     );
   }

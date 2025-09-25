@@ -1,0 +1,20 @@
+{
+    "required": {
+        "phone_number": "Iltimos telefon raqamni kiriting!",
+        "password": "Iltimos parolni kiriting!"
+    },
+    "invalid": {
+        "phone_number": "Iltimos telefon raqamni to'g'ri kiriting!",
+        "password_length": "Parol kamida 4 ta belgidan iborat bo‘lishi kerak!"
+    },
+    "offline": "Internet aloqasi mavjud emas !!!",
+    "online": "Siz internetga ulandingiz ✅",
+    "welcome_message": "Beepost'ga xush kelibsiz! 👋🏻",
+    "placeholder": {
+        "password": "Parol"
+    },
+    "button": {
+        "submit": "Yuborish"
+    },
+    "errorMsg": "Telefon raqam yoki parol noto'g'ri !!!"
+}

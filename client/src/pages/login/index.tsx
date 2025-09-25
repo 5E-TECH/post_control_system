@@ -17,6 +17,7 @@ import * as yup from "yup";
 
 import { useNetworkState, usePrevious } from "@uidotdev/usehooks";
 import InputMask from "react-input-mask";
+import { useTranslation } from "react-i18next";
 
 message.config({
   maxCount: 5,
@@ -24,20 +25,22 @@ message.config({
   top: 70,
 });
 
-const validationSchema = yup.object().shape({
-  // phone_number Formik state-da +998901234567 shaklida saqlanadi,
-  // shu uchun regex bilan tekshirilyapti:
-  phone_number: yup
-    .string()
-    .required("Iltimos telefon raqamni kiriting!")
-    .matches(/^\+998\d{9}$/, "Iltimos telefon raqamni to'g'ri kiriting!"),
-  password: yup
-    .string()
-    .required("Please input your password!")
-    .min(4, "Parol kamida 4 ta belgidan iborat bo‘lishi kerak!"),
-});
-
 const Login: FC = () => {
+  const { t } = useTranslation("login");
+
+  const validationSchema = yup.object().shape({
+    // phone_number Formik state-da +998901234567 shaklida saqlanadi,
+    // shu uchun regex bilan tekshirilyapti:
+    phone_number: yup
+      .string()
+      .required(t("required.phone_number"))
+      .matches(/^\+998\d{9}$/, t("invalid.phone_number")),
+    password: yup
+      .string()
+      .required(t("required.password"))
+      .min(4, t("invalid.password_length")),
+  });
+
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { signinUser } = useLogin();
@@ -75,7 +78,7 @@ const Login: FC = () => {
       onError: (err: any) => {
         const errorMsg =
           err?.response?.data?.message ||
-          "Telefon raqam yoki parol noto'g'ri !!!";
+          t("errorMsg");
         message.error(errorMsg);
         setSubmitting(false);
       },
@@ -87,12 +90,12 @@ const Login: FC = () => {
       <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
         {!network.online ? (
           <div className="bg-red-500 text-white px-6 py-2 rounded-lg shadow-lg">
-            Internet aloqasi mavjud emas !!!
+            {t("offline")}
           </div>
         ) : (
           showOnline && (
             <div className="bg-green-500 text-white px-6 py-2 rounded-lg shadow-lg">
-              Siz internetga ulandingiz ✅
+              {t("online")}
             </div>
           )
         )}
@@ -127,7 +130,7 @@ const Login: FC = () => {
                 </div>
 
                 <div className="mb-5 text-center">
-                  <p className="text-lg sm:text-2xl">Welcome to Beepost! 👋🏻</p>
+                  <p className="text-lg sm:text-2xl">{t("welcome_message")}</p>
                 </div>
 
                 {/* Phone number */}
@@ -173,7 +176,7 @@ const Login: FC = () => {
                     as={Input.Password}
                     name="password"
                     size="large"
-                    placeholder="Password"
+                    placeholder={t("placeholder.password")}
                   />
                   <ErrorMessage
                     name="password"
@@ -189,7 +192,7 @@ const Login: FC = () => {
                   size="large"
                   className="bg-[#8C57FF]! w-full"
                 >
-                  Submit
+                  {t("button.submit")}
                 </Button>
               </Form>
             )}

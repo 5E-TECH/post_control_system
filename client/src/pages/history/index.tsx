@@ -11,6 +11,7 @@ import {
   Cell,
 } from "recharts";
 import { useHistory } from "../../shared/api/hooks/useHistory";
+import { useTranslation } from "react-i18next";
 
 interface ChartData {
   name: string;
@@ -25,6 +26,7 @@ const SkeletonBox = ({ className }: { className?: string }) => (
 );
 
 const Dashboard: React.FC = () => {
+  const { t } = useTranslation("history");
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -56,11 +58,11 @@ const Dashboard: React.FC = () => {
 
   const chartData: ChartData[] = [
     {
-      name: "Balans",
+      name: t("balans"),
       value: balans,
       fill: balans >= 0 ? "#10B981" : "#EF4444",
     },
-    { name: "Kassa", value: kassa, fill: "#10B981" },
+    { name: t("kassa"), value: kassa, fill: "#10B981" },
   ];
 
   const maxValue = Math.max(Math.abs(balans), Math.abs(kassa));
@@ -83,7 +85,7 @@ const Dashboard: React.FC = () => {
                     bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                  Hozirgi holat
+                   {t("current_situation")}
                 </h2>
                 <div
                   className={`text-4xl font-bold ${
@@ -103,7 +105,7 @@ const Dashboard: React.FC = () => {
             ) : (
               <>
                 <h3 className="text-xl font-bold text-gray-800 mb-6 text-center dark:text-white">
-                  Moliyaviy holat
+                  {t("financial_status")}
                 </h3>
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart
@@ -153,7 +155,7 @@ const Dashboard: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center">
                       <div className="text-sm font-medium text-gray-600 mb-1 dark:text-white">
-                        Balans
+                        {t("balans")}
                       </div>
                       <div
                         className={`text-2xl font-bold ${
@@ -165,7 +167,7 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="text-center">
                       <div className="text-sm font-medium text-gray-600 mb-1 dark:text-white">
-                        Kassa
+                        {t("kassa")}
                       </div>
                       <div className="text-2xl font-bold text-green-600">
                         {Number(kassa).toLocaleString()} UZS
@@ -182,13 +184,13 @@ const Dashboard: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           <div className="p-6 rounded-2xl shadow-lg dark:bg-[#312D48]">
             <h3 className="text-xl font-bold text-gray-800 mb-6 dark:text-white">
-              Do'konlar va Kurierlar
+              {t("title")}
             </h3>
             <div className="grid md:grid-cols-2 gap-6">
               {/* Markets */}
               <div className="rounded-xl shadow-lg p-4">
                 <h4 className="text-lg font-bold text-gray-800 mb-4 text-center dark:text-white">
-                  Do'konlar
+                  {t("markets")}
                 </h4>
                 {isLoading ? (
                   [...Array(8)].map((_, i) => (
@@ -200,25 +202,29 @@ const Dashboard: React.FC = () => {
                       <thead className="sticky top-0 bg-white dark:bg-[var(--color-dark-bg-py)] z-10">
                         <tr>
                           <th className="p-3 text-left font-bold text-black dark:text-white">
-                            Nomi
+                            {t("name")}
                           </th>
                           <th className="p-3 text-right font-bold text-black dark:text-white">
-                            Summasi
+                            {t("total")}
                           </th>
                         </tr>
                       </thead>
                       <tbody>
                         {markets?.map((m: any, idx: number) => (
                           <tr key={idx} className="border-b border-gray-200">
-                            <td className="p-3 font-semibold text-gray-600 dark:text-white">
+                            <td
+                              className="data-cell p-3 font-semibold text-gray-600 dark:text-white"
+                              data-cell="NAME"
+                            >
                               {m.name}
                             </td>
                             <td
-                              className={`p-3 text-right font-bold ${
+                              className={`data-cell p-3 min-[901px]:text-right font-bold ${
                                 m.amount < 0 || m.amount == 0
                                   ? "text-green-600"
                                   : "text-red-600"
                               }`}
+                              data-cell="TOTAL"
                             >
                               {Number(m.amount).toLocaleString()} UZS
                             </td>
@@ -227,7 +233,7 @@ const Dashboard: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-gray-800 text-white sticky bottom-0">
                         <tr>
-                          <td className="p-3 font-bold">Jami</td>
+                          <td className="p-3 font-bold">{t("total")}</td>
                           <td
                             className={`p-3 text-right font-bold ${
                               totalMarket >= 0
@@ -247,7 +253,7 @@ const Dashboard: React.FC = () => {
               {/* Couriers */}
               <div className="rounded-xl shadow-lg p-4">
                 <h4 className="text-lg font-bold text-gray-800 mb-4 text-center dark:text-white">
-                  Kurierlar
+                  {t("couriers")}
                 </h4>
                 {isLoading ? (
                   [...Array(8)].map((_, i) => (
@@ -259,17 +265,20 @@ const Dashboard: React.FC = () => {
                       <thead className="sticky top-0 bg-white dark:bg-[var(--color-dark-bg-py)] z-10">
                         <tr>
                           <th className="p-3 text-left font-bold text-black dark:text-white">
-                            Nomi
+                            {t("name")}
                           </th>
                           <th className="p-3 text-right font-bold text-black dark:text-white">
-                            Summasi
+                            {t("total")}
                           </th>
                         </tr>
                       </thead>
                       <tbody>
                         {couriers?.map((c: any, idx: number) => (
-                          <tr key={idx} className="border-b border-gray-200">
-                            <td className="p-3">
+                          <tr
+                            key={idx}
+                            className="border-b border-gray-200"
+                          >
+                            <td className="data-cell p-3" data-cell="NAME">
                               <div className="font-semibold text-gray-600 dark:text-white">
                                 {c.name}
                               </div>
@@ -278,11 +287,12 @@ const Dashboard: React.FC = () => {
                               </div>
                             </td>
                             <td
-                              className={`p-3 text-right font-bold ${
+                              className={`data-cell p-3 min-[901px]:text-right font-bold ${
                                 c.amount >= 0
                                   ? "text-green-600"
                                   : "text-red-600"
                               }`}
+                              data-cell="TOTAL"
                             >
                               {Number(c.amount).toLocaleString()} UZS
                             </td>
@@ -291,7 +301,7 @@ const Dashboard: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-gray-800 text-white sticky bottom-0">
                         <tr>
-                          <td className="p-3 font-bold">Jami</td>
+                          <td className="p-3 font-bold">{t("total")}</td>
                           <td
                             className={`p-3 text-right font-bold ${
                               totalCourier >= 0
@@ -321,7 +331,7 @@ const Dashboard: React.FC = () => {
                     balans >= 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                  Umumiy Balans
+                   {t("totalBalans")}
                 </h4>
                 <div
                   className={`text-3xl font-bold ${
