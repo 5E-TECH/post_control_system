@@ -12,7 +12,7 @@ export class DistrictEntity extends BaseEntity {
   region_id: string;
 
   @Column({ type: 'uuid' })
-  assigned_region: string; // ❌ nullable yo‘q
+  assigned_region: string;
 
   // N-1 District → Region
   @ManyToOne(() => RegionEntity, (region) => region.districts, {

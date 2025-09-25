@@ -79,8 +79,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     marketId?: string;
     regionId?: string;
     search?: string;
-    startDate?: string;
-    endDate?: string;
+    startDate?: string; // frontdan "2025-09-01" yoki "2025-09-01T00:00:00"
+    endDate?: string; // frontdan "2025-09-25" yoki "2025-09-25T23:59:59"
     page?: number;
     limit?: number;
   }) {
@@ -113,20 +113,26 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // ✅ millisekund bo‘yicha filter
-      if (query.startDate && query.endDate) {
+      // ✅ Sana filter (frontdan kelgan string → millisekund)
+      let startMs: number | undefined;
+      let endMs: number | undefined;
+
+      if (query.startDate) {
+        startMs = new Date(query.startDate).getTime(); // string → ms
+      }
+      if (query.endDate) {
+        endMs = new Date(query.endDate).getTime();
+      }
+
+      if (startMs && endMs) {
         qb.andWhere('order.created_at BETWEEN :startDate AND :endDate', {
-          startDate: Number(query.startDate),
-          endDate: Number(query.endDate),
+          startDate: startMs,
+          endDate: endMs,
         });
-      } else if (query.startDate) {
-        qb.andWhere('order.created_at >= :startDate', {
-          startDate: Number(query.startDate),
-        });
-      } else if (query.endDate) {
-        qb.andWhere('order.created_at <= :endDate', {
-          endDate: Number(query.endDate),
-        });
+      } else if (startMs) {
+        qb.andWhere('order.created_at >= :startDate', { startDate: startMs });
+      } else if (endMs) {
+        qb.andWhere('order.created_at <= :endDate', { endDate: endMs });
       }
 
       const page = query.page ? Number(query.page) : 1;

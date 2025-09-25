@@ -722,10 +722,10 @@ export class CashBoxService
         balance_after: mainCashbox.balance,
         cashbox_id: mainCashbox.id,
         comment: updateCashboxDto.comment,
-        operation_type: Operation_type.EXPENSE,
+        operation_type: Operation_type.INCOME,
         created_by: user.id,
         payment_method: updateCashboxDto.type,
-        source_type: Source_type.MANUAL_EXPENSE,
+        source_type: Source_type.MANUAL_INCOME,
       });
       await queryRunner.manager.save(cashboxHistory);
 

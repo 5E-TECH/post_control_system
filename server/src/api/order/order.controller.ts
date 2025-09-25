@@ -50,7 +50,6 @@ export class OrderController {
     return this.orderService.createOrder(creteOrderDto);
   }
 
-  // Controller
   @ApiOperation({ summary: 'List orders with filters' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'marketId', required: false })
@@ -59,15 +58,15 @@ export class OrderController {
   @ApiQuery({
     name: 'startDate',
     required: false,
-    type: Number,
-    example: 1725148800000,
-  }) // 2025-09-01 UTC ms
+    type: String,
+    example: '2025-09-01 yoki 2025-09-01T00:00:00',
+  })
   @ApiQuery({
     name: 'endDate',
     required: false,
-    type: Number,
-    example: 1727222400000,
-  }) // 2025-09-25 UTC ms
+    type: String,
+    example: '2025-09-01 yoki 2025-09-01T00:00:00',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Orders list' })

@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
   OnModuleInit,
@@ -10,9 +9,6 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { DistrictRepository } from 'src/core/repository/district.repository';
 import { RegionRepository } from 'src/core/repository/region.repository';
-import { BaseService } from 'src/infrastructure/lib/baseServise';
-import { CreateDistrictDto } from './dto/create-district.dto';
-import { DeepPartial } from 'typeorm';
 import { successRes } from 'src/infrastructure/lib/response';
 import { catchError } from 'rxjs';
 import { regions } from 'src/infrastructure/lib/data/district';
@@ -55,28 +51,6 @@ export class DistrictService implements OnModuleInit {
       }
     }
   }
-
-  // async create(createDistrictDto: CreateDistrictDto) {
-  //   try {
-  //     const { name, region_id } = createDistrictDto;
-  //     const existsName = await this.districtRepository.findOneBy({ name });
-  //     if (existsName) {
-  //       throw new ConflictException('district alread exists');
-  //     }
-  //     const existsRegion = await this.regionRepository.findOneBy({
-  //       id: region_id,
-  //     });
-  //     if (!existsRegion) {
-  //       throw new NotFoundException('region not found');
-  //     }
-  //     const district = this.districtRepository.create({
-  //       name,
-  //       region_id,
-  //     });
-  //   } catch (error) {
-  //     return catchError(error);
-  //   }
-  // }
 
   async findAll() {
     try {
