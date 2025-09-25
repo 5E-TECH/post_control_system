@@ -80,42 +80,44 @@ const Products = () => {
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
 
       {/* Filter va Add product qismi */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4">
-        <Select
-          name="market"
-          value={form.market}
-          onChange={handleChange}
-          placeholder="Marketni tanlang"
-          className="w-full md:w-[250px]"
-        >
-          {marketOptions}
-        </Select>
-      </div>
 
       <div className="flex flex-col px-4">
-        <div className="flex justify-between max-[800px]:flex-col max-[800px]:gap-4">
-          <div className="relative w-full md:w-[280px]">
-            <input
-              onChange={(e) => debouncedSearch(e.target.value)}
-              className="rounded-[7px] w-full h-[40px] border border-[#2E263D38] px-3 pr-10"
-              placeholder="Search..."
-              type="text"
-            />
-            <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
+        <div className="flex justify-between max-[1100px]:flex-col max-[1100px]:gap-4">
+          <div className="">
+            <Select
+              name="market"
+              value={form.market}
+              onChange={handleChange}
+              placeholder="Marketni tanlang"
+              className="min-[1100px]:w-[250px] max-[1100px]:w-[250px] max-[800px]:w-full"
+            >
+              {marketOptions}
+            </Select>
           </div>
-          <button
-            onClick={() => {
-              if (role === "market") {
-                handleNavigate();
-              } else {
-                setShowMarket(true);
-              }
-            }}
-            className="px-4 py-2 bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
-          >
-            <FilePlus size={18} />
-            Mahsulot qo'shish
-          </button>
+          <div className="flex gap-5 min-[800px]:items-center max-[800px]:flex-col">
+            <div className="relative w-full min-[1100px]:w-[280px] max-[1100px]:w-[280px] max-[800px]:w-full">
+              <input
+                onChange={(e) => debouncedSearch(e.target.value)}
+                className="rounded-[7px] w-full h-[40px] border border-[#2E263D38] px-3 pr-10"
+                placeholder="Search..."
+                type="text"
+              />
+              <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
+            </div>
+            <button
+              onClick={() => {
+                if (role === "market") {
+                  handleNavigate();
+                } else {
+                  setShowMarket(true);
+                }
+              }}
+              className="px-4 py-2 bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
+            >
+              <FilePlus size={18} />
+              Mahsulot qo'shish
+            </button>
+          </div>
         </div>
 
         {/* Popup */}
