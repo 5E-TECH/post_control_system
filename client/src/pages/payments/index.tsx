@@ -238,8 +238,13 @@ const Payments = () => {
             </div>
             <div className="absolute py-2 bottom-0,1 right-4">
               <button
+                disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
-                className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
+                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
+                  !select ? '' : 'hover:bg-blue-600'
+                }  text-white rounded-md cursor-pointer ${
+                  !select ? 'opacity-40' : ''
+                }`}
               >
                 Tanlash
               </button>
