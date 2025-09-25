@@ -90,32 +90,32 @@ const CustomerDetails = () => {
           <tbody>
             {myNewOrders?.map((order: any) => (
               <tr key={order?.id}>
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                <td className="data-cell w-[254px] h-[56px] pl-[20px] text-left" data-cell="ISMI">
                   <div className="flex items-center gap-4">
                     <span className="font-medium text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
                       {order?.customer?.name}
                     </span>
                   </div>
                 </td>
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                <td className="data-cell w-[254px] h-[56px] pl-[20px] text-left" data-cell="TELEFON RAQAMI">
                   <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
                     {order?.customer?.phone_number}
                   </span>
                 </td>
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                <td className="data-cell w-[254px] h-[56px] pl-[20px] text-left" data-cell="TUMANI">
                   <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
                     {order?.customer?.district?.name}
                   </span>
                 </td>
 
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                <td className="data-cell w-[254px] h-[56px] pl-[20px] text-left" data-cell="SUMMA">
                   <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
                     {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}{" "}
                     uzs
                   </span>
                 </td>
 
-                <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                <td className="data-cell w-[254px] h-[56px] pl-[20px] text-left" data-cell="IZOH">
                   <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
                     {order?.comment ? order?.comment : t("noComment")}
                   </span>
