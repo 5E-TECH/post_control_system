@@ -89,7 +89,7 @@ const CreateOrder = () => {
   return (
     <Context.Provider value={contextValue}>
       {contextHolder}
-      <div className="flex gap-6 px-6 pt-6">
+      <div className="flex gap-6 px-6 pt-6 max-[1150px]:flex-col">
         <div className="pr-[81px]">
           <div className="flex items-center gap-1">
             <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
@@ -157,14 +157,10 @@ const CreateOrder = () => {
           </div>
         </div>
 
-        <div className="flex flex-col flex-1 gap-6">
-          <div>
-            <OrderItems />
-          </div>
+        <div className="flex flex-col gap-6 w-full">
+          <OrderItems />
 
-          <div>
-            <ProductInfo />
-          </div>
+          <ProductInfo />
 
           <div className="flex justify-end">
             <div className="flex gap-4">

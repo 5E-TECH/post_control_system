@@ -131,7 +131,7 @@ const CustomerInfocomp = () => {
         ) : (
           ""
         )} */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 max-[650px]:flex-col">
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">{t("customerForm.region")}</label>
             <Select

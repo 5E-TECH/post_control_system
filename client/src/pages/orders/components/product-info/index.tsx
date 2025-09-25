@@ -64,7 +64,7 @@ const ProductInfo = () => {
         </div>
 
         <div className="flex gap-5 px-5">
-          <div className="flex flex-col">
+          <div className="flex flex-col w-1/2">
             <span className="font-normal text-[14px] text-[#2E263DB2] dark:text-[#B1ADC7]">
               {t("productInfo.totalPrice")}
             </span>
@@ -89,13 +89,13 @@ const ProductInfo = () => {
                 }}
                 type="text"
                 placeholder={t("productInfo.totalPricePlaceholder")}
-                className="!w-[639px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! 
+                className="!h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! 
          dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
               />
             </Form.Item>
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col w-1/2">
             <span className="font-normal text-[14px] text-[#2E263DB2] dark:text-[#B1ADC7]">
               {t("productInfo.whereDeliver")}
             </span>
@@ -104,7 +104,7 @@ const ProductInfo = () => {
                 value={formData.where_deliver}
                 onChange={(value) => handleSelectChange("where_deliver", value)}
                 placeholder={t("productInfo.whereDeliverPlaceholder")}
-                className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
+                className="!h-[48px] custom-select-dropdown-bright"
                 defaultValue={"center"}
                 dropdownClassName="dark-dropdown"
               >
@@ -124,7 +124,7 @@ const ProductInfo = () => {
               name="comment"
               value={formData.comment}
               onChange={handleChange}
-              className="!flex-1 !pb-[150px] !pt-3 !pl-4 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
+              className="!pb-[150px] !pt-3 !pl-4 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
               placeholder={t("productInfo.commentPlaceholder")}
             />
           </Form.Item>
