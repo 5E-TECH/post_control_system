@@ -74,12 +74,12 @@ const Header = () => {
           <Space wrap>
             <Select
               defaultValue={localStorage.getItem("i18nextLng")}
-              style={{ width: 98 }}
+              style={{ width: 87 }}
               onChange={handleChange}
               options={[
-                { value: "uz", label: "O'zb" },
-                { value: "ru", label: "Рус" },
-                { value: "en", label: "Eng" },
+                { value: "uz", label: "Uz" },
+                { value: "ru", label: "Ру" },
+                { value: "en", label: "En" },
               ]}
               prefix={<Languages />}
             />
