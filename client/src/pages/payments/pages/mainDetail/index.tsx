@@ -238,7 +238,7 @@ const MainDetail = () => {
           </div>
         )}
 
-        {/* === Maosh to'lashni bosganda === */}
+        {/* === kassani to'ldirishni bosganda === */}
         {kassa && (
           <div className="mt-5">
             <h2>Maosh to'lash</h2>
