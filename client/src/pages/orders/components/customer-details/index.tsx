@@ -117,7 +117,7 @@ const CustomerDetails = () => {
 
                 <td className="w-[254px] h-[56px] pl-[20px] text-left">
                   <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
-                    {order?.comment ? order?.comment : "Izoh mavjud emas"}
+                    {order?.comment ? order?.comment : t("noComment")}
                   </span>
                 </td>
               </tr>

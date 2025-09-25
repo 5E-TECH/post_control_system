@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { setOrderItems } from "../../../../shared/lib/features/customer_and_market-id";
 import type { RootState } from "../../../../app/store";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
+import { useTranslation } from "react-i18next";
 
 export interface IOrderItems {
   product_id: string | undefined;
@@ -20,6 +21,7 @@ const createInitialState = (): IOrderItems => ({
 });
 
 const OrderItems = () => {
+  const { t } = useTranslation("createOrder");
   const [formDataList, setFormDataList] = useState<IOrderItems[]>([
     createInitialState(),
   ]);
@@ -136,7 +138,7 @@ const OrderItems = () => {
       <div>
         <div className="px-5 pt-5 pb-3">
           <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#CBC7E1]">
-            Order Items
+            {t("orderItems.title")}
           </h1>
         </div>
 
@@ -144,7 +146,7 @@ const OrderItems = () => {
           {formDataList.map((formData, index) => (
             <div key={index} className="flex flex-col px-5 relative mt-3">
               <span className="absolute -top-[9px] left-8 z-50 bg-white px-1 text-[13px] font-normal text-[#2E263DB2] dark:bg-[#312D48] dark:text-[#A9A5BF]">
-                Item {index + 1}
+                {t("orderItems.item")} {index + 1}
               </span>
 
               <div className="flex gap-5">
@@ -164,7 +166,7 @@ const OrderItems = () => {
                     onChange={(value) =>
                       handleSelectChange(index, "product_id", value)
                     }
-                    placeholder="Select or type item"
+                    placeholder={t("orderItems.selectProduct")}
                     className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
                     options={formData.search ? searchedProducts : productNames}
                     dropdownClassName="dark-dropdown"
@@ -179,7 +181,7 @@ const OrderItems = () => {
                     value={formData.quantity}
                     onChange={(e) => handleChange(index, e)}
                     type="number"
-                    placeholder="Quantity"
+                    placeholder={t("orderItems.quantity")}
                     className="!w-[639px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                   />
                 </Form.Item>
@@ -198,7 +200,7 @@ const OrderItems = () => {
         <div className="px-5 pb-5" onClick={addItem}>
           <Button className="!w-[183px] !h-[40px] !bg-[var(--color-bg-sy)] !text-[white] !font-medium !text-[15px] dark:border-none! hover:opacity-85!">
             <Plus className="w-[17px] h-[17px]" />
-            Add Another Item
+            {t("orderItems.addAnotherItem")}
           </Button>
         </div>
       </div>
