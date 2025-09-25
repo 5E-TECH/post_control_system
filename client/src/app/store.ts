@@ -8,6 +8,8 @@ import resetOrderItems from "../shared/lib/features/customer_and_market-id";
 import setOrderItems from "../shared/lib/features/customer_and_market-id";
 import setProductInfo from "../shared/lib/features/customer_and_market-id";
 import togglePermission from "../shared/lib/features/add-order-permission";
+import resetFilter  from "../shared/lib/features/order-filters";
+import setFilter from "../shared/lib/features/order-filters";
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +22,8 @@ export const store = configureStore({
     resetOrderItems,
     setProductInfo,
     togglePermission,
+    setFilter,
+    resetFilter
   },
 });
 
