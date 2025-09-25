@@ -161,7 +161,7 @@ const Dashboards = () => {
                 <StatCard
                   icon={<ShoppingCart size={20} />}
                   label={t("totalOrders")}
-                  value={aboutCourier?.totalOrder}
+                  value={aboutCourier?.totalOrders}
                   borderColor="border-gray-400"
                 />
                 <StatCard
