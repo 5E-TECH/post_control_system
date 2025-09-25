@@ -68,18 +68,19 @@ const Products = () => {
   const { pathname } = useLocation();
 
   const marketOptions = marketlar?.map((item: any) => (
-      <option key={item.value} value={item.value}>
-        {item.label}
-      </option>
-    ));
-
+    <option key={item.value} value={item.value}>
+      {item.label}
+    </option>
+  ));
 
   if (pathname.startsWith("/products/create")) return <Outlet />;
+
   return (
     <div className="mt-6 w-full">
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
+
+      {/* Filter va Add product qismi */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4">
-        {/* Chap taraf - Filter */}
         <Select
           name="market"
           value={form.market}
@@ -89,10 +90,11 @@ const Products = () => {
         >
           {marketOptions}
         </Select>
-          {/* Yangi mahsulot qo‘shish */}
+      </div>
+
       <div className="flex flex-col px-4">
         <div className="flex justify-between max-[800px]:flex-col max-[800px]:gap-4">
-        <div className="relative w-full md:w-[280px]">
+          <div className="relative w-full md:w-[280px]">
             <input
               onChange={(e) => debouncedSearch(e.target.value)}
               className="rounded-[7px] w-full h-[40px] border border-[#2E263D38] px-3 pr-10"
@@ -137,62 +139,59 @@ const Products = () => {
             </div>
 
             <div className="max-h-[520px] overflow-y-auto">
-  <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 cursor-pointer">
-    <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
-      <tr>
-        <th className="h-[56px] font-medium text-[13px] text-left px-4">
-          <div className="flex items-center justify-between pr-[21px]">
-            # ID
-            <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-          </div>
-        </th>
-        <th className="h-[56px] font-medium text-[13px] text-left px-4">
-          <div className="flex items-center justify-between pr-[21px]">
-            MARKET NAME
-          </div>
-        </th>
-      </tr>
-    </thead>
+              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 cursor-pointer">
+                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+                  <tr>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        # ID
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        MARKET NAME
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
 
-    <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-      {data?.data?.data &&
-        Array.isArray(data?.data?.data) &&
-        data?.data?.data?.map((item: any, inx: number) => (
-          <tr
-            key={item?.id}
-            onClick={() => setSelect(item?.id)}
-            className={`data-cell border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-              item.id == select ? "bg-gray-100" : ""
-            }`}
-            data-cell="#"
-          >
-            <td
-              className="data-cell text-[#8C57FF] pr-10 py-3"
-              data-cell="# ID"
-            >
-              {inx + 1}
-            </td>
-            <td
-              className="data-cell pr-26 py-3"
-              data-cell="MARKET NAME"
-            >
-              {item?.name}
-            </td>
-          </tr>
-        ))}
-    </tbody>
-  </table>
-</div>
-
-              <button
-                onClick={() => handleNavigate()}
-                className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
-              >
-                Tanlash
-              </button>
-            
-             
+                <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
+                  {data?.data?.data &&
+                    Array.isArray(data?.data?.data) &&
+                    data?.data?.data?.map((item: any, inx: number) => (
+                      <tr
+                        key={item?.id}
+                        onClick={() => setSelect(item?.id)}
+                        className={`data-cell border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                          item.id == select ? "bg-gray-100" : ""
+                        }`}
+                        data-cell="#"
+                      >
+                        <td
+                          className="data-cell text-[#8C57FF] pr-10 py-3"
+                          data-cell="# ID"
+                        >
+                          {inx + 1}
+                        </td>
+                        <td
+                          className="data-cell pr-26 py-3"
+                          data-cell="MARKET NAME"
+                        >
+                          {item?.name}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
+
+            <button
+              onClick={() => handleNavigate()}
+              className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer mt-4"
+            >
+              Tanlash
+            </button>
           </div>
         </Popup>
       </div>
