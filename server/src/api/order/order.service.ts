@@ -79,12 +79,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     marketId?: string;
     regionId?: string;
     search?: string;
+    startDate?: string;
+    endDate?: string;
     page?: number;
     limit?: number;
   }) {
-    this.logger.log('TEST: receiveNewOrders called', 'OrderService');
-    this.logger.warn('TEST warning', 'OrderService');
-    this.logger.error('TEST error', 'stacktrace sample', 'OrderService');
     try {
       const qb = this.orderRepo
         .createQueryBuilder('order')
@@ -112,6 +111,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
           { search: `%${query.search}%` },
         );
+      }
+
+      // ✅ millisekund bo‘yicha filter
+      if (query.startDate && query.endDate) {
+        qb.andWhere('order.created_at BETWEEN :startDate AND :endDate', {
+          startDate: Number(query.startDate),
+          endDate: Number(query.endDate),
+        });
+      } else if (query.startDate) {
+        qb.andWhere('order.created_at >= :startDate', {
+          startDate: Number(query.startDate),
+        });
+      } else if (query.endDate) {
+        qb.andWhere('order.created_at <= :endDate', {
+          endDate: Number(query.endDate),
+        });
       }
 
       const page = query.page ? Number(query.page) : 1;
