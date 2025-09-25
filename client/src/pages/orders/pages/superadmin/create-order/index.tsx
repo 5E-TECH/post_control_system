@@ -15,10 +15,12 @@ import {
   setCustomerData,
   setProductInfo,
 } from "../../../../../shared/lib/features/customer_and_market-id";
+import { useTranslation } from "react-i18next";
 
 const Context = createContext({ name: "Default" });
 
 const CreateOrder = () => {
+  const { t } = useTranslation("createOrder");
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const customer = JSON.parse(localStorage.getItem("customer") ?? "null");
 
@@ -43,16 +45,16 @@ const CreateOrder = () => {
       orderItems.some((item) => !item.quantity || item.quantity === 0)
     ) {
       api.warning({
-        message: "Buyurtma ma'lumotlari to'liq emas",
-        description: "Iltimos, buyurtmadagi barcha maydonlarni to'ldiring",
+        message: t("orderForm.incompleteOrderData"),
+        description: t("orderForm.fillAllFields"),
         placement: "topRight",
       });
       return;
     }
     if (!productInfo?.total_price || !productInfo?.where_deliver) {
       api.warning({
-        message: "Mahsulot malumotlari to'liq emas",
-        description: "Iltimos mahsulotning barcha maydonlarini kiriting",
+        message: t("productForm.incompleteProductData"),
+        description: t("productForm.fillAllFields"),
         placement: "topRight",
       });
       return;
@@ -91,7 +93,7 @@ const CreateOrder = () => {
         <div className="pr-[81px]">
           <div className="flex items-center gap-1">
             <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
-              Process
+              {t("process")}
             </h1>
           </div>
 
@@ -146,10 +148,10 @@ const CreateOrder = () => {
 
             <div className="flex flex-col">
               <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
-                Order details
+                {t("step.three.title")}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
-                Add order details
+                {t("step.three.description")}
               </span>
             </div>
           </div>
@@ -167,7 +169,7 @@ const CreateOrder = () => {
           <div className="flex justify-end">
             <div className="flex gap-4">
               <Discard handleDiscard={handleDiscard} type="button">
-                Discard
+                {t("discard")}
               </Discard>
               <Button
                 onClick={handleClick}
@@ -177,7 +179,7 @@ const CreateOrder = () => {
                 className="w-[130px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! 
            hover:opacity-85! hover:outline-none! dark:border-none!"
               >
-                Create order
+                {t("createOrder")}
               </Button>
             </div>
           </div>

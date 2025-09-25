@@ -119,7 +119,7 @@ const Dashboards = () => {
                 {/* Sana oralig‘i (RangePicker bilan) */}
                 <div className="flex flex-col">
                   <label className="mb-1 text-sm font-medium">
-                    Sana oralig‘i
+                    {t("dateRange")}
                   </label>
                   <RangePicker
                     value={[
@@ -160,27 +160,27 @@ const Dashboards = () => {
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
-                  label="Jami buyurtmalar"
+                  label={t("totalOrders")}
                   value={aboutCourier?.totalOrder}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
-                  label="Sotilgan"
+                  label={t("solded")}
                   value={aboutCourier?.soldOrders}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
-                  label="Bekor qilinganlar"
+                  label={t("cancelled")}
                   value={aboutCourier?.canceledOrders}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
                 <StatCard
                   icon={<DollarSign size={20} />}
-                  label="Jami daromad"
+                  label={t("profit")}
                   value={`${Number(
                     aboutCourier?.profit || 0
                   ).toLocaleString()} UZS`}
@@ -194,27 +194,27 @@ const Dashboards = () => {
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
-                  label="Jami buyurtmalar"
+                  label={t("totalOrders")}
                   value={aboutMarket?.totalOrders}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
-                  label="Sotilgan"
+                  label={t("solded")}
                   value={aboutMarket?.soldOrders}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
-                  label="Bekor qilinganlar"
+                  label={t("cancelled")}
                   value={aboutMarket?.canceledOrders}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
                 <StatCard
                   icon={<DollarSign size={20} />}
-                  label="Jami daromad"
+                  label={t("profit")}
                   value={`${Number(
                     aboutMarket?.profit || 0
                   ).toLocaleString()} UZS`}
@@ -230,27 +230,27 @@ const Dashboards = () => {
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
-                  label="Jami buyurtmalar"
+                  label={t("totalOrders")}
                   value={dashboard?.acceptedCount}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
-                  label="Sotilgan"
+                  label={t("solded")}
                   value={dashboard?.soldAndPaid}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
-                  label="Bekor qilinganlar"
+                  label={t("cancelled")}
                   value={dashboard?.cancelled}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
                 <StatCard
                   icon={<DollarSign size={20} />}
-                  label="Jami daromad"
+                  label={t("profit")}
                   value={`${Number(
                     dashboard?.profit || 0
                   ).toLocaleString()} UZS`}
@@ -409,8 +409,8 @@ const ChartWrapper = ({
             return (
               <div className="p-2 bg-black text-white rounded text-sm">
                 <p>{item.nomi}</p>
-                <p>Buyurtmalar: {item.buyurtmalar}</p>
-                <p>Sotilgan: {item.sotilgan}</p>
+                <p>{t("orders")}: {item.buyurtmalar}</p>
+                <p>{t("solded")}: {item.sotilgan}</p>
               </div>
             );
           }}
@@ -428,14 +428,14 @@ const ChartWrapper = ({
           className="w-4 h-4 rounded-sm"
           style={{ background: "#66B2FF" }}
         />
-        <span>Buyurtmalar</span>
+        <span>{t("orders")}</span>
       </div>
       <div className="flex items-center gap-2">
         <span
           className="w-4 h-4 rounded-sm"
           style={{ background: "#0047AB" }}
         />
-        <span>Sotilganlar</span>
+        <span>{t("solded")}</span>
       </div>
     </div>
 
