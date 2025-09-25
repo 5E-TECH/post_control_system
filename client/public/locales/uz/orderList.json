@@ -2,7 +2,7 @@
     "title": "Buyurtmalar ro'yxati",
     "noPermission": "Ruxsat yo‘q 🚫",
     "placeholder": {
-        "selectMarket": "Bozorni tanlang",
+        "selectMarket": "Marketni tanlang",
         "selectRegion": "Hududni tanlang",
         "selectStatus": "Holatni tanlang",
         "searchOrder": "Buyurtmani qidiring"
