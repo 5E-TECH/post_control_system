@@ -80,8 +80,12 @@ const Dashboard: React.FC = () => {
               <SkeletonBox className="w-40 h-10 mx-auto" />
             ) : (
               <>
-                <h2 className="text-lg font-medium text-gray-600 mb-2 dark:text-white">
-                  {t("current_situation")}
+                <h2
+                  className={`text-lg font-medium mb-2 ${
+                    bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                   {t("current_situation")}
                 </h2>
                 <div
                   className={`text-4xl font-bold ${
@@ -166,7 +170,7 @@ const Dashboard: React.FC = () => {
                         {t("kassa")}
                       </div>
                       <div className="text-2xl font-bold text-green-600">
-                        {String(kassa).toLocaleString()} UZS
+                        {Number(kassa).toLocaleString()} UZS
                       </div>
                     </div>
                   </div>
@@ -222,12 +226,7 @@ const Dashboard: React.FC = () => {
                               }`}
                               data-cell="TOTAL"
                             >
-                              {m.amount > 0
-                                ? `-${m.amount.toLocaleString()}`
-                                : m.amount < 0
-                                ? `+${Math.abs(m.amount).toLocaleString()}`
-                                : m.amount.toLocaleString()}
-                              UZS
+                              {Number(m.amount).toLocaleString()} UZS
                             </td>
                           </tr>
                         ))}
@@ -327,8 +326,12 @@ const Dashboard: React.FC = () => {
               <SkeletonBox className="w-40 h-10 mx-auto" />
             ) : (
               <div className="text-center">
-                <h4 className="text-lg font-medium text-gray-600 mb-2 dark:text-white">
-                  {t("totalBalans")}
+                <h4
+                  className={`text-lg font-medium mb-2 ${
+                    balans >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                   {t("totalBalans")}
                 </h4>
                 <div
                   className={`text-3xl font-bold ${
