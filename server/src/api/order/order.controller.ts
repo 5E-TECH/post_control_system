@@ -145,7 +145,7 @@ export class OrderController {
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.orderService.findOneById(id);
+    return this.orderService.findOne(id);
   }
 
   // Get my orders Market yoki Kurier uchun
