@@ -34,6 +34,7 @@ export enum Source_type {
   MANUAL_EXPENSE = 'manual_expense',
   MANUAL_INCOME = 'manual_income',
   CORRECTION = 'correction',
+  SALARY = 'salary',
   SELL = 'sell',
   CANCEL = 'cancel',
   EXTRA_COST = 'extra_cost',
