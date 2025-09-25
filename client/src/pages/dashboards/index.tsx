@@ -95,7 +95,7 @@ const Dashboards = () => {
 
   let titleText = `📊 ${t("title")}`;
   if (fromDate && toDate && fromDate !== toDate) {
-    titleText = `📊 ${fromDate} - ${toDate} statistikasi`;
+    titleText = `📊 ${fromDate} dan - ${toDate} gacha statistikasi`;
   } else if (fromDate && !toDate) {
     titleText = `📊 ${fromDate} dan boshlab statistikasi`;
   } else if (!fromDate && toDate) {
