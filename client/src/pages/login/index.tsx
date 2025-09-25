@@ -16,7 +16,6 @@ import { Formik, Form, Field, ErrorMessage, type FormikProps } from "formik";
 import * as yup from "yup";
 
 import { useNetworkState, usePrevious } from "@uidotdev/usehooks";
-import InputMask from "react-input-mask";
 import { useTranslation } from "react-i18next";
 
 message.config({
@@ -154,7 +153,7 @@ const Login: FC = () => {
                             formatted += digits
                               .replace(
                                 /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
-                                (_, a: any, b: any, c: any, d: any) =>
+                                (_: any, a: any, b: any, c: any, d: any) =>
                                   [a, b, c, d].filter(Boolean).join(" ")
                               )
                               .trim();
