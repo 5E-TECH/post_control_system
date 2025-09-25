@@ -51,5 +51,25 @@
             "total": "Сумма",
             "comment": "Комментарий"
         }
-    }
+    },
+    "orderItems": {
+        "title": "Товары заказа",
+        "item": "Товар",
+        "selectProduct": "Выберите или введите товар",
+        "quantity": "Количество",
+        "addAnotherItem": "Добавить еще товар"
+    },
+    "productInfo": {
+        "title": "Информация о продукте",
+        "totalPrice": "Общая сумма",
+        "totalPricePlaceholder": "Общая сумма",
+        "whereDeliver": "Место доставки",
+        "whereDeliverPlaceholder": "Выберите место доставки",
+        "whereDeliverCenter": "центр",
+        "whereDeliverAddress": "адрес",
+        "comment": "Комментарий",
+        "commentPlaceholder": "Введите комментарий (необязательно)"
+    },
+    "noComment": "Комментарий недоступен"
+
 }

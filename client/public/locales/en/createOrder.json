@@ -51,5 +51,24 @@
             "total": "Total",
             "comment": "Comment"
         }
-    }
+    },
+    "orderItems": {
+        "title": "Order Items",
+        "item": "Item",
+        "selectProduct": "Select or type item",
+        "quantity": "Quantity",
+        "addAnotherItem": "Add Another Item"
+    },
+    "productInfo": {
+        "title": "Product Information",
+        "totalPrice": "Total Price",
+        "totalPricePlaceholder": "Total Price",
+        "whereDeliver": "Where to deliver",
+        "whereDeliverPlaceholder": "Select delivery place",
+        "whereDeliverCenter": "center",
+        "whereDeliverAddress": "address",
+        "comment": "Comment (optional)",
+        "commentPlaceholder": "Keep your account secure with authentication step"
+    },
+    "noComment": "No comment available"
 }
