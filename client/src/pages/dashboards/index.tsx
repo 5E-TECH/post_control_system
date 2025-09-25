@@ -7,8 +7,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  // Cell,
 } from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
 import { useSelector } from "react-redux";
@@ -20,6 +18,16 @@ import {
   ShoppingCart,
   XCircle,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { t } from "i18next";
+import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
+import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
+
+import { DatePicker} from "antd";
+
+import dayjs from "dayjs";
+
+const { RangePicker } = DatePicker;
 
 const SkeletonBox = ({ className }: { className?: string }) => (
   <div
@@ -28,22 +36,40 @@ const SkeletonBox = ({ className }: { className?: string }) => (
 );
 
 const Dashboards = () => {
-  // default bugungi kun sanasi
-  // const today = new Date().toISOString().split("T")[0];
-  const [fromDate, setFromDate] = useState<string>();
-  const [toDate, setToDate] = useState<string>();
-
+  const { t } = useTranslation(["dashboard"]);
+  const [fromDate, setFromDate] = useState<string | undefined>(undefined);
+  const [toDate, setToDate] = useState<string | undefined>(undefined);
   const [showAllMarkets, setShowAllMarkets] = useState(false);
   const [showAllCouriers, setShowAllCouriers] = useState(false);
 
+  // Redux'dan role olish
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
-  const { data, isLoading } = useChart().getChart({
-    startDate: fromDate,
-    endDate: toDate,
-  });
+  let data: any;
+  let isLoading: boolean = false;
+
+  if (role === "superadmin" || role === "admin") {
+    ({ data, isLoading } = useChart().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  } else if (role === "courier") {
+    ({ data, isLoading } = useCourierStatCard().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  } else if (role === "market") {
+    ({ data, isLoading } = useMarketStatCard().getChart({
+      startDate: fromDate,
+      endDate: toDate,
+    }));
+  }
 
   const dashboard = data?.data?.orders?.data;
+  const aboutCourier = data?.data?.myStat?.data;
+  const aboutMarket = data?.data?.myStat?.data;
+
+  console.log(aboutCourier)
 
   const ordersData =
     data?.data?.markets?.data?.map((market: any) => ({
@@ -56,7 +82,7 @@ const Dashboards = () => {
     data?.data?.couriers?.data?.map((courier: any) => ({
       nomi: courier?.courier?.name + ` (${courier.successRate}%)`,
       buyurtmalar: courier?.totalOrders,
-      sotilgan: courier?.deliveredOrders,
+      sotilgan: courier?.soldOrders,
     })) ?? [];
 
   const couriers = data?.data?.topCouriers?.data ?? [];
@@ -67,7 +93,7 @@ const Dashboards = () => {
     ? couriersData
     : couriersData.slice(0, 10);
 
-  let titleText = "📊 Bugungi statistika";
+  let titleText = `📊 ${t("title")}`;
   if (fromDate && toDate && fromDate !== toDate) {
     titleText = `📊 ${fromDate} - ${toDate} statistikasi`;
   } else if (fromDate && !toDate) {
@@ -88,29 +114,29 @@ const Dashboards = () => {
             </>
           ) : (
             <>
-              <div className="flex flex-col">
-                <label htmlFor="fromDate" className="mb-1 text-sm font-medium">
-                  Boshlanish sanasi
-                </label>
-                <input
-                  id="fromDate"
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="border rounded-md px-4 py-2 bg-white dark:bg-[#2A263D]"
-                />
-              </div>
-              <div className="flex flex-col">
-                <label htmlFor="toDate" className="mb-1 text-sm font-medium">
-                  Tugash sanasi
-                </label>
-                <input
-                  id="toDate"
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="border rounded-md px-4 py-2 bg-white dark:bg-[#2A263D]"
-                />
+              {/* Agar RangePicker ishlatmoqchi bo‘lsangiz */}
+              <div className="flex gap-6">
+                {/* Sana oralig‘i (RangePicker bilan) */}
+                <div className="flex flex-col">
+                  <label className="mb-1 text-sm font-medium">
+                    {t("dateRange")}
+                  </label>
+                  <RangePicker
+                    value={[
+                      fromDate ? dayjs(fromDate) : null,
+                      toDate ? dayjs(toDate) : null,
+                    ]}
+                    onChange={(dates) => {
+                      setFromDate(
+                        dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
+                      );
+                      setToDate(
+                        dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
+                      );
+                    }}
+                    className="w-full"
+                  />
+                </div>
               </div>
             </>
           )}
@@ -119,7 +145,6 @@ const Dashboards = () => {
           {titleText}
         </h2>
       </div>
-
       {/* Stat Cards */}
       <div className="grid grid-cols-4 gap-6 mb-6">
         {isLoading ? (
@@ -131,37 +156,112 @@ const Dashboards = () => {
           ))
         ) : (
           <>
-            <StatCard
-              icon={<ShoppingCart size={20} />}
-              label="Jami buyurtmalar"
-              value={dashboard?.acceptedCount}
-              borderColor="border-gray-400"
-            />
-            <StatCard
-              icon={<CheckCircle size={20} />}
-              label="Sotilgan"
-              value={dashboard?.soldAndPaid}
-              borderColor="border-green-500"
-              textColor="text-green-500"
-            />
-            <StatCard
-              icon={<XCircle size={20} />}
-              label="Bekor qilinganlar"
-              value={dashboard?.cancelled}
-              borderColor="border-red-500"
-              textColor="text-red-500"
-            />
-            <StatCard
-              icon={<DollarSign size={20} />}
-              label="Jami daromad"
-              value={`${Number(dashboard?.profit).toLocaleString()} UZS`}
-              borderColor="border-yellow-500"
-              textColor="text-yellow-500"
-            />
+            {role === "courier" && (
+              <>
+                <StatCard
+                  icon={<ShoppingCart size={20} />}
+                  label={t("totalOrders")}
+                  value={aboutCourier?.totalOrder}
+                  borderColor="border-gray-400"
+                />
+                <StatCard
+                  icon={<CheckCircle size={20} />}
+                  label={t("solded")}
+                  value={aboutCourier?.soldOrders}
+                  borderColor="border-green-500"
+                  textColor="text-green-500"
+                />
+                <StatCard
+                  icon={<XCircle size={20} />}
+                  label={t("cancelled")}
+                  value={aboutCourier?.canceledOrders}
+                  borderColor="border-red-500"
+                  textColor="text-red-500"
+                />
+                <StatCard
+                  icon={<DollarSign size={20} />}
+                  label={t("profit")}
+                  value={`${Number(
+                    aboutCourier?.profit || 0
+                  ).toLocaleString()} UZS`}
+                  borderColor="border-yellow-500"
+                  textColor="text-yellow-500"
+                />
+              </>
+            )}
+
+            {role === "market" && (
+              <>
+                <StatCard
+                  icon={<ShoppingCart size={20} />}
+                  label={t("totalOrders")}
+                  value={aboutMarket?.totalOrders}
+                  borderColor="border-gray-400"
+                />
+                <StatCard
+                  icon={<CheckCircle size={20} />}
+                  label={t("solded")}
+                  value={aboutMarket?.soldOrders}
+                  borderColor="border-green-500"
+                  textColor="text-green-500"
+                />
+                <StatCard
+                  icon={<XCircle size={20} />}
+                  label={t("cancelled")}
+                  value={aboutMarket?.canceledOrders}
+                  borderColor="border-red-500"
+                  textColor="text-red-500"
+                />
+                <StatCard
+                  icon={<DollarSign size={20} />}
+                  label={t("profit")}
+                  value={`${Number(
+                    aboutMarket?.profit || 0
+                  ).toLocaleString()} UZS`}
+                  borderColor="border-yellow-500"
+                  textColor="text-yellow-500"
+                />
+              </>
+            )}
+
+            {(role === "superadmin" ||
+              role === "admin" ||
+              role === "registrator") && (
+              <>
+                <StatCard
+                  icon={<ShoppingCart size={20} />}
+                  label={t("totalOrders")}
+                  value={dashboard?.acceptedCount}
+                  borderColor="border-gray-400"
+                />
+                <StatCard
+                  icon={<CheckCircle size={20} />}
+                  label={t("solded")}
+                  value={dashboard?.soldAndPaid}
+                  borderColor="border-green-500"
+                  textColor="text-green-500"
+                />
+                <StatCard
+                  icon={<XCircle size={20} />}
+                  label={t("cancelled")}
+                  value={dashboard?.cancelled}
+                  borderColor="border-red-500"
+                  textColor="text-red-500"
+                />
+                <StatCard
+                  icon={<DollarSign size={20} />}
+                  label={t("profit")}
+                  value={`${Number(
+                    dashboard?.profit || 0
+                  ).toLocaleString()} UZS`}
+                  borderColor="border-yellow-500"
+                  textColor="text-yellow-500"
+                />
+              </>
+            )}
           </>
         )}
       </div>
-
       {/* Role-based Rendering */}
       {(role === "superadmin" ||
         role === "admin" ||
@@ -185,7 +285,6 @@ const Dashboards = () => {
           </div>
         </>
       )}
-
       {role === "market" && (
         <>
           {renderMarketsChart(
@@ -196,7 +295,6 @@ const Dashboards = () => {
           {renderMarketsTable(markets)}
         </>
       )}
-
       {role === "courier" && (
         <>
           {renderCouriersChart(
@@ -235,6 +333,24 @@ const StatCard = ({
   </div>
 );
 
+// 🔹 Custom Bar for Buyurtmalar + Sotilgan
+const CustomBar = (props: any) => {
+  const { x, y, width, height, payload } = props;
+  const buyurtmalar = payload.buyurtmalar;
+  const sotilgan = payload.sotilgan;
+
+  const soldWidth = buyurtmalar ? (sotilgan / buyurtmalar) * width : 0;
+
+  return (
+    <g>
+      {/* Fon - Buyurtmalar */}
+      <rect x={x} y={y} width={width} height={height} fill="#66B2FF" />
+      {/* Ustiga - Sotilgan */}
+      <rect x={x} y={y} width={soldWidth} height={height} fill="#0047AB" />
+    </g>
+  );
+};
+
 // 🔹 Helper Components (Charts & Tables)
 const renderMarketsChart = (
   visibleMarkets: any[],
@@ -242,7 +358,7 @@ const renderMarketsChart = (
   setShowAllMarkets: (v: boolean) => void
 ) => (
   <ChartWrapper
-    title="Marketlar statistikasi"
+    title={t("marketStatistics")}
     data={visibleMarkets}
     showAll={showAllMarkets}
     setShowAll={setShowAllMarkets}
@@ -255,7 +371,7 @@ const renderCouriersChart = (
   setShowAllCouriers: (v: boolean) => void
 ) => (
   <ChartWrapper
-    title="Kuriyerlar statistikasi"
+    title={t("courierStatistics")}
     data={visibleCouriers}
     showAll={showAllCouriers}
     setShowAll={setShowAllCouriers}
@@ -286,44 +402,58 @@ const ChartWrapper = ({
         <XAxis type="number" />
         <YAxis type="category" dataKey="nomi" width={200} />
         <Tooltip
-          contentStyle={{ backgroundColor: "#000", color: "#fff" }}
-          cursor={{ fill: "rgba(0,0,0,0.1)" }}
-        />
-        <Legend
-          wrapperStyle={{ color: "black" }}
-          formatter={(value) => (
-            <span style={{ color: "inherit", fontWeight: "bold" }}>
-              {value}
-            </span>
-          )}
+          cursor={{ fill: "rgba(0,0,0,0.05)" }}
+          content={({ payload }) => {
+            if (!payload || !payload.length) return null;
+            const item = payload[0].payload;
+            return (
+              <div className="p-2 bg-black text-white rounded text-sm">
+                <p>{item.nomi}</p>
+                <p>{t("orders")}: {item.buyurtmalar}</p>
+                <p>{t("solded")}: {item.sotilgan}</p>
+              </div>
+            );
+          }}
         />
 
-        {/* 🔹 Ustma-ust barlar */}
-        <Bar
-          dataKey="buyurtmalar"
-          name="Buyurtmalar"
-          fill="#66B2FF"
-          stackId="a"
-        />
-        <Bar dataKey="sotilgan" name="Sotilgan" fill="#0047AB" stackId="a" />
+        {/* 🔹 Custom bar */}
+        <Bar dataKey="buyurtmalar" name="Buyurtmalar" shape={<CustomBar />} />
       </BarChart>
     </ResponsiveContainer>
+
+    {/* 🔹 Legend qo'lda */}
+    <div className="flex justify-center gap-6 mt-3">
+      <div className="flex items-center gap-2">
+        <span
+          className="w-4 h-4 rounded-sm"
+          style={{ background: "#66B2FF" }}
+        />
+        <span>{t("orders")}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span
+          className="w-4 h-4 rounded-sm"
+          style={{ background: "#0047AB" }}
+        />
+        <span>{t("solded")}</span>
+      </div>
+    </div>
+
     <div className="flex justify-center mt-4">
       <button
         onClick={() => setShowAll(!showAll)}
         className="px-4 py-2 bg-blue-500 text-white rounded-lg"
       >
-        {showAll ? "Kamroq ko‘rish" : "Ko‘proq ko‘rish"}
+        {showAll ? t("showLess") : t("showMore")}
       </button>
     </div>
   </div>
 );
 
-
 // 🔹 Top Markets Table
 const renderMarketsTable = (markets: any[]) => (
   <TableWrapper
-    title="Top 10 Marketlar (Oxirgi 30 kun)"
+    title={t("topMarkets")}
     data={markets}
     nameKey="market_name"
     ordersKey="total_orders"
@@ -335,7 +465,7 @@ const renderMarketsTable = (markets: any[]) => (
 // 🔹 Top Couriers Table
 const renderCouriersTable = (couriers: any[]) => (
   <TableWrapper
-    title="Top 10 Kuriyerlar (Oxirgi 30 kun)"
+    title={t("topCouriers")}
     data={couriers}
     nameKey="courier_name"
     ordersKey="total_orders"
@@ -365,10 +495,10 @@ const TableWrapper = ({
       <thead>
         <tr className="bg-gray-100 dark:bg-[#3B3656] text-left">
           <th className="p-2 border">#</th>
-          <th className="p-2 border">Nomi</th>
-          <th className="p-2 border">Buyurtmalar</th>
-          <th className="p-2 border">Sotilganlar</th>
-          <th className="p-2 border">Foiz</th>
+          <th className="p-2 border">{t("name")}</th>
+          <th className="p-2 border">{t("orders")}</th>
+          <th className="p-2 border">{t("solded")}</th>
+          <th className="p-2 border">{t("rate")}</th>
         </tr>
       </thead>
       <tbody>

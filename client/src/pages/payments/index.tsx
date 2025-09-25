@@ -1,14 +1,14 @@
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import React, { useState } from 'react';
-import Select from '../users/components/select';
-import Popup from '../../shared/ui/Popup';
-import { X } from 'lucide-react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useMarket } from '../../shared/api/hooks/useMarket/useMarket';
-import { useCourier } from '../../shared/api/hooks/useCourier';
-import { useCashBox } from '../../shared/api/hooks/useCashbox';
-import CountUp from 'react-countup';
-import { useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import React, { useState } from "react";
+import Select from "../users/components/select";
+import Popup from "../../shared/ui/Popup";
+import { X } from "lucide-react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
+import { useCourier } from "../../shared/api/hooks/useCourier";
+import { useCashBox } from "../../shared/api/hooks/useCashbox";
+import CountUp from "react-countup";
+import { useEffect } from "react";
 
 const Payments = () => {
   const [showMarket, setShowMarket] = useState(false);
@@ -40,13 +40,13 @@ const Payments = () => {
     refetch();
   }, [pathname]);
 
-  if (pathname.startsWith('/payments/')) {
+  if (pathname.startsWith("/payments/")) {
     return <Outlet />;
   }
 
   return (
     <div className="mt-10">
-      <div className="grid grid-cols-3 gap-14 text-center text-2xl items-end mx-5 ">
+      <div className="grid grid-cols-3 gap-14 max-[1050px]:grid-cols-2 max-[800px]:grid-cols-1 text-center text-2xl items-end mx-5 ">
         <div
           onClick={() => setShowMarket(true)}
           className="py-15 cursor-pointer rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
@@ -109,7 +109,7 @@ const Payments = () => {
                       key={item?.id}
                       onClick={() => setSelect(item?.id)}
                       className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                        item.id == select ? 'bg-gray-300 text-black' : ''
+                        item.id == select ? "bg-gray-300 text-black" : ""
                       }`}
                     >
                       <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
@@ -125,9 +125,9 @@ const Payments = () => {
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
                 className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
-                  !select ? '' : 'hover:bg-blue-600'
+                  !select ? "" : "hover:bg-blue-600"
                 }  text-white rounded-md cursor-pointer ${
-                  !select ? 'opacity-40' : ''
+                  !select ? "opacity-40" : ""
                 }`}
               >
                 Tanlash
@@ -138,9 +138,9 @@ const Payments = () => {
 
         <div
           onClick={() =>
-            navigate('main-cashbox', {
+            navigate("main-cashbox", {
               state: {
-                role: 'pochta',
+                role: "pochta",
               },
             })
           }
@@ -224,7 +224,7 @@ const Payments = () => {
                       key={inx}
                       onClick={() => setSelect(item?.id)}
                       className={`border-b-2 border-[#c3c5ce] dark:border-[#E7E3FCB2]  text-[15px] font-normal ${
-                        item.id == select ? 'bg-gray-100 text-black' : ''
+                        item.id == select ? "bg-gray-100 text-black" : ""
                       }`}
                     >
                       <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
@@ -316,47 +316,61 @@ const Payments = () => {
                         key={item.id}
                         className="border-t border-[#E7E3FC1F] text-[15px] font-normal"
                       >
-                        <td className="pl-4 py-3 text-[#8C57FF]">{inx + 1}</td>
-                        <td className=" py-3 flex flex-col">
+                        <td
+                          className="data-cell pl-4 py-3 text-[#8C57FF]"
+                          data-cell="#"
+                        >
+                          {inx + 1}
+                        </td>
+                        <td
+                          className="data-cell py-3 flex flex-col"
+                          data-cell="CREATED BY"
+                        >
                           {item?.createdByUser?.name}
                           <span
                             className={`text-[13px] ${
-                              item?.createdByUser?.role == 'superadmin'
-                                ? 'text-green-500'
-                                : 'text-blue-500'
+                              item?.createdByUser?.role == "superadmin"
+                                ? "text-green-500"
+                                : "text-blue-500"
                             }`}
                           >
                             {item?.createdByUser?.role}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="data-cell px-4 py-3"
+                          data-cell="CASHBOX_TYPE"
+                        >
                           <span
                             className={`
                                 px-[12px] py-[2px] rounded-full text-[13px]
                                 ${
-                                  item?.payment_method === 'click_to_market'
-                                    ? 'text-[#16B1FF] bg-[#16B1FF29]' // ko'k
-                                    : item?.payment_method === 'cash'
-                                    ? 'text-[#16C75F] bg-[#16C75F29]' // yashil
-                                    : item?.payment_method === 'click'
-                                    ? 'text-[#FFC107] bg-[#FFC10729]' // sariq
-                                    : 'text-gray-500 bg-gray-200' // default rang
+                                  item?.payment_method === "click_to_market"
+                                    ? "text-[#16B1FF] bg-[#16B1FF29]" // ko'k
+                                    : item?.payment_method === "cash"
+                                    ? "text-[#16C75F] bg-[#16C75F29]" // yashil
+                                    : item?.payment_method === "click"
+                                    ? "text-[#FFC107] bg-[#FFC10729]" // sariq
+                                    : "text-gray-500 bg-gray-200" // default rang
                                 }
                               `}
                           >
                             {item?.payment_method}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td
+                          className="data-cell px-4 py-3"
+                          data-cell="OPERATION_TYPE"
+                        >
                           <span
                             className={`
                                   px-[12px] py-[2px] rounded-full text-[13px]
                                   ${
-                                    item?.operation_type === 'income'
-                                      ? 'text-[#16C75F] bg-[#16C75F29]' // yashil
-                                      : item?.operation_type === 'expense'
-                                      ? 'text-[#FF4D4F] bg-[#FF4D4F29]' // qizil
-                                      : 'text-gray-500 bg-gray-200' // default rang
+                                    item?.operation_type === "income"
+                                      ? "text-[#16C75F] bg-[#16C75F29]" // yashil
+                                      : item?.operation_type === "expense"
+                                      ? "text-[#FF4D4F] bg-[#FF4D4F29]" // qizil
+                                      : "text-gray-500 bg-gray-200" // default rang
                                   }
                                 `}
                           >
@@ -364,29 +378,33 @@ const Payments = () => {
                           </span>
                         </td>
                         <td
-                          className={`px-13 py-3 text-[16px] ${
-                            item?.operation_type === 'income'
-                              ? 'text-[#16C75F]' // yashil
-                              : item?.operation_type === 'expense'
-                              ? 'text-[#FF4D4F]' // qizil
-                              : 'text-gray-500' // default rang
+                          className={`data-cell px-13 py-3 text-[16px] ${
+                            item?.operation_type === "income"
+                              ? "text-[#16C75F]" // yashil
+                              : item?.operation_type === "expense"
+                              ? "text-[#FF4D4F]" // qizil
+                              : "text-gray-500" // default rang
                           }`}
+                          data-cell="AMOUNT"
                         >
-                          {item?.operation_type === 'income'
-                            ? '+'
-                            : item?.operation_type === 'expense'
-                            ? '-'
-                            : ''}
-                          {Number(item?.amount || 0).toLocaleString('uz-UZ')}{' '}
+                          {item?.operation_type === "income"
+                            ? "+"
+                            : item?.operation_type === "expense"
+                            ? "-"
+                            : ""}
+                          {Number(item?.amount || 0).toLocaleString("uz-UZ")}{" "}
                           UZS
                         </td>
-                        <td className="px-13 py-3">
+                        <td
+                          className="data-cell px-13 py-3"
+                          data-cell="PAYMENT DATE"
+                        >
                           {new Date(Number(item?.created_at)).toLocaleString(
-                            'uz-UZ',
+                            "uz-UZ"
                           )}
                         </td>
                       </tr>
-                    ),
+                    )
                   )}
                 </tbody>
               </table>

@@ -5,8 +5,10 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useParamsHook } from "../../../../shared/hooks/useParams";
 import TableSkeleton from "../ordersTabelSkeleton/ordersTableSkeleton";
+import { useTranslation } from "react-i18next";
 
 const CustomerDetails = () => {
+  const { t } = useTranslation("createOrder");
   const { getOrderByMarket, getMarketsByMyNewOrders } = useOrder();
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
@@ -44,7 +46,7 @@ const CustomerDetails = () => {
   return (
     <div className="w-full flex flex-col gap-5 py-5 rounded-md bg-[#ffffff] dark:bg-[#312D48] shadow-lg">
       <h1 className="px-5 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
-        Mening buyurtmalarim
+        {t("customerDetails.title")}
       </h1>
 
       <table>
@@ -52,31 +54,31 @@ const CustomerDetails = () => {
           <tr>
             <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
-                ISMI
+                {t("customerDetails.table.customerName")}
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
             <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
-                TELEFON RAQAMI
+                {t("customerDetails.table.phoneNumber")}
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
             <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
-                TUMANI
+                {t("customerDetails.table.district")}
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
             <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
-                SUMMA
+                {t("customerDetails.table.total")}
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
             <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
               <div className="flex items-center justify-between pr-[21px]">
-                IZOH
+                {t("customerDetails.table.comment")}
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>

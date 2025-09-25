@@ -1,0 +1,20 @@
+{
+    "required": {
+        "phone_number": "Please enter your phone number!",
+        "password": "Please enter your password!"
+    },
+    "invalid": {
+        "phone_number": "Please enter a valid phone number!",
+        "password_length": "Password must be at least 4 characters long!"
+    },
+    "offline": "No internet connection !!!",
+    "online": "You are connected to the internet ✅",
+    "welcome_message": "Welcome to Beepost! 👋🏻",
+    "placeholder": {
+        "password": "Password"
+    },
+    "button": {
+        "submit": "Submit"
+    },
+    "errorMsg": "Incorrect phone number or password !!!"
+}
