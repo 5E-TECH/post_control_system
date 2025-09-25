@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -7,6 +8,7 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
+import { PaymentMethod } from 'src/common/enums';
 
 export class SalaryDto {
   @ApiProperty({
@@ -26,10 +28,18 @@ export class SalaryDto {
   amount: number;
 
   @ApiProperty({
+    enum: PaymentMethod,
+    example: PaymentMethod.CASH,
+  })
+  @IsOptional()
+  @IsIn(Object.values([PaymentMethod.CASH, PaymentMethod.CLICK]))
+  type: PaymentMethod;
+
+  @ApiProperty({
     type: String,
     example: 'Avans berildi',
   })
   @IsOptional()
   @IsString()
-  comment: string;
+  comment?: string;
 }

@@ -31,6 +31,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 import { SalaryDto } from './dto/salary.dto';
+import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
 
 @Injectable()
 export class CashBoxService
@@ -679,6 +680,11 @@ export class CashBoxService
       if (!mainCashbox) {
         throw new NotFoundException('Main cashbox not found');
       }
+      if (mainCashbox.balance < updateCashboxDto.amount) {
+        throw new BadRequestException(
+          'There is not enough money in the cashbox',
+        );
+      }
       mainCashbox.balance -= updateCashboxDto.amount;
       await queryRunner.manager.save(mainCashbox);
 
@@ -745,7 +751,51 @@ export class CashBoxService
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { amount, comment } = salaryDto;
+      const { user_id, amount } = salaryDto;
+      const staff = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: user_id },
+      });
+      if (!staff) {
+        throw new NotFoundException('User not found');
+      }
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) {
+        throw new NotFoundException('Main cashbox not found');
+      }
+      if (mainCashbox.balance < amount) {
+        throw new BadRequestException(
+          'There is not enough money in the cashbox',
+        );
+      }
+      const salary = await queryRunner.manager.findOne(UserSalaryEntity, {
+        where: { user_id },
+      });
+      if (!salary) {
+        throw new NotFoundException('Salary for this user not found');
+      }
+      salary.have_to_pay -= amount;
+      await queryRunner.manager.save(salary);
+
+      mainCashbox.balance -= amount;
+      await queryRunner.manager.save(mainCashbox);
+
+      const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
+        amount,
+        balance_after: mainCashbox.balance,
+        cashbox_id: mainCashbox.id,
+        comment: salaryDto?.comment,
+        created_by: user.id,
+        payment_method: salaryDto.type,
+        operation_type: Operation_type.EXPENSE,
+        source_type: Source_type.SALARY,
+        source_id: user_id,
+      });
+      await queryRunner.manager.save(cashboxHistory);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Staff salary paid');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
