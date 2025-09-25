@@ -4,10 +4,18 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 
 export class SalaryDto {
+  @ApiProperty({
+    type: String,
+  })
+  @IsNotEmpty()
+  @IsUUID()
+  user_id: string;
+
   @ApiProperty({
     type: Number,
     example: 1_000_000,

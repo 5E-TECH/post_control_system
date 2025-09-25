@@ -745,6 +745,7 @@ export class CashBoxService
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      const { amount, comment } = salaryDto;
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
