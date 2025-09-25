@@ -30,6 +30,7 @@ import { OrderRepository } from 'src/core/repository/order.repository';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
+import { SalaryDto } from './dto/salary.dto';
 
 @Injectable()
 export class CashBoxService
@@ -731,6 +732,19 @@ export class CashBoxService
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Cashbox filled');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async paySalary(user: JwtPayload, salaryDto: SalaryDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

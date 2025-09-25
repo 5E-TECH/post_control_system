@@ -385,7 +385,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async findOne(id: string) {
     try {
-      const newOrder = await this.orderRepo.findOne({ where: { id } });
+      const newOrder = await this.orderRepo.findOne({
+        where: { id },
+        relations: ['items', 'items.product', 'market', 'customer'],
+      });
       if (!newOrder) {
         throw new NotFoundException('Order not found');
       }
