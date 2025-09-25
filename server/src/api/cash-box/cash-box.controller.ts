@@ -191,15 +191,15 @@ export class CasheBoxController {
     return this.cashBoxService.spendMoney(user, updateCashboxDto);
   }
 
-  @ApiOperation({ summary: 'Spend money' })
-  @ApiResponse({ status: 200, description: 'Spend money' })
+  @ApiOperation({ summary: 'Fill cahshbox' })
+  @ApiResponse({ status: 200, description: 'Fill cashbox' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Patch('spend')
+  @Patch('fill')
   fillCashbox(
     @CurrentUser() user: JwtPayload,
     @Body() updateCashboxDto: UpdateCashBoxDto,
   ) {
-    return this.cashBoxService.spendMoney(user, updateCashboxDto);
+    return this.cashBoxService.fillTheCashbox(user, updateCashboxDto);
   }
 }
