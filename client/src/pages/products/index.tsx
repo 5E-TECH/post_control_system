@@ -14,9 +14,6 @@ const Products = () => {
   const [select, setSelect] = useState<string | null>("");
   const [searchProduct, setSearchProduct] = useState<any>(null);
 
-  console.log("search input   ",searchProduct);
-  
-
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
   useEffect(() => {
     if (role === "market") {
@@ -34,7 +31,6 @@ const Products = () => {
     []
   );
 
-
   const handleNavigate = () => {
     navigate(`create/${select}`);
     setSelect("");
@@ -43,7 +39,9 @@ const Products = () => {
 
   const { getProducts, getMyProducts } = useProduct();
   const { data: productData } =
-    role === "market" ? getMyProducts({ search: searchProduct }) : getProducts({ search: searchProduct });
+    role === "market"
+      ? getMyProducts({ search: searchProduct })
+      : getProducts({ search: searchProduct });
 
   const { getMarkets } = useMarket();
 
@@ -53,17 +51,17 @@ const Products = () => {
 
   if (pathname.startsWith("/products/create")) return <Outlet />;
   return (
-    <div className="mt-6">
+    <div className="mt-6 w-full">
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
-      <div className="flex flex-col md:flex-row gap-3 md:gap-0 md:items-center md:justify-between px-4">
-        <input
-          onChange={(e) => debouncedSearch(e.target.value)}
-          className="rounded-[7px] w-full md:w-[280px] h-[40px] border border-[#2E263D38] px-3"
-          placeholder="Search"
-          type="text"
-        />
+      <div className="flex flex-col px-4">
+        <div className="flex justify-between max-[800px]:flex-col max-[800px]:gap-4">
+          <input
+            onChange={(e) => debouncedSearch(e.target.value)}
+            className="rounded-[7px] w-full min-[800px]:w-[280px] h-[40px] border border-[#2E263D38] px-3"
+            placeholder="Search"
+            type="text"
+          />
 
-        <div className="flex items-center gap-3">
           <button
             onClick={() => {
               if (role === "market") {
@@ -77,6 +75,8 @@ const Products = () => {
             <FilePlus size={18} />
             Mahsulot qo'shish
           </button>
+        </div>
+        <div className="flex items-center gap-3">
           <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
             <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d] relative">
               <button
@@ -119,14 +119,23 @@ const Products = () => {
                         <tr
                           key={item?.id}
                           onClick={() => setSelect(item?.id)}
-                          className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                          className={`data-cell border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
                             item.id == select ? "bg-gray-100" : ""
                           }`}
+                          data-cell="#"
                         >
-                          <td className="text-[#8C57FF] pr-10 py-3">
+                          <td
+                            className="data-cell text-[#8C57FF] pr-10 py-3"
+                            data-cell="MARKET NAME"
+                          >
                             {inx + 1}
                           </td>
-                          <td className="pr-26 py-3">{item?.name}</td>
+                          <td
+                            className="data-cell pr-26 py-3"
+                            data-cell="ITEM NAME"
+                          >
+                            {item?.name}
+                          </td>
                         </tr>
                       ))}
                   </tbody>
