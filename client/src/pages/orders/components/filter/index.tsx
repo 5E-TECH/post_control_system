@@ -50,8 +50,8 @@ const Filter = () => {
 
   // RangePicker uchun
   const handleDateChange = (_: any, dateStrings: [string, string]) => {
-    dispatch(setFilter({ name: "from", value: dateStrings[0] }));
-    dispatch(setFilter({ name: "to", value: dateStrings[1] }));
+    dispatch(setFilter({ name: "startDate", value: dateStrings[0] }));
+    dispatch(setFilter({ name: "endDate", value: dateStrings[1] }));
   };
 
   // Permission check

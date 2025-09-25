@@ -31,6 +31,12 @@ export const useOrder = () => {
       queryFn: () => api.get("order", { params }).then((res) => res.data),
     });
 
+  const getOrderById = (id:string | undefined, params?: any) =>
+    useQuery({
+      queryKey: [order, params],
+      queryFn: () => api.get(`order/${id}`, { params }).then((res) => res.data),
+    });
+
   const getOrderByMarket = (marketId: string | undefined, params?: any) =>
     useQuery({
       queryKey: [order, marketId, params],
@@ -78,5 +84,6 @@ export const useOrder = () => {
     getCourierOrders,
     getMarketsByMyNewOrders,
     deleteOrders,
+    getOrderById
   };
 };

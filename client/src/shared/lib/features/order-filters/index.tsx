@@ -4,8 +4,8 @@ interface FilterState {
   marketId: string;
   regionId: string;
   status: string;
-  from: string;
-  to: string;
+  startDate: string;
+  endDate: string;
   search: string;
 }
 
@@ -13,8 +13,8 @@ const initialState: FilterState = {
   marketId: "",
   regionId: "",
   status: "",
-  from: "",
-  to: "",
+  startDate: "",
+  endDate: "",
   search: "",
 };
 

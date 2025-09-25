@@ -3,7 +3,7 @@ import detail from "../../../../shared/assets/order/detail.svg";
 
 const Details = () => {
   return (
-    <div>
+    <div className="dark:bg-[#312D4B]">
       <div className="flex justify-between m-5">
         <h2 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
           Order details
