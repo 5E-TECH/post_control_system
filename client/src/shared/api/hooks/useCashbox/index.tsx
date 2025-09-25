@@ -42,6 +42,7 @@ export const useCashBox = () => {
     },
   });
 
+
   return {
     getCashBoxById,
     getCashBoxInfo,
