@@ -1,5 +1,6 @@
 import { memo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Form } from 'antd';
 import { CashboxCard } from '../../components/CashCard';
 import { CashboxHistory } from '../../components/paymentHistory';
 import { useCashBox } from '../../../../shared/api/hooks/useCashbox';
@@ -18,6 +19,8 @@ import { useCourier } from '../../../../shared/api/hooks/useCourier';
 import TextArea from 'antd/es/input/TextArea';
 import { Select, DatePicker } from 'antd';
 import dayjs from 'dayjs';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../../../../shared/api';
 
 const { RangePicker } = DatePicker;
 
@@ -26,8 +29,10 @@ const MainDetail = () => {
   const [showCurier, setShowCurier] = useState(false);
   const [spand, setSpand] = useState(false);
   const [select, setSelect] = useState(null);
+  const [kassa, setMaosh] = useState(false);
 
   const navigate = useNavigate();
+  const client = useQueryClient();
 
   const [form, setForm] = useState({
     from: '',
@@ -59,6 +64,13 @@ const MainDetail = () => {
     refetch();
   }, []);
 
+  const cashboxFill = useMutation({
+    mutationFn: ({ data }: { data: any }) => api.patch(`cashbox/fill`, data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['cashbox'] });
+    },
+  });
+
   const handleNavigate = () => {
     navigate(`/payments/cash-detail/${select}`, {
       state: {
@@ -82,6 +94,33 @@ const MainDetail = () => {
       {
         onSuccess: () => {
           refetch();
+        },
+      },
+    );
+  };
+
+  const handleSalarySubmit = () => {
+    const data = {
+      amount: Number(form.summa),
+      type: form.payment,
+      comment: form.comment,
+    };
+
+    cashboxFill.mutate(
+      { data },
+      {
+        onSuccess: () => {
+          refetch();
+          setMaosh(false);
+          setForm({
+            from: '',
+            to: '',
+            order: '',
+            payment: '',
+            summa: '',
+            market: '',
+            comment: '',
+          });
         },
       },
     );
@@ -120,22 +159,22 @@ const MainDetail = () => {
             <BanknoteArrowUp size={22} />
           </button>
           <button
-          title='Kassadan sarflash'
+            title="Kassadan sarflash"
             onClick={() => setSpand(true)}
             className="rounded-full cursor-pointer p-3 bg-red-500 text-white hover:bg-red-600 transition flex items-center justify-center shadow-md"
           >
             <CircleMinus size={22} />
           </button>
           <button
-          title="Kassani to'ldirish"
-            onClick={() => setShowMarket(true)}
+            title="Kassani to'ldirish"
+            onClick={() => setMaosh(true)}
             className="rounded-full cursor-pointer p-3 bg-green-500 text-white hover:bg-green-600 transition flex items-center justify-center shadow-md"
           >
             <CirclePlus size={22} />
           </button>
 
           <button
-          title="Maosh to'lash"
+            title="Maosh to'lash"
             onClick={() => setShowCurier(true)}
             className="rounded-full cursor-pointer p-3 bg-amber-500 text-white hover:bg-amber-600 transition flex items-center justify-center shadow-md"
           >
@@ -167,25 +206,20 @@ const MainDetail = () => {
                   { value: '', label: "to'lov turi", disabled: true },
                   { value: 'cash', label: 'cash' },
                   { value: 'click', label: 'click' },
-                  ...(data?.data?.cashbox?.user?.role === 'market'
-                    ? []
-                    : [
-                        {
-                          value: 'click_to_market',
-                          label: 'click_to_market',
-                        },
-                      ]),
                 ]}
               />
             </div>
             <div className="mt-5">
-              <TextArea
+              <Form.Item
                 name="comment"
-                value={form.comment}
-                onChange={handleChange}
-                placeholder="Autosize height based on content lines"
-                autoSize
-              />
+                rules={[{ required: true, message: 'Izohni kiriting!' }]}
+              >
+                <TextArea
+                  placeholder="Autosize height based on content lines"
+                  autoSize
+                />
+              </Form.Item>
+
               <div className="flex gap-5">
                 <button
                   onClick={() => handleSubmit()}
@@ -195,6 +229,59 @@ const MainDetail = () => {
                 </button>
                 <button
                   onClick={() => setSpand(false)}
+                  className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
+                >
+                  Bekor qilish
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* === Maosh to'lashni bosganda === */}
+        {kassa && (
+          <div className="mt-5">
+            <h2>Maosh to'lash</h2>
+            <div className="flex gap-4 items-center mt-3">
+              <input
+                name="summa"
+                value={form.summa}
+                onChange={handleChange}
+                className="border rounded-md px-2 py-0.75 border-[#d1cfd4] outline-none hover:border-blue-400 w-[150px]"
+                type="number"
+                placeholder="summa"
+              />
+              <Select
+                value={form.payment}
+                onChange={(value) =>
+                  setForm((prev) => ({ ...prev, payment: value }))
+                }
+                placeholder="To'lov turi"
+                className="w-[150px]"
+                options={[
+                  { value: '', label: "to'lov turi", disabled: true },
+                  { value: 'cash', label: 'cash' },
+                  { value: 'click', label: 'click' },
+                ]}
+              />
+            </div>
+            <div className="mt-5">
+              <Form.Item
+                name="comment"
+                rules={[{ required: true, message: 'Izoh kiritish majburiy!' }]}
+              >
+                <TextArea placeholder="Izoh..." autoSize />
+              </Form.Item>
+
+              <div className="flex gap-5">
+                <button
+                  onClick={() => handleSalarySubmit()}
+                  className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0] text-white"
+                >
+                  Qabul qilish
+                </button>
+                <button
+                  onClick={() => setMaosh(false)}
                   className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
                 >
                   Bekor qilish
@@ -359,7 +446,7 @@ const MainDetail = () => {
               onClick={() => handleNavigate()}
               className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
             >
-              Tanlash
+              Selected
             </button>
           </div>
         </div>
