@@ -29,9 +29,6 @@ const OrderView = () => {
   const user = useSelector((state: RootState) => state.roleSlice);
   const filters = useSelector((state: RootState) => state.setFilter);
 
-  // console.log(filters);
-  
-
   const role = user.role;
   let query;
 

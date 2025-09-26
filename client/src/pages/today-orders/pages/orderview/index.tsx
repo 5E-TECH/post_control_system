@@ -16,8 +16,6 @@ const OrderView = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
-  console.log(user.role);
-
   const { getOrderByMarket, getMarketsByMyNewOrders } = useOrder();
   const { createPost } = usePost();
   const { data, refetch } =
