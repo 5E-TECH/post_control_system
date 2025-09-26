@@ -9,7 +9,7 @@ const RegistratorSidebar = () => {
   const links = [
     { to: "/", icon: <House />, label: t("dashboard"), end: true },
     { to: "/orders", icon: <ShoppingBag />, label: t("orders") },
-    { to: "/history", icon: <History />, label: t("new_orders") },
+    { to: "/order/markets/new-orders", icon: <History />, label: t("new_orders") },
     { to: "/mails", icon: <MailOpen />, label: t("mails") },
     { to: "/payments", icon: <FileText />, label: t("products") },
   ];
