@@ -1,6 +1,5 @@
 import { Input, Select } from "antd";
 import { memo, useEffect, useState, type ChangeEvent } from "react";
-import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useDispatch, useSelector } from "react-redux";
 import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
@@ -34,12 +33,6 @@ const CustomerInfocomp = () => {
     label: item.name,
   }));
 
-  const { getDistricts } = useDistrict();
-  const { data: allDistricts } = getDistricts();
-  const districts = allDistricts?.data.map((item: any) => ({
-    value: item.id,
-    label: item.name,
-  }));
   // const [phoneNumber, setPhoneNumer] = useState<string>("");
 
   // const allNumbers = users
@@ -133,7 +126,9 @@ const CustomerInfocomp = () => {
         )} */}
         <div className="flex gap-4 max-[650px]:flex-col">
           <div className="flex-1">
-            <label className="block text-xs text-gray-500 mb-1">{t("customerForm.region")}</label>
+            <label className="block text-xs text-gray-500 mb-1">
+              {t("customerForm.region")}
+            </label>
             <Select
               value={formData.region_id}
               onChange={(value) => handleSelectChange("region_id", value)}
@@ -145,22 +140,24 @@ const CustomerInfocomp = () => {
           </div>
 
           <div className="flex-1">
-            <label className="block text-xs text-gray-500 mb-1">{t("customerForm.district")}</label>
+            <label className="block text-xs text-gray-500 mb-1">
+              {t("customerForm.district")}
+            </label>
             <Select
               value={formData.district_id}
               onChange={(value) => handleSelectChange("district_id", value)}
               placeholder={t("placeholder.selectDistrict")}
               className="w-full h-[45px]! custom-select-dropdown-bright"
-              options={
-                formData?.region_id ? specificDistrictsByRegion : districts
-              }
+              options={formData?.region_id ? specificDistrictsByRegion : null}
               dropdownClassName="dark-dropdown"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-1">{t("customerForm.name")}</label>
+          <label className="block text-xs text-gray-500 mb-1">
+            {t("customerForm.name")}
+          </label>
           <Input
             name="name"
             value={formData.name}
@@ -171,7 +168,9 @@ const CustomerInfocomp = () => {
         </div>
 
         <div className="pb-1">
-          <label className="block text-xs text-gray-500 mb-1">{t("customerForm.address")}</label>
+          <label className="block text-xs text-gray-500 mb-1">
+            {t("customerForm.address")}
+          </label>
           <Input
             name="address"
             value={formData.address}
