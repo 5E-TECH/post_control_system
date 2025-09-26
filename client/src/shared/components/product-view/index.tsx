@@ -89,7 +89,7 @@ const ProductView: FC<IProps> = ({ data }) => {
               </tr>
             </thead>
             <tbody>
-              {data?.map((item: any, inx: number) => (
+              {data?.data?.map((item: any, inx: number) => (
                 <tr
                   key={item?.id}
                   className="border-b border-gray-300 dark:border-gray-600"
