@@ -12,10 +12,11 @@ export const useDistrict = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getDistrictById = (id:string) =>
+  const getDistrictById = (id:string, enabled = true) =>
     useQuery({
       queryKey: [district],
       queryFn: () => api.get(`district/${id}`).then((res) => res.data),
+      enabled,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });

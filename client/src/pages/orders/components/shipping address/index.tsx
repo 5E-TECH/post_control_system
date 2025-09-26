@@ -19,10 +19,10 @@ const ShippingAddress: FC<IProps> = ({ address, districtId }) => {
 
   // district va regionlarni olish
   const { getDistrictById } = useDistrict();
-  const { data: districtData } = getDistrictById(districtId); // district detail
+  const { data: districtData } = getDistrictById(districtId, isShowPopup); // district detail
 
   const { getRegionsById, getRegions } = useRegion();
-  const { data: regionData } = getRegions(); // barcha viloyatlar
+  const { data: regionData } = getRegions(isShowPopup); // barcha viloyatlar
 
   // default viloyat (districtId orqali)
   const [selectedRegion, setSelectedRegion] = useState<string>(""); // viloyat
@@ -32,7 +32,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId }) => {
   const {
     data: districtByRegionId,
     refetch: refetchDistricts,
-  } = getRegionsById(selectedRegion);
+  } = getRegionsById(selectedRegion, isShowPopup);
 
   // 🔹 1 — districtId orqali regionni aniqlash va set qilish
   useEffect(() => {
