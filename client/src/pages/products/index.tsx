@@ -69,7 +69,8 @@ const Products = () => {
     role === "market"
       ? getMyProducts({ search: searchProduct })
       : getProducts({ search: searchProduct });
-
+  
+      console.log(productData?.data?.items)
   const { getMarkets } = useMarket();
 
   const { data } = getMarkets(role !== "market", { search: searchPopup });
@@ -218,7 +219,7 @@ const Products = () => {
       </div>
 
       <div>
-        <ProductView data={productData?.data?.data} />
+        <ProductView data={productData?.data?.data || productData?.data?.items} />
       </div>
     </div>
   );
