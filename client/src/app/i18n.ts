@@ -21,7 +21,7 @@ i18n
     // for all options read: https://www.i18next.com/overview/configuration-options
     .init({
         fallbackLng: 'uz',
-        debug: true,
+        debug: false,
         fallbackNS: ['header', 'sidebar', 'dashboard', 'history', 'login'],
         interpolation: {
             escapeValue: false, // not needed for react as it escapes by default

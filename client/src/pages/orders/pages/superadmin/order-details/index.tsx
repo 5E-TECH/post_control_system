@@ -2,8 +2,6 @@ import { memo } from "react";
 import Details from "../../../components/orderDetails";
 import ShippingAddress from "../../../components/shipping address";
 import CustomerDetail from "../../../components/customer detail";
-import { useParams } from "react-router-dom";
-import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 
 const OrderDetails = () => {
   const { id } = useParams();
@@ -12,7 +10,6 @@ const OrderDetails = () => {
 
   // Agar data hali kelmagan bo‘lsa loader
   if (!data) return <div className="text-center p-10">Loading...</div>;
-
   return (
     <div className="p-6 bg-white dark:bg-[#28243D]">
       <div className="flex items-center gap-4">

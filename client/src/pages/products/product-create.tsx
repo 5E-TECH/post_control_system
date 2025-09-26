@@ -12,19 +12,14 @@ import type { RootState } from "../../app/store";
 // }
 
 const ProductsCreate: FC = () => {
-  const {id} = useParams()
+  const { id } = useParams();
   // const location = useLocation();
-
-  console.log("createeeee",id);
-  
 
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { getMyProducts, getProductsByMarket } = useProduct();
   const { data } =
-    role === "market" ? getMyProducts() : getProductsByMarket(id);   
-    
-    
+    role === "market" ? getMyProducts() : getProductsByMarket(id);
 
   return (
     <section>
@@ -38,7 +33,7 @@ const ProductsCreate: FC = () => {
         </div>
         <div className="m-[24px]">
           <AddProduct />
-          <ProductView data={data?.data} />
+          <ProductView data={data?.data?.data} />
         </div>
       </div>
       <div></div>

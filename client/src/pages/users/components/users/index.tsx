@@ -1,8 +1,8 @@
 import {
   ChevronLeft,
   ChevronRight,
+  Edit,
   EllipsisVertical,
-  Eye,
   Trash,
 } from "lucide-react";
 import { memo, type FC } from "react";
@@ -68,7 +68,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
                   {inx + 1}
                 </td>
                 <td
-                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[901px]:w-full"
                   data-cell="NAME"
                 >
                   <div className="flex items-center gap-4">
@@ -80,7 +80,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
                   </div>
                 </td>
                 <td
-                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[901px]:w-full"
                   data-cell="PHONE"
                 >
                   <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
@@ -88,7 +88,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
                   </span>
                 </td>
                 <td
-                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                  className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[901px]:w-full"
                   data-cell="ROLE"
                 >
                   <div className="flex gap-2.5 items-center">
@@ -104,7 +104,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
 
                 {user?.status === "active" ? (
                   <td
-                    className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                    className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[901px]:w-full"
                     data-cell="STATUS"
                   >
                     <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
@@ -113,7 +113,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
                   </td>
                 ) : (
                   <td
-                    className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[900px]:w-full"
+                    className="data-cell w-[254px] h-[56px] pl-[20px] text-left max-[901px]:w-full"
                     data-cell="STATUS"
                   >
                     <span className="text-[#FFB400] font-normal text-[13px] px-[12px] py-[3px] bg-[#FFB40029] rounded-[100px]">
@@ -122,12 +122,12 @@ const UsersTableComp: FC<Props> = ({ data, isLoading }) => {
                   </td>
                 )}
                 <td
-                  className="data-cell w-[254px] h-[56px] pl-[19px] text-left max-[900px]:w-full"
+                  className="data-cell w-[254px] h-[56px] pl-[19px] text-left max-[901px]:w-full"
                   data-cell="ACTIONS"
                 >
                   <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
-                    <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
-                    <Eye className="w-[22px] h-[22px] ml-1 cursor-pointer hover:opacity-80" />
+                    <Trash className="w-[22px] h-[22px] cursor-pointer hover:opacity-80" />
+                    <Edit className="w-[22px] h-[22px] ml-1 cursor-pointer hover:opacity-80" />
                     <EllipsisVertical className="w-[22px] h-[22px] cursor-pointer hover:opacity-80" />
                   </div>
                 </td>

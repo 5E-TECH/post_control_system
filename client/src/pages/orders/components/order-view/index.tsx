@@ -28,9 +28,6 @@ const OrderView = () => {
   const { getOrders, getMarketsByMyNewOrders } = useOrder();
   const user = useSelector((state: RootState) => state.roleSlice);
   const filters = useSelector((state: RootState) => state.setFilter);
-
-  // console.log(filters);
-
   const role = user.role;
   let query;
 
@@ -51,6 +48,9 @@ const OrderView = () => {
   switch (role) {
     case "superadmin":
       query = getOrders({ page, limit, ...cleanedFilters });
+      break;
+    case "admin":
+      query = getOrders({ page, limit, ...filters });
       break;
     case "market":
       query = getMarketsByMyNewOrders({ page, limit, ...cleanedFilters });
@@ -183,7 +183,7 @@ const OrderView = () => {
                   </span>
                 </td>
                 <td
-                  className="data-cell pl-15 text-[#2E263DB2]"
+                  className="data-cell pl-15 text-[15px] text-[#2E263DB2]"
                   data-cell="STOCK"
                 >
                   {item?.items.length}

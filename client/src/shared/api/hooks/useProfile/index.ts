@@ -20,5 +20,8 @@ export const useProfile = () => {
       client.invalidateQueries({ queryKey: [user] });
     },
   });
+
+  
+
   return { getUser, updateProfil };
 };
