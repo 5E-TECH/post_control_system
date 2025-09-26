@@ -1673,6 +1673,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const orderIds = allOrders.map((o) => o.id);
 
+      if (orderIds.length === 0) {
+        return successRes(
+          {
+            totalOrders: 0,
+            soldOrders: 0,
+            canceledOrders: 0,
+            profit: 0,
+            successRate: 0,
+          },
+          200,
+          'Couriers stats',
+        );
+      }
+
       // 🔹 Shu marketning sotilgan orderlari
       const soldOrders = await this.orderRepo
         .createQueryBuilder('o')

@@ -188,6 +188,7 @@
     padding: 1rem 1rem;
     border-bottom: 1px solid #e5e7eb;
     color: #475569;
+    font-size: 14px;
   }
 
   td::before {

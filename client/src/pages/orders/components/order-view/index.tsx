@@ -174,7 +174,7 @@ const OrderView = () => {
                   </span>
                 </td>
                 <td
-                  className="data-cell pl-15 text-[#2E263DB2]"
+                  className="data-cell pl-15 text-[15px] text-[#2E263DB2]"
                   data-cell="STOCK"
                 >
                   {item?.items.length}
