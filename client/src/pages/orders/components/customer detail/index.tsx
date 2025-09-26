@@ -3,12 +3,13 @@ import avatar from "../../../../shared/assets/order/avatar.png";
 import cart from "../../../../shared/assets/order/cart.svg";
 import Popup from "../../../../shared/ui/Popup"; // sizda Popup bor edi
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
-import { useParams } from "react-router-dom";
+// import { useParams } from "react-router-dom";
 
 interface IProps {
   customer: {
     name: string;
     phone_number: string;
+    id: string;
   } | null;
 }
 
@@ -17,9 +18,8 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
 
   // popup state
   const [isShowPopup, setIsShowPopup] = useState(false);
-  const {updateOrders} = useOrder()
-  const { id } = useParams();
-
+  const { updateOrdersUserPhoneAndName } = useOrder();
+  // const { id } = useParams();
 
   // editable fields
   const [name, setName] = useState(customer.name);
@@ -35,11 +35,14 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
   // saqlash
   const handleSave = () => {
     const updatedCustomer = {
-      client_name:name,
+      client_name: name,
       client_phone_number: phoneNumber,
     };
 
-    updateOrders.mutate({id, data:updatedCustomer})
+    updateOrdersUserPhoneAndName.mutate({
+      id: customer.id,
+      data: updatedCustomer,
+    });
 
     console.log("Yuboriladigan ma'lumot:", updatedCustomer);
 

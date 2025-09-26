@@ -36,7 +36,7 @@ const OrderDetails = () => {
           </div>
 
           <div className="bg-white rounded-xl shadow p-6 dark:bg-[#312D4B]">
-            <ShippingAddress address={data?.data?.customer?.address} districtId={data?.data?.customer?.district_id} />
+            <ShippingAddress address={data?.data?.customer?.address} districtId={data?.data?.customer?.district_id} id={data?.data?.customer?.id} />
           </div>
         </div>
       </div>

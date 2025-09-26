@@ -74,6 +74,20 @@ export const useOrder = () => {
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
+  const updateOrdersUserAddress = useMutation({
+    mutationFn: ({ id, data }: { id: string | undefined; data: any }) =>
+      api.patch(`user/customer/address/${id}`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
+  const updateOrdersUserPhoneAndName = useMutation({
+    mutationFn: ({ id, data }: { id: string | undefined; data: any }) =>
+      api.patch(`user/customer/name-phone/${id}`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
   return {
     createOrder,
     updateOrders,
@@ -84,6 +98,8 @@ export const useOrder = () => {
     getCourierOrders,
     getMarketsByMyNewOrders,
     deleteOrders,
-    getOrderById
+    getOrderById,
+    updateOrdersUserAddress,
+    updateOrdersUserPhoneAndName
   };
 };
