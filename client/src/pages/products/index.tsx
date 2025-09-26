@@ -17,7 +17,6 @@ const Products = () => {
   const [searchProduct, setSearchProduct] = useState<any>(null);
   const [searchPopup, setSearchPopup] = useState<any>(null);
 
-
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
   useEffect(() => {
     if (role === "market") {
@@ -52,7 +51,6 @@ const Products = () => {
     []
   );
 
-
   const handleChange = (
     e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
   ) => {
@@ -74,7 +72,7 @@ const Products = () => {
 
   const { getMarkets } = useMarket();
 
-  const { data } = getMarkets(role !== "market",{search:searchPopup});
+  const { data } = getMarkets(role !== "market", { search: searchPopup });
 
   const { pathname } = useLocation();
 
@@ -85,8 +83,7 @@ const Products = () => {
   ));
 
   if (pathname.startsWith("/products/create")) return <Outlet />;
-  
-  console.log(data?.data?.data)
+
   return (
     <div className="mt-6 w-full">
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
