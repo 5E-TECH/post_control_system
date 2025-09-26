@@ -23,6 +23,9 @@ export class ProductEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true, name: 'image_url' })
   image_url: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  isDeleted: boolean;
+
   // Many Products → One User (Market owner)
   @ManyToOne(() => UserEntity, (user) => user.products, {
     onDelete: 'CASCADE',
