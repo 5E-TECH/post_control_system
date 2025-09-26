@@ -726,7 +726,10 @@ export class UserService {
     }
   }
 
-  async updateCustomer(id: string, updateCustomerDto: UpdateCustomerDto) {
+  async updateCustomerNamePhone(
+    id: string,
+    dto: UpdateCustomerDto,
+  ): Promise<Object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -734,23 +737,54 @@ export class UserService {
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id, role: Roles.CUSTOMER },
       });
-
       if (!customer) {
         throw new NotFoundException('Customer not found');
       }
-      const { market_id, name, phone_number, district_id, address } =
-        updateCustomerDto;
 
-      if (market_id) {
-        const isRelatedToMarket = await queryRunner.manager.find(
-          CustomerMarketEntity,
-          {
-            where: { market_id },
-          },
-        );
-        if (isRelatedToMarket.length > 1) {
-        }
+      if (dto.name) customer.name = dto.name;
+      if (dto.phone_number) customer.phone_number = dto.phone_number;
+
+      await queryRunner.manager.save(customer);
+
+      await queryRunner.commitTransaction();
+      return successRes(customer, 200, 'Customer updated (name/phone)');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async updateCustomerAddress(
+    id: string,
+    dto: UpdateCustomerDto,
+  ): Promise<Object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id, role: Roles.CUSTOMER },
+      });
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
       }
+
+      if (dto.district_id) {
+        const district = await queryRunner.manager.findOne(DistrictEntity, {
+          where: { id: dto.district_id },
+        });
+        if (!district) throw new NotFoundException('District not found');
+        customer.district_id = dto.district_id;
+      }
+
+      if (dto.address) customer.address = dto.address;
+
+      await queryRunner.manager.save(customer);
+
+      await queryRunner.commitTransaction();
+      return successRes(customer, 200, 'Customer updated (district/address)');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
