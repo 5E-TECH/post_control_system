@@ -85,7 +85,8 @@ const Products = () => {
   ));
 
   if (pathname.startsWith("/products/create")) return <Outlet />;
-
+  
+  console.log(data?.data?.data)
   return (
     <div className="mt-6 w-full">
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
