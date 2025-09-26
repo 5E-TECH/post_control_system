@@ -79,12 +79,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     marketId?: string;
     regionId?: string;
     search?: string;
+    startDate?: string; // frontdan "2025-09-01" yoki "2025-09-01T00:00:00"
+    endDate?: string; // frontdan "2025-09-25" yoki "2025-09-25T23:59:59"
     page?: number;
     limit?: number;
   }) {
-    this.logger.log('TEST: receiveNewOrders called', 'OrderService');
-    this.logger.warn('TEST warning', 'OrderService');
-    this.logger.error('TEST error', 'stacktrace sample', 'OrderService');
     try {
       const qb = this.orderRepo
         .createQueryBuilder('order')
@@ -112,6 +111,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
           { search: `%${query.search}%` },
         );
+      }
+
+      // ✅ Sana filter (frontdan kelgan string → millisekund)
+      let startMs: number | undefined;
+      let endMs: number | undefined;
+
+      if (query.startDate) {
+        startMs = new Date(query.startDate).getTime(); // string → ms
+      }
+      if (query.endDate) {
+        endMs = new Date(query.endDate).getTime();
+      }
+
+      if (startMs && endMs) {
+        qb.andWhere('order.created_at BETWEEN :startDate AND :endDate', {
+          startDate: startMs,
+          endDate: endMs,
+        });
+      } else if (startMs) {
+        qb.andWhere('order.created_at >= :startDate', { startDate: startMs });
+      } else if (endMs) {
+        qb.andWhere('order.created_at <= :endDate', { endDate: endMs });
       }
 
       const page = query.page ? Number(query.page) : 1;
@@ -364,7 +385,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async findOne(id: string) {
     try {
-      const newOrder = await this.orderRepo.findOne({ where: { id } });
+      const newOrder = await this.orderRepo.findOne({
+        where: { id },
+        relations: ['items', 'items.product', 'market', 'customer'],
+      });
       if (!newOrder) {
         throw new NotFoundException('Order not found');
       }

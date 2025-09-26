@@ -1,0 +1,20 @@
+{
+    "title": "Buyurtmalar ro'yxati",
+    "noPermission": "Ruxsat yo‘q 🚫",
+    "placeholder": {
+        "selectMarket": "Marketni tanlang",
+        "selectRegion": "Hududni tanlang",
+        "selectStatus": "Holatni tanlang",
+        "searchOrder": "Buyurtmani qidiring"
+    },
+    "button": {
+        "addOrder": "Buyurtma qo'shish"
+    },
+    "customer": "MIJOZ",
+    "phone": "TELEFON",
+    "address": "MANZIL",
+    "market": "MARKET",
+    "status": "HOLAT",
+    "price": "NARX",
+    "stock": "OMBOR"
+}

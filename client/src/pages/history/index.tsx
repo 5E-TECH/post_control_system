@@ -70,7 +70,7 @@ const Dashboard: React.FC = () => {
   const chartMax = maxValue * 1.2;
 
   return (
-    <div className="w-full p-8 space-y-10 max-h-[100vh]">
+    <div className="w-full p-8  max-h-[100vh]">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left side */}
         <div className="space-y-6">
@@ -80,12 +80,17 @@ const Dashboard: React.FC = () => {
               <SkeletonBox className="w-40 h-10 mx-auto" />
             ) : (
               <>
-                <h2 className="text-lg font-medium text-gray-600 mb-2 dark:text-white">
-                  {t("current_situation")}
+                <h2
+                  className={`text-lg font-medium mb-2 ${
+                    bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                   {t("current_situation")}
                 </h2>
                 <div
-                  className={`text-4xl font-bold ${bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
-                    }`}
+                  className={`text-4xl font-bold ${
+                    bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
                 >
                   {Number(bugungiHolat).toLocaleString()} UZS
                 </div>
@@ -153,8 +158,9 @@ const Dashboard: React.FC = () => {
                         {t("balans")}
                       </div>
                       <div
-                        className={`text-2xl font-bold ${balans >= 0 ? "text-green-600" : "text-red-600"
-                          }`}
+                        className={`text-2xl font-bold ${
+                          balans >= 0 ? "text-green-600" : "text-red-600"
+                        }`}
                       >
                         {Number(balans).toLocaleString()} UZS
                       </div>
@@ -164,7 +170,7 @@ const Dashboard: React.FC = () => {
                         {t("kassa")}
                       </div>
                       <div className="text-2xl font-bold text-green-600">
-                        {String(kassa).toLocaleString()} UZS
+                        {Number(kassa).toLocaleString()} UZS
                       </div>
                     </div>
                   </div>
@@ -206,21 +212,21 @@ const Dashboard: React.FC = () => {
                       <tbody>
                         {markets?.map((m: any, idx: number) => (
                           <tr key={idx} className="border-b border-gray-200">
-                            <td className="p-3 font-semibold text-gray-600 dark:text-white">
+                            <td
+                              className="data-cell p-3 font-semibold text-gray-600 dark:text-white"
+                              data-cell="NAME"
+                            >
                               {m.name}
                             </td>
                             <td
-                              className={`p-3 text-right font-bold ${m.amount < 0 || m.amount == 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                                }`}
+                              className={`data-cell p-3 min-[901px]:text-right font-bold ${
+                                m.amount < 0 || m.amount == 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                              data-cell="TOTAL"
                             >
-                              {m.amount > 0
-                                ? `-${m.amount.toLocaleString()}`
-                                : m.amount < 0
-                                  ? `+${Math.abs(m.amount).toLocaleString()}`
-                                  : m.amount.toLocaleString()}
-                              UZS
+                              {Number(m.amount).toLocaleString()} UZS
                             </td>
                           </tr>
                         ))}
@@ -229,10 +235,11 @@ const Dashboard: React.FC = () => {
                         <tr>
                           <td className="p-3 font-bold">{t("total")}</td>
                           <td
-                            className={`p-3 text-right font-bold ${totalMarket >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                              }`}
+                            className={`p-3 text-right font-bold ${
+                              totalMarket >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
                           >
                             {Number(totalMarket).toLocaleString()} UZS
                           </td>
@@ -267,8 +274,11 @@ const Dashboard: React.FC = () => {
                       </thead>
                       <tbody>
                         {couriers?.map((c: any, idx: number) => (
-                          <tr key={idx} className="border-b border-gray-200">
-                            <td className="p-3">
+                          <tr
+                            key={idx}
+                            className="border-b border-gray-200"
+                          >
+                            <td className="data-cell p-3" data-cell="NAME">
                               <div className="font-semibold text-gray-600 dark:text-white">
                                 {c.name}
                               </div>
@@ -277,10 +287,12 @@ const Dashboard: React.FC = () => {
                               </div>
                             </td>
                             <td
-                              className={`p-3 text-right font-bold ${c.amount >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                                }`}
+                              className={`data-cell p-3 min-[901px]:text-right font-bold ${
+                                c.amount >= 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                              data-cell="TOTAL"
                             >
                               {Number(c.amount).toLocaleString()} UZS
                             </td>
@@ -291,10 +303,11 @@ const Dashboard: React.FC = () => {
                         <tr>
                           <td className="p-3 font-bold">{t("total")}</td>
                           <td
-                            className={`p-3 text-right font-bold ${totalCourier >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                              }`}
+                            className={`p-3 text-right font-bold ${
+                              totalCourier >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
                           >
                             {Number(totalCourier).toLocaleString()} UZS
                           </td>
@@ -313,12 +326,17 @@ const Dashboard: React.FC = () => {
               <SkeletonBox className="w-40 h-10 mx-auto" />
             ) : (
               <div className="text-center">
-                <h4 className="text-lg font-medium text-gray-600 mb-2 dark:text-white">
-                  {t("totalBalans")}
+                <h4
+                  className={`text-lg font-medium mb-2 ${
+                    balans >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                   {t("totalBalans")}
                 </h4>
                 <div
-                  className={`text-3xl font-bold ${balans >= 0 ? "text-green-600" : "text-red-600"
-                    }`}
+                  className={`text-3xl font-bold ${
+                    balans >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
                 >
                   {Number(balans).toLocaleString()} UZS
                 </div>

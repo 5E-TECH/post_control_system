@@ -1,0 +1,75 @@
+{
+    "orderForm": {
+        "incompleteOrderData": "Buyurtma ma'lumotlari to'liq emas",
+        "fillAllFields": "Iltimos, buyurtmadagi barcha maydonlarni to'ldiring"
+    },
+    "productForm": {
+        "incompleteProductData": "Mahsulot ma'lumotlari to'liq emas",
+        "fillAllFields": "Iltimos, mahsulotning barcha maydonlarini kiriting"
+    },
+    "process": "Jarayon",
+    "step": {
+        "one": {
+            "title": "Marketni tanlang",
+            "description": "Iltimos, marketni tanlang"
+        },
+        "two": {
+            "title": "Mijoz ma'lumotlari",
+            "description": "Mijoz ma'lumotlarini kiriting"
+        },
+        "three": {
+            "title": "Buyurtma tafsilotlari",
+            "description": "Buyurtma tafsilotlarini qo'shish"
+        }
+    },
+    "chooseMarket": "Market tanlang",
+    "marketName": "MARKET NOMI",
+    "phoneNumber": "TELEFON RAQAMI",
+    "rowsPerPage": "Sahifada qatorlar:",
+    "next": "Keyingi",
+    "discard": "Bekor qilish",
+    "createOrder": "Buyurtma yaratish",
+    "customerInfo": "Mijoz ma'lumotlari",
+    "customerForm": {
+        "region": "Viloyat",
+        "district": "Tuman",
+        "name": "Ism",
+        "address": "Manzil"
+    },
+    "placeholder": {
+        "selectRegion": "Viloyatni tanlang",
+        "selectDistrict": "Tumanni tanlang",
+        "name": "Ism kiriting",
+        "address": "Manzil kiriting"
+    },
+    "customerDetails": {
+        "title": "Mening buyurtmalarim",
+        "table": {
+            "customerName": "Ismi",
+            "phoneNumber": "Telefon raqami",
+            "district": "Tumani",
+            "total": "Summa",
+            "comment": "Izoh"
+        }
+    },
+    "orderItems": {
+        "title": "Buyurtma mahsulotlari",
+        "item": "Mahsulot",
+        "selectProduct": "Mahsulotni tanlang yoki kiriting",
+        "quantity": "Miqdor",
+        "addAnotherItem": "Mahsulot qo'shish"
+    },
+    "productInfo": {
+        "title": "Mahsulot haqida ma'lumot",
+        "totalPrice": "Umumiy summa",
+        "totalPricePlaceholder": "Umumiy summa",
+        "whereDeliver": "Yetkazib berish",
+        "whereDeliverPlaceholder": "Yetkazib berish joyini tanlang",
+        "whereDeliverCenter": "Markaz",
+        "whereDeliverAddress": "Manzil",
+        "comment": "Izoh (ixtiyoriy)",
+        "commentPlaceholder": "Hisobingizni xavfsizligini tasdiqlash bosqichi bilan saqlang"
+    },
+    "noComment": "Izoh mavjud emas"
+
+}

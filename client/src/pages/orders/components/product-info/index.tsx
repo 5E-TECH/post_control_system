@@ -3,6 +3,7 @@ import { memo, useEffect, useState, type ChangeEvent } from "react";
 import { setProductInfo } from "../../../../shared/lib/features/customer_and_market-id";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { useTranslation } from "react-i18next";
 
 export interface IProductInfo {
   total_price: number | string;
@@ -17,6 +18,7 @@ const initialState: IProductInfo = {
 };
 
 const ProductInfo = () => {
+  const { t } = useTranslation("createOrder");
   const [formData, setFormData] = useState<IProductInfo>(initialState);
 
   const handleChange = (
@@ -57,14 +59,14 @@ const ProductInfo = () => {
       <div className="">
         <div className="px-5 pt-6 pb-3">
           <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#CBC7E1]">
-            Product Information
+            {t("productInfo.title")}
           </h1>
         </div>
 
         <div className="flex gap-5 px-5">
-          <div className="flex flex-col">
+          <div className="flex flex-col w-1/2">
             <span className="font-normal text-[14px] text-[#2E263DB2] dark:text-[#B1ADC7]">
-              Umumiy summa
+              {t("productInfo.totalPrice")}
             </span>
             <Form.Item className="!mt-1">
               <Input
@@ -86,28 +88,28 @@ const ProductInfo = () => {
                   } as any);
                 }}
                 type="text"
-                placeholder="Total Price"
-                className="!w-[639px] !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! 
+                placeholder={t("productInfo.totalPricePlaceholder")}
+                className="!h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! 
          dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
               />
             </Form.Item>
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col w-1/2">
             <span className="font-normal text-[14px] text-[#2E263DB2] dark:text-[#B1ADC7]">
-              Yetkazib berish
+              {t("productInfo.whereDeliver")}
             </span>
             <Form.Item className="!mt-1">
               <Select
                 value={formData.where_deliver}
                 onChange={(value) => handleSelectChange("where_deliver", value)}
-                placeholder="Select delivery place"
-                className="!w-[639px] !h-[48px] custom-select-dropdown-bright"
+                placeholder={t("productInfo.whereDeliverPlaceholder")}
+                className="!h-[48px] custom-select-dropdown-bright"
                 defaultValue={"center"}
                 dropdownClassName="dark-dropdown"
               >
-                <Select.Option value="center">center</Select.Option>
-                <Select.Option value="address">address</Select.Option>
+                <Select.Option value="center">{t("productInfo.whereDeliverCenter")}</Select.Option>
+                <Select.Option value="address">{t("productInfo.whereDeliverAddress")}</Select.Option>
               </Select>
             </Form.Item>
           </div>
@@ -115,15 +117,15 @@ const ProductInfo = () => {
 
         <div className="px-5 pb-1.5">
           <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
-            Izoh (ixtiyoriy)
+            {t("productInfo.comment")}
           </span>
           <Form.Item className="!mt-1">
             <Input.TextArea
               name="comment"
               value={formData.comment}
               onChange={handleChange}
-              className="!flex-1 !pb-[150px] !pt-3 !pl-4 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
-              placeholder="Keep your account secure with authentication step"
+              className="!pb-[150px] !pt-3 !pl-4 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
+              placeholder={t("productInfo.commentPlaceholder")}
             />
           </Form.Item>
         </div>

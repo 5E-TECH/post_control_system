@@ -8,14 +8,15 @@ import { useProduct } from "../../shared/api/hooks/useProduct";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { debounce } from "../../shared/helpers/DebounceFunc";
+import Select from "../orders/components/select/select";
+import { marketlar } from "../../shared/static/order";
 
 const Products = () => {
   const [showMarket, setShowMarket] = useState(false);
   const [select, setSelect] = useState<string | null>("");
   const [searchProduct, setSearchProduct] = useState<any>(null);
+  const [searchPopup, setSearchPopup] = useState<any>(null);
 
-  console.log("search input   ",searchProduct);
-  
 
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
   useEffect(() => {
@@ -26,6 +27,15 @@ const Products = () => {
 
   const navigate = useNavigate();
 
+  const [form, setForm] = useState({
+    market: "",
+    region: "",
+    status: "",
+    from: "",
+    to: "",
+    order: "",
+  });
+
   const debouncedSearch = useMemo(
     () =>
       debounce((value: string) => {
@@ -34,6 +44,21 @@ const Products = () => {
     []
   );
 
+  const popupDebouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSearchPopup(value);
+      }, 800),
+    []
+  );
+
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleNavigate = () => {
     navigate(`create/${select}`);
@@ -43,107 +68,157 @@ const Products = () => {
 
   const { getProducts, getMyProducts } = useProduct();
   const { data: productData } =
-    role === "market" ? getMyProducts({ search: searchProduct }) : getProducts({ search: searchProduct });
+    role === "market"
+      ? getMyProducts({ search: searchProduct })
+      : getProducts({ search: searchProduct });
 
   const { getMarkets } = useMarket();
 
-  const { data } = getMarkets(role !== "market");
+  const { data } = getMarkets(role !== "market",{search:searchPopup});
 
   const { pathname } = useLocation();
 
+  const marketOptions = marketlar?.map((item: any) => (
+    <option key={item.value} value={item.value}>
+      {item.label}
+    </option>
+  ));
+
   if (pathname.startsWith("/products/create")) return <Outlet />;
+
   return (
-    <div className="mt-6">
+    <div className="mt-6 w-full">
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
-      <div className="flex flex-col md:flex-row gap-3 md:gap-0 md:items-center md:justify-between px-4">
-        <input
-          onChange={(e) => debouncedSearch(e.target.value)}
-          className="rounded-[7px] w-full md:w-[280px] h-[40px] border border-[#2E263D38] px-3"
-          placeholder="Search"
-          type="text"
-        />
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (role === "market") {
-                handleNavigate();
-              } else {
-                setShowMarket(true);
-              }
-            }}
-            className="px-4 py-2 bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
-          >
-            <FilePlus size={18} />
-            Mahsulot qo'shish
-          </button>
-          <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
-            <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d] relative">
-              <button
-                onClick={() => setShowMarket(false)}
-                className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
-              >
-                <X size={30} />
-              </button>
-              <h1 className="font-bold text-left pt-8">Choose Market</h1>
-              <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
-                <input
-                  type="text"
-                  placeholder="Search order..."
-                  className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
-                />
-                <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
-              </div>
-              <div className="max-h-[520px] overflow-y-auto">
-                <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto cursor-pointer">
-                  <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
-                    <tr>
-                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                        <div className="flex items-center justify-between pr-[21px]">
-                          # ID
-                          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                        </div>
-                      </th>
-                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                        <div className="flex items-center justify-between pr-[21px]">
-                          MARKET NAME
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
+      {/* Filter va Add product qismi */}
 
-                  <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                    {data?.data?.data &&
-                      Array.isArray(data?.data?.data) &&
-                      data?.data?.data?.map((item: any, inx: number) => (
+      <div className="flex flex-col px-4">
+        <div className="flex justify-between max-[1100px]:flex-col max-[1100px]:gap-4">
+          <div className="">
+            <Select
+              name="market"
+              value={form.market}
+              onChange={handleChange}
+              placeholder="Marketni tanlang"
+              className="min-[1100px]:w-[250px] max-[1100px]:w-[250px] max-[800px]:w-full"
+            >
+              {marketOptions}
+            </Select>
+          </div>
+          <div className="flex gap-5 min-[800px]:items-center max-[800px]:flex-col">
+            <div className="relative w-full min-[1100px]:w-[280px] max-[1100px]:w-[280px] max-[800px]:w-full">
+              <input
+                onChange={(e) => debouncedSearch(e.target.value)}
+                className="rounded-[7px] w-full h-[40px] border border-[#2E263D38] px-3 pr-10"
+                placeholder="Search..."
+                type="text"
+              />
+              <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
+            </div>
+            <button
+              onClick={() => {
+                if (role === "market") {
+                  handleNavigate();
+                } else {
+                  setShowMarket(true);
+                }
+              }}
+              className="px-4 py-2 bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
+            >
+              <FilePlus size={18} />
+              Mahsulot qo'shish
+            </button>
+          </div>
+        </div>
+
+        {/* Popup */}
+        <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
+          <div className="bg-white rounded-md w-[500px] h-[700px] px-6 dark:bg-[#28243d] relative">
+            {/* Close button */}
+            <button
+              onClick={() => setShowMarket(false)}
+              className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
+            >
+              <X size={30} />
+            </button>
+
+            {/* Title */}
+            <h1 className="font-bold text-left pt-8 text-[#2E263D] dark:text-white">
+              Choose Market
+            </h1>
+
+            {/* Search input */}
+            <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
+              <input
+                type="text"
+                placeholder="Search market..."
+                onChange={(e) => popupDebouncedSearch(e.target.value)}
+                className="w-full bg-transparent font-normal text-[15px] outline-none 
+           text-[#2E263D] dark:text-white 
+           placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
+              />
+              <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
+            </div>
+
+            {/* Table with scroll */}
+            <div className="max-h-[520px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D] rounded-md">
+              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 cursor-pointer">
+                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB] sticky top-0 z-10">
+                  <tr>
+                    {/* ✅ Tartib raqam */}
+                    <th className="h-[56px] w-[70px] font-semibold text-[16px] text-left px-4 text-[#2E263D] dark:text-white">
+                      №
+                    </th>
+                    {/* ✅ Market nomi */}
+                    <th className="h-[56px] font-semibold text-[16px] text-left px-4 text-[#2E263D] dark:text-white">
+                      MARKET NAME
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="text-[16px] font-medium text-[#2E263D] dark:text-[#E7E3FC] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
+                  {data?.data?.data &&
+                    Array.isArray(data?.data?.data) &&
+                    data?.data?.data?.map((item: any, index: number) => {
+                      const isSelected = item.id === select;
+                      return (
                         <tr
                           key={item?.id}
-                          onClick={() => setSelect(item?.id)}
-                          className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                            item.id == select ? "bg-gray-100" : ""
-                          }`}
+                          onClick={() => setSelect(isSelected ? null : item.id)}
+                          className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FC1F] 
+                     hover:bg-blue-100 dark:hover:bg-[#3d3759] transition-colors
+                     ${isSelected ? "bg-blue-200 dark:bg-[#524B6C]" : ""}`}
                         >
-                          <td className="text-[#8C57FF] pr-10 py-3">
-                            {inx + 1}
+                          {/* ✅ 1 2 3 4 raqamlar chiqadi */}
+                          <td className="py-3 px-4">{index + 1}</td>
+                          <td className="py-3 px-4 font-semibold">
+                            {item?.name}
                           </td>
-                          <td className="pr-26 py-3">{item?.name}</td>
                         </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="absolute bottom-4 right-4">
-                <button
-                  onClick={() => handleNavigate()}
-                  className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
-                >
-                  Tanlash
-                </button>
-              </div>
+                      );
+                    })}
+                </tbody>
+              </table>
             </div>
-          </Popup>
-        </div>
+
+            {/* Footer with button */}
+            <div className="absolute bottom-4 right-4">
+              <button
+                onClick={() => handleNavigate()}
+                disabled={!select}
+                className={`px-3 py-1.5 text-[16px] rounded-md cursor-pointer 
+          ${
+            select
+              ? "bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white"
+              : "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
+          }`}
+              >
+                Tanlash
+              </button>
+            </div>
+          </div>
+        </Popup>
       </div>
+
       <div>
         <ProductView data={productData?.data?.items} />
       </div>

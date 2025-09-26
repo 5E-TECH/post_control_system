@@ -55,6 +55,18 @@ export class OrderController {
   @ApiQuery({ name: 'marketId', required: false })
   @ApiQuery({ name: 'regionId', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    example: '2025-09-01 yoki 2025-09-01T00:00:00',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    example: '2025-09-01 yoki 2025-09-01T00:00:00',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Orders list' })
@@ -68,6 +80,8 @@ export class OrderController {
     @Query('marketId') marketId?: string,
     @Query('regionId') regionId?: string,
     @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
@@ -76,6 +90,8 @@ export class OrderController {
       marketId,
       regionId,
       search,
+      startDate,
+      endDate,
       page,
       limit,
     });
@@ -129,7 +145,7 @@ export class OrderController {
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.orderService.findOneById(id);
+    return this.orderService.findOne(id);
   }
 
   // Get my orders Market yoki Kurier uchun

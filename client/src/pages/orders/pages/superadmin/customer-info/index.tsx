@@ -9,10 +9,12 @@ import { useUser } from "../../../../../shared/api/hooks/useRegister";
 import CustomerInfo, { initialState } from "../../../components/customer-info";
 import CustomerDetails from "../../../components/customer-details";
 import { setCustomerData } from "../../../../../shared/lib/features/customer_and_market-id";
+import { useTranslation } from "react-i18next";
 
 const Context = createContext({ name: "Default" });
 
 const CustomerInfoOrder = () => {
+  const { t } = useTranslation("createOrder");
   const { pathname } = useLocation();
 
   if (pathname.startsWith("/orders/confirm")) {
@@ -68,10 +70,10 @@ const CustomerInfoOrder = () => {
   return (
     <Context.Provider value={contextValue}>
       {contextHolder}
-      <div className="flex gap-6 px-6 pt-6">
+      <div className="flex gap-6 px-6 pt-6 max-[1100px]:flex-col max-[1100px]:gap-10">
         <div className="w-fit h-fit pr-[81px]">
           <h1 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#D4D0E9]">
-            Process
+            {t("process")}
           </h1>
 
           <div className="flex items-center gap-2 mt-4">
@@ -104,10 +106,10 @@ const CustomerInfoOrder = () => {
 
             <div className="flex flex-col">
               <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
-                Customer Info
+                {t("step.two.title")}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2] text-nowrap">
-                Setup information
+                {t("step.two.description")}
               </span>
             </div>
           </div>
@@ -121,10 +123,10 @@ const CustomerInfoOrder = () => {
 
             <div className="flex flex-col">
               <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5]">
-                Order details
+                {t("step.three.title")}
               </span>
               <span className="font-normal text-[#2E263DB2] text-[13px] dark:text-[#AEAAC2]">
-                Add order details
+                {t("step.three.description")}
               </span>
             </div>
           </div>
@@ -137,7 +139,7 @@ const CustomerInfoOrder = () => {
               onClick={handleDiscard}
               className="w-[91px]! h-[38px]! bg-[#F4F5FA]! border! border-[#8A8D93]! text-[#8A8D93]! hover:opacity-80! dark:bg-[#28243D]!"
             >
-              Discard
+              {t("discard")}
             </Button>
             <Button
               disabled={createUser.isPending}
@@ -145,7 +147,7 @@ const CustomerInfoOrder = () => {
               onClick={handleClick}
               className="w-[91px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
             >
-              Next
+              {t("next")}
               <ArrowRight className="h-[13px] w-[13px]" />
             </Button>
           </div>

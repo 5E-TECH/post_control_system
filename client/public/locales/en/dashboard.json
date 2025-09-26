@@ -1,7 +1,6 @@
 {
     "title": "Today's Statistics",
-    "startDate": "Start Date",
-    "endDate": "End Date",
+    "dateRange": "Date Range",
     "totalOrders": "Total Orders",
     "solded": "Sold",
     "cancelled": "Cancelled",

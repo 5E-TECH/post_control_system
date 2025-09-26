@@ -52,8 +52,8 @@ const CashboxHistoryComponent: React.FC<Props> = ({
             </div>
             <div>
               <strong
-                className={`text-[#068822] dark:text-green-500 text-[25px] ${
-                  item?.operation_type == "expense" ? "text-red-500" : ""
+                className={` text-[25px] ${
+                  item?.operation_type == "expense" ? "text-red-500" : "text-[#068822] dark:text-green-500"
                 }`}
               >
                 {item?.operation_type == "expense" ? "-" : "+"}{" "}

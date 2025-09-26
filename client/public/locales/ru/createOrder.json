@@ -1,0 +1,75 @@
+{
+    "orderForm": {
+        "incompleteOrderData": "Данные заказа неполные",
+        "fillAllFields": "Пожалуйста, заполните все поля заказа"
+    },
+    "productForm": {
+        "incompleteProductData": "Данные продукта неполные",
+        "fillAllFields": "Пожалуйста, заполните все поля продукта"
+    },
+    "process": "Процесс",
+    "step": {
+        "one": {
+            "title": "Выберите mаркет",
+            "description": "Пожалуйста, выберите mаркет"
+        },
+        "two": {
+            "title": "Информация о клиенте",
+            "description": "Введите информацию о клиенте"
+        },
+        "three": {
+            "title": "Детали заказа",
+            "description": "Добавить детали заказа"
+        }
+    },
+    "chooseMarket": "Выберите mаркет",
+    "marketName": "НАЗВАНИЕ MАРКЕТА",
+    "phoneNumber": "НОМЕР ТЕЛЕФОНА",
+    "rowsPerPage": "Строк на странице:",
+    "next": "Далее",
+    "discard": "Отменить",
+    "createOrder": "Создать заказ",
+    "customerInfo": "Информация о клиенте",
+    "customerForm": {
+        "region": "Регион",
+        "district": "Район",
+        "name": "Имя",
+        "address": "Адрес"
+    },
+    "placeholder": {
+        "selectRegion": "Выберите регион",
+        "selectDistrict": "Выберите район",
+        "name": "Введите имя",
+        "address": "Введите адрес"
+    },
+    "customerDetails": {
+        "title": "Мои заказы",
+        "table": {
+            "customerName": "Имя",
+            "phoneNumber": "Номер телефона",
+            "district": "Район",
+            "total": "Сумма",
+            "comment": "Комментарий"
+        }
+    },
+    "orderItems": {
+        "title": "Товары заказа",
+        "item": "Товар",
+        "selectProduct": "Выберите или введите товар",
+        "quantity": "Количество",
+        "addAnotherItem": "Добавить товар"
+    },
+    "productInfo": {
+        "title": "Информация о продукте",
+        "totalPrice": "Общая сумма",
+        "totalPricePlaceholder": "Общая сумма",
+        "whereDeliver": "Место доставки",
+        "whereDeliverPlaceholder": "Выберите место доставки",
+        "whereDeliverCenter": "центр",
+        "whereDeliverAddress": "адрес",
+        "comment": "Комментарий",
+        "commentPlaceholder": "Введите комментарий (необязательно)"
+    },
+    "noComment": "Комментарий недоступен"
+
+}

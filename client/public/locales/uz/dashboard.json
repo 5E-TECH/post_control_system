@@ -1,7 +1,6 @@
 {
     "title": "Bugungi statistika",
-    "startDate": "Boshlanish sanasi",
-    "endDate": "Tugash sanasi",
+    "dateRange": "Sana oralig‘i",
     "totalOrders": "Jami buyurtmalar",
     "solded": "Sotilgan",
     "cancelled": "Bekor qilinganlar",

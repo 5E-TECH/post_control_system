@@ -1,0 +1,74 @@
+{
+    "orderForm": {
+        "incompleteOrderData": "Order data is incomplete",
+        "fillAllFields": "Please fill in all order fields"
+    },
+    "productForm": {
+        "incompleteProductData": "Product data is incomplete",
+        "fillAllFields": "Please fill in all product fields"
+    },
+    "process": "Process",
+    "step": {
+        "one": {
+            "title": "Choose market",
+            "description": "Please choose a market"
+        },
+        "two": {
+            "title": "Customer Info",
+            "description": "Enter customer information"
+        },
+        "three": {
+            "title": "Order details",
+            "description": "Add order details"
+        }
+    },
+    "chooseMarket": "Choose Market",
+    "marketName": "MARKET NAME",
+    "phoneNumber": "PHONE NUMBER",
+    "rowsPerPage": "Rows per page:",
+    "next": "Next",
+    "discard": "Discard",
+    "createOrder": "Create Order",
+    "customerInfo": "Customer Info",
+    "customerForm": {
+        "region": "Region",
+        "district": "District",
+        "name": "Name",
+        "address": "Address"
+    },
+    "placeholder": {
+        "selectRegion": "Select Region",
+        "selectDistrict": "Select District",
+        "name": "Enter Name",
+        "address": "Enter Address"
+    },
+    "customerDetails": {
+        "title": "My Orders",
+        "table": {
+            "customerName": "Name",
+            "phoneNumber": "Phone Number",
+            "district": "District",
+            "total": "Total",
+            "comment": "Comment"
+        }
+    },
+    "orderItems": {
+        "title": "Order Items",
+        "item": "Item",
+        "selectProduct": "Select or type item",
+        "quantity": "Quantity",
+        "addAnotherItem": "Add Another Item"
+    },
+    "productInfo": {
+        "title": "Product Information",
+        "totalPrice": "Total Price",
+        "totalPricePlaceholder": "Total Price",
+        "whereDeliver": "Where to deliver",
+        "whereDeliverPlaceholder": "Select delivery place",
+        "whereDeliverCenter": "center",
+        "whereDeliverAddress": "address",
+        "comment": "Comment (optional)",
+        "commentPlaceholder": "Keep your account secure with authentication step"
+    },
+    "noComment": "No comment available"
+}

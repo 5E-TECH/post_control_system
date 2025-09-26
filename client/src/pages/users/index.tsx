@@ -4,8 +4,10 @@ import Select from "./components/select";
 import SearchInput from "./components/search-input";
 import Button from "./components/button";
 import { Outlet, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const Users = () => {
+  const { t } = useTranslation("users");
   const { pathname } = useLocation();
 
   const isChecked = pathname.startsWith("/all-users/create-user");
@@ -17,24 +19,27 @@ const Users = () => {
       <UsersStatistics />
       <div className="rounded-md mt-6 bg-[#FFFFFF] shadow-lg flex flex-col dark:bg-[#312D4B] pt-[20px]">
         <div className="pl-[20px] pr-[20px]">
-          <span className="text-[18px]">Filters</span>
+          <span className="text-[18px]">{t("filters")}</span>
         </div>
 
         <div className="grid grid-cols-3 gap-5 pt-[16px] pl-[20px] pr-[20px] max-[1000px]:grid-cols-2 max-[750px]:grid-cols-1">
-          <Select text="Select Role" />
-          <Select text="Select Location" />
-          <Select text="Select Status" />
+          <Select text={t("selectRole")} />
+          <Select text={t("selectLocation")} />
+          <Select text={t("selectStatus")} />
         </div>
 
         <div className="w-full border border-[#E9E8EA] my-[20px] dark:border-[#E7E3FC38]"></div>
 
         <div
           className="flex flex-wrap items-center justify-end pl-[20px] pr-[20px] 
-                max-[900px]:gap-5 max-[900px]:w-full"
+                max-[900px]:gap-5 w-full"
         >
-          <div className="flex gap-4 flex-wrap justify-end max-[900px]:justify-center w-full">
-            <SearchInput placeholder="Search User" />
-            <Button text="Add New User" />
+          <div className="flex flex-wrap justify-end gap-4 max-[900px]:flex-col max-[900px]:items-stretch w-full">
+            <SearchInput
+              placeholder={t("searchUser")}
+              className="max-[900px]:w-full!"
+            />
+            <Button text={t("addNewUser")} className="max-[650px]:w-full" />
           </div>
         </div>
         <Outlet />

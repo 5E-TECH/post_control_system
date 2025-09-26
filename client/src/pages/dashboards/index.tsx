@@ -23,7 +23,7 @@ import { t } from "i18next";
 import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
 import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
 
-import { DatePicker} from "antd";
+import { DatePicker } from "antd";
 
 import dayjs from "dayjs";
 
@@ -69,8 +69,6 @@ const Dashboards = () => {
   const aboutCourier = data?.data?.myStat?.data;
   const aboutMarket = data?.data?.myStat?.data;
 
-  console.log(aboutCourier)
-
   const ordersData =
     data?.data?.markets?.data?.map((market: any) => ({
       nomi: market?.market?.name + ` (${market.sellingRate}%)`,
@@ -95,7 +93,7 @@ const Dashboards = () => {
 
   let titleText = `📊 ${t("title")}`;
   if (fromDate && toDate && fromDate !== toDate) {
-    titleText = `📊 ${fromDate} - ${toDate} statistikasi`;
+    titleText = `📊 ${fromDate} dan - ${toDate} gacha statistikasi`;
   } else if (fromDate && !toDate) {
     titleText = `📊 ${fromDate} dan boshlab statistikasi`;
   } else if (!fromDate && toDate) {
@@ -105,7 +103,7 @@ const Dashboards = () => {
   return (
     <div className="w-full p-6 dark:bg-[#312D48] min-h-screen transition">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 relative">
+      <div className="flex items-center justify-between mb-6 max-[1550px]:flex-col-reverse max-[1550px]:gap-5">
         <div className="flex flex-wrap gap-6">
           {isLoading ? (
             <>
@@ -113,40 +111,38 @@ const Dashboards = () => {
               <SkeletonBox className="w-40 h-10" />
             </>
           ) : (
-            <>
-              {/* Agar RangePicker ishlatmoqchi bo‘lsangiz */}
-              <div className="flex gap-6">
-                {/* Sana oralig‘i (RangePicker bilan) */}
-                <div className="flex flex-col">
-                  <label className="mb-1 text-sm font-medium">
-                    Sana oralig‘i
-                  </label>
-                  <RangePicker
-                    value={[
-                      fromDate ? dayjs(fromDate) : null,
-                      toDate ? dayjs(toDate) : null,
-                    ]}
-                    onChange={(dates) => {
-                      setFromDate(
-                        dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
-                      );
-                      setToDate(
-                        dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
-                      );
-                    }}
-                    className="w-full"
-                  />
-                </div>
+            <div className="flex gap-6">
+              <div className="flex flex-col">
+                <label className="mb-1 text-sm font-medium">
+                  {t("dateRange")}
+                </label>
+                <RangePicker
+                  value={[
+                    fromDate ? dayjs(fromDate) : null,
+                    toDate ? dayjs(toDate) : null,
+                  ]}
+                  onChange={(dates) => {
+                    setFromDate(
+                      dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
+                    );
+                    setToDate(
+                      dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
+                    );
+                  }}
+                  className="w-full"
+                />
               </div>
-            </>
+            </div>
           )}
         </div>
-        <h2 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-bold">
+
+        {/* O‘rtada title */}
+        <h2 className="text-xl font-bold mr-170 max-[1550px]:mr-0">
           {titleText}
         </h2>
       </div>
       {/* Stat Cards */}
-      <div className="grid grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-4 gap-6 mb-6 max-xl:grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1">
         {isLoading ? (
           [...Array(4)].map((_, i) => (
             <div key={i} className="bg-white dark:bg-[#2A263D] p-6 rounded-2xl">
@@ -160,27 +156,27 @@ const Dashboards = () => {
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
-                  label="Jami buyurtmalar"
-                  value={aboutCourier?.totalOrder}
+                  label={t("totalOrders")}
+                  value={aboutCourier?.totalOrders}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
-                  label="Sotilgan"
+                  label={t("solded")}
                   value={aboutCourier?.soldOrders}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
-                  label="Bekor qilinganlar"
+                  label={t("cancelled")}
                   value={aboutCourier?.canceledOrders}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
                 <StatCard
                   icon={<DollarSign size={20} />}
-                  label="Jami daromad"
+                  label={t("profit")}
                   value={`${Number(
                     aboutCourier?.profit || 0
                   ).toLocaleString()} UZS`}
@@ -194,27 +190,27 @@ const Dashboards = () => {
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
-                  label="Jami buyurtmalar"
+                  label={t("totalOrders")}
                   value={aboutMarket?.totalOrders}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
-                  label="Sotilgan"
+                  label={t("solded")}
                   value={aboutMarket?.soldOrders}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
-                  label="Bekor qilinganlar"
+                  label={t("cancelled")}
                   value={aboutMarket?.canceledOrders}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
                 <StatCard
                   icon={<DollarSign size={20} />}
-                  label="Jami daromad"
+                  label={t("profit")}
                   value={`${Number(
                     aboutMarket?.profit || 0
                   ).toLocaleString()} UZS`}
@@ -230,27 +226,27 @@ const Dashboards = () => {
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
-                  label="Jami buyurtmalar"
+                  label={t("totalOrders")}
                   value={dashboard?.acceptedCount}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
-                  label="Sotilgan"
+                  label={t("solded")}
                   value={dashboard?.soldAndPaid}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
-                  label="Bekor qilinganlar"
+                  label={t("cancelled")}
                   value={dashboard?.cancelled}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
                 <StatCard
                   icon={<DollarSign size={20} />}
-                  label="Jami daromad"
+                  label={t("profit")}
                   value={`${Number(
                     dashboard?.profit || 0
                   ).toLocaleString()} UZS`}
@@ -267,7 +263,7 @@ const Dashboards = () => {
         role === "admin" ||
         role === "registrator") && (
         <>
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-2 gap-6 mb-6 max-[1250px]:grid-cols-1">
             {renderMarketsChart(
               visibleMarkets,
               showAllMarkets,
@@ -279,7 +275,7 @@ const Dashboards = () => {
               setShowAllCouriers
             )}
           </div>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-6 max-[1050px]:grid-cols-1">
             {renderMarketsTable(markets)}
             {renderCouriersTable(couriers)}
           </div>
@@ -409,8 +405,12 @@ const ChartWrapper = ({
             return (
               <div className="p-2 bg-black text-white rounded text-sm">
                 <p>{item.nomi}</p>
-                <p>Buyurtmalar: {item.buyurtmalar}</p>
-                <p>Sotilgan: {item.sotilgan}</p>
+                <p>
+                  {t("orders")}: {item.buyurtmalar}
+                </p>
+                <p>
+                  {t("solded")}: {item.sotilgan}
+                </p>
               </div>
             );
           }}
@@ -428,14 +428,14 @@ const ChartWrapper = ({
           className="w-4 h-4 rounded-sm"
           style={{ background: "#66B2FF" }}
         />
-        <span>Buyurtmalar</span>
+        <span>{t("orders")}</span>
       </div>
       <div className="flex items-center gap-2">
         <span
           className="w-4 h-4 rounded-sm"
           style={{ background: "#0047AB" }}
         />
-        <span>Sotilganlar</span>
+        <span>{t("solded")}</span>
       </div>
     </div>
 
@@ -491,7 +491,7 @@ const TableWrapper = ({
 }) => (
   <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow">
     <h3 className="text-lg font-semibold mb-4">{title}</h3>
-    <table className="w-full border">
+    <table className="w-full min-[900px]:border">
       <thead>
         <tr className="bg-gray-100 dark:bg-[#3B3656] text-left">
           <th className="p-2 border">#</th>
@@ -517,11 +517,11 @@ const TableWrapper = ({
           }
           return (
             <tr key={item.id ?? inx} className={`hover:bg-gray-50 ${rowStyle}`}>
-              <td className="p-2 border text-center">{medalIcon ?? inx + 1}</td>
-              <td className="p-2 border">{item[nameKey]}</td>
-              <td className="p-2 border">{item[ordersKey]}</td>
-              <td className="p-2 border">{item[soldKey]}</td>
-              <td className="p-2 border">{item[rateKey]}%</td>
+              <td className="data-cell p-2 min-[900px]:border text-center" data-cell="#">{medalIcon ?? inx + 1}</td>
+              <td className="data-cell p-2 min-[900px]:border" data-cell="Name">{item[nameKey]}</td>
+              <td className="data-cell p-2 min-[900px]:border" data-cell="Orders">{item[ordersKey]}</td>
+              <td className="data-cell p-2 min-[900px]:border" data-cell="Sold">{item[soldKey]}</td>
+              <td className="data-cell p-2 min-[900px]:border" data-cell="Rate">{item[rateKey]}%</td>
             </tr>
           );
         })}

@@ -1,10 +1,10 @@
 import { Input, Select } from "antd";
 import { memo, useEffect, useState, type ChangeEvent } from "react";
-import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useDispatch, useSelector } from "react-redux";
 import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import type { RootState } from "../../../../app/store";
+import { useTranslation } from "react-i18next";
 
 export interface ICustomer {
   phone_number: string;
@@ -23,6 +23,7 @@ export const initialState: ICustomer = {
 };
 
 const CustomerInfocomp = () => {
+  const { t } = useTranslation("createOrder");
   const [formData, setFormData] = useState<ICustomer>(initialState);
 
   const { getRegions, getRegionsById } = useRegion();
@@ -32,12 +33,6 @@ const CustomerInfocomp = () => {
     label: item.name,
   }));
 
-  const { getDistricts } = useDistrict();
-  const { data: allDistricts } = getDistricts();
-  const districts = allDistricts?.data.map((item: any) => ({
-    value: item.id,
-    label: item.name,
-  }));
   // const [phoneNumber, setPhoneNumer] = useState<string>("");
 
   // const allNumbers = users
@@ -87,7 +82,7 @@ const CustomerInfocomp = () => {
   return (
     <div className="w-full p-5 rounded-md dark:bg-[#312D48] shadow-lg">
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
-        Customer Info
+        {t("customerInfo")}
       </h1>
       <div className="flex flex-col gap-4">
         <Input
@@ -129,13 +124,15 @@ const CustomerInfocomp = () => {
         ) : (
           ""
         )} */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 max-[650px]:flex-col">
           <div className="flex-1">
-            <label className="block text-xs text-gray-500 mb-1">Region</label>
+            <label className="block text-xs text-gray-500 mb-1">
+              {t("customerForm.region")}
+            </label>
             <Select
               value={formData.region_id}
               onChange={(value) => handleSelectChange("region_id", value)}
-              placeholder="Viloyat tanlang"
+              placeholder={t("placeholder.selectRegion")}
               className="w-full h-[45px]! custom-select-dropdown-bright"
               options={regions}
               dropdownClassName="dark-dropdown"
@@ -143,38 +140,42 @@ const CustomerInfocomp = () => {
           </div>
 
           <div className="flex-1">
-            <label className="block text-xs text-gray-500 mb-1">District</label>
+            <label className="block text-xs text-gray-500 mb-1">
+              {t("customerForm.district")}
+            </label>
             <Select
               value={formData.district_id}
               onChange={(value) => handleSelectChange("district_id", value)}
-              placeholder="Tuman tanlang"
+              placeholder={t("placeholder.selectDistrict")}
               className="w-full h-[45px]! custom-select-dropdown-bright"
-              options={
-                formData?.region_id ? specificDistrictsByRegion : districts
-              }
+              options={formData?.region_id ? specificDistrictsByRegion : null}
               dropdownClassName="dark-dropdown"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Name</label>
+          <label className="block text-xs text-gray-500 mb-1">
+            {t("customerForm.name")}
+          </label>
           <Input
             name="name"
             value={formData.name}
             onChange={handleChange}
-            placeholder="Name"
+            placeholder={t("placeholder.name")}
             className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
           />
         </div>
 
         <div className="pb-1">
-          <label className="block text-xs text-gray-500 mb-1">Address</label>
+          <label className="block text-xs text-gray-500 mb-1">
+            {t("customerForm.address")}
+          </label>
           <Input
             name="address"
             value={formData.address}
             onChange={handleChange}
-            placeholder="Address"
+            placeholder={t("placeholder.address")}
             className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
           />
         </div>
