@@ -16,16 +16,24 @@ export const useCashBox = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [cashbox] }),
   });
 
-  const getCashBoxById = (id: string | undefined) =>
+  const getCashBoxById = (id: string | undefined, bool: boolean = true) =>
     useQuery({
       queryKey: [cashbox, id],
       queryFn: () => api.get(`cashbox/user/${id}`).then((res) => res.data),
+      enabled: bool,
     });
 
-  const getCashBoxInfo = () =>
+  const getCashboxMyCashbox = () =>
+    useQuery({
+      queryKey: [cashbox],
+      queryFn: () => api.get("cashbox/my-cashbox").then((res) => res.data),
+    });
+
+  const getCashBoxInfo = (bool: boolean = true) =>
     useQuery({
       queryKey: [cashbox],
       queryFn: () => api.get(`cashbox/all-info`).then((res) => res.data),
+      enabled: bool,
     });
 
   const getCashBoxMain = () =>
@@ -35,20 +43,19 @@ export const useCashBox = () => {
     });
 
   const cashboxSpand = useMutation({
-    mutationFn: ({ data }: { data: any }) =>
-      api.patch(`cashbox/spend`, data),
+    mutationFn: ({ data }: { data: any }) => api.patch(`cashbox/spend`, data),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: [cashbox] });
     },
   });
 
-
   return {
     getCashBoxById,
     getCashBoxInfo,
+    getCashboxMyCashbox,
     createPaymentCourier,
     createPaymentMarket,
     getCashBoxMain,
-    cashboxSpand
+    cashboxSpand,
   };
 };
