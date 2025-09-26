@@ -38,6 +38,7 @@ import { UpdateSelfDto } from './dto/self-update.dto';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -417,6 +418,34 @@ export class UsersController {
     @Body() updateSelfDto: UpdateSelfDto,
   ) {
     return this.userService.selfUpdate(user, updateSelfDto);
+  }
+
+  @ApiOperation({ summary: 'Customer address update' })
+  @ApiParam({ name: 'id', description: 'Customer id should send here' })
+  @ApiBody({ type: UpdateSelfDto })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Patch('customer/address/:id')
+  updateCustomerAddress(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerDto,
+  ) {
+    return this.userService.updateCustomerAddress(id, dto);
+  }
+
+  @ApiOperation({ summary: 'Customer name phone update' })
+  @ApiParam({ name: 'id', description: 'Customer id should send here' })
+  @ApiBody({ type: UpdateSelfDto })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Patch('customer/name-phone/:id')
+  updateCustomerNamePhone(
+    @Param('id') id: string,
+    @Body() dto: UpdateCustomerDto,
+  ) {
+    return this.userService.updateCustomerNamePhone(id, dto);
   }
 
   @ApiOperation({ summary: 'Delete user by id' })
