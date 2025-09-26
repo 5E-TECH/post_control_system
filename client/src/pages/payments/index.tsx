@@ -9,8 +9,19 @@ import { useCourier } from "../../shared/api/hooks/useCourier";
 import { useCashBox } from "../../shared/api/hooks/useCashbox";
 import CountUp from "react-countup";
 import { useEffect } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 
 const Payments = () => {
+  const user = useSelector((state: RootState) => state.roleSlice);
+  const role = user.role;
+  const id = user.id;
+  useEffect(() => {
+    if (role === "courier" || role === "market") {
+      navigate(`cash-detail/${id}`);
+    }
+  }, [user, role]);
+
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
 
@@ -22,7 +33,9 @@ const Payments = () => {
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
 
-  const { data: cashBoxData, refetch } = getCashBoxInfo();
+  const { data: cashBoxData, refetch } = getCashBoxInfo(
+    role === "superadmin" || role === "admin"
+  );
 
   const { data } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
@@ -36,15 +49,16 @@ const Payments = () => {
 
   const { pathname } = useLocation();
 
-  const hendlerClose = ()=>{
-    setShowCurier(false)
-    setShowMarket(false)
-    setSelect(null)
-
-  }
+  const hendlerClose = () => {
+    setShowCurier(false);
+    setShowMarket(false);
+    setSelect(null);
+  };
 
   useEffect(() => {
-    refetch();
+    if (role === "admin" || role === "superadmin") {
+      refetch();
+    }
   }, [pathname]);
 
   if (pathname.startsWith("/payments/")) {
@@ -248,9 +262,9 @@ const Payments = () => {
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
                 className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
-                  !select ? '' : 'hover:bg-blue-600'
+                  !select ? "" : "hover:bg-blue-600"
                 }  text-white rounded-md cursor-pointer ${
-                  !select ? 'opacity-40' : ''
+                  !select ? "opacity-40" : ""
                 }`}
               >
                 Tanlash
