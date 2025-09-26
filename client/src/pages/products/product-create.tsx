@@ -12,19 +12,14 @@ import type { RootState } from "../../app/store";
 // }
 
 const ProductsCreate: FC = () => {
-  const {id} = useParams()
+  const { id } = useParams();
   // const location = useLocation();
-
-  console.log("createeeee",id);
-  
 
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { getMyProducts, getProductsByMarket } = useProduct();
   const { data } =
-    role === "market" ? getMyProducts() : getProductsByMarket(id);   
-    
-    
+    role === "market" ? getMyProducts() : getProductsByMarket(id);
 
   return (
     <section>
