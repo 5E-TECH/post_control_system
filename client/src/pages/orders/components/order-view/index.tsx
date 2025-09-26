@@ -52,6 +52,9 @@ const OrderView = () => {
     case "admin":
       query = getOrders({ page, limit, ...filters });
       break;
+    case "registrator":
+      query = getOrders({ page, limit, ...filters });
+      break;
     case "market":
       query = getMarketsByMyNewOrders({ page, limit, ...cleanedFilters });
       break;
