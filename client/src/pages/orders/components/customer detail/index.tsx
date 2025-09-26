@@ -35,8 +35,8 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
   // saqlash
   const handleSave = () => {
     const updatedCustomer = {
-      client_name: name,
-      client_phone_number: phoneNumber,
+      name,
+      phone_number: phoneNumber,
     };
 
     updateOrdersUserPhoneAndName.mutate({

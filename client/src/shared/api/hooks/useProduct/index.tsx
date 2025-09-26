@@ -37,6 +37,7 @@ export const useProduct = () => {
       queryKey: [product, marketId],
       queryFn: () =>
         api.get(`product/market/${marketId}`).then((res) => res.data),
+      enabled: !!marketId,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
