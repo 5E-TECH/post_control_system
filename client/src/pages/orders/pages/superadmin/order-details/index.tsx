@@ -2,6 +2,8 @@ import { memo } from "react";
 import Details from "../../../components/orderDetails";
 import ShippingAddress from "../../../components/shipping address";
 import CustomerDetail from "../../../components/customer detail";
+import { useParams } from "react-router-dom";
+import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 
 const OrderDetails = () => {
   const { id } = useParams();
