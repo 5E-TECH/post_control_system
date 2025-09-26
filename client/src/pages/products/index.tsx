@@ -218,7 +218,7 @@ const Products = () => {
       </div>
 
       <div>
-        <ProductView data={productData?.data?.items} />
+        <ProductView data={productData?.data?.data} />
       </div>
     </div>
   );
