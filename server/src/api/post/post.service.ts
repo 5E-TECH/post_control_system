@@ -170,6 +170,7 @@ export class PostService {
       const allRejectedPosts = await this.postRepo.find({
         where: {
           status: In([Post_status.CANCELED]),
+          courier_id: user.id,
         },
         order: { created_at: 'DESC' },
       });
@@ -226,7 +227,8 @@ export class PostService {
   async getPostsOrders(id: string) {
     try {
       const allOrdersByPostId = await this.orderRepo.find({
-        where: { post_id: id },
+        where: [{ post_id: id }, { canceled_post_id: id }],
+
         relations: ['customer', 'customer.district', 'items', 'items.product'],
       });
       return successRes(allOrdersByPostId, 200, 'All orders by post id');

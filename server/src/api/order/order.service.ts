@@ -398,13 +398,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async editOrder(id: string, updateOrderDto: UpdateOrderDto) {
+  async updateOrder(
+    id: string,
+    updateOrderDto: UpdateOrderDto,
+  ): Promise<Object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      const editingOrder = await this.orderRepo.findOne({ where: { id } });
+      const editingOrder = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id },
+      });
       if (!editingOrder) {
         throw new NotFoundException('Order not found');
       }
@@ -415,20 +420,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       ) {
         let product_quantity = 0;
 
-        // 🟡 1. Edit order items
+        // 🟡 1. Update order items (agar kelsa)
         if (
           updateOrderDto.order_item_info &&
           updateOrderDto.order_item_info.length > 0
         ) {
-          // Old order items ni o'chiramiz
           await queryRunner.manager.delete(OrderItemEntity, {
             orderId: editingOrder.id,
           });
 
           for (const o_item of updateOrderDto.order_item_info) {
-            const isExistProduct = await this.productRepo.findOne({
-              where: { id: o_item.product_id },
-            });
+            const isExistProduct = await queryRunner.manager.findOne(
+              ProductEntity,
+              {
+                where: { id: o_item.product_id },
+              },
+            );
             if (!isExistProduct) {
               throw new NotFoundException('Product not found');
             }
@@ -442,30 +449,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             product_quantity += o_item.quantity;
           }
 
-          Object.assign(editingOrder, {
-            product_quantity,
-          });
-          await queryRunner.manager.save(editingOrder);
+          editingOrder.product_quantity = product_quantity;
         }
 
-        // 🟡 2. Edit order info
-        const updateOrderFields: Partial<OrderEntity> = {};
-        if (updateOrderDto.where_deliver)
-          updateOrderFields.where_deliver = updateOrderDto.where_deliver;
-        if (updateOrderDto.total_price)
-          updateOrderFields.total_price = updateOrderDto.total_price;
-        if (updateOrderDto.comment)
-          updateOrderFields.comment = updateOrderDto.comment;
-
-        if (Object.keys(updateOrderFields).length > 0) {
-          Object.assign(editingOrder, {
-            updateOrderFields,
-          });
-          await queryRunner.manager.save(editingOrder);
+        // 🟡 2. Update basic fields
+        if (updateOrderDto.where_deliver !== undefined) {
+          editingOrder.where_deliver = updateOrderDto.where_deliver;
         }
+        if (updateOrderDto.total_price !== undefined) {
+          editingOrder.total_price = updateOrderDto.total_price;
+        }
+        if (updateOrderDto.comment !== undefined) {
+          editingOrder.comment = updateOrderDto.comment;
+        }
+
+        await queryRunner.manager.save(editingOrder);
 
         await queryRunner.commitTransaction();
-        return successRes(null, 200, 'Order updated');
+        return successRes(editingOrder, 200, 'Order updated');
       } else {
         throw new BadRequestException('You can not edit this order');
       }

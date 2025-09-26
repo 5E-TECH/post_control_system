@@ -158,7 +158,7 @@ export class OrderController {
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Patch(':id')
   editOrder(@Param('id') id: string, @Body() updateOrderDto: UpdateOrderDto) {
-    return this.orderService.editOrder(id, updateOrderDto);
+    return this.orderService.updateOrder(id, updateOrderDto);
   }
 
   @ApiOperation({ summary: 'Receive new orders' })
