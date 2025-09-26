@@ -21,17 +21,40 @@ const CreateCourier = () => {
   const { createUser } = useUser("courier");
   const navigate = useNavigate();
 
+  const [form] = Form.useForm<FieldType>();
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const newCourier = {
       ...values,
       tariff_home: Number(values.tariff_home),
       tariff_center: Number(values.tariff_center),
+      phone_number: values.phone_number.split(" ").join(""),
     };
     createUser.mutate(newCourier, {
       onSuccess: () => {
         navigate("/all-users");
       },
     });
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let input = e.target.value;
+
+    if (!input.startsWith("+998 ")) input = "+998 ";
+
+    let val = input.replace(/\D/g, "").slice(3);
+
+    if (val.length > 9) val = val.slice(0, 9);
+
+    let formatted = "+998 ";
+    if (val.length > 0) {
+      formatted += val
+        .replace(/(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/, (_, a, b, c, d) =>
+          [a, b, c, d].filter(Boolean).join(" ")
+        )
+        .trim();
+    }
+
+    form.setFieldsValue({ phone_number: formatted });
   };
 
   const { getRegions } = useRegion();
@@ -48,7 +71,12 @@ const CreateCourier = () => {
       <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
         {t("courierDescription")}
       </span>
-      <Form onFinish={onFinish} className="pt-5!">
+      <Form
+        form={form}
+        onFinish={onFinish}
+        initialValues={{ phone_number: "+998 " }}
+        className="pt-5!"
+      >
         <Form.Item
           name="region_id"
           rules={[{ required: true, message: t("selectLocation") }]}
@@ -73,16 +101,19 @@ const CreateCourier = () => {
 
         <Form.Item
           name="phone_number"
-          rules={[{ required: true, message: t("enterPhoneNumber") },
+          rules={[
+            { required: true, message: t("enterPhoneNumber") },
             {
-              pattern: /^\+998\d{9}$/,
+              pattern: /^\+998 \d{2} \d{3} \d{2} \d{2}$/,
               message: t("phoneNumberPattern"),
             },
           ]}
         >
           <Input
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
             placeholder={t("enterPhoneNumber")}
+            className="h-[48px]"
+            type="text"
+            onChange={handlePhoneChange}
           />
         </Form.Item>
 
