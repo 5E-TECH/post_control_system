@@ -11,7 +11,7 @@ const RegistratorSidebar = () => {
     { to: "/orders", icon: <ShoppingBag />, label: t("orders") },
     { to: "/order/markets/new-orders", icon: <History />, label: t("new_orders") },
     { to: "/mails", icon: <MailOpen />, label: t("mails") },
-    { to: "/payments", icon: <FileText />, label: t("products") },
+    { to: "/products", icon: <FileText />, label: t("products") },
   ];
 
   return (

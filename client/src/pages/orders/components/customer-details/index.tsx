@@ -15,7 +15,7 @@ const CustomerDetails = () => {
 
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const marketId = market?.id;
-
+  
   // URL’dan page olish
   const { getParam, setParam, removeParam } = useParamsHook();
   const page = Number(getParam("page") || 1);

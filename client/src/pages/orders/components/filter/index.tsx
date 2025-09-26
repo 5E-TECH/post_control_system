@@ -26,7 +26,9 @@ const Filter = () => {
 
   const form = useSelector((state: RootState) => state.setFilter);
 
-  const { refetch } = useProfile().getUser();
+  const user = useSelector((state: RootState) => state.authSlice.user);
+  const role = user?.role;
+  const { refetch } = useProfile().getUser(role === "market");
 
   // select va boshqa inputlar uchun
   const handleChange = (
