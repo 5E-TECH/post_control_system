@@ -221,8 +221,7 @@ const Dashboards = () => {
             )}
 
             {(role === "superadmin" ||
-              role === "admin" ||
-              role === "registrator") && (
+              role === "admin" ) && (
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}
