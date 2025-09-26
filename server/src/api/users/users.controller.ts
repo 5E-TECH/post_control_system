@@ -410,7 +410,7 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'User ID (must match current user)' })
   @ApiBody({ type: UpdateSelfDto })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
-  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
   @Patch('self')
   selfUpdate(

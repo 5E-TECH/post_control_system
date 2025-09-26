@@ -17,7 +17,6 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Order_status, Roles } from 'src/common/enums';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { In } from 'typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 
