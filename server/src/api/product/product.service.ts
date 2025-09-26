@@ -17,7 +17,6 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Order_status, Roles } from 'src/common/enums';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { In } from 'typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 
@@ -70,6 +69,7 @@ export class ProductService {
         where: {
           name,
           user_id: market_id,
+          isDeleted: false,
         },
       });
 
@@ -104,6 +104,7 @@ export class ProductService {
     try {
       const query = this.productRepo
         .createQueryBuilder('product')
+        .where('product.isDeleted = :is_deleted', { is_deleted: false })
         .leftJoinAndSelect('product.user', 'user')
         .orderBy('product.created_at', 'ASC')
         .skip((page - 1) * limit)
@@ -156,7 +157,7 @@ export class ProductService {
       }
 
       const products = await this.productRepo.find({
-        where: { user_id: marketId },
+        where: { user_id: marketId, isDeleted: false },
         relations: ['user'],
         order: { created_at: 'ASC' },
       });
@@ -175,7 +176,8 @@ export class ProductService {
     try {
       const qb = this.productRepo
         .createQueryBuilder('product')
-        .where('product.user_id = :userId', { userId: user.id });
+        .where('product.user_id = :userId', { userId: user.id })
+        .andWhere('product.isDeleted = :is_deleted', { is_deleted: false });
 
       if (search) {
         qb.andWhere(
@@ -214,7 +216,9 @@ export class ProductService {
 
   async findOne(user: JwtPayload, id: string) {
     try {
-      const product = await this.productRepo.findOne({ where: { id } });
+      const product = await this.productRepo.findOne({
+        where: { id, isDeleted: false },
+      });
       if (!product || product.user_id !== user.id) {
         throw new NotFoundException(`Product not found by id: ${id}`);
       }
@@ -351,21 +355,37 @@ export class ProductService {
 
   async remove(id: string) {
     try {
-      const product = await this.productRepo.findOne({ where: { id } });
-      if (!product)
+      const product = await this.productRepo.findOne({
+        where: { id, isDeleted: false },
+      });
+      if (!product) {
         throw new NotFoundException(`Product not found by id: ${id}`);
+      }
 
+      // 🟡 Faylni o‘chirish
       if (product.image_url) {
         const imagePath = path.join(
           process.cwd(),
           'uploads',
           product.image_url,
         );
-        if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+        try {
+          if (fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
+          }
+        } catch (fileError) {
+          console.warn(
+            `Could not delete file: ${imagePath}`,
+            fileError.message,
+          );
+        }
       }
 
-      await this.productRepo.delete({ id });
-      return successRes({});
+      // 🟡 Soft delete qilish
+      product.isDeleted = true;
+      await this.productRepo.save(product);
+
+      return successRes({}, 200, 'Product deleted');
     } catch (error) {
       return catchError(error);
     }
