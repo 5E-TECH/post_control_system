@@ -134,9 +134,6 @@ const AddProduct = () => {
               <h2 className="text-[18px] font-medium opacity-[90%] select-none">
                 Product Image
               </h2>
-              <h2 className="text-[15px] font-medium text-[#8C57FF] select-none">
-                Add media from URL
-              </h2>
             </div>
 
             <div
