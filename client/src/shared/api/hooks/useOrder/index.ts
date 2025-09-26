@@ -68,7 +68,7 @@ export const useOrder = () => {
   });
 
   const updateOrders = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
+    mutationFn: ({ id, data }: { id: string | undefined; data: any }) =>
       api.patch(`order/${id}`, data).then((res) => res.data),
     onSuccess: () =>
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),

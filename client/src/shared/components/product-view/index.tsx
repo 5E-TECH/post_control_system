@@ -27,6 +27,9 @@ const ProductView: FC<IProps> = ({ data }) => {
   } | null>(null);
 
   const { deleteProduct } = useProduct();
+
+  console.log(data);
+  
   const [api, contextHolder] = useNotification();
 
   const handleDelete = () => {
