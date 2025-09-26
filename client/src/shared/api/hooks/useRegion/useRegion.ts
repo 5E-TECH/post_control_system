@@ -4,10 +4,11 @@ import { api } from "../..";
 export const region = "region";
 
 export const useRegion = () => {
-  const getRegions = () =>
+  const getRegions = (enabled = true) =>
     useQuery({
       queryKey: [region],
       queryFn: () => api.get("region").then((res) => res.data),
+      enabled,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });

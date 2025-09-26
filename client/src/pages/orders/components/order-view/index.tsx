@@ -28,9 +28,18 @@ const OrderView = () => {
   const { getOrders, getMarketsByMyNewOrders } = useOrder();
   const user = useSelector((state: RootState) => state.roleSlice);
   const filters = useSelector((state: RootState) => state.setFilter);
-
   const role = user.role;
   let query;
+
+  const cleanObject = (obj: Record<string, any>) => {
+    return Object.fromEntries(
+      Object.entries(obj).filter(
+        ([_, v]) => v !== "" && v !== null && v !== undefined
+      )
+    );
+  };
+
+  const cleanedFilters = cleanObject(filters);
 
   const { getParam, setParam, removeParam } = useParamsHook();
   const page = Number(getParam("page") || 1);
@@ -38,13 +47,13 @@ const OrderView = () => {
 
   switch (role) {
     case "superadmin":
-      query = getOrders({ page, limit, ...filters });
+      query = getOrders({ page, limit, ...cleanedFilters });
       break;
     case "admin":
       query = getOrders({ page, limit, ...filters });
       break;
     case "market":
-      query = getMarketsByMyNewOrders({ page, limit, ...filters });
+      query = getMarketsByMyNewOrders({ page, limit, ...cleanedFilters });
       break;
     default:
       query = { data: { data: [] } };
