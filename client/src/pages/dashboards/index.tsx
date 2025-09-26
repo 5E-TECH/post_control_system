@@ -157,20 +157,20 @@ const Dashboards = () => {
                 <StatCard
                   icon={<ShoppingCart size={20} />}
                   label={t("totalOrders")}
-                  value={aboutCourier?.totalOrders}
+                  value={aboutCourier?.totalOrders || 0}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
                   label={t("solded")}
-                  value={aboutCourier?.soldOrders}
+                  value={aboutCourier?.soldOrders || 0}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
                   label={t("cancelled")}
-                  value={aboutCourier?.canceledOrders}
+                  value={aboutCourier?.canceledOrders || 0}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
@@ -191,20 +191,20 @@ const Dashboards = () => {
                 <StatCard
                   icon={<ShoppingCart size={20} />}
                   label={t("totalOrders")}
-                  value={aboutMarket?.totalOrders}
+                  value={aboutMarket?.totalOrders || 0}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
                   label={t("solded")}
-                  value={aboutMarket?.soldOrders}
+                  value={aboutMarket?.soldOrders || 0}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
                   label={t("cancelled")}
-                  value={aboutMarket?.canceledOrders}
+                  value={aboutMarket?.canceledOrders || 0}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
@@ -227,20 +227,20 @@ const Dashboards = () => {
                 <StatCard
                   icon={<ShoppingCart size={20} />}
                   label={t("totalOrders")}
-                  value={dashboard?.acceptedCount}
+                  value={dashboard?.acceptedCount || 0}
                   borderColor="border-gray-400"
                 />
                 <StatCard
                   icon={<CheckCircle size={20} />}
                   label={t("solded")}
-                  value={dashboard?.soldAndPaid}
+                  value={dashboard?.soldAndPaid || 0}
                   borderColor="border-green-500"
                   textColor="text-green-500"
                 />
                 <StatCard
                   icon={<XCircle size={20} />}
                   label={t("cancelled")}
-                  value={dashboard?.cancelled}
+                  value={dashboard?.cancelled || 0}
                   borderColor="border-red-500"
                   textColor="text-red-500"
                 />
