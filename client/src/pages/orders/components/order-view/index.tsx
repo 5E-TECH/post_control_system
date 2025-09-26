@@ -40,6 +40,9 @@ const OrderView = () => {
     case "superadmin":
       query = getOrders({ page, limit, ...filters });
       break;
+    case "admin":
+      query = getOrders({ page, limit, ...filters });
+      break;
     case "market":
       query = getMarketsByMyNewOrders({ page, limit, ...filters });
       break;
