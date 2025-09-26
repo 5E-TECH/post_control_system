@@ -133,7 +133,7 @@ const ChooseMarket = () => {
                 <Input
                   onChange={(e) => debouncedSearch(e.target.value)}
                   placeholder="Search..."
-                  className="h-[40px]! min-w-[350px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+                  className="h-[40px]! min-[900px]:max-w-[350px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
                 />
               </Form.Item>
             </div>
@@ -184,16 +184,16 @@ const ChooseMarket = () => {
                           data-cell="MARKET NOMI"
                         >
                           <div className="flex items-center gap-4">
-                            <span className="font-normal text-[16px] text-[#2E263DB2] dark:text-[#D5D1EB]">
+                            <span className="font-normal text-[#2E263DB2] dark:text-[#D5D1EB]">
                               {market?.name}
                             </span>
                           </div>
                         </td>
                         <td
                           className="data-cell max-[254px]:w-full whitespace-nowrap pl-[20px] text-left"
-                          data-cell="TELEFON NOMERI"
+                          data-cell="TELEFON"
                         >
-                          <span className="font-normal text-[16px] text-[#2E263DB2] dark:text-[#B1ADC7]">
+                          <span className="font-normal text-[#2E263DB2] dark:text-[#B1ADC7]">
                             {market?.phone_number}
                           </span>
                         </td>
