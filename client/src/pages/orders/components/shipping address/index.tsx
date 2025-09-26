@@ -1,21 +1,22 @@
 import { memo, type FC, useState, type ChangeEvent, useEffect } from "react";
 import Popup from "../../../../shared/ui/Popup";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
-import { useParams } from "react-router-dom";
+// import { useParams } from "react-router-dom";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 
 interface IProps {
   address: string;
   districtId: string; // order kelgan tuman id
+  id:string
 }
 
-const ShippingAddress: FC<IProps> = ({ address, districtId }) => {
+const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   const [isShowPopup, setIsShowPopup] = useState(false);
   const [newAddress, setNewAddress] = useState(address);
 
-  const { updateOrders } = useOrder();
-  const { id } = useParams();
+  const { updateOrdersUserAddress } = useOrder();
+  // const { id } = useParams();
 
   // district va regionlarni olish
   const { getDistrictById } = useDistrict();
@@ -76,7 +77,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId }) => {
 
     console.log("Yuboriladigan ma'lumot:", dataToSend);
 
-    updateOrders.mutate(
+    updateOrdersUserAddress.mutate(
       { id, data: dataToSend },
       {
         onSuccess: () => {
