@@ -44,8 +44,6 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
       data: updatedCustomer,
     });
 
-    console.log("Yuboriladigan ma'lumot:", updatedCustomer);
-
     // bu yerda updateCustomer.mutate yoki axios.post qilishingiz mumkin
     // onSuccess bo‘lgach popupni yopish
     setIsShowPopup(false);

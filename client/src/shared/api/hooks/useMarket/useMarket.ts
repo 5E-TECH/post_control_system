@@ -18,6 +18,8 @@ export const useMarket = () => {
       queryFn: () =>
         api.get("user/markets", { params }).then((res) => res.data),
       enabled,
+      staleTime: 1000 * 60 * 60 * 24,
+      refetchOnWindowFocus: false,
     });
 
   const getMarketByid = (id: string) =>
@@ -27,12 +29,12 @@ export const useMarket = () => {
     });
 
   const getMarketsNewOrder = (enabled = true) =>
-  useQuery({
-    queryKey: [market],
-    queryFn: () =>
-      api.get("order/markets/new-orders").then((res) => res.data),
-    enabled,
-  });
+    useQuery({
+      queryKey: [market],
+      queryFn: () =>
+        api.get("order/markets/new-orders").then((res) => res.data),
+      enabled,
+    });
   return {
     createMarket,
     getMarkets,

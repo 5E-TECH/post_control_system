@@ -6,8 +6,6 @@ interface IProps {
 }
 
 const Details: FC<IProps> = ({ items = [], total_price }) => {
-  // console.log(items);
-
   return (
     <div className="dark:bg-[#312D4B]">
       <div className="flex justify-between m-5">

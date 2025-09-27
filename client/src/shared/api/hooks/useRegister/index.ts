@@ -3,6 +3,14 @@ import { api } from "../..";
 
 export const user = "user";
 
+export interface IUserFilter {
+  search?: string;
+  status?: string;
+  role?: string;
+  page?: number;
+  limit?: number;
+}
+
 export const useUser = (path?: string) => {
   const client = useQueryClient();
 
@@ -12,13 +20,11 @@ export const useUser = (path?: string) => {
       client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
   });
 
-  const getUser = () =>
+  const getUser = (params?: IUserFilter) =>
     useQuery({
-      queryKey: [user],
-      queryFn: () => api.get("user").then((res) => res.data),
+      queryKey: [user, params],
+      queryFn: () => api.get("user", { params }).then((res) => res.data),
     });
-
-  
 
   return {
     createUser,
