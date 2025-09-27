@@ -7,9 +7,9 @@ import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useTranslation } from "react-i18next";
 
 const UsersStatistics = () => {
-  const { t } = useTranslation("users")
+  const { t } = useTranslation("users");
   const { getUser } = useUser();
-  const { data: allUsers } = getUser();
+  const { data: allUsers } = getUser({ limit: "0" });
   const markets = Array.isArray(allUsers?.data?.data)
     ? allUsers?.data?.data?.filter((user: any) => user.role === "market")
     : [];
@@ -17,6 +17,7 @@ const UsersStatistics = () => {
   const users = Array.isArray(allUsers?.data?.data)
     ? allUsers?.data?.data?.filter((user: any) => user.role !== "market")
     : [];
+
   return (
     <div className="grid grid-cols-3 max-[1250px]:grid-cols-2 max-[950px]:grid-cols-1 gap-6">
       <NavLink
@@ -34,7 +35,7 @@ const UsersStatistics = () => {
               </p>
               <div className="flex gap-2">
                 <span className="font-medium text-2xl text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                  {allUsers?.data?.data?.length}
+                  {allUsers?.data?.total}
                 </span>
                 <span className="font-normal text-[15px] pt-1 text-[#56CA00]">
                   (+29%)

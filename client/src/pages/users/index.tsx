@@ -5,6 +5,11 @@ import SearchInput from "./components/search-input";
 import Button from "./components/button";
 import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useDispatch } from "react-redux";
+import {
+  setUserFilter,
+  type IUserFilter,
+} from "../../shared/lib/features/user-filters";
 
 const Users = () => {
   const { t } = useTranslation("users");
@@ -14,6 +19,23 @@ const Users = () => {
 
   if (isChecked) return <Outlet />;
 
+  const roles = ["superadmin", "admin", "registrator", "market", "courier"];
+  const roleOptions = roles.map((role: string) => ({
+    value: role,
+    label: role,
+  }));
+
+  const status = ["active", "inactive"];
+  const statusOptions = status.map((status: string) => ({
+    value: status,
+    label: status,
+  }));
+
+  const dispatch = useDispatch();
+  const handleFilterChange = (name: keyof IUserFilter, value: string) => {
+    dispatch(setUserFilter({ name, value }));
+  };
+
   return (
     <div className="p-6">
       <UsersStatistics />
@@ -22,10 +44,19 @@ const Users = () => {
           <span className="text-[18px]">{t("filters")}</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-5 pt-[16px] pl-[20px] pr-[20px] max-[1000px]:grid-cols-2 max-[750px]:grid-cols-1">
-          <Select text={t("selectRole")} />
-          <Select text={t("selectLocation")} />
-          <Select text={t("selectStatus")} />
+        <div className="grid grid-cols-2 gap-5 pt-[16px] pl-[20px] pr-[20px] max-[750px]:grid-cols-1">
+          <Select
+            name="role"
+            text={t("selectRole")}
+            options={roleOptions}
+            onChange={handleFilterChange}
+          />
+          <Select
+            name="status"
+            text={t("selectStatus")}
+            options={statusOptions}
+            onChange={handleFilterChange}
+          />
         </div>
 
         <div className="w-full border border-[#E9E8EA] my-[20px] dark:border-[#E7E3FC38]"></div>

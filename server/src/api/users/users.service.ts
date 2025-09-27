@@ -445,8 +445,8 @@ export class UserService {
         {
           data: users,
           total,
-          page: unlimited ? 1 : page,
-          limit: unlimited ? total : limit,
+          page: unlimited ? 1 : Number(page),
+          limit: unlimited ? total : Number(limit),
           totalPages: unlimited ? 1 : Math.ceil(total / limit),
         },
         200,

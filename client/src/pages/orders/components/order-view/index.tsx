@@ -1,12 +1,14 @@
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import TableSkeleton from "../ordersTabelSkeleton/ordersTableSkeleton";
 import { Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../../../shared/hooks/useParams";
 import { useTranslation } from "react-i18next";
 import type { RootState } from "../../../../app/store";
+import { exportToExcel } from "../../../../shared/helpers/export-download-excel";
+import { resetDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -80,6 +82,54 @@ const OrderView = () => {
       setParam("limit", limit);
     }
   };
+
+  const dispatch = useDispatch();
+  const triggerDownload = useSelector(
+    (state: RootState) => state.requestDownload
+  );
+
+  useEffect(() => {
+    const downloadExcel = async () => {
+      try {
+        const isFiltered = Object.keys(cleanedFilters).length > 0;
+        const BASE_URL = "http://localhost:8080";
+
+        const response = await fetch(
+          `${BASE_URL}/api/v1/order?page=1&limit=10${new URLSearchParams(
+            cleanedFilters
+          )}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
+            },
+          }
+        );
+
+        const rawText = await response.text();
+        console.log("🔍 RAW RESPONSE:", rawText);
+
+        let data;
+        try {
+          data = JSON.parse(rawText);
+        } catch {
+          throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
+        }
+
+        exportToExcel(
+          data?.data?.data || [],
+          isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
+        );
+      } catch (err) {
+        console.error("Excel yuklashda xatolik:", err);
+      } finally {
+        dispatch(resetDownload());
+      }
+    };
+
+    if (triggerDownload.triggerDownload) {
+      downloadExcel();
+    }
+  }, [triggerDownload, dispatch]);
 
   return (
     <div className="w-full bg-white py-1 dark:bg-[#312d4b] min-[650px]:overflow-x-auto">

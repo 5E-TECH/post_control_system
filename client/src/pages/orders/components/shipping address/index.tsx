@@ -8,7 +8,7 @@ import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 interface IProps {
   address: string;
   districtId: string; // order kelgan tuman id
-  id:string
+  id: string;
 }
 
 const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
@@ -30,10 +30,8 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   const [selectedDistrict, setSelectedDistrict] = useState<string>(""); // tuman
 
   // tanlangan region bo‘yicha tumanlarni olish
-  const {
-    data: districtByRegionId,
-    refetch: refetchDistricts,
-  } = getRegionsById(selectedRegion, isShowPopup);
+  const { data: districtByRegionId, refetch: refetchDistricts } =
+    getRegionsById(selectedRegion, isShowPopup);
 
   // 🔹 1 — districtId orqali regionni aniqlash va set qilish
   useEffect(() => {
@@ -75,13 +73,10 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
       district_id: selectedDistrict,
     };
 
-    console.log("Yuboriladigan ma'lumot:", dataToSend);
-
     updateOrdersUserAddress.mutate(
       { id, data: dataToSend },
       {
         onSuccess: () => {
-          console.log("Manzil muvaffaqiyatli yangilandi");
           setIsShowPopup(false);
         },
       }
