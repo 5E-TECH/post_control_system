@@ -327,13 +327,22 @@ export class CashBoxService
           throw new NotFoundException('Market cashbox topilmadi');
         }
 
-        const allSoldOrders = await transaction.manager.find(OrderEntity, {
-          where: {
-            status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
-            user_id: market_id,
-          },
-          order: { updated_at: 'ASC' },
-        });
+        const allSoldOrders = await this.orderRepo
+          .createQueryBuilder('o')
+          .where('o.user_id = :market_id', { market_id })
+          .andWhere('o.status IN (:...statuses)', {
+            statuses: [Order_status.PARTLY_PAID, Order_status.SOLD],
+          })
+          .orderBy(
+            `
+    CASE 
+      WHEN o.status = '${Order_status.PARTLY_PAID}' THEN 1
+      WHEN o.status = '${Order_status.SOLD}' THEN 2
+    END
+  `,
+          )
+          .addOrderBy('o.updated_at', 'ASC')
+          .getMany();
 
         mainCashbox.balance -= amount;
         await transaction.manager.save(mainCashbox);
@@ -458,13 +467,22 @@ export class CashBoxService
         throw new BadRequestException(`Asosiy kassada mablag' yetarli emas`);
       }
 
-      const allSoldOrders = await queryRunner.manager.find(OrderEntity, {
-        where: {
-          status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
-          user_id: market_id,
-        },
-        order: { updated_at: 'ASC' },
-      });
+      const allSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.user_id = :market_id', { market_id })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [Order_status.PARTLY_PAID, Order_status.SOLD],
+        })
+        .orderBy(
+          `
+    CASE 
+      WHEN o.status = '${Order_status.PARTLY_PAID}' THEN 1
+      WHEN o.status = '${Order_status.SOLD}' THEN 2
+    END
+  `,
+        )
+        .addOrderBy('o.updated_at', 'ASC')
+        .getMany();
 
       // ✅ Main cashboxdan pul ayirish
       mainCashbox.balance -= amount;
