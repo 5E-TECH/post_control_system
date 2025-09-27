@@ -96,6 +96,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
         .orderBy('order.created_at', 'DESC');
 
       if (query.status) {
