@@ -373,6 +373,8 @@ const renderCouriersChart = (
   />
 );
 
+
+//Charts
 const ChartWrapper = ({
   title,
   data,
@@ -395,7 +397,27 @@ const ChartWrapper = ({
       >
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis type="number" />
-        <YAxis type="category" dataKey="nomi" width={200} />
+
+        {/* 🔹 YAxis custom tick */}
+        <YAxis
+          type="category"
+          dataKey="nomi"
+          width={15}
+          tick={({ x, y, payload }) => (
+            <text
+              x={x - 5}
+              y={y}
+              dy={4}
+              textAnchor="end"
+              className="fill-gray-800 dark:fill-gray-100"
+            >
+              {payload.value.length > 4
+                ? payload.value.slice(0, 4) + "..."
+                : payload.value}
+            </text>
+          )}
+        />
+
         <Tooltip
           cursor={{ fill: "rgba(0,0,0,0.05)" }}
           content={({ payload }) => {
@@ -448,6 +470,7 @@ const ChartWrapper = ({
     </div>
   </div>
 );
+
 
 // 🔹 Top Markets Table
 const renderMarketsTable = (markets: any[]) => (
