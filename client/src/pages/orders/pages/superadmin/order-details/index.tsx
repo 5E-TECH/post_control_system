@@ -26,6 +26,7 @@ const OrderDetails = () => {
             <Details
               items={data?.data?.items}
               total_price={data?.data?.total_price}
+              // marketId={data?.data?.market?.id}
             />
           </div>
         </div>
