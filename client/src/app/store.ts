@@ -12,7 +12,8 @@ import resetFilter from "../shared/lib/features/order-filters";
 import setFilter from "../shared/lib/features/order-filters";
 import setUserFilter from "../shared/lib/features/user-filters";
 import resetUserFilter from "../shared/lib/features/user-filters";
-
+import requestDownload from "../shared/lib/features/excel-download-func/excelDownloadFunc";
+import resetDownload from "../shared/lib/features/excel-download-func/excelDownloadFunc";
 export const store = configureStore({
   reducer: {
     authSlice,
@@ -28,6 +29,8 @@ export const store = configureStore({
     resetFilter,
     setUserFilter,
     resetUserFilter,
+    requestDownload,
+    resetDownload,
   },
 });
 

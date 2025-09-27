@@ -13,6 +13,7 @@ import { setFilter } from "../../../../shared/lib/features/order-filters";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
+import { requestDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 
 const Filter = () => {
   const { t } = useTranslation("orderList");
@@ -65,6 +66,11 @@ const Filter = () => {
       return;
     }
     navigate("/orders/choose-market");
+  };
+
+  // excel download
+  const handleDownload = () => {
+    dispatch(requestDownload());
   };
 
   // options
@@ -131,6 +137,11 @@ const Filter = () => {
         </Space>
 
         <div className="flex items-center gap-5 flex-wrap max-[800px]:w-full">
+          <div onClick={handleDownload}>
+            <Button className="border border-gray-300 px-6 py-2 rounded-[6px] cursor-pointer hover:opacity-80">
+              Export
+            </Button>
+          </div>
           <input
             type="text"
             name="search"
