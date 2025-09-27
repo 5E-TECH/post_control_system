@@ -10,7 +10,14 @@ import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { catchError } from 'src/infrastructure/lib/response';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
-import { Between, DataSource, DeepPartial, In } from 'typeorm';
+import {
+  Between,
+  DataSource,
+  DeepPartial,
+  In,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+} from 'typeorm';
 import {
   Cashbox_type,
   Operation_type,
@@ -631,15 +638,21 @@ export class CashBoxService
       });
 
       // vaqt oralig‘i
-      let fromDate: number;
-      let toDate: number;
-      if (filters?.fromDate && filters?.toDate) {
+      let fromDate: number | undefined;
+      let toDate: number | undefined;
+
+      const where: any = {};
+
+      if (filters?.fromDate && filters.toDate) {
         fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
         toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
-      } else {
-        const today = new Date();
-        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
-        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+        where.created_at = Between(fromDate, toDate);
+      } else if (filters?.fromDate) {
+        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
+        where.created_at = MoreThanOrEqual(fromDate);
+      } else if (filters?.toDate) {
+        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+        where.created_at = LessThanOrEqual(toDate);
       }
 
       // pagination parametrlari
@@ -650,7 +663,7 @@ export class CashBoxService
       // tarixlarni pagination bilan olish
       const [allCashboxHistories, total] =
         await this.cashboxHistoryRepo.findAndCount({
-          where: { created_at: Between(fromDate, toDate) },
+          where,
           relations: ['createdByUser'],
           order: { created_at: 'DESC' },
           skip,
@@ -678,8 +691,8 @@ export class CashBoxService
           totalPages: Math.ceil(total / limit),
         },
         filter: {
-          fromDate,
-          toDate,
+          fromDate: fromDate ?? null,
+          toDate: toDate ?? null,
         },
       });
     } catch (error) {
