@@ -45,13 +45,14 @@ const Users = () => {
         </div>
 
         <div className="grid grid-cols-2 gap-5 pt-[16px] pl-[20px] pr-[20px] max-[750px]:grid-cols-1">
-          <Select
+          <Select<keyof IUserFilter>
             name="role"
             text={t("selectRole")}
             options={roleOptions}
             onChange={handleFilterChange}
           />
-          <Select
+
+          <Select<keyof IUserFilter>
             name="status"
             text={t("selectStatus")}
             options={statusOptions}
