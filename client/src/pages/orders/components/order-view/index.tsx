@@ -95,7 +95,7 @@ const OrderView = () => {
         const BASE_URL = "http://localhost:8080";
 
         const response = await fetch(
-          `${BASE_URL}/api/v1/order?page=1&limit=10${new URLSearchParams(
+          `${BASE_URL}/api/v1/order?page=1&limit=0&${new URLSearchParams(
             cleanedFilters
           )}`,
           {
@@ -106,7 +106,6 @@ const OrderView = () => {
         );
 
         const rawText = await response.text();
-        console.log("🔍 RAW RESPONSE:", rawText);
 
         let data;
         try {
@@ -114,9 +113,25 @@ const OrderView = () => {
         } catch {
           throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
         }
-
+        const orders = data?.data?.data;
+        const exportData = orders?.map((order: any, inx: number) => ({
+          N: inx + 1,
+          Viloyat: undefined,
+          Tuman: order?.customer?.district?.name,
+          Firma: order?.market?.name,
+          Mahsulot: undefined,
+          "Telefon raqam": order?.customer?.phone_number,
+          Narxi: order?.total_price?.toLocaleString(),
+          Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }));
         exportToExcel(
-          data?.data?.data || [],
+          exportData || [],
           isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
         );
       } catch (err) {
