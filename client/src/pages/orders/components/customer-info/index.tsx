@@ -110,7 +110,7 @@ const CustomerInfocomp = () => {
             } as any);
           }}
           placeholder="+998 90 123 45 67"
-          className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]!"
+          className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
         />
 
         {/* {allNumbers?.length ? (
@@ -163,7 +163,7 @@ const CustomerInfocomp = () => {
             value={formData.name}
             onChange={handleChange}
             placeholder={t("placeholder.name")}
-            className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
           />
         </div>
 
@@ -176,7 +176,7 @@ const CustomerInfocomp = () => {
             value={formData.address}
             onChange={handleChange}
             placeholder={t("placeholder.address")}
-            className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
           />
         </div>
       </div>
