@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 const UsersStatistics = () => {
   const { t } = useTranslation("users");
   const { getUser } = useUser();
-  const { data: allUsers } = getUser({ limit: "0" });
+  const { data: allUsers } = getUser({ limit: 0 });
   const markets = Array.isArray(allUsers?.data?.data)
     ? allUsers?.data?.data?.filter((user: any) => user.role === "market")
     : [];
