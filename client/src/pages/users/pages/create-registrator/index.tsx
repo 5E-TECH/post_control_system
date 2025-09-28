@@ -57,7 +57,7 @@ const CreateRegistrator = () => {
   };
 
   return (
-    <div className="w-[420px]">
+    <div className="min-[800px]:w-[420px]">
       <h1 className="font-medium text-[24px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
         {t("registratorTitle")}
       </h1>
