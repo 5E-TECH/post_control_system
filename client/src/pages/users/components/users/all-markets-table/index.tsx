@@ -6,19 +6,19 @@ import type { RootState } from "../../../../../app/store";
 
 const MarketsTable = () => {
   const userFilter = useSelector((state: RootState) => state.setUserFilter);
-
   const { getUser } = useUser();
+
   const { data, isLoading } = getUser({
     search: userFilter.search as string,
-    role: userFilter.role as string,
+    role: "market",
     status: userFilter.status as string,
     page: userFilter.page as number,
-    limit:
-      (userFilter.limit as number) >= 10 ? (userFilter.limit as number) : 0,
+    limit: userFilter.limit as number,
   });
-  const markets =
-    data?.data?.data?.filter((market: any) => market?.role === "market") || [];
-  const total = markets?.length;
+
+  const markets = Array.isArray(data?.data?.data) ? data.data.data : [];
+  const total = data?.data?.total || 0;
+
   return <UserTableComp data={markets} isLoading={isLoading} total={total} />;
 };
 

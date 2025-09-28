@@ -26,8 +26,16 @@ export const useUser = (path?: string) => {
       queryFn: () => api.get("user", { params }).then((res) => res.data),
     });
 
+  const getUsersExceptMarket = (params?: IUserFilter) =>
+    useQuery({
+      queryKey: [user, params],
+      queryFn: () =>
+        api.get("user/except-market", { params }).then((res) => res.data),
+    });
+
   return {
     createUser,
     getUser,
+    getUsersExceptMarket,
   };
 };
