@@ -114,12 +114,15 @@ const OrderView = () => {
           throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
         }
         const orders = data?.data?.data;
+        console.log(orders);
         const exportData = orders?.map((order: any, inx: number) => ({
           N: inx + 1,
-          Viloyat: undefined,
+          Viloyat: order?.customer?.district?.region?.name,
           Tuman: order?.customer?.district?.name,
           Firma: order?.market?.name,
-          Mahsulot: undefined,
+          Mahsulot: order?.items
+            ?.map((item: any) => item.product.name)
+            ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
           Narxi: order?.total_price?.toLocaleString(),
           Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
