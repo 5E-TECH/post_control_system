@@ -94,7 +94,7 @@ const CreateCourier = () => {
           rules={[{ required: true, message: t("enterName") }]}
         >
           <Input
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterName")}
           />
         </Form.Item>
@@ -111,7 +111,7 @@ const CreateCourier = () => {
         >
           <Input
             placeholder={t("enterPhoneNumber")}
-            className="h-[48px]"
+            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             type="text"
             onChange={handlePhoneChange}
           />
@@ -121,9 +121,9 @@ const CreateCourier = () => {
           name="password"
           rules={[{ required: true, message: t("enterPassword") }]}
         >
-          <Input
+          <Input.Password
             type="password"
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="custom-password h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:text-[#E7E3FC66]!"
             placeholder={t("enterPassword")}
           />
         </Form.Item>
@@ -142,7 +142,7 @@ const CreateCourier = () => {
         >
           <Input
             type="number"
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterHomeTariff")}
           />
         </Form.Item>
@@ -161,7 +161,7 @@ const CreateCourier = () => {
         >
           <Input
             type="number"
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterCenterTariff")}
           />
         </Form.Item>

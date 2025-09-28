@@ -15,7 +15,7 @@ const CustomerDetails = () => {
 
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const marketId = market?.id;
-  
+
   // URL’dan page olish
   const { getParam, setParam, removeParam } = useParamsHook();
   const page = Number(getParam("page") || 1);
@@ -105,7 +105,10 @@ const CustomerDetails = () => {
                   data-cell="TELEFON RAQAMI"
                 >
                   <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
-                    {order?.customer?.phone_number}
+                    {order?.customer?.phone_number.replace(
+                      /^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/,
+                      "+$1 $2 $3 $4 $5"
+                    )}
                   </span>
                 </td>
                 <td

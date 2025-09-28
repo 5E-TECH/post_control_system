@@ -114,7 +114,6 @@ const OrderView = () => {
           throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
         }
         const orders = data?.data?.data;
-        console.log(orders);
         const exportData = orders?.map((order: any, inx: number) => ({
           N: inx + 1,
           Viloyat: order?.customer?.district?.region?.name,

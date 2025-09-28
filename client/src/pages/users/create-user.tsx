@@ -28,7 +28,7 @@ const CreateUser = () => {
               `${
                 isActive
                   ? "bg-gradient-to-r from-[#CDB5FF] via-[#A378FF] to-[#8146FF] text-white"
-                  : "bg-white text-black border border-[#2E263D1F] dark:bg-[#312D4B] dark:text-white"
+                  : "bg-white text-black dark:border dark:border-[#ffffff1a] dark:bg-[#312D4B] dark:text-white"
               } rounded-xl shadow-md p-[20px] w-[300px] hover:scale-[1.02] transition-all duration-300`
             }
             to={""}
@@ -42,7 +42,7 @@ const CreateUser = () => {
               `${
                 isActive
                   ? "bg-gradient-to-r from-[#CDB5FF] via-[#A378FF] to-[#8146FF] text-white"
-                  : "bg-white text-black border border-[#2E263D1F] dark:bg-[#312D4B] dark:text-white"
+                  : "bg-white text-black dark:border dark:border-[#ffffff1a] dark:bg-[#312D4B] dark:text-white"
               } rounded-xl shadow-md p-[20px] w-[300px] hover:scale-[1.02] transition-all duration-300`
             }
             to={"registrator"}
@@ -55,7 +55,7 @@ const CreateUser = () => {
               `${
                 isActive
                   ? "bg-gradient-to-r from-[#CDB5FF] via-[#A378FF] to-[#8146FF] text-white"
-                  : "bg-white text-black border border-[#2E263D1F] dark:bg-[#312D4B] dark:text-white"
+                  : "bg-white text-black dark:border dark:border-[#ffffff1a] dark:bg-[#312D4B] dark:text-white"
               } rounded-xl shadow-md p-[20px] w-[300px] hover:scale-[1.02] transition-all duration-300`
             }
             to={"courier"}
@@ -68,7 +68,7 @@ const CreateUser = () => {
               `${
                 isActive
                   ? "bg-gradient-to-r from-[#CDB5FF] via-[#A378FF] to-[#8146FF] text-white"
-                  : "bg-white text-black border border-[#2E263D1F] dark:bg-[#312D4B] dark:text-white"
+                  : "bg-white text-black dark:border dark:border-[#ffffff1a] dark:bg-[#312D4B] dark:text-white"
               } rounded-xl shadow-md p-[20px] w-[300px] hover:scale-[1.02] transition-all duration-300`
             }
             to={"market"}
