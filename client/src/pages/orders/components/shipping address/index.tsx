@@ -28,23 +28,18 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
 
   const { updateOrdersUserAddress } = useOrder();
 
-  // district va regionlarni olish
   const { getDistrictById } = useDistrict();
   const { data: districtData } = getDistrictById(districtId, isShowPopup);
-  console.log(districtData);
 
   const { getRegionsById, getRegions } = useRegion();
   const { data: regionData } = getRegions(isShowPopup); // barcha viloyatlar
 
-  // default viloyat (districtId orqali)
-  const [selectedRegion, setSelectedRegion] = useState<string>(""); // viloyat
-  const [selectedDistrict, setSelectedDistrict] = useState<string>(""); // tuman
+  const [selectedRegion, setSelectedRegion] = useState<string>("");
+  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
 
-  // tanlangan region bo‘yicha tumanlarni olish
   const { data: districtByRegionId, refetch: refetchDistricts } =
     getRegionsById(selectedRegion, isShowPopup);
 
-  // 🔹 1 — districtId orqali regionni aniqlash va set qilish
   useEffect(() => {
     if (districtData?.data?.region?.id) {
       setSelectedRegion(districtData?.data?.region?.id);
@@ -52,33 +47,28 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
     }
   }, [districtData, districtId]);
 
-  // 🔹 2 — region o‘zgarganda tumanni qayta olish
   useEffect(() => {
     if (selectedRegion) {
       refetchDistricts();
     }
   }, [selectedRegion, refetchDistricts]);
 
-  // 🔹 3 — region o‘zgarsa district reset bo‘lsin
   useEffect(() => {
     if (isShowPopup) {
       setSelectedDistrict("");
     }
   }, [selectedRegion, isShowPopup]);
 
-  // region select
   const handleRegionChange = (value: string) => {
     setSelectedRegion(value);
   };
 
-  // district select
   const handleDistrictChange = (value: string) => {
     setSelectedDistrict(value);
   };
 
   const [api, contextHolder] = useNotification();
 
-  // yangilash
   const { handleApiError } = useApiNotification();
   const handleUpdate = () => {
     const dataToSend = {
@@ -97,13 +87,6 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
             placement: "topRight",
           });
         },
-        onError: () => {
-          api.error({
-            message: "Xatolik!",
-            description: "Order yangilashda muammo yuzaga berdi.",
-            placement: "topRight",
-          });
-        },
         onError: (err: any) =>
           handleApiError(
             err,
@@ -114,35 +97,6 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
-  return (
-    <div>
-      <div className="m-5">
-        <div className="flex justify-between">
-          <h2
-            className={`font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]`}
-          >
-            Shipping address
-          </h2>
-          <button
-            onClick={() => setIsShowPopup(true)}
-            className="text-[15px] font-medium text-[#8C57FF] hover:underline"
-          >
-            Edit
-          </button>
-        </div>
-      </div>
-      <div className="m-5">
-        <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] ">
-          {address}
-        </h2>
-      </div>
-
-      {/* Popup */}
-      <Popup isShow={isShowPopup} onClose={() => setIsShowPopup(false)}>
-        <div className="bg-white dark:bg-[#28243d] w-[400px] rounded-2xl shadow-lg p-6">
-          <h2 className="text-lg font-medium mb-4 dark:text-white">
-            Edit Shipping Address
-          </h2>
 
   return (
     <Context.Provider value={contextValue}>
@@ -188,7 +142,6 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
                 ))}
               </Select>
 
-              {/* Tumanni tanlash */}
               <Select
                 value={selectedDistrict}
                 onChange={handleDistrictChange}
@@ -202,8 +155,6 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
                 ))}
               </Select>
 
-              {/* Manzil */}
-
               <Input
                 value={newAddress}
                 onChange={(e) => setNewAddress(e.target.value)}
@@ -211,7 +162,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
                 className="w-full mb-3 dark:bg-[#312D4B]! dark:outline-none! dark:text-white! dark:placeholder-gray-400!"
               />
             </div>
-            {/* Tugmalar */}
+
             <div className="flex justify-end gap-3 mt-5">
               <button
                 onClick={() => setIsShowPopup(false)}
