@@ -1,26 +1,36 @@
-import { memo, type FC, useState, type ChangeEvent, useEffect } from "react";
+import {
+  memo,
+  type FC,
+  useState,
+  useEffect,
+  createContext,
+  useMemo,
+} from "react";
 import Popup from "../../../../shared/ui/Popup";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
-// import { useParams } from "react-router-dom";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
+import { Input, Select } from "antd";
+import useNotification from "antd/es/notification/useNotification";
 
 interface IProps {
   address: string;
   districtId: string; // order kelgan tuman id
-  id:string
+  id: string;
 }
+
+const Context = createContext({ name: "Default" });
 
 const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   const [isShowPopup, setIsShowPopup] = useState(false);
   const [newAddress, setNewAddress] = useState(address);
 
   const { updateOrdersUserAddress } = useOrder();
-  // const { id } = useParams();
 
   // district va regionlarni olish
   const { getDistrictById } = useDistrict();
-  const { data: districtData } = getDistrictById(districtId, isShowPopup); // district detail
+  const { data: districtData } = getDistrictById(districtId, isShowPopup);
+  console.log(districtData);
 
   const { getRegionsById, getRegions } = useRegion();
   const { data: regionData } = getRegions(isShowPopup); // barcha viloyatlar
@@ -30,16 +40,14 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   const [selectedDistrict, setSelectedDistrict] = useState<string>(""); // tuman
 
   // tanlangan region bo‘yicha tumanlarni olish
-  const {
-    data: districtByRegionId,
-    refetch: refetchDistricts,
-  } = getRegionsById(selectedRegion, isShowPopup);
+  const { data: districtByRegionId, refetch: refetchDistricts } =
+    getRegionsById(selectedRegion, isShowPopup);
 
   // 🔹 1 — districtId orqali regionni aniqlash va set qilish
   useEffect(() => {
     if (districtData?.data?.region?.id) {
-      setSelectedRegion(districtData?.data?.region?.id); // regionni avtomatik set qiladi
-      setSelectedDistrict(districtId); // districtni avtomatik set qiladi
+      setSelectedRegion(districtData?.data?.region?.id);
+      setSelectedDistrict(districtId);
     }
   }, [districtData, districtId]);
 
@@ -52,126 +60,140 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
 
   // 🔹 3 — region o‘zgarsa district reset bo‘lsin
   useEffect(() => {
-    // districtni reset qilish — faqat agar user o‘zgartirsa
     if (isShowPopup) {
       setSelectedDistrict("");
     }
   }, [selectedRegion, isShowPopup]);
 
   // region select
-  const handleRegionChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedRegion(e.target.value);
+  const handleRegionChange = (value: string) => {
+    setSelectedRegion(value);
   };
 
   // district select
-  const handleDistrictChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedDistrict(e.target.value);
+  const handleDistrictChange = (value: string) => {
+    setSelectedDistrict(value);
   };
+
+  const [api, contextHolder] = useNotification();
 
   // yangilash
   const handleUpdate = () => {
     const dataToSend = {
       address: newAddress,
-      district_id: selectedDistrict,
+      district_id: selectedDistrict || districtId,
     };
-
-    console.log("Yuboriladigan ma'lumot:", dataToSend);
 
     updateOrdersUserAddress.mutate(
       { id, data: dataToSend },
       {
         onSuccess: () => {
-          console.log("Manzil muvaffaqiyatli yangilandi");
           setIsShowPopup(false);
+          api.success({
+            message: "Muvaffaqiyatli!",
+            description: "Order manzili muvaffaqiyatli yangilandi.",
+            placement: "topRight",
+          });
+        },
+        onError: () => {
+          api.error({
+            message: "Xatolik!",
+            description: "Order yangilashda muammo yuzaga berdi.",
+            placement: "topRight",
+          });
         },
       }
     );
   };
 
+  const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
+
   return (
-    <div>
-      <div className="m-5">
-        <div className="flex justify-between">
-          <h2
-            className={`font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]`}
-          >
-            Shipping address
-          </h2>
-          <button
-            onClick={() => setIsShowPopup(true)}
-            className="text-[15px] font-medium text-[#8C57FF] hover:underline"
-          >
-            Edit
-          </button>
-        </div>
-      </div>
-      <div className="m-5">
-        <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] ">
-          {address}
-        </h2>
-      </div>
-
-      {/* Popup */}
-      <Popup isShow={isShowPopup} onClose={() => setIsShowPopup(false)}>
-        <div className="bg-white dark:bg-[#28243d] w-[400px] rounded-2xl shadow-lg p-6">
-          <h2 className="text-lg font-medium mb-4 dark:text-white">
-            Edit Shipping Address
-          </h2>
-
-          {/* Viloyat */}
-          <select
-            value={selectedRegion}
-            onChange={handleRegionChange}
-            className="w-full p-2 mb-3 border rounded-md dark:bg-[#1f1b2e] dark:text-white"
-          >
-            <option value="">Viloyatni tanlang</option>
-            {regionData?.data?.map((region: any) => (
-              <option key={region.id} value={region.id}>
-                {region.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Tumanni tanlash */}
-          <select
-            value={selectedDistrict}
-            onChange={handleDistrictChange}
-            className="w-full p-2 mb-3 border rounded-md dark:bg-[#1f1b2e] dark:text-white"
-          >
-            <option value="">Tumanni tanlang</option>
-            {districtByRegionId?.data?.districts?.map((district: any) => (
-              <option key={district.id} value={district.id}>
-                {district.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Manzil */}
-          <input
-            type="text"
-            value={newAddress}
-            onChange={(e) => setNewAddress(e.target.value)}
-            className="w-full p-2 border rounded-md dark:bg-[#1f1b2e] dark:text-white"
-          />
-
-          {/* Tugmalar */}
-          <div className="flex justify-end gap-3 mt-5">
+    <Context.Provider value={contextValue}>
+      {contextHolder}
+      <div>
+        <div className="m-5">
+          <div className="flex justify-between">
+            <h2 className="font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
+              Shipping address
+            </h2>
             <button
-              onClick={() => setIsShowPopup(false)}
-              className="px-4 py-2 rounded-md border dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-[#3a324e]"
+              onClick={() => setIsShowPopup(true)}
+              className="text-[15px] font-medium text-[#8C57FF] hover:underline cursor-pointer"
             >
-              Cancel
-            </button>
-            <button
-              onClick={handleUpdate}
-              className="px-4 py-2 rounded-md bg-[#8C57FF] text-white hover:bg-[#7a4de6]"
-            >
-              Save
+              Edit
             </button>
           </div>
         </div>
-      </Popup>
-    </div>
+        <div className="m-5">
+          <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] ">
+            {address}
+          </h2>
+        </div>
+
+        {/* Popup */}
+        <Popup isShow={isShowPopup} onClose={() => setIsShowPopup(false)}>
+          <div className="bg-white dark:bg-[#28243d] w-[400px] rounded-2xl shadow-lg p-6">
+            <h2 className="text-lg font-medium mb-4 dark:text-white">
+              Edit Shipping Address
+            </h2>
+
+            <div className="flex flex-col  gap-5">
+              <Select
+                value={selectedRegion}
+                onChange={handleRegionChange}
+                placeholder="Viloyatni tanlang"
+                className="w-full mb-3"
+              >
+                {regionData?.data?.map((region: any) => (
+                  <Select.Option key={region.id} value={region.id}>
+                    {region.name}
+                  </Select.Option>
+                ))}
+              </Select>
+
+              {/* Tumanni tanlash */}
+              <Select
+                value={selectedDistrict}
+                onChange={handleDistrictChange}
+                placeholder="Tumanni tanlang"
+                className="w-full mb-3"
+              >
+                {districtByRegionId?.data?.districts?.map((district: any) => (
+                  <Select.Option key={district.id} value={district.id}>
+                    {district.name}
+                  </Select.Option>
+                ))}
+              </Select>
+
+              {/* Manzil */}
+
+              <Input
+                value={newAddress}
+                onChange={(e) => setNewAddress(e.target.value)}
+                placeholder="Manzilni kiriting"
+                className="w-full mb-3 dark:bg-[#312D4B]! dark:outline-none! dark:text-white! dark:placeholder-gray-400!"
+              />
+            </div>
+            {/* Tugmalar */}
+            <div className="flex justify-end gap-3 mt-5">
+              <button
+                onClick={() => setIsShowPopup(false)}
+                className="px-4 py-2 rounded-md border border-[#8C57FF] text-[#8C57FF] dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-[#3a324e]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdate}
+                className="px-4 py-2 rounded-md bg-[#8C57FF] text-white hover:bg-[#7a4de6]"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </Popup>
+      </div>
+    </Context.Provider>
   );
 };
 
