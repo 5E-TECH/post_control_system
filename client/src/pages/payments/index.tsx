@@ -21,7 +21,7 @@ const Payments = () => {
       navigate(`cash-detail/${id}`);
     }
   }, [user, role]);
-
+  
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
 
