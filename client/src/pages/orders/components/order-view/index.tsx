@@ -10,6 +10,7 @@ import type { RootState } from "../../../../app/store";
 import { exportToExcel } from "../../../../shared/helpers/export-download-excel";
 import { resetDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import { BASE_URL } from "../../../../shared/const";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -94,7 +95,6 @@ const OrderView = () => {
     const downloadExcel = async () => {
       try {
         const isFiltered = Object.keys(cleanedFilters).length > 0;
-        const BASE_URL = "http://localhost:8080";
 
         const response = await fetch(
           `${BASE_URL}/api/v1/order?page=1&limit=0&${new URLSearchParams(
