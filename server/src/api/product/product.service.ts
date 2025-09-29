@@ -383,6 +383,7 @@ export class ProductService {
 
       // 🟡 Soft delete qilish
       product.isDeleted = true;
+      product.name = `${product.name + Date.now()}_deleted`;
       await this.productRepo.save(product);
 
       return successRes({}, 200, 'Product deleted');
