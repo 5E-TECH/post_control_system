@@ -61,9 +61,9 @@ const MainDetail = () => {
   const { data: marketData } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
 
-  useEffect(() => {
-    refetch();
-  }, []);
+  // useEffect(() => {
+  //   refetch();
+  // }, []);
 
   const cashboxFill = useMutation({
     mutationFn: ({ data }: { data: any }) => api.patch(`cashbox/fill`, data),
