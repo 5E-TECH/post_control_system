@@ -1,21 +1,50 @@
-import { Spin } from "antd";
+import { Pagination, Spin, type PaginationProps } from "antd";
 import { Edit, Trash } from "lucide-react";
 import { memo, useEffect, useState, type FC } from "react";
 import { useProduct } from "../../api/hooks/useProduct";
 import ConfirmPopup from "../confirmPopup";
 import { useApiNotification } from "../../hooks/useApiNotification";
+import { useParamsHook } from "../../hooks/useParams";
+import { useDispatch } from "react-redux";
+import { setLimit, setPage } from "../../lib/features/paginationProductSlice";
 
 interface IProps {
   data: any;
+  total?: number;
 }
 
-const ProductView: FC<IProps> = ({ data }) => {
+const ProductView: FC<IProps> = ({ data, total }) => {
+  // console.log(total);
+  const dispatch = useDispatch()
+
   const [loading, setLoading] = useState(true);
   const [popup, setPopup] = useState(false);
   const [deleteItem, setDeleteItem] = useState<{
     id: string;
     name: string;
   } | null>(null);
+
+  const { getParam, setParam, removeParam } = useParamsHook();
+  const page = Number(getParam("page") || 1);
+  const limit = Number(getParam("limit") || 10);
+
+  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
+    if (newPage === 1) {
+      dispatch(setPage(newPage))
+      removeParam("page");
+    } else {
+      dispatch(setPage(newPage))
+      setParam("page", newPage);
+    }
+
+    if (limit === 10) {
+      dispatch(setLimit(limit))
+      removeParam("limit");
+    } else {
+      dispatch(setLimit(limit))
+      setParam("limit", limit);
+    }
+  };
 
   const { deleteProduct } = useProduct();
   const { handleSuccess, handleApiError } = useApiNotification();
@@ -42,7 +71,8 @@ const ProductView: FC<IProps> = ({ data }) => {
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
-
+  
+  
   return (
     <div className="mt-4 px-4 overflow-x-auto">
       <Spin spinning={loading} tip="Loading Products...">
@@ -128,6 +158,15 @@ const ProductView: FC<IProps> = ({ data }) => {
           onConfirm={handleDelete}
           onCancel={() => setPopup(false)}
         />
+        <div className="flex justify-center mt-3">
+          <Pagination
+            showSizeChanger
+            current={page}
+            total={total}
+            pageSize={limit}
+            onChange={onChange}
+          />
+        </div>
       </Spin>
     </div>
   );

@@ -24,7 +24,7 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getMyProducts = (params?: { search: string }) =>
+  const getMyProducts = (params?: any) =>
     useQuery({
       queryKey: [product, params],
       queryFn: () =>
@@ -33,11 +33,11 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getProductsByMarket = (marketId: string | undefined, enabled=true) =>
+  const getProductsByMarket = (marketId: string | undefined, enabled=true, params?:any) =>
     useQuery({
-      queryKey: [product, marketId],
+      queryKey: [product, marketId, params],
       queryFn: () =>
-        api.get(`product/market/${marketId}`).then((res) => res.data),
+        api.get(`product/market/${marketId}`, {params}).then((res) => res.data),
       enabled: !!marketId && enabled,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,

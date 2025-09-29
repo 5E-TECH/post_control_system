@@ -14,6 +14,10 @@ import setUserFilter from "../shared/lib/features/user-filters";
 import resetUserFilter from "../shared/lib/features/user-filters";
 import requestDownload from "../shared/lib/features/excel-download-func/excelDownloadFunc";
 import resetDownload from "../shared/lib/features/excel-download-func/excelDownloadFunc";
+import setPage  from "../shared/lib/features/paginationProductSlice";
+import setLimit   from "../shared/lib/features/paginationProductSlice";
+import paginationSlice   from "../shared/lib/features/paginationProductSlice";
+
 export const store = configureStore({
   reducer: {
     authSlice,
@@ -31,6 +35,9 @@ export const store = configureStore({
     resetUserFilter,
     requestDownload,
     resetDownload,
+    setPage,
+    setLimit,
+    paginationSlice
   },
 });
 

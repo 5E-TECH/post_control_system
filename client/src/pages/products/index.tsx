@@ -9,15 +9,19 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { debounce } from "../../shared/helpers/DebounceFunc";
 import Select from "../orders/components/select/select";
-import { marketlar } from "../../shared/static/order";
 
 const Products = () => {
   const [showMarket, setShowMarket] = useState(false);
   const [select, setSelect] = useState<string | null>("");
   const [searchProduct, setSearchProduct] = useState<any>(null);
   const [searchPopup, setSearchPopup] = useState<any>(null);
+  const [searchByMarket, setSearchByMarket] = useState<any>(undefined);
 
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
+  const { page, limit } = useSelector((state: RootState) => state.paginationSlice);
+
+  console.log("pagination", page, limit);
+
   useEffect(() => {
     if (role === "market") {
       setSelect(id);
@@ -25,15 +29,6 @@ const Products = () => {
   }, [role, id]);
 
   const navigate = useNavigate();
-
-  const [form, setForm] = useState({
-    market: "",
-    region: "",
-    status: "",
-    from: "",
-    to: "",
-    order: "",
-  });
 
   const debouncedSearch = useMemo(
     () =>
@@ -51,13 +46,6 @@ const Products = () => {
     []
   );
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
-  ) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
   const handleNavigate = () => {
     navigate(`create/${select}`);
     setSelect("");
@@ -67,8 +55,13 @@ const Products = () => {
   const { getProducts, getMyProducts } = useProduct();
   const { data: productData } =
     role === "market"
-      ? getMyProducts({ search: searchProduct })
-      : getProducts({ search: searchProduct });
+      ? getMyProducts({ search: searchProduct, page, limit })
+      : getProducts({
+          search: searchProduct,
+          marketId: searchByMarket,
+          page,
+          limit,
+        });
 
   const { getMarkets } = useMarket();
 
@@ -76,9 +69,9 @@ const Products = () => {
 
   const { pathname } = useLocation();
 
-  const marketOptions = marketlar?.map((item: any) => (
-    <option key={item.value} value={item.value}>
-      {item.label}
+  const marketOptions = data?.data?.data?.map((item: any) => (
+    <option key={item.id} value={item.id}>
+      {item.name}
     </option>
   ));
 
@@ -95,8 +88,10 @@ const Products = () => {
           <div className="">
             <Select
               name="market"
-              value={form.market}
-              onChange={handleChange}
+              value={searchByMarket}
+              onChange={(e) => {
+                setSearchByMarket(e.target.value);
+              }}
               placeholder="Marketni tanlang"
               className="min-[1100px]:w-[250px] max-[1100px]:w-[250px] max-[800px]:w-full"
             >
@@ -220,6 +215,7 @@ const Products = () => {
       <div>
         <ProductView
           data={productData?.data?.data || productData?.data?.items}
+          total={productData?.data?.total}
         />
       </div>
     </div>
