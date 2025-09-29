@@ -14,7 +14,7 @@ const CourierSidebar = () => {
       label: t("orders"),
     },
     { to: "/courier-mails", icon: <MailOpen />, label: t("mails") },
-    { to: "/payments", icon: <FileText />, label: t("payments") },
+    { to: "/cash-box", icon: <FileText />, label: t("payments") },
   ];
    
   return (

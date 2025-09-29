@@ -20,7 +20,7 @@ const MarketSidebar = () => {
       label: t("new_orders"),
     },
     { to: "/products", icon: <Apple />, label: t("products") },
-    { to: "/payments", icon: <FileText />, label: t("payments") },
+    { to: "/cash-box", icon: <FileText />, label: t("payments") },
   ];
 
   return (
