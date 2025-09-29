@@ -36,7 +36,7 @@ const Details: FC<IProps> = ({
   const [delevery, setDelivery] = useState(deleveryStatus);
 
   const { getProductsByMarket } = useProduct();
-  const { data } = getProductsByMarket(marketId);
+  const { data } = getProductsByMarket(marketId, isModalOpen);
 
   const selectedProduct = data?.data?.find((p: any) => p.id === selectedId);
 

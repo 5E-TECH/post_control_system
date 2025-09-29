@@ -33,12 +33,12 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getProductsByMarket = (marketId: string | undefined) =>
+  const getProductsByMarket = (marketId: string | undefined, enabled=true) =>
     useQuery({
       queryKey: [product, marketId],
       queryFn: () =>
         api.get(`product/market/${marketId}`).then((res) => res.data),
-      enabled: !!marketId,
+      enabled: !!marketId && enabled,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
