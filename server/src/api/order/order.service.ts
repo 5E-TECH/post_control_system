@@ -306,6 +306,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('customer.district', 'district')
         .where('order.status = :status', { status: Order_status.NEW })
         .andWhere('order.user_id = :userId', { userId: user.id });
 
