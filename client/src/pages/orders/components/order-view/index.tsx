@@ -110,7 +110,7 @@ const OrderView = () => {
         const isFiltered = Object.keys(cleanedFilters).length > 0;
 
         const response = await fetch(
-          `${BASE_URL}/api/v1/order?page=1&limit=0&${new URLSearchParams(
+          `${BASE_URL}order?page=1&limit=0&${new URLSearchParams(
             cleanedFilters
           )}`,
           {
