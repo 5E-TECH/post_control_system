@@ -310,6 +310,60 @@ export class UsersController {
     return this.userService.allMarkets(search, page, limit);
   }
 
+  @ApiOperation({ summary: 'List all users except MARKET role' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by name or phone number',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'User status (e.g., ACTIVE, INACTIVE)',
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    enum: [Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER],
+    description: 'Filter by role (only SUPERADMIN, ADMIN, COURIER)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page (default: 10)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Users (excluding MARKET) retrieved successfully',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('except-market')
+  findAllUsersExceptMarket(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('role') role?: Roles,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.userService.allUsersExceptMarket({
+      search,
+      status,
+      role,
+      page,
+      limit,
+    });
+  }
+
   @ApiOperation({ summary: 'List all couriers' })
   @ApiResponse({ status: 200, description: 'Couriers retrieved successfully' })
   @UseGuards(JwtGuard, RolesGuard)
@@ -410,7 +464,7 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'User ID (must match current user)' })
   @ApiBody({ type: UpdateSelfDto })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
-  @UseGuards(JwtGuard, RolesGuard, SelfGuard)
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
   @Patch('self')
   selfUpdate(

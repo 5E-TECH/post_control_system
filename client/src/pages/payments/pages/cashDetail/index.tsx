@@ -8,9 +8,11 @@ import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import dayjs from "dayjs";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 const { RangePicker } = DatePicker;
-
 
 const CashDetail = () => {
   const { id } = useParams();
@@ -40,15 +42,21 @@ const CashDetail = () => {
 
   const [show, setShow] = useState(true);
 
+  const user = useSelector((state: RootState) => state.roleSlice);
+  const role = user.role;
   const { getCashBoxById, createPaymentMarket, createPaymentCourier } =
     useCashBox();
   const { getMarkets } = useMarket();
 
-  const { data, refetch } = getCashBoxById(id);
+  const { data, refetch } = getCashBoxById(
+    id,
+    role === "superadmin" || role === "admin"
+  );
   const { data: marketData } = getMarkets(
     form.payment == "click_to_market" ? true : false
   );
 
+  const { handleApiError } = useApiNotification();
   const handleSubmit = () => {
     const dataCourier = {
       courier_id: id,
@@ -79,9 +87,11 @@ const CashDetail = () => {
           });
           refetch();
         },
-        onError: (err) => {
-          console.log(err);
-        },
+        onError: (err) =>
+          handleApiError(
+            err,
+            "To'lov yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
       });
     } else {
       createPaymentCourier.mutate(dataCourier, {
@@ -97,12 +107,19 @@ const CashDetail = () => {
           });
           refetch();
         },
+        onError: (err) =>
+          handleApiError(
+            err,
+            "To'lov yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
       });
     }
   };
 
   useEffect(() => {
-    refetch();
+    if (role === "superadmin" || role === "admin") {
+      refetch();
+    }
   }, [id]);
 
   const raw = Number(data?.data?.cashbox?.balance || 0);
@@ -123,70 +140,81 @@ const CashDetail = () => {
           show={show}
           setShow={setShow}
         />
-        <div className="mt-5">
-          <h2>{data?.data?.cashbox?.user?.role === 'market' ? "To'lash" : "Qabul qilish"}</h2>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(0,1fr))] w-full gap-4 items-center mt-3">
-            <input
-              name="summa"
-              value={form.summa}
-              onChange={handleChange}
-              className="border  rounded-md px-2 py-2 border-[#d1cfd4] outline-none hover:border-blue-400 "
-              type="number"
-              placeholder="summa"
-            />
-            <Select
-              value={form.payment}
-              onChange={(value) =>
-                setForm((prev) => ({ ...prev, payment: value }))
-              }
-              placeholder="To'lov turi"
-              className="mySelect "
-              size="large"
-              options={[
-                { value: "", label: "to'lov turi", disabled: true },
-                { value: "cash", label: "cash" },
-                { value: "click", label: "click" },
-                ...(data?.data?.cashbox?.user?.role === "market"
-                  ? []
-                  : [{ value: "click_to_market", label: "click_to_market" }]),
-              ]}
-            />
-            {form.payment == "click_to_market" && (
+        {user?.role === "courier" || user?.role === "market" ? null : (
+          <div className="mt-5">
+            <h2>
+              {data?.data?.cashbox?.user?.role === "market"
+                ? "To'lash"
+                : "Qabul qilish"}
+            </h2>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(0,1fr))] w-full gap-4 items-center mt-3">
+              <input
+                name="summa"
+                value={form.summa}
+                onChange={handleChange}
+                className="border  rounded-md px-2 py-2 border-[#d1cfd4] outline-none hover:border-blue-400 "
+                type="number"
+                placeholder="summa"
+              />
               <Select
-                value={form.market}
+                value={form.payment}
                 onChange={(value) =>
-                  setForm((prev) => ({ ...prev, market: value }))
+                  setForm((prev) => ({ ...prev, payment: value }))
                 }
-                placeholder="Kassani tanlang"
-                className="w-[150px]"
+                placeholder="To'lov turi"
+                className="mySelect "
+                size="large"
                 options={[
-                  { value: "", label: "Market tanlang", disabled: true },
-                  ...(marketData?.data?.data?.map((item: any) => ({
-                    value: item.id,
-                    label: item.name,
-                  })) || []),
+                  { value: "", label: "to'lov turi", disabled: true },
+                  { value: "cash", label: "cash" },
+                  { value: "click", label: "click" },
+                  ...(data?.data?.cashbox?.user?.role === "market"
+                    ? []
+                    : [
+                        {
+                          value: "click_to_market",
+                          label: "click_to_market",
+                        },
+                      ]),
                 ]}
               />
-            )}
+              {form.payment == "click_to_market" && (
+                <Select
+                  value={form.market}
+                  onChange={(value) =>
+                    setForm((prev) => ({ ...prev, market: value }))
+                  }
+                  placeholder="Kassani tanlang"
+                  className="w-[150px]"
+                  options={[
+                    { value: "", label: "Market tanlang", disabled: true },
+                    ...(marketData?.data?.data?.map((item: any) => ({
+                      value: item.id,
+                      label: item.name,
+                    })) || []),
+                  ]}
+                />
+              )}
+            </div>
+            <div className="mt-5">
+              <TextArea
+                className="myTextArea"
+                name="comment"
+                size="large"
+                value={form.comment}
+                onChange={handleChange}
+                placeholder="Autosize height based on content lines"
+                autoSize
+              />
+              <button
+                onClick={() => handleSubmit()}
+                className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0]"
+              >
+                Qabul qilish
+              </button>
+            </div>
           </div>
-          <div className="mt-5">
-            <TextArea
-            className="myTextArea"
-              name="comment"
-              size="large"
-              value={form.comment}
-              onChange={handleChange}
-              placeholder="Autosize height based on content lines"
-              autoSize
-            />
-            <button
-              onClick={() => handleSubmit()}
-              className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0]"
-            >
-              Qabul qilish
-            </button>
-          </div>
-        </div>
+        )}
       </div>
       <div className="grid w-full">
         <div className="flex flex-row items-center gap-7">

@@ -402,7 +402,10 @@ export class UserService {
     limit?: number;
   }): Promise<object> {
     try {
-      const { search, status, role, page = 1, limit = 10 } = filters;
+      let { search, status, role, page = 1, limit = 10 } = filters;
+
+      // Agar limit = 0 bo‘lsa → barcha yozuvlarni olish
+      const unlimited = limit === 0;
 
       const qb = this.userRepo
         .createQueryBuilder('user')
@@ -411,7 +414,7 @@ export class UserService {
           excludedRoles: [Roles.CUSTOMER],
         });
 
-      // 🔎 Search: name yoki phone_number bo‘yicha qisman qidirish
+      // 🔎 Search filter
       if (search) {
         qb.andWhere(
           '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
@@ -424,24 +427,27 @@ export class UserService {
         qb.andWhere('user.status = :status', { status });
       }
 
-      // 🎯 Role filter
+      // 🎭 Role filter
       if (role) {
         qb.andWhere('user.role = :role', { role });
       }
 
+      // 🔢 Pagination (faqat limit > 0 bo‘lsa ishlaydi)
+      if (!unlimited) {
+        qb.skip((page - 1) * limit).take(limit);
+      }
+
       const [users, total] = await qb
         .orderBy('user.created_at', 'DESC')
-        .skip((page - 1) * limit)
-        .take(limit)
         .getManyAndCount();
 
       return successRes(
         {
           data: users,
           total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+          page: unlimited ? 1 : Number(page),
+          limit: unlimited ? total : Number(limit),
+          totalPages: unlimited ? 1 : Math.ceil(total / limit),
         },
         200,
         'All users',
@@ -494,6 +500,68 @@ export class UserService {
         },
         200,
         'All markets',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async allUsersExceptMarket(filters: {
+    search?: string;
+    status?: string;
+    role?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<object> {
+    try {
+      let { search, status, role, page = 1, limit = 10 } = filters;
+
+      const unlimited = limit === 0;
+
+      const allowedRoles = [Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER];
+
+      const qb = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.region', 'region')
+        .where('user.role IN (:...allowedRoles)', { allowedRoles });
+
+      // 🔍 Search filter
+      if (search) {
+        qb.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🎯 Status filter
+      if (status) {
+        qb.andWhere('user.status = :status', { status });
+      }
+
+      // 🎭 Role filter — allowedRoles ichida bo'lishi kerak
+      if (role && allowedRoles.includes(role as Roles)) {
+        qb.andWhere('user.role = :role', { role });
+      }
+
+      // 🔢 Pagination
+      if (!unlimited) {
+        qb.skip((page - 1) * limit).take(limit);
+      }
+
+      const [users, total] = await qb
+        .orderBy('user.created_at', 'DESC')
+        .getManyAndCount();
+
+      return successRes(
+        {
+          data: users,
+          total,
+          page: unlimited ? 1 : Number(page),
+          limit: unlimited ? total : Number(limit),
+          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+        },
+        200,
+        'All users with roles: SUPERADMIN, ADMIN, COURIER',
       );
     } catch (error) {
       return catchError(error);

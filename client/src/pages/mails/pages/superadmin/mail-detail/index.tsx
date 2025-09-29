@@ -11,6 +11,7 @@ import { usePost } from "../../../../../shared/api/hooks/usePost";
 import SearchInput from "../../../../users/components/search-input";
 import Popup from "../../../../../shared/ui/Popup";
 import useNotification from "antd/es/notification/useNotification";
+import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
 const Context = createContext({ name: "Default" });
 
@@ -54,7 +55,7 @@ const MailDetail = () => {
 
   const [isShow, setIsShow] = useState(false);
   const [couriers, setCouriers] = useState<any[]>([]);
-
+  const { handleSuccess, handleApiError } = useApiNotification();
   const handleClick = (id: string) => {
     if (selectedIds.length === 0) {
       api.warning({
@@ -76,21 +77,26 @@ const MailDetail = () => {
             orderIds: selectedIds,
             courierId,
           };
+
           sendCouriersToPost(
             { id, data: post },
             {
               onSuccess: (res) => {
                 const courierName = res?.data?.courier?.name;
-                api.success({
-                  message: `✅ Pochta ${courierName} kuryerga jo'natildi`,
-                  placement: "topRight",
-                });
+                handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
                 navigate("/mails");
               },
+              onError: (err: any) =>
+                handleApiError(
+                  err,
+                  "Kuryerga pochta yuborishda xatolik yuz berdi"
+                ),
             }
           );
         }
       },
+      onError: (err: any) =>
+        handleApiError(err, "Kuryerlarni olishda xatolik yuz berdi"),
     });
   };
 
@@ -120,12 +126,11 @@ const MailDetail = () => {
       {
         onSuccess: (res) => {
           const courierName = res?.data?.courier?.name;
-          api.success({
-            message: `✅ Pochta ${courierName} kuryerga jo'natildi`,
-            placement: "topRight",
-          });
+          handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
           navigate("/mails");
         },
+        onError: (err: any) =>
+          handleApiError(err, "Kuryerlarga jo'natishda xatolik yuz berdi."),
       }
     );
   };

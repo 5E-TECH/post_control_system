@@ -5,6 +5,8 @@ import Popup from "../../../../shared/ui/Popup";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { Input } from "antd";
 import useNotification from "antd/es/notification/useNotification";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+
 
 interface IProps {
   customer: {
@@ -37,6 +39,7 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
   const [api, contextHolder] = useNotification();
 
   // saqlash
+  const { handleApiError } = useApiNotification();
   const handleSave = () => {
     const updatedCustomer = {
       name,
@@ -73,6 +76,20 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
+        onSuccess: () => setIsShowPopup(false),
+        onError: (err: any) =>
+          handleApiError(
+            err,
+            "Malumotlarni yangilashda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
+      }
+    );
+  };
+  return (
+    <div>
+      <div className="m-5">
+        <h2 className="dark:text-[#E7E3FC66]">Customer Detail</h2>
+      </div>
 
   return (
     <Context.Provider value={contextValue}>

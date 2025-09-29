@@ -128,6 +128,7 @@ const Details: FC<IProps> = ({
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
 
+const Details: FC<IProps> = ({ items = [], total_price }) => {
   return (
     <Context.Provider value={contextValue}>
       {contextHolder}

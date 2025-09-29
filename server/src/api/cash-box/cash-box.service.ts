@@ -10,7 +10,14 @@ import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { catchError } from 'src/infrastructure/lib/response';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
-import { Between, DataSource, DeepPartial, In } from 'typeorm';
+import {
+  Between,
+  DataSource,
+  DeepPartial,
+  In,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+} from 'typeorm';
 import {
   Cashbox_type,
   Operation_type,
@@ -327,13 +334,22 @@ export class CashBoxService
           throw new NotFoundException('Market cashbox topilmadi');
         }
 
-        const allSoldOrders = await transaction.manager.find(OrderEntity, {
-          where: {
-            status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
-            user_id: market_id,
-          },
-          order: { updated_at: 'ASC' },
-        });
+        const allSoldOrders = await this.orderRepo
+          .createQueryBuilder('o')
+          .where('o.user_id = :market_id', { market_id })
+          .andWhere('o.status IN (:...statuses)', {
+            statuses: [Order_status.PARTLY_PAID, Order_status.SOLD],
+          })
+          .orderBy(
+            `
+    CASE 
+      WHEN o.status = '${Order_status.PARTLY_PAID}' THEN 1
+      WHEN o.status = '${Order_status.SOLD}' THEN 2
+    END
+  `,
+          )
+          .addOrderBy('o.updated_at', 'ASC')
+          .getMany();
 
         mainCashbox.balance -= amount;
         await transaction.manager.save(mainCashbox);
@@ -458,13 +474,22 @@ export class CashBoxService
         throw new BadRequestException(`Asosiy kassada mablag' yetarli emas`);
       }
 
-      const allSoldOrders = await queryRunner.manager.find(OrderEntity, {
-        where: {
-          status: In([Order_status.SOLD, Order_status.PARTLY_PAID]),
-          user_id: market_id,
-        },
-        order: { updated_at: 'ASC' },
-      });
+      const allSoldOrders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.user_id = :market_id', { market_id })
+        .andWhere('o.status IN (:...statuses)', {
+          statuses: [Order_status.PARTLY_PAID, Order_status.SOLD],
+        })
+        .orderBy(
+          `
+    CASE 
+      WHEN o.status = '${Order_status.PARTLY_PAID}' THEN 1
+      WHEN o.status = '${Order_status.SOLD}' THEN 2
+    END
+  `,
+        )
+        .addOrderBy('o.updated_at', 'ASC')
+        .getMany();
 
       // ✅ Main cashboxdan pul ayirish
       mainCashbox.balance -= amount;
@@ -613,15 +638,21 @@ export class CashBoxService
       });
 
       // vaqt oralig‘i
-      let fromDate: number;
-      let toDate: number;
-      if (filters?.fromDate && filters?.toDate) {
+      let fromDate: number | undefined;
+      let toDate: number | undefined;
+
+      const where: any = {};
+
+      if (filters?.fromDate && filters.toDate) {
         fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
         toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
-      } else {
-        const today = new Date();
-        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
-        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+        where.created_at = Between(fromDate, toDate);
+      } else if (filters?.fromDate) {
+        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
+        where.created_at = MoreThanOrEqual(fromDate);
+      } else if (filters?.toDate) {
+        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+        where.created_at = LessThanOrEqual(toDate);
       }
 
       // pagination parametrlari
@@ -632,7 +663,7 @@ export class CashBoxService
       // tarixlarni pagination bilan olish
       const [allCashboxHistories, total] =
         await this.cashboxHistoryRepo.findAndCount({
-          where: { created_at: Between(fromDate, toDate) },
+          where,
           relations: ['createdByUser'],
           order: { created_at: 'DESC' },
           skip,
@@ -660,8 +691,8 @@ export class CashBoxService
           totalPages: Math.ceil(total / limit),
         },
         filter: {
-          fromDate,
-          toDate,
+          fromDate: fromDate ?? null,
+          toDate: toDate ?? null,
         },
       });
     } catch (error) {

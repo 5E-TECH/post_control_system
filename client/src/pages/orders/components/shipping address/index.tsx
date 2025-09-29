@@ -12,6 +12,7 @@ import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { Input, Select } from "antd";
 import useNotification from "antd/es/notification/useNotification";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 interface IProps {
   address: string;
@@ -78,6 +79,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   const [api, contextHolder] = useNotification();
 
   // yangilash
+  const { handleApiError } = useApiNotification();
   const handleUpdate = () => {
     const dataToSend = {
       address: newAddress,
@@ -102,11 +104,45 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
             placement: "topRight",
           });
         },
+        onError: (err: any) =>
+          handleApiError(
+            err,
+            "Malumotlarni yangilashda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
       }
     );
   };
 
   const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
+  return (
+    <div>
+      <div className="m-5">
+        <div className="flex justify-between">
+          <h2
+            className={`font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]`}
+          >
+            Shipping address
+          </h2>
+          <button
+            onClick={() => setIsShowPopup(true)}
+            className="text-[15px] font-medium text-[#8C57FF] hover:underline"
+          >
+            Edit
+          </button>
+        </div>
+      </div>
+      <div className="m-5">
+        <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] ">
+          {address}
+        </h2>
+      </div>
+
+      {/* Popup */}
+      <Popup isShow={isShowPopup} onClose={() => setIsShowPopup(false)}>
+        <div className="bg-white dark:bg-[#28243d] w-[400px] rounded-2xl shadow-lg p-6">
+          <h2 className="text-lg font-medium mb-4 dark:text-white">
+            Edit Shipping Address
+          </h2>
 
   return (
     <Context.Provider value={contextValue}>
