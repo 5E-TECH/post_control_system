@@ -7,6 +7,7 @@ import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { usePost } from "../../../../shared/api/hooks/usePost";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { handleApiError } from "../../../../shared/helpers/handleApiError";
 
 const OrderView = () => {
   const { id } = useParams();
@@ -48,6 +49,11 @@ const OrderView = () => {
           navigate("/order/markets/new-orders");
         }
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Pochtani yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 

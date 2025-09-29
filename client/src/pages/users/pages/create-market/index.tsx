@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useTranslation } from "react-i18next";
+import { handleApiError } from "../../../../shared/helpers/handleApiError";
 
 type FieldType = {
   name: string;
@@ -19,7 +20,6 @@ const CreateMarket = () => {
   const navigate = useNavigate();
 
   const [form] = Form.useForm<FieldType>();
-
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const newMarket = {
       ...values,
@@ -31,6 +31,11 @@ const CreateMarket = () => {
       onSuccess: () => {
         navigate("/all-users");
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Foydalanuvchi yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 

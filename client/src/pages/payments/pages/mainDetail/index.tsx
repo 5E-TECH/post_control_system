@@ -1,10 +1,10 @@
-import { memo, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Form } from 'antd';
-import { CashboxCard } from '../../components/CashCard';
-import { CashboxHistory } from '../../components/paymentHistory';
-import { useCashBox } from '../../../../shared/api/hooks/useCashbox';
-import Popup from '../../../../shared/ui/Popup';
+import { memo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Form } from "antd";
+import { CashboxCard } from "../../components/CashCard";
+import { CashboxHistory } from "../../components/paymentHistory";
+import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
+import Popup from "../../../../shared/ui/Popup";
 import {
   BanknoteArrowDown,
   BanknoteArrowUp,
@@ -13,14 +13,15 @@ import {
   Search,
   Wallet,
   X,
-} from 'lucide-react';
-import { useMarket } from '../../../../shared/api/hooks/useMarket/useMarket';
-import { useCourier } from '../../../../shared/api/hooks/useCourier';
-import TextArea from 'antd/es/input/TextArea';
-import { Select, DatePicker } from 'antd';
-import dayjs from 'dayjs';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../../../shared/api';
+} from "lucide-react";
+import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
+import { useCourier } from "../../../../shared/api/hooks/useCourier";
+import TextArea from "antd/es/input/TextArea";
+import { Select, DatePicker } from "antd";
+import dayjs from "dayjs";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../../../../shared/api";
+import { handleApiError } from "../../../../shared/helpers/handleApiError";
 
 const { RangePicker } = DatePicker;
 
@@ -35,17 +36,17 @@ const MainDetail = () => {
   const client = useQueryClient();
 
   const [form, setForm] = useState({
-    from: '',
-    to: '',
-    order: '',
-    payment: '',
-    summa: '',
-    market: '',
-    comment: '',
+    from: "",
+    to: "",
+    order: "",
+    payment: "",
+    summa: "",
+    market: "",
+    comment: "",
   });
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -67,7 +68,7 @@ const MainDetail = () => {
   const cashboxFill = useMutation({
     mutationFn: ({ data }: { data: any }) => api.patch(`cashbox/fill`, data),
     onSuccess: () => {
-      client.invalidateQueries({ queryKey: ['cashbox'] });
+      client.invalidateQueries({ queryKey: ["cashbox"] });
     },
   });
 
@@ -95,7 +96,12 @@ const MainDetail = () => {
         onSuccess: () => {
           refetch();
         },
-      },
+        onError: (err: any) =>
+          handleApiError(
+            err,
+            "Pul yechishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
+      }
     );
   };
 
@@ -113,16 +119,21 @@ const MainDetail = () => {
           refetch();
           setMaosh(false);
           setForm({
-            from: '',
-            to: '',
-            order: '',
-            payment: '',
-            summa: '',
-            market: '',
-            comment: '',
+            from: "",
+            to: "",
+            order: "",
+            payment: "",
+            summa: "",
+            market: "",
+            comment: "",
           });
         },
-      },
+        onError: (err: any) =>
+          handleApiError(
+            err,
+            "Kassaga pul qo'shishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
+      }
     );
   };
 
@@ -135,7 +146,7 @@ const MainDetail = () => {
           Asosiy kassa
         </h2>
         <CashboxCard
-          role={'superadmin'}
+          role={"superadmin"}
           name={data?.data?.cashbox?.user?.name}
           raw={raw}
           show={show}
@@ -203,16 +214,16 @@ const MainDetail = () => {
                 placeholder="To'lov turi"
                 className="w-[150px]"
                 options={[
-                  { value: '', label: "to'lov turi", disabled: true },
-                  { value: 'cash', label: 'cash' },
-                  { value: 'click', label: 'click' },
+                  { value: "", label: "to'lov turi", disabled: true },
+                  { value: "cash", label: "cash" },
+                  { value: "click", label: "click" },
                 ]}
               />
             </div>
             <div className="mt-5">
               <Form.Item
                 name="comment"
-                rules={[{ required: true, message: 'Izohni kiriting!' }]}
+                rules={[{ required: true, message: "Izohni kiriting!" }]}
               >
                 <TextArea
                   placeholder="Autosize height based on content lines"
@@ -259,16 +270,16 @@ const MainDetail = () => {
                 placeholder="To'lov turi"
                 className="w-[150px]"
                 options={[
-                  { value: '', label: "to'lov turi", disabled: true },
-                  { value: 'cash', label: 'cash' },
-                  { value: 'click', label: 'click' },
+                  { value: "", label: "to'lov turi", disabled: true },
+                  { value: "cash", label: "cash" },
+                  { value: "click", label: "click" },
                 ]}
               />
             </div>
             <div className="mt-5">
               <Form.Item
                 name="comment"
-                rules={[{ required: true, message: 'Izoh kiritish majburiy!' }]}
+                rules={[{ required: true, message: "Izoh kiritish majburiy!" }]}
               >
                 <TextArea placeholder="Izoh..." autoSize />
               </Form.Item>
@@ -306,11 +317,11 @@ const MainDetail = () => {
                 onChange={(dates) => {
                   setForm((prev) => ({
                     ...prev,
-                    from: dates?.[0] ? dates[0].format('YYYY-MM-DD') : '',
-                    to: dates?.[1] ? dates[1].format('YYYY-MM-DD') : '',
+                    from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                    to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
                   }));
                 }}
-                placeholder={['From', 'To']}
+                placeholder={["From", "To"]}
                 format="YYYY-MM-DD"
                 separator={
                   <span className="mx-2 text-xl flex items-center">→</span>
@@ -365,7 +376,7 @@ const MainDetail = () => {
                       key={item?.id}
                       onClick={() => setSelect(item?.id)}
                       className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                        item.id == select ? 'bg-gray-100' : ''
+                        item.id == select ? "bg-gray-100" : ""
                       }`}
                     >
                       <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
@@ -380,9 +391,9 @@ const MainDetail = () => {
               disabled={!select}
               onClick={() => handleNavigate()}
               className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
-                !select ? '' : 'hover:bg-blue-600'
+                !select ? "" : "hover:bg-blue-600"
               } text-white rounded-md cursor-pointer ${
-                !select ? 'opacity-40' : ''
+                !select ? "opacity-40" : ""
               }`}
             >
               Selected
@@ -430,7 +441,7 @@ const MainDetail = () => {
                     key={inx}
                     onClick={() => setSelect(item?.id)}
                     className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                      item.id == select ? 'bg-gray-100' : ''
+                      item.id == select ? "bg-gray-100" : ""
                     }`}
                   >
                     <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>

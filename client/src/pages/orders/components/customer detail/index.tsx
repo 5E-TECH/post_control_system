@@ -3,6 +3,7 @@ import avatar from "../../../../shared/assets/order/avatar.png";
 import cart from "../../../../shared/assets/order/cart.svg";
 import Popup from "../../../../shared/ui/Popup"; // sizda Popup bor edi
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
+import { handleApiError } from "../../../../shared/helpers/handleApiError";
 // import { useParams } from "react-router-dom";
 
 interface IProps {
@@ -39,16 +40,21 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
       phone_number: phoneNumber,
     };
 
-    updateOrdersUserPhoneAndName.mutate({
-      id: customer.id,
-      data: updatedCustomer,
-    });
-
-    // bu yerda updateCustomer.mutate yoki axios.post qilishingiz mumkin
-    // onSuccess bo‘lgach popupni yopish
-    setIsShowPopup(false);
+    updateOrdersUserPhoneAndName.mutate(
+      {
+        id: customer.id,
+        data: updatedCustomer,
+      },
+      {
+        onSuccess: () => setIsShowPopup(false),
+        onError: (err: any) =>
+          handleApiError(
+            err,
+            "Malumotlarni yangilashda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
+      }
+    );
   };
-
   return (
     <div>
       <div className="m-5">

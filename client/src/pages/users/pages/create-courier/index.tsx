@@ -5,6 +5,7 @@ import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { useTranslation } from "react-i18next";
+import { handleApiError } from "../../../../shared/helpers/handleApiError";
 
 type FieldType = {
   region_id: string;
@@ -33,6 +34,11 @@ const CreateCourier = () => {
       onSuccess: () => {
         navigate("/all-users");
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Foydalanuvchi yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 
@@ -63,6 +69,7 @@ const CreateCourier = () => {
     value: item.id,
     label: item.name,
   }));
+
   return (
     <div className="min-[800px]:w-[420px]">
       <h1 className="font-medium text-[24px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
