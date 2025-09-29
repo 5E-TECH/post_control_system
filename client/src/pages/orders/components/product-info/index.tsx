@@ -11,13 +11,13 @@ export interface IProductInfo {
   comment?: string;
 }
 
-const initialState: IProductInfo = {
-  total_price: "",
-  where_deliver: "center",
-  comment: "",
-};
-
 const ProductInfo = () => {
+  const market = JSON.parse(localStorage.getItem("market") ?? "null");
+  const initialState: IProductInfo = {
+    total_price: "",
+    where_deliver: market?.default_tariff,
+    comment: "",
+  };
   const { t } = useTranslation("createOrder");
   const [formData, setFormData] = useState<IProductInfo>(initialState);
 
@@ -105,11 +105,15 @@ const ProductInfo = () => {
                 onChange={(value) => handleSelectChange("where_deliver", value)}
                 placeholder={t("productInfo.whereDeliverPlaceholder")}
                 className="!h-[48px] custom-select-dropdown-bright"
-                defaultValue={"center"}
+                defaultValue={market?.default_tariff}
                 dropdownClassName="dark-dropdown"
               >
-                <Select.Option value="center">{t("productInfo.whereDeliverCenter")}</Select.Option>
-                <Select.Option value="address">{t("productInfo.whereDeliverAddress")}</Select.Option>
+                <Select.Option value="center">
+                  {t("productInfo.whereDeliverCenter")}
+                </Select.Option>
+                <Select.Option value="address">
+                  {t("productInfo.whereDeliverAddress")}
+                </Select.Option>
               </Select>
             </Form.Item>
           </div>

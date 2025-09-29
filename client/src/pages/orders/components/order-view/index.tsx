@@ -15,14 +15,27 @@ import { BASE_URL } from "../../../../shared/const";
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
   received: "bg-green-500",
-  on_the_road: "bg-yellow-500",
+  "on the road": "bg-yellow-500",
   waiting: "bg-orange-500",
   sold: "bg-purple-500",
   cancelled: "bg-red-500",
   paid: "bg-cyan-500",
   partly_paid: "bg-pink-500",
-  cancelled_sent: "bg-gray-500",
+  "cancelled (sent)": "bg-gray-500",
   closed: "bg-black",
+};
+
+const statusLabels: Record<string, string> = {
+  new: "Yangi",
+  received: "Qabul qilingan",
+  "on the road": "Yo‘lda",
+  waiting: "Kutilmoqda",
+  sold: "Sotilgan",
+  cancelled: "Bekor qilingan",
+  paid: "To‘langan",
+  partly_paid: "Qisman to‘langan",
+  cancelled_sent: "Bekorlangan jo‘natma",
+  closed: "Yopilgan",
 };
 
 const OrderView = () => {
@@ -243,10 +256,10 @@ const OrderView = () => {
                 <td className="data-cell pl-10" data-cell="STATUS">
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                      statusColors[item.status] || "bg-slate-400"
+                      statusColors[item?.status] || "bg-gray-400"
                     }`}
                   >
-                    {item.status.toUpperCase()}
+                    {statusLabels[item?.status] || item?.status}
                   </span>
                 </td>
                 <td className="data-cell pl-10" data-cell="PRICE">
