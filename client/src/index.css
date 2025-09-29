@@ -213,3 +213,21 @@
     border-bottom: 0;
   }
 }
+
+
+/* index.css yoki global.css */
+.dark .ant-input-number {
+  background-color: #312D4B !important;
+  border: none !important;
+  color: white !important;
+}
+
+.dark .ant-input-number input {
+  background-color: #312D4B !important;
+  color: white !important;
+}
+
+.dark .ant-input-number .ant-input-number-input::placeholder {
+  color: #9ca3af !important; /* placeholder-gray-400 */
+}
+
