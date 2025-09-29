@@ -1,12 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { HttpStatus, ValidationPipe } from '@nestjs/common';
-// import { AppModule } from 'src/app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.exception.filter';
 import config from 'src/config';
 import * as express from 'express';
-import { join } from 'path';
 import { MyLogger } from 'src/logger/logger.service';
 import { AppModule } from './app.module';
 
@@ -16,17 +14,16 @@ export default class Application {
       bufferLogs: true,
     });
 
-    // Logger — singleton MyLogger ni bir martta oling
+    // Logger
     const myLogger = app.get(MyLogger);
     app.useLogger(myLogger);
 
-    // Static files
-    // dev sersion
-    // app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
-    // prod version
-    app.use('/uploads', express.static('/home/ubuntu/uploads'));
+    // ✅ Static files (uploads)
+    const uploadDir = '/home/ubuntu/uploads';
+    app.use('/uploads', express.static(uploadDir));
 
-    app.use(express.static(join(process.cwd(), 'public')));
+    // Public folder (agar bo‘lsa)
+    app.use(express.static('public'));
 
     // Global filters, pipes, cors
     app.useGlobalFilters(new AllExceptionsFilter());
