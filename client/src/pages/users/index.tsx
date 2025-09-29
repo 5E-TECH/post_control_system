@@ -14,7 +14,8 @@ import {
 const Users = () => {
   const { t } = useTranslation("users");
   const { pathname } = useLocation();
-
+  const dispatch = useDispatch();
+  
   const isChecked = pathname.startsWith("/all-users/create-user");
 
   if (isChecked) return <Outlet />;
@@ -31,7 +32,6 @@ const Users = () => {
     label: status,
   }));
 
-  const dispatch = useDispatch();
   const handleFilterChange = (name: keyof IUserFilter, value: string) => {
     dispatch(setUserFilter({ name, value }));
   };

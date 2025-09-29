@@ -32,8 +32,7 @@ const CustomerInfoOrder = () => {
     if (
       !customerData?.name ||
       !customerData?.phone_number ||
-      !customerData?.district_id ||
-      !customerData.address
+      !customerData?.district_id
     ) {
       handleWarning(
         "Foydalanuvchi malumotlari to'liq emas",

@@ -29,6 +29,7 @@ const CreateMarket = () => {
       tariff_center: Number(values.tariff_center),
       phone_number: values.phone_number.split(" ").join(""),
     };
+    console.log(newMarket)
     createUser.mutate(newMarket, {
       onSuccess: () => {
         navigate("/all-users");
@@ -73,7 +74,7 @@ const CreateMarket = () => {
       <Form
         form={form}
         onFinish={onFinish}
-        initialValues={{ default_tariff: "Markazgacha", phone_number: "+998 " }}
+        initialValues={{ default_tariff: "center", phone_number: "+998 " }}
         className="pt-5!"
       >
         <Form.Item
@@ -142,7 +143,7 @@ const CreateMarket = () => {
           />
         </Form.Item>
 
-        <Form.Item name="default_tariff" className="">
+        <Form.Item name="default_tariff">
           <Select
             defaultValue="center"
             placeholder="Yetkazib berish"

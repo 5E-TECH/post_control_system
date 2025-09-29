@@ -11,7 +11,7 @@ export interface ICustomer {
   region_id?: string | null;
   district_id?: string | null;
   name: string;
-  address: string;
+  address?: string;
 }
 
 export const initialState: ICustomer = {
