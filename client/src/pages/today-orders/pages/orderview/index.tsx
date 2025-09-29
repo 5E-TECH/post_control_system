@@ -7,6 +7,7 @@ import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { usePost } from "../../../../shared/api/hooks/usePost";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 const OrderView = () => {
   const { id } = useParams();
@@ -34,6 +35,7 @@ const OrderView = () => {
   const hanlerDelet = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
   };
+  const { handleApiError } = useApiNotification();
   const handleAccapted = () => {
     const newOrder = {
       order_ids: selectedIds,
@@ -48,6 +50,11 @@ const OrderView = () => {
           navigate("/order/markets/new-orders");
         }
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Pochtani yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 

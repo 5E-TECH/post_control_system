@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 type FieldType = {
   first_name: string;
@@ -20,6 +21,7 @@ const CreateAdmin = () => {
   const navigate = useNavigate();
 
   const [form] = Form.useForm<FieldType>();
+  const { handleApiError } = useApiNotification();
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const newAdmin = {
       ...values,
@@ -31,6 +33,11 @@ const CreateAdmin = () => {
       onSuccess: () => {
         navigate("/all-users");
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Foydalanuvchi yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 

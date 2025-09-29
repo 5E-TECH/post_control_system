@@ -10,6 +10,7 @@ import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import dayjs from "dayjs";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 const { RangePicker } = DatePicker;
 
@@ -55,6 +56,7 @@ const CashDetail = () => {
     form.payment == "click_to_market" ? true : false
   );
 
+  const { handleApiError } = useApiNotification();
   const handleSubmit = () => {
     const dataCourier = {
       courier_id: id,
@@ -85,9 +87,11 @@ const CashDetail = () => {
           });
           refetch();
         },
-        onError: (err) => {
-          console.log(err);
-        },
+        onError: (err) =>
+          handleApiError(
+            err,
+            "To'lov yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
       });
     } else {
       createPaymentCourier.mutate(dataCourier, {
@@ -103,6 +107,11 @@ const CashDetail = () => {
           });
           refetch();
         },
+        onError: (err) =>
+          handleApiError(
+            err,
+            "To'lov yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
       });
     }
   };
@@ -161,7 +170,12 @@ const CashDetail = () => {
                   { value: "click", label: "click" },
                   ...(data?.data?.cashbox?.user?.role === "market"
                     ? []
-                    : [{ value: "click_to_market", label: "click_to_market" }]),
+                    : [
+                        {
+                          value: "click_to_market",
+                          label: "click_to_market",
+                        },
+                      ]),
                 ]}
               />
               {form.payment == "click_to_market" && (

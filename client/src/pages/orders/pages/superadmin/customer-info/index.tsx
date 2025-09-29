@@ -10,6 +10,7 @@ import CustomerInfo, { initialState } from "../../../components/customer-info";
 import CustomerDetails from "../../../components/customer-details";
 import { setCustomerData } from "../../../../../shared/lib/features/customer_and_market-id";
 import { useTranslation } from "react-i18next";
+import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
 const Context = createContext({ name: "Default" });
 
@@ -30,7 +31,7 @@ const CustomerInfoOrder = () => {
   const navigate = useNavigate();
 
   const [api, contextHolder] = useNotification();
-
+  const { handleApiError } = useApiNotification();
   const handleClick = () => {
     if (
       !customerData?.name ||
@@ -58,6 +59,11 @@ const CustomerInfoOrder = () => {
         localStorage.setItem("customer", JSON.stringify(res?.data?.data));
         navigate("/orders/confirm");
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Foydalanuvchi yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 

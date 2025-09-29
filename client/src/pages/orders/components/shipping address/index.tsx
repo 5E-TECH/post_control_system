@@ -4,6 +4,7 @@ import { useOrder } from "../../../../shared/api/hooks/useOrder";
 // import { useParams } from "react-router-dom";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 interface IProps {
   address: string;
@@ -67,6 +68,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   };
 
   // yangilash
+  const { handleApiError } = useApiNotification();
   const handleUpdate = () => {
     const dataToSend = {
       address: newAddress,
@@ -79,10 +81,14 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
         onSuccess: () => {
           setIsShowPopup(false);
         },
+        onError: (err: any) =>
+          handleApiError(
+            err,
+            "Malumotlarni yangilashda xatolik yuz berdi,keyinroq urinib ko'ring"
+          ),
       }
     );
   };
-
   return (
     <div>
       <div className="m-5">

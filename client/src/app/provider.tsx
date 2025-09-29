@@ -1,9 +1,10 @@
-import { memo, Suspense, type ReactNode } from 'react';
-import { Provider } from 'react-redux';
-import { BrowserRouter } from 'react-router-dom';
-import { store } from './store';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Suspensee from '../shared/ui/Suspensee';
+import { memo, Suspense, type ReactNode } from "react";
+import { Provider } from "react-redux";
+import { BrowserRouter } from "react-router-dom";
+import { store } from "./store";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import Suspensee from "../shared/ui/Suspensee";
+import { NotificationProvider } from "../shared/components/notification-provider";
 
 const client = new QueryClient({
   defaultOptions: {
@@ -18,7 +19,9 @@ const AppProvider = ({ children }: { children: ReactNode }) => {
     <BrowserRouter>
       <Provider store={store}>
         <QueryClientProvider client={client}>
-          <Suspense fallback={<Suspensee />}>{children}</Suspense>
+          <NotificationProvider>
+            <Suspense fallback={<Suspensee />}>{children}</Suspense>
+          </NotificationProvider>
         </QueryClientProvider>
       </Provider>
     </BrowserRouter>
