@@ -4,8 +4,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { Button } from "antd";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useNavigate } from "react-router-dom";
 
 const WaitingOrders = () => {
+  const navigate = useNavigate();
+
   const { getCourierOrders, sellOrder, cancelOrder } = useOrder();
   const { data } = getCourierOrders({ status: "waiting" });
 
@@ -106,6 +109,7 @@ const WaitingOrders = () => {
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => (
             <tr
+              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
               key={item?.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >

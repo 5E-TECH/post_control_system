@@ -5,6 +5,8 @@ import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { Input, Select } from "antd";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 
 interface IProps {
   address: string;
@@ -13,6 +15,8 @@ interface IProps {
 }
 
 const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
+  const { role } = useSelector((state: RootState) => state.roleSlice);
+
   const [isShowPopup, setIsShowPopup] = useState(false);
   const [newAddress, setNewAddress] = useState(address);
 
@@ -71,7 +75,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
           setIsShowPopup(false);
           handleSuccess("Order manzili muvaffaqiyatli yangilandi.");
         },
-        onError: (err: any) => 
+        onError: (err: any) =>
           // console.log(err)
           handleApiError(
             err,
@@ -88,12 +92,14 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
           <h2 className="font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
             Shipping address
           </h2>
-          <button
-            onClick={() => setIsShowPopup(true)}
-            className="text-[15px] font-medium text-[#8C57FF] hover:underline cursor-pointer"
-          >
-            Edit
-          </button>
+          {role !== "market" && role !== "courier" && (
+            <button
+              onClick={() => setIsShowPopup(true)}
+              className="text-[15px] font-medium text-[#8C57FF] hover:underline cursor-pointer"
+            >
+              Edit
+            </button>
+          )}
         </div>
       </div>
       <div className="m-5">

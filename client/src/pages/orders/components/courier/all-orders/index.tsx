@@ -4,6 +4,7 @@ import { memo } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useNavigate } from "react-router-dom";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -19,6 +20,8 @@ const statusColors: Record<string, string> = {
 };
 
 const AllOrders = () => {
+  const navigate = useNavigate()
+
   const { getCourierOrders, sellOrder, cancelOrder } = useOrder();
   const { data } = getCourierOrders();
 
@@ -119,6 +122,7 @@ const AllOrders = () => {
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => (
             <tr
+              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
               key={item?.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >

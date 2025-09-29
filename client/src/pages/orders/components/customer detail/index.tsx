@@ -5,6 +5,8 @@ import Popup from "../../../../shared/ui/Popup";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { Input } from "antd";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 
 interface IProps {
   customer: {
@@ -16,6 +18,7 @@ interface IProps {
 
 const CustomerDetail: FC<IProps> = ({ customer }) => {
   if (!customer) return null;
+  const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const [isShowPopup, setIsShowPopup] = useState(false);
   const { updateOrdersUserPhoneAndName } = useOrder();
@@ -93,12 +96,14 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
           <h2 className="font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
             Contact info
           </h2>
-          <button
-            onClick={handleOpenPopup}
-            className="text-[15px] font-medium text-[#8C57FF] hover:underline cursor-pointer"
-          >
-            Edit
-          </button>
+          {role !== "market" && role !== "courier" && (
+            <button
+              onClick={handleOpenPopup}
+              className="text-[15px] font-medium text-[#8C57FF] hover:underline cursor-pointer"
+            >
+              Edit
+            </button>
+          )}
         </div>
         <div>
           <h2 className="text-[#2E263DB2] dark:text-[#E7E3FCB2]">
