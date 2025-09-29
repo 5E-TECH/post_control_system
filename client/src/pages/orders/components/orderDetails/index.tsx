@@ -6,6 +6,8 @@ import TextArea from "antd/es/input/TextArea";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { useParams } from "react-router-dom";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import type { RootState } from "../../../../app/store";
+import { useSelector } from "react-redux";
 
 interface IProps {
   items: any[];
@@ -13,6 +15,7 @@ interface IProps {
   marketId: string;
   comment: string;
   deleveryStatus: string;
+  status?: string;
 }
 
 const Details: FC<IProps> = ({
@@ -21,6 +24,7 @@ const Details: FC<IProps> = ({
   marketId,
   comment,
   deleveryStatus,
+  status,
 }) => {
   const { id } = useParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,6 +50,12 @@ const Details: FC<IProps> = ({
       name: item.product.name,
     }))
   );
+
+  const { role } = useSelector((state: RootState) => state.roleSlice);
+
+  console.log(role);
+  
+
 
   const { updateOrders } = useOrder();
   const { handleSuccess, handleApiError } = useApiNotification();
@@ -104,12 +114,14 @@ const Details: FC<IProps> = ({
         <h2 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
           Order details
         </h2>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="text-[#8C57FF] cursor-pointer"
-        >
-          Edit
-        </button>
+        {status == "new" && role != "market" && role != "courier" &&(
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="text-[#8C57FF] cursor-pointer"
+          >
+            Edit
+          </button>
+        )}
       </div>
 
       {/* Header */}

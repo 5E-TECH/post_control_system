@@ -26,7 +26,7 @@ import { UpdateCourierDto } from './dto/update-courier.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Response } from 'express';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/enums';
+import { Roles, Where_deliver } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
@@ -156,6 +156,7 @@ export class UsersController {
         phone_number: '+998901234567',
         tariff_home: 10000,
         tariff_center: 8000,
+        default_tariff: Where_deliver.CENTER,
         role: 'MARKET',
         status: 'ACTIVE',
         created_at: '2025-01-01T12:00:00.000Z',
@@ -300,7 +301,7 @@ export class UsersController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Markets retrieved successfully' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
   @Get('markets')
   findAllMarkets(
     @Query('search') search?: string,

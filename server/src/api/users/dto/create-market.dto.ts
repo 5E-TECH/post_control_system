@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -6,6 +7,7 @@ import {
   Min,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Where_deliver } from 'src/common/enums';
 
 export class CreateMarketDto {
   @ApiProperty({ example: 'Market 1' })
@@ -29,6 +31,17 @@ export class CreateMarketDto {
   @IsNumber()
   @Min(0)
   tariff_center: number;
+
+  @ApiProperty({
+    example: Where_deliver.CENTER,
+    enum: Where_deliver,
+    description: 'Tariff type (center or address)',
+  })
+  @IsNotEmpty()
+  @IsEnum(Where_deliver, {
+    message: 'default_tariff must be either center or address',
+  })
+  default_tariff: Where_deliver;
 
   @ApiProperty({ example: 'secret123' })
   @IsNotEmpty()

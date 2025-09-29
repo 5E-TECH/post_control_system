@@ -4,13 +4,17 @@ import ShippingAddress from "../../../components/shipping address";
 import CustomerDetail from "../../../components/customer detail";
 import { useParams } from "react-router-dom";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const OrderDetails = () => {
   const { id } = useParams();
+  const { role } = useSelector((state: RootState) => state.roleSlice);
+  console.log(role);
+  
   const { getOrderById } = useOrder();
   const { data } = getOrderById(id);
   console.log(data?.data?.comment);
-  
 
   // Agar data hali kelmagan bo‘lsa loader
   if (!data) return <div className="text-center p-10">Loading...</div>;
@@ -19,7 +23,9 @@ const OrderDetails = () => {
       <div className="flex items-center gap-4">
         <h2 className="text-2xl font-bold">Order detail</h2>
         <div>
-          <p className="px-4 py-1 bg-blue-500 rounded-2xl text-white">{data?.data?.status}</p>
+          <p className="px-4 py-1 bg-blue-500 rounded-2xl text-white">
+            {data?.data?.status}
+          </p>
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-5">
@@ -31,6 +37,7 @@ const OrderDetails = () => {
               marketId={data?.data?.market?.id}
               comment={data?.data?.comment}
               deleveryStatus={data?.data?.where_deliver}
+              status={data?.data?.status}
             />
           </div>
         </div>
@@ -41,7 +48,11 @@ const OrderDetails = () => {
           </div>
 
           <div className="bg-white rounded-xl shadow p-6 dark:bg-[#312D4B]">
-            <ShippingAddress address={data?.data?.customer?.address} districtId={data?.data?.customer?.district_id} id={data?.data?.customer?.id} />
+            <ShippingAddress
+              address={data?.data?.customer?.address}
+              districtId={data?.data?.customer?.district_id}
+              id={data?.data?.customer?.id}
+            />
           </div>
         </div>
       </div>
@@ -50,7 +61,3 @@ const OrderDetails = () => {
 };
 
 export default memo(OrderDetails);
-
-
-
-

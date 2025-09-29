@@ -31,7 +31,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
       </div>
 
       {/* Tarix ro‘yxati */}
-      <div className="h-[520px] w-[700px] mt-5 px-8 py-4 bg-[#ede8ff] dark:bg-[#3D3759] shadow-md rounded-lg overflow-y-auto">
+      <div className="h-[520px] w-full mt-5 px-8 py-4 bg-[#ede8ff] dark:bg-[#3D3759] shadow-md rounded-lg overflow-y-auto">
         {cashboxHistory?.map((item: any, inx: number) => (
           <div
             key={inx}

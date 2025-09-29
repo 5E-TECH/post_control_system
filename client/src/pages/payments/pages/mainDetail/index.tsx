@@ -304,7 +304,7 @@ const MainDetail = () => {
       </div>
 
       {/* === FILTERS & HISTORY === */}
-      <div>
+      <div className="w-full">
         <div className="flex flex-row items-center gap-7">
           <h2 className="text-[20px] font-medium mb-2">Filters:</h2>
           <div className="w-full flex justify-between">
@@ -331,12 +331,14 @@ const MainDetail = () => {
             </div>
           </div>
         </div>
-        <CashboxHistory
-          form={form}
-          income={data?.data?.income}
-          outcome={data?.data?.outcome}
-          cashboxHistory={data?.data?.cashboxHistory}
-        />
+        <div className="">
+          <CashboxHistory
+            form={form}
+            income={data?.data?.income}
+            outcome={data?.data?.outcome}
+            cashboxHistory={data?.data?.cashboxHistory}
+          />
+        </div>
       </div>
 
       {/* === POPUP MARKET === */}

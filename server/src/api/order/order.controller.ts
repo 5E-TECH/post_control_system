@@ -142,7 +142,13 @@ export class OrderController {
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order data' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.COURIER,
+    Roles.MARKET,
+    Roles.REGISTRATOR,
+  )
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.orderService.findOne(id);

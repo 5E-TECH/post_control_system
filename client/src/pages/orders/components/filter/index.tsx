@@ -19,16 +19,19 @@ const Filter = () => {
   const { t } = useTranslation("orderList");
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { getMarkets } = useMarket();
-  const { data } = getMarkets();
+  const { data } = getMarkets(role !=="market");
   const { getRegions } = useRegion();
   const { data: regionData } = getRegions();
 
   const form = useSelector((state: RootState) => state.setFilter);
 
-  const user = useSelector((state: RootState) => state.authSlice.user);
-  const role = user?.role;
+  // const user = useSelector((state: RootState) => state.authSlice.user);
+  // const role = user?.role;
+  console.log("filters role", role);
+
   const { refetch } = useProfile().getUser(role === "market");
 
   // select va boshqa inputlar uchun
@@ -96,15 +99,17 @@ const Filter = () => {
     <div>
       <h2 className="text-[18px] mb-2">Filters</h2>
       <div className="w-full grid grid-cols-3 gap-5 max-[900px]:grid-cols-2 max-[750px]:grid-cols-1">
-        <Select
-          name="marketId"
-          value={form.marketId}
-          onChange={handleChange}
-          placeholder={t("placeholder.selectMarket")}
-          className="w-full"
-        >
-          {marketOptions}
-        </Select>
+        {role !== "market" && (
+          <Select
+            name="marketId"
+            value={form.marketId}
+            onChange={handleChange}
+            placeholder={t("placeholder.selectMarket")}
+            className="w-full"
+          >
+            {marketOptions}
+          </Select>
+        )}
 
         <Select
           name="regionId"

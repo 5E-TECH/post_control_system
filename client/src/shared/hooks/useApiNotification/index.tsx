@@ -47,7 +47,7 @@ export const useApiNotification = () => {
   };
 
   const handleSuccess = (
-    title: string = "✅ Amaliyot muvaffaqiyatli bajarildi",
+    title: string = "Amaliyot muvaffaqiyatli bajarildi",
     description: string = ""
   ) => {
     api.success({
@@ -57,8 +57,19 @@ export const useApiNotification = () => {
     });
   };
 
+  const handleWarning = (
+    title: string = "⚠️ Diqqat",
+    description: string = "E'tibor bering, biror muammo yuz berdi."
+  ) => {
+    api.warning({
+      message: title,
+      description,
+      placement: "topRight",
+    });
+  };
   return {
     handleApiError,
     handleSuccess,
+    handleWarning,
   };
 };

@@ -1,5 +1,5 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Roles, Status } from 'src/common/enums';
+import { Roles, Status, Where_deliver } from 'src/common/enums';
 import {
   Column,
   Entity,
@@ -59,6 +59,13 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   is_deleted: boolean;
 
+  @Column({
+    type: 'enum',
+    name: 'default_tariff',
+    enum: Where_deliver,
+    default: Where_deliver.CENTER,
+  })
+  default_tariff: Where_deliver;
   // 1-1 User → Salary
   @OneToOne(() => UserSalaryEntity, (userSalary) => userSalary.user, {
     cascade: true,

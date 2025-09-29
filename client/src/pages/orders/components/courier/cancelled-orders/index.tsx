@@ -5,8 +5,10 @@ import { Button } from "antd";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useNavigate } from "react-router-dom";
 
 const CancelledOrders = () => {
+  const navigate = useNavigate()
   const { getCourierOrders } = useOrder();
   const { mutate: cancelPost, isPending } = usePost().canceledPost();
   const { data, refetch } = getCourierOrders({ status: "cancelled" });
@@ -120,6 +122,7 @@ const CancelledOrders = () => {
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => (
             <tr
+              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
               key={item?.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >

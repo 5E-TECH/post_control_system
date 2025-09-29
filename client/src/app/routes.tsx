@@ -44,6 +44,7 @@ const OrderDetail = lazy(
   () => import("../pages/orders/pages/superadmin/orderDetail")
 );
 const CashDetail = lazy(() => import("../pages/payments/pages/cashDetail"));
+const CashDetailMarketCourier = lazy(() => import("../pages/payments/pages/courier-market-cashDetail"))
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
 const CustomerInfoOrder = lazy(
   () => import("../pages/orders/pages/superadmin/customer-info")
@@ -232,6 +233,7 @@ const AppRouters = () => {
                 { path: "main-cashbox", element: <MainDetail /> },
               ],
             },
+            { path: "cash-box", element: <CashDetailMarketCourier/>},
             { path: "roles-permissions", element: <RolesPermissions /> },
             {
               path: "profile",

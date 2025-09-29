@@ -222,6 +222,7 @@ export class CashBoxService
           cashbox_id: myCashbox.id,
           created_at: Between(fromDate, toDate), // bigint timestamp
         },
+        relations: ['createdByUser'],
         order: { created_at: 'DESC' },
       });
 

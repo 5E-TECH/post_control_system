@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Button, Form, Input, type FormProps } from "antd";
+import { Button, Form, Input, Select, type FormProps } from "antd";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
@@ -11,6 +11,7 @@ type FieldType = {
   phone_number: string;
   tariff_home: string | number;
   tariff_center: string | number;
+  default_tariff: string;
   password: string;
 };
 
@@ -28,6 +29,7 @@ const CreateMarket = () => {
       tariff_center: Number(values.tariff_center),
       phone_number: values.phone_number.split(" ").join(""),
     };
+    console.log(newMarket)
     createUser.mutate(newMarket, {
       onSuccess: () => {
         navigate("/all-users");
@@ -72,7 +74,7 @@ const CreateMarket = () => {
       <Form
         form={form}
         onFinish={onFinish}
-        initialValues={{ phone_number: "+998 " }}
+        initialValues={{ default_tariff: "center", phone_number: "+998 " }}
         className="pt-5!"
       >
         <Form.Item
@@ -139,6 +141,17 @@ const CreateMarket = () => {
             className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterCenterTariff")}
           />
+        </Form.Item>
+
+        <Form.Item name="default_tariff">
+          <Select
+            defaultValue="center"
+            placeholder="Yetkazib berish"
+            className="h-[48px]!"
+          >
+            <Select.Option value="center">Markazgacha</Select.Option>
+            <Select.Option value="address">Manzilgacha</Select.Option>
+          </Select>
         </Form.Item>
 
         <Form.Item

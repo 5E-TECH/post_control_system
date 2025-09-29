@@ -1,6 +1,6 @@
 import { Button, Form, Input, Select } from "antd";
 import { Plus, X } from "lucide-react";
-import { memo, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useProduct } from "../../../../shared/api/hooks/useProduct";
 import { useDispatch, useSelector } from "react-redux";
 import { setOrderItems } from "../../../../shared/lib/features/customer_and_market-id";
@@ -73,8 +73,7 @@ const OrderItems = () => {
 
   const dispatch = useDispatch();
 
-  const handleChange = (index: number, e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const handleChange = (index: number, name: string, value: string) => {
     const updatedList = [...formDataList];
     updatedList[index] = { ...updatedList[index], [name]: value };
     setFormDataList(updatedList);
@@ -179,7 +178,12 @@ const OrderItems = () => {
                   <Input
                     name="quantity"
                     value={formData.quantity}
-                    onChange={(e) => handleChange(index, e)}
+                    onChange={(e) => {
+                      let value = Number(e.target.value);
+                      if (value >= 99) value = 99;
+                      if (value < 0) value = 0;
+                      handleChange(index, "quantity", value.toString());
+                    }}
                     type="number"
                     placeholder={t("orderItems.quantity")}
                     className=" !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"

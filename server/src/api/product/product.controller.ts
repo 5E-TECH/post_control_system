@@ -36,10 +36,11 @@ import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
-import { SelfGuard } from 'src/common/guards/self.guard';
 
-const uploadDir = './uploads';
+// ✅ Absolute path
+const uploadDir = '/home/ubuntu/uploads';
 
+// Multer storage
 const storage = diskStorage({
   destination: (req, file, cb) => {
     if (!fs.existsSync(uploadDir)) {
@@ -65,17 +66,9 @@ export class ProductController {
     schema: {
       type: 'object',
       properties: {
-        image: {
-          type: 'string',
-          format: 'binary',
-          description: 'Product image file',
-        },
+        image: { type: 'string', format: 'binary' },
         name: { type: 'string', example: 'Pepsi' },
-        market_id: {
-          type: 'string',
-          format: 'uuid',
-          example: 'a79f9f6a-dc32-4fcb-a3c1-8dabc1c51e9b',
-        },
+        market_id: { type: 'string', format: 'uuid' },
         image_url: { type: 'string', example: '17123456789', nullable: true },
       },
       required: ['name'],
@@ -89,36 +82,26 @@ export class ProductController {
   @HttpCode(HttpStatus.CREATED)
   async create(
     @UploadedFile() file: Express.Multer.File,
-    @Body(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-      }),
-    )
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
     createProductDto: CreateProductDto,
     @CurrentUser() currentUser: JwtPayload,
   ) {
     try {
-      const result = await this.productService.create(
+      return await this.productService.create(
         createProductDto,
         file,
         currentUser,
       );
-      return result;
     } catch (error) {
       if (file) {
         const filePath = `${uploadDir}/${file.filename}`;
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
       throw error;
     }
   }
 
   @ApiOperation({ summary: 'List all products' })
-  @ApiResponse({ status: 200, description: 'Products list' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get()
@@ -138,7 +121,6 @@ export class ProductController {
 
   @ApiOperation({ summary: 'Get products by market id' })
   @ApiParam({ name: 'marketId', description: 'Market ID' })
-  @ApiResponse({ status: 200, description: 'Products for market' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get('market/:marketId')
@@ -147,15 +129,14 @@ export class ProductController {
   }
 
   @ApiOperation({ summary: 'Get my products (market role)' })
-  @ApiResponse({ status: 200, description: 'Products for current market' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
   @Get('/my-products')
   async myProducts(
     @CurrentUser() user: JwtPayload,
     @Query('search') search?: string,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
   ) {
     return this.productService.getMyProducts(
       user,
@@ -167,7 +148,6 @@ export class ProductController {
 
   @ApiOperation({ summary: 'Get product by id' })
   @ApiParam({ name: 'id', description: 'Product ID' })
-  @ApiResponse({ status: 200, description: 'Product data' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET, Roles.REGISTRATOR)
   @Get(':id')
@@ -175,26 +155,9 @@ export class ProductController {
     return this.productService.findOne(user, id);
   }
 
-  @ApiOperation({
-    summary: 'Update product (admin/registrator) with optional image',
-  })
+  @ApiOperation({ summary: 'Update product (admin/registrator)' })
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'id', description: 'Product ID' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        image: {
-          type: 'string',
-          format: 'binary',
-          description: 'New product image (optional)',
-        },
-        name: { type: 'string', example: 'Pepsi Max 1L', nullable: true },
-        image_url: { type: 'string', example: '17123456789', nullable: true },
-      },
-    },
-  })
-  @ApiResponse({ status: 200, description: 'Product updated' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Patch(':id')
@@ -202,13 +165,7 @@ export class ProductController {
   async update(
     @Param('id') id: string,
     @CurrentUser() currentUser: JwtPayload,
-    @Body(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-      }),
-    )
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
     updateProductDto: UpdateProductDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
@@ -222,46 +179,23 @@ export class ProductController {
     } catch (error) {
       if (file) {
         const filePath = `${uploadDir}/${file.filename}`;
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
       throw error;
     }
   }
 
-  @ApiOperation({ summary: 'Update own product (market) with optional image' })
+  @ApiOperation({ summary: 'Update own product (market)' })
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'id', description: 'Product ID' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        image: {
-          type: 'string',
-          format: 'binary',
-          description: 'New product image (optional)',
-        },
-        name: { type: 'string', nullable: true },
-        image_url: { type: 'string', nullable: true },
-      },
-    },
-  })
-  @ApiResponse({ status: 200, description: 'Own product updated' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
-  @Patch(':id')
+  @Patch('my/:id') // ✅ DIFFERENT ROUTE
   @UseInterceptors(FileInterceptor('image', { storage }))
   async updateOwnProduct(
     @Param('id') id: string,
     @CurrentUser() currentUser: JwtPayload,
-    @Body(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-      }),
-    )
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
     updateProductDto: UpdateProductDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
@@ -275,9 +209,7 @@ export class ProductController {
     } catch (error) {
       if (file) {
         const filePath = `${uploadDir}/${file.filename}`;
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
       throw error;
     }
@@ -285,7 +217,6 @@ export class ProductController {
 
   @ApiOperation({ summary: 'Delete product by id' })
   @ApiParam({ name: 'id', description: 'Product ID' })
-  @ApiResponse({ status: 200, description: 'Product deleted' })
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Delete(':id')
   async remove(@Param('id') id: string) {

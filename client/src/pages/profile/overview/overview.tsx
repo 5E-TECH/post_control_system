@@ -101,7 +101,7 @@ const Overview = () => {
                         Region
                       </span>
                       <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                        {user.region_id}
+                        {user?.region?.name}
                       </span>
                     </div>
                   )}
