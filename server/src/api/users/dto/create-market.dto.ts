@@ -35,11 +35,11 @@ export class CreateMarketDto {
   @ApiProperty({
     example: Where_deliver.CENTER,
     enum: Where_deliver,
-    description: 'Tariff type (center or home)',
+    description: 'Tariff type (center or address)',
   })
   @IsNotEmpty()
   @IsEnum(Where_deliver, {
-    message: 'default_tariff must be either center or home',
+    message: 'default_tariff must be either center or address',
   })
   default_tariff: Where_deliver;
 
