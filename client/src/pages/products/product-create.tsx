@@ -16,12 +16,14 @@ const ProductsCreate: FC = () => {
   // const location = useLocation();
 
   const { role } = useSelector((state: RootState) => state.roleSlice);
+  const { page, limit } = useSelector((state: RootState) => state.paginationSlice);
+
 
   const { getMyProducts, getProductsByMarket } = useProduct();
   const { data } =
-    role === "market" ? getMyProducts() : getProductsByMarket(id);
+    role === "market" ? getMyProducts() : getProductsByMarket(id, true, {page, limit});
 
-    console.log(data);
+    // console.log(data);
     
 
   return (

@@ -61,7 +61,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   const handleUpdate = () => {
     const dataToSend = {
       address: newAddress,
-      district_id: selectedDistrict || districtId,
+      district_id: selectedDistrict,
     };
 
     updateOrdersUserAddress.mutate(
@@ -71,7 +71,8 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
           setIsShowPopup(false);
           handleSuccess("Order manzili muvaffaqiyatli yangilandi.");
         },
-        onError: (err: any) =>
+        onError: (err: any) => 
+          // console.log(err)
           handleApiError(
             err,
             "Malumotlarni yangilashda xatolik yuz berdi,keyinroq urinib ko'ring"
