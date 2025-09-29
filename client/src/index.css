@@ -19,15 +19,15 @@
 .dark .custom-select-dropdown .ant-select-selector {
   background-color: #312d4b !important;
   border-color: rgba(231, 227, 252, 0.22) !important;
-  color: rgba(231, 227, 252, 0.4) !important;
+  color: #E7E3FCCC!important;
 }
 
 .dark .custom-select-dropdown .ant-select-selection-placeholder {
-  color: rgba(231, 227, 252, 0.4) !important;
+  color: #E7E3FCCC!important;
 }
 
 .dark .custom-select-dropdown .ant-select-arrow {
-  color: rgba(231, 227, 252, 0.4) !important;
+  color: #E7E3FCCC!important;
 }
 
 .dark .custom-select-dropdown {
@@ -168,6 +168,14 @@
   color: #9ca3af !important;
 }
 
+.dark .custom-password input::placeholder {
+  color: #E7E3FCCC !important;
+}
+
+.dark .custom-password .ant-input-password-icon {
+  color: #E7E3FCCC !important;
+}
+
 @media (max-width: 900px) {
   table {
     border-collapse: collapse;
@@ -205,3 +213,21 @@
     border-bottom: 0;
   }
 }
+
+
+/* index.css yoki global.css */
+.dark .ant-input-number {
+  background-color: #312D4B !important;
+  border: none !important;
+  color: white !important;
+}
+
+.dark .ant-input-number input {
+  background-color: #312D4B !important;
+  color: white !important;
+}
+
+.dark .ant-input-number .ant-input-number-input::placeholder {
+  color: #9ca3af !important; /* placeholder-gray-400 */
+}
+

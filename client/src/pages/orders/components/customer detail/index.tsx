@@ -1,9 +1,10 @@
-import { memo, type FC, useState, type ChangeEvent } from "react";
+import { memo, type FC, useState } from "react";
 import avatar from "../../../../shared/assets/order/avatar.png";
 import cart from "../../../../shared/assets/order/cart.svg";
-import Popup from "../../../../shared/ui/Popup"; // sizda Popup bor edi
+import Popup from "../../../../shared/ui/Popup";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
-// import { useParams } from "react-router-dom";
+import { Input } from "antd";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 interface IProps {
   customer: {
@@ -16,39 +17,44 @@ interface IProps {
 const CustomerDetail: FC<IProps> = ({ customer }) => {
   if (!customer) return null;
 
-  // popup state
   const [isShowPopup, setIsShowPopup] = useState(false);
   const { updateOrdersUserPhoneAndName } = useOrder();
-  // const { id } = useParams();
 
-  // editable fields
   const [name, setName] = useState(customer.name);
   const [phoneNumber, setPhoneNumber] = useState(customer.phone_number);
 
-  // popup ochilganda current customer qiymatlarini inputga set qilamiz
   const handleOpenPopup = () => {
     setName(customer.name);
     setPhoneNumber(customer.phone_number);
     setIsShowPopup(true);
   };
 
-  // saqlash
+  const { handleApiError, handleSuccess } = useApiNotification();
+
   const handleSave = () => {
     const updatedCustomer = {
-      client_name: name,
-      client_phone_number: phoneNumber,
+      name,
+      phone_number: phoneNumber,
     };
 
-    updateOrdersUserPhoneAndName.mutate({
-      id: customer.id,
-      data: updatedCustomer,
-    });
-
-    console.log("Yuboriladigan ma'lumot:", updatedCustomer);
-
-    // bu yerda updateCustomer.mutate yoki axios.post qilishingiz mumkin
-    // onSuccess bo‘lgach popupni yopish
-    setIsShowPopup(false);
+    updateOrdersUserPhoneAndName.mutate(
+      {
+        id: customer.id,
+        data: updatedCustomer,
+      },
+      {
+        onSuccess: () => {
+          setIsShowPopup(false);
+          handleSuccess("Order manzili muvaffaqiyatli yangilandi");
+        },
+        onError: (err: any) => {
+          handleApiError(
+            err,
+            "Malumotlarni yangilashda xatolik yuz berdi,keyinroq urinib ko'ring"
+          );
+        },
+      }
+    );
   };
 
   return (
@@ -89,7 +95,7 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
           </h2>
           <button
             onClick={handleOpenPopup}
-            className="text-[15px] font-medium text-[#8C57FF] hover:underline"
+            className="text-[15px] font-medium text-[#8C57FF] hover:underline cursor-pointer"
           >
             Edit
           </button>
@@ -108,27 +114,21 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
             Edit Customer Info
           </h2>
 
-          {/* Name */}
-          <input
-            type="text"
-            value={name}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setName(e.target.value)
-            }
-            className="w-full p-2 mb-3 border rounded-md dark:bg-[#1f1b2e] dark:text-white"
-            placeholder="Name"
-          />
+          <div className="flex flex-col gap-5">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Name"
+              className="w-full mb-3 dark:bg-[#312D4B] dark:outline-none dark:text-white dark:placeholder-gray-400"
+            />
 
-          {/* Phone Number */}
-          <input
-            type="text"
-            value={phoneNumber}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setPhoneNumber(e.target.value)
-            }
-            className="w-full p-2 mb-3 border rounded-md dark:bg-[#1f1b2e] dark:text-white"
-            placeholder="Phone number"
-          />
+            <Input
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="Phone number"
+              className="w-full mb-3 dark:bg-[#312D4B] dark:outline-none dark:text-white dark:placeholder-gray-400"
+            />
+          </div>
 
           {/* Buttons */}
           <div className="flex justify-end gap-3 mt-5">

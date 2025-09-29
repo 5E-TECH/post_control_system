@@ -79,12 +79,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     marketId?: string;
     regionId?: string;
     search?: string;
-    startDate?: string; // frontdan "2025-09-01" yoki "2025-09-01T00:00:00"
-    endDate?: string; // frontdan "2025-09-25" yoki "2025-09-25T23:59:59"
+    startDate?: string;
+    endDate?: string;
     page?: number;
     limit?: number;
   }) {
     try {
+      // 📌 limit default 10, agar 0 bo‘lsa → unlimited
+      let { limit = 10, page = 1 } = query;
+      const unlimited = limit === 0;
+
       const qb = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
@@ -92,6 +96,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
         .orderBy('order.created_at', 'DESC');
 
       if (query.status) {
@@ -113,12 +118,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // ✅ Sana filter (frontdan kelgan string → millisekund)
+      // ✅ Sana filter
       let startMs: number | undefined;
       let endMs: number | undefined;
 
       if (query.startDate) {
-        startMs = new Date(query.startDate).getTime(); // string → ms
+        startMs = new Date(query.startDate).getTime();
       }
       if (query.endDate) {
         endMs = new Date(query.endDate).getTime();
@@ -135,11 +140,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         qb.andWhere('order.created_at <= :endDate', { endDate: endMs });
       }
 
-      const page = query.page ? Number(query.page) : 1;
-      const limit = query.limit ? Number(query.limit) : 10;
-      const skip = (page - 1) * limit;
-
-      qb.skip(skip).take(limit);
+      // 🔢 Pagination (faqat limit > 0 bo‘lsa)
+      if (!unlimited) {
+        const skip = (page - 1) * limit;
+        qb.skip(skip).take(limit);
+      }
 
       const [data, total] = await qb.getManyAndCount();
 
@@ -147,9 +152,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         {
           data,
           total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+          page: unlimited ? 1 : page,
+          limit: unlimited ? total : limit,
+          totalPages: unlimited ? 1 : Math.ceil(total / limit),
         },
         200,
         'All orders',

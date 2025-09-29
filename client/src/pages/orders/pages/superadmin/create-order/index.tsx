@@ -16,6 +16,7 @@ import {
   setProductInfo,
 } from "../../../../../shared/lib/features/customer_and_market-id";
 import { useTranslation } from "react-i18next";
+import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
 const Context = createContext({ name: "Default" });
 
@@ -38,6 +39,7 @@ const CreateOrder = () => {
   const navigate = useNavigate();
 
   const [api, contextHolder] = useNotification();
+  const { handleApiError } = useApiNotification();
   const handleClick = () => {
     if (
       !orderItems ||
@@ -75,6 +77,11 @@ const CreateOrder = () => {
         dispatch(setProductInfo(null));
         navigate("/orders/customer-info");
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Buyurtma yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 

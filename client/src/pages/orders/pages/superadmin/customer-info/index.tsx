@@ -10,6 +10,7 @@ import CustomerInfo, { initialState } from "../../../components/customer-info";
 import CustomerDetails from "../../../components/customer-details";
 import { setCustomerData } from "../../../../../shared/lib/features/customer_and_market-id";
 import { useTranslation } from "react-i18next";
+import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
 const Context = createContext({ name: "Default" });
 
@@ -30,7 +31,7 @@ const CustomerInfoOrder = () => {
   const navigate = useNavigate();
 
   const [api, contextHolder] = useNotification();
-
+  const { handleApiError } = useApiNotification();
   const handleClick = () => {
     if (
       !customerData?.name ||
@@ -47,7 +48,7 @@ const CustomerInfoOrder = () => {
     }
 
     const customer = {
-      phone_number: customerData?.phone_number,
+      phone_number: customerData?.phone_number.split(" ").join(""),
       district_id: customerData?.district_id,
       name: customerData?.name,
       address: customerData.address,
@@ -58,6 +59,11 @@ const CustomerInfoOrder = () => {
         localStorage.setItem("customer", JSON.stringify(res?.data?.data));
         navigate("/orders/confirm");
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Foydalanuvchi yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 
@@ -137,7 +143,7 @@ const CustomerInfoOrder = () => {
           <div className="flex gap-4 justify-end">
             <Button
               onClick={handleDiscard}
-              className="w-[91px]! h-[38px]! bg-[#F4F5FA]! border! border-[#8A8D93]! text-[#8A8D93]! hover:opacity-80! dark:bg-[#28243D]!"
+              className="w-[110px]! h-[38px]! bg-[#F4F5FA]! border! border-[#8A8D93]! text-[#8A8D93]! hover:opacity-80! dark:bg-[#28243D]!"
             >
               {t("discard")}
             </Button>
@@ -145,7 +151,7 @@ const CustomerInfoOrder = () => {
               disabled={createUser.isPending}
               loading={createUser.isPending}
               onClick={handleClick}
-              className="w-[91px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
+              className="w-[110px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none!"
             >
               {t("next")}
               <ArrowRight className="h-[13px] w-[13px]" />

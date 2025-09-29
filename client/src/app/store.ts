@@ -8,9 +8,12 @@ import resetOrderItems from "../shared/lib/features/customer_and_market-id";
 import setOrderItems from "../shared/lib/features/customer_and_market-id";
 import setProductInfo from "../shared/lib/features/customer_and_market-id";
 import togglePermission from "../shared/lib/features/add-order-permission";
-import resetFilter  from "../shared/lib/features/order-filters";
+import resetFilter from "../shared/lib/features/order-filters";
 import setFilter from "../shared/lib/features/order-filters";
-
+import setUserFilter from "../shared/lib/features/user-filters";
+import resetUserFilter from "../shared/lib/features/user-filters";
+import requestDownload from "../shared/lib/features/excel-download-func/excelDownloadFunc";
+import resetDownload from "../shared/lib/features/excel-download-func/excelDownloadFunc";
 export const store = configureStore({
   reducer: {
     authSlice,
@@ -23,7 +26,11 @@ export const store = configureStore({
     setProductInfo,
     togglePermission,
     setFilter,
-    resetFilter
+    resetFilter,
+    setUserFilter,
+    resetUserFilter,
+    requestDownload,
+    resetDownload,
   },
 });
 

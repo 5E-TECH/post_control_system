@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 type FieldType = {
   first_name: string;
@@ -20,6 +21,7 @@ const CreateAdmin = () => {
   const navigate = useNavigate();
 
   const [form] = Form.useForm<FieldType>();
+  const { handleApiError } = useApiNotification();
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const newAdmin = {
       ...values,
@@ -31,6 +33,11 @@ const CreateAdmin = () => {
       onSuccess: () => {
         navigate("/all-users");
       },
+      onError: (err: any) =>
+        handleApiError(
+          err,
+          "Foydalanuvchi yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+        ),
     });
   };
 
@@ -56,7 +63,7 @@ const CreateAdmin = () => {
   };
 
   return (
-    <div className="w-[420px]">
+    <div className="min-[800px]:w-[420px]">
       <h1 className="font-medium text-[24px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
         {t("adminTitle")}
       </h1>
@@ -74,7 +81,7 @@ const CreateAdmin = () => {
           rules={[{ required: true, message: t("enterName") }]}
         >
           <Input
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterName")}
           />
         </Form.Item>
@@ -91,7 +98,7 @@ const CreateAdmin = () => {
         >
           <Input
             placeholder={t("enterPhoneNumber")}
-            className="h-[48px]"
+            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             type="text"
             onChange={handlePhoneChange}
           />
@@ -101,9 +108,9 @@ const CreateAdmin = () => {
           name="password"
           rules={[{ required: true, message: t("enterPassword") }]}
         >
-          <Input
+          <Input.Password
             type="password"
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="custom-password h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:text-[#E7E3FC66]!"
             placeholder={t("enterPassword")}
           />
         </Form.Item>
@@ -122,7 +129,7 @@ const CreateAdmin = () => {
         >
           <Input
             type="number"
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterSalary")}
           />
         </Form.Item>
@@ -141,7 +148,7 @@ const CreateAdmin = () => {
         >
           <Input
             type="number"
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterPaymentDay")}
           />
         </Form.Item>

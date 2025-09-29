@@ -13,6 +13,7 @@ import { setFilter } from "../../../../shared/lib/features/order-filters";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
+import { requestDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 
 const Filter = () => {
   const { t } = useTranslation("orderList");
@@ -65,6 +66,11 @@ const Filter = () => {
       return;
     }
     navigate("/orders/choose-market");
+  };
+
+  // excel download
+  const handleDownload = () => {
+    dispatch(requestDownload());
   };
 
   // options
@@ -131,19 +137,25 @@ const Filter = () => {
         </Space>
 
         <div className="flex items-center gap-5 flex-wrap max-[800px]:w-full">
+          <Button
+            onClick={handleDownload}
+            className="w-[100px]! h-[38px]! outline-none text-[16px]! text-gray-500! max-[800px]:w-full!"
+          >
+            Export
+          </Button>
           <input
             type="text"
             name="search"
             defaultValue={form.search} // value emas, defaultValue bo‘lishi yaxshi
             onChange={handleSearchChange} // debounce ishlaydi
             placeholder={t("placeholder.searchOrder")}
-            className="border border-[#E5E7EB] rounded-lg px-3 py-[10px] outline-none max-[800px]:w-full"
+            className="border border-gray-300! rounded-lg h-[38px]! indent-3 hover:outline-none max-[800px]:w-full"
           />
           <Button
             onClick={handleCheck}
-            className="w-[140px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none! max-[800px]:w-full!"
+            className="w-[180px]! h-[38px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! hover:opacity-85! hover:outline-none! dark:border-none! max-[800px]:w-full!"
           >
-            {t("button.addOrder")} <ArrowRight className="w-[13px] h-[13px]" />
+            {t("button.addOrder")} <ArrowRight className="h-[13px] w-[13px]" />
           </Button>
         </div>
       </div>
