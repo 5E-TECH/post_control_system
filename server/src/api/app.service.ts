@@ -21,7 +21,11 @@ export default class Application {
     app.useLogger(myLogger);
 
     // Static files
-    app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+    // dev sersion
+    // app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+    // prod version
+    app.use('/uploads', express.static('/home/ubuntu/uploads'));
+
     app.use(express.static(join(process.cwd(), 'public')));
 
     // Global filters, pipes, cors
