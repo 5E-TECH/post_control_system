@@ -21,7 +21,7 @@ const Payments = () => {
       navigate(`cash-detail/${id}`);
     }
   }, [user, role]);
-  
+
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
 
@@ -54,6 +54,30 @@ const Payments = () => {
     setShowMarket(false);
     setSelect(null);
   };
+
+  const operationType = ["income", "expense"];
+  const operationOptions = operationType.map((role: string) => ({
+    value: role,
+    label: role,
+  }));
+
+  const sourceType = ["cash", "card", "click_to_market"];
+  const sourceOptions = sourceType.map((status: string) => ({
+    value: status,
+    label: status,
+  }));
+
+  const createdBy = ["superadmin", "admin", "courier"];
+  const createdByOptions = createdBy.map((role: string) => ({
+    value: role,
+    label: role,
+  }));
+
+  const cashboxType = ["markets", "couriers", "main"];
+  const cashboxOptions = cashboxType.map((status: string) => ({
+    value: status,
+    label: status,
+  }));
 
   useEffect(() => {
     if (role === "admin" || role === "superadmin") {
@@ -277,10 +301,10 @@ const Payments = () => {
       <div className="mt-12 mx-5">
         <h1 className="text-xl font-semibold mb-3">Filters</h1>
         <div className="grid grid-cols-4 gap-6 pt-[16px] max-[1000px]:grid-cols-2 max-[750px]:grid-cols-1">
-          <Select text="Operation type" />
-          <Select text="Source type" />
-          <Select text="Created By" />
-          <Select text="Cashbox type" />
+          <Select name="" options={operationOptions} text="Operation type" />
+          <Select options={sourceOptions} text="Source type" />
+          <Select options={createdByOptions} text="Created By" />
+          <Select options={cashboxOptions} text="Cashbox type" />
         </div>
       </div>
 
