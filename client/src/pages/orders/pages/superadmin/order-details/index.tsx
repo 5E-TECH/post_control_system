@@ -9,6 +9,8 @@ const OrderDetails = () => {
   const { id } = useParams();
   const { getOrderById } = useOrder();
   const { data } = getOrderById(id);
+  console.log(data?.data?.comment);
+  
 
   // Agar data hali kelmagan bo‘lsa loader
   if (!data) return <div className="text-center p-10">Loading...</div>;
@@ -26,7 +28,9 @@ const OrderDetails = () => {
             <Details
               items={data?.data?.items}
               total_price={data?.data?.total_price}
-              // marketId={data?.data?.market?.id}
+              marketId={data?.data?.market?.id}
+              comment={data?.data?.comment}
+              deleveryStatus={data?.data?.where_deliver}
             />
           </div>
         </div>
