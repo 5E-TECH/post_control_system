@@ -1,4 +1,4 @@
-import { createContext, memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Check, Trash } from "lucide-react";
 import {
   useLocation,
@@ -10,10 +10,7 @@ import { Button } from "antd";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import SearchInput from "../../../../users/components/search-input";
 import Popup from "../../../../../shared/ui/Popup";
-import useNotification from "antd/es/notification/useNotification";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
-
-const Context = createContext({ name: "Default" });
 
 const MailDetail = () => {
   const { id } = useParams();
@@ -55,14 +52,13 @@ const MailDetail = () => {
 
   const [isShow, setIsShow] = useState(false);
   const [couriers, setCouriers] = useState<any[]>([]);
-  const { handleSuccess, handleApiError } = useApiNotification();
+  const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
   const handleClick = (id: string) => {
     if (selectedIds.length === 0) {
-      api.warning({
-        message: "Buyurtma tanlanmagan",
-        description: "Buyurtmani tanlab keyin jo'nata olasiz",
-        placement: "topRight",
-      });
+      handleWarning(
+        "Buyurtma tanlanmagan",
+        "Buyurtmani tanlab keyin jo'nata olasiz"
+      );
       return;
     }
 
@@ -107,14 +103,10 @@ const MailDetail = () => {
     setSelectedCourierId(id);
   };
 
-  const [api, contextHolder] = useNotification();
   const navigate = useNavigate();
   const handleConfirmCouriers = () => {
     if (!selectedCourierId) {
-      api.warning({
-        message: "Kuryer tanlanmagan",
-        placement: "topRight",
-      });
+      handleWarning("Kuryer tanlanmagan", "Kuryer tanlab keyin jo'nata olasiz");
       return;
     }
     const post = {
@@ -137,211 +129,201 @@ const MailDetail = () => {
 
   const hideSend = state?.hideSend;
 
-  const contextValue = useMemo(() => ({ name: "Ant Design" }), []);
   return (
-    <Context.Provider value={contextValue}>
-      {contextHolder}
-      <div className="flex flex-col gap-5 p-5 h-[800px]">
-        <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
-          <div className="flex justify-between px-5 pt-5">
-            <h1 className="text-2xl mt-1">
-              <span>{regionName}</span> buyurtmalari
-            </h1>
-            <SearchInput placeholder="Qidiruv..." />
-          </div>
+    <div className="flex flex-col gap-5 p-5 h-[800px]">
+      <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
+        <div className="flex justify-between px-5 pt-5">
+          <h1 className="text-2xl mt-1">
+            <span>{regionName}</span> buyurtmalari
+          </h1>
+          <SearchInput placeholder="Qidiruv..." />
+        </div>
 
-          <div className="mt-5">
-            <table>
-              <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
-                <tr>
+        <div className="mt-5">
+          <table>
+            <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
+              <tr>
+                {!hideSend ? (
+                  <th className="p-[20px] flex items-center">
+                    <input
+                      type="checkbox"
+                      className="w-[18px] h-[18px] rounded-sm"
+                      checked={
+                        !!postData && selectedIds.length === postData?.length
+                      }
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(postData.map((item: any) => item.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                    />
+                  </th>
+                ) : null}
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    MIJOZ ISMI
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    TELEFON RAQAMI
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    TUMANI
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    PUL MIQDORI
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    DONA
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                {!hideSend ? (
+                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                    <div className="flex items-center justify-between pr-[21px]">
+                      HARAKATLAR
+                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    </div>
+                  </th>
+                ) : null}
+              </tr>
+            </thead>
+            <tbody>
+              {postData?.map((order: any) => (
+                <tr key={order?.id}>
                   {!hideSend ? (
-                    <th className="p-[20px] flex items-center">
+                    <td className="p-[20px] flex items-center">
+                      {" "}
                       <input
                         type="checkbox"
                         className="w-[18px] h-[18px] rounded-sm"
                         checked={
-                          !!postData && selectedIds.length === postData?.length
+                          order?.id ? selectedIds.includes(order.id) : false
                         }
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedIds(
-                              postData.map((item: any) => item.id)
-                            );
+                            setSelectedIds([...selectedIds, order.id]);
                           } else {
-                            setSelectedIds([]);
+                            setSelectedIds(
+                              selectedIds.filter((id) => id !== order.id)
+                            );
                           }
                         }}
                       />
-                    </th>
+                    </td>
                   ) : null}
-                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      MIJOZ ISMI
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
-                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      TELEFON RAQAMI
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
-                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      TUMANI
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
-                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      PUL MIQDORI
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
-                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      DONA
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
+                  <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                    <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
+                      {order?.customer?.name}
+                    </span>
+                  </td>
+                  <td className="w-[254px] h-[56px] pl-[20px] text-left">
+                    <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
+                      {order?.customer?.phone_number}
+                    </span>
+                  </td>
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {order?.customer?.district?.name}
+                  </td>
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}
+                  </td>
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {order?.items?.length}
+                  </td>
+
                   {!hideSend ? (
-                    <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        HARAKATLAR
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <td className="w-[254px] h-[56px] pl-[19px] text-left">
+                      <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
+                        <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
                       </div>
-                    </th>
+                    </td>
                   ) : null}
                 </tr>
-              </thead>
-              <tbody>
-                {postData?.map((order: any) => (
-                  <tr key={order?.id}>
-                    {!hideSend ? (
-                      <td className="p-[20px] flex items-center">
-                        {" "}
-                        <input
-                          type="checkbox"
-                          className="w-[18px] h-[18px] rounded-sm"
-                          checked={
-                            order?.id ? selectedIds.includes(order.id) : false
-                          }
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedIds([...selectedIds, order.id]);
-                            } else {
-                              setSelectedIds(
-                                selectedIds.filter((id) => id !== order.id)
-                              );
-                            }
-                          }}
-                        />
-                      </td>
-                    ) : null}
-                    <td className="w-[254px] h-[56px] pl-[20px] text-left">
-                      <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
-                        {order?.customer?.name}
-                      </span>
-                    </td>
-                    <td className="w-[254px] h-[56px] pl-[20px] text-left">
-                      <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
-                        {order?.customer?.phone_number}
-                      </span>
-                    </td>
-                    <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                      {order?.customer?.district?.name}
-                    </td>
-                    <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                      {new Intl.NumberFormat("uz-UZ").format(
-                        order?.total_price
-                      )}
-                    </td>
-                    <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                      {order?.items?.length}
-                    </td>
-
-                    {!hideSend ? (
-                      <td className="w-[254px] h-[56px] pl-[19px] text-left">
-                        <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
-                          <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-
-        {!hideSend ? (
-          <div className="flex justify-end">
-            <Button
-              disabled={isPending}
-              loading={isPending}
-              onClick={() => handleClick(id as string)}
-              className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
-            >
-              Po'chtani jo'natish
-            </Button>
-          </div>
-        ) : null}
-
-        {isShow && (
-          <Popup isShow={isShow} onClose={() => setIsShow(false)}>
-            <div className="min-h-[450px] w-[450px] bg-[#ffffff] rounded-md">
-              <h1 className="text-[22px] text-center py-3">
-                Kuryerlar ro'yxati
-              </h1>
-
-              <div className="grid grid-cols-1 gap-3 p-3">
-                {couriers.map((courier: any) => (
-                  <div
-                    key={courier?.id}
-                    className="p-4 rounded-xl shadow-md flex items-center justify-between hover:shadow-lg transition cursor-pointer"
-                  >
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-800">
-                        {courier?.name}
-                      </h2>
-                      <p className="text-sm text-gray-500">
-                        📞 {courier?.phone_number || "Telefon raqami yo‘q"}
-                      </p>
-                    </div>
-
-                    <Button
-                      className={`${
-                        selectedCourierId === courier?.id
-                          ? "bg-[var(--color-bg-sy)]! text-white!"
-                          : ""
-                      }`}
-                      onClick={() => handleSelectedCourier(courier?.id)}
-                    >
-                      {selectedCourierId === courier?.id ? (
-                        <span className="flex items-center gap-1">
-                          Tanlandi <Check className="w-4 h-4 text-green-300" />
-                        </span>
-                      ) : (
-                        "Tanlash"
-                      )}
-                    </Button>
-                  </div>
-                ))}
-
-                <Button
-                  disabled={isPending}
-                  loading={isPending}
-                  className="bg-[var(--color-bg-sy)]! text-white!"
-                  onClick={handleConfirmCouriers}
-                >
-                  Tasdiqlash
-                </Button>
-              </div>
-            </div>
-          </Popup>
-        )}
       </div>
-    </Context.Provider>
+
+      {!hideSend ? (
+        <div className="flex justify-end">
+          <Button
+            disabled={isPending}
+            loading={isPending}
+            onClick={() => handleClick(id as string)}
+            className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
+          >
+            Po'chtani jo'natish
+          </Button>
+        </div>
+      ) : null}
+
+      {isShow && (
+        <Popup isShow={isShow} onClose={() => setIsShow(false)}>
+          <div className="min-h-[450px] w-[450px] bg-[#ffffff] rounded-md">
+            <h1 className="text-[22px] text-center py-3">Kuryerlar ro'yxati</h1>
+
+            <div className="grid grid-cols-1 gap-3 p-3">
+              {couriers.map((courier: any) => (
+                <div
+                  key={courier?.id}
+                  className="p-4 rounded-xl shadow-md flex items-center justify-between hover:shadow-lg transition cursor-pointer"
+                >
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-800">
+                      {courier?.name}
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      📞 {courier?.phone_number || "Telefon raqami yo‘q"}
+                    </p>
+                  </div>
+
+                  <Button
+                    className={`${
+                      selectedCourierId === courier?.id
+                        ? "bg-[var(--color-bg-sy)]! text-white!"
+                        : ""
+                    }`}
+                    onClick={() => handleSelectedCourier(courier?.id)}
+                  >
+                    {selectedCourierId === courier?.id ? (
+                      <span className="flex items-center gap-1">
+                        Tanlandi <Check className="w-4 h-4 text-green-300" />
+                      </span>
+                    ) : (
+                      "Tanlash"
+                    )}
+                  </Button>
+                </div>
+              ))}
+
+              <Button
+                disabled={isPending}
+                loading={isPending}
+                className="bg-[var(--color-bg-sy)]! text-white!"
+                onClick={handleConfirmCouriers}
+              >
+                Tasdiqlash
+              </Button>
+            </div>
+          </div>
+        </Popup>
+      )}
+    </div>
   );
 };
 
