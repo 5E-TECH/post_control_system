@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form } from "antd";
 import { CashboxCard } from "../../components/CashCard";
