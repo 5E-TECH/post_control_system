@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useTranslation } from "react-i18next";
-import { handleApiError } from "../../../../shared/helpers/handleApiError";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 type FieldType = {
   name: string;
@@ -20,6 +20,7 @@ const CreateMarket = () => {
   const navigate = useNavigate();
 
   const [form] = Form.useForm<FieldType>();
+  const { handleApiError } = useApiNotification();
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const newMarket = {
       ...values,

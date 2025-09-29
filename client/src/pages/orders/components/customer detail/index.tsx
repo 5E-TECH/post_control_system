@@ -3,7 +3,7 @@ import avatar from "../../../../shared/assets/order/avatar.png";
 import cart from "../../../../shared/assets/order/cart.svg";
 import Popup from "../../../../shared/ui/Popup"; // sizda Popup bor edi
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
-import { handleApiError } from "../../../../shared/helpers/handleApiError";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 // import { useParams } from "react-router-dom";
 
 interface IProps {
@@ -34,6 +34,7 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
   };
 
   // saqlash
+  const { handleApiError } = useApiNotification();
   const handleSave = () => {
     const updatedCustomer = {
       name,

@@ -4,7 +4,7 @@ import { useOrder } from "../../../../shared/api/hooks/useOrder";
 // import { useParams } from "react-router-dom";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
-import { handleApiError } from "../../../../shared/helpers/handleApiError";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 interface IProps {
   address: string;
@@ -68,6 +68,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   };
 
   // yangilash
+  const { handleApiError } = useApiNotification();
   const handleUpdate = () => {
     const dataToSend = {
       address: newAddress,

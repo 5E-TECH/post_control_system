@@ -21,7 +21,7 @@ import { Select, DatePicker } from "antd";
 import dayjs from "dayjs";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../../shared/api";
-import { handleApiError } from "../../../../shared/helpers/handleApiError";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 const { RangePicker } = DatePicker;
 
@@ -83,7 +83,7 @@ const MainDetail = () => {
     setShowMarket(false);
     setShowCurier(false);
   };
-
+  const { handleApiError } = useApiNotification();
   const handleSubmit = () => {
     const data = {
       amount: Number(form.summa),

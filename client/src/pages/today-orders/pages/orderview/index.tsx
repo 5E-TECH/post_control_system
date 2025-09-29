@@ -7,7 +7,7 @@ import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { usePost } from "../../../../shared/api/hooks/usePost";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
-import { handleApiError } from "../../../../shared/helpers/handleApiError";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 const OrderView = () => {
   const { id } = useParams();
@@ -35,6 +35,7 @@ const OrderView = () => {
   const hanlerDelet = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
   };
+  const { handleApiError } = useApiNotification();
   const handleAccapted = () => {
     const newOrder = {
       order_ids: selectedIds,

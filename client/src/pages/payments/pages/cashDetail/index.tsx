@@ -10,7 +10,7 @@ import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import dayjs from "dayjs";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
-import { handleApiError } from "../../../../shared/helpers/handleApiError";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 const { RangePicker } = DatePicker;
 
@@ -56,6 +56,7 @@ const CashDetail = () => {
     form.payment == "click_to_market" ? true : false
   );
 
+  const { handleApiError } = useApiNotification();
   const handleSubmit = () => {
     const dataCourier = {
       courier_id: id,
