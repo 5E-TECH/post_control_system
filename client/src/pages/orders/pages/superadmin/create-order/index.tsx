@@ -47,7 +47,11 @@ const CreateOrder = () => {
       );
       return;
     }
-    if (!productInfo?.total_price || !productInfo?.where_deliver) {
+    if (
+      productInfo?.total_price === null ||
+      productInfo?.total_price === undefined ||
+      !productInfo?.where_deliver
+    ) {
       handleWarning(
         t("productForm.incompleteProductData"),
         t("productForm.fillAllFields")
