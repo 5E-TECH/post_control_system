@@ -36,11 +36,14 @@ export class CashboxHistoryService {
 
   async findOne(id: string) {
     try {
-      const cashboxHistory = await this.cashboxRepo.findOne({ where: { id } });
+      const cashboxHistory = await this.cashboxRepo.findOne({
+        where: { id },
+        relations: ['cashbox', 'createdByUser', 'order'],
+      });
       if (!cashboxHistory) {
         throw new NotFoundException('CashboxHistory not found by id: ', id);
       }
-      return successRes(cashboxHistory);
+      return successRes(cashboxHistory, 200, 'Cashbox by id');
     } catch (error) {
       return catchError(error.message);
     }

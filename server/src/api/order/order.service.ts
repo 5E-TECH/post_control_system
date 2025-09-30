@@ -1217,7 +1217,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return successRes({}, 200, 'Order WAITING ga qaytarildi');
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      throw err;
+      throw catchError(err);
     } finally {
       await queryRunner.release();
     }
