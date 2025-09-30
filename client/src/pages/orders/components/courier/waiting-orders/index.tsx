@@ -1,4 +1,4 @@
-import { memo, useRef, useState, type MouseEvent } from "react";
+import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import {
@@ -31,7 +31,8 @@ const WaitingOrders = () => {
   const { getParam, setParam, removeParam } = useParamsHook();
   const page = Number(getParam("page") || 1);
   const limit = Number(getParam("limit") || 10);
-  const { getCourierOrders, sellOrder, cancelOrder } = useOrder();
+  const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
+    useOrder();
   const { data } = getCourierOrders({ status: "waiting" });
   const total = data?.data?.total || 0;
 
@@ -42,29 +43,74 @@ const WaitingOrders = () => {
     const type = urlType.current;
 
     if (type === "sell") {
-      sellOrder.mutate(
-        { id: item?.id as string, data: values },
-        {
-          onSuccess: () => {
-            setIsShow(false);
-            handleSuccess("Buyurtma muvaffaqiyatli sotildi");
-          },
-          onError: (err: any) =>
-            handleApiError(err, "Buyurtmani sotishda xatolik yuz berdi"),
-        }
-      );
+      if (partleSoldShow!) {
+        const order_item_info = orderItemInfo.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }));
+        const data = {
+          order_item_info,
+          totalPrice: Number(String(totalPrice).split(",").join("")),
+          extraCost: Number(values?.extraCost),
+          comment: values?.comment,
+        };
+        partlySellOrder.mutate(
+          { id: order.current.id, data },
+          {
+            onSuccess: (res) => {
+              console.log(res);
+            },
+          }
+        );
+      } else {
+        sellOrder.mutate(
+          { id: item?.id as string, data: values },
+          {
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+            },
+            onError: (err: any) =>
+              handleApiError(err, "Buyurtmani sotishda xatolik yuz berdi"),
+          }
+        );
+      }
     } else {
-      cancelOrder.mutate(
-        { id: item?.id as string, data: values },
-        {
-          onSuccess: () => {
-            setIsShow(false);
-            handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
-          },
-          onError: (err: any) =>
-            handleApiError(err, "Buyurtmani bekor qilishda xatolik yuz berdi"),
-        }
-      );
+      if (partleSoldShow) {
+        const order_item_info = orderItemInfo.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }));
+        const data = {
+          order_item_info,
+          totalPrice: Number(String(totalPrice).split(",").join("")),
+          extraCost: Number(values?.extraCost),
+          comment: values?.comment,
+        };
+        partlySellOrder.mutate(
+          { id: order.current.id, data },
+          {
+            onSuccess: (res) => {
+              console.log(res);
+            },
+          }
+        );
+      } else {
+        cancelOrder.mutate(
+          { id: item?.id as string, data: values },
+          {
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+            },
+            onError: (err: any) =>
+              handleApiError(
+                err,
+                "Buyurtmani bekor qilishda xatolik yuz berdi"
+              ),
+          }
+        );
+      }
     }
   };
   const handleSellOrder = (
@@ -103,9 +149,19 @@ const WaitingOrders = () => {
 
   const [isShow, setIsShow] = useState<boolean>(false);
   const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
-  const [orderQuantity, setOrderQuantity] = useState<number>(0);
 
-  // const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
+  const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
+  const [totalPrice, setTotalPrice] = useState<number | string>("");
+  useEffect(() => {
+    if (isShow && order.current) {
+      const initialItems = order.current?.items?.map((item: any) => ({
+        product_id: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity,
+      }));
+      setOrderItemInfo(initialItems || []);
+    }
+  }, [isShow]);
 
   return data?.data?.data?.length > 0 ? (
     <div>
@@ -275,48 +331,62 @@ const WaitingOrders = () => {
 
           {partleSoldShow && (
             <div className="flex flex-col">
-              <div className="pt-4 flex gap-10 justify-between">
-                <Form.Item className="flex-1!">
-                  <Select
-                    className="!h-[40px] custom-select-dropdown-bright"
-                    dropdownClassName="dark-dropdown"
-                    showSearch
-                    filterOption={false}
-                  />
-                </Form.Item>
-                <div className="flex gap-2 items-center mb-6 select-none">
-                  <Plus
-                    className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                    onClick={() => setOrderQuantity((p) => p + 1)}
-                  />
-                  <span className="text-[20px]">
-                    {orderQuantity < 0 ? 0 : orderQuantity}
-                  </span>
-                  <Minus
-                    className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                    onClick={() => setOrderQuantity((p) => (p > 0 ? p - 1 : 0))}
-                  />
+              {orderItemInfo.map((item, index) => (
+                <div
+                  key={item.productId}
+                  className="pt-4 flex gap-10 justify-between"
+                >
+                  <Form.Item className="flex-1!">
+                    <Select
+                      className="!h-[40px] custom-select-dropdown-bright"
+                      dropdownClassName="dark-dropdown"
+                      value={item.product_id}
+                      disabled
+                      options={[
+                        {
+                          label: item.name,
+                          value: item.product_id,
+                        },
+                      ]}
+                    />
+                  </Form.Item>
+
+                  <div className="flex gap-2 items-center mb-6 select-none">
+                    <Plus
+                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
+                      onClick={() => {
+                        const updated = [...orderItemInfo];
+                        updated[index].quantity += 1;
+                        setOrderItemInfo(updated);
+                      }}
+                    />
+                    <span className="text-[20px]">{item.quantity}</span>
+                    <Minus
+                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
+                      onClick={() => {
+                        const updated = [...orderItemInfo];
+                        if (updated[index].quantity > 0) {
+                          updated[index].quantity -= 1;
+                          setOrderItemInfo(updated);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              ))}
+
               <Form.Item>
                 <Input
                   className="h-[40px]!"
                   placeholder="To'lov summasi"
-                  // onChange={(e) => {
-                  //   const rawValue = e.target.value.replace(/\D/g, "");
-                  //   const formatted = new Intl.NumberFormat("uz-UZ").format(
-                  //     Number(rawValue || 0)
-                  //   );
-
-                  //   handleChange({
-                  //     ...e,
-                  //     target: {
-                  //       ...e.target,
-                  //       name: "total_price",
-                  //       value: formatted,
-                  //     },
-                  //   } as any);
-                  // }}
+                  value={totalPrice}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/\D/g, "");
+                    const formatted = new Intl.NumberFormat("uz-UZ").format(
+                      Number(rawValue || 0)
+                    );
+                    setTotalPrice(formatted);
+                  }}
                 ></Input>
               </Form.Item>
             </div>

@@ -1064,7 +1064,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (remainingItems.length > 0) {
         const cancelledOrder = queryRunner.manager.create(OrderEntity, {
-          market_id: order.user_id,
+          user_id: order.user_id,
           customer_id: order.customer_id, // ✅ same customer
           comment: 'Qolgan mahsulotlar bekor qilindi',
           total_price: 0,

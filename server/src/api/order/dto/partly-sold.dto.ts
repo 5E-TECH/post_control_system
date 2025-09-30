@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -18,7 +19,7 @@ export class PartlySoldDto {
     ],
   })
   @IsNotEmpty()
-  @IsObject()
+  @IsArray()
   order_item_info: OrderItems[];
 
   @ApiProperty({ description: 'Total price for sold items', example: 15000, minimum: 0 })
