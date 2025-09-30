@@ -15,14 +15,22 @@ export class PartlySoldDto {
     description: 'Items sold partly with updated quantities and prices',
     type: 'array',
     example: [
-      { product_id: '11111111-2222-3333-4444-555555555555', quantity: 1, price: 15000 },
+      {
+        product_id: '11111111-2222-3333-4444-555555555555',
+        quantity: 1,
+        price: 15000,
+      },
     ],
   })
   @IsNotEmpty()
   @IsArray()
   order_item_info: OrderItems[];
 
-  @ApiProperty({ description: 'Total price for sold items', example: 15000, minimum: 0 })
+  @ApiProperty({
+    description: 'Total price for sold items',
+    example: 15000,
+    minimum: 0,
+  })
   @IsNotEmpty()
   @IsNumber()
   @Min(0)
@@ -34,7 +42,10 @@ export class PartlySoldDto {
   @Min(0)
   extraCost?: number;
 
-  @ApiPropertyOptional({ description: 'Reason or note', example: 'Customer bought only 1 unit' })
+  @ApiPropertyOptional({
+    description: 'Reason or note',
+    example: 'Customer bought only 1 unit',
+  })
   @IsOptional()
   @IsString()
   comment?: string;
