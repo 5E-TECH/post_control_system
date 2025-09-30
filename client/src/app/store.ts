@@ -17,6 +17,8 @@ import resetDownload from "../shared/lib/features/excel-download-func/excelDownl
 import setPage  from "../shared/lib/features/paginationProductSlice";
 import setLimit   from "../shared/lib/features/paginationProductSlice";
 import paginationSlice   from "../shared/lib/features/paginationProductSlice";
+import  clearEditItem  from "../shared/lib/features/updateSlice";
+import  setEditItem  from "../shared/lib/features/updateSlice";
 
 export const store = configureStore({
   reducer: {
@@ -37,7 +39,9 @@ export const store = configureStore({
     resetDownload,
     setPage,
     setLimit,
-    paginationSlice
+    paginationSlice,
+    setEditItem,
+    clearEditItem
   },
 });
 
