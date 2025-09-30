@@ -576,6 +576,68 @@ export class UserService {
     }
   }
 
+  async allRegistratorAndAdminUsers(filters: {
+    search?: string;
+    status?: string;
+    role?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<object> {
+    try {
+      let { search, status, role, page = 1, limit = 10 } = filters;
+
+      const unlimited = limit === 0;
+
+      const allowedRoles = [Roles.REGISTRATOR, Roles.ADMIN];
+
+      const qb = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.region', 'region')
+        .where('user.role IN (:...allowedRoles)', { allowedRoles });
+
+      // 🔍 Search filter
+      if (search) {
+        qb.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🎯 Status filter
+      if (status) {
+        qb.andWhere('user.status = :status', { status });
+      }
+
+      // 🎭 Role filter — allowedRoles ichida bo'lishi kerak
+      if (role && allowedRoles.includes(role as Roles)) {
+        qb.andWhere('user.role = :role', { role });
+      }
+
+      // 🔢 Pagination
+      if (!unlimited) {
+        qb.skip((page - 1) * limit).take(limit);
+      }
+
+      const [users, total] = await qb
+        .orderBy('user.created_at', 'DESC')
+        .getManyAndCount();
+
+      return successRes(
+        {
+          data: users,
+          total,
+          page: unlimited ? 1 : Number(page),
+          limit: unlimited ? total : Number(limit),
+          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+        },
+        200,
+        'All users with roles: REGISTRATOR, ADMIN',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async allCouriers(): Promise<object> {
     try {
       const allCouriers = await this.userRepo.find({
