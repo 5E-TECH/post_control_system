@@ -34,7 +34,7 @@ const statusLabels: Record<string, string> = {
   cancelled: "Bekor qilingan",
   paid: "To‘langan",
   partly_paid: "Qisman to‘langan",
-  cancelled_sent: "Bekorlangan jo‘natma",
+  "cancelled (sent)": "Bekorlangan jo‘natma",
   closed: "Yopilgan",
 };
 
@@ -138,8 +138,8 @@ const OrderView = () => {
             ?.map((item: any) => item.product.name)
             ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
-          Narxi: order?.total_price?.toLocaleString(),
-          // Holati: order?,
+          Narxi: Number((order?.total_price ?? 0) / 1000),
+          Holati: statusLabels[order?.status],
           Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
             year: "numeric",
             month: "2-digit",
