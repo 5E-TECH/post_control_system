@@ -619,12 +619,17 @@ export class CashBoxService
   }
 
   async allCashboxesTotal(filters?: {
+    operationType?: Operation_type;
+    sourceType?: Source_type;
+    createdBy?: string;
+    cashboxType?: Cashbox_type;
     fromDate?: string;
     toDate?: string;
     page?: number;
     limit?: number;
   }) {
     try {
+      // 1️⃣ Main, courier and market cashboxes
       const mainCashbox = await this.cashboxRepo.findOne({
         where: { cashbox_type: Cashbox_type.MAIN },
       });
@@ -638,39 +643,71 @@ export class CashBoxService
         where: { cashbox_type: Cashbox_type.FOR_MARKET },
       });
 
-      // vaqt oralig‘i
-      let fromDate: number | undefined;
-      let toDate: number | undefined;
-
-      const where: any = {};
-
-      if (filters?.fromDate && filters.toDate) {
-        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
-        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
-        where.created_at = Between(fromDate, toDate);
-      } else if (filters?.fromDate) {
-        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
-        where.created_at = MoreThanOrEqual(fromDate);
-      } else if (filters?.toDate) {
-        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
-        where.created_at = LessThanOrEqual(toDate);
-      }
-
-      // pagination parametrlari
+      // 2️⃣ Pagination
       const page = filters?.page && filters.page > 0 ? filters.page : 1;
       const limit = filters?.limit && filters.limit > 0 ? filters.limit : 20;
       const skip = (page - 1) * limit;
 
-      // tarixlarni pagination bilan olish
-      const [allCashboxHistories, total] =
-        await this.cashboxHistoryRepo.findAndCount({
-          where,
-          relations: ['createdByUser'],
-          order: { created_at: 'DESC' },
-          skip,
-          take: limit,
-        });
+      // 3️⃣ Build query
+      const qb = this.cashboxHistoryRepo
+        .createQueryBuilder('h')
+        .leftJoinAndSelect('h.createdByUser', 'createdByUser')
+        .leftJoinAndSelect('h.cashbox', 'cashbox')
+        .orderBy('h.created_at', 'DESC')
+        .skip(skip)
+        .take(limit);
 
+      // date filters
+      let fromDate: number | null = null;
+      let toDate: number | null = null;
+
+      if (filters?.fromDate && filters?.toDate) {
+        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
+        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+        qb.andWhere('h.created_at BETWEEN :fromDate AND :toDate', {
+          fromDate,
+          toDate,
+        });
+      } else if (filters?.fromDate) {
+        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
+        qb.andWhere('h.created_at >= :fromDate', { fromDate });
+      } else if (filters?.toDate) {
+        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+        qb.andWhere('h.created_at <= :toDate', { toDate });
+      }
+
+      // operation type
+      if (filters?.operationType) {
+        qb.andWhere('h.operation_type = :operationType', {
+          operationType: filters.operationType,
+        });
+      }
+
+      // source type
+      if (filters?.sourceType) {
+        qb.andWhere('h.source_type = :sourceType', {
+          sourceType: filters.sourceType,
+        });
+      }
+
+      // createdBy (user id)
+      if (filters?.createdBy) {
+        qb.andWhere('h.created_by = :createdBy', {
+          createdBy: filters.createdBy,
+        });
+      }
+
+      // cashbox type
+      if (filters?.cashboxType) {
+        qb.andWhere('cashbox.cashbox_type = :cashboxType', {
+          cashboxType: filters.cashboxType,
+        });
+      }
+
+      // 4️⃣ Execute query
+      const [allCashboxHistories, total] = await qb.getManyAndCount();
+
+      // 5️⃣ Totals
       let courierCashboxTotal = 0;
       let marketCashboxTotal = 0;
       for (const cashbox of courierCashboxes) {
@@ -680,22 +717,23 @@ export class CashBoxService
         marketCashboxTotal += Number(cashbox.balance);
       }
 
-      return successRes({
-        mainCashboxTotal: Number(mainCashbox.balance),
-        courierCashboxTotal,
-        marketCashboxTotal,
-        allCashboxHistories,
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+      // 6️⃣ Response
+      return successRes(
+        {
+          mainCashboxTotal: Number(mainCashbox.balance),
+          courierCashboxTotal,
+          marketCashboxTotal,
+          allCashboxHistories,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
         },
-        filter: {
-          fromDate: fromDate ?? null,
-          toDate: toDate ?? null,
-        },
-      });
+        200,
+        'All cashbox histories',
+      );
     } catch (error) {
       return catchError(error);
     }
