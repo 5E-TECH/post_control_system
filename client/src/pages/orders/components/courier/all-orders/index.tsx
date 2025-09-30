@@ -28,7 +28,6 @@ const AllOrders = () => {
   const { data } = getCourierOrders();
   const [isShow, setIsShow] = useState<boolean>(false);
   const orderId = useRef<string | null>(null);
-
   const { handleSuccess, handleApiError } = useApiNotification();
   const handleSellOrder = (id: string) => {
     sellOrder.mutate(
@@ -66,7 +65,8 @@ const AllOrders = () => {
   };
 
   const handleConfirm = () => {
-    rollbackOrder.mutate(orderId.current as string, {
+    const id = orderId.current;
+    rollbackOrder.mutate(id as string, {
       onSuccess: () => {
         handleSuccess("Buyurtma muvaffaqiyatli ortga qaytarildi");
         setIsShow(false);
