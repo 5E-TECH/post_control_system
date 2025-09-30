@@ -52,12 +52,21 @@ const MainDetail = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const params = {
+    fromDate:form.from,
+    toDate:form.to
+  }
+
+  // console.log("from", form.from);
+  // console.log("to", form.to);
+  
+
   const [show, setShow] = useState(true);
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
   const { getCashBoxMain, cashboxSpand } = useCashBox();
 
-  const { data, refetch } = getCashBoxMain();
+  const { data, refetch } = getCashBoxMain(params);
   const { data: marketData } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
 

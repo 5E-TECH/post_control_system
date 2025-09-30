@@ -37,10 +37,10 @@ export const useCashBox = () => {
       enabled: bool,
     });
 
-  const getCashBoxMain = () =>
+  const getCashBoxMain = (params?:any) =>
     useQuery({
-      queryKey: [cashbox],
-      queryFn: () => api.get(`cashbox/main`).then((res) => res.data),
+      queryKey: [cashbox, params],
+      queryFn: () => api.get(`cashbox/main`, {params}).then((res) => res.data),
     });
 
   const cashboxSpand = useMutation({
