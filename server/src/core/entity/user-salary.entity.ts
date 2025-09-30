@@ -1,5 +1,5 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Column, Entity, OneToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { Max, Min } from 'class-validator';
 
@@ -20,6 +20,8 @@ export class UserSalaryEntity extends BaseEntity {
   @Max(30)
   payment_day: number;
 
+  // user-salary.entity.ts
   @OneToOne(() => UserEntity, (user) => user.salary)
+  @JoinColumn({ name: 'user_id' }) // foreign key shu yerda
   user: UserEntity;
 }

@@ -655,6 +655,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const qb = this.orderRepo
         .createQueryBuilder('o')
         .leftJoinAndSelect('o.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('o.market', 'market')
         .leftJoinAndSelect('o.customer', 'customer')
         .leftJoinAndSelect('customer.district', 'district')
@@ -1395,6 +1396,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           sellingRate,
         };
       });
+      // 7) Sort qilish (masalan: sellingRate bo‘yicha kamayish tartibida)
+      marketWithOrderStats.sort((a, b) => b.sellingRate - a.sellingRate);
 
       return successRes(marketWithOrderStats, 200, 'Markets stats');
     } catch (error) {
@@ -1426,7 +1429,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id: In(uniqueCourierIds), role: Roles.COURIER },
       });
 
-      const courierWithStats: object[] = [];
+      const courierWithStats: {
+        courier: any;
+        totalOrders: number;
+        soldOrders: number;
+        successRate: number;
+      }[] = [];
+
       const validStatuses = [
         Order_status.SOLD,
         Order_status.PAID,
@@ -1478,8 +1487,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           successRate,
         });
       }
+      courierWithStats.sort((a, b) => b.successRate - a.successRate);
 
-      return successRes(courierWithStats, 200, 'Couriers stats');
+      return successRes(courierWithStats, 200, 'Couriers stats(sorted)');
     } catch (error) {
       return catchError(error);
     }

@@ -120,13 +120,10 @@ export class UserService {
         have_to_pay: salary,
         payment_day,
       });
-
       await queryRunner.manager.save(adminSalary);
       await queryRunner.commitTransaction();
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
-      console.log(error);
-
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
@@ -666,7 +663,7 @@ export class UserService {
     try {
       const user = await this.userRepo.findOne({
         where: { id: id, role: Not(Roles.SUPERADMIN) },
-        relations: ['salary', 'region'],
+        relations: ['region', 'salary'],
       });
       if (!user) {
         throw new NotFoundException('User not fount');
