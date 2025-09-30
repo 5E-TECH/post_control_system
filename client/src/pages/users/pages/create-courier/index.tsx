@@ -38,7 +38,7 @@ const CreateCourier = () => {
       onError: (err: any) =>
         handleApiError(
           err,
-          "Foydalanuvchi yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          "Foydalanuvchi yaratishda xatolik yuz berdi"
         ),
     });
   };

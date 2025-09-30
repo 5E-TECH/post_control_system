@@ -90,7 +90,7 @@ const CashDetail = () => {
         onError: (err) =>
           handleApiError(
             err,
-            "To'lov yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "To'lov yaratishda xatolik yuz berdi"
           ),
       });
     } else {
@@ -110,7 +110,7 @@ const CashDetail = () => {
         onError: (err) =>
           handleApiError(
             err,
-            "To'lov yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "To'lov yaratishda xatolik yuz berdi"
           ),
       });
     }

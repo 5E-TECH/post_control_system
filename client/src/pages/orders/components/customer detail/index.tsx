@@ -53,7 +53,7 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
         onError: (err: any) => {
           handleApiError(
             err,
-            "Malumotlarni yangilashda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Malumotlarni yangilashda xatolik yuz berdi"
           );
         },
       }

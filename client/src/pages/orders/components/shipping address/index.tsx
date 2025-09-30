@@ -79,7 +79,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
           // console.log(err)
           handleApiError(
             err,
-            "Malumotlarni yangilashda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Malumotlarni yangilashda xatolik yuz berdi"
           ),
       }
     );

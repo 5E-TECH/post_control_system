@@ -22,15 +22,11 @@ const Filter = () => {
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { getMarkets } = useMarket();
-  const { data } = getMarkets(role !=="market");
+  const { data } = getMarkets(role !== "market");
   const { getRegions } = useRegion();
   const { data: regionData } = getRegions();
 
   const form = useSelector((state: RootState) => state.setFilter);
-
-  // const user = useSelector((state: RootState) => state.authSlice.user);
-  // const role = user?.role;
-  console.log("filters role", role);
 
   const { refetch } = useProfile().getUser(role === "market");
 

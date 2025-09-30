@@ -29,10 +29,11 @@ export const useCashBox = () => {
       queryFn: () => api.get("cashbox/my-cashbox").then((res) => res.data),
     });
 
-  const getCashBoxInfo = (bool: boolean = true) =>
+  const getCashBoxInfo = (bool: boolean = true, params?: any) =>
     useQuery({
-      queryKey: [cashbox],
-      queryFn: () => api.get(`cashbox/all-info`).then((res) => res.data),
+      queryKey: [cashbox, params],
+      queryFn: () =>
+        api.get(`cashbox/all-info`, { params }).then((res) => res.data),
       enabled: bool,
     });
 

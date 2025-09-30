@@ -81,7 +81,7 @@ const AddProduct = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Mahsulot yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Mahsulot yaratishda xatolik yuz berdi"
           ),
       });
       reset();

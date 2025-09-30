@@ -36,7 +36,7 @@ const AllOrders = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Buyurtmalar sotilishda xatolik,keyinroq urinib ko'ring"
+            "Buyurtmalar sotilishda xatolik"
           ),
       }
     );
@@ -52,7 +52,7 @@ const AllOrders = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Buyurtmalar bekor qilishda xatolik,keyinroq urinib ko'ring"
+            "Buyurtmalar bekor qilishda xatolik"
           ),
       }
     );

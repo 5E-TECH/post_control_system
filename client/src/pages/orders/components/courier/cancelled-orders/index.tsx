@@ -32,7 +32,7 @@ const CancelledOrders = () => {
       onError: (error: any) =>
         handleApiError(
           error,
-          "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring."
+          "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi"
         ),
     });
   };
