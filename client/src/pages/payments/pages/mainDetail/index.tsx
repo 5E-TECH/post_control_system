@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form } from "antd";
 import { CashboxCard } from "../../components/CashCard";
@@ -61,9 +61,9 @@ const MainDetail = () => {
   const { data: marketData } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
 
-  // useEffect(() => {
-  //   refetch();
-  // }, []);
+  useEffect(() => {
+    refetch();
+  }, []);
 
   const cashboxFill = useMutation({
     mutationFn: ({ data }: { data: any }) => api.patch(`cashbox/fill`, data),
