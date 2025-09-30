@@ -1,10 +1,11 @@
 import { Button } from "antd";
-import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
-import { memo } from "react";
+import { AlertCircle } from "lucide-react";
+import { memo, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useNavigate } from "react-router-dom";
+import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -20,10 +21,13 @@ const statusColors: Record<string, string> = {
 };
 
 const AllOrders = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  const { getCourierOrders, sellOrder, cancelOrder } = useOrder();
+  const { getCourierOrders, sellOrder, cancelOrder, rollbackOrder } =
+    useOrder();
   const { data } = getCourierOrders();
+  const [isShow, setIsShow] = useState<boolean>(false);
+  const orderId = useRef<string | null>(null);
 
   const { handleSuccess, handleApiError } = useApiNotification();
   const handleSellOrder = (id: string) => {
@@ -34,10 +38,7 @@ const AllOrders = () => {
           handleSuccess("Buyurtma muvaffaqiyatli sotildi");
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Buyurtmalar sotilishda xatolik"
-          ),
+          handleApiError(err, "Buyurtmalar sotilishda xatolik"),
       }
     );
   };
@@ -50,12 +51,29 @@ const AllOrders = () => {
           handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Buyurtmalar bekor qilishda xatolik"
-          ),
+          handleApiError(err, "Buyurtmalar bekor qilishda xatolik"),
       }
     );
+  };
+
+  const handleRollback = (
+    e: MouseEvent<HTMLButtonElement | HTMLElement>,
+    id: string
+  ) => {
+    e.stopPropagation();
+    orderId.current = id;
+    setIsShow(true);
+  };
+
+  const handleConfirm = () => {
+    rollbackOrder.mutate(orderId.current as string, {
+      onSuccess: () => {
+        handleSuccess("Buyurtma muvaffaqiyatli ortga qaytarildi");
+        setIsShow(false);
+      },
+      onError: (err: any) =>
+        handleApiError(err, "Buyurtma qaytarilishda xatolik"),
+    });
   };
 
   return data?.data?.data?.length > 0 ? (
@@ -176,7 +194,7 @@ const AllOrders = () => {
                   </div>
                 ) : item?.status === "sold" || item?.status === "cancelled" ? (
                   <div className="ml-9">
-                    <Button>
+                    <Button onClick={(e) => handleRollback(e, item?.id)}>
                       <AlertCircle />
                     </Button>
                   </div>
@@ -186,7 +204,7 @@ const AllOrders = () => {
           ))}
         </tbody>
       </table>
-      <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
+      {/* <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
         <div className="flex items-center">
           <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
             Rows per page:
@@ -212,7 +230,14 @@ const AllOrders = () => {
           <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
           <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
         </div>
-      </div>
+      </div> */}
+
+      <ConfirmPopup
+        isShow={isShow}
+        onCancel={() => setIsShow(false)}
+        onConfirm={handleConfirm}
+        description="Buyurtmani ortga qaytarszmi?"
+      />
     </div>
   ) : (
     <div className="h-[65vh]">

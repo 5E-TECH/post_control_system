@@ -139,6 +139,7 @@ const OrderView = () => {
             ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
           Narxi: order?.total_price?.toLocaleString(),
+          // Holati: order?,
           Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
             year: "numeric",
             month: "2-digit",
