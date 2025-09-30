@@ -1,16 +1,20 @@
 import { memo } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import EmptyPage from "../../../../../shared/components/empty-page";
-import { Button } from "antd";
+import { Button, Pagination, type PaginationProps } from "antd";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useNavigate } from "react-router-dom";
+import { useParamsHook } from "../../../../../shared/hooks/useParams";
 
 const WaitingOrders = () => {
   const navigate = useNavigate();
 
+  const { getParam, setParam, removeParam } = useParamsHook();
+  const page = Number(getParam("page") || 1);
+  const limit = Number(getParam("limit") || 10);
   const { getCourierOrders, sellOrder, cancelOrder } = useOrder();
   const { data } = getCourierOrders({ status: "waiting" });
+  const total = data?.data?.total || 0;
 
   const { handleSuccess, handleApiError } = useApiNotification();
   const handleSellOrder = (id: string) => {
@@ -21,10 +25,7 @@ const WaitingOrders = () => {
           handleSuccess("Buyurtma muvaffaqiyatli sotildi");
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Buyurtmani sotishda xatolik yuz berdi"
-          ),
+          handleApiError(err, "Buyurtmani sotishda xatolik yuz berdi"),
       }
     );
   };
@@ -37,12 +38,23 @@ const WaitingOrders = () => {
           handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Buyurtmani bekor qilishda xatolik yuz berdi"
-          ),
+          handleApiError(err, "Buyurtmani bekor qilishda xatolik yuz berdi"),
       }
     );
+  };
+
+  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
+    if (newPage === 1) {
+      removeParam("page");
+    } else {
+      setParam("page", newPage);
+    }
+
+    if (limit === 10) {
+      removeParam("limit");
+    } else {
+      setParam("limit", limit);
+    }
   };
 
   return data?.data?.data?.length > 0 ? (
@@ -162,32 +174,14 @@ const WaitingOrders = () => {
         </tbody>
       </table>
 
-      <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
-        <div className="flex items-center">
-          <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-            Rows per page:
-          </span>
-          <select
-            className="rounded px-2 py-1 text-[15px] outline-none ml-2"
-            defaultValue="10"
-          >
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-          </select>
-        </div>
-
-        <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-          <span className="mr-1">1-5</span>
-          <span className="mr-1">of</span>
-          <span>13</span>
-        </div>
-
-        <div className="flex items-center gap-[23px]">
-          <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-          <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-        </div>
+      <div className="flex justify-center">
+        <Pagination
+          showSizeChanger
+          current={page}
+          total={total}
+          pageSize={limit}
+          onChange={onChange}
+        />
       </div>
     </div>
   ) : (

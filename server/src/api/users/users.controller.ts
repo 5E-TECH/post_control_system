@@ -365,6 +365,61 @@ export class UsersController {
     });
   }
 
+  @ApiOperation({ summary: 'List all users with REGISTRATOR and ADMIN roles' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by name or phone number',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'User status (e.g., ACTIVE, INACTIVE)',
+  })
+  @ApiQuery({
+    name: 'role',
+    required: false,
+    enum: [Roles.REGISTRATOR, Roles.ADMIN],
+    description: 'Filter by role (only REGISTRATOR, ADMIN)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    example: 1,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    example: 10,
+    description: 'Items per page (default: 10)',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Users with roles REGISTRATOR and ADMIN retrieved successfully',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('registrator-and-admin')
+  findAllRegistratorAndAdminUsers(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('role') role?: Roles,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+  ) {
+    return this.userService.allRegistratorAndAdminUsers({
+      search,
+      status,
+      role,
+      page,
+      limit,
+    });
+  }
+
   @ApiOperation({ summary: 'List all couriers' })
   @ApiResponse({ status: 200, description: 'Couriers retrieved successfully' })
   @UseGuards(JwtGuard, RolesGuard)
