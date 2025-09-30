@@ -20,7 +20,7 @@ const Products = () => {
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
   const { page, limit } = useSelector((state: RootState) => state.paginationSlice);
 
-  console.log("pagination", page, limit);
+  // console.log("pagination", page, limit);
 
   useEffect(() => {
     if (role === "market") {

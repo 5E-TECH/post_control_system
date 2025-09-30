@@ -24,6 +24,15 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
+  const getProductById = (id:string, enabled:boolean = true, params?: any) =>
+    useQuery({
+      queryKey: [product, params, id],
+      queryFn: () => api.get(`product${id}`, { params }).then((res) => res.data),
+      enabled,
+      staleTime: 1000 * 60 * 60 * 24,
+      refetchOnWindowFocus: false,
+    });
+
   const getMyProducts = (params?: any) =>
     useQuery({
       queryKey: [product, params],
@@ -33,11 +42,17 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getProductsByMarket = (marketId: string | undefined, enabled=true, params?:any) =>
+  const getProductsByMarket = (
+    marketId: string | undefined,
+    enabled = true,
+    params?: any
+  ) =>
     useQuery({
       queryKey: [product, marketId, params],
       queryFn: () =>
-        api.get(`product/market/${marketId}`, {params}).then((res) => res.data),
+        api
+          .get(`product/market/${marketId}`, { params })
+          .then((res) => res.data),
       enabled: !!marketId && enabled,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
@@ -46,8 +61,7 @@ export const useProduct = () => {
   const getProductsById = (id: string | undefined) =>
     useQuery({
       queryKey: [product, id],
-      queryFn: () =>
-        api.get(`product/${id}`).then((res) => res.data),
+      queryFn: () => api.get(`product/${id}`).then((res) => res.data),
       enabled: !!id,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
@@ -60,12 +74,28 @@ export const useProduct = () => {
     },
   });
 
+  const updateProduct = useMutation({
+  mutationFn: ({ id, data, isMarket }: { id: string; data: any; isMarket?: boolean }) => {
+    if (isMarket) {
+      return api.patch(`/product/my/${id}`, data); // market uchun
+    } else {
+      return api.patch(`/product/${id}`, data); // admin/registrator uchun
+    }
+  },
+  onSuccess: () => {
+    client.invalidateQueries({ queryKey: ["product"] });
+  },
+});
+
+
   return {
     createProduct,
     getProducts,
     getProductsByMarket,
-    deleteProduct,
     getMyProducts,
-    getProductsById
+    getProductsById,
+    getProductById,
+    deleteProduct,
+    updateProduct
   };
 };
