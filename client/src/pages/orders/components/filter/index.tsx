@@ -1,8 +1,7 @@
 import { memo, useCallback } from "react";
 import { statusOptions } from "../../../../shared/static/order";
 import { ArrowRight } from "lucide-react";
-import Select from "../select/select";
-import { Button, DatePicker, Space } from "antd";
+import { Button, DatePicker, Select, Space } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { useProfile } from "../../../../shared/api/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -30,11 +29,8 @@ const Filter = () => {
 
   const { refetch } = useProfile().getUser(role === "market");
 
-  // select va boshqa inputlar uchun
-  const handleChange = (
-    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
-  ) => {
-    const { name, value } = e.target;
+  // umumiy Select uchun handler
+  const handleSelectChange = (name: string) => (value: string) => {
     dispatch(setFilter({ name, value }));
   };
 
@@ -73,23 +69,23 @@ const Filter = () => {
   };
 
   // options
-  const marketOptions = data?.data?.data?.map((item: any) => (
-    <option key={item.id} value={item.id}>
-      {item.name}
-    </option>
-  ));
+  const marketOptions =
+    data?.data?.data?.map((item: any) => ({
+      value: item.id,
+      label: item.name,
+    })) || [];
 
-  const regionOptions = regionData?.data?.map((item: any) => (
-    <option key={item.id} value={item.id}>
-      {item.name}
-    </option>
-  ));
+  const regionOptions =
+    regionData?.data?.map((item: any) => ({
+      value: item.id,
+      label: item.name,
+    })) || [];
 
-  const statusOpts = statusOptions.map((item) => (
-    <option key={item.value} value={item.value}>
-      {item.label}
-    </option>
-  ));
+  const statusOpts =
+    statusOptions.map((item) => ({
+      value: item.value,
+      label: item.label,
+    })) || [];
 
   return (
     <div>
@@ -97,35 +93,29 @@ const Filter = () => {
       <div className="w-full grid grid-cols-3 gap-5 max-[900px]:grid-cols-2 max-[750px]:grid-cols-1">
         {role !== "market" && (
           <Select
-            name="marketId"
             value={form.marketId}
-            onChange={handleChange}
+            onChange={handleSelectChange("marketId")}
             placeholder={t("placeholder.selectMarket")}
-            className="w-full"
-          >
-            {marketOptions}
-          </Select>
+            className="w-full h-[45px]!"
+            options={marketOptions}
+          />
         )}
 
         <Select
-          name="regionId"
           value={form.regionId}
-          onChange={handleChange}
+          onChange={handleSelectChange("regionId")}
           placeholder={t("placeholder.selectRegion")}
-          className="w-full"
-        >
-          {regionOptions}
-        </Select>
+          className="w-full h-[45px]!"
+          options={regionOptions}
+        />
 
         <Select
-          name="status"
           value={form.status}
-          onChange={handleChange}
+          onChange={handleSelectChange("status")}
           placeholder={t("placeholder.selectStatus")}
-          className="w-full"
-        >
-          {statusOpts}
-        </Select>
+          className="w-full h-[45px]!"
+          options={statusOpts}
+        />
       </div>
 
       <div className="w-full flex flex-wrap gap-4 justify-between items-center pt-5 border-[#F6F7FB] dark:border-[#595572] max-[800px]:flex-col max-[800px]:gap-5">
@@ -147,8 +137,8 @@ const Filter = () => {
           <input
             type="text"
             name="search"
-            defaultValue={form.search} // value emas, defaultValue bo‘lishi yaxshi
-            onChange={handleSearchChange} // debounce ishlaydi
+            defaultValue={form.search}
+            onChange={handleSearchChange}
             placeholder={t("placeholder.searchOrder")}
             className="border border-gray-300! rounded-lg h-[38px]! indent-3 hover:outline-none max-[800px]:w-full"
           />

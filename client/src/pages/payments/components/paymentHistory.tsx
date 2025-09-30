@@ -40,7 +40,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
             <div>
               <h3 className="text-[25px] font-medium">
                 {item?.createdByUser?.name}
-                <span className="text-gray-400 text-[15px]">
+                <span className="text-gray-400 text-[15px] pl-0.5">
                   ({item?.createdByUser?.role})
                 </span>
               </h3>
