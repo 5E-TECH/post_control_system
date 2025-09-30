@@ -13,6 +13,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../shared/hooks/useParams";
+import HistoryPopup from "./components/historyPopup";
 
 const Payments = () => {
   const user = useSelector((state: RootState) => state.roleSlice);
@@ -26,8 +27,8 @@ const Payments = () => {
 
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
-
-  const [select, setSelect] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [select, setSelect] = useState<null | string>(null);
 
   const navigate = useNavigate();
 
@@ -108,6 +109,12 @@ const Payments = () => {
 
   if (pathname.startsWith("/payments/")) {
     return <Outlet />;
+  }
+
+  const handleHistoryPopup = (id:string) => {
+    setSelect(id)
+    setShowHistory(true)
+
   }
 
   return (
@@ -379,6 +386,7 @@ const Payments = () => {
                   {cashBoxData?.data?.allCashboxHistories?.map(
                     (item: any, inx: number) => (
                       <tr
+                        onClick={() => handleHistoryPopup(item.id)}
                         key={item.id}
                         className="border-t border-[#E7E3FC1F] text-[15px] font-normal"
                       >
@@ -487,6 +495,9 @@ const Payments = () => {
           </div>
         </div>
       </div>
+      {showHistory && (
+        <HistoryPopup id={select} onClose={() => setShowHistory(false)} />
+      )}
     </div>
   );
 };

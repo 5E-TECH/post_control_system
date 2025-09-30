@@ -18,14 +18,19 @@ const CashDetail = () => {
   const { id } = useParams();
 
   const [form, setForm] = useState({
-    from: "",
-    to: "",
+    from: new Date().toISOString().split("T")[0],
+    to: new Date().toISOString().split("T")[0],
     order: "",
     payment: "",
     summa: "",
     market: "",
     comment: "",
   });
+
+  const params = {
+    fromDate:form.from,
+    toDate:form.to
+  }
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -50,7 +55,8 @@ const CashDetail = () => {
 
   const { data, refetch } = getCashBoxById(
     id,
-    role === "superadmin" || role === "admin"
+    role === "superadmin" || role === "admin",
+    params
   );
   const { data: marketData } = getMarkets(
     form.payment == "click_to_market" ? true : false

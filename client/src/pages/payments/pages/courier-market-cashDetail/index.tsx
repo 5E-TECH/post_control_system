@@ -14,14 +14,19 @@ const CashDetailMarketCourier = () => {
   const { id } = useParams();
 
   const [form, setForm] = useState({
-    from: "",
-    to: "",
+    from: new Date().toISOString().split("T")[0],
+    to: new Date().toISOString().split("T")[0],
     order: "",
     payment: "",
     summa: "",
     market: "",
     comment: "",
   });
+
+  const params = {
+    fromDate:form.from,
+    toDate:form.to
+  }
 
   useEffect(() => {
     if (form.payment != "click_to_market") {
@@ -35,7 +40,7 @@ const CashDetailMarketCourier = () => {
   const role = user.role;
   const { getCashboxMyCashbox } = useCashBox();
 
-  const { data, refetch } = getCashboxMyCashbox();
+  const { data, refetch } = getCashboxMyCashbox(params);
 
   useEffect(() => {
     if (role === "superadmin" || role === "admin") {

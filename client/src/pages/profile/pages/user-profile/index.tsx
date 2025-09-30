@@ -5,13 +5,15 @@ import Vector from '../../../../shared/assets/profile-image/Vector.svg';
 import Star from '../../../../shared/assets/profile-image/star.svg';
 import EditProfileModal from '../../ui/Popap';
 import { useDispatch } from 'react-redux';
-import { useProfile } from '../../../../shared/api/hooks/useProfile';
 import { setEditing } from '../../../../shared/lib/features/profile/profileEditSlice';
+import { useParams } from 'react-router-dom';
+import { useUser } from '../../../../shared/api/hooks/useRegister';
 
 const UserProfile = () => {
+  const {id} = useParams()
   const dispatch = useDispatch();
-  const { getUser } = useProfile();
-  const { data, isLoading, refetch } = getUser();
+  const {getUserById} = useUser()
+  const { data, isLoading, refetch } = getUserById(id);
   const [open, setOpen] = useState(false);
 
   if (isLoading) {
