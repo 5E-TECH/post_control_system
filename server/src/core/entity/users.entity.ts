@@ -1,13 +1,6 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Roles, Status, Where_deliver } from 'src/common/enums';
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  OneToOne,
-  OneToMany,
-  ManyToOne,
-} from 'typeorm';
+import { Column, Entity, OneToOne, OneToMany, ManyToOne } from 'typeorm';
 import { UserSalaryEntity } from './user-salary.entity';
 import { CashEntity } from './cash-box.entity';
 import { CashboxHistoryEntity } from './cashbox-history.entity';
@@ -66,11 +59,11 @@ export class UserEntity extends BaseEntity {
     default: Where_deliver.CENTER,
   })
   default_tariff: Where_deliver;
-  // 1-1 User → Salary
+
+  // 1-1 User → Salary (inverse side, FK yo‘q)
   @OneToOne(() => UserSalaryEntity, (userSalary) => userSalary.user, {
     cascade: true,
   })
-  @JoinColumn()
   salary: UserSalaryEntity;
 
   // 1-1 User → Cashbox
@@ -85,28 +78,20 @@ export class UserEntity extends BaseEntity {
   @ManyToOne(() => RegionEntity, (region) => region.couriers, {
     onDelete: 'SET NULL',
   })
-  @JoinColumn({ name: 'region_id' })
   region: RegionEntity;
 
   // 1-N Courier (User) → Posts
   @OneToMany(() => PostEntity, (post) => post.courier)
   posts: PostEntity[];
 
-  // users.entity.ts
   @OneToMany(() => CustomerMarketEntity, (cm) => cm.customer)
   customerLinks: CustomerMarketEntity[];
 
   @OneToMany(() => CustomerMarketEntity, (cm) => cm.market)
   marketLinks: CustomerMarketEntity[];
 
-  // ...
   @OneToMany(() => ProductEntity, (product) => product.user)
   products: ProductEntity[];
-
-  // users.entity.ts ichida
-
-  // ...
-  // users.entity.ts
 
   @OneToMany(() => OrderEntity, (order) => order.market)
   marketOrders: OrderEntity[];
@@ -114,10 +99,8 @@ export class UserEntity extends BaseEntity {
   @OneToMany(() => OrderEntity, (order) => order.customer)
   customerOrders: OrderEntity[];
 
-  // User → District (N-1)
   @ManyToOne(() => DistrictEntity, (district) => district.users, {
     onDelete: 'SET NULL',
   })
-  @JoinColumn({ name: 'district_id' })
   district: DistrictEntity;
 }

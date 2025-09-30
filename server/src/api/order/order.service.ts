@@ -655,6 +655,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const qb = this.orderRepo
         .createQueryBuilder('o')
         .leftJoinAndSelect('o.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('o.market', 'market')
         .leftJoinAndSelect('o.customer', 'customer')
         .leftJoinAndSelect('customer.district', 'district')
@@ -1061,34 +1062,33 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         0,
       );
 
-      if (remainingItems.length > 0) {
-        const cancelledOrder = queryRunner.manager.create(OrderEntity, {
-          market_id: order.user_id,
-          customer_id: order.customer_id, // ✅ same customer
-          comment: 'Qolgan mahsulotlar bekor qilindi',
-          total_price: 0,
-          to_be_paid: 0,
-          where_deliver: order.where_deliver,
-          status: Order_status.CANCELLED,
-          qr_code_token: generateCustomToken(),
-          parent_order_id: id,
-          product_quantity: remainingQuantity,
-        });
-        await queryRunner.manager.save(cancelledOrder);
+      const cancelledOrder = queryRunner.manager.create(OrderEntity, {
+        user_id: order.user_id,
+        customer_id: order.customer_id, // ✅ same customer
+        comment: 'Qolgan mahsulotlar bekor qilindi',
+        total_price: 0,
+        to_be_paid: 0,
+        where_deliver: order.where_deliver,
+        status: Order_status.CANCELLED,
+        qr_code_token: generateCustomToken(),
+        parent_order_id: id,
+        product_quantity: remainingQuantity,
+        post_id: order.post_id,
+      });
+      await queryRunner.manager.save(cancelledOrder);
 
-        for (const item of remainingItems) {
-          await queryRunner.manager.save(
-            queryRunner.manager.create(OrderItemEntity, {
-              productId: item.productId,
-              quantity: item.quantity,
-              orderId: cancelledOrder.id,
-            }),
-          );
-        }
+      for (const item of remainingItems) {
+        await queryRunner.manager.save(
+          queryRunner.manager.create(OrderItemEntity, {
+            productId: item.productId,
+            quantity: item.quantity,
+            orderId: cancelledOrder.id,
+          }),
+        );
       }
 
       await queryRunner.commitTransaction();
-      return successRes({}, 200, 'Order qisman sotildi');
+      return successRes({ order, cancelledOrder }, 200, 'Order qisman sotildi');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -1105,7 +1105,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
-        relations: ['market', 'courier', 'post'],
+        relations: ['market', 'post'],
       });
       if (!order) throw new NotFoundException('Order not found');
 
@@ -1217,7 +1217,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return successRes({}, 200, 'Order WAITING ga qaytarildi');
     } catch (err) {
       await queryRunner.rollbackTransaction();
-      throw err;
+      throw catchError(err);
     } finally {
       await queryRunner.release();
     }
@@ -1395,6 +1395,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           sellingRate,
         };
       });
+      // 7) Sort qilish (masalan: sellingRate bo‘yicha kamayish tartibida)
+      marketWithOrderStats.sort((a, b) => b.sellingRate - a.sellingRate);
 
       return successRes(marketWithOrderStats, 200, 'Markets stats');
     } catch (error) {
@@ -1426,7 +1428,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id: In(uniqueCourierIds), role: Roles.COURIER },
       });
 
-      const courierWithStats: object[] = [];
+      const courierWithStats: {
+        courier: any;
+        totalOrders: number;
+        soldOrders: number;
+        successRate: number;
+      }[] = [];
+
       const validStatuses = [
         Order_status.SOLD,
         Order_status.PAID,
@@ -1478,8 +1486,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           successRate,
         });
       }
+      courierWithStats.sort((a, b) => b.successRate - a.successRate);
 
-      return successRes(courierWithStats, 200, 'Couriers stats');
+      return successRes(courierWithStats, 200, 'Couriers stats(sorted)');
     } catch (error) {
       return catchError(error);
     }

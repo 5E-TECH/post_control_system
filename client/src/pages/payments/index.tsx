@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import React, { useState } from "react";
 import Select from "../users/components/select";
 import Popup from "../../shared/ui/Popup";
@@ -11,6 +11,9 @@ import CountUp from "react-countup";
 import { useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { Pagination, type PaginationProps } from "antd";
+import { useParamsHook } from "../../shared/hooks/useParams";
+import HistoryPopup from "./components/historyPopup";
 
 const Payments = () => {
   const user = useSelector((state: RootState) => state.roleSlice);
@@ -24,8 +27,8 @@ const Payments = () => {
 
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
-
-  const [select, setSelect] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [select, setSelect] = useState<null | string>(null);
 
   const navigate = useNavigate();
 
@@ -33,12 +36,31 @@ const Payments = () => {
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
 
+  // Pagination start
+  const { getParam, setParam, removeParam } = useParamsHook();
+  const page = Number(getParam("page") || 1);
+  const limit = Number(getParam("limit") || 10);
   const { data: cashBoxData, refetch } = getCashBoxInfo(
-    role === "superadmin" || role === "admin"
+    role === "superadmin" || role === "admin",
+    { page, limit }
   );
-
   const { data } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
+  const total = cashBoxData?.data?.pagination?.total || 0;
+  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
+    if (newPage === 1) {
+      removeParam("page");
+    } else {
+      setParam("page", newPage);
+    }
+
+    if (limit === 10) {
+      removeParam("limit");
+    } else {
+      setParam("limit", limit);
+    }
+  };
+  // Pagination end
 
   const handleNavigate = () => {
     navigate(`cash-detail/${select}`);
@@ -87,6 +109,12 @@ const Payments = () => {
 
   if (pathname.startsWith("/payments/")) {
     return <Outlet />;
+  }
+
+  const handleHistoryPopup = (id:string) => {
+    setSelect(id)
+    setShowHistory(true)
+
   }
 
   return (
@@ -358,6 +386,7 @@ const Payments = () => {
                   {cashBoxData?.data?.allCashboxHistories?.map(
                     (item: any, inx: number) => (
                       <tr
+                        onClick={() => handleHistoryPopup(item.id)}
                         key={item.id}
                         className="border-t border-[#E7E3FC1F] text-[15px] font-normal"
                       >
@@ -453,37 +482,22 @@ const Payments = () => {
                   )}
                 </tbody>
               </table>
-              <div className="flex justify-end  pr-[105px] pt-4 gap-6 pb-[16px]">
-                <div className="flex items-center">
-                  <span className="font-normal dark:text-[#E7E3FCB2]">
-                    Rows per page:
-                  </span>
-                  <select
-                    className="rounded px-2 py-1  outline-none"
-                    defaultValue="10"
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                  </select>
-                </div>
-
-                <div className="flex font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                  <span className="mr-1">1-5</span>
-                  <span className="mr-1">of</span>
-                  <span className="">13</span>
-                </div>
-
-                <div className="flex items-center gap-[23px]">
-                  <ChevronLeft className="w-5 dark:text-[#E7E3FCE5]" />
-                  <ChevronRight className="w-5 dark:text-[#E7E3FCE5]" />
-                </div>
+              <div className="flex justify-center py-2">
+                <Pagination
+                  showSizeChanger
+                  current={page}
+                  total={total}
+                  pageSize={limit}
+                  onChange={onChange}
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
+      {showHistory && (
+        <HistoryPopup id={select} onClose={() => setShowHistory(false)} />
+      )}
     </div>
   );
 };

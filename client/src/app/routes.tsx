@@ -93,6 +93,7 @@ const CourierOldMails = lazy(
   () => import("../pages/mails/components/courier/old-mails")
 );
 const BalanceDashboard = lazy(() => import("../pages/history"));
+const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -240,6 +241,10 @@ const AppRouters = () => {
               element: <Profile />,
               children: [{ index: true, element: <Overview /> }],
             },
+            {
+              path:"user-profile/:id",
+              element:<UserProfile/>
+            }
           ],
         },
       ],

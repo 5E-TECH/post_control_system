@@ -4,7 +4,7 @@ import { AddOrder, Status } from 'src/common/enums';
 export class UpdateMarketDto {
   @IsOptional()
   @IsString()
-  market_name?: string;
+  full_name?: string;
 
   @IsOptional()
   @IsString()

@@ -16,30 +16,38 @@ export const useCashBox = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [cashbox] }),
   });
 
-  const getCashBoxById = (id: string | undefined, bool: boolean = true) =>
+  const getCashBoxById = (id: string | undefined, bool: boolean = true, params?:any) =>
+    useQuery({
+      queryKey: [cashbox, id, params],
+      queryFn: () => api.get(`cashbox/user/${id}`, {params}).then((res) => res.data),
+      enabled: bool,
+    });
+
+  const getCashBoxHistoryById = (id: string | null, bool: boolean = true) =>
     useQuery({
       queryKey: [cashbox, id],
-      queryFn: () => api.get(`cashbox/user/${id}`).then((res) => res.data),
+      queryFn: () => api.get(`cashbox-history/${id}`).then((res) => res.data),
+      enabled: bool,
+    });  
+
+  const getCashboxMyCashbox = (params?:any) =>
+    useQuery({
+      queryKey: [cashbox, params],
+      queryFn: () => api.get("cashbox/my-cashbox", {params}).then((res) => res.data),
+    });
+
+  const getCashBoxInfo = (bool: boolean = true, params?: any) =>
+    useQuery({
+      queryKey: [cashbox, params],
+      queryFn: () =>
+        api.get(`cashbox/all-info`, { params }).then((res) => res.data),
       enabled: bool,
     });
 
-  const getCashboxMyCashbox = () =>
+  const getCashBoxMain = (params?:any) =>
     useQuery({
-      queryKey: [cashbox],
-      queryFn: () => api.get("cashbox/my-cashbox").then((res) => res.data),
-    });
-
-  const getCashBoxInfo = (bool: boolean = true) =>
-    useQuery({
-      queryKey: [cashbox],
-      queryFn: () => api.get(`cashbox/all-info`).then((res) => res.data),
-      enabled: bool,
-    });
-
-  const getCashBoxMain = () =>
-    useQuery({
-      queryKey: [cashbox],
-      queryFn: () => api.get(`cashbox/main`).then((res) => res.data),
+      queryKey: [cashbox, params],
+      queryFn: () => api.get(`cashbox/main`, {params}).then((res) => res.data),
     });
 
   const cashboxSpand = useMutation({
@@ -49,13 +57,22 @@ export const useCashBox = () => {
     },
   });
 
+  const cashboxFill = useMutation({
+    mutationFn: ({ data }: { data: any }) => api.patch(`cashbox/fill`, data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["cashbox"] });
+    },
+  });
+
   return {
     getCashBoxById,
     getCashBoxInfo,
     getCashboxMyCashbox,
+    getCashBoxHistoryById,
+    getCashBoxMain,
     createPaymentCourier,
     createPaymentMarket,
-    getCashBoxMain,
     cashboxSpand,
+    cashboxFill,
   };
 };

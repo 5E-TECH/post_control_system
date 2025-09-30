@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form } from "antd";
 import { CashboxCard } from "../../components/CashCard";
@@ -19,9 +19,8 @@ import { useCourier } from "../../../../shared/api/hooks/useCourier";
 import TextArea from "antd/es/input/TextArea";
 import { Select, DatePicker } from "antd";
 import dayjs from "dayjs";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../../../shared/api";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import { useUser } from "../../../../shared/api/hooks/useRegister";
 
 const { RangePicker } = DatePicker;
 
@@ -31,13 +30,13 @@ const MainDetail = () => {
   const [spand, setSpand] = useState(false);
   const [select, setSelect] = useState(null);
   const [kassa, setMaosh] = useState(false);
+  const [showAdminAndRegistrator, setshowAdminAndRegistrator] = useState(false)
 
   const navigate = useNavigate();
-  const client = useQueryClient();
 
   const [form, setForm] = useState({
-    from: "",
-    to: "",
+    from: new Date().toISOString().split("T")[0],
+    to: new Date().toISOString().split("T")[0],
     order: "",
     payment: "",
     summa: "",
@@ -52,25 +51,39 @@ const MainDetail = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const params = {
+    fromDate:form.from,
+    toDate:form.to
+  }
+
+  // console.log("from", form.from);
+  // console.log("to", form.to);
+  
+
   const [show, setShow] = useState(true);
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
-  const { getCashBoxMain, cashboxSpand } = useCashBox();
+  const { getCashBoxMain, cashboxSpand, cashboxFill } = useCashBox();
+  const { getAdminAndRegister } = useUser()
 
-  const { data, refetch } = getCashBoxMain();
+  const {data:adminAndRegisterData} = getAdminAndRegister(showAdminAndRegistrator)
+  // console.log(adminAndRegisterData?.data?.data);
+  
+
+  const { data, refetch } = getCashBoxMain(params);
   const { data: marketData } = getMarkets(showMarket);
   const { data: courierData } = getCourier(showCurier);
 
-  // useEffect(() => {
-  //   refetch();
-  // }, []);
+  useEffect(() => {
+    refetch();
+  }, []);
 
-  const cashboxFill = useMutation({
-    mutationFn: ({ data }: { data: any }) => api.patch(`cashbox/fill`, data),
-    onSuccess: () => {
-      client.invalidateQueries({ queryKey: ["cashbox"] });
-    },
-  });
+  const handleNavigateProfile = () => {
+    navigate(`/user-profile/${select}`)
+    setSelect(null)
+    setshowAdminAndRegistrator(false)
+  }
+  
 
   const handleNavigate = () => {
     navigate(`/payments/cash-detail/${select}`, {
@@ -99,7 +112,7 @@ const MainDetail = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Pul yechishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Pul yechishda xatolik yuz berdi"
           ),
       }
     );
@@ -131,7 +144,7 @@ const MainDetail = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Kassaga pul qo'shishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Kassaga pul qo'shishda xatolik yuz berdi"
           ),
       }
     );
@@ -186,7 +199,7 @@ const MainDetail = () => {
 
           <button
             title="Maosh to'lash"
-            onClick={() => setShowCurier(true)}
+            onClick={() => setshowAdminAndRegistrator(true)}
             className="rounded-full cursor-pointer p-3 bg-amber-500 text-white hover:bg-amber-600 transition flex items-center justify-center shadow-md"
           >
             <Wallet size={22} />
@@ -399,6 +412,73 @@ const MainDetail = () => {
               }`}
             >
               Selected
+            </button>
+          </div>
+        </div>
+      </Popup>
+
+      <Popup isShow={showAdminAndRegistrator} onClose={() => setshowAdminAndRegistrator(false)}>
+        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative pt-5">
+          <button
+            onClick={() => setshowAdminAndRegistrator(false)}
+            className="cursor-pointer hover:bg-gray-200 text-red-500 p-2 rounded flex items-center justify-center absolute top-2 right-2"
+          >
+            <X size={22} />
+          </button>
+          <h1 className="font-bold text-left">Hodimni tanlang</h1>
+          <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
+            <input
+              type="text"
+              placeholder="Qidiruv..."
+              className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
+            />
+            <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
+          </div>
+          <div className="max-h-[520px] overflow-y-auto">
+            <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 cursor-pointer">
+              <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+                <tr>
+                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    # 
+                  </th>
+                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    Hodim ismi
+                  </th>
+                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    Roli
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
+                {
+                // Array.isArray(marketData?.data?.items) &&
+                  adminAndRegisterData?.data?.data?.map((item: any, inx: number) => (
+                    <tr
+                      key={item?.id}
+                      onClick={() => setSelect(item?.id)}
+                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                        item.id == select ? "bg-gray-100" : ""
+                      }`}
+                    >
+                      <td className="text-[#8C57FF] pl-4 py-3">{inx + 1}</td>
+                      <td className="py-3">{item?.name}</td>
+                      <td className="py-3">{item?.role}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="py-2 text-right">
+            <button
+              disabled={!select}
+              onClick={() => handleNavigateProfile()}
+              className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-3 right-3 ${
+                !select ? "" : "hover:bg-blue-600"
+              } text-white rounded-md cursor-pointer ${
+                !select ? "opacity-40" : ""
+              }`}
+            >
+              Tanlash
             </button>
           </div>
         </div>

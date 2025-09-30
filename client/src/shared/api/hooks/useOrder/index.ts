@@ -25,13 +25,24 @@ export const useOrder = () => {
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
+  const rollbackOrder = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`order/rollback/${id}`).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
+  });
+  const partlySellOrder = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      api.post(`order/partly-sell/${id}`, data).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
+  });
+
   const getOrders = (params?: any) =>
     useQuery({
       queryKey: [order, params],
       queryFn: () => api.get("order", { params }).then((res) => res.data),
     });
 
-  const getOrderById = (id:string | undefined, params?: any) =>
+  const getOrderById = (id: string | undefined, params?: any) =>
     useQuery({
       queryKey: [order, params],
       queryFn: () => api.get(`order/${id}`, { params }).then((res) => res.data),
@@ -93,6 +104,8 @@ export const useOrder = () => {
     updateOrders,
     sellOrder,
     cancelOrder,
+    rollbackOrder,
+    partlySellOrder,
     getOrders,
     getOrderByMarket,
     getCourierOrders,
@@ -100,6 +113,6 @@ export const useOrder = () => {
     deleteOrders,
     getOrderById,
     updateOrdersUserAddress,
-    updateOrdersUserPhoneAndName
+    updateOrdersUserPhoneAndName,
   };
 };

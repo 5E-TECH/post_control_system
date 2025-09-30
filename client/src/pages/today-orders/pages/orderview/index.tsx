@@ -53,7 +53,7 @@ const OrderView = () => {
       onError: (err: any) =>
         handleApiError(
           err,
-          "Pochtani yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          "Pochtani yaratishda xatolik yuz berdi"
         ),
     });
   };
@@ -147,7 +147,7 @@ const OrderView = () => {
               <tr
                 key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
-                onClick={() => setSelectedOrder(item)}
+                onClick={() => navigate(`/orders/order-detail/${item?.id}`)}
               >
                 <td className="pl-10">
                   <input

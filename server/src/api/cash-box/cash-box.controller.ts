@@ -21,7 +21,12 @@ import {
 import { CashBoxService } from './cash-box.service';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
-import { Roles } from 'src/common/enums';
+import {
+  Cashbox_type,
+  Operation_type,
+  Roles,
+  Source_type,
+} from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CreatePaymentsFromCourierDto } from './dto/payments-from-courier.dto';
@@ -157,12 +162,20 @@ export class CasheBoxController {
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Get('all-info')
   allCashboxesInfo(
+    @Query('operationType') operationType?: Operation_type,
+    @Query('sourceType') sourceType?: Source_type,
+    @Query('createdBy') createdBy?: string,
+    @Query('cashboxType') cashboxType?: Cashbox_type,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
     return this.cashBoxService.allCashboxesTotal({
+      operationType,
+      sourceType,
+      createdBy,
+      cashboxType,
       fromDate,
       toDate,
       page,

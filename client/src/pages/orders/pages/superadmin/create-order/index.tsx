@@ -39,7 +39,7 @@ const CreateOrder = () => {
     if (
       !orderItems ||
       orderItems.length === 0 ||
-      orderItems.some((item) => !item.quantity || item.quantity === 0)
+      orderItems.some((item: any) => !item.quantity || item.quantity === 0)
     ) {
       handleWarning(
         t("orderForm.incompleteOrderData"),
@@ -75,10 +75,7 @@ const CreateOrder = () => {
         navigate("/orders/customer-info");
       },
       onError: (err: any) =>
-        handleApiError(
-          err,
-          "Buyurtma yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
-        ),
+        handleApiError(err, "Buyurtma yaratishda xatolik yuz berdi"),
     });
   };
 

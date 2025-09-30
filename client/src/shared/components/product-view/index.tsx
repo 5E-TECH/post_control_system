@@ -1,5 +1,5 @@
 import { Pagination, Spin, type PaginationProps } from "antd";
-import { Edit, Trash } from "lucide-react";
+import { Trash } from "lucide-react";
 import { memo, useEffect, useState, type FC } from "react";
 import { useProduct } from "../../api/hooks/useProduct";
 import ConfirmPopup from "../confirmPopup";
@@ -56,7 +56,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
       onError: (err: any) =>
         handleApiError(
           err,
-          "mahsulotini o'chirishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          "mahsulotini o'chirishda xatolik yuz berdi"
         ),
     });
     setPopup(false);
@@ -111,10 +111,10 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                 key={item?.id}
                 className="border-b border-gray-300 dark:border-gray-600"
               >
-                <td className="data-cell p-3" data-cell="#">
+                <td className="data-cell p-3 pl-5" data-cell="#">
                   {inx + 1}
                 </td>
-                <td className="data-cell p-3" data-cell="PRODUCT NAME">
+                <td className="data-cell p-3 pl-5" data-cell="PRODUCT NAME">
                   <div className="flex items-center gap-3">
                     <img
                       src={item?.image_url}
@@ -127,17 +127,14 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                   </div>
                 </td>
 
-                <td className="data-cell p-3" data-cell="MARKET">
+                <td className="data-cell p-3 pl-5" data-cell="MARKET">
                   {item?.user?.name}
                 </td>
 
                 <td
-                  className="data-cell p-3 flex items-center gap-3"
+                  className="data-cell p-3 flex items-center pl-5"
                   data-cell="ACTION"
                 >
-                  <button className="hover:text-[#8C57FF]">
-                    <Edit />
-                  </button>
                   <button
                     onClick={() => handlePoup(item.id, item.name)}
                     className="hover:text-red-500"

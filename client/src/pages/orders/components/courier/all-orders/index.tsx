@@ -1,10 +1,11 @@
 import { Button } from "antd";
-import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
-import { memo } from "react";
+import { AlertCircle } from "lucide-react";
+import { memo, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useNavigate } from "react-router-dom";
+import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -20,11 +21,13 @@ const statusColors: Record<string, string> = {
 };
 
 const AllOrders = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  const { getCourierOrders, sellOrder, cancelOrder } = useOrder();
+  const { getCourierOrders, sellOrder, cancelOrder, rollbackOrder } =
+    useOrder();
   const { data } = getCourierOrders();
-
+  const [isShow, setIsShow] = useState<boolean>(false);
+  const orderId = useRef<string | null>(null);
   const { handleSuccess, handleApiError } = useApiNotification();
   const handleSellOrder = (id: string) => {
     sellOrder.mutate(
@@ -34,10 +37,7 @@ const AllOrders = () => {
           handleSuccess("Buyurtma muvaffaqiyatli sotildi");
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Buyurtmalar sotilishda xatolik,keyinroq urinib ko'ring"
-          ),
+          handleApiError(err, "Buyurtmalar sotilishda xatolik"),
       }
     );
   };
@@ -50,12 +50,30 @@ const AllOrders = () => {
           handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Buyurtmalar bekor qilishda xatolik,keyinroq urinib ko'ring"
-          ),
+          handleApiError(err, "Buyurtmalar bekor qilishda xatolik"),
       }
     );
+  };
+
+  const handleRollback = (
+    e: MouseEvent<HTMLButtonElement | HTMLElement>,
+    id: string
+  ) => {
+    e.stopPropagation();
+    orderId.current = id;
+    setIsShow(true);
+  };
+
+  const handleConfirm = () => {
+    const id = orderId.current;
+    rollbackOrder.mutate(id as string, {
+      onSuccess: () => {
+        handleSuccess("Buyurtma muvaffaqiyatli ortga qaytarildi");
+        setIsShow(false);
+      },
+      onError: (err: any) =>
+        handleApiError(err, "Buyurtma qaytarilishda xatolik"),
+    });
   };
 
   return data?.data?.data?.length > 0 ? (
@@ -71,49 +89,49 @@ const AllOrders = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>CUSTOMER</span>
+                <span>MIJOZ</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>PHONE</span>
+                <span>TEL RAQAMI</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>ADDRESS</span>
+                <span>MANZIL</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MARKET</span>
+                <span>FIRMA</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>STATUS</span>
+                <span>HOLATI</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>PRICE</span>
+                <span>NARXI</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>STOCK</span>
+                <span>OMBOR</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
             <th>
               <div className="flex items-center justify-center gap-30">
-                <span>ACTIONS</span>
+                <span>HARAKAT</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
@@ -176,7 +194,7 @@ const AllOrders = () => {
                   </div>
                 ) : item?.status === "sold" || item?.status === "cancelled" ? (
                   <div className="ml-9">
-                    <Button>
+                    <Button onClick={(e) => handleRollback(e, item?.id)}>
                       <AlertCircle />
                     </Button>
                   </div>
@@ -186,33 +204,13 @@ const AllOrders = () => {
           ))}
         </tbody>
       </table>
-      <div className="flex justify-end items-center pr-[105px] pt-4 gap-6 pb-[16px]">
-        <div className="flex items-center">
-          <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-            Rows per page:
-          </span>
-          <select
-            className="rounded px-2 py-1 text-[15px] outline-none"
-            defaultValue="10"
-          >
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-          </select>
-        </div>
 
-        <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-          <span className="mr-1">1-5</span>
-          <span className="mr-1">of</span>
-          <span className="">13</span>
-        </div>
-
-        <div className="flex items-center gap-[23px]">
-          <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-          <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-        </div>
-      </div>
+      <ConfirmPopup
+        isShow={isShow}
+        onCancel={() => setIsShow(false)}
+        onConfirm={handleConfirm}
+        description="Buyurtmani ortga qaytarszmi?"
+      />
     </div>
   ) : (
     <div className="h-[65vh]">

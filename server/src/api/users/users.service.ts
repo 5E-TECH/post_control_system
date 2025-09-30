@@ -120,13 +120,10 @@ export class UserService {
         have_to_pay: salary,
         payment_day,
       });
-
       await queryRunner.manager.save(adminSalary);
       await queryRunner.commitTransaction();
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
-      console.log(error);
-
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
@@ -576,6 +573,68 @@ export class UserService {
     }
   }
 
+  async allRegistratorAndAdminUsers(filters: {
+    search?: string;
+    status?: string;
+    role?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<object> {
+    try {
+      let { search, status, role, page = 1, limit = 10 } = filters;
+
+      const unlimited = limit === 0;
+
+      const allowedRoles = [Roles.REGISTRATOR, Roles.ADMIN];
+
+      const qb = this.userRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.region', 'region')
+        .where('user.role IN (:...allowedRoles)', { allowedRoles });
+
+      // 🔍 Search filter
+      if (search) {
+        qb.andWhere(
+          '(user.name ILIKE :search OR user.phone_number ILIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🎯 Status filter
+      if (status) {
+        qb.andWhere('user.status = :status', { status });
+      }
+
+      // 🎭 Role filter — allowedRoles ichida bo'lishi kerak
+      if (role && allowedRoles.includes(role as Roles)) {
+        qb.andWhere('user.role = :role', { role });
+      }
+
+      // 🔢 Pagination
+      if (!unlimited) {
+        qb.skip((page - 1) * limit).take(limit);
+      }
+
+      const [users, total] = await qb
+        .orderBy('user.created_at', 'DESC')
+        .getManyAndCount();
+
+      return successRes(
+        {
+          data: users,
+          total,
+          page: unlimited ? 1 : Number(page),
+          limit: unlimited ? total : Number(limit),
+          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+        },
+        200,
+        'All users with roles: REGISTRATOR, ADMIN',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async allCouriers(): Promise<object> {
     try {
       const allCouriers = await this.userRepo.find({
@@ -604,6 +663,7 @@ export class UserService {
     try {
       const user = await this.userRepo.findOne({
         where: { id: id, role: Not(Roles.SUPERADMIN) },
+        relations: ['region', 'salary'],
       });
       if (!user) {
         throw new NotFoundException('User not fount');
@@ -648,7 +708,11 @@ export class UserService {
       // Phone number oldin ro'yxatdan o'tganmi yoki yo'qligini tekshirish
       if (otherFields.phone_number) {
         const existPhone = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
         });
         if (existPhone) {
           throw new ConflictException(
@@ -668,8 +732,13 @@ export class UserService {
       });
       await this.userRepo.save(user);
 
-      const updatedUser = await this.userRepo.findOne({ where: { id } });
-      return successRes(updatedUser, 200, 'User updated');
+      const updatedUser = await this.userRepo.findOneOrFail({
+        where: { id },
+        relations: ['region', 'salary'],
+      });
+
+      const { password: _, ...safeUser } = updatedUser;
+      return successRes(safeUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }

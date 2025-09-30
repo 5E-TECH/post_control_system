@@ -32,7 +32,7 @@ const CancelledOrders = () => {
       onError: (error: any) =>
         handleApiError(
           error,
-          "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko'ring."
+          "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi"
         ),
     });
   };
@@ -77,43 +77,43 @@ const CancelledOrders = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>CUSTOMER</span>
+                <span>MIJOZ</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>PHONE</span>
+                <span>TEL RAQAMI</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>ADDRESS</span>
+                <span>MANZIL</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MARKET</span>
+                <span>FIRMA</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>STATUS</span>
+                <span>HOLATI</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>PRICE</span>
+                <span>NARXI</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>STOCK</span>
+                <span>OMBOR</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>

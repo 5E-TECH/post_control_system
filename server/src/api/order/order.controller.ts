@@ -238,10 +238,10 @@ export class OrderController {
   @ApiOperation({ summary: 'Rollback order to waiting' })
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order rolled back' })
-  @UseGuards()
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER)
   @Post('rollback/:id')
-  rollbackOrder(@CurrentUser() user: JwtPayload, @Param() id: string) {
+  rollbackOrder(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.orderService.rollbackOrderToWaiting(user, id);
   }
 

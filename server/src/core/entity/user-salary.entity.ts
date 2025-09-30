@@ -1,9 +1,9 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Column, Entity, OneToOne } from 'typeorm';
+import { Column, Entity, OneToOne, JoinColumn } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { Max, Min } from 'class-validator';
 
-@Entity('userSalary')
+@Entity('user_salary')
 export class UserSalaryEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
@@ -14,12 +14,14 @@ export class UserSalaryEntity extends BaseEntity {
   @Column({ type: 'int' })
   have_to_pay: number;
 
-  // Bu faqat 1 dan 30 gacha son qabul qiladi
+  // faqat 1 dan 30 gacha son qabul qiladi
   @Column({ type: 'int' })
   @Min(1)
   @Max(30)
   payment_day: number;
 
+  // Bu tomonda FK bor → JoinColumn shu yerda
   @OneToOne(() => UserEntity, (user) => user.salary)
+  @JoinColumn({ name: 'user_id' })
   user: UserEntity;
 }
