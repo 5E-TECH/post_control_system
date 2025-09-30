@@ -708,7 +708,11 @@ export class UserService {
       // Phone number oldin ro'yxatdan o'tganmi yoki yo'qligini tekshirish
       if (otherFields.phone_number) {
         const existPhone = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
         });
         if (existPhone) {
           throw new ConflictException(
@@ -728,8 +732,13 @@ export class UserService {
       });
       await this.userRepo.save(user);
 
-      const updatedUser = await this.userRepo.findOne({ where: { id } });
-      return successRes(updatedUser, 200, 'User updated');
+      const updatedUser = await this.userRepo.findOneOrFail({
+        where: { id },
+        relations: ['region', 'salary'],
+      });
+
+      const { password: _, ...safeUser } = updatedUser;
+      return successRes(safeUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }
