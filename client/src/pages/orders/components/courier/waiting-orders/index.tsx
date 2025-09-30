@@ -23,7 +23,7 @@ const WaitingOrders = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Buyurtmani sotishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Buyurtmani sotishda xatolik yuz berdi"
           ),
       }
     );
@@ -39,7 +39,7 @@ const WaitingOrders = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Buyurtmani bekor qilishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Buyurtmani bekor qilishda xatolik yuz berdi"
           ),
       }
     );

@@ -56,7 +56,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
       onError: (err: any) =>
         handleApiError(
           err,
-          "mahsulotini o'chirishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          "mahsulotini o'chirishda xatolik yuz berdi"
         ),
     });
     setPopup(false);

@@ -53,7 +53,7 @@ const OrderView = () => {
       onError: (err: any) =>
         handleApiError(
           err,
-          "Pochtani yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          "Pochtani yaratishda xatolik yuz berdi"
         ),
     });
   };

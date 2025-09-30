@@ -99,7 +99,7 @@ const MainDetail = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Pul yechishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Pul yechishda xatolik yuz berdi"
           ),
       }
     );
@@ -131,7 +131,7 @@ const MainDetail = () => {
         onError: (err: any) =>
           handleApiError(
             err,
-            "Kassaga pul qo'shishda xatolik yuz berdi,keyinroq urinib ko'ring"
+            "Kassaga pul qo'shishda xatolik yuz berdi"
           ),
       }
     );

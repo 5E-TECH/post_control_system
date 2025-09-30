@@ -77,7 +77,7 @@ const CreateOrder = () => {
       onError: (err: any) =>
         handleApiError(
           err,
-          "Buyurtma yaratishda xatolik yuz berdi,keyinroq urinib ko'ring"
+          "Buyurtma yaratishda xatolik yuz berdi"
         ),
     });
   };

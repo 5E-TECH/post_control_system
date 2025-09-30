@@ -94,7 +94,7 @@ const Details: FC<IProps> = ({
           handleSuccess("Order muvaffaqiyatli yangilandi");
         },
         onError: (err: any) => {
-          handleApiError(err, "Order yangilashda muammo yuzaga berdi.");
+          handleApiError(err, "Order yangilashda muammo yuzaga berdi");
         },
       }
     );
