@@ -17,6 +17,8 @@ const ProductsCreate: FC = () => {
 
   const { role } = useSelector((state: RootState) => state.roleSlice);
   const { page, limit } = useSelector((state: RootState) => state.paginationSlice);
+  
+  
 
 
   const { getMyProducts, getProductsByMarket } = useProduct();

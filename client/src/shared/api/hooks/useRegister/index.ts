@@ -42,6 +42,20 @@ export const useUser = (path?: string) => {
           enabled
     });
 
+    const updateUser = useMutation({
+    mutationFn: ({
+      role,
+      id,
+      data,
+    }: {
+      role: string;
+      id: string;
+      data: any;
+    }) => api.patch(`user/${role}/${id}`, data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
+  });
+
   const getUsersExceptMarket = (params?: IUserFilter) =>
     useQuery({
       queryKey: [user, params],
@@ -54,6 +68,7 @@ export const useUser = (path?: string) => {
     getUser,
     getUsersExceptMarket,
     getAdminAndRegister,
-    getUserById
+    getUserById,
+    updateUser
   };
 };

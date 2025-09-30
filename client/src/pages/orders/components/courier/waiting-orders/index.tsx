@@ -1,4 +1,4 @@
-import { memo, useRef, useState, type MouseEvent } from "react";
+import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import {
@@ -7,6 +7,7 @@ import {
   Input,
   InputNumber,
   Pagination,
+  Select,
   type FormProps,
   type PaginationProps,
 } from "antd";
@@ -14,7 +15,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import Popup from "../../../../../shared/ui/Popup";
-import { X } from "lucide-react";
+import { AlertCircle, Minus, Plus, X } from "lucide-react";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
 type FieldType = {
@@ -24,64 +25,110 @@ type FieldType = {
 
 const WaitingOrders = () => {
   const navigate = useNavigate();
-  const orderId = useRef<string | null>(null);
+  const order = useRef<any | null>(null);
   const urlType = useRef<string | null>(null);
 
   const { getParam, setParam, removeParam } = useParamsHook();
   const page = Number(getParam("page") || 1);
   const limit = Number(getParam("limit") || 10);
-  const { getCourierOrders, sellOrder, cancelOrder } = useOrder();
+  const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
+    useOrder();
   const { data } = getCourierOrders({ status: "waiting" });
   const total = data?.data?.total || 0;
 
   const [form] = Form.useForm<FieldType>();
   const { handleSuccess, handleApiError } = useApiNotification();
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
-    const id = orderId.current;
+    const item = order.current;
     const type = urlType.current;
 
     if (type === "sell") {
-      sellOrder.mutate(
-        { id: id as string, data: values },
-        {
-          onSuccess: () => {
-            setIsShow(false);
-            handleSuccess("Buyurtma muvaffaqiyatli sotildi");
-          },
-          onError: (err: any) =>
-            handleApiError(err, "Buyurtmani sotishda xatolik yuz berdi"),
-        }
-      );
+      if (partleSoldShow!) {
+        const order_item_info = orderItemInfo.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }));
+        const data = {
+          order_item_info,
+          totalPrice: Number(String(totalPrice).split(",").join("")),
+          extraCost: Number(values?.extraCost),
+          comment: values?.comment,
+        };
+        partlySellOrder.mutate(
+          { id: order.current.id, data },
+          {
+            onSuccess: (res) => {
+              console.log(res);
+            },
+          }
+        );
+      } else {
+        sellOrder.mutate(
+          { id: item?.id as string, data: values },
+          {
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+            },
+            onError: (err: any) =>
+              handleApiError(err, "Buyurtmani sotishda xatolik yuz berdi"),
+          }
+        );
+      }
     } else {
-      cancelOrder.mutate(
-        { id: id as string, data: values },
-        {
-          onSuccess: () => {
-            setIsShow(false);
-            handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
-          },
-          onError: (err: any) =>
-            handleApiError(err, "Buyurtmani bekor qilishda xatolik yuz berdi"),
-        }
-      );
+      if (partleSoldShow) {
+        const order_item_info = orderItemInfo.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }));
+        const data = {
+          order_item_info,
+          totalPrice: Number(String(totalPrice).split(",").join("")),
+          extraCost: Number(values?.extraCost),
+          comment: values?.comment,
+        };
+        partlySellOrder.mutate(
+          { id: order.current.id, data },
+          {
+            onSuccess: (res) => {
+              console.log(res);
+            },
+          }
+        );
+      } else {
+        cancelOrder.mutate(
+          { id: item?.id as string, data: values },
+          {
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+            },
+            onError: (err: any) =>
+              handleApiError(
+                err,
+                "Buyurtmani bekor qilishda xatolik yuz berdi"
+              ),
+          }
+        );
+      }
     }
   };
   const handleSellOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    id: string
+    item: any
   ) => {
     e.stopPropagation();
-    orderId.current = id;
+    order.current = item;
     urlType.current = "sell";
     setIsShow(true);
   };
 
   const handleCancelOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    id: string
+    item: any
   ) => {
     e.stopPropagation();
-    orderId.current = id;
+    order.current = item;
     urlType.current = "cancel";
     setIsShow(true);
   };
@@ -100,7 +147,21 @@ const WaitingOrders = () => {
     }
   };
 
-  const [isShow, setIsShow] = useState(false);
+  const [isShow, setIsShow] = useState<boolean>(false);
+  const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
+
+  const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
+  const [totalPrice, setTotalPrice] = useState<number | string>("");
+  useEffect(() => {
+    if (isShow && order.current) {
+      const initialItems = order.current?.items?.map((item: any) => ({
+        product_id: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity,
+      }));
+      setOrderItemInfo(initialItems || []);
+    }
+  }, [isShow]);
 
   return data?.data?.data?.length > 0 ? (
     <div>
@@ -166,7 +227,7 @@ const WaitingOrders = () => {
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => (
             <tr
-              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
+              onClick={() => navigate(`/orders/order-detail/${item.item}`)}
               key={item?.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >
@@ -204,7 +265,7 @@ const WaitingOrders = () => {
                   <Button
                     disabled={sellOrder.isPending}
                     loading={sellOrder.isPending}
-                    onClick={(e) => handleSellOrder(e, item?.id)}
+                    onClick={(e) => handleSellOrder(e, item)}
                     className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                   >
                     Sotish
@@ -212,7 +273,7 @@ const WaitingOrders = () => {
                   <Button
                     disabled={cancelOrder.isPending}
                     loading={cancelOrder.isPending}
-                    onClick={(e) => handleCancelOrder(e, item?.id)}
+                    onClick={(e) => handleCancelOrder(e, item)}
                     className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                   >
                     Bekor qilish
@@ -234,19 +295,105 @@ const WaitingOrders = () => {
         />
       </div>
       <Popup isShow={isShow} onClose={() => setIsShow(false)}>
-        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4">
+        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8">
           <X
             className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
             onClick={() => setIsShow(false)}
           />
-
-          <Form
-            initialValues={{}}
-            form={form}
-            onFinish={onFinish}
-            className="px-8!"
+          {partleSoldShow && (
+            <h2 className="text-center pt-3 text-[20px]">
+              Qisman {urlType.current === "sell" ? "sotish" : "bekor qilish"}
+            </h2>
+          )}
+          <div
+            className={`space-y-1 pt-${
+              partleSoldShow ? 1 : 4
+            } text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
           >
-            <div className="pt-10">
+            <p>
+              <span className="font-semibold">Mijoz ismi:</span>{" "}
+              <span>{order.current?.customer?.name || "—"}</span>
+            </p>
+            <p>
+              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
+              <span>{order.current?.customer?.phone_number || "—"}</span>
+            </p>
+            <p>
+              <span className="font-semibold">Umumiy summa:</span>{" "}
+              <span>
+                {order.current?.total_price
+                  ? order.current.total_price.toLocaleString("uz-UZ")
+                  : "0"}{" "}
+                so'm
+              </span>
+            </p>
+          </div>
+
+          {partleSoldShow && (
+            <div className="flex flex-col">
+              {orderItemInfo.map((item, index) => (
+                <div
+                  key={item.productId}
+                  className="pt-4 flex gap-10 justify-between"
+                >
+                  <Form.Item className="flex-1!">
+                    <Select
+                      className="!h-[40px] custom-select-dropdown-bright"
+                      dropdownClassName="dark-dropdown"
+                      value={item.product_id}
+                      disabled
+                      options={[
+                        {
+                          label: item.name,
+                          value: item.product_id,
+                        },
+                      ]}
+                    />
+                  </Form.Item>
+
+                  <div className="flex gap-2 items-center mb-6 select-none">
+                    <Plus
+                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
+                      onClick={() => {
+                        const updated = [...orderItemInfo];
+                        updated[index].quantity += 1;
+                        setOrderItemInfo(updated);
+                      }}
+                    />
+                    <span className="text-[20px]">{item.quantity}</span>
+                    <Minus
+                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
+                      onClick={() => {
+                        const updated = [...orderItemInfo];
+                        if (updated[index].quantity > 0) {
+                          updated[index].quantity -= 1;
+                          setOrderItemInfo(updated);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <Form.Item>
+                <Input
+                  className="h-[40px]!"
+                  placeholder="To'lov summasi"
+                  value={totalPrice}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/\D/g, "");
+                    const formatted = new Intl.NumberFormat("uz-UZ").format(
+                      Number(rawValue || 0)
+                    );
+                    setTotalPrice(formatted);
+                  }}
+                ></Input>
+              </Form.Item>
+            </div>
+          )}
+
+          <Form initialValues={{}} form={form} onFinish={onFinish}>
+            <div className={`pt-${partleSoldShow ? 0 : 3}`}>
               <span className="">Izoh</span>
               <Form.Item name="comment">
                 <Input.TextArea
@@ -273,12 +420,19 @@ const WaitingOrders = () => {
               </Form.Item>
             </div>
 
-            <div className="flex justify-center">
+            <div className="flex justify-between">
+              <Button onClick={() => setPartlySoldShow((p) => !p)}>
+                <AlertCircle />
+              </Button>
               <Button
                 htmlType="submit"
-                className="px-5! py-4! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
+                className={`px-5! py-4! ${
+                  urlType.current === "sell"
+                    ? "bg-[var(--color-bg-sy)]!"
+                    : "bg-red-500!"
+                } bg-[var(--color-bg-sy)]! text-[#ffffff]!`}
               >
-                Tasdiqlash
+                {urlType.current === "sell" ? "Sotish" : "Bekor qilish"}
               </Button>
             </div>
           </Form>

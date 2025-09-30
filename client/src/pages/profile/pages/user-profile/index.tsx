@@ -1,18 +1,18 @@
-import { memo, useState } from 'react';
-import { Image, Spin } from 'antd';
-import Avatar from '../../../../shared/assets/profile-image/Avatar.png';
-import Vector from '../../../../shared/assets/profile-image/Vector.svg';
-import Star from '../../../../shared/assets/profile-image/star.svg';
-import EditProfileModal from '../../ui/Popap';
-import { useDispatch } from 'react-redux';
-import { setEditing } from '../../../../shared/lib/features/profile/profileEditSlice';
-import { useParams } from 'react-router-dom';
-import { useUser } from '../../../../shared/api/hooks/useRegister';
+import { memo, useState } from "react";
+import { Image, Spin, Modal, Form, Input, Button } from "antd";
+import Avatar from "../../../../shared/assets/profile-image/Avatar.png";
+import Vector from "../../../../shared/assets/profile-image/Vector.svg";
+import Star from "../../../../shared/assets/profile-image/star.svg";
+import { useDispatch } from "react-redux";
+import { setEditing } from "../../../../shared/lib/features/profile/profileEditSlice";
+import { useParams } from "react-router-dom";
+import { useUser } from "../../../../shared/api/hooks/useRegister";
+// import Password from "antd/es/input/Password";
 
 const UserProfile = () => {
-  const {id} = useParams()
+  const { id } = useParams();
   const dispatch = useDispatch();
-  const {getUserById} = useUser()
+  const { getUserById, updateUser } = useUser();
   const { data, isLoading, refetch } = getUserById(id);
   const [open, setOpen] = useState(false);
 
@@ -26,12 +26,43 @@ const UserProfile = () => {
 
   const user = data?.data;
 
+  const handleUpdate = (values: any) => {
+    // values dan nusxa olish
+    const payload: any = { ...values };
+
+    // O'zgarmaganlarini olib tashlash
+    if (payload.name === user.name) delete payload.name;
+    if (payload.phone_number === user.phone_number) delete payload.phone_number;
+
+    // Password faqat kiritilganda yuboriladi
+    if (!payload.password) delete payload.password;
+
+    // Agar hech nima o'zgarmagan bo'lsa, backendga yubormaslik uchun
+    if (Object.keys(payload).length === 0) {
+      setOpen(false);
+      return;
+    }
+
+    updateUser.mutate(
+      {
+        role: user.role,
+        id: user.id,
+        data: payload,
+      },
+      {
+        onSuccess: () => {
+          refetch();
+          setOpen(false);
+        },
+      }
+    );
+  };
+
   return (
     <div className="flex flex-col  px-4 md:px-8 lg:px-16">
       <div className="flex flex-col  px-4 md:px-8 lg:px-16">
         <div className="flex flex-col md:flex-row w-full  mx-auto flex-grow gap-6 mt-8">
-
-
+          {/* Profile Card */}
           <div className="w-full md:w-[380px] lg:w-[420px] p-4 flex flex-col items-center justify-between bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md">
             <div className="flex flex-col items-center">
               <Image
@@ -46,9 +77,9 @@ const UserProfile = () => {
               <h2
                 className={`mt-3 px-3 py-1 text-sm md:text-[15px] rounded-2xl 
             ${
-              user?.status === 'active'
-                ? 'bg-green-500/20 text-green-600'
-                : 'bg-red-500/17 text-[#FF4C51]'
+              user?.status === "active"
+                ? "bg-green-500/20 text-green-600"
+                : "bg-red-500/17 text-[#FF4C51]"
             }`}
               >
                 {user?.status}
@@ -78,7 +109,7 @@ const UserProfile = () => {
             </div>
           </div>
 
-          
+          {/* Details */}
           {user && (
             <div className="flex-1 bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md p-6 flex flex-col justify-between">
               <div>
@@ -161,7 +192,7 @@ const UserProfile = () => {
                     dispatch(
                       setEditing({
                         phone_number: user?.phone_number,
-                      }),
+                      })
                     );
                   }}
                   className="hover:bg-[#9b72f5] w-[100px] border-none bg-[#8C57FF] px-4 h-[38px] rounded-[6px] text-white"
@@ -173,18 +204,47 @@ const UserProfile = () => {
           )}
         </div>
 
+        {/* Modal */}
         {user && (
-          <EditProfileModal
+          <Modal
+            title="Edit Profile"
             open={open}
-            onClose={() => setOpen(false)}
-            user={user}
-            refetch={refetch}
-          />
+            onCancel={() => setOpen(false)}
+            footer={null}
+          >
+            <Form
+              layout="vertical"
+              initialValues={{
+                name: user.name,
+                phone_number: user.phone_number,
+                password: "",
+              }}
+              onFinish={handleUpdate}
+            >
+              <Form.Item label="Name" name="name">
+                <Input />
+              </Form.Item>
+              <Form.Item label="Phone Number" name="phone_number">
+                <Input />
+              </Form.Item>
+              <Form.Item label="Password" name="password">
+                <Input />
+              </Form.Item>
+              <div className="flex justify-end">
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={updateUser.isPending}
+                >
+                  Save
+                </Button>
+              </div>
+            </Form>
+          </Modal>
         )}
       </div>
 
-      {/* maosh */}
-
+      {/* Salary (Maosh) */}
       <div className="w-full  mt-5 mx-auto bg-white dark:bg-[#312D4B] shadow-xl rounded-xl p-6 space-y-6 text-gray-900 dark:text-gray-200">
         <div className="flex w-full justify-between items-center">
           <div>
@@ -202,15 +262,15 @@ const UserProfile = () => {
 
         <ul className="space-y-2 text-gray-700 dark:text-gray-300 text-left">
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{' '}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
             10 Users
           </li>
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{' '}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
             Up to 10 GB storage
           </li>
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{' '}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
             Basic Support
           </li>
         </ul>
