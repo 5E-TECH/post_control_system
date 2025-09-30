@@ -1073,6 +1073,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         qr_code_token: generateCustomToken(),
         parent_order_id: id,
         product_quantity: remainingQuantity,
+        post_id: order.post_id,
       });
       await queryRunner.manager.save(cancelledOrder);
 
