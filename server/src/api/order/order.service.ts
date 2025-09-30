@@ -1105,7 +1105,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
-        relations: ['market', 'courier', 'post'],
+        relations: ['market', 'post'],
       });
       if (!order) throw new NotFoundException('Order not found');
 
