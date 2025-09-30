@@ -666,6 +666,7 @@ export class UserService {
     try {
       const user = await this.userRepo.findOne({
         where: { id: id, role: Not(Roles.SUPERADMIN) },
+        relations: ['salary', 'region'],
       });
       if (!user) {
         throw new NotFoundException('User not fount');
