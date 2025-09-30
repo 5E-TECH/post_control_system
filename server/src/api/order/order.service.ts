@@ -1062,34 +1062,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         0,
       );
 
-      if (remainingItems.length > 0) {
-        const cancelledOrder = queryRunner.manager.create(OrderEntity, {
-          market_id: order.user_id,
-          customer_id: order.customer_id, // ✅ same customer
-          comment: 'Qolgan mahsulotlar bekor qilindi',
-          total_price: 0,
-          to_be_paid: 0,
-          where_deliver: order.where_deliver,
-          status: Order_status.CANCELLED,
-          qr_code_token: generateCustomToken(),
-          parent_order_id: id,
-          product_quantity: remainingQuantity,
-        });
-        await queryRunner.manager.save(cancelledOrder);
+      const cancelledOrder = queryRunner.manager.create(OrderEntity, {
+        user_id: order.user_id,
+        customer_id: order.customer_id, // ✅ same customer
+        comment: 'Qolgan mahsulotlar bekor qilindi',
+        total_price: 0,
+        to_be_paid: 0,
+        where_deliver: order.where_deliver,
+        status: Order_status.CANCELLED,
+        qr_code_token: generateCustomToken(),
+        parent_order_id: id,
+        product_quantity: remainingQuantity,
+      });
+      await queryRunner.manager.save(cancelledOrder);
 
-        for (const item of remainingItems) {
-          await queryRunner.manager.save(
-            queryRunner.manager.create(OrderItemEntity, {
-              productId: item.productId,
-              quantity: item.quantity,
-              orderId: cancelledOrder.id,
-            }),
-          );
-        }
+      for (const item of remainingItems) {
+        await queryRunner.manager.save(
+          queryRunner.manager.create(OrderItemEntity, {
+            productId: item.productId,
+            quantity: item.quantity,
+            orderId: cancelledOrder.id,
+          }),
+        );
       }
 
       await queryRunner.commitTransaction();
-      return successRes({}, 200, 'Order qisman sotildi');
+      return successRes({ order, cancelledOrder }, 200, 'Order qisman sotildi');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
