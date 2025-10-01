@@ -12,6 +12,7 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 const OrderView = () => {
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
+
   const navigate = useNavigate();
   const [_, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -28,9 +29,9 @@ const OrderView = () => {
     }
   }, [data]);
 
-  const hanlerUpdate = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-  };
+  // const hanlerUpdate = (e: React.MouseEvent<HTMLButtonElement>) => {
+  //   e.stopPropagation();
+  // };
 
   const hanlerDelet = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -51,10 +52,7 @@ const OrderView = () => {
         }
       },
       onError: (err: any) =>
-        handleApiError(
-          err,
-          "Pochtani yaratishda xatolik yuz berdi"
-        ),
+        handleApiError(err, "Pochtani yaratishda xatolik yuz berdi"),
     });
   };
 
@@ -147,7 +145,6 @@ const OrderView = () => {
               <tr
                 key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
-                onClick={() => navigate(`/orders/order-detail/${item?.id}`)}
               >
                 <td className="pl-10">
                   <input
@@ -198,7 +195,7 @@ const OrderView = () => {
                   </button>
                   <button
                     className="hover:text-[#396ebe] cursor-pointer"
-                    onClick={hanlerUpdate}
+                    onClick={() => navigate(`/orders/order-detail/${item?.id}`)}
                   >
                     <Edit />
                   </button>
@@ -289,25 +286,26 @@ const OrderView = () => {
             </div>
           </div>
         )}
-
-        <div className="flex justify-end mr-10 mt-5">
-          <button
-            type="submit"
-            disabled={
-              !selectedIds ||
-              (Array.isArray(selectedIds) && selectedIds.length === 0)
-            }
-            onClick={handleAccapted}
-            className={`px-2 py-1 ${
-              !selectedIds ||
-              (Array.isArray(selectedIds) && selectedIds.length === 0)
-                ? "opacity-50 cursor-not-allowed"
-                : "cursor-pointer"
-            } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}
-          >
-            Qabul qilish
-          </button>
-        </div>
+        {user?.role !== "market" && (
+          <div className="flex justify-end mr-10 mt-5">
+            <button
+              type="submit"
+              disabled={
+                !selectedIds ||
+                (Array.isArray(selectedIds) && selectedIds.length === 0)
+              }
+              onClick={handleAccapted}
+              className={`px-2 py-1 ${
+                !selectedIds ||
+                (Array.isArray(selectedIds) && selectedIds.length === 0)
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer"
+              } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}
+            >
+              Qabul qilish
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

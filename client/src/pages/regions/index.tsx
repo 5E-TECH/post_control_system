@@ -1,8 +1,11 @@
 import React from 'react'
+import UzbekistanMap from './components/map'
 
 const Regions = () => {
     return (
-        <div>Regions</div>
+        <div>Regions
+            <UzbekistanMap/>
+        </div>
     )
 }
 

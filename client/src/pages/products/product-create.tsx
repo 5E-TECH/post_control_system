@@ -40,7 +40,7 @@ const ProductsCreate: FC = () => {
         </div>
         <div className="m-[24px]">
           <AddProduct />
-          <ProductView data={data?.data} />
+          <ProductView data={data?.data?.data} />
         </div>
       </div>
       <div></div>

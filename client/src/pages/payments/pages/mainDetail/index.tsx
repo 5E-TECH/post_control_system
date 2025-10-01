@@ -28,9 +28,9 @@ const MainDetail = () => {
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
   const [spand, setSpand] = useState(false);
-  const [select, setSelect] = useState(null);
+  const [select, setSelect] = useState<null | string>(null);
   const [kassa, setMaosh] = useState(false);
-  const [showAdminAndRegistrator, setshowAdminAndRegistrator] = useState(false)
+  const [showAdminAndRegistrator, setshowAdminAndRegistrator] = useState(false);
 
   const navigate = useNavigate();
 
@@ -52,23 +52,23 @@ const MainDetail = () => {
   };
 
   const params = {
-    fromDate:form.from,
-    toDate:form.to
-  }
+    fromDate: form.from,
+    toDate: form.to,
+  };
 
   // console.log("from", form.from);
   // console.log("to", form.to);
-  
 
   const [show, setShow] = useState(true);
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
   const { getCashBoxMain, cashboxSpand, cashboxFill } = useCashBox();
-  const { getAdminAndRegister } = useUser()
+  const { getAdminAndRegister } = useUser();
 
-  const {data:adminAndRegisterData} = getAdminAndRegister(showAdminAndRegistrator)
+  const { data: adminAndRegisterData } = getAdminAndRegister(
+    showAdminAndRegistrator
+  );
   // console.log(adminAndRegisterData?.data?.data);
-  
 
   const { data, refetch } = getCashBoxMain(params);
   const { data: marketData } = getMarkets(showMarket);
@@ -79,11 +79,10 @@ const MainDetail = () => {
   }, []);
 
   const handleNavigateProfile = () => {
-    navigate(`/user-profile/${select}`)
-    setSelect(null)
-    setshowAdminAndRegistrator(false)
-  }
-  
+    navigate(`/user-profile/${select}`);
+    setSelect(null);
+    setshowAdminAndRegistrator(false);
+  };
 
   const handleNavigate = () => {
     navigate(`/payments/cash-detail/${select}`, {
@@ -108,12 +107,19 @@ const MainDetail = () => {
       {
         onSuccess: () => {
           refetch();
+          setSpand(false)
+          setForm({
+            from: "",
+            to: "",
+            order: "",
+            payment: "",
+            summa: "",
+            market: "",
+            comment: "",
+          });
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Pul yechishda xatolik yuz berdi"
-          ),
+          handleApiError(err, "Pul yechishda xatolik yuz berdi"),
       }
     );
   };
@@ -142,13 +148,14 @@ const MainDetail = () => {
           });
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Kassaga pul qo'shishda xatolik yuz berdi"
-          ),
+          handleApiError(err, "Kassaga pul qo'shishda xatolik yuz berdi"),
       }
     );
   };
+
+
+
+
 
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
@@ -184,14 +191,14 @@ const MainDetail = () => {
           </button>
           <button
             title="Kassadan sarflash"
-            onClick={() => setSpand(true)}
+            onClick={() => {setSpand(true), setMaosh(false)}}
             className="rounded-full cursor-pointer p-3 bg-red-500 text-white hover:bg-red-600 transition flex items-center justify-center shadow-md"
           >
             <CircleMinus size={22} />
           </button>
           <button
             title="Kassani to'ldirish"
-            onClick={() => setMaosh(true)}
+            onClick={() => {setMaosh(true), setSpand(false)}}
             className="rounded-full cursor-pointer p-3 bg-green-500 text-white hover:bg-green-600 transition flex items-center justify-center shadow-md"
           >
             <CirclePlus size={22} />
@@ -265,7 +272,7 @@ const MainDetail = () => {
         {/* === kassani to'ldirishni bosganda === */}
         {kassa && (
           <div className="mt-5">
-            <h2>Maosh to'lash</h2>
+            <h2>Kassaga qo'shish</h2>
             <div className="flex gap-4 items-center mt-3">
               <input
                 name="summa"
@@ -356,14 +363,14 @@ const MainDetail = () => {
 
       {/* === POPUP MARKET === */}
       <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
-        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d]">
+        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
           <button
             onClick={() => setShowMarket(false)}
-            className="cursor-pointer hover:bg-red-700 text-white p-2 rounded flex items-center justify-center shadow-md"
+            className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
           >
-            <X size={18} />
+            <X size={30} />
           </button>
-          <h1 className="font-bold text-left">Choose Market</h1>
+          <h1 className="font-bold text-left pt-10">Choose Market</h1>
           <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
             <input
               type="text"
@@ -401,23 +408,26 @@ const MainDetail = () => {
               </tbody>
             </table>
           </div>
-          <div className="py-2 text-right">
+          <div className="absolute bottom-4 right-4">
             <button
-              disabled={!select}
+              disabled={!select ? true : false}
               onClick={() => handleNavigate()}
-              className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
+              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700${
                 !select ? "" : "hover:bg-blue-600"
-              } text-white rounded-md cursor-pointer ${
+              }  text-white rounded-md cursor-pointer ${
                 !select ? "opacity-40" : ""
               }`}
             >
-              Selected
+              Tanlash
             </button>
           </div>
         </div>
       </Popup>
 
-      <Popup isShow={showAdminAndRegistrator} onClose={() => setshowAdminAndRegistrator(false)}>
+      <Popup
+        isShow={showAdminAndRegistrator}
+        onClose={() => setshowAdminAndRegistrator(false)}
+      >
         <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative pt-5">
           <button
             onClick={() => setshowAdminAndRegistrator(false)}
@@ -439,7 +449,7 @@ const MainDetail = () => {
               <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
                 <tr>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    # 
+                    #
                   </th>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
                     Hodim ismi
@@ -451,20 +461,23 @@ const MainDetail = () => {
               </thead>
               <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
                 {
-                // Array.isArray(marketData?.data?.items) &&
-                  adminAndRegisterData?.data?.data?.map((item: any, inx: number) => (
-                    <tr
-                      key={item?.id}
-                      onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
-                        item.id == select ? "bg-gray-100" : ""
-                      }`}
-                    >
-                      <td className="text-[#8C57FF] pl-4 py-3">{inx + 1}</td>
-                      <td className="py-3">{item?.name}</td>
-                      <td className="py-3">{item?.role}</td>
-                    </tr>
-                  ))}
+                  // Array.isArray(marketData?.data?.items) &&
+                  adminAndRegisterData?.data?.data?.map(
+                    (item: any, inx: number) => (
+                      <tr
+                        key={item?.id}
+                        onClick={() => setSelect(item?.id)}
+                        className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                          item.id == select ? "bg-gray-100" : ""
+                        }`}
+                      >
+                        <td className="text-[#8C57FF] pl-4 py-3">{inx + 1}</td>
+                        <td className="py-3">{item?.name}</td>
+                        <td className="py-3">{item?.role}</td>
+                      </tr>
+                    )
+                  )
+                }
               </tbody>
             </table>
           </div>
@@ -486,14 +499,14 @@ const MainDetail = () => {
 
       {/* === POPUP CURIER === */}
       <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>
-        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d]">
+        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
           <button
             onClick={() => setShowCurier(false)}
-            className="cursor-pointer bg-red-600 hover:bg-red-700 text-white p-2 rounded flex items-center justify-center shadow-md"
+            className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
           >
-            <X size={18} />
+            <X size={30} />
           </button>
-          <h1 className="font-bold text-left">Olinishi kerak</h1>
+          <h1 className="font-bold text-left pt-10">Olinishi kerak</h1>
           <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
             <input
               type="text"
@@ -534,12 +547,17 @@ const MainDetail = () => {
               </tbody>
             </table>
           </div>
-          <div className="py-2 text-right">
+          <div className="absolute bottom-4 right-4">
             <button
+              disabled={!select ? true : false}
               onClick={() => handleNavigate()}
-              className="px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 text-white rounded-md cursor-pointer"
+              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700${
+                !select ? "" : "hover:bg-blue-600"
+              }  text-white rounded-md cursor-pointer ${
+                !select ? "opacity-40" : ""
+              }`}
             >
-              Selected
+              Tanlash
             </button>
           </div>
         </div>
