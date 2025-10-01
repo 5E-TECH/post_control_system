@@ -123,11 +123,15 @@ const Payments = () => {
     label: status,
   }));
 
-  const createdBy = ["superadmin", "admin", "courier"];
-  const createdByOptions = createdBy.map((role: string) => ({
-    value: role,
-    label: role,
-  }));
+  const createdByOptions = cashBoxData?.data?.allCashboxHistories
+    ?.map((item: any) => ({
+      value: item?.createdByUser?.id,
+      label: item?.createdByUser?.role,
+    }))
+    .filter(
+      (option: any, index: any, self: any) =>
+        index === self.findIndex((o: any) => o.value === option.value)
+    );
 
   const cashboxType = ["markets", "couriers", "main"];
   const cashboxOptions = cashboxType.map((status: string) => ({
@@ -156,7 +160,6 @@ const Payments = () => {
       [name]: value,
     }));
   };
-  console.log(paymentFilter);
   return (
     <div className="mt-10">
       <div className="grid grid-cols-3 gap-14 max-[1050px]:grid-cols-2 max-[800px]:grid-cols-1 text-center text-2xl items-end mx-5 ">
