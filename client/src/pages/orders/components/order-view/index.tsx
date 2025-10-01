@@ -190,7 +190,13 @@ const OrderView = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("address")}</span>
+                <span>{t("region")}</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("district")}</span>
               </div>
             </th>
             <th>
@@ -248,7 +254,10 @@ const OrderView = () => {
                 <td className="data-cell pl-10" data-cell="PHONE">
                   {item?.customer?.phone_number}
                 </td>
-                <td className="data-cell pl-10 " data-cell="ADDRESS">
+                <td className="data-cell pl-10" data-cell="REGION">
+                  {item?.customer?.district?.name}
+                </td>
+                <td className="data-cell pl-10" data-cell="DISTRICT">
                   {item?.customer?.district?.name}
                 </td>
                 <td className="data-cell pl-10" data-cell="MARKET">
