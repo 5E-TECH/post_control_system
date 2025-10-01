@@ -31,7 +31,7 @@ const UserProfile = () => {
     const payload: any = { ...values };
 
     // O'zgarmaganlarini olib tashlash
-    if (payload.name === user.name) delete payload.name;
+    if (payload.full_name === user.full_name) delete payload.full_name;
     if (payload.phone_number === user.phone_number) delete payload.phone_number;
 
     // Password faqat kiritilganda yuboriladi
@@ -215,13 +215,13 @@ const UserProfile = () => {
             <Form
               layout="vertical"
               initialValues={{
-                name: user.name,
+                full_name: user.name,
                 phone_number: user.phone_number,
                 password: "",
               }}
               onFinish={handleUpdate}
             >
-              <Form.Item label="Name" name="name">
+              <Form.Item label="Name" name="full_name">
                 <Input />
               </Form.Item>
               <Form.Item label="Phone Number" name="phone_number">
