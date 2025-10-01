@@ -1,20 +1,21 @@
 {
-    "title": "Order List",
-    "noPermission": "No Permission 🚫",
-    "placeholder": {
-        "selectMarket": "Select market",
-        "selectRegion": "Select region",
-        "selectStatus": "Select status",
-        "searchOrder": "Search order"
-    },
-    "button": {
-        "addOrder": "Add order"
-    },
-    "customer": "CUSTOMER",
-    "phone": "PHONE",
-    "address": "ADDRESS",
-    "market": "MARKET",
-    "status": "STATUS",
-    "price": "PRICE",
-    "stock": "STOCK"
+  "title": "Order List",
+  "noPermission": "No Permission 🚫",
+  "placeholder": {
+    "selectMarket": "Select market",
+    "selectRegion": "Select region",
+    "selectStatus": "Select status",
+    "searchOrder": "Search order"
+  },
+  "button": {
+    "addOrder": "Add order"
+  },
+  "customer": "CUSTOMER",
+  "phone": "PHONE",
+  "region": "REGION",
+  "district": "DISTRICT",
+  "market": "MARKET",
+  "status": "STATUS",
+  "price": "PRICE",
+  "stock": "STOCK"
 }
