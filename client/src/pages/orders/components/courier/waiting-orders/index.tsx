@@ -11,14 +11,13 @@ import {
   type FormProps,
   type PaginationProps,
 } from "antd";
-// import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useNavigate } from "react-router-dom";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import Popup from "../../../../../shared/ui/Popup";
 import { AlertCircle, Minus, Plus, X } from "lucide-react";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
-type FieldType = {
+export type FieldType = {
   comment?: string;
   extraCost?: number;
 };
@@ -37,7 +36,7 @@ const WaitingOrders = () => {
   const total = data?.data?.total || 0;
 
   const [form] = Form.useForm<FieldType>();
-  const { handleSuccess, handleApiError } = useApiNotification();
+  const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const item = order.current;
     const type = urlType.current;
@@ -48,6 +47,15 @@ const WaitingOrders = () => {
           product_id: item.product_id,
           quantity: item.quantity,
         }));
+        if (
+          totalPrice === undefined ||
+          totalPrice === null ||
+          totalPrice === "" ||
+          Number(totalPrice) < 0
+        ) {
+          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+          return;
+        }
         const data = {
           order_item_info,
           totalPrice: Number(String(totalPrice).split(",").join("")),
@@ -57,8 +65,12 @@ const WaitingOrders = () => {
         partlySellOrder.mutate(
           { id: order.current.id, data },
           {
-            onSuccess: (res) => {
-              console.log(res);
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
+            },
+            onError: (err: any) => {
+              handleApiError(err, "Buyurtma qisman sotilishda xatolik");
             },
           }
         );
@@ -71,7 +83,7 @@ const WaitingOrders = () => {
               handleSuccess("Buyurtma muvaffaqiyatli sotildi");
             },
             onError: (err: any) =>
-              handleApiError(err, "Buyurtmani sotishda xatolik yuz berdi"),
+              handleApiError(err, "Buyurtmani sotishda xatolik"),
           }
         );
       }
@@ -81,6 +93,15 @@ const WaitingOrders = () => {
           product_id: item.product_id,
           quantity: item.quantity,
         }));
+        if (
+          totalPrice === undefined ||
+          totalPrice === null ||
+          totalPrice === "" ||
+          Number(totalPrice) < 0
+        ) {
+          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+          return;
+        }
         const data = {
           order_item_info,
           totalPrice: Number(String(totalPrice).split(",").join("")),
@@ -90,9 +111,12 @@ const WaitingOrders = () => {
         partlySellOrder.mutate(
           { id: order.current.id, data },
           {
-            onSuccess: (res) => {
-              console.log(res);
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
             },
+            onError: (err: any) =>
+              handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
           }
         );
       } else {
@@ -104,10 +128,7 @@ const WaitingOrders = () => {
               handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
             },
             onError: (err: any) =>
-              handleApiError(
-                err,
-                "Buyurtmani bekor qilishda xatolik yuz berdi"
-              ),
+              handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
           }
         );
       }
@@ -162,6 +183,15 @@ const WaitingOrders = () => {
       setOrderItemInfo(initialItems || []);
     }
   }, [isShow]);
+
+  // Loading and Disabled button
+  const getIsPending = () => {
+    if (urlType.current === "sell") {
+      return partleSoldShow ? partlySellOrder.isPending : sellOrder.isPending;
+    } else {
+      return partleSoldShow ? partlySellOrder.isPending : cancelOrder.isPending;
+    }
+  };
 
   return data?.data?.data?.length > 0 ? (
     <div>
@@ -263,16 +293,12 @@ const WaitingOrders = () => {
               <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 <div className="flex gap-3">
                   <Button
-                    disabled={sellOrder.isPending}
-                    loading={sellOrder.isPending}
                     onClick={(e) => handleSellOrder(e, item)}
                     className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                   >
                     Sotish
                   </Button>
                   <Button
-                    disabled={cancelOrder.isPending}
-                    loading={cancelOrder.isPending}
                     onClick={(e) => handleCancelOrder(e, item)}
                     className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                   >
@@ -425,6 +451,8 @@ const WaitingOrders = () => {
                 <AlertCircle />
               </Button>
               <Button
+                disabled={getIsPending()}
+                loading={getIsPending()}
                 htmlType="submit"
                 className={`px-5! py-4! ${
                   urlType.current === "sell"
