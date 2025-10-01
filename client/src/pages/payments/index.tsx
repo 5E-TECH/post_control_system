@@ -179,14 +179,14 @@ const Payments = () => {
         </div>
 
         <Popup isShow={showMarket} onClose={() => hendlerClose()}>
-          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d]">
+          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative ">
             <button
               onClick={() => setShowMarket(false)}
-              className="cursor-pointer hover:bg-red-700 text-white p-2 rounded- ml-160 flex items-center justify-center shadow-md"
+              className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
             >
-              <X size={18} />
+              <X size={30} />
             </button>
-            <h1 className="font-bold text-left">Choose Market</h1>
+            <h1 className="font-bold text-left pt-10">Choose Market</h1>
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
                 type="text"
@@ -240,7 +240,7 @@ const Payments = () => {
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
-                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
+                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-4 right-4 ${
                   !select ? "" : "hover:bg-blue-600"
                 }  text-white rounded-md cursor-pointer ${
                   !select ? "opacity-40" : ""
@@ -352,11 +352,11 @@ const Payments = () => {
                 </tbody>
               </table>
             </div>
-            <div className="absolute py-2 bottom-0,1 right-4">
+            <div className="absolute bottom-4 right-4">
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
-                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
+                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700${
                   !select ? "" : "hover:bg-blue-600"
                 }  text-white rounded-md cursor-pointer ${
                   !select ? "opacity-40" : ""

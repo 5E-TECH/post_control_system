@@ -5,10 +5,12 @@ import Popup from "../../shared/ui/Popup";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 import ProductView from "../../shared/components/product-view";
 import { useProduct } from "../../shared/api/hooks/useProduct";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { debounce } from "../../shared/helpers/DebounceFunc";
 import Select from "../orders/components/select/select";
+import { useProfile } from "../../shared/api/hooks/useProfile";
+import { togglePermission } from "../../shared/lib/features/add-order-permission";
 
 const Products = () => {
   const [showMarket, setShowMarket] = useState(false);
@@ -16,9 +18,23 @@ const Products = () => {
   const [searchProduct, setSearchProduct] = useState<any>(null);
   const [searchPopup, setSearchPopup] = useState<any>(null);
   const [searchByMarket, setSearchByMarket] = useState<any>(undefined);
+  const dispatch = useDispatch();
 
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
-  const { page, limit } = useSelector((state: RootState) => state.paginationSlice);
+  const { page, limit } = useSelector(
+    (state: RootState) => state.paginationSlice
+  );
+  const { refetch } = useProfile().getUser(role === "market");
+
+  const handleCheck = async () => {
+    const res = await refetch();
+    const addOrder = res.data.data.add_order;
+    if (!addOrder && res.data.data.role === "market") {
+      dispatch(togglePermission(true));
+      return;
+    }
+    navigate(`create/${select}`);
+  };
 
   // console.log("pagination", page, limit);
 
@@ -111,7 +127,8 @@ const Products = () => {
             <button
               onClick={() => {
                 if (role === "market") {
-                  handleNavigate();
+                  handleCheck()
+                  // handleNavigate()
                 } else {
                   setShowMarket(true);
                 }

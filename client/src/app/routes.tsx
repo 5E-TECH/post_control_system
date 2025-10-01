@@ -244,6 +244,9 @@ const AppRouters = () => {
             {
               path:"user-profile/:id",
               element:<UserProfile/>
+            },
+            {
+              path:"regions", element:<Regions/>
             }
           ],
         },
