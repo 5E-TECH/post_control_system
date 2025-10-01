@@ -17,7 +17,7 @@ type FieldType = {
 
 const CreateAdmin = () => {
   const { t } = useTranslation("users");
-  const { createUser } = useUser("admin");
+  const { createUser } = useUser();
   const navigate = useNavigate();
 
   const [form] = Form.useForm<FieldType>();
@@ -29,16 +29,16 @@ const CreateAdmin = () => {
       payment_day: values.payment_day ? Number(values.payment_day) : undefined,
       phone_number: values.phone_number.split(" ").join(""),
     };
-    createUser.mutate(newAdmin, {
-      onSuccess: () => {
-        navigate("/all-users");
-      },
-      onError: (err: any) =>
-        handleApiError(
-          err,
-          "Foydalanuvchi yaratishda xatolik yuz berdi"
-        ),
-    });
+    createUser.mutate(
+      { path: "admin", data: newAdmin },
+      {
+        onSuccess: () => {
+          navigate("/all-users");
+        },
+        onError: (err: any) =>
+          handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),
+      }
+    );
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {

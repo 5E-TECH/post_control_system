@@ -17,7 +17,7 @@ type FieldType = {
 
 const CreateMarket = () => {
   const { t } = useTranslation("users");
-  const { createUser } = useUser("market");
+  const { createUser } = useUser();
   const navigate = useNavigate();
 
   const [form] = Form.useForm<FieldType>();
@@ -29,17 +29,17 @@ const CreateMarket = () => {
       tariff_center: Number(values.tariff_center),
       phone_number: values.phone_number.split(" ").join(""),
     };
-    console.log(newMarket)
-    createUser.mutate(newMarket, {
-      onSuccess: () => {
-        navigate("/all-users");
-      },
-      onError: (err: any) =>
-        handleApiError(
-          err,
-          "Foydalanuvchi yaratishda xatolik yuz berdi"
-        ),
-    });
+    console.log(newMarket);
+    createUser.mutate(
+      { path: "market", data: newMarket },
+      {
+        onSuccess: () => {
+          navigate("/all-users");
+        },
+        onError: (err: any) =>
+          handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),
+      }
+    );
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {

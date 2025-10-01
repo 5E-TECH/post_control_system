@@ -17,7 +17,7 @@ type FieldType = {
 
 const CreateRegistrator = () => {
   const { t } = useTranslation("users");
-  const { createUser } = useUser("registrator");
+  const { createUser } = useUser();
   const navigate = useNavigate();
 
   const [form] = Form.useForm<FieldType>();
@@ -29,16 +29,16 @@ const CreateRegistrator = () => {
       payment_day: Number(values.payment_day),
       phone_number: values.phone_number.split(" ").join(""),
     };
-    createUser.mutate(newRegistrator, {
-      onSuccess: () => {
-        navigate("/all-users");
-      },
-      onError: (err: any) =>
-        handleApiError(
-          err,
-          "Foydalanuvchi yaratishda xatolik yuz berdi"
-        ),
-    });
+    createUser.mutate(
+      { path: "registrator", data: newRegistrator },
+      {
+        onSuccess: () => {
+          navigate("/all-users");
+        },
+        onError: (err: any) =>
+          handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),
+      }
+    );
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {

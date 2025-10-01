@@ -11,11 +11,19 @@ export interface IUserFilter {
   limit?: number;
 }
 
-export const useUser = (path?: string) => {
+export const useUser = () => {
   const client = useQueryClient();
 
   const createUser = useMutation({
-    mutationFn: (data: any) => api.post(`user/${path}`, data),
+    mutationFn: ({ path, data }: { path: string; data: any }) =>
+      api.post(`user/${path}`, data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
+  });
+
+  const updateUser = useMutation({
+    mutationFn: ({ role, id, data }: { role: string; id: string; data: any }) =>
+      api.patch(`user/${role}/${id}`, data),
     onSuccess: () =>
       client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
   });
@@ -26,7 +34,7 @@ export const useUser = (path?: string) => {
       queryFn: () => api.get("user", { params }).then((res) => res.data),
     });
 
-  const getUserById = (id:string | undefined, params?: IUserFilter) =>
+  const getUserById = (id: string | undefined, params?: IUserFilter) =>
     useQuery({
       queryKey: [user, params, id],
       queryFn: () => api.get(`user/${id}`, { params }).then((res) => res.data),
@@ -39,22 +47,8 @@ export const useUser = (path?: string) => {
         api
           .get("user/registrator-and-admin", { params })
           .then((res) => res.data),
-          enabled
+      enabled,
     });
-
-    const updateUser = useMutation({
-    mutationFn: ({
-      role,
-      id,
-      data,
-    }: {
-      role: string;
-      id: string;
-      data: any;
-    }) => api.patch(`user/${role}/${id}`, data),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
-  });
 
   const getUsersExceptMarket = (params?: IUserFilter) =>
     useQuery({
@@ -69,6 +63,6 @@ export const useUser = (path?: string) => {
     getUsersExceptMarket,
     getAdminAndRegister,
     getUserById,
-    updateUser
+    updateUser,
   };
 };

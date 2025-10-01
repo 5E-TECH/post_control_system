@@ -18,6 +18,7 @@ const Users = () => {
   const { t } = useTranslation("users");
   const { pathname } = useLocation();
   const dispatch = useDispatch();
+  const form = useSelector((state: RootState) => state.setUserFilter);
 
   const isChecked = pathname.startsWith("/all-users/create-user");
 
@@ -35,7 +36,6 @@ const Users = () => {
     label: status,
   }));
 
-  const form = useSelector((state: RootState) => state.setUserFilter);
   const handleFilterChange = (name: keyof IUserFilter, value: string) => {
     dispatch(setUserFilter({ name, value }));
   };

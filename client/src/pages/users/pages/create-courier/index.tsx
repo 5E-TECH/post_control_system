@@ -19,7 +19,7 @@ type FieldType = {
 
 const CreateCourier = () => {
   const { t } = useTranslation("users");
-  const { createUser } = useUser("courier");
+  const { createUser } = useUser();
   const navigate = useNavigate();
 
   const [form] = Form.useForm<FieldType>();
@@ -31,16 +31,16 @@ const CreateCourier = () => {
       tariff_center: Number(values.tariff_center),
       phone_number: values.phone_number.split(" ").join(""),
     };
-    createUser.mutate(newCourier, {
-      onSuccess: () => {
-        navigate("/all-users");
-      },
-      onError: (err: any) =>
-        handleApiError(
-          err,
-          "Foydalanuvchi yaratishda xatolik yuz berdi"
-        ),
-    });
+    createUser.mutate(
+      { path: "courier", data: newCourier },
+      {
+        onSuccess: () => {
+          navigate("/all-users");
+        },
+        onError: (err: any) =>
+          handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),
+      }
+    );
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
