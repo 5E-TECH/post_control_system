@@ -11,19 +11,11 @@ export interface IUserFilter {
   limit?: number;
 }
 
-export const useUser = () => {
+export const useUser = (path?: string) => {
   const client = useQueryClient();
 
   const createUser = useMutation({
-    mutationFn: ({ path, data }: { path: string; data: any }) =>
-      api.post(`user/${path}`, data),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
-  });
-
-  const updateUser = useMutation({
-    mutationFn: ({ role, id, data }: { role: string; id: string; data: any }) =>
-      api.patch(`user/${role}/${id}`, data),
+    mutationFn: (data: any) => api.post(`user/${path}`, data),
     onSuccess: () =>
       client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
   });
@@ -49,6 +41,13 @@ export const useUser = () => {
           .then((res) => res.data),
       enabled,
     });
+
+  const updateUser = useMutation({
+    mutationFn: ({ role, id, data }: { role: string; id: string; data: any }) =>
+      api.patch(`user/${role}/${id}`, data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
+  });
 
   const getUsersExceptMarket = (params?: IUserFilter) =>
     useQuery({
