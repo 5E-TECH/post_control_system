@@ -3,19 +3,22 @@ import UsersStatistics from "./components/users-statistics";
 import Select from "./components/select";
 import SearchInput from "./components/search-input";
 import Button from "./components/button";
+import { Button as AntButton } from "antd";
 import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
+  resetUserFilter,
   setUserFilter,
   type IUserFilter,
 } from "../../shared/lib/features/user-filters";
+import type { RootState } from "../../app/store";
 
 const Users = () => {
   const { t } = useTranslation("users");
   const { pathname } = useLocation();
   const dispatch = useDispatch();
-  
+
   const isChecked = pathname.startsWith("/all-users/create-user");
 
   if (isChecked) return <Outlet />;
@@ -32,8 +35,12 @@ const Users = () => {
     label: status,
   }));
 
+  const form = useSelector((state: RootState) => state.setUserFilter);
   const handleFilterChange = (name: keyof IUserFilter, value: string) => {
     dispatch(setUserFilter({ name, value }));
+  };
+  const handleClear = () => {
+    dispatch(resetUserFilter());
   };
 
   return (
@@ -44,9 +51,10 @@ const Users = () => {
           <span className="text-[18px]">{t("filters")}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-5 pt-[16px] pl-[20px] pr-[20px] max-[750px]:grid-cols-1">
+        <div className="grid grid-cols-3 gap-5 pt-[16px] pl-[20px] pr-[20px] max-[750px]:grid-cols-1">
           <Select<keyof IUserFilter>
             name="role"
+            value={form.role}
             text={t("selectRole")}
             options={roleOptions}
             onChange={handleFilterChange}
@@ -54,10 +62,20 @@ const Users = () => {
 
           <Select<keyof IUserFilter>
             name="status"
+            value={form.status}
             text={t("selectStatus")}
             options={statusOptions}
             onChange={handleFilterChange}
           />
+
+          <div className="flex min-[900px]:justify-end">
+            <AntButton
+              className="w-[150px]! max-[651px]:w-full! h-[45px]!"
+              onClick={handleClear}
+            >
+              Tozalash
+            </AntButton>
+          </div>
         </div>
 
         <div className="w-full border border-[#E9E8EA] my-[20px] dark:border-[#E7E3FC38]"></div>
