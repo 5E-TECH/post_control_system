@@ -49,6 +49,12 @@ export const useUser = (path?: string) => {
       client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
   });
 
+  const removeUser = useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`user/${id}`).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [user] }),
+  });
+
   const getUsersExceptMarket = (params?: IUserFilter) =>
     useQuery({
       queryKey: [user, params],
@@ -63,5 +69,6 @@ export const useUser = (path?: string) => {
     getAdminAndRegister,
     getUserById,
     updateUser,
+    removeUser,
   };
 };
