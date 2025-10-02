@@ -24,6 +24,9 @@ const Products = () => {
   const { page, limit } = useSelector(
     (state: RootState) => state.paginationSlice
   );
+  const permission = useSelector(
+      (state: RootState) => state.togglePermission.value
+    );
   const { refetch } = useProfile().getUser(role === "market");
 
   const handleCheck = async () => {
@@ -93,7 +96,7 @@ const Products = () => {
 
   if (pathname.startsWith("/products/create")) return <Outlet />;
 
-  return (
+  return !permission ? (
     <div className="mt-6 w-full">
       <h2 className="text-2xl font-medium ml-4 mb-5">Products</h2>
 
@@ -234,6 +237,12 @@ const Products = () => {
           data={productData?.data?.data || productData?.data?.items}
           total={productData?.data?.total}
         />
+      </div>
+    </div>
+  ) : (
+    <div className="flex justify-center items-center h-[65vh]">
+      <div className="text-red-500 text-lg font-semibold mt-5 text-[25px]">
+        {"noPermission"}
       </div>
     </div>
   );
