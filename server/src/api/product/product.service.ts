@@ -108,7 +108,7 @@ export class ProductService {
 
       await this.botService.sendMessageToGroup(
         telegramGroup?.group_id ?? null,
-        `You have added new product: ${product.name}`,
+        `🆕 New product added: <b>${product.name}</b>`,
       );
 
       return successRes(product, 201, 'New product added');

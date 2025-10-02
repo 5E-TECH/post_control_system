@@ -42,6 +42,9 @@ import { UserRepository } from 'src/core/repository/user.repository';
 import { OrderGateaway } from '../socket/order.gateaway';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { MyLogger } from 'src/logger/logger.service';
+import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
+import { BotService } from '../bot/bot.service';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -67,9 +70,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     @InjectRepository(PostEntity)
     private readonly postRepo: PostRepository,
 
+    @InjectRepository(TelegramEntity)
+    private readonly telegramRepo: TelegramRepository,
+
     private readonly logger: MyLogger,
     private readonly dataSource: DataSource,
     private readonly orderGateaway: OrderGateaway,
+    private readonly botService: BotService,
   ) {
     super(orderRepo);
   }
@@ -855,6 +862,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
+        relations: ['items', 'items.product'],
       });
       if (!order) {
         throw new NotFoundException('Order not found');
@@ -901,6 +909,40 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment: finalComment,
       });
       await queryRunner.manager.save(order);
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: order.customer_id },
+        relations: ['district', 'district.region'],
+      });
+
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id: order?.post_id || '' },
+        relations: ['courier'],
+      });
+
+      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
+        where: { market_id: marketId },
+      });
+      // created_at string yoki bigint bo'lishi mumkin
+      const createdAt = new Date(Number(order.created_at));
+
+      await this.botService.sendMessageToGroup(
+        telegramGroup?.group_id || null,
+        `*❌ Buyurtma bekor qilindi!*\n\n` +
+          `👤 *Mijoz:* ${customer?.name}\n` +
+          `📞 *Telefon:* ${customer?.phone_number}\n` +
+          `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
+          `📦 *Buyurtmalar:*\n${order.items
+            .map(
+              (item, i) =>
+                `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
+            )
+            .join('\n')}\n\n` +
+          `💰 *Narxi:* ${order.total_price} so‘m\n` +
+          `🕒 *Yaratilgan vaqti:* ${order.created_at.toLocaleString('uz-UZ')}\n\n` +
+          `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
+          `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
+          `📝 *Izoh:* ${order.comment || '-'}\n`,
+      );
 
       await queryRunner.commitTransaction();
       return successRes({ id: order.id }, 200, 'Order canceled');
@@ -1757,13 +1799,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async remove(id: string) {
     try {
       const order = await this.orderRepo.findOne({
-        where: { id, status: Order_status.NEW },
+        where: { id, status: In([Order_status.NEW, Order_status.RECEIVED]) },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
       }
-      await this.orderRepo.delete({ id });
-
       return successRes({}, 200, 'Order deleted');
     } catch (error) {
       return catchError(error);
