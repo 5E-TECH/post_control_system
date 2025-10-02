@@ -19,6 +19,9 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
+import { BotService } from '../bot/bot.service';
+import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 
 @Injectable()
 export class ProductService {
@@ -31,6 +34,11 @@ export class ProductService {
 
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
+
+    @InjectRepository(TelegramEntity)
+    private readonly telegramRepo: TelegramRepository,
+
+    private readonly botService: BotService,
   ) {}
 
   private buildImageUrl(filename: string): string {
@@ -77,6 +85,10 @@ export class ProductService {
         throw new ConflictException('Product name already exists');
       }
 
+      const telegramGroup = await this.telegramRepo.findOne({
+        where: { market_id },
+      });
+
       let imageFileName: string | null = null;
       if (file) {
         imageFileName = file.filename;
@@ -93,6 +105,11 @@ export class ProductService {
       if (product.image_url) {
         product.image_url = this.buildImageUrl(product.image_url);
       }
+
+      await this.botService.sendMessageToGroup(
+        telegramGroup?.group_id ?? null,
+        `You have added new product: ${product.name}`,
+      );
 
       return successRes(product, 201, 'New product added');
     } catch (error) {

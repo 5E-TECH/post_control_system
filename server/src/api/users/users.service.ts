@@ -268,7 +268,7 @@ export class UserService {
         tariff_home,
         default_tariff,
         password: hashedPassword,
-        telegram_token,
+        market_tg_token: telegram_token,
       });
       await queryRunner.manager.save(newMarket);
       const cashbox = queryRunner.manager.create(CashEntity, {

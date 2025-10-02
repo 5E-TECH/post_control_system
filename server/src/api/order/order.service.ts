@@ -355,6 +355,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .where('order.user_id = :id', { id })
