@@ -50,25 +50,25 @@ export class OrderEntity extends BaseEntity {
   sold_at: number | null;
 
   // 🟢 One Order → Many OrderItems
-  @OneToMany(() => OrderItemEntity, (item) => item.order, { cascade: true })
+  @OneToMany(() => OrderItemEntity, (item) => item.order)
   items: OrderItemEntity[];
 
   // 🟢 Many Orders → One Post
   @ManyToOne(() => PostEntity, (post) => post.orders, {
-    onDelete: 'SET NULL',
+    onDelete: 'SET NULL', // order o‘chsa post qoladi
   })
   @JoinColumn({ name: 'post_id' })
   post: PostEntity;
 
   // order.entity.ts
   @ManyToOne(() => UserEntity, (user) => user.marketOrders, {
-    onDelete: 'CASCADE',
+    onDelete: 'CASCADE', // user o‘chsa order o‘chadi
   })
   @JoinColumn({ name: 'user_id' })
   market: UserEntity; // Market egasi
 
   @ManyToOne(() => UserEntity, (user) => user.customerOrders, {
-    onDelete: 'CASCADE',
+    onDelete: 'CASCADE', // user o‘chsa order o‘chadi
   })
   @JoinColumn({ name: 'customer_id' })
   customer: UserEntity; // Buyurtma beruvchi

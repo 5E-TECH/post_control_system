@@ -11,8 +11,7 @@ export class BotUpdate {
   constructor(private readonly botService: BotService) {}
   @Start()
   async start(@Ctx() ctx: Context) {
-    const msg = await this.botService.startBot(ctx);
-    console.log(msg);
+    const msg = this.botService.startBot(ctx);
 
     ctx.reply(`👋 ${msg}`);
   }

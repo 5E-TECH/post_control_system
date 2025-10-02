@@ -74,7 +74,7 @@ export class BotService {
         throw new BadRequestException('Group not found');
       }
       await this.bot.telegram.sendMessage(groupId, message, {
-        parse_mode: 'HTML',
+        parse_mode: 'Markdown',
       });
       return { success: true, message: 'Message sent successfully' };
     } catch (error) {
