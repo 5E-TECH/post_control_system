@@ -1058,6 +1058,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       Object.assign(order, {
         status: Order_status.SOLD,
         to_be_paid,
+        totalPrice,
         comment: finalComment,
         product_quantity: soldProductQuantity,
         sold_at: order.sold_at ?? Date.now(),
