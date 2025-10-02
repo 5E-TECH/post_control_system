@@ -1,5 +1,5 @@
-import { Edit, EllipsisVertical, Trash } from "lucide-react";
-import { memo, useEffect, type FC } from "react";
+import { Trash } from "lucide-react";
+import { memo, useEffect, useState, type FC } from "react";
 import superImg from "../../../../shared/assets/users/super.svg";
 import TableSkeleton from "../../../orders/components/ordersTabelSkeleton/ordersTableSkeleton";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,7 @@ import { setUserFilter } from "../../../../shared/lib/features/user-filters";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import ConfirmPopup from "../../../../shared/components/confirmPopup";
 
 interface Props {
   data: any[];
@@ -46,7 +47,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
   const navigate = useNavigate();
 
   const { handleSuccess, handleApiError } = useApiNotification();
-  const { updateUser } = useUser();
+  const { updateUser, removeUser } = useUser();
   const onChangeChecked = (checked: boolean, user: any) => {
     const id = user?.id;
     const role = user?.role;
@@ -61,6 +62,21 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
           handleApiError(err, `Foydalanuvchini holatini yangilashda xatolik`),
       }
     );
+  };
+
+  const [popup, setPopup] = useState(false);
+  const [deleteItem, setDeleteItem] = useState<any>(null);
+
+  const confirmDelete = () => {
+    if (!deleteItem?.id) return;
+    removeUser.mutate(deleteItem.id, {
+      onSuccess: () => {
+        handleSuccess(`Foydalanuvchi muvaffaqiyatli o'chirildi`);
+        setPopup(false);
+      },
+      onError: (err) =>
+        handleApiError(err, "Foydalanuvchini o'chirishda xatolik"),
+    });
   };
 
   return (
@@ -195,9 +211,14 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
                   data-cell="ACTIONS"
                 >
                   <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
-                    <Trash className="w-[22px] h-[22px] cursor-pointer hover:opacity-80" />
-                    <Edit className="w-[22px] h-[22px] ml-1 cursor-pointer hover:opacity-80" />
-                    <EllipsisVertical className="w-[22px] h-[22px] cursor-pointer hover:opacity-80" />
+                    <Trash
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteItem(user);
+                        setPopup(true);
+                      }}
+                      className="w-[22px] h-[22px] cursor-pointer hover:opacity-80"
+                    />
                   </div>
                 </td>
               </tr>
@@ -205,6 +226,16 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
           </tbody>
         )}
       </table>
+      <ConfirmPopup
+        isShow={popup}
+        title={`“${deleteItem?.name}” foydalanuvchini o‘chirishni tasdiqlaysizmi?`}
+        description="Bu amalni ortga qaytarib bo‘lmaydi."
+        confirmText="Ha, o‘chir"
+        cancelText="Bekor qilish"
+        onConfirm={confirmDelete}
+        onCancel={() => setPopup(false)}
+      />
+
       <div className="flex justify-center my-4">
         <Pagination
           showSizeChanger
