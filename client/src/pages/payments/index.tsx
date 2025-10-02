@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import Select from "../users/components/select";
 import Popup from "../../shared/ui/Popup";
 import { X } from "lucide-react";
@@ -14,6 +14,7 @@ import type { RootState } from "../../app/store";
 import { Button, Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../shared/hooks/useParams";
 import HistoryPopup from "./components/historyPopup";
+import { debounce } from "../../shared/helpers/DebounceFunc";
 
 export interface IPaymentFilter {
   operationType?: string | null;
@@ -43,14 +44,19 @@ const Payments = () => {
   const [showCurier, setShowCurier] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [select, setSelect] = useState<null | string>(null);
+  const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] =
     useState<IPaymentFilter>(initialState);
 
   const navigate = useNavigate();
-
+  const { pathname } = useLocation();
+  
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
+  const searchParam = search
+    ? { search: search } // ✅ faqat search bo‘lsa qo‘shiladi
+    : {};
 
   // Pagination start
   const { getParam, setParam, removeParam } = useParamsHook();
@@ -67,8 +73,8 @@ const Payments = () => {
       limit,
     }
   );
-  const { data } = getMarkets(showMarket);
-  const { data: courierData } = getCourier(showCurier);
+  const { data } = getMarkets(showMarket, {...searchParam});
+  const { data: courierData } = getCourier(showCurier, {...searchParam});
   const total = cashBoxData?.data?.pagination?.total || 0;
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
     if (newPage === 1) {
@@ -85,6 +91,7 @@ const Payments = () => {
   };
   // Pagination end
 
+
   const handleNavigate = () => {
     navigate(`cash-detail/${select}`);
     setSelect(null);
@@ -92,12 +99,22 @@ const Payments = () => {
     setShowCurier(false);
   };
 
-  const { pathname } = useLocation();
 
   const hendlerClose = () => {
     setShowCurier(false);
     setShowMarket(false);
     setSelect(null);
+  };
+
+  const debouncedSearch = useCallback(
+    debounce((value: string) => {
+      setSearch(value);
+    }, 500),
+    []
+  );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    debouncedSearch(e.target.value);
   };
 
   const operationType = ["income", "expense"];
@@ -160,6 +177,7 @@ const Payments = () => {
       [name]: value,
     }));
   };
+
   return (
     <div className="mt-10">
       <div className="grid grid-cols-3 gap-14 max-[1050px]:grid-cols-2 max-[800px]:grid-cols-1 text-center text-2xl items-end mx-5 ">
@@ -189,6 +207,8 @@ const Payments = () => {
             <h1 className="font-bold text-left pt-10">Choose Market</h1>
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
+                defaultValue={search}
+                onChange={handleSearchChange}
                 type="text"
                 placeholder="Search order..."
                 className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
@@ -299,6 +319,8 @@ const Payments = () => {
             <h1 className="font-bold text-left pt-10">Olinishi kerak</h1>
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
+                defaultValue={search}
+                onChange={handleSearchChange}
                 type="text"
                 placeholder="Search order..."
                 className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"

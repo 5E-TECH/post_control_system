@@ -13,7 +13,7 @@ export const useMarket = () => {
   });
 
   const getMarkets = (
-    enabled = true,
+    enabled:boolean = true,
     params?: { search?: string; limit?: number }
   ) =>
     useQuery({
@@ -27,7 +27,7 @@ export const useMarket = () => {
 
   const getMarketByid = (id: string) =>
     useQuery({
-      queryKey: [market],
+      queryKey: [market, id],
       queryFn: () => api.get(`user/${id}`).then((res) => res.data),
     });
 
