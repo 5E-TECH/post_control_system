@@ -24,7 +24,7 @@ const Filter = () => {
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { getMarkets } = useMarket();
-  const { data } = getMarkets(role !== "market");
+  const { data } = getMarkets(role !== "market", { limit: 0 });
   const { getRegions } = useRegion();
   const { data: regionData } = getRegions();
 
