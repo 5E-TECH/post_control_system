@@ -254,7 +254,7 @@ const OrderView = () => {
                   {item?.customer?.phone_number}
                 </td>
                 <td className="data-cell pl-10" data-cell="REGION">
-                  {item?.customer?.district?.name}
+                  {item?.customer?.district?.region?.name}
                 </td>
                 <td className="data-cell pl-10" data-cell="DISTRICT">
                   {item?.customer?.district?.name}
