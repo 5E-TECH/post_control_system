@@ -14,9 +14,12 @@ import { OrderModule } from './order/order.module';
 import { BotModule } from './bot/bot.module';
 import { OrderGateaway } from './socket/order.gateaway';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { TelegrafModule } from 'nestjs-telegraf';
+import { BotUpdate } from './bot/bot.update';
 
 @Module({
   imports: [
+    TelegrafModule.forRoot({ token: config.BOT_TOKEN }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: config.DB_URL,

@@ -15,6 +15,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { OrderGateaway } from '../socket/order.gateaway';
 import { PostEntity } from 'src/core/entity/post.entity';
 import { MyLogger } from 'src/logger/logger.service';
+import { BotModule } from '../bot/bot.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { MyLogger } from 'src/logger/logger.service';
       PostEntity,
     ]),
     CashBoxModule,
+    BotModule,
   ],
   controllers: [OrderController],
   providers: [
