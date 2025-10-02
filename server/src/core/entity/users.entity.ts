@@ -85,6 +85,7 @@ export class UserEntity extends BaseEntity {
   @ManyToOne(() => RegionEntity, (region) => region.couriers, {
     onDelete: 'SET NULL',
   })
+  @JoinColumn({ name: 'region_id' })
   region: RegionEntity;
 
   // 1-N Courier (User) → Posts

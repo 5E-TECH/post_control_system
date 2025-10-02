@@ -415,7 +415,7 @@ export class UserService {
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.region', 'region')
         .where('user.role NOT IN (:...excludedRoles)', {
-          excludedRoles: [Roles.CUSTOMER],
+          excludedRoles: [Roles.CUSTOMER, Roles.SUPERADMIN],
         });
 
       // 🔎 Search filter
