@@ -81,6 +81,20 @@ const AllOrders = () => {
     });
   };
 
+  const resetPopupState = () => {
+    form.resetFields();
+    setPartlySoldShow(false);
+    setOrderItemInfo([]);
+    setTotalPrice("");
+    order.current = null;
+    urlType.current = null;
+  };
+
+  const closePopup = () => {
+    resetPopupState();
+    setIsShow(false);
+  };
+
   const [form] = Form.useForm<FieldType>();
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const item = order.current;
@@ -112,7 +126,7 @@ const AllOrders = () => {
           { id: order.current.id, data },
           {
             onSuccess: () => {
-              setIsShow(false);
+              closePopup();
               handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
             },
             onError: (err: any) => {
@@ -125,7 +139,7 @@ const AllOrders = () => {
           { id: item?.id as string, data: values },
           {
             onSuccess: () => {
-              setIsShow(false);
+              closePopup();
               handleSuccess("Buyurtma muvaffaqiyatli sotildi");
             },
             onError: (err: any) =>
@@ -158,7 +172,7 @@ const AllOrders = () => {
           { id: order.current.id, data },
           {
             onSuccess: () => {
-              setIsShow(false);
+              closePopup();
               handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
             },
             onError: (err: any) =>
@@ -170,7 +184,7 @@ const AllOrders = () => {
           { id: item?.id as string, data: values },
           {
             onSuccess: () => {
-              setIsShow(false);
+              closePopup();
               handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
             },
             onError: (err: any) =>
@@ -337,11 +351,11 @@ const AllOrders = () => {
         description="Buyurtmani ortga qaytarszmi?"
       />
 
-      <Popup isShow={isShow} onClose={() => setIsShow(false)}>
+      <Popup isShow={isShow} onClose={closePopup}>
         <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8">
           <X
             className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
-            onClick={() => setIsShow(false)}
+            onClick={closePopup}
           />
           {partleSoldShow && (
             <h2 className="text-center pt-3 text-[20px]">

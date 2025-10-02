@@ -169,7 +169,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
                     <span
                       className={`font-normal w-[70px] h-[30px] flex items-center justify-center rounded-[100px] ${
                         user?.status === "active"
-                          ? "text-[#FFB400] bg-[#FFB40029]"
+                          ? "text-green-600 bg-green-500/20"
                           : "text-[#F76659] bg-[#F7665929]"
                       }`}
                     >
@@ -178,7 +178,7 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
                     <Switch
                       className={`${
                         user?.status === "active"
-                          ? "bg-[#FFB400]!"
+                          ? "bg-green-600!"
                           : "bg-[#F76659]!"
                       }`}
                       checked={user?.status === "active"}
