@@ -75,10 +75,22 @@ const Login: FC = () => {
         setSubmitting(false);
       },
       onError: (err: any) => {
-        const errorMsg =
-          err?.response?.data?.message ||
-          t("errorMsg");
-        message.error(errorMsg);
+        const errorMsg = err?.response?.data?.error?.message;
+        let errorDesc: any;
+
+        switch (true) {
+          case errorMsg === "Phone number or password incorrect":
+            errorDesc = "Telefon raqam yoki parol noto'g'ri";
+            break;
+          case errorMsg === "You have been blocked by superadmin":
+            errorDesc = "Siz superadmin tomonidan bloklangansiz";
+            break;
+          default:
+            errorDesc = "Server nosozlik";
+            break;
+        }
+
+        message.error(errorDesc);
         setSubmitting(false);
       },
     });

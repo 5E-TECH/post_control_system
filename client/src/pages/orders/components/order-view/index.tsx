@@ -81,7 +81,6 @@ const OrderView = () => {
 
   const { data, isLoading } = query;
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
-
   const total = data?.data?.total || 0;
 
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
