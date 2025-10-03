@@ -26,13 +26,13 @@ export class BotService {
 
     @InjectBot() private readonly bot: Telegraf,
   ) {}
-  async startBot(ctx: Context) {
-    try {
-      return `Ushbu guruh idsi: ${ctx.chat?.id} va turi ${ctx.chat?.type}`;
-    } catch (error) {
-      return error;
-    }
-  }
+  // async startBot(ctx: Context) {
+  //   try {
+  //     return `Ushbu guruh idsi: ${ctx.chat?.id} va turi ${ctx.chat?.type}`;
+  //   } catch (error) {
+  //     return error;
+  //   }
+  // }
 
   async addToGroup(text: string, ctx: Context) {
     try {

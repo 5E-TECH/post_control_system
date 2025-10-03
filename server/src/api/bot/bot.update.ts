@@ -11,9 +11,9 @@ export class BotUpdate {
   constructor(private readonly botService: BotService) {}
   @Start()
   async start(@Ctx() ctx: Context) {
-    const msg = this.botService.startBot(ctx);
-
-    ctx.reply(`👋 ${msg}`);
+    ctx.reply(
+      `👋 Salom men Beepost botman. Ushbu guruhga xabar jo'natishim uchun platformadagi telegram tokenni shu yerga jo'nating`,
+    );
   }
 
   @Help()
@@ -27,21 +27,17 @@ export class BotUpdate {
     ctx: NarrowedContext<Context, TgUpdate.MessageUpdate<Message.TextMessage>>,
   ) {
     const text = ctx.message['text'];
-    console.log(text, 'Kelgan xabar');
     const response = await this.botService.addToGroup(text, ctx);
-    await ctx.reply(response.message);
+    await ctx.reply('⌛ O‘chirilyapti...');
+
+    setTimeout(async () => {
+      await ctx.deleteMessage();
+      await ctx.reply(response.message);
+    }, 2000);
   }
 
   @Hears('salom')
   async hearsSalom(@Ctx() ctx: Context) {
     await ctx.reply('Valeykum assalom!');
-  }
-
-  @On('text')
-  async onMessage(
-    ctx: NarrowedContext<Context, TgUpdate.MessageUpdate<Message.TextMessage>>,
-  ) {
-    console.log(ctx.message.text); // ✅ endi xato chiqmaydi
-    await ctx.reply(`Siz yubordingiz: ${ctx.message.text}`);
   }
 }
