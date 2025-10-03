@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { House, ShoppingBag, MailOpen, FileText, Apple,History } from "lucide-react";
+import { House, ShoppingBag, FileText, Apple,History } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 
@@ -13,7 +13,7 @@ const MarketSidebar = () => {
       icon: <ShoppingBag />,
       label: t("orders"),
     },
-    { to: "/clients", icon: <MailOpen />, label: t("clients") },
+    // { to: "/clients", icon: <MailOpen />, label: t("clients") },
     {
       to: "/order/markets/new-orders",
       icon: <History />,

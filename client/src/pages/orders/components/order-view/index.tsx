@@ -81,7 +81,6 @@ const OrderView = () => {
 
   const { data, isLoading } = query;
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
-
   const total = data?.data?.total || 0;
 
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
@@ -190,7 +189,13 @@ const OrderView = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("address")}</span>
+                <span>{t("region")}</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("district")}</span>
               </div>
             </th>
             <th>
@@ -212,10 +217,9 @@ const OrderView = () => {
               </div>
             </th>
             <th>
-              <div className="flex items-center gap-10">
+              <div className="flex items-center gap-10 pl-4">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("stock")}</span>
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("createdAt")}</span>
               </div>
             </th>
           </tr>
@@ -248,7 +252,10 @@ const OrderView = () => {
                 <td className="data-cell pl-10" data-cell="PHONE">
                   {item?.customer?.phone_number}
                 </td>
-                <td className="data-cell pl-10 " data-cell="ADDRESS">
+                <td className="data-cell pl-10" data-cell="REGION">
+                  {item?.customer?.district?.region?.name}
+                </td>
+                <td className="data-cell pl-10" data-cell="DISTRICT">
                   {item?.customer?.district?.name}
                 </td>
                 <td className="data-cell pl-10" data-cell="MARKET">
@@ -269,10 +276,16 @@ const OrderView = () => {
                   </span>
                 </td>
                 <td
-                  className="data-cell pl-15 text-[15px] text-[#2E263DB2]"
-                  data-cell="STOCK"
+                  className="data-cell pl-15"
+                  data-cell="CREATED AT"
                 >
-                  {item?.items.length}
+                  {new Date(Number(item?.created_at)).toLocaleString("uz-UZ", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </td>
               </tr>
             ))}

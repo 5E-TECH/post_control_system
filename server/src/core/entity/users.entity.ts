@@ -1,6 +1,13 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Roles, Status, Where_deliver } from 'src/common/enums';
-import { Column, Entity, OneToOne, OneToMany, ManyToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  OneToOne,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { UserSalaryEntity } from './user-salary.entity';
 import { CashEntity } from './cash-box.entity';
 import { CashboxHistoryEntity } from './cashbox-history.entity';
@@ -78,6 +85,7 @@ export class UserEntity extends BaseEntity {
   @ManyToOne(() => RegionEntity, (region) => region.couriers, {
     onDelete: 'SET NULL',
   })
+  @JoinColumn({ name: 'region_id' })
   region: RegionEntity;
 
   // 1-N Courier (User) → Posts
@@ -102,5 +110,6 @@ export class UserEntity extends BaseEntity {
   @ManyToOne(() => DistrictEntity, (district) => district.users, {
     onDelete: 'SET NULL',
   })
+  @JoinColumn({ name: 'district_id' }) // 🔑 aynan shu kerak
   district: DistrictEntity;
 }

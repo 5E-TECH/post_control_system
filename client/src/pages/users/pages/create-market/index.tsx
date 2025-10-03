@@ -29,16 +29,12 @@ const CreateMarket = () => {
       tariff_center: Number(values.tariff_center),
       phone_number: values.phone_number.split(" ").join(""),
     };
-    console.log(newMarket)
     createUser.mutate(newMarket, {
       onSuccess: () => {
         navigate("/all-users");
       },
       onError: (err: any) =>
-        handleApiError(
-          err,
-          "Foydalanuvchi yaratishda xatolik yuz berdi"
-        ),
+        handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),
     });
   };
 

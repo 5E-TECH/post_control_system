@@ -8,7 +8,10 @@ import { useNavigate } from "react-router-dom";
 import { togglePermission } from "../../../../shared/lib/features/add-order-permission";
 import { useTranslation } from "react-i18next";
 import type { RootState } from "../../../../app/store";
-import { setFilter } from "../../../../shared/lib/features/order-filters";
+import {
+  resetFilter,
+  setFilter,
+} from "../../../../shared/lib/features/order-filters";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
@@ -21,7 +24,7 @@ const Filter = () => {
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { getMarkets } = useMarket();
-  const { data } = getMarkets(role !== "market");
+  const { data } = getMarkets(role !== "market", { limit: 0 });
   const { getRegions } = useRegion();
   const { data: regionData } = getRegions();
 
@@ -87,10 +90,14 @@ const Filter = () => {
       label: item.label,
     })) || [];
 
+  const handleClear = () => {
+    dispatch(resetFilter());
+  };
+
   return (
     <div>
       <h2 className="text-[18px] mb-2">Filters</h2>
-      <div className="w-full grid grid-cols-3 gap-5 max-[900px]:grid-cols-2 max-[750px]:grid-cols-1">
+      <div className="w-full grid grid-cols-4 gap-5 max-[900px]:grid-cols-3 max-[750px]:grid-cols-2 max-[350px]:grid-cols-1">
         {role !== "market" && (
           <Select
             value={form.marketId}
@@ -116,6 +123,14 @@ const Filter = () => {
           className="w-full h-[45px]!"
           options={statusOpts}
         />
+        <div className="flex min-[900px]:justify-end">
+          <Button
+            className="w-[150px]! max-[651px]:w-full! h-[45px]!"
+            onClick={handleClear}
+          >
+            Tozalash
+          </Button>
+        </div>
       </div>
 
       <div className="w-full flex flex-wrap gap-4 justify-between items-center pt-5 border-[#F6F7FB] dark:border-[#595572] max-[800px]:flex-col max-[800px]:gap-5">

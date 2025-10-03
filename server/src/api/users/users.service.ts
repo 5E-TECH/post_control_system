@@ -268,7 +268,7 @@ export class UserService {
         tariff_home,
         default_tariff,
         password: hashedPassword,
-        telegram_token,
+        market_tg_token: telegram_token,
       });
       await queryRunner.manager.save(newMarket);
       const cashbox = queryRunner.manager.create(CashEntity, {
@@ -415,7 +415,7 @@ export class UserService {
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.region', 'region')
         .where('user.role NOT IN (:...excludedRoles)', {
-          excludedRoles: [Roles.CUSTOMER],
+          excludedRoles: [Roles.CUSTOMER, Roles.SUPERADMIN],
         });
 
       // 🔎 Search filter

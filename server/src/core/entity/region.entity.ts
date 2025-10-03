@@ -16,13 +16,13 @@ export class RegionEntity extends BaseEntity {
   })
   districts: DistrictEntity[];
 
-  // 1-N Region → Couriers (User table orqali)
+  // 1-N Region → Couriers (User orqali)
   @OneToMany(() => UserEntity, (user) => user.region)
   couriers: UserEntity[];
 
-  // 1-N Region → Assigned Districts (assigned_region orqali)
+  // 1-N Region → Assigned Districts
   @OneToMany(() => DistrictEntity, (district) => district.assignedRegion)
-  assignedDistricts: DistrictEntity[];
+  assigned_districts: DistrictEntity[];
 
   // 1-N Region → Posts
   @OneToMany(() => PostEntity, (post) => post.region)

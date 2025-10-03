@@ -31,7 +31,7 @@ const UserProfile = () => {
     const payload: any = { ...values };
 
     // O'zgarmaganlarini olib tashlash
-    if (payload.name === user.name) delete payload.name;
+    if (payload.full_name === user.full_name) delete payload.full_name;
     if (payload.phone_number === user.phone_number) delete payload.phone_number;
 
     // Password faqat kiritilganda yuboriladi
@@ -185,7 +185,17 @@ const UserProfile = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end mt-6">
+              <div className="flex justify-between items-center mt-6">
+                {user.market_tg_token && (
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        Tg Token
+                      </span>
+                      <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                        {user.market_tg_token}
+                      </span>
+                    </div>
+                  )}
                 <button
                   onClick={() => {
                     setOpen(true);
@@ -215,13 +225,13 @@ const UserProfile = () => {
             <Form
               layout="vertical"
               initialValues={{
-                name: user.name,
+                full_name: user.name,
                 phone_number: user.phone_number,
                 password: "",
               }}
               onFinish={handleUpdate}
             >
-              <Form.Item label="Name" name="name">
+              <Form.Item label="Name" name="full_name">
                 <Input />
               </Form.Item>
               <Form.Item label="Phone Number" name="phone_number">

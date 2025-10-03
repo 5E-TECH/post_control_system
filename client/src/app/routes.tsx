@@ -16,6 +16,7 @@ const Dashboards = lazy(() => import("../pages/dashboards"));
 const Orders = lazy(() => import("../pages/orders"));
 const CourierOrder = lazy(() => import("../pages/orders/pages/courier"));
 const Regions = lazy(() => import("../pages/regions"));
+const Districts = lazy(() => import("../pages/regions/pages/districts"));
 const Users = lazy(() => import("../pages/users"));
 const Mails = lazy(() => import("../pages/mails"));
 const Products = lazy(() => import("../pages/products"));
@@ -244,6 +245,12 @@ const AppRouters = () => {
             {
               path:"user-profile/:id",
               element:<UserProfile/>
+            },
+            {
+              path:"regions", element:<Regions/>,
+              children: [{
+                path:"region-districts", element:<Districts/>
+              }]
             }
           ],
         },

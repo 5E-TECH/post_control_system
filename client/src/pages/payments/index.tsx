@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import Select from "../users/components/select";
 import Popup from "../../shared/ui/Popup";
 import { X } from "lucide-react";
@@ -11,9 +11,24 @@ import CountUp from "react-countup";
 import { useEffect } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
-import { Pagination, type PaginationProps } from "antd";
+import { Button, Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../shared/hooks/useParams";
 import HistoryPopup from "./components/historyPopup";
+import { debounce } from "../../shared/helpers/DebounceFunc";
+
+export interface IPaymentFilter {
+  operationType?: string | null;
+  sourceType?: string | null;
+  createdBy?: string | null;
+  cashboxType?: string | null;
+}
+
+const initialState: IPaymentFilter = {
+  operationType: null,
+  sourceType: null,
+  createdBy: null,
+  cashboxType: null,
+};
 
 const Payments = () => {
   const user = useSelector((state: RootState) => state.roleSlice);
@@ -29,12 +44,19 @@ const Payments = () => {
   const [showCurier, setShowCurier] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [select, setSelect] = useState<null | string>(null);
+  const [search, setSearch] = useState("");
+  const [paymentFilter, setPaymentFilter] =
+    useState<IPaymentFilter>(initialState);
 
   const navigate = useNavigate();
-
+  const { pathname } = useLocation();
+  
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
+  const searchParam = search
+    ? { search: search } // ✅ faqat search bo‘lsa qo‘shiladi
+    : {};
 
   // Pagination start
   const { getParam, setParam, removeParam } = useParamsHook();
@@ -42,10 +64,17 @@ const Payments = () => {
   const limit = Number(getParam("limit") || 10);
   const { data: cashBoxData, refetch } = getCashBoxInfo(
     role === "superadmin" || role === "admin",
-    { page, limit }
+    {
+      operationType: paymentFilter.operationType,
+      sourceType: paymentFilter.sourceType,
+      createdBy: paymentFilter.createdBy,
+      cashboxType: paymentFilter.cashboxType,
+      page,
+      limit,
+    }
   );
-  const { data } = getMarkets(showMarket);
-  const { data: courierData } = getCourier(showCurier);
+  const { data } = getMarkets(showMarket, {...searchParam});
+  const { data: courierData } = getCourier(showCurier, {...searchParam});
   const total = cashBoxData?.data?.pagination?.total || 0;
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
     if (newPage === 1) {
@@ -62,6 +91,7 @@ const Payments = () => {
   };
   // Pagination end
 
+
   const handleNavigate = () => {
     navigate(`cash-detail/${select}`);
     setSelect(null);
@@ -69,12 +99,22 @@ const Payments = () => {
     setShowCurier(false);
   };
 
-  const { pathname } = useLocation();
 
   const hendlerClose = () => {
     setShowCurier(false);
     setShowMarket(false);
     setSelect(null);
+  };
+
+  const debouncedSearch = useCallback(
+    debounce((value: string) => {
+      setSearch(value);
+    }, 500),
+    []
+  );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    debouncedSearch(e.target.value);
   };
 
   const operationType = ["income", "expense"];
@@ -83,17 +123,32 @@ const Payments = () => {
     label: role,
   }));
 
-  const sourceType = ["cash", "card", "click_to_market"];
+  const sourceType = [
+    "courier_payment",
+    "market_payment",
+    "manual_expense",
+    "manual_income",
+    "correction",
+    "salary",
+    "sell",
+    "cancel",
+    "extra_cost",
+    "bills",
+  ];
   const sourceOptions = sourceType.map((status: string) => ({
     value: status,
     label: status,
   }));
 
-  const createdBy = ["superadmin", "admin", "courier"];
-  const createdByOptions = createdBy.map((role: string) => ({
-    value: role,
-    label: role,
-  }));
+  const createdByOptions = cashBoxData?.data?.allCashboxHistories
+    ?.map((item: any) => ({
+      value: item?.createdByUser?.id,
+      label: item?.createdByUser?.role,
+    }))
+    .filter(
+      (option: any, index: any, self: any) =>
+        index === self.findIndex((o: any) => o.value === option.value)
+    );
 
   const cashboxType = ["markets", "couriers", "main"];
   const cashboxOptions = cashboxType.map((status: string) => ({
@@ -105,17 +160,23 @@ const Payments = () => {
     if (role === "admin" || role === "superadmin") {
       refetch();
     }
-  }, [pathname]);
+  }, [pathname, paymentFilter]);
 
   if (pathname.startsWith("/payments/")) {
     return <Outlet />;
   }
 
-  const handleHistoryPopup = (id:string) => {
-    setSelect(id)
-    setShowHistory(true)
+  const handleHistoryPopup = (id: string) => {
+    setSelect(id);
+    setShowHistory(true);
+  };
 
-  }
+  const handleChange = (name: keyof IPaymentFilter, value: string) => {
+    setPaymentFilter((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
 
   return (
     <div className="mt-10">
@@ -136,16 +197,18 @@ const Payments = () => {
         </div>
 
         <Popup isShow={showMarket} onClose={() => hendlerClose()}>
-          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d]">
+          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative ">
             <button
               onClick={() => setShowMarket(false)}
-              className="cursor-pointer hover:bg-red-700 text-white p-2 rounded- ml-160 flex items-center justify-center shadow-md"
+              className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
             >
-              <X size={18} />
+              <X size={30} />
             </button>
-            <h1 className="font-bold text-left">Choose Market</h1>
+            <h1 className="font-bold text-left pt-10">Choose Market</h1>
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
+                defaultValue={search}
+                onChange={handleSearchChange}
                 type="text"
                 placeholder="Search order..."
                 className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
@@ -197,7 +260,7 @@ const Payments = () => {
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
-                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
+                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-4 right-4 ${
                   !select ? "" : "hover:bg-blue-600"
                 }  text-white rounded-md cursor-pointer ${
                   !select ? "opacity-40" : ""
@@ -256,6 +319,8 @@ const Payments = () => {
             <h1 className="font-bold text-left pt-10">Olinishi kerak</h1>
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
+                defaultValue={search}
+                onChange={handleSearchChange}
                 type="text"
                 placeholder="Search order..."
                 className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
@@ -309,11 +374,11 @@ const Payments = () => {
                 </tbody>
               </table>
             </div>
-            <div className="absolute py-2 bottom-0,1 right-4">
+            <div className="absolute bottom-4 right-4">
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
-                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 ${
+                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700${
                   !select ? "" : "hover:bg-blue-600"
                 }  text-white rounded-md cursor-pointer ${
                   !select ? "opacity-40" : ""
@@ -328,11 +393,43 @@ const Payments = () => {
 
       <div className="mt-12 mx-5">
         <h1 className="text-xl font-semibold mb-3">Filters</h1>
-        <div className="grid grid-cols-4 gap-6 pt-[16px] max-[1000px]:grid-cols-2 max-[750px]:grid-cols-1">
-          <Select name="" options={operationOptions} text="Operation type" />
-          <Select options={sourceOptions} text="Source type" />
-          <Select options={createdByOptions} text="Created By" />
-          <Select options={cashboxOptions} text="Cashbox type" />
+        <div className="grid grid-cols-5 gap-6 pt-[16px] max-[1000px]:grid-cols-3 max-[750px]:grid-cols-2 max-[450px]:grid-cols-1">
+          <Select
+            value={paymentFilter.operationType}
+            onChange={handleChange}
+            options={operationOptions}
+            text="Operation type"
+            name="operationType"
+          />
+          <Select
+            value={paymentFilter.sourceType}
+            onChange={handleChange}
+            options={sourceOptions}
+            text="Source type"
+            name="sourceType"
+          />
+          <Select
+            value={paymentFilter.createdBy}
+            onChange={handleChange}
+            options={createdByOptions}
+            text="Created By"
+            name="createdBy"
+          />
+          <Select
+            value={paymentFilter.cashboxType}
+            onChange={handleChange}
+            options={cashboxOptions}
+            text="Cashbox type"
+            name="cashboxType"
+          />
+          <div className="flex min-[1000px]:justify-end">
+            <Button
+              className="h-[45px]! w-[150px]! max-[450px]:w-full!"
+              onClick={() => setPaymentFilter(initialState)}
+            >
+              Tozalash
+            </Button>
+          </div>
         </div>
       </div>
 

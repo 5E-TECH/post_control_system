@@ -26,7 +26,7 @@ export const useUser = (path?: string) => {
       queryFn: () => api.get("user", { params }).then((res) => res.data),
     });
 
-  const getUserById = (id:string | undefined, params?: IUserFilter) =>
+  const getUserById = (id: string | undefined, params?: IUserFilter) =>
     useQuery({
       queryKey: [user, params, id],
       queryFn: () => api.get(`user/${id}`, { params }).then((res) => res.data),
@@ -39,21 +39,20 @@ export const useUser = (path?: string) => {
         api
           .get("user/registrator-and-admin", { params })
           .then((res) => res.data),
-          enabled
+      enabled,
     });
 
-    const updateUser = useMutation({
-    mutationFn: ({
-      role,
-      id,
-      data,
-    }: {
-      role: string;
-      id: string;
-      data: any;
-    }) => api.patch(`user/${role}/${id}`, data),
+  const updateUser = useMutation({
+    mutationFn: ({ role, id, data }: { role: string; id: string; data: any }) =>
+      api.patch(`user/${role}/${id}`, data),
     onSuccess: () =>
       client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
+  });
+
+  const removeUser = useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`user/${id}`).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [user] }),
   });
 
   const getUsersExceptMarket = (params?: IUserFilter) =>
@@ -69,6 +68,7 @@ export const useUser = (path?: string) => {
     getUsersExceptMarket,
     getAdminAndRegister,
     getUserById,
-    updateUser
+    updateUser,
+    removeUser,
   };
 };

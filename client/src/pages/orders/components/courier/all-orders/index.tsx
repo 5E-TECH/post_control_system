@@ -1,11 +1,13 @@
-import { Button } from "antd";
-import { AlertCircle } from "lucide-react";
-import { memo, useRef, useState, type MouseEvent } from "react";
+import { Button, Form, Input, InputNumber, Select, type FormProps } from "antd";
+import { AlertCircle, Minus, Plus, X } from "lucide-react";
+import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useNavigate } from "react-router-dom";
 import ConfirmPopup from "../../../../../shared/components/confirmPopup";
+import Popup from "../../../../../shared/ui/Popup";
+import type { FieldType } from "../waiting-orders";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -23,36 +25,39 @@ const statusColors: Record<string, string> = {
 const AllOrders = () => {
   const navigate = useNavigate();
 
-  const { getCourierOrders, sellOrder, cancelOrder, rollbackOrder } =
-    useOrder();
+  const {
+    getCourierOrders,
+    sellOrder,
+    cancelOrder,
+    rollbackOrder,
+    partlySellOrder,
+  } = useOrder();
   const { data } = getCourierOrders();
   const [isShow, setIsShow] = useState<boolean>(false);
+  const [isShowModal, setIsShowModal] = useState<boolean>(false);
   const orderId = useRef<string | null>(null);
-  const { handleSuccess, handleApiError } = useApiNotification();
-  const handleSellOrder = (id: string) => {
-    sellOrder.mutate(
-      { id, data: {} },
-      {
-        onSuccess: () => {
-          handleSuccess("Buyurtma muvaffaqiyatli sotildi");
-        },
-        onError: (err: any) =>
-          handleApiError(err, "Buyurtmalar sotilishda xatolik"),
-      }
-    );
+  const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
+
+  const order = useRef<any | null>(null);
+  const urlType = useRef<string | null>(null);
+  const handleSellOrder = (
+    e: MouseEvent<HTMLButtonElement | HTMLElement>,
+    item: any
+  ) => {
+    e.stopPropagation();
+    order.current = item;
+    urlType.current = "sell";
+    setIsShow(true);
   };
 
-  const handleCancelOrder = (id: string) => {
-    cancelOrder.mutate(
-      { id, data: {} },
-      {
-        onSuccess: () => {
-          handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
-        },
-        onError: (err: any) =>
-          handleApiError(err, "Buyurtmalar bekor qilishda xatolik"),
-      }
-    );
+  const handleCancelOrder = (
+    e: MouseEvent<HTMLButtonElement | HTMLElement>,
+    item: any
+  ) => {
+    e.stopPropagation();
+    order.current = item;
+    urlType.current = "cancel";
+    setIsShow(true);
   };
 
   const handleRollback = (
@@ -61,7 +66,7 @@ const AllOrders = () => {
   ) => {
     e.stopPropagation();
     orderId.current = id;
-    setIsShow(true);
+    setIsShowModal(true);
   };
 
   const handleConfirm = () => {
@@ -69,11 +74,149 @@ const AllOrders = () => {
     rollbackOrder.mutate(id as string, {
       onSuccess: () => {
         handleSuccess("Buyurtma muvaffaqiyatli ortga qaytarildi");
-        setIsShow(false);
+        setIsShowModal(false);
       },
       onError: (err: any) =>
         handleApiError(err, "Buyurtma qaytarilishda xatolik"),
     });
+  };
+
+  const resetPopupState = () => {
+    form.resetFields();
+    setPartlySoldShow(false);
+    setOrderItemInfo([]);
+    setTotalPrice("");
+    order.current = null;
+    urlType.current = null;
+  };
+
+  const closePopup = () => {
+    resetPopupState();
+    setIsShow(false);
+  };
+
+  const [form] = Form.useForm<FieldType>();
+  const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
+    const item = order.current;
+    const type = urlType.current;
+
+    if (type === "sell") {
+      if (partleSoldShow!) {
+        const order_item_info = orderItemInfo.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }));
+
+        if (
+          totalPrice === undefined ||
+          totalPrice === null ||
+          totalPrice === "" ||
+          Number(totalPrice) < 0
+        ) {
+          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+          return;
+        }
+        const data = {
+          order_item_info,
+          totalPrice: Number(String(totalPrice).split(",").join("")),
+          extraCost: Number(values?.extraCost),
+          comment: values?.comment,
+        };
+        partlySellOrder.mutate(
+          { id: order.current.id, data },
+          {
+            onSuccess: () => {
+              closePopup();
+              handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
+            },
+            onError: (err: any) => {
+              handleApiError(err, "Buyurtma qisman sotilishda xatolik");
+            },
+          }
+        );
+      } else {
+        sellOrder.mutate(
+          { id: item?.id as string, data: values },
+          {
+            onSuccess: () => {
+              closePopup();
+              handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+            },
+            onError: (err: any) =>
+              handleApiError(err, "Buyurtmani sotishda xatolik"),
+          }
+        );
+      }
+    } else {
+      if (partleSoldShow) {
+        const order_item_info = orderItemInfo.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }));
+        if (
+          totalPrice === undefined ||
+          totalPrice === null ||
+          totalPrice === "" ||
+          Number(totalPrice) < 0
+        ) {
+          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+          return;
+        }
+        const data = {
+          order_item_info,
+          totalPrice: Number(String(totalPrice).split(",").join("")),
+          extraCost: Number(values?.extraCost),
+          comment: values?.comment,
+        };
+        partlySellOrder.mutate(
+          { id: order.current.id, data },
+          {
+            onSuccess: () => {
+              closePopup();
+              handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
+            },
+            onError: (err: any) =>
+              handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
+          }
+        );
+      } else {
+        cancelOrder.mutate(
+          { id: item?.id as string, data: values },
+          {
+            onSuccess: () => {
+              closePopup();
+              handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+            },
+            onError: (err: any) =>
+              handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
+          }
+        );
+      }
+    }
+  };
+
+  const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
+
+  const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
+  const [totalPrice, setTotalPrice] = useState<number | string>("");
+  useEffect(() => {
+    if (isShow && order.current) {
+      const initialItems = order.current?.items?.map((item: any) => ({
+        product_id: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity,
+      }));
+      setOrderItemInfo(initialItems || []);
+    }
+  }, [isShow]);
+
+  // Loading and Disabled button
+  const getIsPending = () => {
+    if (urlType.current === "sell") {
+      return partleSoldShow ? partlySellOrder.isPending : sellOrder.isPending;
+    } else {
+      return partleSoldShow ? partlySellOrder.isPending : cancelOrder.isPending;
+    }
   };
 
   return data?.data?.data?.length > 0 ? (
@@ -176,17 +319,13 @@ const AllOrders = () => {
                 {item?.status === "waiting" ? (
                   <div className="flex gap-3">
                     <Button
-                      disabled={sellOrder.isPending}
-                      loading={sellOrder.isPending}
-                      onClick={() => handleSellOrder(item?.id)}
+                      onClick={(e) => handleSellOrder(e, item)}
                       className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                     >
                       Sotish
                     </Button>
                     <Button
-                      disabled={cancelOrder.isPending}
-                      loading={cancelOrder.isPending}
-                      onClick={() => handleCancelOrder(item?.id)}
+                      onClick={(e) => handleCancelOrder(e, item)}
                       className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                     >
                       Bekor qilish
@@ -206,11 +345,158 @@ const AllOrders = () => {
       </table>
 
       <ConfirmPopup
-        isShow={isShow}
-        onCancel={() => setIsShow(false)}
+        isShow={isShowModal}
+        onCancel={() => setIsShowModal(false)}
         onConfirm={handleConfirm}
         description="Buyurtmani ortga qaytarszmi?"
       />
+
+      <Popup isShow={isShow} onClose={closePopup}>
+        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8">
+          <X
+            className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
+            onClick={closePopup}
+          />
+          {partleSoldShow && (
+            <h2 className="text-center pt-3 text-[20px]">
+              Qisman {urlType.current === "sell" ? "sotish" : "bekor qilish"}
+            </h2>
+          )}
+          <div
+            className={`space-y-1 pt-${
+              partleSoldShow ? 1 : 4
+            } text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
+          >
+            <p>
+              <span className="font-semibold">Mijoz ismi:</span>{" "}
+              <span>{order.current?.customer?.name || "—"}</span>
+            </p>
+            <p>
+              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
+              <span>{order.current?.customer?.phone_number || "—"}</span>
+            </p>
+            <p>
+              <span className="font-semibold">Umumiy summa:</span>{" "}
+              <span>
+                {order.current?.total_price
+                  ? order.current.total_price.toLocaleString("uz-UZ")
+                  : "0"}{" "}
+                so'm
+              </span>
+            </p>
+          </div>
+
+          {partleSoldShow && (
+            <div className="flex flex-col">
+              {orderItemInfo.map((item, index) => (
+                <div
+                  key={item.productId}
+                  className="pt-4 flex gap-10 justify-between"
+                >
+                  <Form.Item className="flex-1!">
+                    <Select
+                      className="!h-[40px] custom-select-dropdown-bright"
+                      dropdownClassName="dark-dropdown"
+                      value={item.product_id}
+                      disabled
+                      options={[
+                        {
+                          label: item.name,
+                          value: item.product_id,
+                        },
+                      ]}
+                    />
+                  </Form.Item>
+
+                  <div className="flex gap-2 items-center mb-6 select-none">
+                    <Plus
+                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
+                      onClick={() => {
+                        const updated = [...orderItemInfo];
+                        updated[index].quantity += 1;
+                        setOrderItemInfo(updated);
+                      }}
+                    />
+                    <span className="text-[20px]">{item.quantity}</span>
+                    <Minus
+                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
+                      onClick={() => {
+                        const updated = [...orderItemInfo];
+                        if (updated[index].quantity > 0) {
+                          updated[index].quantity -= 1;
+                          setOrderItemInfo(updated);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <Form.Item>
+                <Input
+                  className="h-[40px]!"
+                  placeholder="To'lov summasi"
+                  value={totalPrice}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/\D/g, "");
+                    const formatted = new Intl.NumberFormat("uz-UZ").format(
+                      Number(rawValue || 0)
+                    );
+                    setTotalPrice(formatted);
+                  }}
+                ></Input>
+              </Form.Item>
+            </div>
+          )}
+
+          <Form initialValues={{}} form={form} onFinish={onFinish}>
+            <div className={`pt-${partleSoldShow ? 0 : 3}`}>
+              <span className="">Izoh</span>
+              <Form.Item name="comment">
+                <Input.TextArea
+                  className="py-4! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
+                  placeholder="Izoh qoldiring (ixtiyoriy)"
+                  style={{ resize: "none" }}
+                />
+              </Form.Item>
+            </div>
+
+            <div>
+              <span>Qo'shimcha (pul)</span>
+              <Form.Item name="extraCost">
+                <InputNumber
+                  placeholder="Qo'shimcha pul"
+                  className="h-[40px]! w-full!"
+                  formatter={(value) =>
+                    value
+                      ? value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                      : ""
+                  }
+                  parser={(value) => value?.replace(/,/g, "") || ""}
+                />
+              </Form.Item>
+            </div>
+
+            <div className="flex justify-between">
+              <Button onClick={() => setPartlySoldShow((p) => !p)}>
+                <AlertCircle />
+              </Button>
+              <Button
+                disabled={getIsPending()}
+                loading={getIsPending()}
+                htmlType="submit"
+                className={`px-5! py-4! ${
+                  urlType.current === "sell"
+                    ? "bg-[var(--color-bg-sy)]!"
+                    : "bg-red-500!"
+                } bg-[var(--color-bg-sy)]! text-[#ffffff]!`}
+              >
+                {urlType.current === "sell" ? "Sotish" : "Bekor qilish"}
+              </Button>
+            </div>
+          </Form>
+        </div>
+      </Popup>
     </div>
   ) : (
     <div className="h-[65vh]">
