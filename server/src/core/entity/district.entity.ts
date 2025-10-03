@@ -1,3 +1,4 @@
+// district.entity.ts
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import {
   Column,
@@ -18,25 +19,26 @@ export class DistrictEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   region_id: string;
 
-  // N-1 District → Region (asosiy region_id orqali)
+  @Column({ type: 'uuid', nullable: true })
+  assigned_region: string;
+
+  // N-1 District → Region
   @ManyToOne(() => RegionEntity, (region) => region.districts, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'region_id' })
   region: RegionEntity;
 
-  // N-1 District → Assigned Region (bog‘langan region)
-  @ManyToOne(() => RegionEntity, (region) => region.assigned_districts, {
+  // N-1 District → Assigned Region
+  @ManyToOne(() => RegionEntity, (region) => region.assignedDistricts, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'assigned_region' })
-  assignedRegion: RegionEntity;
+  assignedToRegion: RegionEntity;
 
-  // faqat id kerak bo‘lganda
-  @RelationId((district: DistrictEntity) => district.assignedRegion)
-  assigned_region: string;
+  @RelationId((district: DistrictEntity) => district.assignedToRegion)
+  assignedToRegionId: string;
 
-  // District → Users (1-N)
   @OneToMany(() => UserEntity, (user) => user.district)
   users: UserEntity[];
 }
