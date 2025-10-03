@@ -14,8 +14,7 @@ interface IProps {
 }
 
 const ProductView: FC<IProps> = ({ data, total }) => {
-  // console.log(total);
-  const dispatch = useDispatch()
+  const dispatch = useDispatch();
 
   const [loading, setLoading] = useState(true);
   const [popup, setPopup] = useState(false);
@@ -30,18 +29,18 @@ const ProductView: FC<IProps> = ({ data, total }) => {
 
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
     if (newPage === 1) {
-      dispatch(setPage(newPage))
+      dispatch(setPage(newPage));
       removeParam("page");
     } else {
-      dispatch(setPage(newPage))
+      dispatch(setPage(newPage));
       setParam("page", newPage);
     }
 
     if (limit === 10) {
-      dispatch(setLimit(limit))
+      dispatch(setLimit(limit));
       removeParam("limit");
     } else {
-      dispatch(setLimit(limit))
+      dispatch(setLimit(limit));
       setParam("limit", limit);
     }
   };
@@ -54,10 +53,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
         handleSuccess("Mahsulot muvaffaqiyatli o'chirib tashlandi");
       },
       onError: (err: any) =>
-        handleApiError(
-          err,
-          "mahsulotini o'chirishda xatolik yuz berdi"
-        ),
+        handleApiError(err, "mahsulotini o'chirishda xatolik yuz berdi"),
     });
     setPopup(false);
   };
@@ -71,8 +67,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
-  
-  
+
   return (
     <div className="mt-4 px-4 overflow-x-auto">
       <Spin spinning={loading} tip="Loading Products...">
