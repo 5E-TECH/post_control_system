@@ -16,19 +16,17 @@ const ProductsCreate: FC = () => {
   // const location = useLocation();
 
   const { role } = useSelector((state: RootState) => state.roleSlice);
-  const { page, limit } = useSelector((state: RootState) => state.paginationSlice);
-  
-  
-
+  const { page, limit } = useSelector(
+    (state: RootState) => state.paginationSlice
+  );
 
   const { getMyProducts, getProductsByMarket } = useProduct();
   const { data } =
-    role === "market" ? getMyProducts() : getProductsByMarket(id, true, {page, limit});
+    role === "market"
+      ? getMyProducts()
+      : getProductsByMarket(id, true, { page, limit });
 
-    // console.log(permission);
-    
-
-  return ( 
+  return (
     <section>
       <div className="bg-white mt-5 dark:bg-[#28243d] w-full">
         <div className="mx-[24px]">

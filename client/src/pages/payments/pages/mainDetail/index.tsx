@@ -56,9 +56,8 @@ const MainDetail = () => {
   const [kassa, setMaosh] = useState(false);
   const [showAdminAndRegistrator, setshowAdminAndRegistrator] = useState(false);
   const { handleApiError } = useApiNotification();
-  
-  const navigate = useNavigate();
 
+  const navigate = useNavigate();
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -71,9 +70,6 @@ const MainDetail = () => {
     fromDate: form.from,
     toDate: form.to,
   };
-
-  // console.log("from", form.from);
-  // console.log("to", form.to);
 
   const [show, setShow] = useState(true);
   const { getMarkets } = useMarket();
@@ -90,7 +86,6 @@ const MainDetail = () => {
     { ...searchParam }
   );
 
-
   const debouncedSearch = useCallback(
     debounce((value: string) => {
       setForm((prev) => ({
@@ -104,7 +99,6 @@ const MainDetail = () => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     debouncedSearch(e.target.value);
   };
-  // console.log(adminAndRegisterData?.data?.data);
 
   const { data, refetch } = getCashBoxMain(params);
   const { data: marketData } = getMarkets(showMarket, { ...searchParam });
@@ -171,8 +165,6 @@ const MainDetail = () => {
       }
     );
   };
-
-  // console.log(form.search);
 
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
@@ -562,7 +554,7 @@ const MainDetail = () => {
       </Popup>
 
       {/* === POPUP CURIER === */}
-      <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>  
+      <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>
         <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
           <button
             onClick={() => setShowCurier(false)}

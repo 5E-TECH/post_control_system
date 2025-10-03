@@ -9,8 +9,6 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../../app/store";
 
 // ✅ Yup validation
 const schema = yup.object().shape({
@@ -32,12 +30,6 @@ interface FormValues {
 const AddProduct = () => {
   const { createProduct } = useProduct();
   const [showMarket, setShowMarket] = useState(false);
-
-  const editItem = useSelector((state: RootState) => state.setEditItem);
-  console.log(editItem);
-
-  // const location = useLocation();
-  // const market = location.state?.market;
 
   const { id } = useParams();
 
@@ -84,10 +76,7 @@ const AddProduct = () => {
           handleSuccess("Mahsulot muvaffaqiyatli qo'shildi");
         },
         onError: (err: any) =>
-          handleApiError(
-            err,
-            "Mahsulot yaratishda xatolik yuz berdi"
-          ),
+          handleApiError(err, "Mahsulot yaratishda xatolik yuz berdi"),
       });
       reset();
     } catch (err) {

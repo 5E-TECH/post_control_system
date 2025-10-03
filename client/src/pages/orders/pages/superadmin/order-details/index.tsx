@@ -4,17 +4,12 @@ import ShippingAddress from "../../../components/shipping address";
 import CustomerDetail from "../../../components/customer detail";
 import { useParams } from "react-router-dom";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../../../../app/store";
 
 const OrderDetails = () => {
   const { id } = useParams();
-  const { role } = useSelector((state: RootState) => state.roleSlice);
-  console.log(role);
-  
+
   const { getOrderById } = useOrder();
   const { data } = getOrderById(id);
-  console.log(data?.data?.comment);
 
   // Agar data hali kelmagan bo‘lsa loader
   if (!data) return <div className="text-center p-10">Loading...</div>;

@@ -53,10 +53,6 @@ const Details: FC<IProps> = ({
 
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
-  console.log(role);
-  
-
-
   const { updateOrders } = useOrder();
   const { handleSuccess, handleApiError } = useApiNotification();
   const handlesubmit = () => {
@@ -82,7 +78,6 @@ const Details: FC<IProps> = ({
     if (!isSame) payload.order_item_info = currentItems;
 
     if (Object.keys(payload).length === 0) {
-      console.log("Hech narsa o'zgarmagan, so'rov yuborilmadi");
       return;
     }
 
@@ -114,7 +109,7 @@ const Details: FC<IProps> = ({
         <h2 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
           Order details
         </h2>
-        {status == "new" && role != "market" && role != "courier" &&(
+        {status == "new" && role != "market" && role != "courier" && (
           <button
             onClick={() => setIsModalOpen(true)}
             className="text-[#8C57FF] cursor-pointer"
