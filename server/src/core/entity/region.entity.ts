@@ -1,3 +1,4 @@
+// region.entity.ts
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Column, Entity, OneToMany } from 'typeorm';
 import { DistrictEntity } from './district.entity';
@@ -21,8 +22,8 @@ export class RegionEntity extends BaseEntity {
   couriers: UserEntity[];
 
   // 1-N Region → Assigned Districts
-  @OneToMany(() => DistrictEntity, (district) => district.assignedRegion)
-  assigned_districts: DistrictEntity[];
+  @OneToMany(() => DistrictEntity, (district) => district.assignedToRegion)
+  assignedDistricts: DistrictEntity[];
 
   // 1-N Region → Posts
   @OneToMany(() => PostEntity, (post) => post.region)
