@@ -21,6 +21,12 @@ export default function ScanPage() {
           .then((result) => {
             const res = result.getText();
             const token = res.split("/").at(-1);
+
+            const audio = new Audio(
+              "../../../../../../../public/sound/beep.mp3"
+            );
+            audio.play().catch((err) => console.error("Ovoz chiqmadi:", err));
+
             navigate(`/scan/${token}`);
           })
           .catch((err) => console.error("QR Scan xatosi:", err));
