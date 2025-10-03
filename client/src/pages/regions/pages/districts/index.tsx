@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Card } from "antd";
 import {
   DragDropContext,
@@ -24,9 +24,16 @@ interface RegionType {
 const Districts = () => {
   const { getRegions } = useRegion();
   const { updateDistrict } = useDistrict();
-  const { data: apiResponse } = getRegions();
+  const { data: apiResponse, isLoading } = getRegions();
 
-  const [regions, setRegions] = useState<RegionType[]>(apiResponse?.data || []);
+  const [regions, setRegions] = useState<RegionType[]>([]);
+
+  // 🔹 API dan data kelganda state ni yangilash
+  useEffect(() => {
+    if (apiResponse?.data) {
+      setRegions(apiResponse.data);
+    }
+  }, [apiResponse]);
 
   const handleDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
@@ -44,32 +51,28 @@ const Districts = () => {
       );
       if (!draggedDistrict) return prevRegions;
 
-      // eski regiondan olib tashlash
       sourceRegion.assignedDistricts = sourceRegion.assignedDistricts.filter(
         (d) => d.id !== draggableId
       );
-      // yangi regionga qo‘shish
+
       destRegion.assignedDistricts.push({
         ...draggedDistrict,
-        region_id: destRegion.id, // frontendda ham yangilab qo‘yamiz
+        region_id: destRegion.id,
       });
 
-      // ✅ Backendni update qilish
       updateDistrict.mutate(
         { id: draggedDistrict.id, data: { assigned_region: destRegion.id } },
         {
-          onSuccess: (data) => {
-            console.log("✅ Update success:", data);
-          },
-          onError: (err) => {
-            console.error("❌ Update error:", err);
-          },
+          onSuccess: (data) => console.log("✅ Update success:", data),
+          onError: (err) => console.error("❌ Update error:", err),
         }
       );
 
       return updated;
     });
   };
+
+  if (isLoading) return <div className="p-5">Loading...</div>;
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -100,7 +103,7 @@ const Districts = () => {
                           {...dragProvided.draggableProps}
                           {...dragProvided.dragHandleProps}
                           style={dragProvided.draggableProps.style}
-                          className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-lg cursor-grab select-none hover:bg-blue-200 active:cursor-grabbing transition"
+                          className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-lg cursor-pointer select-none hover:bg-blue-200 active:cursor-grabbing transition"
                         >
                           {district.name}
                         </div>
