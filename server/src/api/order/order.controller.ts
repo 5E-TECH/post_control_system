@@ -154,6 +154,22 @@ export class OrderController {
     return this.orderService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Get order by QR code' })
+  @ApiParam({ name: 'id', description: 'Order TOKEN' })
+  @ApiResponse({ status: 200, description: 'Order data' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.COURIER,
+    Roles.MARKET,
+    Roles.REGISTRATOR,
+  )
+  @Get('qr-code/:token')
+  findByQR(@Param('token') token: string) {
+    return this.orderService.findByQrCode(token);
+  }
+
   // Get my orders Market yoki Kurier uchun
 
   @ApiOperation({ summary: 'Edit order by id' })
