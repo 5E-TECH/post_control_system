@@ -55,6 +55,12 @@ export const useOrder = () => {
         api.get(`order/market/${marketId}`, { params }).then((res) => res.data),
     });
 
+  const getOrdersByToken = (token: string) =>
+    useQuery({
+      queryKey: [order, token],
+      queryFn: () => api.get(`order/qr-code/${token}`).then((res) => res.data),
+    });
+
   const getMarketsByMyNewOrders = (params?: any) =>
     useQuery({
       queryKey: [order, params],
@@ -110,6 +116,7 @@ export const useOrder = () => {
     getOrderByMarket,
     getCourierOrders,
     getMarketsByMyNewOrders,
+    getOrdersByToken,
     deleteOrders,
     getOrderById,
     updateOrdersUserAddress,

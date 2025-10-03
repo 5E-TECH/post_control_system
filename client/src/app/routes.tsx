@@ -1,5 +1,12 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+const ScanAndOrder = lazy(
+  () =>
+    import("../pages/orders/pages/superadmin/order-details/scan/scanAndOrder")
+);
+const ScanPage = lazy(
+  () => import("../pages/orders/pages/superadmin/order-details/scan/scanPage")
+);
 const WaitingOrders = lazy(
   () => import("../pages/orders/components/courier/waiting-orders")
 );
@@ -45,7 +52,9 @@ const OrderDetail = lazy(
   () => import("../pages/orders/pages/superadmin/orderDetail")
 );
 const CashDetail = lazy(() => import("../pages/payments/pages/cashDetail"));
-const CashDetailMarketCourier = lazy(() => import("../pages/payments/pages/courier-market-cashDetail"))
+const CashDetailMarketCourier = lazy(
+  () => import("../pages/payments/pages/courier-market-cashDetail")
+);
 const NotFound = lazy(() => import("../shared/ui/NotFound"));
 const CustomerInfoOrder = lazy(
   () => import("../pages/orders/pages/superadmin/customer-info")
@@ -98,6 +107,14 @@ const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
 
 const AppRouters = () => {
   return useRoutes([
+    {
+      path: "scan",
+      element: <ScanPage />,
+    },
+    {
+      path: "scan/:token",
+      element: <ScanAndOrder />,
+    },
     {
       path: "/login",
       element: <Login />,
@@ -235,7 +252,7 @@ const AppRouters = () => {
                 { path: "main-cashbox", element: <MainDetail /> },
               ],
             },
-            { path: "cash-box", element: <CashDetailMarketCourier/>},
+            { path: "cash-box", element: <CashDetailMarketCourier /> },
             { path: "roles-permissions", element: <RolesPermissions /> },
             {
               path: "profile",
@@ -243,10 +260,11 @@ const AppRouters = () => {
               children: [{ index: true, element: <Overview /> }],
             },
             {
-              path:"user-profile/:id",
-              element:<UserProfile/>
+              path: "user-profile/:id",
+              element: <UserProfile />,
             },
             {
+
               path:"regions", element:<Regions/>,
               children: [{
                 path:"districts", element:<Districts/>
