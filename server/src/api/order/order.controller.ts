@@ -157,7 +157,7 @@ export class OrderController {
   @ApiOperation({ summary: 'Get order by QR code' })
   @ApiParam({ name: 'id', description: 'Order TOKEN' })
   @ApiResponse({ status: 200, description: 'Order data' })
-  @UseGuards(JwtGuard, RolesGuard)
+  // @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(
     Roles.ADMIN,
     Roles.SUPERADMIN,
