@@ -3,6 +3,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  QrCode,
   Search,
   Sun,
   User,
@@ -70,7 +71,13 @@ const Header = () => {
 
       {/* Actions */}
       <div className="flex gap-6 items-center">
-        <div className="max-[350px]:hidden">
+        <div
+          onClick={() => navigate("scan")}
+          className="cursor-pointer max-[650px]:hidden"
+        >
+          <QrCode className="h-[25px] w-[25px]" />
+        </div>
+        <div className="max-[400px]:hidden">
           <Space wrap>
             <Select
               defaultValue={localStorage.getItem("i18nextLng")}
@@ -160,7 +167,17 @@ const Header = () => {
                       {dark ? "Light Mode" : "Dark Mode"}
                     </span>
                   </button>
-
+                  <button
+                    onClick={() => navigate("/scan")}
+                    className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-400 dark:border-gray-600
+     bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
+     hover:bg-gray-200 dark:hover:bg-gray-700 
+     shadow-sm hover:shadow-md transition-all duration-200
+     "
+                  >
+                    <QrCode className="w-5 h-5" />
+                    <span className="text-sm font-medium">Scan QR</span>
+                  </button>
                   <button
                     onClick={() => signOut()}
                     className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-red-500 
