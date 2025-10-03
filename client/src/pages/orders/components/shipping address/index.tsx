@@ -76,11 +76,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
           handleSuccess("Order manzili muvaffaqiyatli yangilandi.");
         },
         onError: (err: any) =>
-          // console.log(err)
-          handleApiError(
-            err,
-            "Malumotlarni yangilashda xatolik yuz berdi"
-          ),
+          handleApiError(err, "Malumotlarni yangilashda xatolik yuz berdi"),
       }
     );
   };

@@ -7,6 +7,7 @@ import { useDispatch } from "react-redux";
 import { setEditing } from "../../../../shared/lib/features/profile/profileEditSlice";
 import { useParams } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
+import { Check, Copy } from "lucide-react";
 // import Password from "antd/es/input/Password";
 
 const UserProfile = () => {
@@ -15,6 +16,8 @@ const UserProfile = () => {
   const { getUserById, updateUser } = useUser();
   const { data, isLoading, refetch } = getUserById(id);
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
 
   if (isLoading) {
     return (
@@ -187,15 +190,30 @@ const UserProfile = () => {
 
               <div className="flex justify-between items-center mt-6">
                 {user.market_tg_token && (
-                    <div className="flex flex-col">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Tg Token
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 flex gap-3 items-center">
+                      Tg Token
+                      <span
+                        className="cursor-pointer flex items-center gap-2 select-none"
+                        onClick={() => {
+                          navigator.clipboard.writeText(user.market_tg_token);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000); // 2s dan keyin o‘chadi
+                        }}
+                      >
+                        <Copy width={18} />
+                        {copied && (
+                          <span className="text-green-500 text-[16px]">
+                            <Check />
+                          </span>
+                        )}
                       </span>
-                      <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                        {user.market_tg_token}
-                      </span>
-                    </div>
-                  )}
+                    </span>
+                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                      {user.market_tg_token}
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     setOpen(true);

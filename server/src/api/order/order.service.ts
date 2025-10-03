@@ -412,6 +412,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  async findByQrCode(token: string) {
+    try {
+      const order = await this.orderRepo.findOne({
+        where: { qr_code_token: token },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      return successRes(order, 200, 'Order by QR code');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async updateOrder(
     id: string,
     updateOrderDto: UpdateOrderDto,

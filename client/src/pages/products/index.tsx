@@ -25,8 +25,8 @@ const Products = () => {
     (state: RootState) => state.paginationSlice
   );
   const permission = useSelector(
-      (state: RootState) => state.togglePermission.value
-    );
+    (state: RootState) => state.togglePermission.value
+  );
   const { refetch } = useProfile().getUser(role === "market");
 
   const handleCheck = async () => {
@@ -38,8 +38,6 @@ const Products = () => {
     }
     navigate(`create/${select}`);
   };
-
-  // console.log("pagination", page, limit);
 
   useEffect(() => {
     if (role === "market") {
@@ -130,7 +128,7 @@ const Products = () => {
             <button
               onClick={() => {
                 if (role === "market") {
-                  handleCheck()
+                  handleCheck();
                   // handleNavigate()
                 } else {
                   setShowMarket(true);
