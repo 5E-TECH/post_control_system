@@ -1,7 +1,7 @@
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsUUID } from 'class-validator';
 
 export class UpdateDistrictDto {
-  @IsOptional()
+  @IsNotEmpty()
   @IsUUID()
   assigned_region: string;
 }

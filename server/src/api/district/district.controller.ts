@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, UseGuards, Body } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { DistrictService } from './district.service';
 import { UpdateDistrictDto } from './dto/update-district.dto';
@@ -29,7 +29,10 @@ export class DistrictController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Patch(':id')
-  update(@Param('id') id: string, updateDistrictDto: UpdateDistrictDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateDistrictDto: UpdateDistrictDto,
+  ) {
     return this.districtService.update(id, updateDistrictDto);
   }
 }
