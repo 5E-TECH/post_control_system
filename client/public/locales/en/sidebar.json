@@ -7,5 +7,6 @@
     "users": "Users",
     "payments": "Payments",
     "balance": "Financial Balance",
-    "logs": "Logs"
+    "logs": "Logs",
+    "region": "Region"
 }
