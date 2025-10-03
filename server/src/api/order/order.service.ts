@@ -938,7 +938,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             )
             .join('\n')}\n\n` +
           `💰 *Narxi:* ${order.total_price} so‘m\n` +
-          `🕒 *Yaratilgan vaqti:* ${order.created_at.toLocaleString('uz-UZ')}\n\n` +
+          `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
           `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
           `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
           `📝 *Izoh:* ${order.comment || '-'}\n`,
