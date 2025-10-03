@@ -217,10 +217,9 @@ const OrderView = () => {
               </div>
             </th>
             <th>
-              <div className="flex items-center gap-10">
+              <div className="flex items-center gap-10 pl-4">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("stock")}</span>
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("createdAt")}</span>
               </div>
             </th>
           </tr>
@@ -277,10 +276,16 @@ const OrderView = () => {
                   </span>
                 </td>
                 <td
-                  className="data-cell pl-15 text-[15px] text-[#2E263DB2]"
-                  data-cell="STOCK"
+                  className="data-cell pl-15"
+                  data-cell="CREATED AT"
                 >
-                  {item?.items.length}
+                  {new Date(Number(item?.created_at)).toLocaleString("uz-UZ", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </td>
               </tr>
             ))}

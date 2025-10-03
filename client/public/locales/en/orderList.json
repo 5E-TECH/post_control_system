@@ -17,5 +17,5 @@
   "market": "MARKET",
   "status": "STATUS",
   "price": "PRICE",
-  "stock": "STOCK"
+  "createdAt": "CREATED AT"
 }
