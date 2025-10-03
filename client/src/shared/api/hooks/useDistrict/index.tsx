@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../..";
 
 export const district = "district";
 
 export const useDistrict = () => {
+  const client = useQueryClient();
+
   const getDistricts = () =>
     useQuery({
       queryKey: [district],
@@ -20,5 +22,13 @@ export const useDistrict = () => {
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
-  return { getDistricts, getDistrictById };
+
+   const updateDistrict = useMutation({
+  mutationFn: ({ id, data }: { id: string; data: any }) =>
+    api.patch(`district/${id}`, data).then((res) => res.data), // 👈 faqat data qaytarayapmiz
+  onSuccess: () => {
+    client.invalidateQueries({ queryKey: [district] });
+  },
+});
+  return { getDistricts, getDistrictById, updateDistrict };
 };
