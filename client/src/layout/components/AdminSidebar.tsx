@@ -8,6 +8,7 @@ import {
   UserRound,
   FileText,
   History,
+  MapPinned,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -28,6 +29,7 @@ const AdminSidebar = () => {
     { to: "/all-users", icon: <UserRound />, label: t("users") },
     { to: "/payments", icon: <FileText />, label: t("payments") },
     { to: "/m-balance", icon: <History />, label: t("balance") },
+    { to: "/regions", icon: <MapPinned />, label: t("region") },
   ];
 
   return (
