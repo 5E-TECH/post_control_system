@@ -264,15 +264,12 @@ const AppRouters = () => {
               element: <UserProfile />,
             },
             {
-              path: "regions",
-              element: <Regions />,
-              children: [
-                {
-                  path: "region-districts",
-                  element: <Districts />,
-                },
-              ],
-            },
+
+              path:"regions", element:<Regions/>,
+              children: [{
+                path:"districts", element:<Districts/>
+              }]
+            }
           ],
         },
       ],

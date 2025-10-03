@@ -67,11 +67,13 @@ export class DistrictService implements OnModuleInit {
     try {
       const district = await this.districtRepository.findOne({
         where: { id },
-        relations: ['region'],
+        relations: ['region', 'assignedToRegion'], // faqat obyektlarni qo‘shamiz
       });
+
       if (!district) {
         throw new NotFoundException('district not found');
       }
+
       return successRes(district);
     } catch (error) {
       return catchError(error);
