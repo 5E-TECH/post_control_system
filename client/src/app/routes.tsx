@@ -249,7 +249,7 @@ const AppRouters = () => {
             {
               path:"regions", element:<Regions/>,
               children: [{
-                path:"region-districts", element:<Districts/>
+                path:"districts", element:<Districts/>
               }]
             }
           ],
