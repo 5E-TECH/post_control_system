@@ -9,8 +9,7 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { DistrictRepository } from 'src/core/repository/district.repository';
 import { RegionRepository } from 'src/core/repository/region.repository';
-import { successRes } from 'src/infrastructure/lib/response';
-import { catchError } from 'rxjs';
+import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { regions } from 'src/infrastructure/lib/data/district';
 import { UpdateDistrictDto } from './dto/update-district.dto';
 
@@ -67,11 +66,13 @@ export class DistrictService implements OnModuleInit {
     try {
       const district = await this.districtRepository.findOne({
         where: { id },
-        relations: ['region'],
+        relations: ['region', 'assignedToRegion'], // faqat obyektlarni qo‘shamiz
       });
+
       if (!district) {
         throw new NotFoundException('district not found');
       }
+
       return successRes(district);
     } catch (error) {
       return catchError(error);
@@ -80,30 +81,38 @@ export class DistrictService implements OnModuleInit {
 
   async update(id: string, updateDistrictDto: UpdateDistrictDto) {
     try {
-      const { assigned_region } = updateDistrictDto;
       const district = await this.districtRepository.findOne({ where: { id } });
       if (!district) {
         throw new NotFoundException('District not found');
       }
+      if (district.assigned_region === updateDistrictDto.assigned_region) {
+        throw new BadRequestException(
+          'The district already assigned to this region',
+        );
+      }
+
       const assigningRegion = await this.regionRepository.findOne({
-        where: { id: assigned_region },
+        where: { id: updateDistrictDto.assigned_region },
       });
       if (!assigningRegion) {
         throw new NotFoundException(
-          'The region you are trying to assign is not exist',
+          'The region you are trying to assign does not exist',
         );
       }
-      if (district.assigned_region === assigningRegion.id) {
+
+      if (district.assignedToRegionId === assigningRegion.id) {
         throw new BadRequestException(
-          'This district already assigned to this region',
+          'This district is already assigned to this region',
         );
       }
-      Object.assign(district, {
-        assigned_region: assigningRegion.id,
-      });
+
+      // 🔑 ikkala fieldni yangilab qo‘yamiz
+      district.assigned_region = assigningRegion.id; // column
+      district.assignedToRegion = assigningRegion; // relation
+
       await this.districtRepository.save(district);
 
-      return successRes({}, 200, 'District assigned to new region');
+      return successRes(district, 200, 'District assigned to new region');
     } catch (error) {
       return catchError(error);
     }

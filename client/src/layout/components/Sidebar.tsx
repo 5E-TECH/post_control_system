@@ -9,6 +9,7 @@ import {
   FileText,
   History,
   SquareDashedMousePointer,
+  MapPinned,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -29,6 +30,7 @@ const Sidebar = () => {
     { to: "/all-users", icon: <UserRound />, label: t("users") },
     { to: "/payments", icon: <FileText />, label: t("payments") },
     { to: "/m-balance", icon: <History />, label: t("balance") },
+    { to: "/regions", icon: <MapPinned />, label: t("region") },
     { to: "/logs", icon: <SquareDashedMousePointer />, label: t("logs") },
   ];
 

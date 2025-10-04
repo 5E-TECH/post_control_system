@@ -4,12 +4,14 @@ import ShippingAddress from "../../../components/shipping address";
 import CustomerDetail from "../../../components/customer detail";
 import { useParams } from "react-router-dom";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
+import QRCode from "react-qr-code";
 
 const OrderDetails = () => {
   const { id } = useParams();
 
   const { getOrderById } = useOrder();
   const { data } = getOrderById(id);
+  const token = data?.data?.qr_code_token;
 
   // Agar data hali kelmagan bo‘lsa loader
   if (!data) return <div className="text-center p-10">Loading...</div>;
@@ -34,6 +36,9 @@ const OrderDetails = () => {
               deleveryStatus={data?.data?.where_deliver}
               status={data?.data?.status}
             />
+          </div>
+          <div>
+            <QRCode size={160} value={`https://beepost.uz/scan/${token}`} />
           </div>
         </div>
 
