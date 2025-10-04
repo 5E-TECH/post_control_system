@@ -416,6 +416,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const order = await this.orderRepo.findOne({
         where: { qr_code_token: token },
+        relations: ['customer', 'customer.district', 'items', 'items.product'],
       });
       if (!order) {
         throw new NotFoundException('Order not found');

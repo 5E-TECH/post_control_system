@@ -5,7 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Cashbox_type, Roles, Status } from 'src/common/enums';
+import {
+  Cashbox_type,
+  Order_status,
+  Post_status,
+  Roles,
+  Status,
+} from 'src/common/enums';
 import config from 'src/config';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { CreateCourierDto } from './dto/create-courier.dto';
@@ -37,6 +43,8 @@ import { CustomerMarketEntity } from 'src/core/entity/customer-market.entity';
 import { CustomerMarketReository } from 'src/core/repository/customer-market.repository';
 import { UpdateMarketDto } from './dto/update-market.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { OrderEntity } from 'src/core/entity/order.entity';
+import { PostEntity } from 'src/core/entity/post.entity';
 
 @Injectable()
 export class UserService {
@@ -918,7 +926,6 @@ export class UserService {
       if (!customer) {
         throw new NotFoundException('Customer not found');
       }
-
       if (dto.district_id) {
         const district = await queryRunner.manager.findOne(DistrictEntity, {
           where: { id: dto.district_id },
@@ -931,8 +938,75 @@ export class UserService {
 
       await queryRunner.manager.save(customer);
 
+      const updatedCustomer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id, role: Roles.CUSTOMER },
+        relations: ['district'],
+      });
+      if (!updatedCustomer) {
+        throw new NotFoundException('Customer not found');
+      }
+
+      const customerOrder = await queryRunner.manager.findOne(OrderEntity, {
+        where: { customer_id: customer.id },
+      });
+      if (!customerOrder) {
+        throw new NotFoundException('Users order not found');
+      }
+
+      if (
+        customerOrder.status === Order_status.RECEIVED &&
+        customerOrder.post_id
+      ) {
+        let hasNewPost = await queryRunner.manager.findOne(PostEntity, {
+          where: {
+            region_id: updatedCustomer.district.assigned_region,
+            status: Post_status.NEW,
+          },
+        });
+        if (!hasNewPost) {
+          hasNewPost = queryRunner.manager.create(PostEntity, {
+            region_id: updatedCustomer.district.assigned_region,
+            qr_code_token: generateCustomToken(),
+            post_total_price: 0,
+            order_quantity: 0,
+            status: Post_status.NEW,
+          });
+          hasNewPost = await queryRunner.manager.save(hasNewPost);
+        }
+        const oldPost = await queryRunner.manager.findOne(PostEntity, {
+          where: { id: customerOrder.post_id },
+        });
+        if (!oldPost) {
+          throw new NotFoundException('Old post not found');
+        }
+        customerOrder.post_id = hasNewPost.id;
+        await queryRunner.manager.save(customerOrder);
+
+        if (
+          Number(oldPost.post_total_price) ===
+            Number(customerOrder.total_price) &&
+          oldPost.order_quantity === 1
+        ) {
+          await queryRunner.manager.delete(PostEntity, { id: oldPost.id });
+        } else {
+          oldPost.post_total_price -= customerOrder.total_price;
+          oldPost.order_quantity--;
+          await queryRunner.manager.save(oldPost);
+        }
+
+        hasNewPost.post_total_price =
+          Number(hasNewPost.post_total_price) +
+          Number(customerOrder.total_price);
+        hasNewPost.order_quantity++;
+        await queryRunner.manager.save(hasNewPost);
+      }
+
       await queryRunner.commitTransaction();
-      return successRes(customer, 200, 'Customer updated (district/address)');
+      return successRes(
+        updatedCustomer,
+        200,
+        'Customer updated (district/address)',
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
