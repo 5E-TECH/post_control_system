@@ -2,7 +2,7 @@ import { memo, type FC, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
-  onClose: () => void;
+  onClose?: () => void;
   isShow?: boolean;
 }
 
