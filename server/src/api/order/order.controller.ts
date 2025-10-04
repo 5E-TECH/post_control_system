@@ -275,4 +275,14 @@ export class OrderController {
   ) {
     return this.orderService.partlySold(currentUser, id, partlySellDto);
   }
+
+  @ApiOperation({ summary: 'Delete order' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiResponse({ status: 200, description: 'Order partly sold' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @Delete(':id')
+  delete(@Param('id') id: string) {
+    return this.orderService.remove(id);
+  }
 }

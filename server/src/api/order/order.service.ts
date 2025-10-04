@@ -1815,11 +1815,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async remove(id: string) {
     try {
       const order = await this.orderRepo.findOne({
-        where: { id, status: In([Order_status.NEW, Order_status.RECEIVED]) },
+        where: { id, status: Order_status.NEW },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
       }
+      await this.orderRepo.delete(id);
       return successRes({}, 200, 'Order deleted');
     } catch (error) {
       return catchError(error);
