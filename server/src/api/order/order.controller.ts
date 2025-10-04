@@ -197,6 +197,15 @@ export class OrderController {
     return this.orderService.receiveNewOrders(ordersArray, search);
   }
 
+  @ApiOperation({ summary: 'Receive new order by scaner' })
+  @ApiResponse({ status: 200, description: 'Orders received' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('receive/:id')
+  receiveOrderWithScaner(@Param('id') id: string) {
+    return this.orderService.receiveWithScaner(id);
+  }
+
   @ApiOperation({ summary: 'All orders for market' })
   @ApiResponse({ status: 200, description: 'All orders for current market' })
   @UseGuards(JwtGuard, RolesGuard)
