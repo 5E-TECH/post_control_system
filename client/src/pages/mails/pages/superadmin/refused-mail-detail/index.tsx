@@ -89,6 +89,12 @@ const RefusedMailDetail = () => {
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
+                {/* <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    Market
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th> */}
                 <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
                     PUL MIQDORI

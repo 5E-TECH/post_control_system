@@ -19,12 +19,19 @@ const OrderView = () => {
   const [_, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-
-  const { getOrderByMarket, getMarketsByMyNewOrders } = useOrder();
+  const { getOrderByMarket, getMarketsByMyNewOrders, deleteOrders } = useOrder();
   const { createPost } = usePost();
   const { data, refetch } =
     user.role === "market" ? getMarketsByMyNewOrders() : getOrderByMarket(id);
 
+    useEffect(() => {
+      if(data?.data?.total === 0){
+        navigate(-1)
+      }
+
+    }, [data])
+    // console.log(data?.data?.total);
+    
   useEffect(() => {
     if (data?.data?.data) {
       setSelectedIds(data.data?.data?.map((item: any) => item.id));
@@ -34,11 +41,19 @@ const OrderView = () => {
   // const hanlerUpdate = (e: React.MouseEvent<HTMLButtonElement>) => {
   //   e.stopPropagation();
   // };
+  const { handleApiError, handleSuccess } = useApiNotification();
 
   const hanlerDelete = (id: string) => {
     console.log(id);
+    deleteOrders.mutate(id, {
+      onSuccess: () => {
+        handleSuccess("Order muvaffaqiyatli o'chirildi")
+      },
+      onError: (err:any) => {
+        handleApiError(err, "Orderni o'chirishda xatolik yuz ber")
+      }
+    })
   };
-  const { handleApiError } = useApiNotification();
   const handleAccapted = () => {
     const newOrder = {
       order_ids: selectedIds,
