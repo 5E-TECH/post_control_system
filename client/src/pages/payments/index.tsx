@@ -50,7 +50,7 @@ const Payments = () => {
 
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  
+
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
@@ -73,8 +73,8 @@ const Payments = () => {
       limit,
     }
   );
-  const { data } = getMarkets(showMarket, {...searchParam});
-  const { data: courierData } = getCourier(showCurier, {...searchParam});
+  const { data } = getMarkets(showMarket, { ...searchParam, limit: 0 });
+  const { data: courierData } = getCourier(showCurier, { ...searchParam });
   const total = cashBoxData?.data?.pagination?.total || 0;
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
     if (newPage === 1) {
@@ -91,14 +91,12 @@ const Payments = () => {
   };
   // Pagination end
 
-
   const handleNavigate = () => {
     navigate(`cash-detail/${select}`);
     setSelect(null);
     setShowMarket(false);
     setShowCurier(false);
   };
-
 
   const hendlerClose = () => {
     setShowCurier(false);
