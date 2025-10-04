@@ -12,7 +12,6 @@ const OrderDetails = () => {
   const { getOrderById } = useOrder();
   const { data } = getOrderById(id);
   const token = data?.data?.qr_code_token;
-  // const { data: orderByToken } = getOrdersByToken(token);
 
   // Agar data hali kelmagan bo‘lsa loader
   if (!data) return <div className="text-center p-10">Loading...</div>;

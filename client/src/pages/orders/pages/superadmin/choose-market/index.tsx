@@ -1,5 +1,5 @@
-import { Button, Form, Input } from "antd";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button, Form, Input, Pagination, type PaginationProps } from "antd";
+import { ArrowRight } from "lucide-react";
 import { memo, useState, useMemo, useEffect } from "react";
 
 import { useNavigate } from "react-router-dom";
@@ -10,14 +10,40 @@ import { debounce } from "../../../../../shared/helpers/DebounceFunc";
 import TableSkeleton from "../../../components/ordersTabelSkeleton/ordersTableSkeleton";
 import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useParamsHook } from "../../../../../shared/hooks/useParams";
 
 const ChooseMarket = () => {
   const { t } = useTranslation("createOrder");
   // API get
   const { getMarkets } = useMarket();
   const [searchMarket, setSearchMarket] = useState<any>(null);
-  const { data, isLoading } = getMarkets(true, { search: searchMarket });
+
+  const { getParam, setParam, removeParam } = useParamsHook();
+  const page = Number(getParam("page") || 1);
+  const limit = Number(getParam("limit") || 10);
+
+  const { data, isLoading } = getMarkets(true, {
+    search: searchMarket,
+    page,
+    limit,
+  });
   const markets = Array.isArray(data?.data?.data) ? data?.data?.data : [];
+  const total = data?.data?.total || 0;
+
+  // Pagination onChange
+  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
+    if (newPage === 1) {
+      removeParam("page");
+    } else {
+      setParam("page", newPage);
+    }
+
+    if (limit === 10) {
+      removeParam("limit");
+    } else {
+      setParam("limit", limit);
+    }
+  };
 
   // Debounce Func for search
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
@@ -47,7 +73,7 @@ const ChooseMarket = () => {
         "Market tanlanmagan!",
         "Iltimos, davom etishdan oldin marketni tanlang"
       );
-      return
+      return;
     }
 
     localStorage.setItem("market", JSON.stringify(selectedMarket));
@@ -194,32 +220,14 @@ const ChooseMarket = () => {
                 </tbody>
               )}
             </table>
-            <div className="flex justify-end items-center pr-[105px] pt-4 gap-6">
-              <div className="flex items-center">
-                <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-                  {t("rowsPerPage")}
-                </span>
-                <select
-                  className="rounded px-2 py-1 text-[15px] outline-none"
-                  defaultValue="10"
-                >
-                  <option value="5">5</option>
-                  <option value="10">10</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                </select>
-              </div>
-
-              <div className="flex items-center font-normal text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                <span className="mr-1">1-5</span>
-                <span className="mr-1">of</span>
-                <span className="">13</span>
-              </div>
-
-              <div className="flex items-center gap-[23px]">
-                <ChevronLeft className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-                <ChevronRight className="w-5 h-5 cursor-pointer text-gray-600 dark:text-[#E7E3FCE5] hover:opacity-75" />
-              </div>
+            <div className="flex justify-center pt-3">
+              <Pagination
+                showSizeChanger
+                current={page}
+                total={total}
+                pageSize={limit}
+                onChange={onChange}
+              />
             </div>
           </div>
         </div>
