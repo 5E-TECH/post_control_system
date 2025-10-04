@@ -39,10 +39,7 @@ const OrderDetails = () => {
             />
           </div>
           <div>
-            <QRCode
-              size={160}
-              value={`http://192.168.10.209:5173/scan/${token}`}
-            />
+            <QRCode size={160} value={`https://beepost.uz/scan/${token}`} />
           </div>
         </div>
 

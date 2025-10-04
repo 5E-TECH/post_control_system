@@ -32,6 +32,7 @@ export class RegionService implements OnModuleInit {
     try {
       const regions = await this.regionRepository.find({
         relations: ['assignedDistricts'],
+        order: { created_at: 'ASC' },
       });
       return successRes(regions, 200, 'All regions with assigned districts');
     } catch (error) {
