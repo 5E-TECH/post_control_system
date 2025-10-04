@@ -99,7 +99,7 @@ const UzbekistanMap: React.FC = () => {
           ...mapOptions,
           chart: {
             ...(mapOptions?.chart || {}),
-            height: "50%",
+            height: "49%",
           },
         }}
       />

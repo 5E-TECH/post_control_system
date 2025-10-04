@@ -16,6 +16,9 @@ interface IProps {
 
 const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   const { role } = useSelector((state: RootState) => state.roleSlice);
+  const [district, setDistrict] = useState(districtId)
+  // console.log(district);
+  
 
   const [isShowPopup, setIsShowPopup] = useState(false);
   const [newAddress, setNewAddress] = useState(address);
@@ -23,7 +26,11 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
   const { updateOrdersUserAddress } = useOrder();
 
   const { getDistrictById } = useDistrict();
-  const { data: districtData } = getDistrictById(districtId, isShowPopup);
+  const { data: districtData, refetch } = getDistrictById(district);
+
+  useEffect(() => {
+    refetch()
+  }, [district])
 
   const { getRegionsById, getRegions } = useRegion();
   const { data: regionData } = getRegions(isShowPopup); // barcha viloyatlar
@@ -49,7 +56,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
 
   useEffect(() => {
     if (isShowPopup) {
-      setSelectedDistrict("");
+      setSelectedDistrict(districtData?.data?.id);
     }
   }, [selectedRegion, isShowPopup]);
 
@@ -73,6 +80,7 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
       {
         onSuccess: () => {
           setIsShowPopup(false);
+          setDistrict(selectedDistrict)
           handleSuccess("Order manzili muvaffaqiyatli yangilandi.");
         },
         onError: (err: any) =>
@@ -99,7 +107,12 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
         </div>
       </div>
       <div className="m-5">
+        <div>
+          <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] "><strong>Viloyat:</strong>{districtData?.data?.region?.name}</h2>
+          <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] "><strong>Tuman:</strong>{districtData?.data?.name}</h2>
+        </div>
         <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] ">
+          <strong>Manzil:</strong>
           {address}
         </h2>
       </div>

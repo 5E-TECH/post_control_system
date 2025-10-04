@@ -8,11 +8,13 @@ import { usePost } from "../../../../shared/api/hooks/usePost";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import ConfirmPopup from "../../../../shared/components/confirmPopup";
 
 const OrderView = () => {
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
-
+  const [deleteId, setDeleteId] = useState("");
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const navigate = useNavigate();
   const [_, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -33,8 +35,8 @@ const OrderView = () => {
   //   e.stopPropagation();
   // };
 
-  const hanlerDelet = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
+  const hanlerDelete = (id: string) => {
+    console.log(id);
   };
   const { handleApiError } = useApiNotification();
   const handleAccapted = () => {
@@ -189,7 +191,10 @@ const OrderView = () => {
                 <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                   <button
                     className="hover:text-red-600 cursor-pointer"
-                    onClick={hanlerDelet}
+                    onClick={() => {
+                      setDeleteId(item.id); // shu joyda id saqlanadi
+                      setIsConfirmOpen(true); // popup ochiladi
+                    }}
                   >
                     <Trash />
                   </button>
@@ -307,6 +312,24 @@ const OrderView = () => {
           </div>
         )}
       </div>
+      <ConfirmPopup
+        isShow={isConfirmOpen}
+        title="Buyurtmani o‘chirishni tasdiqlaysizmi?"
+        description="O‘chirilgandan so‘ng uni qaytarib bo‘lmaydi."
+        confirmText="Ha, o‘chirish"
+        cancelText="Bekor qilish"
+        onConfirm={() => {
+          if (deleteId) {
+            hanlerDelete(deleteId); // 🔴 shu joyda API yoki console.log ishlaydi
+          }
+          setIsConfirmOpen(false);
+          setDeleteId("");
+        }}
+        onCancel={() => {
+          setIsConfirmOpen(false);
+          setDeleteId("");
+        }}
+      />
     </div>
   );
 };
