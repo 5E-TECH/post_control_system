@@ -1,13 +1,13 @@
 import { ArrowRight, Check } from "lucide-react";
 import { memo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { Button } from "antd";
 import type { RootState } from "../../../../../app/store";
 import { useUser } from "../../../../../shared/api/hooks/useRegister";
-import CustomerInfo, { initialState } from "../../../components/customer-info";
+import CustomerInfo from "../../../components/customer-info";
 import CustomerDetails from "../../../components/customer-details";
-import { setCustomerData } from "../../../../../shared/lib/features/customer_and_market-id";
+// import { setCustomerData } from "../../../../../shared/lib/features/customer_and_market-id";
 import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
@@ -62,10 +62,10 @@ const CustomerInfoOrder = () => {
     });
   };
 
-  const dispatch = useDispatch();
-  const handleDiscard = () => {
-    dispatch(setCustomerData(initialState));
-  };
+  // const dispatch = useDispatch();
+  // const handleDiscard = () => {
+  //   dispatch(setCustomerData(initialState));
+  // };
 
   return (
     <div className="flex gap-6 px-6 pt-6 max-[1100px]:flex-col max-[1100px]:gap-10">
@@ -133,12 +133,12 @@ const CustomerInfoOrder = () => {
       <div className="flex flex-col gap-4.5 w-full">
         <CustomerInfo />
         <div className="flex gap-4 justify-end">
-          <Button
+          {/* <Button
             onClick={handleDiscard}
             className="w-[110px]! h-[38px]! bg-[#F4F5FA]! border! border-[#8A8D93]! text-[#8A8D93]! hover:opacity-80! dark:bg-[#28243D]!"
           >
             {t("discard")}
-          </Button>
+          </Button> */}
           <Button
             disabled={createUser.isPending}
             loading={createUser.isPending}

@@ -21,9 +21,9 @@ const Regions = () => {
 
       <button
         onClick={() => navigate("districts")}
-        className="absolute top-5 right-5 border py-2 px-3 text-[#834BFF] border-[#834BFF] rounded-md"
+        className="absolute top-5 right-5 border py-2 px-3 text-[#834BFF] border-[#834BFF] rounded-md cursor-pointer"
       >
-        Districni tartiblash
+        Tumanlarni tartiblash
       </button>
     </div>
   );
