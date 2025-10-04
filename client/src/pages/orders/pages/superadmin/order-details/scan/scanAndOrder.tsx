@@ -45,7 +45,7 @@ export default function ScanAndOrder() {
 
       try {
         const res = await fetch(
-          `http://192.168.10.209:8080/api/v1/order/qr-code/${token}`,
+          `http://10.181.40.168:8080/api/v1/order/qr-code/${token}`,
           {
             method: "GET",
             headers: {
@@ -94,8 +94,7 @@ export default function ScanAndOrder() {
 
         {/* Umumiy content */}
         <div
-          className={`space-y-1 text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
-        >
+          className={`space-y-1 text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}>
           <p>
             <span className="font-semibold">Mijoz ismi:</span>{" "}
             <span>{order.data?.customer?.name || "—"}</span>
@@ -132,8 +131,7 @@ export default function ScanAndOrder() {
             {orderItemInfo.map((item, index) => (
               <div
                 key={item.productId}
-                className="pt-4 flex gap-10 justify-between"
-              >
+                className="pt-4 flex gap-10 justify-between">
                 <Form.Item className="flex-1!">
                   <Select
                     className="!h-[40px] custom-select-dropdown-bright"
@@ -184,8 +182,7 @@ export default function ScanAndOrder() {
                     Number(rawValue || 0)
                   );
                   setTotalPrice(formatted);
-                }}
-              ></Input>
+                }}></Input>
             </Form.Item>
           </div>
         )}
@@ -238,8 +235,7 @@ export default function ScanAndOrder() {
             <div className="w-full flex gap-5">
               <Button
                 className="w-full h-[40px]!"
-                onClick={() => setPartlySoldShow((p) => !p)}
-              >
+                onClick={() => setPartlySoldShow((p) => !p)}>
                 <AlertCircle />
               </Button>
               <Button className="w-full h-[40px]! bg-red-500! text-[#ffffff]!">

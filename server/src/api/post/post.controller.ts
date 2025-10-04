@@ -150,6 +150,16 @@ export class PostController {
     return this.postService.receivePost(user, id, receivePostDto);
   }
 
+  @ApiOperation({ summary: 'Receive order (courier)' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiResponse({ status: 200, description: 'Order received' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Patch('receive/order/:id')
+  receive(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.postService.receiveOrderWithScanerCourier(user, id);
+  }
+
   @ApiOperation({ summary: 'Create canceled post (courier)' })
   @ApiResponse({ status: 201, description: 'Canceled post created' })
   @UseGuards(JwtGuard, RolesGuard)
