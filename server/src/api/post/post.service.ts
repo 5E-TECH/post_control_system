@@ -404,6 +404,59 @@ export class PostService {
     }
   }
 
+  async receiveOrderWithScanerCourier(user: JwtPayload, id: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1) Orderni topamiz
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      if (!order.post_id) {
+        throw new NotFoundException('Order has no post');
+      }
+
+      // 2) Shu order tegishli bo'lgan postni faqat shu courierga bog‘langanini tekshiramiz
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id: order.post_id, courier_id: user.id },
+      });
+      if (!post) {
+        throw new NotFoundException(
+          'Post not found or not assigned to this courier',
+        );
+      }
+
+      // 3) Order statusini o‘zgartiramiz
+      order.status = Order_status.WAITING;
+      await queryRunner.manager.save(order);
+
+      // 4) Post ichida hali "ON_THE_ROAD" order bor yoki yo‘qligini tekshiramiz
+      const activeOrdersCount = await queryRunner.manager.count(OrderEntity, {
+        where: { post_id: post.id, status: Order_status.ON_THE_ROAD },
+      });
+
+      if (activeOrdersCount === 0) {
+        post.status = Post_status.RECEIVED;
+        await queryRunner.manager.save(post);
+      }
+
+      // 5) Commit
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Order received');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async createCanceledPost(user: JwtPayload, ordersArrayDto: ReceivePostDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
