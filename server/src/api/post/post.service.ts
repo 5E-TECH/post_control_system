@@ -229,7 +229,13 @@ export class PostService {
       const allOrdersByPostId = await this.orderRepo.find({
         where: [{ post_id: id }, { canceled_post_id: id }],
 
-        relations: ['customer', 'customer.district', 'items', 'items.product'],
+        relations: [
+          'customer',
+          'market',
+          'customer.district',
+          'items',
+          'items.product',
+        ],
       });
       return successRes(allOrdersByPostId, 200, 'All orders by post id');
     } catch (error) {
