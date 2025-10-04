@@ -85,6 +85,11 @@ export class DistrictService implements OnModuleInit {
       if (!district) {
         throw new NotFoundException('District not found');
       }
+      if (district.assigned_region === updateDistrictDto.assigned_region) {
+        throw new BadRequestException(
+          'The district already assigned to this region',
+        );
+      }
 
       const assigningRegion = await this.regionRepository.findOne({
         where: { id: updateDistrictDto.assigned_region },

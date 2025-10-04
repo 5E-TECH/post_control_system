@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useParams } from "react-router-dom";
 import type { RootState } from "../../../../../../app/store";
+import { BASE_URL } from "../../../../../../shared/const";
 
 export default function ScanAndOrder() {
   const { token } = useParams();
@@ -24,15 +25,12 @@ export default function ScanAndOrder() {
       setOrder(null);
 
       try {
-        const res = await fetch(
-          `http://192.168.10.209:8080/api/v1/order/qr-code/${token}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: authToken ? `Bearer ${authToken}` : "",
-            },
-          }
-        );
+        const res = await fetch(`${BASE_URL}order/qr-code/${token}`, {
+          method: "GET",
+          headers: {
+            Authorization: authToken ? `Bearer ${authToken}` : "",
+          },
+        });
 
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
