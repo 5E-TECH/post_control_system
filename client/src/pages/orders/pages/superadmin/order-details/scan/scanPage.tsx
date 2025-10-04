@@ -34,7 +34,7 @@ export default function ScanPage() {
 
             // 🔊 beep ovoz
             const audio = new Audio(
-              "../../../../../../../public/sound/beep.mp3"
+              "../../../../../../../sound/beep.mp3"
             );
             audio.play().catch((err) => console.error("Ovoz chiqmadi:", err));
 
