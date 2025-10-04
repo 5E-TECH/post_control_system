@@ -181,6 +181,12 @@ const MailDetail = () => {
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
+                    Market
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
                     PUL MIQDORI
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
@@ -234,6 +240,9 @@ const MailDetail = () => {
                     <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
                       {order?.customer?.phone_number}
                     </span>
+                  </td>
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {order?.customer?.district?.name}
                   </td>
                   <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
                     {order?.customer?.district?.name}
