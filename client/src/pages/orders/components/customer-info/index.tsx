@@ -1,10 +1,11 @@
 import { Input, Select } from "antd";
-import { memo, useEffect, useState, type ChangeEvent } from "react";
+import { memo, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import type { RootState } from "../../../../app/store";
 import { useTranslation } from "react-i18next";
+import { debounce } from "../../../../shared/helpers/DebounceFunc";
 
 export interface ICustomer {
   phone_number: string;
@@ -26,23 +27,37 @@ const CustomerInfocomp = () => {
   const { t } = useTranslation("createOrder");
   const [formData, setFormData] = useState<ICustomer>(initialState);
 
+  // 🔑 search uchun alohida state
+  const [regionSearch, setRegionSearch] = useState("");
+  const [districtSearch, setDistrictSearch] = useState("");
+
   const { getRegions, getRegionsById } = useRegion();
+
+  // 🔹 Regionlarni backenddan searchsiz olib kelamiz
   const { data: allRegions } = getRegions();
-  const regions = allRegions?.data.map((item: any) => ({
-    value: item.id,
-    label: item.name,
-  }));
 
-  // const [phoneNumber, setPhoneNumer] = useState<string>("");
+  // 🔹 Frontendda search qilamiz
+  const regions = allRegions?.data
+    ?.filter((item: any) =>
+      regionSearch
+        ? item.name.toLowerCase().includes(regionSearch.toLowerCase())
+        : true
+    )
+    .map((item: any) => ({
+      value: item.id,
+      label: item.name,
+    }));
 
-  // const allNumbers = users
-  //   ?.filter((user: any) =>
-  //     phoneNumber && user?.phone_number?.startsWith(phoneNumber)
-  //       ? user?.phone_number
-  //       : null
-  //   )
-  //   .map((user: any) => user?.phone_number);
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((callback: (val: string) => void, value: string) => {
+        callback(value);
+      }, 500),
+    []
+  );
+
   const dispatch = useDispatch();
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     const updated = { ...formData, [name]: value };
@@ -68,16 +83,23 @@ const CustomerInfocomp = () => {
     }
   }, [customerData]);
 
+  // 🔹 Tanlangan regionga qarab districtlarni olib kelamiz
   const { data } = getRegionsById(
     formData?.region_id as string,
-    formData?.region_id ? true : false
+    !!formData?.region_id
   );
-  const specificDistrictsByRegion = data?.data?.districts?.map(
-    (district: any) => ({
+
+  // 🔹 Districtlarda ham frontend search
+  const specificDistrictsByRegion = data?.data?.districts
+    ?.filter((district: any) =>
+      districtSearch
+        ? district.name.toLowerCase().includes(districtSearch.toLowerCase())
+        : true
+    )
+    .map((district: any) => ({
       value: district?.id,
       label: district?.name,
-    })
-  );
+    }));
 
   return (
     <div className="w-full p-5 rounded-md dark:bg-[#312D48] shadow-lg">
@@ -85,6 +107,7 @@ const CustomerInfocomp = () => {
         {t("customerInfo")}
       </h1>
       <div className="flex flex-col gap-4">
+        {/* Telefon raqami */}
         <Input
           name="phone_number"
           value={formData.phone_number}
@@ -113,17 +136,7 @@ const CustomerInfocomp = () => {
           className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
         />
 
-        {/* {allNumbers?.length ? (
-          <div className="grid grid-cols-5 gap-5">
-            {allNumbers?.map((number: string, inx: number) => (
-              <div key={inx} className="cursor-pointer hover:opacity-80">
-                <span>{number}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          ""
-        )} */}
+        {/* Region va District */}
         <div className="flex gap-4 max-[650px]:flex-col">
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">
@@ -131,11 +144,18 @@ const CustomerInfocomp = () => {
             </label>
             <Select
               value={formData.region_id}
+              onSearch={(value) =>
+                debouncedSearch((searchValue: string) => {
+                  setRegionSearch(searchValue);
+                }, value)
+              }
               onChange={(value) => handleSelectChange("region_id", value)}
               placeholder={t("placeholder.selectRegion")}
               className="w-full h-[45px]! custom-select-dropdown-bright"
               options={regions}
               dropdownClassName="dark-dropdown"
+              showSearch
+              filterOption={false}
             />
           </div>
 
@@ -145,15 +165,23 @@ const CustomerInfocomp = () => {
             </label>
             <Select
               value={formData.district_id}
+              onSearch={(value) =>
+                debouncedSearch((searchValue: string) => {
+                  setDistrictSearch(searchValue);
+                }, value)
+              }
               onChange={(value) => handleSelectChange("district_id", value)}
               placeholder={t("placeholder.selectDistrict")}
               className="w-full h-[45px]! custom-select-dropdown-bright"
-              options={formData?.region_id ? specificDistrictsByRegion : null}
+              options={formData?.region_id ? specificDistrictsByRegion : []}
               dropdownClassName="dark-dropdown"
+              showSearch
+              filterOption={false}
             />
           </div>
         </div>
 
+        {/* Ism */}
         <div>
           <label className="block text-xs text-gray-500 mb-1">
             {t("customerForm.name")}
@@ -167,6 +195,7 @@ const CustomerInfocomp = () => {
           />
         </div>
 
+        {/* Address */}
         <div className="pb-1">
           <label className="block text-xs text-gray-500 mb-1">
             {t("customerForm.address")}
