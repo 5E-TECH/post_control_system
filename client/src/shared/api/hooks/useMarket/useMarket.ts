@@ -12,10 +12,7 @@ export const useMarket = () => {
       client.invalidateQueries({ queryKey: [market], refetchType: "active" }),
   });
 
-  const getMarkets = (
-    enabled:boolean = true,
-    params?: { search?: string; limit?: number }
-  ) =>
+  const getMarkets = (enabled: boolean = true, params?: any) =>
     useQuery({
       queryKey: [market, params],
       queryFn: () =>
