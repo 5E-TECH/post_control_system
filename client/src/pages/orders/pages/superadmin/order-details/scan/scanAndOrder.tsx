@@ -17,7 +17,13 @@ export default function ScanAndOrder() {
   const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
   const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
   const [totalPrice, setTotalPrice] = useState<number | string>("");
-  const [isShow, setIsShow] = useState(true);
+  const [isShow, setIsShow] = useState<boolean>(true);
+  const [alertBtnYesNo, setAlertBtnYesNo] = useState<boolean>(false);
+  const [alertBtnYesNoWaiting, setAlertBtnYesNoWaiting] =
+    useState<boolean>(false);
+  const [actionTypeOrder, setActionTypeOrder] = useState<
+    "sell" | "cancel" | null
+  >(null);
 
   useEffect(() => {
     if (isShow && order?.data) {
@@ -28,9 +34,9 @@ export default function ScanAndOrder() {
       }));
       setOrderItemInfo(initialItems || []);
     }
-  }, [isShow]);
+  }, [isShow, order]);
 
-  const orderStatus = "waiting";
+  const orderStatus = order?.data?.status;
   useEffect(() => {
     if (!token) {
       setError("QR token topilmadi");
@@ -81,12 +87,22 @@ export default function ScanAndOrder() {
   const [form] = Form.useForm<FieldType>();
   const onFinish: FormProps<FieldType>["onFinish"] = () => {};
 
+  const handleSellOrder = () => {
+    setAlertBtnYesNoWaiting(true);
+    setActionTypeOrder("sell");
+  };
+
+  const handleCancelOrder = () => {
+    setAlertBtnYesNoWaiting(true);
+    setActionTypeOrder("cancel");
+  };
+
   if (loading) return <div>Yuklanmoqda...</div>;
   if (error) return <div style={{ color: "red" }}>Error: {error}</div>;
 
   return (
     <Popup isShow={isShow}>
-      <div className="shadow-lg rounded-md bg-[#ffffff] flex flex-col justify-between pt-6 px-8">
+      <div className="w-[350px] shadow-lg rounded-md bg-[#ffffff] flex flex-col justify-between pt-6 px-8">
         <X
           className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
           onClick={() => setIsShow(false)}
@@ -106,11 +122,17 @@ export default function ScanAndOrder() {
           </p>
           <p>
             <span className="font-semibold">Tumani: </span>
-            <span>{order.data?.customer?.phone_number || "—"}</span>
+            <span>{order.data?.customer?.district?.name || "—"}</span>
           </p>
           <p>
             <span className="font-semibold">Mahsulot nomi: </span>
-            <span>{order.data?.customer?.phone_number || "—"}</span>
+            <span>
+              {order.data?.items?.length
+                ? order.data.items
+                    .map((item: any) => item.product.name)
+                    .join(", ")
+                : "—"}
+            </span>
           </p>
           <p>
             <span className="font-semibold">Mahsulot soni: </span>
@@ -131,7 +153,7 @@ export default function ScanAndOrder() {
           <div className={`flex flex-col pt-${partleSoldShow ? 3 : 0}`}>
             {orderItemInfo.map((item, index) => (
               <div
-                key={item.productId}
+                key={item.product_id}
                 className="pt-4 flex gap-10 justify-between"
               >
                 <Form.Item className="flex-1!">
@@ -190,9 +212,32 @@ export default function ScanAndOrder() {
           </div>
         )}
 
-        {(orderStatus === "waiting" ||
-          orderStatus === "sold" ||
-          orderStatus === "cancel") && (
+        {alertBtnYesNo && (
+          <div className="flex flex-col gap-5 pt-2">
+            <span className="text-center text-[18px] text-red-500">
+              {orderStatus === "sold"
+                ? "Sotilgan"
+                : orderStatus === "cancelled"
+                ? "Bekor qilingan"
+                : ""}{" "}
+              buyurtmani ortga qaytarmohchimsz?
+            </span>
+
+            <div className="flex gap-10">
+              <Button
+                className="w-full bg-red-500! text-white! h-[40px]!"
+                onClick={() => setAlertBtnYesNo(false)}
+              >
+                Yo'q
+              </Button>
+              <Button className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!">
+                Ha
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {orderStatus === "waiting" && (
           <div className="pt-1">
             <Form initialValues={{}} form={form} onFinish={onFinish}>
               <div>
@@ -226,15 +271,39 @@ export default function ScanAndOrder() {
         )}
 
         <div className="pb-4">
-          {/* {orderStatus === "on the road" && (
-            <div className="w-full">
+          {orderStatus === "on_the_road" && (
+            <div className="w-full pt-5">
               <Button className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!">
                 Qabul qildim
               </Button>
             </div>
-          )} */}
+          )}
 
-          {orderStatus === "waiting" && (
+          {alertBtnYesNoWaiting && (
+            <div className="flex flex-col gap-5 pt-2">
+              <span className="text-center text-[18px] text-red-500">
+                Buyurtmani{" "}
+                {actionTypeOrder === "sell"
+                  ? "sotmohchimsz"
+                  : "bekor qilmohchimsz"}
+                ?
+              </span>
+
+              <div className="flex gap-10">
+                <Button
+                  className="w-full bg-red-500! text-white! h-[40px]!"
+                  onClick={() => setAlertBtnYesNoWaiting(false)}
+                >
+                  Yo'q
+                </Button>
+                <Button className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!">
+                  Ha
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!alertBtnYesNoWaiting && orderStatus === "waiting" && (
             <div className="w-full flex gap-5">
               <Button
                 className="w-full h-[40px]!"
@@ -242,11 +311,47 @@ export default function ScanAndOrder() {
               >
                 <AlertCircle />
               </Button>
-              <Button className="w-full h-[40px]! bg-red-500! text-[#ffffff]!">
+              <Button
+                className="w-full h-[40px]! bg-red-500! text-[#ffffff]!"
+                onClick={handleCancelOrder}
+              >
                 Bekor qilish
               </Button>
-              <Button className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!">
+              <Button
+                className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
+                onClick={handleSellOrder}
+              >
                 Sotish
+              </Button>
+            </div>
+          )}
+
+          {!alertBtnYesNo && orderStatus === "sold" && (
+            <div className="pt-4 flex gap-10">
+              <Button
+                className="w-full h-[40px]!"
+                onClick={() => setAlertBtnYesNo((p) => !p)}
+              >
+                <AlertCircle />
+              </Button>
+
+              <Button className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!">
+                Buyurtmani qaytarish
+              </Button>
+            </div>
+          )}
+
+          {!alertBtnYesNo && orderStatus === "cancelled" && (
+            <div className="pt-4 flex gap-10">
+              <Button
+                className="w-full h-[40px]!"
+                onClick={() => setAlertBtnYesNo((p) => !p)}
+              >
+                <AlertCircle />
+              </Button>
+
+              <Button className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!">
+                Buyurtmani qaytarish
               </Button>
             </div>
           )}

@@ -15,7 +15,7 @@ import { BASE_URL } from "../../../../shared/const";
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
   received: "bg-green-500",
-  "on the road": "bg-yellow-500",
+  "on_the_road": "bg-yellow-500",
   waiting: "bg-orange-500",
   sold: "bg-purple-500",
   cancelled: "bg-red-500",
@@ -28,7 +28,7 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   new: "Yangi",
   received: "Qabul qilingan",
-  "on the road": "Yo‘lda",
+  "on_the_road": "Yo‘lda",
   waiting: "Kutilmoqda",
   sold: "Sotilgan",
   cancelled: "Bekor qilingan",
