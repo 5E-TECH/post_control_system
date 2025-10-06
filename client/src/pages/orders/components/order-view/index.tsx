@@ -40,6 +40,8 @@ const statusLabels: Record<string, string> = {
 
 const OrderView = () => {
   const { t } = useTranslation("orderList");
+  const { t:st } = useTranslation("status");
+
   const navigate = useNavigate();
 
   const { getOrders, getMarketsByMyNewOrders } = useOrder();
@@ -268,7 +270,7 @@ const OrderView = () => {
                     }`}
                   >
                     {/* {statusLabels[item?.status] || item?.status} */}
-                    {t(`Status.${item?.status}`)}
+                    {st(`${item?.status}`)}
                   </span>
                 </td>
                 <td className="data-cell pl-10" data-cell="PRICE">

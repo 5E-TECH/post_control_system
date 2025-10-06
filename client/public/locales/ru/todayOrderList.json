@@ -1,0 +1,16 @@
+{
+    "title": "Заказы на сегодня",
+    "placeholder": {
+        "search": "Поиск заказа"
+    },
+    "market": "Маркет",
+    "phone": "Телефон",
+    "totalPrice": "Общая цена",
+    "stock": "Склад",
+    "customer": "Клиент",
+    "address": "Адрес",
+    "status": "Статус",
+    "price": "Цена",
+    "action": "Действие",
+    "qabulQilish":"Принять"
+}

@@ -1,6 +1,6 @@
 {
   "title": "Order List",
-  "filters":"Filters",
+  "filters": "Filters",
   "noPermission": "No Permission 🚫",
   "placeholder": {
     "selectMarket": "Select market",
@@ -12,21 +12,21 @@
   },
   "button": {
     "addOrder": "Add order",
-    "tozalash":"Clear",
-    "export":"Export"
+    "tozalash": "Clear",
+    "export": "Export"
   },
   "Status": {
-  "new": "New",
-  "received": "Received",
-  "on_the_road": "On the Road",
-  "waiting": "Waiting",
-  "sold": "Sold",
-  "cancelled": "Cancelled",
-  "paid": "Paid",
-  "partly_paid": "Partly Paid",
-  "cancelled_sent": "Cancelled (Sent)",
-  "closed": "Closed"
-},
+    "new": "New",
+    "received": "Received",
+    "on_the_road": "On the Road",
+    "waiting": "Waiting",
+    "sold": "Sold",
+    "cancelled": "Cancelled",
+    "paid": "Paid",
+    "partly_paid": "Partly Paid",
+    "cancelled_sent": "Cancelled (Sent)",
+    "closed": "Closed"
+  },
   "customer": "CUSTOMER",
   "phone": "PHONE",
   "region": "REGION",

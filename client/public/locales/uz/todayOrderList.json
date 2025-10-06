@@ -1,0 +1,16 @@
+{
+    "title": "Bugungi buyurtmalar",
+    "placeholder": {
+        "search": "Buyurtma qidirish"
+    },
+    "market": "Bozor",
+    "phone": "Telefon",
+    "totalPrice": "Umumiy narx",
+    "stock": "Ombor",
+    "customer": "Mijoz",
+    "address": "Manzil",
+    "status": "Holat",
+    "price": "Narx",
+    "action": "Amal",
+    "qabulQilish": "Qabul qilish"
+}

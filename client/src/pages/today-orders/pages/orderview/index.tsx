@@ -9,8 +9,12 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import ConfirmPopup from "../../../../shared/components/confirmPopup";
+import { useTranslation } from "react-i18next";
 
 const OrderView = () => {
+  const { t } = useTranslation("todayOrderList");
+  const { t:st } = useTranslation("status");
+
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
   const [deleteId, setDeleteId] = useState("");
@@ -19,19 +23,19 @@ const OrderView = () => {
   const [_, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  const { getOrderByMarket, getMarketsByMyNewOrders, deleteOrders } = useOrder();
+  const { getOrderByMarket, getMarketsByMyNewOrders, deleteOrders } =
+    useOrder();
   const { createPost } = usePost();
   const { data, refetch } =
     user.role === "market" ? getMarketsByMyNewOrders() : getOrderByMarket(id);
 
-    useEffect(() => {
-      if(data?.data?.total === 0){
-        navigate(-1)
-      }
+  useEffect(() => {
+    if (data?.data?.total === 0) {
+      navigate(-1);
+    }
+  }, [data]);
+  // console.log(data?.data?.total);
 
-    }, [data])
-    // console.log(data?.data?.total);
-    
   useEffect(() => {
     if (data?.data?.data) {
       setSelectedIds(data.data?.data?.map((item: any) => item.id));
@@ -47,12 +51,12 @@ const OrderView = () => {
     console.log(id);
     deleteOrders.mutate(id, {
       onSuccess: () => {
-        handleSuccess("Order muvaffaqiyatli o'chirildi")
+        handleSuccess("Order muvaffaqiyatli o'chirildi");
       },
-      onError: (err:any) => {
-        handleApiError(err, "Orderni o'chirishda xatolik yuz ber")
-      }
-    })
+      onError: (err: any) => {
+        handleApiError(err, "Orderni o'chirishda xatolik yuz ber");
+      },
+    });
   };
   const handleAccapted = () => {
     const newOrder = {
@@ -114,44 +118,44 @@ const OrderView = () => {
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>CUSTOMER</span>
+                  <span>{t("customer")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>PHONE</span>
+                  <span>{t("phone")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>ADDRESS</span>
+                  <span>{t("address")}</span>
                 </div>
               </th>
 
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>STATUS</span>
+                  <span>{t("status")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>PRICE</span>
+                  <span>{t("price")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>STOCK</span>
+                  <span>{t("stock")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>ACTION</span>
+                  <span>{t("action")}</span>
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
@@ -194,7 +198,7 @@ const OrderView = () => {
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}
                   >
-                    {item?.status?.toUpperCase()}
+                    {st(`${item.status}`).toUpperCase()}
                   </span>
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
@@ -322,7 +326,7 @@ const OrderView = () => {
                   : "cursor-pointer"
               } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}
             >
-              Qabul qilish
+              {t("qabulQilish")}
             </button>
           </div>
         )}
