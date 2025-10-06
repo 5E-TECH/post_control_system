@@ -44,13 +44,13 @@ export enum Source_type {
 export enum Order_status {
   NEW = 'new',
   RECEIVED = 'received',
-  ON_THE_ROAD = 'on_the_road',
+  ON_THE_ROAD = 'on the road',
   WAITING = 'waiting',
   SOLD = 'sold',
   CANCELLED = 'cancelled',
   PAID = 'paid',
   PARTLY_PAID = 'partly_paid',
-  CANCELLED_SENT = 'cancelled_(sent)',
+  CANCELLED_SENT = 'cancelled (sent)',
   CLOSED = 'closed',
 }
 
