@@ -1,0 +1,23 @@
+{
+  "title": "Products",
+  "add": "Add new product",
+  "productInformation": "Product information",
+  "addProduct": "Add product",
+  "productName": "Product name",
+  "productRasmi": "Product image",
+  "dragAndDrop": "Drag and drop your image here",
+  "browseImage": "Choose image",
+  "discard": "Clear",
+  "save": "Save",
+  "or": "or",
+  "action": "Action",
+  "placeholder": {
+    "selectMarket": "Select market",
+    "search": "Search",
+    "productName": "Product name"
+  },
+  "popup": {
+    "market": "Market name",
+    "tanlash": "Select"
+  }
+}
