@@ -1,4 +1,3 @@
-// src/pages/orders/pages/superadmin/order-details/scan/ScanAndOrder.tsx
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useParams } from "react-router-dom";
@@ -371,7 +370,7 @@ export default function ScanAndOrder() {
           )}
 
           <div className="pb-4">
-            {orderStatus === "on_the_road" && (
+            {orderStatus === "on the road" && (
               <div className="w-full pt-5">
                 <Button
                   onClick={() => handleReceiveOrderById(order?.data?.id)}

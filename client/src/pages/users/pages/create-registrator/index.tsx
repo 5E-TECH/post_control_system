@@ -25,7 +25,7 @@ const CreateRegistrator = () => {
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const newRegistrator = {
       ...values,
-      salary: Number(values.salary),
+      salary: Number(String(values.salary).replace(/,/g, "")),
       payment_day: Number(values.payment_day),
       phone_number: values.phone_number.split(" ").join(""),
     };
@@ -34,10 +34,7 @@ const CreateRegistrator = () => {
         navigate("/all-users");
       },
       onError: (err: any) =>
-        handleApiError(
-          err,
-          "Foydalanuvchi yaratishda xatolik yuz berdi"
-        ),
+        handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),
     });
   };
 
@@ -116,18 +113,15 @@ const CreateRegistrator = () => {
 
         <Form.Item
           name="salary"
-          rules={[
-            { required: true, message: t("enterSalary") },
-            {
-              type: "number",
-              min: 0,
-              message: t("salaryMin"),
-              transform: (value) => Number(value),
-            },
-          ]}
+          rules={[{ required: true, message: t("enterSalary") }]}
+          getValueFromEvent={(e) => e.target.value.replace(/,/g, "")}
+          normalize={(value) => {
+            if (!value) return value;
+            const onlyNums = value.replace(/\D/g, "");
+            return onlyNums.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+          }}
         >
           <Input
-            type="number"
             className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterSalary")}
           />
@@ -139,11 +133,18 @@ const CreateRegistrator = () => {
             {
               type: "number",
               min: 1,
-              max: 30,
+              max: 31,
               message: t("paymentDayRange"),
               transform: (value) => Number(value),
             },
           ]}
+          normalize={(value) => {
+            if (value > 31) {
+              return 31;
+            } else {
+              return value;
+            }
+          }}
         >
           <Input
             type="number"

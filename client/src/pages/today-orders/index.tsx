@@ -8,7 +8,7 @@ import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 import { useTranslation } from "react-i18next";
 
 const TodayOrders = () => {
-    const { t } = useTranslation("todayOrderList");
+  const { t } = useTranslation("todayOrderList");
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const role = useSelector((state: RootState) => state.roleSlice);
@@ -22,16 +22,15 @@ const TodayOrders = () => {
   const handleProps = (id: string) => {
     navigate(`${id}`);
   };
-  
 
   const { getMarketsNewOrder } = useMarket();
   const { data, refetch, isLoading } = getMarketsNewOrder(false);
-  
+
   useEffect(() => {
-    if(role.role !== "market" && pathname === "/order/markets/new-orders"){
+    if (role.role !== "market" && pathname === "/order/markets/new-orders") {
       refetch();
     }
-  }, [pathname])
+  }, [pathname]);
 
   if (pathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
@@ -94,7 +93,14 @@ const TodayOrders = () => {
                     {item?.market?.name}
                   </td>
                   <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.market?.phone_number}
+                    {item?.market?.phone_number
+                      ? `${item?.market?.phone_number
+                          .replace(/\D/g, "")
+                          .replace(
+                            /^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/,
+                            "+$1 $2 $3 $4 $5"
+                          )}`
+                      : ""}
                   </td>
                   <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                     {item?.orderTotalPrice}

@@ -13,16 +13,16 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 import { BASE_URL } from "../../../../shared/const";
 
 const statusColors: Record<string, string> = {
-  new: "bg-sky-500",             // Yangi — ishonch va yangilik hissi uchun moviy
-  received: "bg-green-600",      // Qabul qilingan — muvaffaqiyat va tasdiq ramzi, yashil
+  new: "bg-sky-500", // Yangi — ishonch va yangilik hissi uchun moviy
+  received: "bg-green-600", // Qabul qilingan — muvaffaqiyat va tasdiq ramzi, yashil
   "on the road": "bg-amber-500", // Yo‘lda — harakat va ogohlantirish hissi uchun sariq-to‘q
-  waiting: "bg-orange-400",      // Kutilyapti — sabr va ogohlantirish uchun to‘q sariq
-  sold: "bg-violet-600",         // Sotilgan — natija va muvaffaqiyat ramzi, binafsha
-  cancelled: "bg-red-600",       // Bekor qilingan — xatolik yoki to‘xtash holati, qizil
-  paid: "bg-emerald-500",        // To‘langan — barqarorlik va ishonch, yashil-jade
-  partly_paid: "bg-teal-500",    // Qisman to‘langan — oraliq holat, ko‘k-yashil
+  waiting: "bg-orange-400", // Kutilyapti — sabr va ogohlantirish uchun to‘q sariq
+  sold: "bg-violet-600", // Sotilgan — natija va muvaffaqiyat ramzi, binafsha
+  cancelled: "bg-red-600", // Bekor qilingan — xatolik yoki to‘xtash holati, qizil
+  paid: "bg-emerald-500", // To‘langan — barqarorlik va ishonch, yashil-jade
+  partly_paid: "bg-teal-500", // Qisman to‘langan — oraliq holat, ko‘k-yashil
   "cancelled (sent)": "bg-gray-500", // Jo‘natilgan, lekin bekor qilingan — neytral kulrang
-  closed: "bg-zinc-800",         // Yopilgan — yakunlangan holat, quyuq kulrang yoki qora
+  closed: "bg-zinc-800", // Yopilgan — yakunlangan holat, quyuq kulrang yoki qora
 };
 
 const statusLabels: Record<string, string> = {
@@ -40,7 +40,7 @@ const statusLabels: Record<string, string> = {
 
 const OrderView = () => {
   const { t } = useTranslation("orderList");
-  const { t:st } = useTranslation("status");
+  const { t: st } = useTranslation("status");
 
   const navigate = useNavigate();
 
@@ -252,7 +252,14 @@ const OrderView = () => {
                   {item?.customer?.name}
                 </td>
                 <td className="data-cell pl-10" data-cell="PHONE">
-                  {item?.customer?.phone_number}
+                  {item?.customer?.phone_number
+                    ? `${item?.customer.phone_number
+                        .replace(/\D/g, "")
+                        .replace(
+                          /^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/,
+                          "+$1 $2 $3 $4 $5"
+                        )}`
+                    : ""}
                 </td>
                 <td className="data-cell pl-10" data-cell="REGION">
                   {item?.customer?.district?.region?.name}
@@ -278,10 +285,7 @@ const OrderView = () => {
                     {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}{" "}
                   </span>
                 </td>
-                <td
-                  className="data-cell pl-15"
-                  data-cell="CREATED AT"
-                >
+                <td className="data-cell pl-15" data-cell="CREATED AT">
                   {new Date(Number(item?.created_at)).toLocaleString("uz-UZ", {
                     day: "2-digit",
                     month: "2-digit",
