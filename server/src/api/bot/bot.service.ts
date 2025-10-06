@@ -78,7 +78,6 @@ export class BotService {
       });
       return { success: true, message: 'Message sent successfully' };
     } catch (error) {
-      console.error('Error sending message:', error);
       const message =
         error?.response?.message ||
         error?.message ||
