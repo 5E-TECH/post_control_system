@@ -250,7 +250,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
           </div>
         );
-      case "kuryer":
+      case "courier":
         return (
           <div className="flex justify-evenly px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
             <NavLink

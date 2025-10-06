@@ -7,6 +7,8 @@ import Popup from "../../../../../../shared/ui/Popup";
 import { AlertCircle, Minus, Plus, X } from "lucide-react";
 import { Button, Form, Input, InputNumber, Select, type FormProps } from "antd";
 import type { FieldType } from "../../../../components/courier/waiting-orders";
+import { useOrder } from "../../../../../../shared/api/hooks/useOrder";
+import { useApiNotification } from "../../../../../../shared/hooks/useApiNotification";
 
 export default function ScanAndOrder() {
   const { token } = useParams();
@@ -36,6 +38,7 @@ export default function ScanAndOrder() {
     }
   }, [isShow, order]);
 
+  const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
   const orderStatus = order?.data?.status;
   useEffect(() => {
     if (!token) {
@@ -51,7 +54,7 @@ export default function ScanAndOrder() {
 
       try {
         const res = await fetch(
-          `http://10.181.40.168:8080/api/v1/order/qr-code/${token}`,
+          `http://192.168.10.209:8080/api/v1/order/qr-code/${token}`,
           {
             method: "GET",
             headers: {
@@ -84,8 +87,109 @@ export default function ScanAndOrder() {
     fetchOrder();
   }, [token, authToken]);
 
+  const { sellOrder, cancelOrder, partlySellOrder } = useOrder();
   const [form] = Form.useForm<FieldType>();
-  const onFinish: FormProps<FieldType>["onFinish"] = () => {};
+
+  const id = order?.data?.id;
+  const onFinish: FormProps<FieldType>["onFinish"] = (data) => {
+    if (actionTypeOrder === "sell") {
+      if (!partleSoldShow) {
+        const order_item_info = orderItemInfo.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }));
+        if (
+          totalPrice === undefined ||
+          totalPrice === null ||
+          totalPrice === "" ||
+          Number(totalPrice) < 0
+        ) {
+          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+          return;
+        }
+        const partlySellData = {
+          order_item_info,
+          totalPrice: Number(String(totalPrice).split(",").join("")),
+          extraCost: Number(data?.extraCost),
+          comment: data?.comment,
+        };
+        partlySellOrder.mutate(
+          { id, data: partlySellData },
+          {
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
+            },
+            onError: (err: any) => {
+              handleApiError(err, "Buyurtma qisman sotilishda xatolik");
+            },
+          }
+        );
+      } else {
+        sellOrder.mutate(
+          { id, data },
+          {
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+            },
+            onError: (err: any) => {
+              handleApiError(err, "Buyurtmani sotishda xatolik");
+            },
+          }
+        );
+      }
+    } else {
+      if (partleSoldShow) {
+        const order_item_info = orderItemInfo.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+        }));
+        if (
+          totalPrice === undefined ||
+          totalPrice === null ||
+          totalPrice === "" ||
+          Number(totalPrice) < 0
+        ) {
+          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+          return;
+        }
+        const partlySellData = {
+          order_item_info,
+          totalPrice: Number(String(totalPrice).split(",").join("")),
+          extraCost: Number(data?.extraCost),
+          comment: data?.comment,
+        };
+        partlySellOrder.mutate(
+          { id, data: partlySellData },
+          {
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
+            },
+            onError: (err: any) =>
+              handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
+          }
+        );
+      } else {
+        cancelOrder.mutate(
+          { id, data },
+          {
+            onSuccess: () => {
+              setIsShow(false);
+              handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+            },
+            onError: (err: any) =>
+              handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
+          }
+        );
+      }
+    }
+  };
+
+  const handleReceiveOrderById = (id: string) => {
+    console.log(id);
+  };
 
   const handleSellOrder = () => {
     setAlertBtnYesNoWaiting(true);
@@ -110,7 +214,8 @@ export default function ScanAndOrder() {
 
         {/* Umumiy content */}
         <div
-          className={`space-y-1 text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}>
+          className={`space-y-1 text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
+        >
           <p>
             <span className="font-semibold">Mijoz ismi:</span>{" "}
             <span>{order.data?.customer?.name || "—"}</span>
@@ -205,11 +310,11 @@ export default function ScanAndOrder() {
                     Number(rawValue || 0)
                   );
                   setTotalPrice(formatted);
-                }}></Input>
+                }}
+              ></Input>
             </Form.Item>
           </div>
         )}
-
         {alertBtnYesNo && (
           <div className="flex flex-col gap-5 pt-2">
             <span className="text-center text-[18px] text-red-500">
@@ -235,9 +340,9 @@ export default function ScanAndOrder() {
           </div>
         )}
 
-        {orderStatus === "waiting" && (
-          <div className="pt-1">
-            <Form initialValues={{}} form={form} onFinish={onFinish}>
+        <Form initialValues={{}} form={form} onFinish={onFinish}>
+          {orderStatus === "waiting" && (
+            <div className="pt-1">
               <div>
                 <span className="">Izoh</span>
                 <Form.Item name="comment">
@@ -264,95 +369,102 @@ export default function ScanAndOrder() {
                   />
                 </Form.Item>
               </div>
-            </Form>
-          </div>
-        )}
-
-        <div className="pb-4">
-          {orderStatus === "on_the_road" && (
-            <div className="w-full pt-5">
-              <Button className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!">
-                Qabul qildim
-              </Button>
             </div>
           )}
 
-          {alertBtnYesNoWaiting && (
-            <div className="flex flex-col gap-5 pt-2">
-              <span className="text-center text-[18px] text-red-500">
-                Buyurtmani{" "}
-                {actionTypeOrder === "sell"
-                  ? "sotmohchimsz"
-                  : "bekor qilmohchimsz"}
-                ?
-              </span>
-
-              <div className="flex gap-10">
+          <div className="pb-4">
+            {orderStatus === "on_the_road" && (
+              <div className="w-full pt-5">
                 <Button
-                  className="w-full bg-red-500! text-white! h-[40px]!"
-                  onClick={() => setAlertBtnYesNoWaiting(false)}
+                  onClick={() => handleReceiveOrderById(order?.data?.id)}
+                  className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
                 >
-                  Yo'q
-                </Button>
-                <Button className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!">
-                  Ha
+                  Qabul qilish
                 </Button>
               </div>
-            </div>
-          )}
+            )}
 
-          {!alertBtnYesNoWaiting && orderStatus === "waiting" && (
-            <div className="w-full flex gap-5">
-              <Button
-                className="w-full h-[40px]!"
-                onClick={() => setPartlySoldShow((p) => !p)}>
-                <AlertCircle />
-              </Button>
-              <Button
-                className="w-full h-[40px]! bg-red-500! text-[#ffffff]!"
-                onClick={handleCancelOrder}
-              >
-                Bekor qilish
-              </Button>
-              <Button
-                className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
-                onClick={handleSellOrder}
-              >
-                Sotish
-              </Button>
-            </div>
-          )}
+            {alertBtnYesNoWaiting && (
+              <div className="flex flex-col gap-5 pt-2">
+                <span className="text-center text-[18px] text-red-500">
+                  Buyurtmani{" "}
+                  {actionTypeOrder === "sell"
+                    ? "sotmohchimsz"
+                    : "bekor qilmohchimsz"}
+                  ?
+                </span>
 
-          {!alertBtnYesNo && orderStatus === "sold" && (
-            <div className="pt-4 flex gap-10">
-              <Button
-                className="w-full h-[40px]!"
-                onClick={() => setAlertBtnYesNo((p) => !p)}
-              >
-                <AlertCircle />
-              </Button>
+                <div className="flex gap-10">
+                  <Button
+                    className="w-full bg-red-500! text-white! h-[40px]!"
+                    onClick={() => setAlertBtnYesNoWaiting(false)}
+                  >
+                    Yo'q
+                  </Button>
+                  <Button
+                    onClick={() => form.submit()}
+                    className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
+                  >
+                    Ha
+                  </Button>
+                </div>
+              </div>
+            )}
 
-              <Button className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!">
-                Buyurtmani qaytarish
-              </Button>
-            </div>
-          )}
+            {!alertBtnYesNoWaiting && orderStatus === "waiting" && (
+              <div className="w-full flex gap-5">
+                <Button
+                  className="w-full h-[40px]!"
+                  onClick={() => setPartlySoldShow((p) => !p)}
+                >
+                  <AlertCircle />
+                </Button>
+                <Button
+                  className="w-full h-[40px]! bg-red-500! text-[#ffffff]!"
+                  onClick={handleCancelOrder}
+                >
+                  Bekor qilish
+                </Button>
+                <Button
+                  className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
+                  onClick={handleSellOrder}
+                >
+                  Sotish
+                </Button>
+              </div>
+            )}
 
-          {!alertBtnYesNo && orderStatus === "cancelled" && (
-            <div className="pt-4 flex gap-10">
-              <Button
-                className="w-full h-[40px]!"
-                onClick={() => setAlertBtnYesNo((p) => !p)}
-              >
-                <AlertCircle />
-              </Button>
+            {!alertBtnYesNo && orderStatus === "sold" && (
+              <div className="pt-4 flex gap-10">
+                <Button
+                  className="w-full h-[40px]!"
+                  onClick={() => setAlertBtnYesNo((p) => !p)}
+                >
+                  <AlertCircle />
+                </Button>
 
-              <Button className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!">
-                Buyurtmani qaytarish
-              </Button>
-            </div>
-          )}
-        </div>
+                <Button className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!">
+                  Buyurtmani qaytarish
+                </Button>
+              </div>
+            )}
+
+            {!alertBtnYesNo && orderStatus === "cancelled" && (
+              <div className="pt-4 flex gap-10">
+                <Button
+                  className="w-full h-[40px]!"
+                  onClick={() => setAlertBtnYesNo((p) => !p)}
+                >
+                  <AlertCircle />
+                </Button>
+
+                <Button className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!">
+                  Buyurtmani qaytarish
+                </Button>
+              </div>
+            )}
+          </div>
+        </Form>
       </div>
     </Popup>
   );
