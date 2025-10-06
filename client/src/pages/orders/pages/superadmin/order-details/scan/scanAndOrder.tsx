@@ -9,6 +9,7 @@ import { Button, Form, Input, InputNumber, Select, type FormProps } from "antd";
 import type { FieldType } from "../../../../components/courier/waiting-orders";
 import { useOrder } from "../../../../../../shared/api/hooks/useOrder";
 import { useApiNotification } from "../../../../../../shared/hooks/useApiNotification";
+import { BASE_URL } from "../../../../../../shared/const";
 
 export default function ScanAndOrder() {
   const { token } = useParams();
@@ -53,15 +54,12 @@ export default function ScanAndOrder() {
       setOrder(null);
 
       try {
-        const res = await fetch(
-          `http://192.168.10.209:8080/api/v1/order/qr-code/${token}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: authToken ? `Bearer ${authToken}` : "",
-            },
-          }
-        );
+        const res = await fetch(`${BASE_URL}order/qr-code/${token}`, {
+          method: "GET",
+          headers: {
+            Authorization: authToken ? `Bearer ${authToken}` : "",
+          },
+        });
 
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
