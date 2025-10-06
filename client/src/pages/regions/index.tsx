@@ -7,9 +7,7 @@ import RegionMap from "./components/regionMap";
 
 const Regions = () => {
   const navigate = useNavigate();
-  const {role, region} = useSelector((state: RootState) => state.roleSlice);
-  console.log(role);
-  
+  const { role, region } = useSelector((state: RootState) => state.roleSlice);
 
   const { pathname } = useLocation();
   if (pathname.startsWith("/regions/")) {
@@ -17,7 +15,11 @@ const Regions = () => {
   }
   return (
     <div className="relative">
-      {role === "courier" ? <RegionMap regionName={region} /> : <UzbekistanMap />}
+      {role === "courier" ? (
+        <RegionMap regionName={region} />
+      ) : (
+        <UzbekistanMap />
+      )}
 
       <button
         onClick={() => navigate("districts")}
