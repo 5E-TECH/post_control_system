@@ -15,6 +15,7 @@ import { Button, Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../shared/hooks/useParams";
 import HistoryPopup from "./components/historyPopup";
 import { debounce } from "../../shared/helpers/DebounceFunc";
+import { useTranslation } from "react-i18next";
 
 export interface IPaymentFilter {
   operationType?: string | null;
@@ -31,6 +32,7 @@ const initialState: IPaymentFilter = {
 };
 
 const Payments = () => {
+  const { t } = useTranslation("payment");
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
   const id = user.id;
@@ -183,13 +185,13 @@ const Payments = () => {
           onClick={() => setShowMarket(true)}
           className="py-15 cursor-pointer rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
-          <h3>Berilishi kerak</h3>
+          <h3>{t("berilishiKerak")}</h3>
           <strong className="block pt-3 text-4xl">
             <CountUp
               end={cashBoxData?.data?.marketCashboxTotal || 0}
               duration={1.5} // qancha sekundda sanashini belgilaydi
               separator=" " // mingliklarni bo‘lib beradi
-              suffix=" UZS" // oxiriga UZS qo‘shadi
+              suffix=" UZS" // oxiriga UZS qo‘sha  const { t } = useTranslation("product");
             />
           </strong>
         </div>
@@ -280,7 +282,7 @@ const Payments = () => {
           }
           className="h-[250px] flex cursor-pointer flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
-          <h3>Kassadagi miqdor</h3>
+          <h3>{t("kassadagiMiqdor")}</h3>
           <strong className="block pt-3 text-4xl">
             <CountUp
               end={cashBoxData?.data?.mainCashboxTotal || 0}
@@ -314,41 +316,41 @@ const Payments = () => {
             >
               <X size={30} />
             </button>
-            <h1 className="font-bold text-left pt-10">Olinishi kerak</h1>
+            <h1 className="font-bold text-left pt-10">{t("olinishiKerak")}</h1>
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
                 defaultValue={search}
                 onChange={handleSearchChange}
                 type="text"
-                placeholder="Search order..."
+                placeholder={`${t("search")}...`}
                 className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
               />
               <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
             </div>
             <div className="max-h-[520px] overflow-y-auto">
               <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
-                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB] sticky top-[-2px]">
+                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB] sticky top-[-2px] uppercase">
                   <tr>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
+                      <div className="flex items-center justify-between pr-[21px]"> 
                         #
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        CURIER NAME
+                        {t("courierName")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        REGION
+                        {t("region")}
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        Olinishi kerak summa
+                        {t("olinishiKerakSumma")}
                       </div>
                     </th>
                   </tr>
@@ -382,7 +384,7 @@ const Payments = () => {
                   !select ? "opacity-40" : ""
                 }`}
               >
-                Tanlash
+                {t("tanlash")}
               </button>
             </div>
           </div>
