@@ -108,14 +108,6 @@ const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
 const AppRouters = () => {
   return useRoutes([
     {
-      path: "scan",
-      element: <ScanPage />,
-    },
-    {
-      path: "scan/:token",
-      element: <ScanAndOrder />,
-    },
-    {
       path: "/login",
       element: <Login />,
     },
@@ -123,6 +115,14 @@ const AppRouters = () => {
       path: "/",
       element: <Auth />,
       children: [
+        {
+          path: "scan",
+          element: <ScanPage />,
+        },
+        {
+          path: "scan/:token",
+          element: <ScanAndOrder />,
+        },
         {
           path: "/",
           element: <DashboardLayout />,
@@ -264,12 +264,15 @@ const AppRouters = () => {
               element: <UserProfile />,
             },
             {
-
-              path:"regions", element:<Regions/>,
-              children: [{
-                path:"districts", element:<Districts/>
-              }]
-            }
+              path: "regions",
+              element: <Regions />,
+              children: [
+                {
+                  path: "districts",
+                  element: <Districts />,
+                },
+              ],
+            },
           ],
         },
       ],

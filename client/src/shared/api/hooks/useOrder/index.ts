@@ -36,6 +36,12 @@ export const useOrder = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
+  const receiveOrderByScanerById = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`order/receive/${id}`).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
+  });
+
   const getOrders = (params?: any) =>
     useQuery({
       queryKey: [order, params],
@@ -112,6 +118,7 @@ export const useOrder = () => {
     cancelOrder,
     rollbackOrder,
     partlySellOrder,
+    receiveOrderByScanerById,
     getOrders,
     getOrderByMarket,
     getCourierOrders,

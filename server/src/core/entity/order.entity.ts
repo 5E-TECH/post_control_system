@@ -49,6 +49,9 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'bigint', nullable: true })
   sold_at: number | null;
 
+  @Column({ type: 'boolean', default: true })
+  deleted: boolean;
+
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order)
   items: OrderItemEntity[];

@@ -16,6 +16,8 @@ import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import { requestDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
+import { RiFileExcel2Line } from "react-icons/ri";
+
 
 const Filter = () => {
   const { t } = useTranslation("orderList");
@@ -87,7 +89,7 @@ const Filter = () => {
   const statusOpts =
     statusOptions.map((item) => ({
       value: item.value,
-      label: item.label,
+      label: t(`Status.${item.value}`),
     })) || [];
 
   const handleClear = () => {
@@ -96,7 +98,7 @@ const Filter = () => {
 
   return (
     <div>
-      <h2 className="text-[18px] mb-2">Filters</h2>
+      <h2 className="text-[18px] mb-2">{t("filters")}</h2>
       <div className="w-full grid grid-cols-4 gap-5 max-[900px]:grid-cols-3 max-[750px]:grid-cols-2 max-[350px]:grid-cols-1">
         {role !== "market" && (
           <Select
@@ -128,26 +130,27 @@ const Filter = () => {
             className="w-[150px]! max-[651px]:w-full! h-[45px]!"
             onClick={handleClear}
           >
-            Tozalash
+            {t("button.tozalash")}
           </Button>
         </div>
       </div>
 
       <div className="w-full flex flex-wrap gap-4 justify-between items-center pt-5 border-[#F6F7FB] dark:border-[#595572] max-[800px]:flex-col max-[800px]:gap-5">
-        <Space direction="vertical" size={10} className="max-[800px]:w-full">
+        <Space direction="vertical" size={10} className="h-[38px]! max-[800px]:w-full">
           <DatePicker.RangePicker
             format="YYYY-MM-DD"
-            className="w-full"
+            className="w-full h-[38px]"
             onChange={handleDateChange}
+            placeholder={[t("placeholder.startDate"), t("placeholder.endDate")]}
           />
         </Space>
 
         <div className="flex items-center gap-5 flex-wrap max-[800px]:w-full">
           <Button
             onClick={handleDownload}
-            className="w-[100px]! h-[38px]! outline-none text-[16px]! text-gray-500! max-[800px]:w-full!"
+            className=" h-[38px]! outline-none text-[16px]! text-white! font-bold! bg-[#08753F]! max-[800px]:w-full!"
           >
-            Export
+            {t("button.export")} <RiFileExcel2Line/>
           </Button>
           <input
             type="text"

@@ -5,8 +5,10 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import EmptyPage from "../../shared/components/empty-page";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
+import { useTranslation } from "react-i18next";
 
 const TodayOrders = () => {
+    const { t } = useTranslation("todayOrderList");
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const role = useSelector((state: RootState) => state.roleSlice);
@@ -57,25 +59,25 @@ const TodayOrders = () => {
                 <th className="pr-[120px]">
                   <div className="flex items-center gap-10">
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    <span>MARKET</span>
+                    <span>{t("market")}</span>
                   </div>
                 </th>
                 <th className="pr-[120px]">
                   <div className="flex items-center gap-10">
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    <span>PHONE</span>
+                    <span>{t("phone")}</span>
                   </div>
                 </th>
                 <th className="pr-[100px]">
                   <div className="flex items-center gap-10">
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    <span>TOTAL PRICE</span>
+                    <span>{t("totalPrice")}</span>
                   </div>
                 </th>
                 <th>
                   <div className="flex items-center gap-10">
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    <span>STOCK</span>
+                    <span>{t("stock")}</span>
                   </div>
                 </th>
               </tr>

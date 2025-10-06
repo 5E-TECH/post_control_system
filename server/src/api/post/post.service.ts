@@ -13,7 +13,12 @@ import { DataSource, In, IsNull, Not } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
-import { Order_status, Post_status, Roles } from 'src/common/enums';
+import {
+  Order_status,
+  Post_status,
+  Roles,
+  Where_deliver,
+} from 'src/common/enums';
 import { ReceivePostDto } from './dto/receive-post.dto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
@@ -58,10 +63,9 @@ export class PostService {
         relations: ['customer', 'customer.district'],
       });
 
-      const newPosts: PostEntity[] = [];
       const regionPostMap = new Map<string, PostEntity>();
 
-      // 2️⃣ Har bir orderni region bo‘yicha grouping
+      // 2️⃣ Region bo‘yicha grouping (post obyektlarini yaratish)
       for (const order of orphanOrders) {
         const district = order.customer?.district;
         if (!district) {
@@ -71,37 +75,43 @@ export class PostService {
         }
 
         const regionId = district.assigned_region;
-        let post = regionPostMap.get(regionId);
-
-        if (!post) {
-          post = queryRunner.manager.create(PostEntity, {
+        if (!regionPostMap.has(regionId)) {
+          const newPost = queryRunner.manager.create(PostEntity, {
             region_id: regionId,
             qr_code_token: generateCustomToken(),
             post_total_price: 0,
             order_quantity: 0,
             status: Post_status.NEW,
           });
-          newPosts.push(post);
-          regionPostMap.set(regionId, post);
+          regionPostMap.set(regionId, newPost);
         }
 
-        // Post statistikasi
+        // keyin statistikani to‘plash uchun
+        const post = regionPostMap.get(regionId)!;
         post.post_total_price =
           (post.post_total_price ?? 0) + (order.total_price ?? 0);
         post.order_quantity = (post.order_quantity ?? 0) + 1;
-
-        // Orderni shu postga biriktirish
-        order.post = post;
-        order.status = Order_status.RECEIVED; // statusini saqlab qolish
       }
 
-      // 3️⃣ Yangi postlarni saqlash va orderlarni update qilish
-      if (newPosts.length > 0) {
-        await queryRunner.manager.save(PostEntity, newPosts);
-        await queryRunner.manager.save(OrderEntity, orphanOrders);
+      // 3️⃣ Avval yangi postlarni saqlaymiz (IDlar hosil bo‘lishi uchun)
+      const savedPosts = await queryRunner.manager.save(
+        Array.from(regionPostMap.values()),
+      );
+
+      // 4️⃣ regionId → yangi post.id mapping
+      const idMap = new Map<string, string>();
+      savedPosts.forEach((post) => idMap.set(post.region_id, post.id));
+
+      // 5️⃣ Endi orderlarga post_id biriktiramiz
+      for (const order of orphanOrders) {
+        const regionId = order.customer?.district?.assigned_region;
+        const postId = idMap.get(regionId);
+        order.post_id = postId!;
       }
 
-      // 4️⃣ Mavjud + yangi yaratilgan NEW postlarni olish
+      await queryRunner.manager.save(orphanOrders);
+
+      // 6️⃣ Mavjud + yangi yaratilgan NEW postlarni olish
       const allPosts = await this.postRepo.find({
         where: { status: Post_status.NEW },
         relations: ['region'],
@@ -229,9 +239,41 @@ export class PostService {
       const allOrdersByPostId = await this.orderRepo.find({
         where: [{ post_id: id }, { canceled_post_id: id }],
 
-        relations: ['customer', 'customer.district', 'items', 'items.product'],
+        relations: [
+          'customer',
+          'market',
+          'customer.district',
+          'items',
+          'items.product',
+        ],
       });
-      return successRes(allOrdersByPostId, 200, 'All orders by post id');
+
+      let homeOrders: number = 0;
+      let centerOrders: number = 0;
+      let homeOrdersTotalPrice: number = 0;
+      let centerOrdersTotalPrice: number = 0;
+
+      for (const order of allOrdersByPostId) {
+        if (order.where_deliver === Where_deliver.ADDRESS) {
+          homeOrders++;
+          homeOrdersTotalPrice =
+            homeOrdersTotalPrice + Number(order.total_price);
+        } else {
+          centerOrders++;
+          centerOrdersTotalPrice =
+            centerOrdersTotalPrice + Number(order.total_price);
+        }
+      }
+
+      return successRes(
+        {
+          allOrdersByPostId,
+          homeOrders: { homeOrders, homeOrdersTotalPrice },
+          centerOrders: { centerOrders, centerOrdersTotalPrice },
+        },
+        200,
+        'All orders by post id',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -390,6 +432,59 @@ export class PostService {
       await queryRunner.commitTransaction();
 
       return successRes({}, 200, 'Post received successfully');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async receiveOrderWithScanerCourier(user: JwtPayload, id: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1) Orderni topamiz
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      if (!order.post_id) {
+        throw new NotFoundException('Order has no post');
+      }
+
+      // 2) Shu order tegishli bo'lgan postni faqat shu courierga bog‘langanini tekshiramiz
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id: order.post_id, courier_id: user.id },
+      });
+      if (!post) {
+        throw new NotFoundException(
+          'Post not found or not assigned to this courier',
+        );
+      }
+
+      // 3) Order statusini o‘zgartiramiz
+      order.status = Order_status.WAITING;
+      await queryRunner.manager.save(order);
+
+      // 4) Post ichida hali "ON_THE_ROAD" order bor yoki yo‘qligini tekshiramiz
+      const activeOrdersCount = await queryRunner.manager.count(OrderEntity, {
+        where: { post_id: post.id, status: Order_status.ON_THE_ROAD },
+      });
+
+      if (activeOrdersCount === 0) {
+        post.status = Post_status.RECEIVED;
+        await queryRunner.manager.save(post);
+      }
+
+      // 5) Commit
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Order received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

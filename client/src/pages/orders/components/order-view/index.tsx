@@ -13,33 +13,35 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 import { BASE_URL } from "../../../../shared/const";
 
 const statusColors: Record<string, string> = {
-  new: "bg-blue-500",
-  received: "bg-green-500",
-  "on the road": "bg-yellow-500",
-  waiting: "bg-orange-500",
-  sold: "bg-purple-500",
-  cancelled: "bg-red-500",
-  paid: "bg-cyan-500",
-  partly_paid: "bg-pink-500",
-  "cancelled (sent)": "bg-gray-500",
-  closed: "bg-black",
+  new: "bg-sky-500",             // Yangi — ishonch va yangilik hissi uchun moviy
+  received: "bg-green-600",      // Qabul qilingan — muvaffaqiyat va tasdiq ramzi, yashil
+  "on the road": "bg-amber-500", // Yo‘lda — harakat va ogohlantirish hissi uchun sariq-to‘q
+  waiting: "bg-orange-400",      // Kutilyapti — sabr va ogohlantirish uchun to‘q sariq
+  sold: "bg-violet-600",         // Sotilgan — natija va muvaffaqiyat ramzi, binafsha
+  cancelled: "bg-red-600",       // Bekor qilingan — xatolik yoki to‘xtash holati, qizil
+  paid: "bg-emerald-500",        // To‘langan — barqarorlik va ishonch, yashil-jade
+  partly_paid: "bg-teal-500",    // Qisman to‘langan — oraliq holat, ko‘k-yashil
+  "cancelled (sent)": "bg-gray-500", // Jo‘natilgan, lekin bekor qilingan — neytral kulrang
+  closed: "bg-zinc-800",         // Yopilgan — yakunlangan holat, quyuq kulrang yoki qora
 };
 
 const statusLabels: Record<string, string> = {
   new: "Yangi",
   received: "Qabul qilingan",
-  "on the road": "Yo‘lda",
+  "on the road": "Yo'lda",
   waiting: "Kutilmoqda",
   sold: "Sotilgan",
   cancelled: "Bekor qilingan",
-  paid: "To‘langan",
-  partly_paid: "Qisman to‘langan",
-  "cancelled (sent)": "Bekorlangan jo‘natma",
+  paid: "To'langan",
+  partly_paid: "Qisman to'langan",
+  "cancelled (sent)": "Bekorlangan jo'natma",
   closed: "Yopilgan",
 };
 
 const OrderView = () => {
   const { t } = useTranslation("orderList");
+  const { t:st } = useTranslation("status");
+
   const navigate = useNavigate();
 
   const { getOrders, getMarketsByMyNewOrders } = useOrder();
@@ -267,7 +269,8 @@ const OrderView = () => {
                       statusColors[item?.status] || "bg-gray-400"
                     }`}
                   >
-                    {statusLabels[item?.status] || item?.status}
+                    {/* {statusLabels[item?.status] || item?.status} */}
+                    {st(`${item?.status}`)}
                   </span>
                 </td>
                 <td className="data-cell pl-10" data-cell="PRICE">

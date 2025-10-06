@@ -41,7 +41,7 @@ const MailDetail = () => {
   }
 
   const { data } = getPostById(id as string, endpoint, condition);
-  const postData = data?.data;
+  const postData = data?.data?.allOrdersByPostId;
 
   useEffect(() => {
     if (postData && !initialized) {
@@ -139,6 +139,38 @@ const MailDetail = () => {
           <SearchInput placeholder="Qidiruv..." />
         </div>
 
+        <div className="mt-5 grid grid-cols-2 gap-6 px-5 max-[901px]:grid-cols-1">
+          <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
+            <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
+              Uygacha
+            </span>
+            <span className="text-[22px] font-bold text-[#2E263D] dark:text-[#E7E3FC]">
+              {data?.data?.homeOrders?.homeOrders ?? 0} ta
+            </span>
+            <span className="text-[15px] text-gray-500 dark:text-[#A9A5C0]">
+              {data?.data?.homeOrders?.homeOrdersTotalPrice?.toLocaleString(
+                "uz-UZ"
+              ) ?? 0}{" "}
+              so'm
+            </span>
+          </div>
+
+          <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
+            <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
+              Markazgacha
+            </span>
+            <span className="text-[22px] font-bold text-[#2E263D] dark:text-[#E7E3FC]">
+              {data?.data?.centerOrders?.centerOrders ?? 0} ta
+            </span>
+            <span className="text-[15px] text-gray-500 dark:text-[#A9A5C0]">
+              {data?.data?.centerOrders?.centerOrdersTotalPrice?.toLocaleString(
+                "uz-UZ"
+              ) ?? 0}{" "}
+              so'm
+            </span>
+          </div>
+        </div>
+
         <div className="mt-5">
           <table>
             <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
@@ -176,6 +208,12 @@ const MailDetail = () => {
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
                     TUMANI
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    MARKET
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
@@ -237,6 +275,9 @@ const MailDetail = () => {
                   </td>
                   <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
                     {order?.customer?.district?.name}
+                  </td>
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {order?.market?.name}
                   </td>
                   <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
                     {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}

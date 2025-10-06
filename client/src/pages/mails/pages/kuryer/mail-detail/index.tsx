@@ -60,7 +60,7 @@ const CourierMailDetail = () => {
   }
 
   const { data } = getPostById(id as string, endpoint, condition);
-  const postData = data?.data;
+  const postData = data?.data?.allOrdersByPostId;
 
   useEffect(() => {
     if (postData) {

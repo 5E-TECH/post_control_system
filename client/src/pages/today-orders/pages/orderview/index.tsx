@@ -8,20 +8,33 @@ import { usePost } from "../../../../shared/api/hooks/usePost";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import ConfirmPopup from "../../../../shared/components/confirmPopup";
+import { useTranslation } from "react-i18next";
 
 const OrderView = () => {
+  const { t } = useTranslation("todayOrderList");
+  const { t:st } = useTranslation("status");
+
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
-
+  const [deleteId, setDeleteId] = useState("");
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const navigate = useNavigate();
   const [_, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
-
-  const { getOrderByMarket, getMarketsByMyNewOrders } = useOrder();
+  const { getOrderByMarket, getMarketsByMyNewOrders, deleteOrders } =
+    useOrder();
   const { createPost } = usePost();
   const { data, refetch } =
     user.role === "market" ? getMarketsByMyNewOrders() : getOrderByMarket(id);
+
+  useEffect(() => {
+    if (data?.data?.total === 0) {
+      navigate(-1);
+    }
+  }, [data]);
+  // console.log(data?.data?.total);
 
   useEffect(() => {
     if (data?.data?.data) {
@@ -32,11 +45,19 @@ const OrderView = () => {
   // const hanlerUpdate = (e: React.MouseEvent<HTMLButtonElement>) => {
   //   e.stopPropagation();
   // };
+  const { handleApiError, handleSuccess } = useApiNotification();
 
-  const hanlerDelet = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
+  const hanlerDelete = (id: string) => {
+    console.log(id);
+    deleteOrders.mutate(id, {
+      onSuccess: () => {
+        handleSuccess("Order muvaffaqiyatli o'chirildi");
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Orderni o'chirishda xatolik yuz ber");
+      },
+    });
   };
-  const { handleApiError } = useApiNotification();
   const handleAccapted = () => {
     const newOrder = {
       order_ids: selectedIds,
@@ -97,44 +118,44 @@ const OrderView = () => {
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>CUSTOMER</span>
+                  <span>{t("customer")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>PHONE</span>
+                  <span>{t("phone")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>ADDRESS</span>
+                  <span>{t("address")}</span>
                 </div>
               </th>
 
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>STATUS</span>
+                  <span>{t("status")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>PRICE</span>
+                  <span>{t("price")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>STOCK</span>
+                  <span>{t("stock")}</span>
                 </div>
               </th>
               <th>
                 <div className="flex items-center gap-10">
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>ACTION</span>
+                  <span>{t("action")}</span>
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
@@ -177,7 +198,7 @@ const OrderView = () => {
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}
                   >
-                    {item?.status?.toUpperCase()}
+                    {st(`${item.status}`).toUpperCase()}
                   </span>
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
@@ -189,7 +210,10 @@ const OrderView = () => {
                 <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                   <button
                     className="hover:text-red-600 cursor-pointer"
-                    onClick={hanlerDelet}
+                    onClick={() => {
+                      setDeleteId(item.id); // shu joyda id saqlanadi
+                      setIsConfirmOpen(true); // popup ochiladi
+                    }}
                   >
                     <Trash />
                   </button>
@@ -302,11 +326,29 @@ const OrderView = () => {
                   : "cursor-pointer"
               } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}
             >
-              Qabul qilish
+              {t("qabulQilish")}
             </button>
           </div>
         )}
       </div>
+      <ConfirmPopup
+        isShow={isConfirmOpen}
+        title="Buyurtmani o‘chirishni tasdiqlaysizmi?"
+        description="O‘chirilgandan so‘ng uni qaytarib bo‘lmaydi."
+        confirmText="Ha, o‘chirish"
+        cancelText="Bekor qilish"
+        onConfirm={() => {
+          if (deleteId) {
+            hanlerDelete(deleteId); // 🔴 shu joyda API yoki console.log ishlaydi
+          }
+          setIsConfirmOpen(false);
+          setDeleteId("");
+        }}
+        onCancel={() => {
+          setIsConfirmOpen(false);
+          setDeleteId("");
+        }}
+      />
     </div>
   );
 };

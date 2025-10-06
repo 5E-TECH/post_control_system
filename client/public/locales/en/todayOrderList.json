@@ -1,0 +1,16 @@
+{
+    "title": "Today's Orders",
+    "placeholder": {
+        "search": "Search Order"
+    },
+    "market": "Market",
+    "phone": "Phone",
+    "totalPrice": "Total Price",
+    "stock": "Stock",
+    "customer": "Customer",
+    "address": "Address",
+    "status": "Status",
+    "price": "Price",
+    "action": "Action",
+    "qabulQilish": "Accept"
+}

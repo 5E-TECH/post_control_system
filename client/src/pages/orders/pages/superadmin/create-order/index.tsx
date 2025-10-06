@@ -7,7 +7,7 @@ import type { RootState } from "../../../../../app/store";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import OrderItems from "../../../components/order-items";
 import ProductInfo from "../../../components/product-info";
-import Discard from "../../../components/button/discard";
+// import Discard from "../../../components/button/discard";
 import {
   resetOrderItems,
   setCustomerData,
@@ -80,10 +80,10 @@ const CreateOrder = () => {
   };
 
   const dispatch = useDispatch();
-  const handleDiscard = () => {
-    dispatch(resetOrderItems());
-    dispatch(setProductInfo(null));
-  };
+  // const handleDiscard = () => {
+  //   dispatch(resetOrderItems());
+  //   dispatch(setProductInfo(null));
+  // };
 
   return (
     <div className="flex gap-6 px-6 pt-6 max-[1150px]:flex-col">
@@ -161,9 +161,9 @@ const CreateOrder = () => {
 
         <div className="flex justify-end">
           <div className="flex gap-4">
-            <Discard handleDiscard={handleDiscard} type="button">
+            {/* <Discard handleDiscard={handleDiscard} type="button">
               {t("discard")}
-            </Discard>
+            </Discard> */}
             <Button
               onClick={handleClick}
               disabled={createOrder.isPending}

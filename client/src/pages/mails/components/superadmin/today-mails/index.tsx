@@ -42,7 +42,7 @@ const TodayMails = () => {
               })
             }
           >
-            <h1 className="text-[30px]">{post?.region?.name}</h1>
+            <h1 className="text-[30px] line-clamp-1">{post?.region?.name}</h1>
             <p className="text-[22px]">
               <span>{post?.order_quantity}</span> ta buyurtmalar
             </p>

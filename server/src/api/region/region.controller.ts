@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RegionService } from './region.service';
 import { CreateRegionDto } from './dto/create-region.dto';
@@ -10,12 +18,12 @@ export class RegionController {
   constructor(private readonly regionService: RegionService) {}
 
   @Get()
-  getAll(){
-    return this.regionService.findAll()
+  getAll() {
+    return this.regionService.findAll();
   }
 
   @Get(':id')
-  getOne(@Param('id') id: string){
-    return this.regionService.findOneById(id)
+  getOne(@Param('id') id: string) {
+    return this.regionService.findOneById(id);
   }
 }

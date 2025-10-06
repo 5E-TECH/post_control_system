@@ -416,6 +416,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const order = await this.orderRepo.findOne({
         where: { qr_code_token: token },
+        relations: ['customer', 'customer.district', 'items', 'items.product'],
       });
       if (!order) {
         throw new NotFoundException('Order not found');
@@ -592,13 +593,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             order_quantity: 0,
             status: Post_status.NEW,
           });
+          await queryRunner.manager.save(post);
           newPosts.push(post);
           postMap.set(district.assigned_region, post);
         }
 
         // Orderni shu postga bog‘lash
         order.status = Order_status.RECEIVED;
-        order.post = post;
+        order.post_id = post.id;
         this.logger.log(
           `order status updated: ${order.status}`,
           'Order service',
@@ -630,6 +632,61 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Orders received');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async receiveWithScaner(id: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: order.customer_id, role: Roles.CUSTOMER },
+        relations: ['district'],
+      });
+
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+
+      let newPost = await queryRunner.manager.findOne(PostEntity, {
+        where: {
+          region_id: customer.district.assigned_region,
+          status: Post_status.NEW,
+        },
+      });
+      if (!newPost) {
+        newPost = queryRunner.manager.create(PostEntity, {
+          region_id: customer.district.assigned_region,
+          qr_code_token: generateCustomToken(),
+          post_total_price: 0,
+          order_quantity: 0,
+          status: Post_status.NEW,
+        });
+        await queryRunner.manager.save(newPost);
+      }
+      order.status = Order_status.RECEIVED;
+      order.post_id = newPost.id;
+      await queryRunner.manager.save(order);
+
+      newPost.post_total_price =
+        Number(newPost.post_total_price) + Number(order.total_price);
+      newPost.order_quantity++;
+      await queryRunner.manager.save(newPost);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Order received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -1814,11 +1871,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async remove(id: string) {
     try {
       const order = await this.orderRepo.findOne({
-        where: { id, status: In([Order_status.NEW, Order_status.RECEIVED]) },
+        where: { id, status: Order_status.NEW },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
       }
+      await this.orderRepo.delete(id);
       return successRes({}, 200, 'Order deleted');
     } catch (error) {
       return catchError(error);

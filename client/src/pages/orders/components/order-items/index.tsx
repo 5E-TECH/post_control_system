@@ -171,6 +171,7 @@ const OrderItems = () => {
                     dropdownClassName="dark-dropdown"
                     showSearch
                     filterOption={false}
+
                   />
                 </Form.Item>
 
@@ -201,8 +202,8 @@ const OrderItems = () => {
           ))}
         </div>
 
-        <div className="px-5 pb-5" onClick={addItem}>
-          <Button className="!w-[183px] !h-[40px] !bg-[var(--color-bg-sy)] !text-[white] !font-medium !text-[15px] dark:border-none! hover:opacity-85!">
+        <div className="px-5 pb-5" >
+          <Button onClick={addItem} className="!w-[183px] !h-[40px] !bg-[var(--color-bg-sy)] !text-[white] !font-medium !text-[15px] dark:border-none! hover:opacity-85!">
             <Plus className="w-[17px] h-[17px]" />
             {t("orderItems.addAnotherItem")}
           </Button>

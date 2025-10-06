@@ -4,7 +4,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import type { RootState } from "../../app/store";
 import { api } from "../../shared/api";
 import { setToken } from "../../shared/lib/features/login/authSlice";
-import { setId, setRole } from "../../shared/lib/features/roleSlice";
+import { setId, setRegion, setRole } from "../../shared/lib/features/roleSlice";
 import Suspensee from "../../shared/ui/Suspensee";
 
 const Auth = () => {
@@ -25,6 +25,7 @@ const Auth = () => {
         setValid(true); // token to‘g‘ri bo‘lsa
         dispatch(setRole(res.data.data.role))
         dispatch(setId(res.data.data.id))
+        {res?.data?.data?.region?.name ? dispatch(setRegion(res?.data?.data?.region?.name)) : ""}
       })
       .catch(() => {
         dispatch(setToken(null)); // ❌ noto‘g‘ri token → localStorage va reduxdan o‘chir
