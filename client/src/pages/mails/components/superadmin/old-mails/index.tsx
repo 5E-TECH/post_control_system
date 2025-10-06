@@ -2,6 +2,7 @@ import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
+import { useTranslation } from "react-i18next";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -17,6 +18,7 @@ const borderColorsByStatus = {
 };
 
 const OldMails = () => {
+  const { t } = useTranslation("mails");
   const navigate = useNavigate();
   const { getAllPosts } = usePost();
   const { data } = getAllPosts("");
@@ -41,12 +43,12 @@ const OldMails = () => {
             <p>{post?.status}</p>
             <h1 className="text-[30px]">{post?.region?.name}</h1>
             <p className="text-[22px]">
-              <span>{post?.order_quantity}</span> ta buyurtmalar
+              <span>{post?.order_quantity}</span> {t("tabuyurtmalar")}
             </p>
             <p className="text-[22px] font-bold">
               <span>
                 {new Intl.NumberFormat("uz-UZ").format(post?.post_total_price)}{" "}
-                so'm
+                {t("so'm")}
               </span>
             </p>
             {post?.created_at &&

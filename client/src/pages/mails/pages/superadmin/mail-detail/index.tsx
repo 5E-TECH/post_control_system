@@ -11,8 +11,11 @@ import { usePost } from "../../../../../shared/api/hooks/usePost";
 import SearchInput from "../../../../users/components/search-input";
 import Popup from "../../../../../shared/ui/Popup";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useTranslation } from "react-i18next";
 
 const MailDetail = () => {
+  const { t } = useTranslation("mails");
+
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
@@ -134,39 +137,39 @@ const MailDetail = () => {
       <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
         <div className="flex justify-between px-5 pt-5">
           <h1 className="text-2xl mt-1">
-            <span>{regionName}</span> buyurtmalari
+            <span>{regionName}</span> {t("buyurtmalari")}
           </h1>
-          <SearchInput placeholder="Qidiruv..." />
+          <SearchInput placeholder={`${t("qidiruv")}...`} />
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-6 px-5 max-[901px]:grid-cols-1">
           <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
             <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
-              Uygacha
+              {t("uygacha")}
             </span>
             <span className="text-[22px] font-bold text-[#2E263D] dark:text-[#E7E3FC]">
-              {data?.data?.homeOrders?.homeOrders ?? 0} ta
+              {data?.data?.homeOrders?.homeOrders ?? 0} {t("ta")}
             </span>
             <span className="text-[15px] text-gray-500 dark:text-[#A9A5C0]">
               {data?.data?.homeOrders?.homeOrdersTotalPrice?.toLocaleString(
                 "uz-UZ"
               ) ?? 0}{" "}
-              so'm
+              {t("so'm")}
             </span>
           </div>
 
           <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
             <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
-              Markazgacha
+              {t("markazgacha")}
             </span>
             <span className="text-[22px] font-bold text-[#2E263D] dark:text-[#E7E3FC]">
-              {data?.data?.centerOrders?.centerOrders ?? 0} ta
+              {data?.data?.centerOrders?.centerOrders ?? 0} {t("ta")}
             </span>
             <span className="text-[15px] text-gray-500 dark:text-[#A9A5C0]">
               {data?.data?.centerOrders?.centerOrdersTotalPrice?.toLocaleString(
                 "uz-UZ"
               ) ?? 0}{" "}
-              so'm
+              {t("so'm")}
             </span>
           </div>
         </div>
@@ -195,44 +198,44 @@ const MailDetail = () => {
                 ) : null}
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    MIJOZ ISMI
+                    {t("mijozIsmi")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    TELEFON RAQAMI
+                    {t("telefonRaqami")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    TUMANI
+                    {t("tumani")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    MARKET
+                    {t("market")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    PUL MIQDORI
+                    {t("pulMiqdori")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    DONA
+                    {t("dona")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 {!hideSend ? (
                   <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
-                      HARAKATLAR
+                    {t("harakatlar")}
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
@@ -308,7 +311,7 @@ const MailDetail = () => {
             onClick={() => handleClick(id as string)}
             className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
           >
-            Po'chtani jo'natish
+           {t("pochtanijonatish")}
           </Button>
         </div>
       ) : null}
