@@ -393,7 +393,8 @@ const ChartWrapper = ({
         data={data}
         layout="vertical"
         margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
-        barCategoryGap={20}
+        barCategoryGap="10%" // ✅ barlar orasidagi masofa nisbiy
+        barSize={75}
       >
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis type="number" />
