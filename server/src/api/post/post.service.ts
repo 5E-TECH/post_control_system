@@ -63,13 +63,9 @@ export class PostService {
         relations: ['customer', 'customer.district'],
       });
 
-      const newPosts: PostEntity[] = [];
       const regionPostMap = new Map<string, PostEntity>();
 
-      let homeOrderTotalPrice: number = 0;
-      let centerOrdersTotalPrice: number = 0;
-
-      // 2️⃣ Har bir orderni region bo‘yicha grouping
+      // 2️⃣ Region bo‘yicha grouping (post obyektlarini yaratish)
       for (const order of orphanOrders) {
         const district = order.customer?.district;
         if (!district) {
@@ -79,37 +75,43 @@ export class PostService {
         }
 
         const regionId = district.assigned_region;
-        let post = regionPostMap.get(regionId);
-
-        if (!post) {
-          post = queryRunner.manager.create(PostEntity, {
+        if (!regionPostMap.has(regionId)) {
+          const newPost = queryRunner.manager.create(PostEntity, {
             region_id: regionId,
             qr_code_token: generateCustomToken(),
             post_total_price: 0,
             order_quantity: 0,
             status: Post_status.NEW,
           });
-          newPosts.push(post);
-          regionPostMap.set(regionId, post);
+          regionPostMap.set(regionId, newPost);
         }
 
-        // Orderni shu postga biriktirish
-        order.post_id = post.id;
-        order.status = Order_status.RECEIVED; // statusini saqlab qolish
-
-        // Post statistikasi
+        // keyin statistikani to‘plash uchun
+        const post = regionPostMap.get(regionId)!;
         post.post_total_price =
           (post.post_total_price ?? 0) + (order.total_price ?? 0);
         post.order_quantity = (post.order_quantity ?? 0) + 1;
       }
 
-      // 3️⃣ Yangi postlarni saqlash va orderlarni update qilish
-      if (newPosts.length > 0) {
-        await queryRunner.manager.save(PostEntity, newPosts);
-        await queryRunner.manager.save(OrderEntity, orphanOrders);
+      // 3️⃣ Avval yangi postlarni saqlaymiz (IDlar hosil bo‘lishi uchun)
+      const savedPosts = await queryRunner.manager.save(
+        Array.from(regionPostMap.values()),
+      );
+
+      // 4️⃣ regionId → yangi post.id mapping
+      const idMap = new Map<string, string>();
+      savedPosts.forEach((post) => idMap.set(post.region_id, post.id));
+
+      // 5️⃣ Endi orderlarga post_id biriktiramiz
+      for (const order of orphanOrders) {
+        const regionId = order.customer?.district?.assigned_region;
+        const postId = idMap.get(regionId);
+        order.post_id = postId!;
       }
 
-      // 4️⃣ Mavjud + yangi yaratilgan NEW postlarni olish
+      await queryRunner.manager.save(orphanOrders);
+
+      // 6️⃣ Mavjud + yangi yaratilgan NEW postlarni olish
       const allPosts = await this.postRepo.find({
         where: { status: Post_status.NEW },
         relations: ['region'],
