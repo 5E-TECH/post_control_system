@@ -13,7 +13,12 @@ import { DataSource, In, IsNull, Not } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
-import { Order_status, Post_status, Roles } from 'src/common/enums';
+import {
+  Order_status,
+  Post_status,
+  Roles,
+  Where_deliver,
+} from 'src/common/enums';
 import { ReceivePostDto } from './dto/receive-post.dto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
@@ -61,6 +66,9 @@ export class PostService {
       const newPosts: PostEntity[] = [];
       const regionPostMap = new Map<string, PostEntity>();
 
+      let homeOrderTotalPrice: number = 0;
+      let centerOrdersTotalPrice: number = 0;
+
       // 2️⃣ Har bir orderni region bo‘yicha grouping
       for (const order of orphanOrders) {
         const district = order.customer?.district;
@@ -85,14 +93,14 @@ export class PostService {
           regionPostMap.set(regionId, post);
         }
 
+        // Orderni shu postga biriktirish
+        order.post_id = post.id;
+        order.status = Order_status.RECEIVED; // statusini saqlab qolish
+
         // Post statistikasi
         post.post_total_price =
           (post.post_total_price ?? 0) + (order.total_price ?? 0);
         post.order_quantity = (post.order_quantity ?? 0) + 1;
-
-        // Orderni shu postga biriktirish
-        order.post = post;
-        order.status = Order_status.RECEIVED; // statusini saqlab qolish
       }
 
       // 3️⃣ Yangi postlarni saqlash va orderlarni update qilish
@@ -237,7 +245,33 @@ export class PostService {
           'items.product',
         ],
       });
-      return successRes(allOrdersByPostId, 200, 'All orders by post id');
+
+      let homeOrders: number = 0;
+      let centerOrders: number = 0;
+      let homeOrdersTotalPrice: number = 0;
+      let centerOrdersTotalPrice: number = 0;
+
+      for (const order of allOrdersByPostId) {
+        if (order.where_deliver === Where_deliver.ADDRESS) {
+          homeOrders++;
+          homeOrdersTotalPrice =
+            homeOrdersTotalPrice + Number(order.total_price);
+        } else {
+          centerOrders++;
+          centerOrdersTotalPrice =
+            centerOrdersTotalPrice + Number(order.total_price);
+        }
+      }
+
+      return successRes(
+        {
+          allOrdersByPostId,
+          homeOrders: { homeOrders, homeOrdersTotalPrice },
+          centerOrders: { centerOrders, centerOrdersTotalPrice },
+        },
+        200,
+        'All orders by post id',
+      );
     } catch (error) {
       return catchError(error);
     }
