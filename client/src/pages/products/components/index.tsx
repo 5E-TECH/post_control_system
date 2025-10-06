@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
+import { useTranslation } from "react-i18next";
 
 // ✅ Yup validation
 const schema = yup.object().shape({
@@ -28,6 +29,7 @@ interface FormValues {
 }
 
 const AddProduct = () => {
+  const { t } = useTranslation("product");
   const { createProduct } = useProduct();
   const [showMarket, setShowMarket] = useState(false);
 
@@ -88,7 +90,7 @@ const AddProduct = () => {
     <section>
       <div className="w-full bg-white p-5 text-[#2E263DE5] flex gap-5 flex-col rounded-md dark:text-[#E7E3FCE5] dark:bg-[#312d4b] shadow-md">
         <h2 className="text-[18px] font-medium opacity-[90%] select-none">
-          Product information
+          {t("productInformation")}
         </h2>
 
         <form
@@ -100,7 +102,7 @@ const AddProduct = () => {
             <input
               className="w-full border px-4 py-3 rounded-md"
               type="text"
-              placeholder="Product Name"
+              placeholder={`${t("productName")}...`}
               {...register("name")}
             />
             {errors.name && (
@@ -111,7 +113,7 @@ const AddProduct = () => {
           {/* Image input */}
           <div className="flex justify-between mt-2">
             <h2 className="text-[18px] font-medium opacity-[90%] select-none">
-              Product Image
+              {t("productRasmi")}
             </h2>
           </div>
 
@@ -135,15 +137,15 @@ const AddProduct = () => {
                   <img src={upload} alt="Upload" />
                 </div>
                 <h2 className="font-medium text-[24px] select-none">
-                  Drag and drop your image here
+                  {t("dragAndDrop")}
                 </h2>
-                <p className="text-[#2E263D66] select-none">or</p>
+                <p className="text-[#2E263D66] select-none">{t("or")}</p>
                 <div className="relative mb-[48px]">
                   <button
                     type="button"
                     className="border border-[#8C57FF] text-[#8C57FF] px-[14px] py-[8px] rounded-md font-medium text-[13px]"
                   >
-                    Browse Image
+                    {t("browseImage")}
                   </button>
                   <input
                     type="file"
@@ -182,13 +184,13 @@ const AddProduct = () => {
               type="button"
               className="border px-4 py-2 rounded-md border-[#8A8D93] text-[#8A8D93] font-medium mt-4"
             >
-              Discard
+              {t("discard")}
             </button>
             <button
               type="submit"
               className="bg-[#8C57FF] text-white px-4 py-2 rounded-md font-medium mt-4"
             >
-              Save Product
+              {t("save")}
             </button>
           </div>
         </form>

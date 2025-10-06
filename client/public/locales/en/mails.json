@@ -1,6 +1,21 @@
 {
-    "todayMails": "Today’s posts",
-    "refusedMails": "Refused posts",
-    "oldMails": "Old posts",
-    "newMails": "New posts"
+  "todayMails": "Today's mails",
+  "refusedMails": "Refused mails",
+  "oldMails": "Old mails",
+  "newMails": "New mails",
+  "buyurtmalari": "Orders",
+  "mijozIsmi": "Customer name",
+  "telefonRaqami": "Phone number",
+  "tumani": "District",
+  "market": "Market",
+  "pulMiqdori": "Amount",
+  "dona": "Quantity",
+  "harakatlar": "Actions",
+  "pochtanijonatish": "Send mail",
+  "uygacha": "To home",
+  "markazgacha": "To center",
+  "ta": "pcs",
+  "so'm": "sum",
+  "qidiruv": "Search",
+  "tabuyurtmalar": "orders"
 }

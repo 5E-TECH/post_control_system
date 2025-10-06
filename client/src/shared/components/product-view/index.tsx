@@ -7,6 +7,7 @@ import { useApiNotification } from "../../hooks/useApiNotification";
 import { useParamsHook } from "../../hooks/useParams";
 import { useDispatch } from "react-redux";
 import { setLimit, setPage } from "../../lib/features/paginationProductSlice";
+import { useTranslation } from "react-i18next";
 
 interface IProps {
   data: any;
@@ -14,8 +15,8 @@ interface IProps {
 }
 
 const ProductView: FC<IProps> = ({ data, total }) => {
+  const { t } = useTranslation("product");
   const dispatch = useDispatch();
-
   const [loading, setLoading] = useState(true);
   const [popup, setPopup] = useState(false);
   const [deleteItem, setDeleteItem] = useState<{
@@ -72,7 +73,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
     <div className="mt-4 px-4 overflow-x-auto">
       <Spin spinning={loading} tip="Loading Products...">
         <table className="w-full cursor-pointer">
-          <thead className="h-[54px] bg-[#F6F7FB] dark:bg-[#3D3759] text-left">
+          <thead className="h-[54px] bg-[#F6F7FB] dark:bg-[#3D3759] text-left uppercase">
             <tr>
               <th className="w-[50px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
@@ -82,19 +83,19 @@ const ProductView: FC<IProps> = ({ data, total }) => {
               </th>
               <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
                 <div className="flex items-center justify-between pr-[21px]">
-                  PRODUCT NAME
+                  {t("productName")}
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
               <th className="w-[1100px] h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
                 <div className="flex items-center justify-between pr-[21px]">
-                  MARKET
+                  {t("popup.market")}
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C] "></div>
                 </div>
               </th>
               <th className="h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
                 <div className="flex items-center justify-between pr-[21px]">
-                  ACTION
+                  {t("action")}
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>

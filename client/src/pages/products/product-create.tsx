@@ -5,6 +5,7 @@ import ProductView from "../../shared/components/product-view";
 import { useProduct } from "../../shared/api/hooks/useProduct";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { useTranslation } from "react-i18next";
 // import { useLocation } from 'react-router-dom';
 
 // interface Iprops {
@@ -12,6 +13,7 @@ import type { RootState } from "../../app/store";
 // }
 
 const ProductsCreate: FC = () => {
+  const { t } = useTranslation("product");
   const { id } = useParams();
   // const location = useLocation();
 
@@ -32,7 +34,7 @@ const ProductsCreate: FC = () => {
         <div className="mx-[24px]">
           <div className=" flex w-full justify-between">
             <h2 className="text-[24px] font-medium">
-              Add a new product for market {data?.data[0]?.user?.name}
+              {t("add")} <span className="font-extrabold">{data?.data[0]?.user?.name}</span>
             </h2>
           </div>
         </div>
