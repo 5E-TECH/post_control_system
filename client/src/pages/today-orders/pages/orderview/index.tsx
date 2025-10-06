@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 
 const OrderView = () => {
   const { t } = useTranslation("todayOrderList");
-  const { t:st } = useTranslation("status");
+  const { t: st } = useTranslation("status");
 
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
@@ -34,7 +34,6 @@ const OrderView = () => {
       navigate(-1);
     }
   }, [data]);
-  // console.log(data?.data?.total);
 
   useEffect(() => {
     if (data?.data?.data) {
@@ -42,13 +41,9 @@ const OrderView = () => {
     }
   }, [data]);
 
-  // const hanlerUpdate = (e: React.MouseEvent<HTMLButtonElement>) => {
-  //   e.stopPropagation();
-  // };
   const { handleApiError, handleSuccess } = useApiNotification();
 
   const hanlerDelete = (id: string) => {
-    console.log(id);
     deleteOrders.mutate(id, {
       onSuccess: () => {
         handleSuccess("Order muvaffaqiyatli o'chirildi");
