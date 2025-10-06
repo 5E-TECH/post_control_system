@@ -1,6 +1,6 @@
 {
   "title": "Buyurtmalar ro'yxati",
-  "filters":"Saralash",
+  "filters": "Saralash",
   "noPermission": "Ruxsat yo‘q 🚫",
   "placeholder": {
     "selectMarket": "Marketni tanlang",
@@ -12,21 +12,21 @@
   },
   "button": {
     "addOrder": "Buyurtma qo'shish",
-    "tozalash":"Tozalash",
-    "export":"Export"
+    "tozalash": "Tozalash",
+    "export": "Export"
   },
   "Status": {
-  "new": "Yangi",
-  "received": "Qabul qilingan",
-  "on_the_road": "Yo‘lda",
-  "waiting": "Kutilmoqda",
-  "sold": "Sotilgan",
-  "cancelled": "Bekor qilingan",
-  "paid": "To‘langan",
-  "partly_paid": "Qisman to‘langan",
-  "cancelled_sent": "Bekor qilingan (jo‘natilgan)",
-  "closed": "Yopilgan"
-},
+    "new": "Yangi",
+    "received": "Qabul qilingan",
+    "on_the_road": "Yo‘lda",
+    "waiting": "Kutilmoqda",
+    "sold": "Sotilgan",
+    "cancelled": "Bekor qilingan",
+    "paid": "To‘langan",
+    "partly_paid": "Qisman to‘langan",
+    "cancelled_sent": "Bekor qilingan (jo‘natilgan)",
+    "closed": "Yopilgan"
+  },
   "customer": "MIJOZ",
   "phone": "TELEFON",
   "region": "VILOYAT",

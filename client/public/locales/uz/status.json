@@ -1,0 +1,12 @@
+{
+    "new": "Yangi",
+    "received": "Qabul qilingan",
+    "on_the_road": "Yo‘lda",
+    "waiting": "Kutilmoqda",
+    "sold": "Sotilgan",
+    "cancelled": "Bekor qilingan",
+    "paid": "To‘langan",
+    "partly_paid": "Qisman to‘langan",
+    "cancelled_sent": "Bekor qilingan (jo‘natilgan)",
+    "closed": "Yopilgan"
+}
