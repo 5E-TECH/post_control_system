@@ -1,15 +1,32 @@
 {
   "title": "Buyurtmalar ro'yxati",
+  "filters":"Saralash",
   "noPermission": "Ruxsat yo‘q 🚫",
   "placeholder": {
     "selectMarket": "Marketni tanlang",
     "selectRegion": "Hududni tanlang",
     "selectStatus": "Holatni tanlang",
-    "searchOrder": "Buyurtmani qidiring"
+    "searchOrder": "Buyurtmani qidiring",
+    "startDate": "Boshlanish sanasi",
+    "endDate": "Tugash sanasi"
   },
   "button": {
-    "addOrder": "Buyurtma qo'shish"
+    "addOrder": "Buyurtma qo'shish",
+    "tozalash":"Tozalash",
+    "export":"Export"
   },
+  "Status": {
+  "new": "Yangi",
+  "received": "Qabul qilingan",
+  "on_the_road": "Yo‘lda",
+  "waiting": "Kutilmoqda",
+  "sold": "Sotilgan",
+  "cancelled": "Bekor qilingan",
+  "paid": "To‘langan",
+  "partly_paid": "Qisman to‘langan",
+  "cancelled_sent": "Bekor qilingan (jo‘natilgan)",
+  "closed": "Yopilgan"
+},
   "customer": "MIJOZ",
   "phone": "TELEFON",
   "region": "VILOYAT",
