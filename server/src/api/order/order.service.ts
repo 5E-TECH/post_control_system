@@ -646,7 +646,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.startTransaction();
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
-        where: { id },
+        where: { qr_code_token: id },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
