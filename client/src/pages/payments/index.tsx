@@ -204,13 +204,13 @@ const Payments = () => {
             >
               <X size={30} />
             </button>
-            <h1 className="font-bold text-left pt-10">Choose Market</h1>
+            <h1 className="font-bold text-left pt-10">{t("berilishiKerak")}</h1>
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
                 defaultValue={search}
                 onChange={handleSearchChange}
                 type="text"
-                placeholder="Search order..."
+                placeholder={`${t("search")}...`}
                 className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
               />
               <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
@@ -227,13 +227,13 @@ const Payments = () => {
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        MARKET NAME
+                        {t("marketName")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        Berilishi kerak summa
+                        {t("berilishiKerakSumma")}
                       </div>
                     </th>
                   </tr>
@@ -266,7 +266,7 @@ const Payments = () => {
                   !select ? "opacity-40" : ""
                 }`}
               >
-                Tanlash
+                {t("tanlash")}
               </button>
             </div>
           </div>
@@ -392,34 +392,34 @@ const Payments = () => {
       </div>
 
       <div className="mt-12 mx-5">
-        <h1 className="text-xl font-semibold mb-3">Filters</h1>
+        <h1 className="text-xl font-semibold mb-3">{t("filters")}</h1>
         <div className="grid grid-cols-5 gap-6 pt-[16px] max-[1000px]:grid-cols-3 max-[750px]:grid-cols-2 max-[450px]:grid-cols-1">
           <Select
             value={paymentFilter.operationType}
             onChange={handleChange}
             options={operationOptions}
-            text="Operation type"
+            text={t("operationType")}
             name="operationType"
           />
           <Select
             value={paymentFilter.sourceType}
             onChange={handleChange}
             options={sourceOptions}
-            text="Source type"
+            text={t("sourceType")}
             name="sourceType"
           />
           <Select
             value={paymentFilter.createdBy}
             onChange={handleChange}
             options={createdByOptions}
-            text="Created By"
+            text={t("createdBy")}
             name="createdBy"
           />
           <Select
             value={paymentFilter.cashboxType}
             onChange={handleChange}
             options={cashboxOptions}
-            text="Cashbox type"
+            text={t("cashboxtype")}
             name="cashboxType"
           />
           <div className="flex min-[1000px]:justify-end">
