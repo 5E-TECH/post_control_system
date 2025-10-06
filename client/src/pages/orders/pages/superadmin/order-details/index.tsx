@@ -40,7 +40,7 @@ const OrderDetails = () => {
           <div>
             <QRCode
               size={160}
-              value={`http://10.181.40.168:5173/scan/${token}`}
+              value={`http://192.168.10.209:5173/scan/${token}`}
             />
           </div>
         </div>
