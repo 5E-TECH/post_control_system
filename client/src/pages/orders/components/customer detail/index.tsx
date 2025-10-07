@@ -1,12 +1,13 @@
 import { memo, type FC, useState } from "react";
 import avatar from "../../../../shared/assets/order/avatar.png";
-import cart from "../../../../shared/assets/order/cart.svg";
+// import cart from "../../../../shared/assets/order/cart.svg";
 import Popup from "../../../../shared/ui/Popup";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { Input } from "antd";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { useTranslation } from "react-i18next";
 
 interface IProps {
   customer: {
@@ -17,6 +18,7 @@ interface IProps {
 }
 
 const CustomerDetail: FC<IProps> = ({ customer }) => {
+  const { t } = useTranslation("orderList");
   if (!customer) return null;
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
@@ -51,10 +53,7 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
           handleSuccess("Order manzili muvaffaqiyatli yangilandi");
         },
         onError: (err: any) => {
-          handleApiError(
-            err,
-            "Malumotlarni yangilashda xatolik yuz berdi"
-          );
+          handleApiError(err, "Malumotlarni yangilashda xatolik yuz berdi");
         },
       }
     );
@@ -63,7 +62,7 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
   return (
     <div>
       <div className="m-5">
-        <h2 className="dark:text-[#E7E3FC66]">Customer Detail</h2>
+        <h2 className="dark:text-[#E7E3FC66] text-[20px]">{t("detail.customerDetail")}</h2>
       </div>
 
       {/* Avatar + Name */}
@@ -79,7 +78,7 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
       </div>
 
       {/* Orders */}
-      <div className="mx-5 flex items-center gap-3 mb-6">
+      {/* <div className="mx-5 flex items-center gap-3 mb-6">
         <div>
           <img src={cart} alt="orders" />
         </div>
@@ -88,26 +87,26 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
             Orders
           </h2>
         </div>
-      </div>
+      </div> */}
 
       {/* Contact Info */}
       <div className="mx-5 mb-6 flex gap-3 flex-col text-[15px] text-[#E7E3FCB2] dark:text-[#E7E3FCE5]">
         <div className="flex justify-between items-center">
           <h2 className="font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
-            Contact info
+            {t("detail.customerInfo")}
           </h2>
           {role !== "market" && role !== "courier" && (
             <button
               onClick={handleOpenPopup}
               className="text-[15px] font-medium text-[#8C57FF] hover:underline cursor-pointer"
             >
-              Edit
+              {t("detail.edit")}
             </button>
           )}
         </div>
         <div>
           <h2 className="text-[#2E263DB2] dark:text-[#E7E3FCB2]">
-            Phone Number: {customer.phone_number}
+            {t("phone")}: {customer.phone_number}
           </h2>
         </div>
       </div>
@@ -116,7 +115,7 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
       <Popup isShow={isShowPopup} onClose={() => setIsShowPopup(false)}>
         <div className="bg-white dark:bg-[#28243d] w-[400px] rounded-2xl shadow-lg p-6">
           <h2 className="text-lg font-medium mb-4 dark:text-white">
-            Edit Customer Info
+            {t("detail.editCustomerInfo")}
           </h2>
 
           <div className="flex flex-col gap-5">
@@ -141,13 +140,13 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
               onClick={() => setIsShowPopup(false)}
               className="px-4 py-2 rounded-md border dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-[#3a324e]"
             >
-              Cancel
+              {t("detail.cancel")}
             </button>
             <button
               onClick={handleSave}
               className="px-4 py-2 rounded-md bg-[#8C57FF] text-white hover:bg-[#7a4de6]"
             >
-              Save
+              {t("detail.save")}
             </button>
           </div>
         </div>

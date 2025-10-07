@@ -34,5 +34,27 @@
   "market": "MARKET",
   "status": "HOLAT",
   "price": "NARX",
-  "createdAt": "YARATILGAN VAQTI"
+  "createdAt": "YARATILGAN VAQTI",
+  "detail": {
+    "title": "Buyurtma ma'lumotlari",
+    "orderDetails": "Buyurtma mahsulotlari",
+    "edit": "Tahrirlash",
+    "product": "Mahsulot",
+    "qty": "soni",
+    "total": "jami",
+    "customerDetail": "Buyurtmachi ma'lumotlari",
+    "customerInfo": "Kontakt ma'lumotlari",
+    "editCustomerInfo": "Buyurtmachi ma'lumotlarini tahrirlash",
+    "cancel": "Bekor qilish",
+    "save": "Saqlash",
+    "editOrder": "Buyurtmani tahrirlash",
+    "add": "Yangi mahsulot qo'shish",
+    "delete": "O'chirish",
+    "add1": "qo'shish",
+    "totalPrice": "Jami summa",
+    "address": "Manzili",
+    "viloyat": "Viloyat",
+    "tuman": "Tuman",
+    "manzil": "Manzil"
+  }
 }

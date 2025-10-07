@@ -7,10 +7,12 @@ import { CashboxHistory } from "../../components/paymentHistory";
 import dayjs from "dayjs";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { useTranslation } from "react-i18next";
 
 const { RangePicker } = DatePicker;
 
 const CashDetailMarketCourier = () => {
+  const { t } = useTranslation("payment");
   const { id } = useParams();
 
   const [form, setForm] = useState({
@@ -24,9 +26,9 @@ const CashDetailMarketCourier = () => {
   });
 
   const params = {
-    fromDate:form.from,
-    toDate:form.to
-  }
+    fromDate: form.from,
+    toDate: form.to,
+  };
 
   useEffect(() => {
     if (form.payment != "click_to_market") {
@@ -54,7 +56,7 @@ const CashDetailMarketCourier = () => {
     <div className="px-5 mt-5 flex gap-24">
       <div>
         <h2 className="flex items-center mb-5 text-[25px] capitalize font-bold">
-          Cash box
+          {t("cashbox")}
         </h2>
         <CashboxCard
           role={"market"}
@@ -66,7 +68,7 @@ const CashDetailMarketCourier = () => {
       </div>
       <div className="grid w-full">
         <div className="flex flex-row items-center gap-7">
-          <h2 className="text-[20px] font-medium mb-2">Filters:</h2>
+          <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
             <div className="flex gap-5">
               {/* RangePicker bilan custom */}
