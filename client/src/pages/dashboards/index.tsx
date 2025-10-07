@@ -403,7 +403,7 @@ const ChartWrapper = ({
         <YAxis
           type="category"
           dataKey="nomi"
-          width={15}
+          width={20}
           tick={({ x, y, payload }) => (
             <text
               x={x - 5}
