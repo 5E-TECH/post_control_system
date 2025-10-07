@@ -55,15 +55,15 @@ const OrderView = () => {
   };
   const handlePrint = () => {
     const orderids = {
-      orderIds:selectedIds
-    }
+      orderIds: selectedIds,
+    };
     createPrint.mutate(orderids, {
       onSuccess: () => {
         // alert('chop etildi')
         console.log("chop etildi");
-      }
-    })
-  }
+      },
+    });
+  };
 
   const handleAccapted = () => {
     const newOrder = {
@@ -91,7 +91,13 @@ const OrderView = () => {
     >
       <div className="flex justify-between items-center">
         <Search />
-        <button onClick={() => handlePrint()} className="border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff]">
+        <button
+          onClick={(e) => {
+            if (!e.isTrusted) return; // 🚫 Scanner yoki JS trigger bo‘lsa to‘xtaydi
+            handlePrint(); // ✅ Faqat haqiqiy click bo‘lsa ishlaydi
+          }}
+          className="border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff]"
+        >
           Chop etish
         </button>
       </div>
