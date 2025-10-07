@@ -16,6 +16,7 @@ import { OrderGateaway } from './socket/order.gateaway';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { BotUpdate } from './bot/bot.update';
+import { PrinterModule } from './printer/printer.module';
 
 @Module({
   imports: [
@@ -44,6 +45,8 @@ import { BotUpdate } from './bot/bot.update';
 
     // loggerni oxirida yoki avvaliga qo'yish muammo bo'lmaydi — global ekan ishlaydi
     LoggerModule,
+
+    PrinterModule,
   ],
   providers: [OrderGateaway],
 })
