@@ -15,6 +15,21 @@ const OrderView = () => {
   const { t } = useTranslation("todayOrderList");
   const { t: st } = useTranslation("status");
 
+  // useEffect(() => {
+  //   const blockScanner = (e: KeyboardEvent) => {
+  //     e.preventDefault(); // ❌ hech narsa bajarilmaydi
+  //     e.stopPropagation(); // ❌ boshqa joyga o‘tmaydi
+  //   };
+
+  //   window.addEventListener("keydown", blockScanner, true);
+  //   window.addEventListener("keypress", blockScanner, true);
+
+  //   return () => {
+  //     window.removeEventListener("keydown", blockScanner, true);
+  //     window.removeEventListener("keypress", blockScanner, true);
+  //   };
+  // }, []);
+
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
   const [deleteId, setDeleteId] = useState("");
@@ -55,15 +70,15 @@ const OrderView = () => {
   };
   const handlePrint = () => {
     const orderids = {
-      orderIds:selectedIds
-    }
+      orderIds: selectedIds,
+    };
     createPrint.mutate(orderids, {
       onSuccess: () => {
         // alert('chop etildi')
         console.log("chop etildi");
-      }
-    })
-  }
+      },
+    });
+  };
 
   const handleAccapted = () => {
     const newOrder = {
@@ -87,11 +102,12 @@ const OrderView = () => {
   return (
     <div
       onClick={() => setOpenMenuId("")}
-      className="bg-white rounded-md m-5 dark:bg-[#312d4b]"
-    >
+      className="bg-white rounded-md m-5 dark:bg-[#312d4b]">
       <div className="flex justify-between items-center">
         <Search />
-        <button onClick={() => handlePrint()} className="border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff]">
+        <button
+          onClick={() => handlePrint()}
+          className="border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff]">
           Chop etish
         </button>
       </div>
@@ -177,8 +193,7 @@ const OrderView = () => {
             {data?.data?.data?.map((item: any, inx: number) => (
               <tr
                 key={item?.id}
-                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
-              >
+                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]">
                 <td className="pl-10">
                   <input
                     type="checkbox"
@@ -208,8 +223,7 @@ const OrderView = () => {
 
                 <td className="pl-10">
                   <span
-                    className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}
-                  >
+                    className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}>
                     {st(`${item.status}`).toUpperCase()}
                   </span>
                 </td>
@@ -225,14 +239,14 @@ const OrderView = () => {
                     onClick={() => {
                       setDeleteId(item.id); // shu joyda id saqlanadi
                       setIsConfirmOpen(true); // popup ochiladi
-                    }}
-                  >
+                    }}>
                     <Trash />
                   </button>
                   <button
                     className="hover:text-[#396ebe] cursor-pointer"
-                    onClick={() => navigate(`/orders/order-detail/${item?.id}`)}
-                  >
+                    onClick={() =>
+                      navigate(`/orders/order-detail/${item?.id}`)
+                    }>
                     <Edit />
                   </button>
                 </td>
@@ -243,16 +257,13 @@ const OrderView = () => {
         {selectedOrder && (
           <div
             className="fixed inset-0 bg-[#f4f5fa79] bg-opacity-80 flex items-center justify-center z-50 dark:bg-[#28243d3b]"
-            onClick={() => setSelectedOrder(null)}
-          >
+            onClick={() => setSelectedOrder(null)}>
             <div
               className="bg-white rounded-lg shadow-lg p-6 w-[500px] relative dark:bg-[#28243d]"
-              onClick={(e) => e.stopPropagation()}
-            >
+              onClick={(e) => e.stopPropagation()}>
               <button
                 className="absolute top-3 right-3 text-gray-600 hover:text-black"
-                onClick={() => setSelectedOrder(null)}
-              >
+                onClick={() => setSelectedOrder(null)}>
                 ✕
               </button>
               <div>
@@ -282,8 +293,7 @@ const OrderView = () => {
                         {Array.from({ length: 3 }).map((_, inx: number) => (
                           <tr
                             key={inx}
-                            className="flex justify-between items-center pr-4 border-b mb-2"
-                          >
+                            className="flex justify-between items-center pr-4 border-b mb-2">
                             <td>
                               <div className="flex items-center gap-3">
                                 <div>
@@ -336,8 +346,7 @@ const OrderView = () => {
                 (Array.isArray(selectedIds) && selectedIds.length === 0)
                   ? "opacity-50 cursor-not-allowed"
                   : "cursor-pointer"
-              } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}
-            >
+              } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}>
               {t("qabulQilish")}
             </button>
           </div>
