@@ -120,7 +120,7 @@ const Payments = () => {
   const operationType = ["income", "expense"];
   const operationOptions = operationType.map((role: string) => ({
     value: role,
-    label: role,
+    label: t(`${role}`),
   }));
 
   const sourceType = [
@@ -137,7 +137,7 @@ const Payments = () => {
   ];
   const sourceOptions = sourceType.map((status: string) => ({
     value: status,
-    label: status,
+    label: t(`sourceTypes.${status}`),
   }));
 
   const createdByOptions = cashBoxData?.data?.allCashboxHistories
@@ -297,7 +297,7 @@ const Payments = () => {
           onClick={() => setShowCurier(true)}
           className="py-15 cursor-pointer rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
-          <h3>Olinishi kerak</h3>
+          <h3>{t("olinishiKerak")}</h3>
           <strong className="block pt-3 text-4xl">
             <CountUp
               end={cashBoxData?.data?.courierCashboxTotal || 0}
@@ -427,7 +427,7 @@ const Payments = () => {
               className="h-[45px]! w-[150px]! max-[450px]:w-full!"
               onClick={() => setPaymentFilter(initialState)}
             >
-              Tozalash
+              {t("tozalash")}
             </Button>
           </div>
         </div>
@@ -438,7 +438,7 @@ const Payments = () => {
           <div>
             <div>
               <table className="w-full border-collapse">
-                <thead className="dark:bg-[#3D3759] text-[13px] bg-[#F6F7FB] border-4 border-white dark:border-[#3D3759]">
+                <thead className="dark:bg-[#3D3759] text-[13px] bg-[#F6F7FB] border-4 border-white dark:border-[#3D3759] uppercase">
                   <tr>
                     <th className="h-[56px] font-medium  text-left pl-4">
                       <div className="flex items-center justify-between">
@@ -448,38 +448,38 @@ const Payments = () => {
                     </th>
                     <th className="h-[56px] font-medium text-left">
                       <div className="flex items-center justify-between pr-[21px]">
-                        CREATED BY
+                        {t("createdBy")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        CASHBOX TYPE
+                        {t("cashboxtype")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        OPERTAION TYPE
+                        {t("operationType")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        AMOUNT
+                      <div className="flex items-center justify-between pr-[21px] pl-9">
+                        {t("amount")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        Payment Date
+                      <div className="flex items-center justify-between pr-[21px] pl-9">
+                        {t("paymentDate")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                   </tr>
                 </thead>
 
-                <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2]">
+                <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] capitalize">
                   {cashBoxData?.data?.allCashboxHistories?.map(
                     (item: any, inx: number) => (
                       <tr
@@ -526,7 +526,7 @@ const Payments = () => {
                                 }
                               `}
                           >
-                            {item?.payment_method}
+                            {t(item?.payment_method)}
                           </span>
                         </td>
                         <td
@@ -545,7 +545,7 @@ const Payments = () => {
                                   }
                                 `}
                           >
-                            {item?.operation_type}
+                            {t(item?.operation_type)}
                           </span>
                         </td>
                         <td
