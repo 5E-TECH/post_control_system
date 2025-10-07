@@ -12,6 +12,12 @@ export const usePost = () => {
       client.invalidateQueries({ queryKey: [post], refetchType: "active" }),
   });
 
+  const createPrint = useMutation({
+    mutationFn: (data: any) => api.post("printer/print", data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [post], refetchType: "active" }),
+  });
+
   const getAllPosts = (path?: string) =>
     useQuery({
       queryKey: [post, path],
@@ -84,6 +90,7 @@ export const usePost = () => {
     });
   return {
     createPost,
+    createPrint,
     getAllPosts,
     getPostById,
     sendAndGetCouriersByPostId,
