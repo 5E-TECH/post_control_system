@@ -129,12 +129,13 @@ TEXT 20,80,"3",0,1,1,"Mijoz:"
 TEXT 20,120,"3",0,1,1,"${customerName}"
 
 TEXT 20,160,"3",0,1,1,"Telefon:"
-TEXT 160,160,"3",0,1,1,"${customerPhone.toLocaleString()}"
+TEXT 160,160,"3",0,1,1,"${customerPhone}"
 
 TEXT 20,200,"3",0,1,1,"Tuman: ${district}"
 TEXT 20,240,"3",0,1,1,"Manzil: ${address}"
 
-TEXT 20,290,"3",0,1,1,"${orderPrice.toLocaleString('uz-UZ')}"
+TEXT 20,290,"3",0,1,1,"Narxi: ${district}"
+TEXT 160,290,"3",0,1,1,"${orderPrice}"
 
 QRCODE 600,50,L,6,A,0,"${qrCode}"
 BARCODE 0,350,"128",100,1,0,2,2,"${qrCode}"
