@@ -7,6 +7,7 @@ import { Input, Select } from "antd";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { useTranslation } from "react-i18next";
 
 interface IProps {
   address: string;
@@ -15,6 +16,7 @@ interface IProps {
 }
 
 const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
+  const { t } = useTranslation("orderList");
   const { role } = useSelector((state: RootState) => state.roleSlice);
   const [district, setDistrict] = useState(districtId);
 
@@ -92,14 +94,14 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
       <div className="m-5">
         <div className="flex justify-between">
           <h2 className="font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
-            Shipping address
+            {t("detail.address")}
           </h2>
           {role !== "market" && role !== "courier" && (
             <button
               onClick={() => setIsShowPopup(true)}
               className="text-[15px] font-medium text-[#8C57FF] hover:underline cursor-pointer"
             >
-              Edit
+              {t("detail.edit")}
             </button>
           )}
         </div>
@@ -107,16 +109,16 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id }) => {
       <div className="m-5">
         <div>
           <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] ">
-            <strong>Viloyat:</strong>
+            <strong>{t("detail.viloyat")}:</strong>
             {districtData?.data?.region?.name}
           </h2>
           <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] ">
-            <strong>Tuman:</strong>
+            <strong>{t("detail.tuman")}:</strong>
             {districtData?.data?.name}
           </h2>
         </div>
         <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2] ">
-          <strong>Manzil:</strong>
+          <strong>{t("detail.manzil")}:</strong>
           {address}
         </h2>
       </div>

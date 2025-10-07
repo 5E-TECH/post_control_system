@@ -34,5 +34,27 @@
   "market": "MARKET",
   "status": "STATUS",
   "price": "PRICE",
-  "createdAt": "CREATED AT"
+  "createdAt": "CREATED AT",
+  "detail": {
+    "title": "Order details",
+    "orderDetails": "Order products",
+    "edit": "Edit",
+    "product": "Product",
+    "qty": "Quantity",
+    "total": "Total",
+    "customerDetail": "Customer details",
+    "customerInfo": "Contact information",
+    "editCustomerInfo": "Edit customer information",
+    "cancel": "Cancel",
+    "save": "Save",
+    "editOrder": "Edit order",
+    "add": "Add new product",
+    "delete": "Delete",
+    "add1": "add",
+    "totalPrice": "Total amount",
+    "address": "Address",
+    "viloyat": "Region",
+    "tuman": "District",
+    "manzil": "Address"
+  }
 }

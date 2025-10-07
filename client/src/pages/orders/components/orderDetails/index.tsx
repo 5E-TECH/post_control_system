@@ -8,6 +8,7 @@ import { useParams } from "react-router-dom";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import type { RootState } from "../../../../app/store";
 import { useSelector } from "react-redux";
+import { useTranslation } from "react-i18next";
 
 interface IProps {
   items: any[];
@@ -26,6 +27,7 @@ const Details: FC<IProps> = ({
   deleveryStatus,
   status,
 }) => {
+  const { t } = useTranslation("orderList");
   const { id } = useParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedId, setSelectedId] = useState("");
@@ -107,14 +109,14 @@ const Details: FC<IProps> = ({
     <div className="dark:bg-[#312D4B]">
       <div className="flex justify-between m-5">
         <h2 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-          Order details
+          {t("detail.orderDetails")}
         </h2>
         {status == "new" && role != "market" && role != "courier" && (
           <button
             onClick={() => setIsModalOpen(true)}
             className="text-[#8C57FF] cursor-pointer"
           >
-            Edit
+            {t("detail.edit")}
           </button>
         )}
       </div>
@@ -122,11 +124,11 @@ const Details: FC<IProps> = ({
       {/* Header */}
       <div className="flex justify-between items-center gap-5 bg-[#F6F7FB] dark:bg-[#3d3759]">
         <h2 className="flex-1 font-medium p-5 text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-          PRODUCT
+          {t("detail.product")}
         </h2>
         <div className="h-[14px] border-l-2 border-[#2E263D1F] dark:border-[#E7E3FC1F]"></div>
         <h2 className="ml-5 mr-10 font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-          QTY
+          {t("detail.qty")}
         </h2>
         <div className="h-[14px] border-l-2 border-[#2E263D1F] pr-5 dark:border-[#E7E3FC1F]"></div>
       </div>
@@ -161,7 +163,7 @@ const Details: FC<IProps> = ({
       <div className="flex justify-end mr-5 my-5">
         <div className="flex gap-[48px]">
           <div className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-            <h2>Total:</h2>
+            <h2>{t("detail.total")}:</h2>
           </div>
           <div className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
             <h2>{Number(total_price).toLocaleString("uz-UZ")} so‘m</h2>
@@ -171,13 +173,7 @@ const Details: FC<IProps> = ({
       <Popup isShow={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <div className="w-[720px] bg-white dark:bg-[#2f2a45] rounded-2xl shadow-lg p-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl">Edit order</h2>
-            <button
-              onClick={() => setAddItem((p) => !p)}
-              className="text-[#854FFF] py-1 px-1 rounded-md border border-[#854FFF]"
-            >
-              Add order item
-            </button>
+            <h2 className="text-xl">{t("detail.editOrder")}</h2>
           </div>
           <div>
             {orderItems.map((item) => (
@@ -219,7 +215,7 @@ const Details: FC<IProps> = ({
                         className="bg-green-500 text-white px-2 rounded"
                         onClick={() => setEditItem("")} // 👈 Save bosilganda yopiladi
                       >
-                        Save
+                        {t("detail.save")}
                       </button>
                     </div>
                   ) : (
@@ -231,7 +227,7 @@ const Details: FC<IProps> = ({
                     className="cursor-pointer"
                     onClick={() => setEditItem(item.id)}
                   >
-                    Edit
+                    {t("detail.edit")}
                   </button>
                   <button
                     className="cursor-pointer"
@@ -241,7 +237,7 @@ const Details: FC<IProps> = ({
                       )
                     }
                   >
-                    Delete
+                    {t("detail.delete")}
                   </button>
                 </div>
               </div>
@@ -287,7 +283,7 @@ const Details: FC<IProps> = ({
                     setAddItem(false);
                   }}
                 >
-                  Add
+                  {t("detail.add1")}
                 </button>
               </div>
             )}
@@ -305,7 +301,7 @@ const Details: FC<IProps> = ({
                 </Select>
               </div>
               <div className="flex justify-end items-center gap-5">
-                <h2>Total price:</h2>
+                <h2>{t("detail.totalPrice")}:</h2>
                 <InputNumber
                   min={1}
                   defaultValue={totalPrice}
@@ -326,12 +322,18 @@ const Details: FC<IProps> = ({
               className="w-full mb-3 dark:bg-[#312D4B]! dark:outline-none! dark:text-white! dark:placeholder-gray-400!"
             />{" "}
           </div>
-          <div className="flex justify-end mt-5">
+          <div className="flex justify-end mt-5 gap-5">
+            <button
+              onClick={() => setAddItem((p) => !p)}
+              className="text-[#854FFF] py-1 px-1 rounded-md border border-[#854FFF] cursor-pointer"
+            >
+              {t("detail.add")}
+            </button>
             <button
               onClick={() => handlesubmit()}
-              className="text-[18px] bg-[#854FFF] text-white py-1 px-3 rounded-md"
+              className="text-[18px] bg-[#854FFF] text-white py-1 px-3 rounded-md cursor-pointer"
             >
-              Save
+              {t("detail.save")}
             </button>
           </div>
         </div>
