@@ -25,7 +25,7 @@ const OrderView = () => {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const { getOrderByMarket, getMarketsByMyNewOrders, deleteOrders } =
     useOrder();
-  const { createPost } = usePost();
+  const { createPost, createPrint } = usePost();
   const { data, refetch } =
     user.role === "market" ? getMarketsByMyNewOrders() : getOrderByMarket(id);
 
@@ -53,6 +53,18 @@ const OrderView = () => {
       },
     });
   };
+  const handlePrint = () => {
+    const orderids = {
+      orderIds:selectedIds
+    }
+    createPrint.mutate(orderids, {
+      onSuccess: () => {
+        // alert('chop etildi')
+        console.log("chop etildi");
+      }
+    })
+  }
+
   const handleAccapted = () => {
     const newOrder = {
       order_ids: selectedIds,
@@ -77,7 +89,12 @@ const OrderView = () => {
       onClick={() => setOpenMenuId("")}
       className="bg-white rounded-md m-5 dark:bg-[#312d4b]"
     >
-      <Search />
+      <div className="flex justify-between items-center">
+        <Search />
+        <button onClick={() => handlePrint()} className="border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff]">
+          Chop etish
+        </button>
+      </div>
       <div className="w-full">
         <table className="w-full">
           <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:text-[#E7E3FCE5] dark:bg-[#3d3759]">
