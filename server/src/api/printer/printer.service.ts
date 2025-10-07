@@ -123,22 +123,23 @@ SIZE 100 mm,60 mm
 GAP 2 mm,0 mm
 CLS
 
-TEXT 200,20,"3",0,1,1,"Post Control System"
+TEXT 325,20,"3",0,1,1,"Beepost"
 
-TEXT 20,80,"3",0,1,1,"Mijoz:"
-TEXT 20,120,"3",0,1,1,"${customerName}"
+TEXT 20,80,"3",0,1,1,"${customerName}"
 
-TEXT 20,160,"3",0,1,1,"Telefon:"
-TEXT 160,160,"3",0,1,1,"${customerPhone}"
+TEXT 20,120,"3",0,1,1,"Telefon:"
+TEXT 160,120,"3",0,1,1,"${customerPhone}"
 
-TEXT 20,200,"3",0,1,1,"Tuman: ${district}"
-TEXT 20,240,"3",0,1,1,"Manzil: ${address}"
+TEXT 20,200,"3",0,1,1,"Narxi:"
+TEXT 160,200,"3",0,1,1,"${orderPrice}"
 
-TEXT 20,290,"3",0,1,1,"Narxi: ${district}"
-TEXT 160,290,"3",0,1,1,"${orderPrice}"
+TEXT 20,240,"3",0,1,1,"Tuman: ${district}"
+TEXT 20,280,"3",0,1,1,"Manzil: ${address}"
+
+
 
 QRCODE 600,50,L,6,A,0,"${qrCode}"
-BARCODE 0,350,"128",100,1,0,2,2,"${qrCode}"
+BARCODE 20,350,"128",100,1,0,2,2,"${qrCode}"
 
 PRINT 1
 `;
