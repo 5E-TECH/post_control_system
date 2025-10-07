@@ -1,6 +1,6 @@
 import React from "react";
 import Lottie from "lottie-react";
-import animationData from "../../shared/assets/logs/Developer cyan.json"; // manzilni to‘g‘rilab yoz
+import animationData from "../../shared/assets/animation/Developer cyan.json"; // manzilni to‘g‘rilab yoz
 
 const LogsPage = () => {
   return (
