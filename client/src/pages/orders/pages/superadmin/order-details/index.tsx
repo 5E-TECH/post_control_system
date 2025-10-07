@@ -5,8 +5,11 @@ import CustomerDetail from "../../../components/customer detail";
 import { useParams } from "react-router-dom";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import QRCode from "react-qr-code";
+import { useTranslation } from "react-i18next";
 
 const OrderDetails = () => {
+  const { t } = useTranslation("orderList");
+  const { t:st } = useTranslation("status");
   const { id } = useParams();
 
   const { getOrderById } = useOrder();
@@ -18,10 +21,10 @@ const OrderDetails = () => {
   return (
     <div className="p-6 bg-white dark:bg-[#28243D]">
       <div className="flex items-center gap-4">
-        <h2 className="text-2xl font-bold">Order detail</h2>
+        <h2 className="text-2xl font-bold">{t("detail.title")}</h2>
         <div>
           <p className="px-4 py-1 bg-blue-500 rounded-2xl text-white">
-            {data?.data?.status}
+            {st(`${data?.data?.status}`)}
           </p>
         </div>
       </div>
