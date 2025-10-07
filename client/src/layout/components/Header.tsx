@@ -192,7 +192,7 @@ const Header = () => {
                 <div className="flex flex-col gap-4 justify-end">
                   <div className="flex items-center gap-7 text-sm text-gray-600 dark:text-gray-300">
                     <a
-                      href="https://instagram.com/faxriddin_maripov"
+                      href="https://www.instagram.com/ye77i.tech?igsh=eHpwaDVhb2R5dWtq"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="hover:text-pink-500"
@@ -200,7 +200,7 @@ const Header = () => {
                       <FaInstagram size={20} />
                     </a>
                     <a
-                      href="https://t.me/faxriddin_maripov"
+                      href="https://t.me/yetti_tech"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="hover:text-sky-500"

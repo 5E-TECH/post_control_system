@@ -39,7 +39,7 @@ const Footer = () => {
           </Trans>
         </span>
         <a
-          href="https://instagram.com/faxriddin_maripov"
+          href="https://www.instagram.com/ye77i.tech?igsh=eHpwaDVhb2R5dWtq"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-pink-500"
@@ -47,7 +47,7 @@ const Footer = () => {
           <FaInstagram size={20} />
         </a>
         <a
-          href="https://t.me/faxriddin_maripov"
+          href="https://t.me/yetti_tech"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-sky-500"
