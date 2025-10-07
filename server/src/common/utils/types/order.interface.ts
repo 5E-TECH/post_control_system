@@ -1,6 +1,6 @@
 export interface PrintOrder {
   orderId: string;
-  orderPrice: number;
+  orderPrice: string;
   customerName: string;
   customerPhone: string;
   district: string;
