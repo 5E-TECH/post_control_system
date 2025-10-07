@@ -464,7 +464,7 @@ const ChartWrapper = ({
     <div className="flex justify-center mt-4">
       <button
         onClick={() => setShowAll(!showAll)}
-        className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+        className="px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer"
       >
         {showAll ? t("showLess") : t("showMore")}
       </button>
