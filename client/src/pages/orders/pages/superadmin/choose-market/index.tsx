@@ -155,27 +155,17 @@ const ChooseMarket = () => {
               />
             </Form.Item>
           </div>
-          <div className="">
-            <table className="max-[901px]:w-full">
-              <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow overflow-hidden">
+            <table className="w-full border dark:border-none border-gray-200 shadow-sm">
+              <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
                 <tr>
-                  <th className="w-[654px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    #
-                  </th>
-                  <th className="w-[654px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      {t("marketName")}
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
-                  <th className="w-[654px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      {t("phoneNumber")}
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
+                  <th className="text-left pl-8 w-[60px]">#</th>
+                  <th className="text-left px-8">{t("marketName")}</th>
+                  {/* padding-left qo'shildi, width olib tashlandi */}
+                  <th className="text-left pl-12">{t("phoneNumber")}</th>
                 </tr>
               </thead>
+
               {isLoading ? (
                 <TableSkeleton rows={5} columns={2} />
               ) : (
@@ -183,44 +173,30 @@ const ChooseMarket = () => {
                   {markets?.map((market: any, inx: number) => (
                     <tr
                       key={market?.id}
+                      className={`h-[56px] cursor-pointer hover:bg-[#f6f7fb9f] dark:hover:bg-[#3d3759] 
+            font-medium dark:text-[#d5d1eb] text-[#2E263DE5] text-[16px]
+            ${
+              inx % 2 === 0
+                ? "bg-white dark:bg-[#2a243a]"
+                : "bg-[#aa85f818] dark:bg-[#342d4a]"
+            }`}
                       onClick={() => setSelectedMarket(market)}
                       onDoubleClick={() => setSelectedMarket(null)}
-                      className={`cursor-pointer ${
-                        selectedMarket?.id === market.id
-                          ? "bg-[#E3DCFB] dark:bg-[#524B6C]"
-                          : "hover:bg-[#F6F7FB] dark:hover:bg-[#3D3759]"
-                      }`}
                     >
-                      <td
-                        className="data-cell max-[254px]:w-full h-[56px] pl-[20px] text-left"
-                        data-cell="#"
-                      >
-                        {inx + 1}
-                      </td>
-                      <td
-                        className="data-cell max-[254px]:w-full h-[56px] pl-[20px] text-left"
-                        data-cell="MARKET NOMI"
-                      >
-                        <div className="flex items-center gap-4">
-                          <span className="font-normal text-[#2E263DB2] dark:text-[#D5D1EB]">
-                            {market?.name}
-                          </span>
-                        </div>
-                      </td>
-                      <td
-                        className="data-cell max-[254px]:w-full whitespace-nowrap pl-[20px] text-left"
-                        data-cell="TELEFON"
-                      >
-                        <span className="font-normal text-[#2E263DB2] dark:text-[#B1ADC7]">
-                          {market?.phone_number}
-                        </span>
+                      <td className="pl-8 w-[60px]">{inx + 1}</td>
+                      <td className="px-8">{market?.name}</td>
+                      {/* width olib tashlandi, pl-12 bilan joylashtirildi */}
+                      <td className="text-left pl-12">
+                        {market?.phone_number}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               )}
             </table>
-            <div className="flex justify-center pt-3">
+
+            {/* Pagination (pastki qism) */}
+            <div className="flex justify-center items-center border-t border-[#E9E8EE] dark:border-[#3D3759] py-3 bg-[#FDFDFF] dark:bg-[#2A263D]">
               <Pagination
                 showSizeChanger
                 current={page}

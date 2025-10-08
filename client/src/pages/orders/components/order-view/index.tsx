@@ -167,7 +167,7 @@ const OrderView = () => {
   }, [triggerDownload, dispatch]);
   return (
     <div className="w-full bg-white py-1 dark:bg-[#312d4b] min-[650px]:overflow-x-auto">
-      <table className="w-full border border-gray-200 shadow-sm">
+      <table className="w-full border-gray-200 shadow-sm">
         <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
           <tr>
             <th>
