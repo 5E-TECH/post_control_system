@@ -42,6 +42,8 @@
     "product": "Товар",
     "qty": "Количество",
     "total": "Итого",
+    "to_be_paid": "К оплате",
+    "paid_amount": "Оплачено",
     "customerDetail": "Информация о клиенте",
     "customerInfo": "Контактная информация",
     "editCustomerInfo": "Редактировать данные клиента",

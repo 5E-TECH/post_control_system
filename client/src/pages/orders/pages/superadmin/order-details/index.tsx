@@ -33,6 +33,8 @@ const OrderDetails = () => {
           <div className="bg-white rounded-xl shadow p-6 dark:bg-[#312D4B]">
             <Details
               items={data?.data?.items}
+              to_be_paid={data?.data?.to_be_paid}
+              paid_amount={data?.data?.paid_amount}
               total_price={data?.data?.total_price}
               marketId={data?.data?.market?.id}
               comment={data?.data?.comment}

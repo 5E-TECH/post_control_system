@@ -12,6 +12,8 @@ import { useTranslation } from "react-i18next";
 
 interface IProps {
   items: any[];
+  to_be_paid: any;
+  paid_amount: any;
   total_price: any;
   marketId: string;
   comment: string;
@@ -22,6 +24,8 @@ interface IProps {
 const Details: FC<IProps> = ({
   items = [],
   total_price,
+  to_be_paid,
+  paid_amount,
   marketId,
   comment,
   deleveryStatus,
@@ -52,7 +56,7 @@ const Details: FC<IProps> = ({
       name: item.product.name,
     }))
   );
-
+   
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { updateOrders } = useOrder();
@@ -161,15 +165,39 @@ const Details: FC<IProps> = ({
 
       {/* Totals */}
       <div className="flex justify-end mr-5 my-5">
-        <div className="flex gap-[48px]">
-          <div className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-            <h2>{t("detail.total")}:</h2>
+        <div className="flex flex-col items-end gap-2">
+          {/* Umumiy summa */}
+          <div className="flex gap-3">
+            <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+              {t("detail.total")}:
+            </h2>
+            <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
+              {Number(total_price).toLocaleString("uz-UZ")} so'm
+            </h2>
           </div>
-          <div className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
-            <h2>{Number(total_price).toLocaleString("uz-UZ")} so‘m</h2>
+
+          {/* To‘lanishi kerak */}
+          <div className="flex gap-3">
+            <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+              {t("detail.to_be_paid")}:
+            </h2>
+            <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
+              {Number(to_be_paid).toLocaleString("uz-UZ")} so'm
+            </h2>
+          </div>
+
+          {/* To‘langan */}
+          <div className="flex gap-3">
+            <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+              {t("detail.paid_amount")}:
+            </h2>
+            <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
+              {Number(paid_amount).toLocaleString("uz-UZ")} so'm
+            </h2>
           </div>
         </div>
       </div>
+
       <Popup isShow={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <div className="w-[720px] bg-white dark:bg-[#2f2a45] rounded-2xl shadow-lg p-6">
           <div className="flex justify-between items-center">
