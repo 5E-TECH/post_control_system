@@ -47,8 +47,8 @@ const TodayOrders = () => {
         </div>
       ) : markets.length > 0 ? (
         <div className="w-full">
-          <table className="w-full ">
-            <thead className="bg-[#f6f7fb]  h-[56px] text-[13px] text-[#2E263DE5] text-center dark:text-[#E7E3FCE5] dark:bg-[#3d3759]">
+          <table className=" w-full  border-gray-200 shadow-sm ">
+            <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
               <tr>
                 <th>
                   <div className="flex items-center gap-10 ml-10 mr-5">
@@ -81,11 +81,16 @@ const TodayOrders = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="[&>tr]:odd:bg-white  [&>tr]:odd:dark:bg-[#312d4b] [&>tr]:even:bg-[#f6f7fb6c] [&>tr]:even:dark:bg-[#3d375957] [&>tr:hover]:bg-[#f6f7fb] [&>tr:hover]:dark:bg-[#3d3759]">
+            <tbody className="">
               {markets?.map((item: any, inx: number) => (
                 <tr
                   key={item?.market?.id}
-                  className="h-[56px] cursor-pointer"
+                  className={`h-[56px] cursor-pointer hover:bg-[#f6f7fb9f] dark:hover:bg-[#3d3759] font-medium dark:text-[#d5d1eb] text-[#2E263DE5] text-[16px]
+                  ${
+                    inx % 2 === 0
+                      ? "bg-white dark:bg-[#2a243a]"
+                      : "bg-[#aa85f818] dark:bg-[#342d4a]"
+                  }`}
                   onClick={() => handleProps(item?.market?.id)}
                 >
                   <td className="pl-10">{inx + 1}</td>
