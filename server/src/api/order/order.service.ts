@@ -646,10 +646,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.startTransaction();
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
-        where: { qr_code_token: id },
+        where: {
+          qr_code_token: id,
+          status: In([Order_status.NEW, Order_status.CANCELLED_SENT]),
+        },
       });
       if (!order) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException('Order not in correct status');
+      }
+      if (order.status === Order_status.CANCELLED_SENT) {
+        order.status = Order_status.CLOSED;
+        await queryRunner.manager.save(order);
+
+        await queryRunner.commitTransaction();
+        return successRes({}, 200, 'Order closed');
       }
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id: order.customer_id, role: Roles.CUSTOMER },
