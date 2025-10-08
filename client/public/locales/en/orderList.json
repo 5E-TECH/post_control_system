@@ -18,13 +18,13 @@
   "Status": {
     "new": "New",
     "received": "Received",
-    "on_the_road": "On the Road",
+    "on the road": "On the Road",
     "waiting": "Waiting",
     "sold": "Sold",
     "cancelled": "Cancelled",
     "paid": "Paid",
     "partly_paid": "Partly Paid",
-    "cancelled_sent": "Cancelled (Sent)",
+    "cancelled (sent)": "Cancelled (Sent)",
     "closed": "Closed"
   },
   "customer": "CUSTOMER",

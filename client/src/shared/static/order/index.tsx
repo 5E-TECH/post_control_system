@@ -45,13 +45,13 @@ export const viloyatlar = [
 export const statusOptions = [
   { value: "new", label: "NEW" },
   { value: "received", label: "RECEIVED"},
-  { value: "on_the_road", label: "ON THE ROAD"},
+  { value: "on the road", label: "ON THE ROAD"},
   { value: "waiting", label: "WAITING"},
   { value: "sold", label: "SOLD"},
   { value: "cancelled", label: "CANCELLED"},
   { value: "paid", label: "PAID", color: "cyan" },
   { value: "partly_paid", label: "PARTLY PAID"},
-  { value: "cancelled_sent", label: "CANCELLED (SENT)"},
+  { value: "cancelled (sent)", label: "CANCELLED (SENT)"},
   { value: "closed", label: "CLOSED"},
 ];
 

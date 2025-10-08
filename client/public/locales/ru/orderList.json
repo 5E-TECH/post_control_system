@@ -18,13 +18,13 @@
   "Status": {
     "new": "Новый",
     "received": "Получен",
-    "on_the_road": "В пути",
+    "on the road": "В пути",
     "waiting": "Ожидает",
     "sold": "Продан",
     "cancelled": "Отменён",
     "paid": "Оплачен",
     "partly_paid": "Частично оплачен",
-    "cancelled_sent": "Отменён (отправлен)",
+    "cancelled (sent)": "Отменён (отправлен)",
     "closed": "Закрыт"
   },
   "customer": "КЛИЕНТ",
