@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { OrderService } from '../order/order.service';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { JwtPayload } from 'src/common/utils/types/user.type';
+import {
+  getUzbekistanDayRange,
+  toUzbekistanTimestamp,
+} from 'src/common/utils/date.util';
 
 @Injectable()
 export class DashboardService {
@@ -10,13 +14,25 @@ export class DashboardService {
     try {
       let { startDate, endDate } = filter;
 
-      if (!startDate && !endDate) {
-        const today = new Date();
-        const start = new Date(today.setHours(0, 0, 0, 0)).getTime();
-        const end = new Date(today.setHours(23, 59, 59, 999)).getTime();
-
+      if (!startDate || !endDate) {
+        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
+        const { start, end } = getUzbekistanDayRange();
         startDate = String(start);
         endDate = String(end);
+      } else {
+        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
+        if (startDate === endDate) {
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        } else {
+          // Har xil kunlar oralig‘i
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        }
       }
 
       const [orders, markets, couriers, topMarkets, topCouriers] =
@@ -45,13 +61,25 @@ export class DashboardService {
     try {
       let { startDate, endDate } = filter;
 
-      if (!startDate && !endDate) {
-        const today = new Date();
-        const start = new Date(today.setHours(0, 0, 0, 0)).getTime();
-        const end = new Date(today.setHours(23, 59, 59, 999)).getTime();
-
+      if (!startDate || !endDate) {
+        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
+        const { start, end } = getUzbekistanDayRange();
         startDate = String(start);
         endDate = String(end);
+      } else {
+        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
+        if (startDate === endDate) {
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        } else {
+          // Har xil kunlar oralig‘i
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        }
       }
 
       const [myStat, couriers, topCouriers] = await Promise.all([
@@ -77,13 +105,25 @@ export class DashboardService {
     try {
       let { startDate, endDate } = filter;
 
-      if (!startDate && !endDate) {
-        const today = new Date();
-        const start = new Date(today.setHours(0, 0, 0, 0)).getTime();
-        const end = new Date(today.setHours(23, 59, 59, 999)).getTime();
-
+      if (!startDate || !endDate) {
+        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
+        const { start, end } = getUzbekistanDayRange();
         startDate = String(start);
         endDate = String(end);
+      } else {
+        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
+        if (startDate === endDate) {
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        } else {
+          // Har xil kunlar oralig‘i
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        }
       }
 
       const [myStat, markets, topMarkets] = await Promise.all([

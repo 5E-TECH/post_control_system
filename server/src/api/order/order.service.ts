@@ -45,6 +45,7 @@ import { MyLogger } from 'src/logger/logger.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { BotService } from '../bot/bot.service';
+import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -130,10 +131,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       let endMs: number | undefined;
 
       if (query.startDate) {
-        startMs = new Date(query.startDate).getTime();
+        startMs = toUzbekistanTimestamp(query.startDate, false);
       }
       if (query.endDate) {
-        endMs = new Date(query.endDate).getTime();
+        endMs = toUzbekistanTimestamp(query.endDate, true);
       }
 
       if (startMs && endMs) {
@@ -1350,8 +1351,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getStats(startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
       const acceptedCount = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.created_at BETWEEN :start AND :end', {
@@ -1447,8 +1448,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getMarketStats(startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
 
       // 1) totalOrders: created_at oralig'ida yaratilgan buyurtmalar soni per market
       const totalsRaw = await this.orderRepo
@@ -1531,8 +1532,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getCourierStats(startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
 
       // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
@@ -1702,8 +1703,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async courierStat(user: JwtPayload, startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
 
       // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
@@ -1796,8 +1797,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async marketStat(user: JwtPayload, startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
 
       // 1️⃣ Shu davrdagi barcha postlar
       const allOrders = await this.orderRepo
