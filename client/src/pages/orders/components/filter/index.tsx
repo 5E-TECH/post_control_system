@@ -1,6 +1,6 @@
 import { memo, useCallback } from "react";
 import { statusOptions } from "../../../../shared/static/order";
-import { ArrowRight, Eraser, Trash2 } from "lucide-react";
+import { ArrowRight, Eraser} from "lucide-react";
 import { Button, DatePicker, Select, Space } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { useProfile } from "../../../../shared/api/hooks/useProfile";
