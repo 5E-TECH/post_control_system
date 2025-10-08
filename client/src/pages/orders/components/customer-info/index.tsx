@@ -106,37 +106,62 @@ const CustomerInfocomp = () => {
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
         {t("customerInfo")}
       </h1>
+
       <div className="flex flex-col gap-4">
-        {/* Telefon raqami */}
-        <Input
-          name="phone_number"
-          value={formData.phone_number}
-          onChange={(e) => {
-            let val = e.target.value.replace(/\D/g, "");
-            if (val.startsWith("998")) {
-              val = val.slice(3);
-            }
+        {/* 🔹 Telefon raqam va ism yonma-yon */}
+        <div className="flex gap-4 max-[650px]:flex-col">
+          {/* Telefon raqami */}
+          <div className="flex-1">
+            <label className="block text-xs text-gray-500 mb-1">
+              {t("customerForm.phone")}
+            </label>
+            <Input
+              name="phone_number"
+              value={formData.phone_number}
+              onChange={(e) => {
+                let val = e.target.value.replace(/\D/g, "");
+                if (val.startsWith("998")) val = val.slice(3);
 
-            let formatted = "+998 ";
-            if (val.length > 0) {
-              formatted += val
-                .replace(
-                  /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
-                  (_, a, b, c, d) => [a, b, c, d].filter(Boolean).join(" ")
-                )
-                .trim();
-            }
+                let formatted = "+998 ";
+                if (val.length > 0) {
+                  formatted += val
+                    .replace(
+                      /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
+                      (_, a, b, c, d) => [a, b, c, d].filter(Boolean).join(" ")
+                    )
+                    .trim();
+                }
 
-            handleChange({
-              ...e,
-              target: { ...e.target, name: "phone_number", value: formatted },
-            } as any);
-          }}
-          placeholder="+998 90 123 45 67"
-          className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
-        />
+                handleChange({
+                  ...e,
+                  target: {
+                    ...e.target,
+                    name: "phone_number",
+                    value: formatted,
+                  },
+                } as any);
+              }}
+              placeholder="+998 90 123 45 67"
+              className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
+            />
+          </div>
 
-        {/* Region va District */}
+          {/* Ism */}
+          <div className="flex-1">
+            <label className="block text-xs text-gray-500 mb-1">
+              {t("customerForm.name")}
+            </label>
+            <Input
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder={t("placeholder.name")}
+              className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
+            />
+          </div>
+        </div>
+
+        {/* 🔹 Region va District */}
         <div className="flex gap-4 max-[650px]:flex-col">
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">
@@ -179,20 +204,6 @@ const CustomerInfocomp = () => {
               filterOption={false}
             />
           </div>
-        </div>
-
-        {/* Ism */}
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">
-            {t("customerForm.name")}
-          </label>
-          <Input
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            placeholder={t("placeholder.name")}
-            className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
-          />
         </div>
 
         {/* Address */}

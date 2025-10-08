@@ -42,6 +42,8 @@
     "product": "Product",
     "qty": "Quantity",
     "total": "Total",
+    "to_be_paid": "To be paid",
+    "paid_amount": "Paid",
     "customerDetail": "Customer details",
     "customerInfo": "Contact information",
     "editCustomerInfo": "Edit customer information",
