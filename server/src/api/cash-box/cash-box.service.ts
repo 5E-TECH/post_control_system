@@ -39,6 +39,10 @@ import { UserRepository } from 'src/core/repository/user.repository';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 import { SalaryDto } from './dto/salary.dto';
 import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
+import {
+  getUzbekistanDayRange,
+  toUzbekistanTimestamp,
+} from 'src/common/utils/date.util';
 
 @Injectable()
 export class CashBoxService
@@ -89,22 +93,34 @@ export class CashBoxService
         throw new NotFoundException('Main cashbox not found');
       }
 
-      let fromDate: number;
-      let toDate: number;
+      let startDate = filters?.fromDate;
+      let endDate = filters?.toDate;
 
-      if (filters?.fromDate && filters?.toDate) {
-        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
-        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+      if (!startDate || !endDate) {
+        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
+        const { start, end } = getUzbekistanDayRange();
+        startDate = String(start);
+        endDate = String(end);
       } else {
-        const today = new Date();
-        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
-        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
+        if (startDate === endDate) {
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        } else {
+          // Har xil kunlar oralig‘i
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        }
       }
 
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: {
           cashbox_id: mainCashbox.id,
-          created_at: Between(fromDate, toDate), // bigint timestamp
+          created_at: Between(Number(startDate), Number(endDate)), // bigint timestamp
         },
         relations: ['createdByUser'],
         order: { created_at: 'DESC' },
@@ -150,22 +166,34 @@ export class CashBoxService
       }
 
       // vaqt oralig‘ini hisoblash (bigint timestamp)
-      let fromDate: number;
-      let toDate: number;
+      let startDate = filters?.fromDate;
+      let endDate = filters?.toDate;
 
-      if (filters?.fromDate && filters?.toDate) {
-        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
-        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+      if (!startDate || !endDate) {
+        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
+        const { start, end } = getUzbekistanDayRange();
+        startDate = String(start);
+        endDate = String(end);
       } else {
-        const today = new Date();
-        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
-        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
+        if (startDate === endDate) {
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        } else {
+          // Har xil kunlar oralig‘i
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        }
       }
 
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: {
           cashbox_id: cashbox.id,
-          created_at: Between(fromDate, toDate), // bigint timestamp filter
+          created_at: Between(Number(startDate), Number(endDate)), // bigint timestamp filter
         },
         relations: ['createdByUser'],
         order: { created_at: 'DESC' },
@@ -205,22 +233,34 @@ export class CashBoxService
       }
 
       // vaqt oralig‘ini aniqlash
-      let fromDate: number;
-      let toDate: number;
+      let startDate = filters?.fromDate;
+      let endDate = filters?.toDate;
 
-      if (filters?.fromDate && filters?.toDate) {
-        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
-        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
+      if (!startDate || !endDate) {
+        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
+        const { start, end } = getUzbekistanDayRange();
+        startDate = String(start);
+        endDate = String(end);
       } else {
-        const today = new Date();
-        fromDate = new Date(today.setHours(0, 0, 0, 0)).getTime();
-        toDate = new Date(today.setHours(23, 59, 59, 999)).getTime();
+        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
+        if (startDate === endDate) {
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        } else {
+          // Har xil kunlar oralig‘i
+          const start = toUzbekistanTimestamp(startDate, false);
+          const end = toUzbekistanTimestamp(endDate, true);
+          startDate = String(start);
+          endDate = String(end);
+        }
       }
 
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: {
           cashbox_id: myCashbox.id,
-          created_at: Between(fromDate, toDate), // bigint timestamp
+          created_at: Between(Number(startDate), Number(endDate)), // bigint timestamp
         },
         relations: ['createdByUser'],
         order: { created_at: 'DESC' },
@@ -661,20 +701,17 @@ export class CashBoxService
       let fromDate: number | null = null;
       let toDate: number | null = null;
 
-      if (filters?.fromDate && filters?.toDate) {
-        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
-        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
-        qb.andWhere('h.created_at BETWEEN :fromDate AND :toDate', {
-          fromDate,
-          toDate,
-        });
-      } else if (filters?.fromDate) {
-        fromDate = new Date(filters.fromDate).setHours(0, 0, 0, 0);
-        qb.andWhere('h.created_at >= :fromDate', { fromDate });
-      } else if (filters?.toDate) {
-        toDate = new Date(filters.toDate).setHours(23, 59, 59, 999);
-        qb.andWhere('h.created_at <= :toDate', { toDate });
+      if (filters?.fromDate) {
+        fromDate = toUzbekistanTimestamp(filters.fromDate, false);
       }
+      if (filters?.toDate) {
+        toDate = toUzbekistanTimestamp(filters.toDate, true);
+      }
+
+      qb.andWhere('h.created_at BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      });
 
       // operation type
       if (filters?.operationType) {
