@@ -970,10 +970,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         if (!marketCashbox) {
           throw new NotFoundException('Market cashbox not found');
         }
+        const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
+          where: {
+            cashbox_type: Cashbox_type.FOR_COURIER,
+            user_id: currentUser.id,
+          },
+        });
+        if (!courierCashbox) {
+          throw new NotFoundException();
+        }
+        courierCashbox.balance -= cancelOrderDto.extraCost;
+        await queryRunner.manager.save(courierCashbox);
         marketCashbox.balance -= cancelOrderDto.extraCost;
         await queryRunner.manager.save(marketCashbox);
 
-        const history = queryRunner.manager.create(CashboxHistoryEntity, {
+        const courierHistory = queryRunner.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_type: Source_type.EXTRA_COST,
+            source_id: order.id,
+            amount: cancelOrderDto.extraCost,
+            balance_after: courierCashbox.balance,
+            comment: finalComment,
+            created_by: currentUser.id,
+          },
+        );
+        await queryRunner.manager.save(courierHistory);
+
+        const marketHistory = queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.EXPENSE,
           cashbox_id: marketCashbox.id,
           source_type: Source_type.EXTRA_COST,
@@ -983,7 +1009,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           comment: finalComment,
           created_by: currentUser.id,
         });
-        await queryRunner.manager.save(history);
+        await queryRunner.manager.save(marketHistory);
       }
 
       Object.assign(order, {
