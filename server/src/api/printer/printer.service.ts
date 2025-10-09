@@ -90,17 +90,31 @@ export class PrinterService {
       // Find orders with client relation
       const orders = await this.orderRepo.find({
         where: { id: In(orderIds) },
-        relations: ['customer', 'customer.district'],
+        relations: [
+          'items',
+          'items.product',
+          'market',
+          'customer',
+          'customer.district',
+        ],
       });
       for (const order of orders) {
+        console.log('test buyurtma', order);
+
         const printingOrder: PrintOrder = {
           orderId: order.id,
           orderPrice: formatCurrency(order.total_price),
           customerName: order.customer.name,
           customerPhone: formatPhoneNumber(order.customer.phone_number),
+          market: order.market.name,
+          comment: order.comment,
           district: order.customer.district.name,
           address: order.customer.address,
           qrCode: order.qr_code_token,
+          items: {
+            product: order.customer.name,
+            quantity: order.product_quantity,
+          },
         };
         this.queue.push(printingOrder);
       }
@@ -128,7 +142,7 @@ export class PrinterService {
 
       try {
         await this.printSingle(order);
-        await new Promise((r) => setTimeout(r, 1000)); // kichik delay
+        await new Promise((r) => setTimeout(r, 3000)); // kichik delay
       } catch (error) {
         console.error(
           `❌ Print error for order ${order.orderId}:`,
@@ -150,6 +164,8 @@ export class PrinterService {
       qrCode,
       district,
       address,
+      market,
+      comment,
     } = order;
 
     const tspl = `
@@ -159,19 +175,24 @@ CLS
 
 TEXT 325,20,"4",0,1,1,"Beepost"
 
-TEXT 20,80,"4",0,1,1,"${customerName}"
+TEXT 20,80,"4",0,1,1,"${customerName.length > 20 ? `${customerName.slice(0, 19)}...` : customerName}"
 TEXT 20,120,"4",0,1,1,"${customerPhone}"
 
-TEXT 20,200,"3",0,1,1,"Narxi:"
-TEXT 160,200,"3",0,1,1,"${orderPrice}"
+TEXT 20,150,"3",0,1,1,"-----------------------------"
 
-TEXT 20,240,"3",0,1,1,"Tuman: ${district}"
-TEXT 20,280,"3",0,1,1,"Manzil: ${address}"
+TEXT 20,180,"3",0,1,1,"Narxi:"
+TEXT 160,180,"3",0,1,1,"${orderPrice}"
+
+TEXT 20,220,"3",0,1,1,"Tuman: ${district}"
+TEXT 20,260,"3",0,1,1,"Manzil: ${address}"
+TEXT 20,300,"3",0,1,1,"Comment: ${comment}"
+
+TEXT 20,330,"2",0,1,1,"${market} --> ${market}"
 
 
 
 QRCODE 560,50,L,8,A,0,"${qrCode}"
-BARCODE 100,350,"128",100,1,0,2,2,"${qrCode}"
+BARCODE 100,370,"128",100,1,0,2,2,"${qrCode}"
 
 PRINT 1
 `;

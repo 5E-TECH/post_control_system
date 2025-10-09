@@ -976,7 +976,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         const history = queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.EXPENSE,
           cashbox_id: marketCashbox.id,
-          source_type: Source_type.CANCEL,
+          source_type: Source_type.EXTRA_COST,
           source_id: order.id,
           amount: cancelOrderDto.extraCost,
           balance_after: marketCashbox.balance,
@@ -1005,7 +1005,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { market_id: marketId },
       });
       // created_at string yoki bigint bo'lishi mumkin
-      const createdAt = new Date(Number(order.created_at));
+
+      // console.log(telegramGroup);
 
       await this.botService.sendMessageToGroup(
         telegramGroup?.group_id || null,
