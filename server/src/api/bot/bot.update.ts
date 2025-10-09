@@ -28,7 +28,7 @@ export class BotUpdate {
   ) {
     const text = ctx.message['text'];
     const response = await this.botService.addToGroup(text, ctx);
-    await ctx.reply('⌛ O‘chirilyapti...');
+    await ctx.reply('⌛ Malumot tahlil qilinyapti...');
 
     setTimeout(async () => {
       await ctx.deleteMessage();
