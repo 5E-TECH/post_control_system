@@ -1,5 +1,5 @@
 import { Status } from 'src/common/enums';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class UpdateCourierDto {
   @IsOptional()
@@ -13,6 +13,16 @@ export class UpdateCourierDto {
   @IsOptional()
   @IsString()
   password?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tariff_home?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tariff_center?: number;
 
   @IsOptional()
   @IsString()
