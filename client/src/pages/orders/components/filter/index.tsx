@@ -1,6 +1,6 @@
 import { memo, useCallback } from "react";
 import { statusOptions } from "../../../../shared/static/order";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Eraser} from "lucide-react";
 import { Button, DatePicker, Select, Space } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { useProfile } from "../../../../shared/api/hooks/useProfile";
@@ -109,7 +109,6 @@ const Filter = () => {
             options={marketOptions}
           />
         )}
-
         <Select
           value={form.regionId}
           onChange={handleSelectChange("regionId")}
@@ -117,7 +116,6 @@ const Filter = () => {
           className="w-full h-[45px]!"
           options={regionOptions}
         />
-
         <Select
           value={form.status}
           onChange={handleSelectChange("status")}
@@ -130,13 +128,18 @@ const Filter = () => {
             className="w-[150px]! max-[651px]:w-full! h-[45px]!"
             onClick={handleClear}
           >
+            <Eraser className="w-4 h-4 mr-2" />
             {t("button.tozalash")}
           </Button>
         </div>
       </div>
 
       <div className="w-full flex flex-wrap gap-4 justify-between items-center pt-5 border-[#F6F7FB] dark:border-[#595572] max-[800px]:flex-col max-[800px]:gap-5">
-        <Space direction="vertical" size={10} className="h-[38px]! max-[800px]:w-full">
+        <Space
+          direction="vertical"
+          size={10}
+          className="h-[38px]! max-[800px]:w-full"
+        >
           <DatePicker.RangePicker
             format="YYYY-MM-DD"
             className="w-full h-[38px]"
@@ -150,7 +153,7 @@ const Filter = () => {
             onClick={handleDownload}
             className=" h-[38px]! outline-none text-[16px]! text-white! font-bold! bg-[#08753F]! max-[800px]:w-full!"
           >
-            {t("button.export")} <RiFileExcel2Line/>
+            {t("button.export")} <RiFileExcel2Line />
           </Button>
           <input
             type="text"

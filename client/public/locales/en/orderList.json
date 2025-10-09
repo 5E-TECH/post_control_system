@@ -18,13 +18,13 @@
   "Status": {
     "new": "New",
     "received": "Received",
-    "on_the_road": "On the Road",
+    "on the road": "On the Road",
     "waiting": "Waiting",
     "sold": "Sold",
     "cancelled": "Cancelled",
     "paid": "Paid",
     "partly_paid": "Partly Paid",
-    "cancelled_sent": "Cancelled (Sent)",
+    "cancelled (sent)": "Cancelled (Sent)",
     "closed": "Closed"
   },
   "customer": "CUSTOMER",
@@ -34,5 +34,29 @@
   "market": "MARKET",
   "status": "STATUS",
   "price": "PRICE",
-  "createdAt": "CREATED AT"
+  "createdAt": "CREATED AT",
+  "detail": {
+    "title": "Order details",
+    "orderDetails": "Order products",
+    "edit": "Edit",
+    "product": "Product",
+    "qty": "Quantity",
+    "total": "Total",
+    "to_be_paid": "To be paid",
+    "paid_amount": "Paid",
+    "customerDetail": "Customer details",
+    "customerInfo": "Contact information",
+    "editCustomerInfo": "Edit customer information",
+    "cancel": "Cancel",
+    "save": "Save",
+    "editOrder": "Edit order",
+    "add": "Add new product",
+    "delete": "Delete",
+    "add1": "add",
+    "totalPrice": "Total amount",
+    "address": "Address",
+    "viloyat": "Region",
+    "tuman": "District",
+    "manzil": "Address"
+  }
 }

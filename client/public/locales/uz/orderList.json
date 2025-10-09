@@ -18,13 +18,13 @@
   "Status": {
     "new": "Yangi",
     "received": "Qabul qilingan",
-    "on_the_road": "Yo‘lda",
+    "on the road": "Yo‘lda",
     "waiting": "Kutilmoqda",
     "sold": "Sotilgan",
     "cancelled": "Bekor qilingan",
     "paid": "To‘langan",
     "partly_paid": "Qisman to‘langan",
-    "cancelled_sent": "Bekor qilingan (jo‘natilgan)",
+    "cancelled (sent)": "Bekor qilingan (jo‘natilgan)",
     "closed": "Yopilgan"
   },
   "customer": "MIJOZ",
@@ -34,5 +34,29 @@
   "market": "MARKET",
   "status": "HOLAT",
   "price": "NARX",
-  "createdAt": "YARATILGAN VAQTI"
+  "createdAt": "YARATILGAN VAQTI",
+  "detail": {
+    "title": "Buyurtma ma'lumotlari",
+    "orderDetails": "Buyurtma mahsulotlari",
+    "edit": "Tahrirlash",
+    "product": "Mahsulot",
+    "qty": "soni",
+    "total": "Jami",
+    "to_be_paid": "To'lanishi kerak",
+    "paid_amount": "To'langan",
+    "customerDetail": "Buyurtmachi ma'lumotlari",
+    "customerInfo": "Kontakt ma'lumotlari",
+    "editCustomerInfo": "Buyurtmachi ma'lumotlarini tahrirlash",
+    "cancel": "Bekor qilish",
+    "save": "Saqlash",
+    "editOrder": "Buyurtmani tahrirlash",
+    "add": "Yangi mahsulot qo'shish",
+    "delete": "O'chirish",
+    "add1": "qo'shish",
+    "totalPrice": "Jami summa",
+    "address": "Manzili",
+    "viloyat": "Viloyat",
+    "tuman": "Tuman",
+    "manzil": "Manzil"
+  }
 }

@@ -1,0 +1,23 @@
+{
+    "title":"Mahsulotlar",
+    "add":"Yangi mahsulot qo'shish",
+    "productInformation":"Mahsulot ma'lumotmotlari",
+    "addProduct":"Mahsulot qo'shish",
+    "productName":"Mahsulot nomi",
+    "productRasmi":"Mahsulot rasmi",
+    "dragAndDrop":"Rasmingizni bu yerga tortib tashlang",
+    "browseImage":"Rasm tanlash",
+    "discard":"Tozalash",
+    "save":"Saqlash",
+    "or":"yoki",
+    "action":"Amal",
+    "placeholder":{
+        "selectMarket":"Marketni tanlang",
+        "search":"Qidiruv",
+        "productName":"Mahsulot nomi"
+    },
+    "popup":{
+        "market":"Market nomi",
+        "tanlash":"Tanlash"
+    }
+}

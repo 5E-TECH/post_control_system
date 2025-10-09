@@ -11,12 +11,13 @@ import dayjs from "dayjs";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import { useTranslation } from "react-i18next";
 
 const { RangePicker } = DatePicker;
 
 const CashDetail = () => {
+  const { t } = useTranslation("payment");
   const { id } = useParams();
-
   const [form, setForm] = useState({
     from: new Date().toISOString().split("T")[0],
     to: new Date().toISOString().split("T")[0],
@@ -28,9 +29,9 @@ const CashDetail = () => {
   });
 
   const params = {
-    fromDate:form.from,
-    toDate:form.to
-  }
+    fromDate: form.from,
+    toDate: form.to,
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -94,10 +95,7 @@ const CashDetail = () => {
           refetch();
         },
         onError: (err) =>
-          handleApiError(
-            err,
-            "To'lov yaratishda xatolik yuz berdi"
-          ),
+          handleApiError(err, "To'lov yaratishda xatolik yuz berdi"),
       });
     } else {
       createPaymentCourier.mutate(dataCourier, {
@@ -114,10 +112,7 @@ const CashDetail = () => {
           refetch();
         },
         onError: (err) =>
-          handleApiError(
-            err,
-            "To'lov yaratishda xatolik yuz berdi"
-          ),
+          handleApiError(err, "To'lov yaratishda xatolik yuz berdi"),
       });
     }
   };
@@ -134,7 +129,7 @@ const CashDetail = () => {
     <div className="px-5 mt-5 flex gap-24">
       <div>
         <h2 className="flex items-center mb-5 text-[20px] capitalize">
-          {data?.data?.cashbox?.user?.role} <ChevronRight />
+          {t(`${data?.data?.cashbox?.user?.role}`)} <ChevronRight />
           <span className="text-[22px] font-bold">
             {data?.data?.cashbox?.user?.name}
           </span>
@@ -150,8 +145,8 @@ const CashDetail = () => {
           <div className="mt-5">
             <h2>
               {data?.data?.cashbox?.user?.role === "market"
-                ? "To'lash"
-                : "Qabul qilish"}
+                ? `${t("to'lash")}`
+                : `${t("qabulQilish")}`}
             </h2>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(0,1fr))] w-full gap-4 items-center mt-3">
               <input
@@ -160,26 +155,26 @@ const CashDetail = () => {
                 onChange={handleChange}
                 className="border  rounded-md px-2 py-2 border-[#d1cfd4] outline-none hover:border-blue-400 "
                 type="number"
-                placeholder="summa"
+                placeholder={t("summa")}
               />
               <Select
                 value={form.payment}
                 onChange={(value) =>
                   setForm((prev) => ({ ...prev, payment: value }))
                 }
-                placeholder="To'lov turi"
+                placeholder={t("to'lovTuri")}
                 className="mySelect "
                 size="large"
                 options={[
                   { value: "", label: "to'lov turi", disabled: true },
-                  { value: "cash", label: "cash" },
-                  { value: "click", label: "click" },
+                  { value: "cash", label: `${t("cash")}` },
+                  { value: "click", label: `${t("click")}` },
                   ...(data?.data?.cashbox?.user?.role === "market"
                     ? []
                     : [
                         {
                           value: "click_to_market",
-                          label: "click_to_market",
+                          label: `${t("click_to_market")}`,
                         },
                       ]),
                 ]}
@@ -190,7 +185,7 @@ const CashDetail = () => {
                   onChange={(value) =>
                     setForm((prev) => ({ ...prev, market: value }))
                   }
-                  placeholder="Kassani tanlang"
+                  placeholder={t("marketniTanlang")}
                   className="w-[150px]"
                   options={[
                     { value: "", label: "Market tanlang", disabled: true },
@@ -209,14 +204,14 @@ const CashDetail = () => {
                 size="large"
                 value={form.comment}
                 onChange={handleChange}
-                placeholder="Autosize height based on content lines"
+                placeholder={t("comment")}
                 autoSize
               />
               <button
                 onClick={() => handleSubmit()}
                 className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0]"
               >
-                Qabul qilish
+                {t("qabulQilish")}
               </button>
             </div>
           </div>
@@ -224,7 +219,7 @@ const CashDetail = () => {
       </div>
       <div className="grid w-full">
         <div className="flex flex-row items-center gap-7">
-          <h2 className="text-[20px] font-medium mb-2">Filters:</h2>
+          <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
             <div className="flex gap-5">
               {/* RangePicker bilan custom */}

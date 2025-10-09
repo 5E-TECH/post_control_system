@@ -1,6 +1,21 @@
 {
-    "todayMails": "Bugungi pochtalar",
-    "refusedMails": "Qaytgan pochtalar",
-    "oldMails": "Eski pochtalar",
-    "newMails": "Yangi pochtalar"
+  "todayMails": "Bugungi pochtalar",
+  "refusedMails": "Rad etilgan pochtalar",
+  "oldMails": "Eski pochtalar",
+  "newMails": "Yangi pochtalar",
+  "buyurtmalari": "Buyurtmalar",
+  "mijozIsmi": "Mijoz ismi",
+  "telefonRaqami": "Telefon raqami",
+  "tumani": "Tumani",
+  "market": "Market",
+  "pulMiqdori": "Pul miqdori",
+  "dona": "Dona",
+  "harakatlar": "Harakatlar",
+  "pochtanijonatish": "Pochtani jo‘natish",
+  "uygacha": "Uyga yetkazish",
+  "markazgacha": "Markazgacha",
+  "ta": "ta",
+  "so'm": "so'm",
+  "qidiruv": "Qidiruv",
+  "tabuyurtmalar": "ta buyurtmalar"
 }

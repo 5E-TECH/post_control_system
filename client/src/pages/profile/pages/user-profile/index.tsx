@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Image, Spin, Modal, Form, Input, Button } from "antd";
+import { Image, Spin, Modal, Form, Input, Button, InputNumber } from "antd";
 import Avatar from "../../../../shared/assets/profile-image/Avatar.png";
 import Vector from "../../../../shared/assets/profile-image/Vector.svg";
 import Star from "../../../../shared/assets/profile-image/star.svg";
@@ -8,7 +8,6 @@ import { setEditing } from "../../../../shared/lib/features/profile/profileEditS
 import { useParams } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { Check, Copy } from "lucide-react";
-// import Password from "antd/es/input/Password";
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -18,6 +17,7 @@ const UserProfile = () => {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const [form] = Form.useForm();
 
   if (isLoading) {
     return (
@@ -30,17 +30,12 @@ const UserProfile = () => {
   const user = data?.data;
 
   const handleUpdate = (values: any) => {
-    // values dan nusxa olish
     const payload: any = { ...values };
 
-    // O'zgarmaganlarini olib tashlash
-    if (payload.full_name === user.full_name) delete payload.full_name;
+    if (payload.full_name === user.name) delete payload.full_name;
     if (payload.phone_number === user.phone_number) delete payload.phone_number;
-
-    // Password faqat kiritilganda yuboriladi
     if (!payload.password) delete payload.password;
 
-    // Agar hech nima o'zgarmagan bo'lsa, backendga yubormaslik uchun
     if (Object.keys(payload).length === 0) {
       setOpen(false);
       return;
@@ -54,226 +49,245 @@ const UserProfile = () => {
       },
       {
         onSuccess: () => {
-          refetch();
-          setOpen(false);
+          refetch().then(() => {
+            form.resetFields(); // Formni yangilangan ma'lumot bilan tozalash
+            setOpen(false);
+          });
         },
       }
     );
   };
 
+  const handleOpenModal = () => {
+    form.setFieldsValue({
+      full_name: user.name,
+      phone_number: user.phone_number,
+      password: "",
+      ...(user.role === "market" || user.role === "courier"
+        ? {
+            tariff_center: Number(user.tariff_center) || 0,
+            tariff_home: Number(user.tariff_home) || 0,
+          }
+        : {}),
+    });
+    setOpen(true);
+    dispatch(
+      setEditing({
+        phone_number: user?.phone_number,
+      })
+    );
+  };
+
   return (
-    <div className="flex flex-col  px-4 md:px-8 lg:px-16">
-      <div className="flex flex-col  px-4 md:px-8 lg:px-16">
-        <div className="flex flex-col md:flex-row w-full  mx-auto flex-grow gap-6 mt-8">
-          {/* Profile Card */}
-          <div className="w-full md:w-[380px] lg:w-[420px] p-4 flex flex-col items-center justify-between bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md">
-            <div className="flex flex-col items-center">
-              <Image
-                src={user?.avatar || Avatar}
-                alt="avatar"
-                className="rounded-full w-[100px] h-[100px] object-cover"
-                preview={false}
-              />
-              <h2 className="mt-3 text-lg md:text-xl font-semibold">
-                {user?.name}
-              </h2>
-              <h2
-                className={`mt-3 px-3 py-1 text-sm md:text-[15px] rounded-2xl 
-            ${
-              user?.status === "active"
-                ? "bg-green-500/20 text-green-600"
-                : "bg-red-500/17 text-[#FF4C51]"
-            }`}
-              >
-                {user?.status}
-              </h2>
+    <div className="flex flex-col px-4 md:px-8 lg:px-16">
+      <div className="flex flex-col md:flex-row w-full mx-auto flex-grow gap-6 mt-8">
+        {/* Profile Card */}
+        <div className="w-full md:w-[380px] lg:w-[420px] p-4 flex flex-col items-center justify-between bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md">
+          <div className="flex flex-col items-center">
+            <Image
+              src={user?.avatar || Avatar}
+              alt="avatar"
+              className="rounded-full w-[100px] h-[100px] object-cover"
+              preview={false}
+            />
+            <h2 className="mt-3 text-lg md:text-xl font-semibold">
+              {user?.name}
+            </h2>
+            <h2
+              className={`mt-3 px-3 py-1 text-sm md:text-[15px] rounded-2xl ${
+                user?.status === "active"
+                  ? "bg-green-500/20 text-green-600"
+                  : "bg-red-500/17 text-[#FF4C51]"
+              }`}
+            >
+              {user?.status}
+            </h2>
+          </div>
+
+          <div className="flex justify-between items-center w-full mt-6 gap-6">
+            <div className="flex justify-center items-center gap-3">
+              <div className="size-[40px] bg-[#f4f5fa] dark:bg-[#8C57FF29] flex justify-center items-center rounded-[6px]">
+                <img src={Vector} alt="" />
+              </div>
+              <div>
+                <h2 className="text-base md:text-lg font-semibold">1.23k</h2>
+                <h2 className="text-[#686666] text-sm">Task Done</h2>
+              </div>
             </div>
 
-            <div className="flex justify-between items-center w-full mt-6 gap-6">
-              <div className="flex justify-center items-center gap-3">
-                <div className="size-[40px] bg-[#f4f5fa] dark:bg-[#8C57FF29] flex justify-center items-center rounded-[6px]">
-                  <img src={Vector} alt="" />
-                </div>
-                <div>
-                  <h2 className="text-base md:text-lg font-semibold">1.23k</h2>
-                  <h2 className="text-[#686666] text-sm">Task Done</h2>
-                </div>
+            <div className="flex justify-center items-center gap-3">
+              <div className="size-[40px] bg-[#f4f5fa] dark:bg-[#8C57FF29] flex justify-center items-center rounded-[6px]">
+                <img src={Star} alt="" />
               </div>
-
-              <div className="flex justify-center items-center gap-3">
-                <div className="size-[40px] bg-[#f4f5fa] dark:bg-[#8C57FF29] flex justify-center items-center rounded-[6px]">
-                  <img src={Star} alt="" />
-                </div>
-                <div>
-                  <h2 className="text-base md:text-lg font-semibold">587</h2>
-                  <h2 className="text-[#686666] text-sm">Task Done</h2>
-                </div>
+              <div>
+                <h2 className="text-base md:text-lg font-semibold">587</h2>
+                <h2 className="text-[#686666] text-sm">Task Done</h2>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Details */}
-          {user && (
-            <div className="flex-1 bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md p-6 flex flex-col justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Details</h2>
-                <div className="w-full border border-[#2E263D1F] my-3"></div>
+        {/* Details */}
+        {user && (
+          <div className="flex-1 bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md p-6 flex flex-col justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Details</h2>
+              <div className="w-full border border-[#2E263D1F] my-3"></div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  {user.name && (
-                    <div className="flex flex-col">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        First Name
-                      </span>
-                      <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                        {user.name}
-                      </span>
-                    </div>
-                  )}
-
-                  {user.region_id && (
-                    <div className="flex flex-col">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Region
-                      </span>
-                      <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                        {user?.region?.name}
-                      </span>
-                    </div>
-                  )}
-
-                  {user.tariff_center && (
-                    <div className="flex flex-col">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Tariff Center
-                      </span>
-                      <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                        {user.tariff_center}
-                      </span>
-                    </div>
-                  )}
-
-                  {user.tariff_home && (
-                    <div className="flex flex-col">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Tariff Home
-                      </span>
-                      <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                        {user.tariff_home}
-                      </span>
-                    </div>
-                  )}
-
-                  {user.role && (
-                    <div className="flex flex-col">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Role
-                      </span>
-                      <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                        {user.role}
-                      </span>
-                    </div>
-                  )}
-
-                  {user.phone_number && (
-                    <div className="flex flex-col">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Contact
-                      </span>
-                      <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                        {user.phone_number}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center mt-6">
-                {user.market_tg_token && (
+              <div className="grid md:grid-cols-2 gap-4">
+                {user.name && (
                   <div className="flex flex-col">
-                    <span className="text-sm text-gray-500 dark:text-gray-400 flex gap-3 items-center">
-                      Tg Token
-                      <span
-                        className="cursor-pointer flex items-center gap-2 select-none"
-                        onClick={() => {
-                          navigator.clipboard.writeText(user.market_tg_token);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000); // 2s dan keyin o‘chadi
-                        }}
-                      >
-                        <Copy width={18} />
-                        {copied && (
-                          <span className="text-green-500 text-[16px]">
-                            <Check />
-                          </span>
-                        )}
-                      </span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Full Name
                     </span>
                     <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      {user.market_tg_token}
+                      {user.name}
                     </span>
                   </div>
                 )}
-                <button
-                  onClick={() => {
-                    setOpen(true);
-                    dispatch(
-                      setEditing({
-                        phone_number: user?.phone_number,
-                      })
-                    );
-                  }}
-                  className="hover:bg-[#9b72f5] w-[100px] border-none bg-[#8C57FF] px-4 h-[38px] rounded-[6px] text-white"
-                >
-                  Edit
-                </button>
+
+                {user.region_id && (
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Region
+                    </span>
+                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                      {user?.region?.name}
+                    </span>
+                  </div>
+                )}
+
+                {user.tariff_center && (
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Tariff Center
+                    </span>
+                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                      {user.tariff_center}
+                    </span>
+                  </div>
+                )}
+
+                {user.tariff_home && (
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Tariff Home
+                    </span>
+                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                      {user.tariff_home}
+                    </span>
+                  </div>
+                )}
+
+                {user.role && (
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Role
+                    </span>
+                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                      {user.role}
+                    </span>
+                  </div>
+                )}
+
+                {user.phone_number && (
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Contact
+                    </span>
+                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                      {user.phone_number}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Modal */}
-        {user && (
-          <Modal
-            title="Edit Profile"
-            open={open}
-            onCancel={() => setOpen(false)}
-            footer={null}
-          >
-            <Form
-              layout="vertical"
-              initialValues={{
-                full_name: user.name,
-                phone_number: user.phone_number,
-                password: "",
-              }}
-              onFinish={handleUpdate}
-            >
-              <Form.Item label="Name" name="full_name">
-                <Input />
-              </Form.Item>
-              <Form.Item label="Phone Number" name="phone_number">
-                <Input />
-              </Form.Item>
-              <Form.Item label="Password" name="password">
-                <Input />
-              </Form.Item>
-              <div className="flex justify-end">
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={updateUser.isPending}
-                >
-                  Save
-                </Button>
-              </div>
-            </Form>
-          </Modal>
+            <div className="flex justify-between items-center mt-6">
+              {user.market_tg_token && (
+                <div className="flex flex-col">
+                  <span className="text-sm text-gray-500 dark:text-gray-400 flex gap-3 items-center">
+                    Tg Token
+                    <span
+                      className="cursor-pointer flex items-center gap-2 select-none"
+                      onClick={() => {
+                        navigator.clipboard.writeText(user.market_tg_token);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                    >
+                      <Copy width={18} />
+                      {copied && (
+                        <span className="text-green-500 text-[16px]">
+                          <Check />
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                  <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                    {user.market_tg_token}
+                  </span>
+                </div>
+              )}
+
+              <button
+                onClick={handleOpenModal}
+                className="hover:bg-[#9b72f5] w-[100px] border-none bg-[#8C57FF] px-4 h-[38px] rounded-[6px] text-white"
+              >
+                Edit
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
+      {/* Modal */}
+      {user && (
+        <Modal
+          title="Edit Profile"
+          open={open}
+          onCancel={() => setOpen(false)}
+          footer={null}
+        >
+          <Form form={form} layout="vertical" onFinish={handleUpdate}>
+            <Form.Item label="Name" name="full_name">
+              <Input />
+            </Form.Item>
+
+            <Form.Item label="Phone Number" name="phone_number">
+              <Input />
+            </Form.Item>
+
+            {(user.role === "market" || user.role === "courier") && (
+              <>
+                <Form.Item label="Tariff Center" name="tariff_center">
+                  <InputNumber style={{ width: "100%" }} min={0} />
+                </Form.Item>
+                <Form.Item label="Tariff Home" name="tariff_home">
+                  <InputNumber style={{ width: "100%" }} min={0} />
+                </Form.Item>
+              </>
+            )}
+
+            <Form.Item label="Password" name="password">
+              <Input.Password />
+            </Form.Item>
+
+            <div className="flex justify-end">
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={updateUser.isPending}
+              >
+                Save
+              </Button>
+            </div>
+          </Form>
+        </Modal>
+      )}
+
       {/* Salary (Maosh) */}
-      <div className="w-full  mt-5 mx-auto bg-white dark:bg-[#312D4B] shadow-xl rounded-xl p-6 space-y-6 text-gray-900 dark:text-gray-200">
+      <div className="w-full mt-5 mx-auto bg-white dark:bg-[#312D4B] shadow-xl rounded-xl p-6 space-y-6 text-gray-900 dark:text-gray-200">
         <div className="flex w-full justify-between items-center">
           <div>
             <h2 className="px-4 py-1 rounded-2xl bg-[#8C57FF29] text-[#9155FD] text-sm font-medium">
@@ -290,18 +304,19 @@ const UserProfile = () => {
 
         <ul className="space-y-2 text-gray-700 dark:text-gray-300 text-left">
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
             10 Users
           </li>
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
             Up to 10 GB storage
           </li>
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
             Basic Support
           </li>
         </ul>
+
         <div>
           <div className="flex justify-between text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
             <span>Days</span>

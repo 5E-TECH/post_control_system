@@ -1,5 +1,6 @@
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
+import { useGlobalScanner } from "../shared/components/global-scanner";
 const ScanAndOrder = lazy(
   () =>
     import("../pages/orders/pages/superadmin/order-details/scan/scanAndOrder")
@@ -106,6 +107,7 @@ const BalanceDashboard = lazy(() => import("../pages/history"));
 const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
 
 const AppRouters = () => {
+  useGlobalScanner();
   return useRoutes([
     {
       path: "/login",

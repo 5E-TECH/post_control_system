@@ -25,8 +25,8 @@ const CreateMarket = () => {
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const newMarket = {
       ...values,
-      tariff_home: Number(values.tariff_home),
-      tariff_center: Number(values.tariff_center),
+      tariff_home: Number(String(values.tariff_home).replace(/,/g, "")),
+      tariff_center: Number(String(values.tariff_center).replace(/,/g, "")),
       phone_number: values.phone_number.split(" ").join(""),
     };
     createUser.mutate(newMarket, {
@@ -103,18 +103,14 @@ const CreateMarket = () => {
 
         <Form.Item
           name="tariff_home"
-          rules={[
-            { required: true, message: t("enterHomeTariff") },
-            {
-              type: "number",
-              min: 0,
-              message: t("tariffMin"),
-              transform: (value) => Number(value),
-            },
-          ]}
+          rules={[{ required: true, message: t("enterHomeTariff") }]}
+          normalize={(value) => {
+            if (!value) return value;
+            const onlyNums = value.replace(/\D/g, "");
+            return onlyNums.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+          }}
         >
           <Input
-            type="number"
             className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterHomeTariff")}
           />
@@ -122,18 +118,14 @@ const CreateMarket = () => {
 
         <Form.Item
           name="tariff_center"
-          rules={[
-            { required: true, message: t("enterCenterTariff") },
-            {
-              type: "number",
-              min: 0,
-              message: t("tariffMin"),
-              transform: (value) => Number(value),
-            },
-          ]}
+          rules={[{ required: true, message: t("enterCenterTariff") }]}
+          normalize={(value) => {
+            if (!value) return value;
+            const onlyNums = value.replace(/\D/g, "");
+            return onlyNums.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+          }}
         >
           <Input
-            type="number"
             className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             placeholder={t("enterCenterTariff")}
           />

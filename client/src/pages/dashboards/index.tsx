@@ -388,7 +388,7 @@ const ChartWrapper = ({
 }) => (
   <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow overflow-hidden">
     <h3 className="text-lg font-semibold mb-4 text-center">{title}</h3>
-    <ResponsiveContainer width="100%" height={Math.max(data.length * 45, 400)}>
+    <ResponsiveContainer width="100%" height={Math.max(data.length * 60, 400)}>
       <BarChart
         data={data}
         layout="vertical"
@@ -403,7 +403,7 @@ const ChartWrapper = ({
         <YAxis
           type="category"
           dataKey="nomi"
-          width={15}
+          width={20}
           tick={({ x, y, payload }) => (
             <text
               x={x - 5}
@@ -464,7 +464,7 @@ const ChartWrapper = ({
     <div className="flex justify-center mt-4">
       <button
         onClick={() => setShowAll(!showAll)}
-        className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+        className="px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer"
       >
         {showAll ? t("showLess") : t("showMore")}
       </button>

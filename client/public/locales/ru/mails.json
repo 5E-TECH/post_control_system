@@ -2,5 +2,20 @@
     "todayMails": "Сегодняшние почты",
     "refusedMails": "Отказанные почты",
     "oldMails": "Старые почты",
-    "newMails": "Новые почты"
+    "newMails": "Новые почты",
+    "buyurtmalari": "заказы",
+    "mijozIsmi": "Имя клиента",
+    "telefonRaqami": "Номер телефона",
+    "tumani": "Район",
+    "market": "Маркет",
+    "pulMiqdori": "Сумма",
+    "dona": "Количество",
+    "harakatlar": "Действия",
+    "pochtanijonatish":"Отправить почту",
+    "uygacha":"До дома",
+    "markazgacha":"до центра",
+    "ta":"шт",
+    "so'm":"сумма",
+    "qidiruv":"поиск",
+    "tabuyurtmalar":"Заказы"
 }

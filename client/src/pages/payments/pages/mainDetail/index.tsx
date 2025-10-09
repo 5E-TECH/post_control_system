@@ -22,6 +22,7 @@ import dayjs from "dayjs";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
+import { useTranslation } from "react-i18next";
 
 const { RangePicker } = DatePicker;
 
@@ -48,6 +49,7 @@ const initialForm: IForm = {
 };
 
 const MainDetail = () => {
+  const { t } = useTranslation("payment");
   const [form, setForm] = useState(initialForm);
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
@@ -172,7 +174,7 @@ const MainDetail = () => {
     <div className="px-5 mt-5 flex gap-24">
       <div>
         <h2 className="flex items-center mb-5 text-[30px] font-medium capitalize">
-          Asosiy kassa
+          {t("title")}
         </h2>
         <CashboxCard
           role={"superadmin"}
@@ -185,21 +187,21 @@ const MainDetail = () => {
         {/* === BUTTONLAR 1 QATORDA === */}
         <div className="mt-5 flex gap-3 flex-nowrap">
           <button
-            title="Kuriyerdan olish"
+            title={t("kuriyerdanOlish")}
             onClick={() => setShowCurier(true)}
             className="rounded-full cursor-pointer p-3 bg-green-500 text-white hover:bg-green-600 transition flex items-center justify-center shadow-md"
           >
             <BanknoteArrowDown size={22} />
           </button>
           <button
-            title="Marketga to'lash"
+            title={t("marketgaTo'lash")}
             onClick={() => setShowMarket(true)}
             className="rounded-full cursor-pointer p-3 bg-blue-500 text-white hover:bg-blue-600 transition flex items-center justify-center shadow-md"
           >
             <BanknoteArrowUp size={22} />
           </button>
           <button
-            title="Kassadan sarflash"
+            title={t("kassadanSarflash")}
             onClick={() => {
               setSpand(true), setMaosh(false);
             }}
@@ -208,7 +210,7 @@ const MainDetail = () => {
             <CircleMinus size={22} />
           </button>
           <button
-            title="Kassani to'ldirish"
+            title={t("kassaniTo'ldirish")}
             onClick={() => {
               setMaosh(true), setSpand(false);
             }}
@@ -218,7 +220,7 @@ const MainDetail = () => {
           </button>
 
           <button
-            title="Maosh to'lash"
+            title={t("maoshTo'lash")}
             onClick={() => setshowAdminAndRegistrator(true)}
             className="rounded-full cursor-pointer p-3 bg-amber-500 text-white hover:bg-amber-600 transition flex items-center justify-center shadow-md"
           >
@@ -229,10 +231,10 @@ const MainDetail = () => {
         {/* === Agar kassadan sarflash bosilsa form chiqadi === */}
         {spand && (
           <div className="mt-5">
-            <h2>Kassadan Sarflash</h2>
+            <h2>{t("kassadanSarflash")}</h2>
             <div className="flex gap-4 items-center mt-3">
               <input
-                name="summa"
+                name={t("summa")}
                 value={form.summa}
                 onChange={(e) => {
                   // faqat raqamlarni olish
@@ -253,7 +255,7 @@ const MainDetail = () => {
                   } as any);
                 }}
                 type="text"
-                placeholder="summa"
+                placeholder={t("summa")}
                 className="border rounded-md px-2 py-0.75 border-[#d1cfd4] outline-none hover:border-blue-400 w-[150px]"
               />
               <Select
@@ -261,7 +263,7 @@ const MainDetail = () => {
                 onChange={(value) =>
                   setForm((prev) => ({ ...prev, payment: value }))
                 }
-                placeholder="To'lov turi"
+                placeholder={t("to'lovTuri")}
                 className="w-[150px]"
                 options={[
                   { value: "", label: "to'lov turi", disabled: true },
@@ -273,11 +275,11 @@ const MainDetail = () => {
             <div className="mt-5">
               <Form>
                 <Form.Item
-                  name="comment"
+                  name={t("comment")}
                   rules={[{ required: true, message: "Izohni kiriting!" }]}
                 >
                   <TextArea
-                    placeholder="Autosize height based on content lines"
+                    placeholder={t("comment")}
                     autoSize
                   />
                 </Form.Item>
@@ -288,13 +290,13 @@ const MainDetail = () => {
                   onClick={() => handleSubmit()}
                   className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0] text-white"
                 >
-                  Qabul qilish
+                  {t("qabulQilish")}
                 </button>
                 <button
                   onClick={() => setSpand(false)}
                   className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
                 >
-                  Bekor qilish
+                  {t("bekorQilish")}
                 </button>
               </div>
             </div>
@@ -304,10 +306,10 @@ const MainDetail = () => {
         {/* === kassani to'ldirishni bosganda === */}
         {kassa && (
           <div className="mt-5">
-            <h2>Kassaga qo'shish</h2>
+            <h2>{t("kassagaQo'shish")}</h2>
             <div className="flex gap-4 items-center mt-3">
               <input
-                name="summa"
+                name={t("summa")}
                 value={form.summa}
                 onChange={(e) => {
                   const rawValue = e.target.value.replace(/\D/g, "");
@@ -337,8 +339,8 @@ const MainDetail = () => {
                 className="w-[150px]"
                 options={[
                   { value: "", label: "to'lov turi", disabled: true },
-                  { value: "cash", label: "cash" },
-                  { value: "click", label: "click" },
+                  { value: "cash", label: `${t("cash")}` },
+                  { value: "click", label: `${t("click")}` },
                 ]}
               />
             </div>
@@ -350,7 +352,7 @@ const MainDetail = () => {
                     { required: true, message: "Izoh kiritish majburiy!" },
                   ]}
                 >
-                  <TextArea placeholder="Izoh..." autoSize />
+                  <TextArea placeholder={`${t("comment")}...`} autoSize />
                 </Form.Item>
               </Form>
 
@@ -359,13 +361,13 @@ const MainDetail = () => {
                   onClick={() => handleSalarySubmit()}
                   className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0] text-white"
                 >
-                  Qabul qilish
+                  {t("qabulQilish")}
                 </button>
                 <button
                   onClick={() => setMaosh(false)}
                   className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
                 >
-                  Bekor qilish
+                  {t("bekorQilish")}
                 </button>
               </div>
             </div>
@@ -376,7 +378,7 @@ const MainDetail = () => {
       {/* === FILTERS & HISTORY === */}
       <div className="w-full">
         <div className="flex flex-row items-center gap-7">
-          <h2 className="text-[20px] font-medium mb-2">Filters:</h2>
+          <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
             <div className="flex gap-5">
               <RangePicker
@@ -420,13 +422,13 @@ const MainDetail = () => {
           >
             <X size={30} />
           </button>
-          <h1 className="font-bold text-left pt-10">Choose Market</h1>
+          <h1 className="font-bold text-left pt-10">{t("berilishiKerak")}</h1>
           <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
             <input
               defaultValue={form.search}
               onChange={handleSearchChange}
               type="text"
-              placeholder="Search order..."
+              placeholder={`${t("search")}...`}
               className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
             />
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
@@ -439,7 +441,7 @@ const MainDetail = () => {
                     # ID
                   </th>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    MARKET NAME
+                    {t("marketName")}
                   </th>
                 </tr>
               </thead>
@@ -454,8 +456,8 @@ const MainDetail = () => {
                         item.id == select ? "bg-gray-100" : ""
                       }`}
                     >
-                      <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                      <td className="py-3">{item?.name}</td>
+                      <td className="text-[#8C57FF] py-3 pl-5">{inx + 1}</td>
+                      <td className="py-3 pl-5">{item?.name}salom</td>
                     </tr>
                   ))
                 }
@@ -472,7 +474,7 @@ const MainDetail = () => {
                 !select ? "opacity-40" : ""
               }`}
             >
-              Tanlash
+              {t("tanlash")}
             </button>
           </div>
         </div>
@@ -489,13 +491,13 @@ const MainDetail = () => {
           >
             <X size={22} />
           </button>
-          <h1 className="font-bold text-left">Hodimni tanlang</h1>
+          <h1 className="font-bold text-left">{t("hodimniTanlang")}</h1>
           <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
             <input
               defaultValue={form.search}
               onChange={handleSearchChange}
               type="text"
-              placeholder="Qidiruv..."
+              placeholder={`${t("search")}...`}
               className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
             />
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
@@ -508,10 +510,10 @@ const MainDetail = () => {
                     #
                   </th>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    Hodim ismi
+                    {t("hodimName")}
                   </th>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    Roli
+                    {t("rol")}
                   </th>
                 </tr>
               </thead>
@@ -528,8 +530,8 @@ const MainDetail = () => {
                         }`}
                       >
                         <td className="text-[#8C57FF] pl-4 py-3">{inx + 1}</td>
-                        <td className="py-3">{item?.name}</td>
-                        <td className="py-3">{item?.role}</td>
+                        <td className="py-3 pl-4">{item?.name}</td>
+                        <td className="py-3 pl-4">{item?.role}</td>
                       </tr>
                     )
                   )
@@ -547,7 +549,7 @@ const MainDetail = () => {
                 !select ? "opacity-40" : ""
               }`}
             >
-              Tanlash
+              {t("tanlash")}
             </button>
           </div>
         </div>
@@ -562,13 +564,13 @@ const MainDetail = () => {
           >
             <X size={30} />
           </button>
-          <h1 className="font-bold text-left pt-10">Olinishi kerak</h1>
+          <h1 className="font-bold text-left pt-10">{t("olinishiKerak")}</h1>
           <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
             <input
               defaultValue={form.search}
               onChange={handleSearchChange}
               type="text"
-              placeholder="Search order..."
+              placeholder={`${t("search")}`}
               className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
             />
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
@@ -581,10 +583,10 @@ const MainDetail = () => {
                     # ID
                   </th>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    COURIER NAME
+                    {t("courierName")}
                   </th>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    REGION
+                    {t("region")}
                   </th>
                 </tr>
               </thead>
@@ -597,9 +599,9 @@ const MainDetail = () => {
                       item.id == select ? "bg-gray-100" : ""
                     }`}
                   >
-                    <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                    <td className="py-3">{item?.name}</td>
-                    <td className="py-3">{item?.region?.name}</td>
+                    <td className="text-[#8C57FF] pr-10 py-3 pl-5">{inx + 1}</td>
+                    <td className="py-3 pl-5">{item?.name}</td>
+                    <td className="py-3 pl-5">{item?.region?.name}</td>
                   </tr>
                 ))}
               </tbody>
@@ -615,7 +617,7 @@ const MainDetail = () => {
                 !select ? "opacity-40" : ""
               }`}
             >
-              Tanlash
+              {t("tanlash")}
             </button>
           </div>
         </div>

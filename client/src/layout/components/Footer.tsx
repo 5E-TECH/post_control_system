@@ -1,9 +1,11 @@
-import { memo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaInstagram, FaLinkedin, FaTelegram } from 'react-icons/fa';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { memo } from "react";
+import { useNavigate } from "react-router-dom";
+import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Trans, useTranslation } from "react-i18next";
 
 const Footer = () => {
+  useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -28,11 +30,16 @@ const Footer = () => {
 
       <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 max-[1050px]:hidden">
         <span>
-          © 2025, Made with ❤️ by{' '}
-          <span className="font-semibold">Ye77i grup</span>
+          <Trans
+            i18nKey="footer.madeWith"
+            components={{ bold: <span className="font-semibold" /> }}
+          >
+            © 2025, Made with ❤️ by{" "}
+            <span className="font-semibold">Ye77i group</span>
+          </Trans>
         </span>
         <a
-          href="https://instagram.com/faxriddin_maripov"
+          href="https://www.instagram.com/ye77i.tech?igsh=eHpwaDVhb2R5dWtq"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-pink-500"
@@ -40,7 +47,7 @@ const Footer = () => {
           <FaInstagram size={20} />
         </a>
         <a
-          href="https://t.me/faxriddin_maripov"
+          href="https://t.me/yetti_tech"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-sky-500"

@@ -158,7 +158,14 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
                   data-cell="PHONE"
                 >
                   <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
-                    {user?.phone_number}
+                    {user?.phone_number
+                      ? `${user.phone_number
+                          .replace(/\D/g, "")
+                          .replace(
+                            /^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/,
+                            "+$1 $2 $3 $4 $5"
+                          )}`
+                      : ""}
                   </span>
                 </td>
                 <td

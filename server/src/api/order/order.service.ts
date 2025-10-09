@@ -45,6 +45,7 @@ import { MyLogger } from 'src/logger/logger.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { BotService } from '../bot/bot.service';
+import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -130,10 +131,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       let endMs: number | undefined;
 
       if (query.startDate) {
-        startMs = new Date(query.startDate).getTime();
+        startMs = toUzbekistanTimestamp(query.startDate, false);
       }
       if (query.endDate) {
-        endMs = new Date(query.endDate).getTime();
+        endMs = toUzbekistanTimestamp(query.endDate, true);
       }
 
       if (startMs && endMs) {
@@ -646,10 +647,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.startTransaction();
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
-        where: { id },
+        where: {
+          qr_code_token: id,
+          status: In([Order_status.NEW, Order_status.CANCELLED_SENT]),
+        },
       });
       if (!order) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException('Order not in correct status');
+      }
+      if (order.status === Order_status.CANCELLED_SENT) {
+        order.status = Order_status.CLOSED;
+        await queryRunner.manager.save(order);
+
+        await queryRunner.commitTransaction();
+        return successRes({}, 200, 'Order closed');
       }
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id: order.customer_id, role: Roles.CUSTOMER },
@@ -959,20 +970,46 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         if (!marketCashbox) {
           throw new NotFoundException('Market cashbox not found');
         }
+        const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
+          where: {
+            cashbox_type: Cashbox_type.FOR_COURIER,
+            user_id: currentUser.id,
+          },
+        });
+        if (!courierCashbox) {
+          throw new NotFoundException();
+        }
+        courierCashbox.balance -= cancelOrderDto.extraCost;
+        await queryRunner.manager.save(courierCashbox);
         marketCashbox.balance -= cancelOrderDto.extraCost;
         await queryRunner.manager.save(marketCashbox);
 
-        const history = queryRunner.manager.create(CashboxHistoryEntity, {
+        const courierHistory = queryRunner.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_type: Source_type.EXTRA_COST,
+            source_id: order.id,
+            amount: cancelOrderDto.extraCost,
+            balance_after: courierCashbox.balance,
+            comment: finalComment,
+            created_by: currentUser.id,
+          },
+        );
+        await queryRunner.manager.save(courierHistory);
+
+        const marketHistory = queryRunner.manager.create(CashboxHistoryEntity, {
           operation_type: Operation_type.EXPENSE,
           cashbox_id: marketCashbox.id,
-          source_type: Source_type.CANCEL,
+          source_type: Source_type.EXTRA_COST,
           source_id: order.id,
           amount: cancelOrderDto.extraCost,
           balance_after: marketCashbox.balance,
           comment: finalComment,
           created_by: currentUser.id,
         });
-        await queryRunner.manager.save(history);
+        await queryRunner.manager.save(marketHistory);
       }
 
       Object.assign(order, {
@@ -994,7 +1031,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { market_id: marketId },
       });
       // created_at string yoki bigint bo'lishi mumkin
-      const createdAt = new Date(Number(order.created_at));
+
+      // console.log(telegramGroup);
 
       await this.botService.sendMessageToGroup(
         telegramGroup?.group_id || null,
@@ -1340,8 +1378,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getStats(startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
       const acceptedCount = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.created_at BETWEEN :start AND :end', {
@@ -1437,8 +1475,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getMarketStats(startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
 
       // 1) totalOrders: created_at oralig'ida yaratilgan buyurtmalar soni per market
       const totalsRaw = await this.orderRepo
@@ -1521,8 +1559,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getCourierStats(startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
 
       // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
@@ -1692,8 +1730,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async courierStat(user: JwtPayload, startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
 
       // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
@@ -1786,8 +1824,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async marketStat(user: JwtPayload, startDate?: string, endDate?: string) {
     try {
-      const start = Number(startDate) || 0;
-      const end = Number(endDate) || Date.now();
+      const start = Number(startDate);
+      const end = Number(endDate);
 
       // 1️⃣ Shu davrdagi barcha postlar
       const allOrders = await this.orderRepo

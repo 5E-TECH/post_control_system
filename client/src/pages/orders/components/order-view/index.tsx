@@ -1,4 +1,4 @@
-import { memo, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { useDispatch, useSelector } from "react-redux";
@@ -13,16 +13,16 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 import { BASE_URL } from "../../../../shared/const";
 
 const statusColors: Record<string, string> = {
-  new: "bg-sky-500",             // Yangi — ishonch va yangilik hissi uchun moviy
-  received: "bg-green-600",      // Qabul qilingan — muvaffaqiyat va tasdiq ramzi, yashil
-  "on the road": "bg-amber-500", // Yo‘lda — harakat va ogohlantirish hissi uchun sariq-to‘q
-  waiting: "bg-orange-400",      // Kutilyapti — sabr va ogohlantirish uchun to‘q sariq
-  sold: "bg-violet-600",         // Sotilgan — natija va muvaffaqiyat ramzi, binafsha
-  cancelled: "bg-red-600",       // Bekor qilingan — xatolik yoki to‘xtash holati, qizil
-  paid: "bg-emerald-500",        // To‘langan — barqarorlik va ishonch, yashil-jade
-  partly_paid: "bg-teal-500",    // Qisman to‘langan — oraliq holat, ko‘k-yashil
-  "cancelled (sent)": "bg-gray-500", // Jo‘natilgan, lekin bekor qilingan — neytral kulrang
-  closed: "bg-zinc-800",         // Yopilgan — yakunlangan holat, quyuq kulrang yoki qora
+  new: "bg-sky-500",
+  received: "bg-green-600",
+  "on the road": "bg-amber-500",
+  waiting: "bg-orange-400",
+  sold: "bg-violet-600",
+  cancelled: "bg-red-600",
+  paid: "bg-emerald-500",
+  partly_paid: "bg-teal-500",
+  "cancelled (sent)": "bg-gray-500",
+  closed: "bg-zinc-800",
 };
 
 const statusLabels: Record<string, string> = {
@@ -40,76 +40,76 @@ const statusLabels: Record<string, string> = {
 
 const OrderView = () => {
   const { t } = useTranslation("orderList");
-  const { t:st } = useTranslation("status");
-
+  const { t: st } = useTranslation("status");
   const navigate = useNavigate();
-
+  const dispatch = useDispatch();
   const { getOrders, getMarketsByMyNewOrders } = useOrder();
+
   const user = useSelector((state: RootState) => state.roleSlice);
   const filters = useSelector((state: RootState) => state.setFilter);
+  const triggerDownload = useSelector(
+    (state: RootState) => state.requestDownload
+  );
+  const { handleApiError, handleSuccess } = useApiNotification();
   const role = user.role;
-  let query;
 
-  const cleanObject = (obj: Record<string, any>) => {
-    return Object.fromEntries(
+  const { getParam, setParam, removeParam } = useParamsHook();
+  const limit = Number(getParam("limit") || 10);
+
+  // page state
+  const [page, setPage] = useState<number>(Number(getParam("page") || 1));
+
+  const cleanObject = (obj: Record<string, any>) =>
+    Object.fromEntries(
       Object.entries(obj).filter(
         ([_, v]) => v !== "" && v !== null && v !== undefined
       )
     );
-  };
 
   const cleanedFilters = cleanObject(filters);
 
-  const { getParam, setParam, removeParam } = useParamsHook();
-  const page = Number(getParam("page") || 1);
-  const limit = Number(getParam("limit") || 10);
+  // filter o'zgarganda sahifa 1 ga tushadi
+  useEffect(() => {
+    setPage(1);
+    setParam("page", 1);
+  }, [JSON.stringify(cleanedFilters)]);
 
+  // page o'zgarganda URL-ni yangilaymiz
+  useEffect(() => {
+    page === 1 ? removeParam("page") : setParam("page", page);
+  }, [page]);
+
+  // query
+  const queryParams = { page, limit, ...cleanedFilters };
+  let query;
   switch (role) {
     case "superadmin":
-      query = getOrders({ page, limit, ...cleanedFilters });
-      break;
     case "admin":
-      query = getOrders({ page, limit, ...filters });
-      break;
     case "registrator":
-      query = getOrders({ page, limit, ...filters });
+      query = getOrders(queryParams);
       break;
     case "market":
-      query = getMarketsByMyNewOrders({ page, limit, ...cleanedFilters });
+      query = getMarketsByMyNewOrders(queryParams);
       break;
     default:
-      query = { data: { data: [] } };
+      query = { data: { data: [], total: 0 } };
   }
 
   const { data, isLoading } = query;
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
   const total = data?.data?.total || 0;
 
-  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
-    if (newPage === 1) {
-      removeParam("page");
-    } else {
-      setParam("page", newPage);
-    }
-
-    if (limit === 10) {
-      removeParam("limit");
-    } else {
-      setParam("limit", limit);
-    }
+  // pagination onChange
+  const onChange: PaginationProps["onChange"] = (newPage, newLimit) => {
+    setPage(newPage);
+    if (newLimit !== limit) setParam("limit", newLimit);
   };
 
-  const dispatch = useDispatch();
-  const triggerDownload = useSelector(
-    (state: RootState) => state.requestDownload
-  );
-
-  const { handleApiError, handleSuccess } = useApiNotification();
+  // Excel yuklash
   useEffect(() => {
     const downloadExcel = async () => {
       try {
         const isFiltered = Object.keys(cleanedFilters).length > 0;
-
         const response = await fetch(
           `${BASE_URL}order?page=1&limit=0&${new URLSearchParams(
             cleanedFilters
@@ -120,9 +120,7 @@ const OrderView = () => {
             },
           }
         );
-
         const rawText = await response.text();
-
         let data;
         try {
           data = JSON.parse(rawText);
@@ -161,69 +159,34 @@ const OrderView = () => {
       }
     };
 
-    if (triggerDownload.triggerDownload) {
-      downloadExcel();
-    }
-  }, [triggerDownload, dispatch]);
+    if (triggerDownload.triggerDownload) downloadExcel();
+  }, [triggerDownload, dispatch, cleanedFilters]);
+
   return (
     <div className="w-full bg-white py-1 dark:bg-[#312d4b] min-[650px]:overflow-x-auto">
-      <table className="w-full border border-gray-200 shadow-sm">
+      <table className="w-full border-gray-200 shadow-sm">
         <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
           <tr>
-            <th>
-              <div className="flex items-center ml-10">
-                <span>#</span>
-              </div>
-            </th>
-
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("customer")}</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("phone")}</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("region")}</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("district")}</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("market")}</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("status")}</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("price")}</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10 pl-4">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("createdAt")}</span>
-              </div>
-            </th>
+            {[
+              "#",
+              t("customer"),
+              t("phone"),
+              t("region"),
+              t("district"),
+              t("market"),
+              t("status"),
+              t("price"),
+              t("createdAt"),
+            ].map((header, idx) => (
+              <th key={idx}>
+                <div className="flex items-center gap-2">
+                  {idx !== 0 && (
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  )}
+                  <span>{header}</span>
+                </div>
+              </th>
+            ))}
           </tr>
         </thead>
         {isLoading ? (
@@ -233,55 +196,43 @@ const OrderView = () => {
             {myNewOrders?.map((item: any, inx: number) => (
               <tr
                 key={item.id}
-                className={`h-[56px] cursor-pointer hover:bg-[#f6f7fb9f] dark:hover:bg-[#3d3759] font-medium dark:text-[#d5d1eb] text-[#2E263DE5] text-[16px]
-                  ${
-                    inx % 2 === 0
-                      ? "bg-white dark:bg-[#2a243a]"
-                      : "bg-[#aa85f818] dark:bg-[#342d4a]"
-                  }
-                `}
+                className={`h-[56px] cursor-pointer hover:bg-[#f6f7fb9f] dark:hover:bg-[#3d3759] font-medium dark:text-[#d5d1eb] text-[#2E263DE5] text-[16px] ${
+                  inx % 2 === 0
+                    ? "bg-white dark:bg-[#2a243a]"
+                    : "bg-[#aa85f818] dark:bg-[#342d4a]"
+                }`}
                 onClick={() => navigate(`order-detail/${item.id}`)}
               >
-                <td className="data-cell pl-10" data-cell="#">
-                  {inx + 1}
+                <td className="pl-10">{inx + 1}</td>
+                <td className="pl-10">{item?.customer?.name}</td>
+                <td className="pl-10">
+                  {item?.customer?.phone_number
+                    ? `${item?.customer.phone_number
+                        .replace(/\D/g, "")
+                        .replace(
+                          /^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/,
+                          "+$1 $2 $3 $4 $5"
+                        )}`
+                    : ""}
                 </td>
-                <td
-                  className="data-cell pl-10  dark:text-[#d5d1eb]"
-                  data-cell="CUSTOMER"
-                >
-                  {item?.customer?.name}
-                </td>
-                <td className="data-cell pl-10" data-cell="PHONE">
-                  {item?.customer?.phone_number}
-                </td>
-                <td className="data-cell pl-10" data-cell="REGION">
+                <td className="pl-10">
                   {item?.customer?.district?.region?.name}
                 </td>
-                <td className="data-cell pl-10" data-cell="DISTRICT">
-                  {item?.customer?.district?.name}
-                </td>
-                <td className="data-cell pl-10" data-cell="MARKET">
-                  {item?.market?.name}
-                </td>
-                <td className="data-cell pl-10" data-cell="STATUS">
+                <td className="pl-10">{item?.customer?.district?.name}</td>
+                <td className="pl-10">{item?.market?.name}</td>
+                <td className="pl-10">
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
                       statusColors[item?.status] || "bg-gray-400"
                     }`}
                   >
-                    {/* {statusLabels[item?.status] || item?.status} */}
                     {st(`${item?.status}`)}
                   </span>
                 </td>
-                <td className="data-cell pl-10" data-cell="PRICE">
-                  <span>
-                    {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}{" "}
-                  </span>
+                <td className="pl-10">
+                  {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
                 </td>
-                <td
-                  className="data-cell pl-15"
-                  data-cell="CREATED AT"
-                >
+                <td className="pl-10">
                   {new Date(Number(item?.created_at)).toLocaleString("uz-UZ", {
                     day: "2-digit",
                     month: "2-digit",
