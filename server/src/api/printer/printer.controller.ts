@@ -19,9 +19,4 @@ export class PrinterController {
   async printLabel(@Body() printOrderDto: CreatePrinterDto) {
     return await this.printerService.printMultiple(printOrderDto);
   }
-
-  // @Post('print:token')
-  // async printSingleLabel(@Param('token') token: string) {
-  //   return await this.printerService.printLabel(token);
-  // }
 }
