@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && node --max-old-space-size=2048 vite build",
+    "build": "tsc -b && node --max-old-space-size=2048 node_modules/vite/bin/vite.js build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -16,6 +16,7 @@
     "@tailwindcss/vite": "^4.1.11",
     "@tanstack/react-query": "^5.85.0",
     "@uidotdev/usehooks": "^2.4.1",
+    "@yudiel/react-qr-scanner": "^2.3.1",
     "@zxing/browser": "^0.1.5",
     "antd": "^5.27.1",
     "axios": "^1.11.0",
