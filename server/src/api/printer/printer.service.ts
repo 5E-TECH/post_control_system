@@ -12,6 +12,7 @@ import { OrderRepository } from 'src/core/repository/order.repository';
 import { PrintOrder } from 'src/common/utils/types/order.interface';
 import { In } from 'typeorm';
 import { existsSync } from 'fs';
+import axios from 'axios'; // ✅ yangi qo‘shildi
 
 @Injectable()
 export class PrinterService {
@@ -27,38 +28,6 @@ export class PrinterService {
     console.log('🖨️ PrinterService initialized');
   }
 
-  //   async printLabel(token: string): Promise<string> {
-  //     try {
-  //       const order = await this.orderRepo.findOne({
-  //         where: { qr_code_token: token },
-  //         relations: ['customer', 'customer.district'],
-  //       });
-  //       if (!order) {
-  //         throw new NotFoundException('Order not found');
-  //       }
-
-  //       const tspl = `
-  // SIZE 40 mm,30 mm
-  // GAP 2 mm,0 mm
-  // CLS
-  // TEXT 20,20,"3",0,1,1,"Post Control System"
-  // TEXT 20,60,"3",0,1,1,"Order #${orderId}"
-  // TEXT 20,100,"3",0,1,1,"Receiver: ${receiver}"
-  // BARCODE 20,140,"128",50,1,0,2,2,"${orderId}"
-  // PRINT 1
-  // `;
-
-  //       // 🔥 Printerga bevosita yozish
-  //       await writeFile('/dev/usb/lp0', tspl);
-
-  //       console.log('🖨️ Label printed successfully (no sudo)!');
-  //       return 'Printed successfully';
-  //     } catch (error) {
-  //       console.error('❌ Print error:', error);
-  //       return catchError(error);
-  //     }
-  //   }
-
   async printMultiple(ordersInfoDto: CreatePrinterDto) {
     try {
       const { orderIds } = ordersInfoDto;
@@ -66,11 +35,26 @@ export class PrinterService {
         throw new BadRequestException('⚠️ No orders provided');
       }
 
-      // Telefon raqamini UZB formatda chiqarish
+      // ✅ NGROK yoki boshqa printer server URL
+      const printerServerUrl = process.env.PRINTER_LOCAL_URL;
+
+      // Agar URL mavjud bo‘lsa — axios orqali yuboramiz (ya’ni production)
+      if (printerServerUrl) {
+        console.log('🌍 Remote printer detected, sending via Axios...');
+        const response = await axios.post(`${printerServerUrl}/printer/print`, {
+          orderIds,
+        });
+        return successRes(
+          '✅ Print so‘rov yuborildi (remote printer)',
+          response.data,
+        );
+      }
+
+      // ⚙️ Local printerga to‘g‘ridan-to‘g‘ri chop etish (local holat)
+      console.log('🖨️ Local printer detected, printing via USB...');
+
       function formatPhoneNumber(phone: string): string {
-        // faqat raqamlarni qoldiramiz
         const cleaned = phone.replace(/\D/g, '');
-        // 998 bilan boshlanayotgan format uchun
         if (cleaned.startsWith('998') && cleaned.length === 12) {
           const code = cleaned.slice(3, 5);
           const part1 = cleaned.slice(5, 8);
@@ -78,7 +62,6 @@ export class PrinterService {
           const part3 = cleaned.slice(10, 12);
           return `+998 (${code}) ${part1}-${part2}-${part3}`;
         }
-        // agar boshqa format bo'lsa — o‘zgarmagan holda qaytaramiz
         return phone;
       }
 
@@ -87,20 +70,32 @@ export class PrinterService {
         return num.toLocaleString('en-US') + " so'm";
       }
 
-      // Find orders with client relation
       const orders = await this.orderRepo.find({
         where: { id: In(orderIds) },
-        relations: ['customer', 'customer.district'],
+        relations: [
+          'items',
+          'items.product',
+          'market',
+          'customer',
+          'customer.district',
+        ],
       });
+
       for (const order of orders) {
         const printingOrder: PrintOrder = {
           orderId: order.id,
           orderPrice: formatCurrency(order.total_price),
           customerName: order.customer.name,
           customerPhone: formatPhoneNumber(order.customer.phone_number),
+          market: order.market.name,
+          comment: order.comment,
           district: order.customer.district.name,
           address: order.customer.address,
           qrCode: order.qr_code_token,
+          items: {
+            product: order.customer.name,
+            quantity: order.product_quantity,
+          },
         };
         this.queue.push(printingOrder);
       }
@@ -119,7 +114,7 @@ export class PrinterService {
   }
 
   private async startWorker() {
-    if (this.isPrinting) return; // Agar allaqachon ishlayotgan bo‘lsa, chiqadi
+    if (this.isPrinting) return;
     this.isPrinting = true;
 
     while (this.queue.length > 0) {
@@ -128,7 +123,7 @@ export class PrinterService {
 
       try {
         await this.printSingle(order);
-        await new Promise((r) => setTimeout(r, 1000)); // kichik delay
+        await new Promise((r) => setTimeout(r, 3000));
       } catch (error) {
         console.error(
           `❌ Print error for order ${order.orderId}:`,
@@ -150,6 +145,8 @@ export class PrinterService {
       qrCode,
       district,
       address,
+      market,
+      comment,
     } = order;
 
     const tspl = `
@@ -159,19 +156,22 @@ CLS
 
 TEXT 325,20,"4",0,1,1,"Beepost"
 
-TEXT 20,80,"4",0,1,1,"${customerName}"
+TEXT 20,80,"4",0,1,1,"${customerName.length > 20 ? `${customerName.slice(0, 19)}...` : customerName}"
 TEXT 20,120,"4",0,1,1,"${customerPhone}"
 
-TEXT 20,200,"3",0,1,1,"Narxi:"
-TEXT 160,200,"3",0,1,1,"${orderPrice}"
+TEXT 20,150,"3",0,1,1,"-----------------------------"
 
-TEXT 20,240,"3",0,1,1,"Tuman: ${district}"
-TEXT 20,280,"3",0,1,1,"Manzil: ${address}"
+TEXT 20,180,"3",0,1,1,"Narxi:"
+TEXT 160,180,"3",0,1,1,"${orderPrice}"
 
+TEXT 20,220,"3",0,1,1,"Tuman: ${district}"
+TEXT 20,260,"3",0,1,1,"Manzil: ${address}"
+TEXT 20,300,"3",0,1,1,"Comment: ${comment}"
 
+TEXT 20,330,"2",0,1,1,"${market} --> ${market}"
 
 QRCODE 560,50,L,8,A,0,"${qrCode}"
-BARCODE 100,350,"128",100,1,0,2,2,"${qrCode}"
+BARCODE 100,370,"128",100,1,0,2,2,"${qrCode}"
 
 PRINT 1
 `;
@@ -184,9 +184,6 @@ PRINT 1
     console.log(`✅ Printed order: ${orderId}`);
   }
 
-  /**
-   * 🔍 Queue holatini ko‘rish
-   */
   getQueueStatus() {
     return {
       pending: this.queue.length,
