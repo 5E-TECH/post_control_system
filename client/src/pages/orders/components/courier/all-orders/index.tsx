@@ -22,6 +22,7 @@ const statusColors: Record<string, string> = {
   closed: "bg-black",
 };
 
+
 const AllOrders = () => {
   const navigate = useNavigate();
 
@@ -281,9 +282,15 @@ const AllOrders = () => {
           </tr>
         </thead>
         <tbody>
-          {data?.data?.data?.map((item: any, inx: number) => (
+          {data?.data?.data?.map((item: any, inx: number) => {
+            console.log(item.id);
+            
+            return (
             <tr
-              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
+              onClick={(e) => {
+                console.log(e);
+                
+                navigate(`/order/order-detail/${item.id}`);}}
               key={item?.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >
@@ -340,7 +347,8 @@ const AllOrders = () => {
                 ) : null}
               </td>
             </tr>
-          ))}
+          )}
+          )}
         </tbody>
       </table>
 

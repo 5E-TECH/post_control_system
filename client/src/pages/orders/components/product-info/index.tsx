@@ -128,7 +128,8 @@ const ProductInfo = () => {
               name="comment"
               value={formData.comment}
               onChange={handleChange}
-              className="!pb-[150px] !pt-3 !pl-4 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
+              rows={3} // 🔹 balandlikni nazorat qiladi
+              className="!pt-2 !pb-2 !pl-3 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
               placeholder={t("productInfo.commentPlaceholder")}
             />
           </Form.Item>

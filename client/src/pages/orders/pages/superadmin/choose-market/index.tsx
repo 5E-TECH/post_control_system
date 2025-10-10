@@ -170,27 +170,40 @@ const ChooseMarket = () => {
                 <TableSkeleton rows={5} columns={2} />
               ) : (
                 <tbody>
-                  {markets?.map((market: any, inx: number) => (
-                    <tr
-                      key={market?.id}
-                      className={`h-[56px] cursor-pointer hover:bg-[#f6f7fb9f] dark:hover:bg-[#3d3759] 
-            font-medium dark:text-[#d5d1eb] text-[#2E263DE5] text-[16px]
-            ${
-              inx % 2 === 0
-                ? "bg-white dark:bg-[#2a243a]"
-                : "bg-[#aa85f818] dark:bg-[#342d4a]"
-            }`}
-                      onClick={() => setSelectedMarket(market)}
-                      onDoubleClick={() => setSelectedMarket(null)}
-                    >
-                      <td className="pl-8 w-[60px]">{inx + 1}</td>
-                      <td className="px-8">{market?.name}</td>
-                      {/* width olib tashlandi, pl-12 bilan joylashtirildi */}
-                      <td className="text-left pl-12">
-                        {market?.phone_number}
-                      </td>
-                    </tr>
-                  ))}
+                  {markets?.map((market: any, inx: number) => {
+                    const isSelected = selectedMarket?.id === market.id;
+                    return (
+                      <tr
+                        key={market?.id}
+                        onClick={() =>
+                          isSelected
+                            ? setSelectedMarket(null)
+                            : setSelectedMarket(market)
+                        }
+                        className={`h-[56px] cursor-pointer font-medium text-[16px] transition-all duration-150
+          ${
+            isSelected
+              ? "bg-[#c5adff] dark:bg-[#56468a]" // ✅ tanlangan qator — to‘qroq violet
+              : inx % 2 === 0
+              ? "bg-white dark:bg-[#2a243a]"
+              : "bg-[#f6f3ff] dark:bg-[#342d4a]"
+          }
+          ${
+            !isSelected
+              ? "hover:bg-[#ddd0ff] dark:hover:bg-[#4d3e7a]" // ✅ faqat tanlanmaganlarda hover bo‘lsin
+              : ""
+          }
+          text-[#2E263DE5] dark:text-[#d5d1eb]
+        `}
+                      >
+                        <td className="pl-8 w-[60px]">{inx + 1}</td>
+                        <td className="px-8">{market?.name}</td>
+                        <td className="text-left pl-12">
+                          {market?.phone_number}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               )}
             </table>

@@ -1,61 +1,83 @@
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BrowserMultiFormatReader } from "@zxing/browser";
+import { Scanner } from "@yudiel/react-qr-scanner";
 
 export default function ScanPage() {
   const navigate = useNavigate();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [_, setData] = useState("");
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const codeReader = new BrowserMultiFormatReader();
+  const handleScan = (result: any) => {
+    if (result) {
+      let scannedValue = "";
 
-    BrowserMultiFormatReader.listVideoInputDevices()
-      .then((videoInputDevices) => {
-        if (videoInputDevices.length === 0) {
-          throw new Error("Video qurilma topilmadi");
-        }
-
-        let deviceId = videoInputDevices[0].deviceId;
-
-        // 📷 orqa kamerani tanlash (agar bo‘lsa)
-        const backCamera = videoInputDevices.find((d) =>
-          d.label.toLowerCase().includes("back")
-        );
-        if (backCamera) deviceId = backCamera.deviceId;
-
-        if (!videoRef.current) return;
-
-        // ✅ faqat 1 marta scan qiladi va avtomatik stop bo‘ladi
-        codeReader
-          .decodeOnceFromVideoDevice(deviceId, videoRef.current)
-          .then((result) => {
-            const res = result.getText();
-            const token = res.split("/").at(-1);
-
-            // 🔊 beep ovoz
-            const audio = new Audio("../../../../../../../sound/beep.mp3");
-            audio.play().catch((err) => console.error("Ovoz chiqmadi:", err));
-
-            // 🔀 keyingi bosqichga o‘tish
-            navigate(`/scan/${token}`);
-          })
-          .catch((err) => console.error("QR Scan xatosi:", err));
-      })
-      .catch((err) => console.error("Video qurilma xatosi:", err));
-
-    // ❌ Sahifadan chiqqanda kamerani to‘xtatish
-    return () => {
-      if (videoRef.current?.srcObject instanceof MediaStream) {
-        videoRef.current.srcObject.getTracks().forEach((t) => t.stop);
-        videoRef.current.srcObject = null;
+      if (Array.isArray(result) && result.length > 0) {
+        scannedValue = result[0]?.rawValue || "";
+      } else if (typeof result === "object" && result.rawValue) {
+        scannedValue = result.rawValue;
+      } else if (typeof result === "string") {
+        scannedValue = result;
       }
-    };
-  }, [navigate]);
+
+      if (scannedValue) {
+        setData(scannedValue);
+        setError("");
+
+        // 🔊 beep ovozi
+        const audio = new Audio("/sound/beep.mp3");
+        audio.play().catch((err) => console.error("Ovoz chiqmadi:", err));
+
+        // tokenni ajratib olish
+        const token = scannedValue.split("/").at(-1);
+
+        // 🔀 sahifaga yo‘naltirish
+        navigate(`/scan/${token}`);
+      }
+    }
+  };
+
+  const handleError = () => {
+    setError("Kamera yuklanmadi yoki ruxsat berilmadi");
+  };
 
   return (
-    <div>
-      <h2>QR kodni skaner qiling:</h2>
-      <video ref={videoRef} id="video" width="100%" className="scale-[1.5]" />
+    <div className="text-center">
+      <h2 className="mb-3 font-semibold text-lg">QR kodni skaner qiling:</h2>
+
+      <Scanner
+        onScan={handleScan}
+        onError={handleError}
+        components={{
+          finder: undefined,
+          torch: undefined,
+          tracker: undefined,
+          onOff: undefined,
+          zoom: undefined,
+        }}
+        sound={false}
+        constraints={{
+          facingMode: "environment",
+        }}
+        styles={{
+          container: {
+            width: "100%",
+            height: "320px",
+            borderRadius: "20px",
+            overflow: "hidden",
+          },
+          video: {
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            transform: "scale(1)",
+            borderRadius: "20px",
+          },
+        }}
+      />
+
+      {error && (
+        <p className="text-red-500 mt-2 text-sm font-medium">{error}</p>
+      )}
     </div>
   );
 }
