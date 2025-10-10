@@ -12,6 +12,7 @@ import { OrderRepository } from 'src/core/repository/order.repository';
 import { PrintOrder } from 'src/common/utils/types/order.interface';
 import { In } from 'typeorm';
 import { existsSync } from 'fs';
+import axios from 'axios'; // ✅ yangi qo‘shildi
 
 @Injectable()
 export class PrinterService {
@@ -34,11 +35,26 @@ export class PrinterService {
         throw new BadRequestException('⚠️ No orders provided');
       }
 
-      // Telefon raqamini UZB formatda chiqarish
+      // ✅ NGROK yoki boshqa printer server URL
+      const printerServerUrl = process.env.PRINTER_LOCAL_URL;
+
+      // Agar URL mavjud bo‘lsa — axios orqali yuboramiz (ya’ni production)
+      if (printerServerUrl) {
+        console.log('🌍 Remote printer detected, sending via Axios...');
+        const response = await axios.post(`${printerServerUrl}/printer/print`, {
+          orderIds,
+        });
+        return successRes(
+          '✅ Print so‘rov yuborildi (remote printer)',
+          response.data,
+        );
+      }
+
+      // ⚙️ Local printerga to‘g‘ridan-to‘g‘ri chop etish (local holat)
+      console.log('🖨️ Local printer detected, printing via USB...');
+
       function formatPhoneNumber(phone: string): string {
-        // faqat raqamlarni qoldiramiz
         const cleaned = phone.replace(/\D/g, '');
-        // 998 bilan boshlanayotgan format uchun
         if (cleaned.startsWith('998') && cleaned.length === 12) {
           const code = cleaned.slice(3, 5);
           const part1 = cleaned.slice(5, 8);
@@ -46,7 +62,6 @@ export class PrinterService {
           const part3 = cleaned.slice(10, 12);
           return `+998 (${code}) ${part1}-${part2}-${part3}`;
         }
-        // agar boshqa format bo'lsa — o‘zgarmagan holda qaytaramiz
         return phone;
       }
 
@@ -55,7 +70,6 @@ export class PrinterService {
         return num.toLocaleString('en-US') + " so'm";
       }
 
-      // Find orders with client relation
       const orders = await this.orderRepo.find({
         where: { id: In(orderIds) },
         relations: [
@@ -66,9 +80,8 @@ export class PrinterService {
           'customer.district',
         ],
       });
-      for (const order of orders) {
-        console.log('test buyurtma', order);
 
+      for (const order of orders) {
         const printingOrder: PrintOrder = {
           orderId: order.id,
           orderPrice: formatCurrency(order.total_price),
@@ -101,7 +114,7 @@ export class PrinterService {
   }
 
   private async startWorker() {
-    if (this.isPrinting) return; // Agar allaqachon ishlayotgan bo‘lsa, chiqadi
+    if (this.isPrinting) return;
     this.isPrinting = true;
 
     while (this.queue.length > 0) {
@@ -110,7 +123,7 @@ export class PrinterService {
 
       try {
         await this.printSingle(order);
-        await new Promise((r) => setTimeout(r, 3000)); // kichik delay
+        await new Promise((r) => setTimeout(r, 3000));
       } catch (error) {
         console.error(
           `❌ Print error for order ${order.orderId}:`,
@@ -157,8 +170,6 @@ TEXT 20,300,"3",0,1,1,"Comment: ${comment}"
 
 TEXT 20,330,"2",0,1,1,"${market} --> ${market}"
 
-
-
 QRCODE 560,50,L,8,A,0,"${qrCode}"
 BARCODE 100,370,"128",100,1,0,2,2,"${qrCode}"
 
@@ -173,9 +184,6 @@ PRINT 1
     console.log(`✅ Printed order: ${orderId}`);
   }
 
-  /**
-   * 🔍 Queue holatini ko‘rish
-   */
   getQueueStatus() {
     return {
       pending: this.queue.length,

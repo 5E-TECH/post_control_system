@@ -3,6 +3,7 @@ config();
 
 export default {
   PORT: Number(process.env.PORT),
+  PORT_PRINT: Number(process.env.PORT_PRINT),
   PROD_HOST: String(process.env.PROD_HOST),
   DB_URL: String(process.env.DB_URL),
   HOST_URL: String(process.env.HOST_URL),
@@ -16,4 +17,5 @@ export default {
   REFRESH_TOKEN_TIME: String(process.env.REFRESH_TOKEN_TIME),
 
   BOT_TOKEN: String(process.env.BOT_TOKEN),
+  NGROK_AUTHTOKEN: String(process.env.NGROK_AUTHTOKEN),
 };
