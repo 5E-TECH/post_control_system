@@ -133,7 +133,7 @@ const MailDetail = () => {
   const hideSend = state?.hideSend;
 
   return (
-    <div className="flex flex-col gap-5 p-5 h-[800px]">
+    <div className="flex flex-col gap-5 p-5 ">
       <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
         <div className="flex justify-between px-5 pt-5">
           <h1 className="text-2xl mt-1">

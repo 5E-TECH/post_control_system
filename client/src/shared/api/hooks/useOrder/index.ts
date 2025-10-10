@@ -80,7 +80,10 @@ export const useOrder = () => {
     useQuery({
       queryKey: [order, params],
       queryFn: () =>
-        api.get("order/courier/orders", { params }).then((res) => res.data),
+        api.get("order/courier/orders", { params }).then((res) =>  {
+          const orders = res.data;
+         return orders}),
+      
     });
 
   const deleteOrders = useMutation({
