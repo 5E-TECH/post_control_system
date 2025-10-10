@@ -33,9 +33,7 @@ export default function ScanPage() {
             const token = res.split("/").at(-1);
 
             // 🔊 beep ovoz
-            const audio = new Audio(
-              "../../../../../../../sound/beep.mp3"
-            );
+            const audio = new Audio("../../../../../../../sound/beep.mp3");
             audio.play().catch((err) => console.error("Ovoz chiqmadi:", err));
 
             // 🔀 keyingi bosqichga o‘tish
@@ -57,7 +55,7 @@ export default function ScanPage() {
   return (
     <div>
       <h2>QR kodni skaner qiling:</h2>
-      <video ref={videoRef} id="video" width="100%" />
+      <video ref={videoRef} id="video" width="100%" className="scale-[1.5]" />
     </div>
   );
 }

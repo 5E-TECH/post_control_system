@@ -27,38 +27,6 @@ export class PrinterService {
     console.log('🖨️ PrinterService initialized');
   }
 
-  //   async printLabel(token: string): Promise<string> {
-  //     try {
-  //       const order = await this.orderRepo.findOne({
-  //         where: { qr_code_token: token },
-  //         relations: ['customer', 'customer.district'],
-  //       });
-  //       if (!order) {
-  //         throw new NotFoundException('Order not found');
-  //       }
-
-  //       const tspl = `
-  // SIZE 40 mm,30 mm
-  // GAP 2 mm,0 mm
-  // CLS
-  // TEXT 20,20,"3",0,1,1,"Post Control System"
-  // TEXT 20,60,"3",0,1,1,"Order #${orderId}"
-  // TEXT 20,100,"3",0,1,1,"Receiver: ${receiver}"
-  // BARCODE 20,140,"128",50,1,0,2,2,"${orderId}"
-  // PRINT 1
-  // `;
-
-  //       // 🔥 Printerga bevosita yozish
-  //       await writeFile('/dev/usb/lp0', tspl);
-
-  //       console.log('🖨️ Label printed successfully (no sudo)!');
-  //       return 'Printed successfully';
-  //     } catch (error) {
-  //       console.error('❌ Print error:', error);
-  //       return catchError(error);
-  //     }
-  //   }
-
   async printMultiple(ordersInfoDto: CreatePrinterDto) {
     try {
       const { orderIds } = ordersInfoDto;
