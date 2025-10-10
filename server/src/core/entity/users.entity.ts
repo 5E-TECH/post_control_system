@@ -7,6 +7,7 @@ import {
   OneToMany,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { UserSalaryEntity } from './user-salary.entity';
 import { CashEntity } from './cash-box.entity';
@@ -23,6 +24,7 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   name: string;
 
+  @Index()
   @Column({ type: 'varchar' })
   phone_number: string;
 
