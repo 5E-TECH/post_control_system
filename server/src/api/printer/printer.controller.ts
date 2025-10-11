@@ -1,22 +1,39 @@
+// src/printer/printer.controller.ts
 import {
   Controller,
-  Get,
   Post,
   Body,
-  Patch,
-  Param,
-  Delete,
+  BadRequestException,
+  Get,
 } from '@nestjs/common';
-import { PrinterService } from './printer.service';
-import { CreatePrinterDto } from './dto/create-printer.dto';
-import { UpdatePrinterDto } from './dto/update-printer.dto';
+import { promises as fsPromises } from 'fs';
+import { existsSync } from 'fs';
 
 @Controller('printer')
 export class PrinterController {
-  constructor(private readonly printerService: PrinterService) {}
+  private readonly printerPath = '/dev/usb/lp0';
 
-  @Post('print')
-  async printLabel(@Body() printOrderDto: CreatePrinterDto) {
-    return await this.printerService.printMultiple(printOrderDto);
+  @Get('status')
+  status() {
+    return {
+      printerPath: this.printerPath,
+      exists: existsSync(this.printerPath),
+    };
+  }
+
+  @Post('raw')
+  async rawPrint(@Body() body: { tspl?: string }) {
+    const { tspl } = body;
+    if (!tspl) throw new BadRequestException('tspl missing');
+    if (!existsSync(this.printerPath))
+      throw new BadRequestException('Printer not connected');
+
+    try {
+      await fsPromises.writeFile(this.printerPath, Buffer.from(tspl, 'utf8'));
+      return { ok: true, printedBytes: tspl.length };
+    } catch (err) {
+      console.error('rawPrint failed:', err);
+      throw err;
+    }
   }
 }
