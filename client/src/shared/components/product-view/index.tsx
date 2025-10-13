@@ -70,9 +70,9 @@ const ProductView: FC<IProps> = ({ data, total }) => {
   }, []);
 
   return (
-    <div className="mt-4 px-4 overflow-x-auto">
+    <div className="mt-4 px-4 ">
       <Spin spinning={loading} tip="Loading Products...">
-        <table className="w-full cursor-pointer">
+        <table className="w-full">
           <thead className="h-[54px] bg-[#F6F7FB] dark:bg-[#3D3759] text-left uppercase">
             <tr>
               <th className="w-[50px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
@@ -96,7 +96,6 @@ const ProductView: FC<IProps> = ({ data, total }) => {
               <th className="h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
                 <div className="flex items-center justify-between pr-[21px]">
                   {t("action")}
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
             </tr>
