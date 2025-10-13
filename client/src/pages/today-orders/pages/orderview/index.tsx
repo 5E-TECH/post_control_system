@@ -1,7 +1,6 @@
 import { Edit, Trash } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Search from "../../components/search";
 import phone from "../../../../shared/assets/order/detail.svg";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { usePost } from "../../../../shared/api/hooks/usePost";
@@ -10,6 +9,9 @@ import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import ConfirmPopup from "../../../../shared/components/confirmPopup";
 import { useTranslation } from "react-i18next";
+import { debounce } from "../../../../shared/helpers/DebounceFunc";
+import EmptyPage from "../../../../shared/components/empty-page";
+import Skeleton from "../../components/search/skeleton";
 
 const OrderView = () => {
   const { t } = useTranslation("todayOrderList");
@@ -38,14 +40,27 @@ const OrderView = () => {
   const [_, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [searchData, setSearch] = useState<any>(null);
   const { getOrderByMarket, getMarketsByMyNewOrders, deleteOrders } =
     useOrder();
+
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSearch(value);
+      }, 500),
+    []
+  );
+
+  const params = searchData ? { search: searchData, limit: 0 } : { limit: 0 };
   const { createPost, createPrint } = usePost();
-  const { data, refetch } =
-    user.role === "market" ? getMarketsByMyNewOrders() : getOrderByMarket(id);
+  const { data, refetch, isLoading } =
+    user.role === "market"
+      ? getMarketsByMyNewOrders(params)
+      : getOrderByMarket(id, params);
 
   useEffect(() => {
-    if (data?.data?.total === 0) {
+    if (data?.data?.total === 0 && searchData == null) {
       navigate(-1);
     }
   }, [data]);
@@ -74,8 +89,10 @@ const OrderView = () => {
     };
     createPrint.mutate(orderids, {
       onSuccess: () => {
-        // alert('chop etildi')
-        console.log("chop etildi");
+        handleSuccess("Chop etildi");
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Chop etishda hatolik yuz berdi");
       },
     });
   };
@@ -102,168 +119,208 @@ const OrderView = () => {
   return (
     <div
       onClick={() => setOpenMenuId("")}
-      className="bg-white rounded-md m-5 dark:bg-[#312d4b]">
+      className="bg-white rounded-md m-5 dark:bg-[#312d4b]"
+    >
       <div className="flex justify-between items-center">
-        <Search />
+        <div className="flex justify-between w-full items-center p-10">
+          <h2 className="text-[20px] font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+            {t("title")}
+          </h2>
+          <form action="">
+            <div className="border border-[#d1cfd4] rounded-md">
+              <input
+                onChange={(e) => debouncedSearch(e.target.value)}
+                className="outline-none px-4 py-3"
+                type="text"
+                placeholder={t("placeholder.search")}
+              />
+            </div>
+          </form>
+        </div>{" "}
         <button
           onClick={() => handlePrint()}
-          className="border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff]">
+          className="border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff]"
+        >
           Chop etish
         </button>
       </div>
       <div className="w-full">
-        <table className="w-full">
-          <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:text-[#E7E3FCE5] dark:bg-[#3d3759]">
-            <tr>
-              {user.role !== "market" && (
+        {isLoading ? (
+          <Skeleton /> // ⬅️ Skelet chiqadi yuklanayotgan paytda
+        ) : (
+          <table className="w-full">
+            <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:text-[#E7E3FCE5] dark:bg-[#3d3759]">
+              <tr>
+                {user.role !== "market" && (
+                  <th>
+                    <div className="flex items-center gap-10 ml-10">
+                      <input
+                        type="checkbox"
+                        checked={
+                          !!data?.data?.data &&
+                          selectedIds.length === data.data?.data?.length
+                        } // ✅ doim boolean
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(
+                              data?.data?.data?.map((item: any) => item.id)
+                            ); // 🔄 hamma id yig‘iladi
+                          } else {
+                            setSelectedIds([]); // 🔄 bo‘shatib yuboriladi
+                          }
+                        }}
+                      />
+                    </div>
+                  </th>
+                )}
                 <th>
-                  <div className="flex items-center gap-10 ml-10">
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>#</span>
+                  </div>
+                </th>
+                <th>
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>{t("customer")}</span>
+                  </div>
+                </th>
+                <th>
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>{t("phone")}</span>
+                  </div>
+                </th>
+                <th>
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>{t("address")}</span>
+                  </div>
+                </th>
+
+                <th>
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>{t("status")}</span>
+                  </div>
+                </th>
+                <th>
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>{t("price")}</span>
+                  </div>
+                </th>
+                <th>
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>{t("stock")}</span>
+                  </div>
+                </th>
+                <th>
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>{t("action")}</span>
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="cursor-pointer">
+              {data?.data?.data?.map((item: any, inx: number) => (
+                <tr
+                  key={item?.id}
+                  className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
+                >
+                  <td className="pl-10">
                     <input
                       type="checkbox"
-                      checked={
-                        !!data?.data?.data &&
-                        selectedIds.length === data.data?.data?.length
-                      } // ✅ doim boolean
+                      onClick={(e) => e.stopPropagation()}
+                      checked={item?.id ? selectedIds.includes(item.id) : false}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setSelectedIds(
-                            data?.data?.data?.map((item: any) => item.id)
-                          ); // 🔄 hamma id yig‘iladi
+                          setSelectedIds([...selectedIds, item.id]);
                         } else {
-                          setSelectedIds([]); // 🔄 bo‘shatib yuboriladi
+                          setSelectedIds(
+                            selectedIds.filter((id) => id !== item.id)
+                          );
                         }
                       }}
                     />
-                  </div>
-                </th>
-              )}
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>#</span>
-                </div>
-              </th>
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>{t("customer")}</span>
-                </div>
-              </th>
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>{t("phone")}</span>
-                </div>
-              </th>
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>{t("address")}</span>
-                </div>
-              </th>
+                  </td>
+                  <td className="pl-10">{inx + 1}</td>
+                  <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
+                    {item?.customer?.name}
+                  </td>
+                  <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                    {item?.customer?.phone_number
+                      ? `${item.customer.phone_number
+                          .replace(/\D/g, "")
+                          .replace(
+                            /^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/,
+                            "+$1 $2 $3 $4 $5"
+                          )}`
+                      : ""}{" "}
+                  </td>
+                  <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
+                    {item?.customer?.address?.split(" ").slice(0, 2).join(" ")}
+                  </td>
 
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>{t("status")}</span>
-                </div>
-              </th>
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>{t("price")}</span>
-                </div>
-              </th>
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>{t("stock")}</span>
-                </div>
-              </th>
-              <th>
-                <div className="flex items-center gap-10">
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  <span>{t("action")}</span>
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="cursor-pointer">
-            {data?.data?.data?.map((item: any, inx: number) => (
-              <tr
-                key={item?.id}
-                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]">
-                <td className="pl-10">
-                  <input
-                    type="checkbox"
-                    onClick={(e) => e.stopPropagation()}
-                    checked={item?.id ? selectedIds.includes(item.id) : false}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedIds([...selectedIds, item.id]);
-                      } else {
-                        setSelectedIds(
-                          selectedIds.filter((id) => id !== item.id)
-                        );
+                  <td className="pl-10">
+                    <span
+                      className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}
+                    >
+                      {st(`${item.status}`).toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                    {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}{" "}
+                    UZS
+                  </td>
+                  <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                    {item?.items?.length}
+                  </td>
+                  <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                    <button
+                      className="hover:text-red-600 cursor-pointer"
+                      onClick={() => {
+                        setDeleteId(item.id); // shu joyda id saqlanadi
+                        setIsConfirmOpen(true); // popup ochiladi
+                      }}
+                    >
+                      <Trash />
+                    </button>
+                    <button
+                      className="hover:text-[#396ebe] cursor-pointer"
+                      onClick={() =>
+                        navigate(`/orders/order-detail/${item?.id}`)
                       }
-                    }}
-                  />
-                </td>
-                <td className="pl-10">{inx + 1}</td>
-                <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.customer?.name}
-                </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.customer?.phone_number}
-                </td>
-                <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.customer?.address?.split(" ").slice(0, 2).join(" ")}
-                </td>
-
-                <td className="pl-10">
-                  <span
-                    className={`py-2 px-3 rounded-2xl text-[13px] text-white dark:text-[#E7E3FCB2]  bg-blue-500`}>
-                    {st(`${item.status}`).toUpperCase()}
-                  </span>
-                </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.total_price} UZS
-                </td>
-                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {item?.items?.length}
-                </td>
-                <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  <button
-                    className="hover:text-red-600 cursor-pointer"
-                    onClick={() => {
-                      setDeleteId(item.id); // shu joyda id saqlanadi
-                      setIsConfirmOpen(true); // popup ochiladi
-                    }}>
-                    <Trash />
-                  </button>
-                  <button
-                    className="hover:text-[#396ebe] cursor-pointer"
-                    onClick={() =>
-                      navigate(`/orders/order-detail/${item?.id}`)
-                    }>
-                    <Edit />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    >
+                      <Edit />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {(!data?.data?.data || data.data.data.length === 0) && (
+          <div className="flex flex-col justify-center items-center min-h-[60vh]">
+            <EmptyPage />
+          </div>
+        )}
         {selectedOrder && (
           <div
             className="fixed inset-0 bg-[#f4f5fa79] bg-opacity-80 flex items-center justify-center z-50 dark:bg-[#28243d3b]"
-            onClick={() => setSelectedOrder(null)}>
+            onClick={() => setSelectedOrder(null)}
+          >
             <div
               className="bg-white rounded-lg shadow-lg p-6 w-[500px] relative dark:bg-[#28243d]"
-              onClick={(e) => e.stopPropagation()}>
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 className="absolute top-3 right-3 text-gray-600 hover:text-black"
-                onClick={() => setSelectedOrder(null)}>
+                onClick={() => setSelectedOrder(null)}
+              >
                 ✕
               </button>
               <div>
@@ -293,7 +350,8 @@ const OrderView = () => {
                         {Array.from({ length: 3 }).map((_, inx: number) => (
                           <tr
                             key={inx}
-                            className="flex justify-between items-center pr-4 border-b mb-2">
+                            className="flex justify-between items-center pr-4 border-b mb-2"
+                          >
                             <td>
                               <div className="flex items-center gap-3">
                                 <div>
@@ -332,7 +390,7 @@ const OrderView = () => {
             </div>
           </div>
         )}
-        {user?.role !== "market" && (
+        {user?.role !== "market" && data?.data?.data?.length > 0 && (
           <div className="flex justify-end mr-10 mt-5">
             <button
               type="submit"
@@ -346,7 +404,8 @@ const OrderView = () => {
                 (Array.isArray(selectedIds) && selectedIds.length === 0)
                   ? "opacity-50 cursor-not-allowed"
                   : "cursor-pointer"
-              } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}>
+              } font-sans bg-[#8c57ff] rounded-md mb-5 text-white`}
+            >
               {t("qabulQilish")}
             </button>
           </div>
