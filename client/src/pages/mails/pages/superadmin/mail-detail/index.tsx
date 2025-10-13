@@ -12,6 +12,8 @@ import SearchInput from "../../../../users/components/search-input";
 import Popup from "../../../../../shared/ui/Popup";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const MailDetail = () => {
   const { t } = useTranslation("mails");
@@ -19,6 +21,9 @@ const MailDetail = () => {
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
+  const search = useSelector((state: RootState) => state.resetUserFilter.search);
+  console.log(search);
+  
 
   const { getPostById, sendAndGetCouriersByPostId, sendPost } = usePost();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
@@ -43,7 +48,7 @@ const MailDetail = () => {
     condition = true;
   }
 
-  const { data } = getPostById(id as string, endpoint, condition);
+  const { data } = getPostById(id as string, endpoint, condition, search);
   const postData = data?.data?.allOrdersByPostId;
 
   useEffect(() => {
