@@ -257,7 +257,7 @@ const WaitingOrders = () => {
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => (
             <tr
-              onClick={() => navigate(`/orders/order-detail/${item.item}`)}
+              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
               key={item?.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >

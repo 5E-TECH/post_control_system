@@ -172,7 +172,7 @@ export default function ScanAndOrder() {
             },
             onError: (err: any) =>
               handleApiError(err, "Buyurtmani sotishda xatolik"),
-          }
+          },
         );
       }
     } else if (actionTypeOrder === "cancel") {
