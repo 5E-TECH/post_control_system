@@ -1,8 +1,9 @@
-import { memo, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useTranslation } from "react-i18next";
+import MailSkeleton from "../../choose-mail/MailSkeleton";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -21,30 +22,50 @@ const TodayMails = () => {
   const { t } = useTranslation("mails");
   const navigate = useNavigate();
   const { getAllPosts } = usePost();
-  const { data, refetch } = getAllPosts("new");
+  const { data, refetch, isLoading } = getAllPosts("new");
   const posts = Array.isArray(data?.data) ? data?.data : [];
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    refetch();
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await refetch();
+      } catch (err) {
+        console.error("Refetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [refetch]);
+
+  if (loading || isLoading) {
+    return <MailSkeleton />;
+  }
+
   return (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts?.length ? (
         posts?.map((post: any) => (
           <div
             key={post?.id}
-            className={`min-h-[250px] border ${
+            className={`min-h-[250px] ${
               borderColorsByStatus[
                 post?.status as keyof typeof borderColorsByStatus
               ]
-            } shadow-sm rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]`}
+            } shadow-2xl rounded-md flex flex-col items-center justify-center cursor-pointer bg-green-500 dark:bg-[#3f692e] text-white`}
             onClick={() =>
               navigate(`/mails/${post?.id}`, {
                 state: { regionName: post?.region?.name },
               })
             }
           >
-            <h1 className="text-[30px] line-clamp-1 text-center">{post?.region?.name}</h1>
+            <h1 className="text-[30px] line-clamp-1 text-center">
+              {post?.region?.name}
+            </h1>
             <p className="text-[22px]">
               <span>{post?.order_quantity}</span> {t("tabuyurtmalar")}
             </p>
