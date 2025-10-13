@@ -22,7 +22,6 @@ const statusColors: Record<string, string> = {
   closed: "bg-black",
 };
 
-
 const AllOrders = () => {
   const navigate = useNavigate();
 
@@ -284,71 +283,73 @@ const AllOrders = () => {
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => {
             console.log(item.id);
-            
+
             return (
-            <tr
-              onClick={(e) => {
-                console.log(e);
-                
-                navigate(`/order/order-detail/${item.id}`);}}
-              key={item?.id}
-              className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
-            >
-              <td className="pl-10">{inx + 1}</td>
-              <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.name}
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.phone_number}
-              </td>
-              <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.district?.name}
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.market?.name}
-              </td>
-              <td className="pl-10">
-                <span
-                  className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                    statusColors[item.status] || "bg-slate-400"
-                  }`}
-                >
-                  {item.status.toUpperCase()}
-                </span>
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
-              </td>
-              <td className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.items.length}
-              </td>
-              <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.status === "waiting" ? (
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={(e) => handleSellOrder(e, item)}
-                      className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
-                    >
-                      Sotish
-                    </Button>
-                    <Button
-                      onClick={(e) => handleCancelOrder(e, item)}
-                      className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
-                    >
-                      Bekor qilish
-                    </Button>
-                  </div>
-                ) : item?.status === "sold" || item?.status === "cancelled" ? (
-                  <div className="ml-9">
-                    <Button onClick={(e) => handleRollback(e, item?.id)}>
-                      <AlertCircle />
-                    </Button>
-                  </div>
-                ) : null}
-              </td>
-            </tr>
-          )}
-          )}
+              <tr
+                onClick={(e) => {
+                  console.log(e);
+
+                  navigate(`/order/order-detail/${item.id}`);
+                }}
+                key={item?.id}
+                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
+              >
+                <td className="pl-10">{inx + 1}</td>
+                <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.customer?.name}
+                </td>
+                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.customer?.phone_number}
+                </td>
+                <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.customer?.district?.name}
+                </td>
+                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.market?.name}
+                </td>
+                <td className="pl-10">
+                  <span
+                    className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
+                      statusColors[item.status] || "bg-slate-400"
+                    }`}
+                  >
+                    {item.status.toUpperCase()}
+                  </span>
+                </td>
+                <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+                </td>
+                <td className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.items.length}
+                </td>
+                <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+                  {item?.status === "waiting" ? (
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={(e) => handleSellOrder(e, item)}
+                        className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
+                      >
+                        Sotish
+                      </Button>
+                      <Button
+                        onClick={(e) => handleCancelOrder(e, item)}
+                        className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
+                      >
+                        Bekor qilish
+                      </Button>
+                    </div>
+                  ) : item?.status === "sold" ||
+                    item?.status === "cancelled" ? (
+                    <div className="ml-9">
+                      <Button onClick={(e) => handleRollback(e, item?.id)}>
+                        <AlertCircle />
+                      </Button>
+                    </div>
+                  ) : null}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
@@ -356,7 +357,7 @@ const AllOrders = () => {
         isShow={isShowModal}
         onCancel={() => setIsShowModal(false)}
         onConfirm={handleConfirm}
-        description="Buyurtmani ortga qaytarszmi?"
+        description="Buyurtmani ortga qaytarasizmi?"
       />
 
       <Popup isShow={isShow} onClose={closePopup}>
