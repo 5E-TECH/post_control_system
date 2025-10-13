@@ -24,11 +24,11 @@ export const usePost = () => {
       queryFn: () => api.get(`post/${path}`).then((res) => res.data),
     });
 
-  const getPostById = (id: string, path: string, bool: boolean = true) =>
+  const getPostById = (id: string, path: string, bool: boolean = true, params?:any) =>
     useQuery({
-      queryKey: [post, id, path],
+      queryKey: [post, id, path, params],
       queryFn: () =>
-        api.get(`post/orders/${path}${id}`).then((res) => res.data),
+        api.get(`post/orders/${path}${id}`, params).then((res) => res.data),
       enabled: bool,
     });
 
