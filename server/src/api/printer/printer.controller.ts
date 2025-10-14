@@ -20,9 +20,4 @@ export class PrinterController {
     console.log(`so'rov keldi`);
     return await this.printerService.printMultiple(printOrderDto);
   }
-
-  // @Post('print:token')
-  // async printSingleLabel(@Param('token') token: string) {
-  //   return await this.printerService.printLabel(token);
-  // }
 }
