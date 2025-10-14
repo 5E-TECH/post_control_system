@@ -13,6 +13,7 @@ import {
   type IUserFilter,
 } from "../../shared/lib/features/user-filters";
 import type { RootState } from "../../app/store";
+import { Eraser } from "lucide-react";
 
 const Users = () => {
   const { t } = useTranslation("users");
@@ -73,7 +74,8 @@ const Users = () => {
               className="w-[150px]! max-[651px]:w-full! h-[45px]!"
               onClick={handleClear}
             >
-              Tozalash
+              <Eraser className="w-4 h-4 mr-2" />
+              {t('clear')}
             </AntButton>
           </div>
         </div>
