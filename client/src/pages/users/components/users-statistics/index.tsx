@@ -38,7 +38,7 @@ const UsersStatistics = () => {
                   {allUsers?.data?.total}
                 </span>
                 <span className="font-normal text-[15px] pt-1 text-[#56CA00]">
-                  (+29%)
+                  
                 </span>
               </div>
             </div>
@@ -66,7 +66,7 @@ const UsersStatistics = () => {
                   {markets?.length}
                 </span>
                 <span className="font-normal text-[15px] pt-1 text-[#56CA00]">
-                  (+18%)
+                  
                 </span>
               </div>
             </div>
@@ -94,7 +94,7 @@ const UsersStatistics = () => {
                   {users?.length}
                 </span>
                 <span className="font-normal text-[15px] pt-1 text-[#FF4C51]">
-                  (-14%)
+                
                 </span>
               </div>
             </div>
