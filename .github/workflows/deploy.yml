@@ -1,4 +1,4 @@
-name: CI/CD Deploy Monorepo (Systemd)
+name: ⚡ Fast CI/CD Deploy (Systemd + pnpm + cache)
 
 on:
   push:
@@ -7,16 +7,24 @@ on:
 
 jobs:
   deploy:
-    name: 🚀 Build & Deploy to Production
     runs-on: ubuntu-latest
     environment: Production
 
     steps:
-      # 1️⃣ Checkout repository
-      - name: 🧾 Checkout repository
-        uses: actions/checkout@v4
+      # 1️⃣ Checkout
+      - uses: actions/checkout@v4
 
-      # 2️⃣ Setup GitHub App token for private repo access
+      # 2️⃣ Setup Node + pnpm
+      - name: ⚙️ Setup Node.js + pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      # 3️⃣ Setup GitHub App Token
       - name: 🔐 Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
@@ -25,7 +33,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           repository: 5E-TECH/post_control_system
 
-      # 3️⃣ Deploy to server via SSH
+      # 4️⃣ Deploy to server
       - name: 🚀 Deploy to Server
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
@@ -34,45 +42,23 @@ jobs:
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             set -e
 
-            echo '📂 Switching to app directory...'
             cd ${{ secrets.APP_PATH }}
-
-            echo '🔄 Updating repo...'
             git fetch origin main
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
-            # -------------------------
-            # 4️⃣ Build frontend (React)
-            echo '🧱 Building frontend...'
+            # ✅ Frontend
             cd client
+            pnpm install --frozen-lockfile
+            pnpm build
 
-            # Clean previous build
-            [ -d dist ] && rm -rf dist
-
-            # Faster, consistent install
-            npm ci --include=dev
-
-            npm run build
-            echo '✅ Frontend built successfully.'
-
-            # -------------------------
-            # 5️⃣ Build backend (NestJS)
-            echo '🧱 Building backend...'
+            # ✅ Backend
             cd ../server
+            pnpm install --frozen-lockfile
+            pnpm build
 
-            npm ci --include=dev
-            npm run build
-            echo '✅ Backend built successfully.'
-
-            # -------------------------
-            # 6️⃣ Restart NestJS systemd service
-            echo '🔁 Restarting systemd service...'
+            # ✅ Restart
             sudo systemctl daemon-reload
             sudo systemctl restart nestapp.service
-
-            echo '📋 Checking service status...'
             sudo systemctl status nestapp --no-pager -l || true
-
-            echo '🎉 Deploy finished successfully!'
           "
