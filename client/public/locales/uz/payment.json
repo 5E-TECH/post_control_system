@@ -53,6 +53,8 @@
     "to'lanishiKerak": "To'lanishi Kerak",
     "to'langan": "To'langan",
     "status": "Holat",
+    "main":"asosiy",
+    "paymentType":"to'lov turi",
     "sourceTypes":{
         "courier_payment": "Kuryer to'lovi",
         "market_payment": "Market to'lovi",
