@@ -1,4 +1,4 @@
-name: CI/CD Deploy Monorepo (Systemd)
+name: CI/CD Deploy Monorepo (Systemd, Optimized)
 
 on:
   push:
@@ -6,16 +6,23 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     environment: Production
 
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 2️⃣ GitHub App token setup
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      # 3️⃣ Setup GitHub App token
       - name: Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
@@ -24,41 +31,48 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           repository: 5E-TECH/post_control_system
 
-      # 3️⃣ Deploy to server
-      - name: Deploy to server
+      # 4️⃣ Install and build FRONTEND (React)
+      - name: Build frontend
+        working-directory: client
         run: |
-          # Save SSH key and set permissions
+          echo "📦 Installing frontend deps..."
+          npm ci --omit=dev
+          echo "⚙️  Building React app..."
+          npm run build
+
+      # 5️⃣ Install and build BACKEND (NestJS)
+      - name: Build backend
+        working-directory: server
+        run: |
+          echo "📦 Installing backend deps..."
+          npm ci --omit=dev
+          echo "⚙️  Building NestJS app..."
+          npm run build
+
+      # 6️⃣ Prepare build artifacts (for upload)
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp -r client/dist artifacts/client
+          cp -r server/dist artifacts/server
+          cp -r server/package*.json artifacts/server/
+          cp -r server/node_modules artifacts/server/node_modules || true
+
+      # 7️⃣ Deploy to remote server
+      - name: Deploy to EC2
+        run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
           chmod 600 server_key.pem
 
-          # Connect to server
+          echo "🚀 Deploying to ${{ secrets.SERVER_IP }}..."
+          rsync -avz --delete -e "ssh -i server_key.pem -o StrictHostKeyChecking=no" \
+            artifacts/client/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/home/ubuntu/post_control_system/client/dist
+
+          rsync -avz --delete -e "ssh -i server_key.pem -o StrictHostKeyChecking=no" \
+            artifacts/server/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/home/ubuntu/post_control_system/server/dist
+
+          echo "🔁 Restarting Nest app..."
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-
-            # Go to root app folder
-            cd ${{ secrets.APP_PATH }}
-
-            # Update main branch
-            git reset --hard
-            git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
-
-            # -------------------------
-            # 4️⃣ Build frontend
-            cd client
-            if [ -d dist ]; then
-              sudo chown -R $USER:$USER dist || true
-              rm -rf dist
-            fi
-            npm install
-            npm run build
-
-            # -------------------------
-            # 5️⃣ Build backend
-            cd ../server
-            npm install
-            npm run build
-
-            # -------------------------
-            # 6️⃣ Reload systemd service for NestJS
             sudo systemctl daemon-reload
             sudo systemctl restart nestapp.service
             sudo systemctl status nestapp --no-pager
