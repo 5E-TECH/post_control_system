@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useTranslation } from "react-i18next";
+import MailSkeleton from "../../choose-mail/MailSkeleton";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -21,8 +22,12 @@ const OldMails = () => {
   const { t } = useTranslation("mails");
   const navigate = useNavigate();
   const { getAllPosts } = usePost();
-  const { data } = getAllPosts("");
+  const { data, isLoading } = getAllPosts("");
   const posts = Array.isArray(data?.data) ? data?.data : [];
+
+  if (isLoading) {
+    return <MailSkeleton />;
+  }
   return (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts.length ? (
@@ -33,7 +38,11 @@ const OldMails = () => {
               borderColorsByStatus[
                 post?.status as keyof typeof borderColorsByStatus
               ]
-            } shadow-sm rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]`}
+            } shadow-2xl rounded-md flex flex-col items-center justify-center cursor-pointer ${
+              post?.status == "canceled"
+                ? "bg-red-500 dark:bg-[#73374d]"
+                : "bg-[#45C1FF] dark:bg-[#2a4c76]"
+            } text-white border-0`}
             onClick={() =>
               navigate(`/mails/${post?.id}?status=${post?.status}`, {
                 state: { regionName: post?.region?.name, hideSend: true },
@@ -41,7 +50,9 @@ const OldMails = () => {
             }
           >
             <p>{post?.status}</p>
-            <h1 className="text-[30px]">{post?.region?.name}</h1>
+            <h1 className="text-[30px] line-clamp-1 text-center">
+              {post?.region?.name}
+            </h1>
             <p className="text-[22px]">
               <span>{post?.order_quantity}</span> {t("tabuyurtmalar")}
             </p>
