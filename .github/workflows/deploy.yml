@@ -14,6 +14,8 @@ jobs:
       # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
 
       # 2️⃣ Setup Node.js
       - name: Setup Node.js
@@ -31,34 +33,53 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           repository: 5E-TECH/post_control_system
 
-      # 4️⃣ Deploy to server
+      # 4️⃣ Determine what changed
+      - name: Determine changed directories
+        id: changes
+        run: |
+          git fetch origin main
+          CHANGED_DIRS=$(git diff --name-only origin/main...HEAD | awk -F/ '{print $1}' | sort -u)
+          echo "changed=$CHANGED_DIRS" >> $GITHUB_OUTPUT
+          echo "Changed dirs: $CHANGED_DIRS"
+
+      # 5️⃣ Deploy to Production Server
       - name: Deploy to Production Server
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
           chmod 600 server_key.pem
 
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            
             cd ${{ secrets.APP_PATH }}
 
             echo '📦 Pulling latest code...'
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
-            echo '📁 Building client...'
-            cd client
-            rm -rf dist
-            npm ci --legacy-peer-deps
-            npm run build
+            # Build client only if changed
+            if [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
+              echo '📁 Building client...'
+              cd client
+              rm -rf dist
+              npm ci --prefer-offline --legacy-peer-deps
+              NODE_OPTIONS='--max-old-space-size=2048' npm run build
+              # Copy build to nginx root (adjust path if needed)
+              cp -r dist/* /var/www/html/
+              cd ..
+              echo '⚡ Client build deployed.'
+            fi
 
-            echo '🧠 Building server...'
-            cd ../server
-            npm ci --legacy-peer-deps
-            npm run build
-
-            echo '🔁 Restarting systemd service...'
-            sudo systemctl daemon-reload
-            sudo systemctl restart nestapp.service
-            sudo systemctl status nestapp --no-pager
+            # Build server only if changed
+            if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]]; then
+              echo '🧠 Building server...'
+              cd server
+              npm ci --prefer-offline --legacy-peer-deps
+              NODE_OPTIONS='--max-old-space-size=2048' npm run build
+              cd ..
+              echo '🔁 Restarting Node server...'
+              sudo systemctl restart nestapp.service
+              sudo systemctl status nestapp --no-pager
+            fi
 
             echo '✅ Deployment completed successfully.'
           "
