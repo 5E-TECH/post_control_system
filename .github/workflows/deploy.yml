@@ -1,4 +1,4 @@
-name: CI/CD Deploy Monorepo (Systemd)
+name: CI/CD Deploy with npm (Systemd)
 
 on:
   push:
@@ -15,7 +15,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ GitHub App token setup
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      # 3️⃣ Generate GitHub App Token (for private repos)
       - name: Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
@@ -24,42 +31,34 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           repository: 5E-TECH/post_control_system
 
-      # 3️⃣ Deploy to server
-      - name: Deploy to server
+      # 4️⃣ Deploy to server
+      - name: Deploy to Production Server
         run: |
-          # Save SSH key and set permissions
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
           chmod 600 server_key.pem
 
-          # Connect to server
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-
-            # Go to root app folder
             cd ${{ secrets.APP_PATH }}
 
-            # Update main branch
+            echo '📦 Pulling latest code...'
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
-            # -------------------------
-            # 4️⃣ Build frontend
+            echo '📁 Building client...'
             cd client
-            if [ -d dist ]; then
-              sudo chown -R $USER:$USER dist || true
-              rm -rf dist
-            fi
-            npm install
+            rm -rf dist
+            npm ci --legacy-peer-deps
             npm run build
 
-            # -------------------------
-            # 5️⃣ Build backend
+            echo '🧠 Building server...'
             cd ../server
-            npm install
+            npm ci --legacy-peer-deps
             npm run build
 
-            # -------------------------
-            # 6️⃣ Reload systemd service for NestJS
+            echo '🔁 Restarting systemd service...'
             sudo systemctl daemon-reload
             sudo systemctl restart nestapp.service
             sudo systemctl status nestapp --no-pager
+
+            echo '✅ Deployment completed successfully.'
           "

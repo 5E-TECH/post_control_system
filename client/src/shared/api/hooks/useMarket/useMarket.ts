@@ -28,12 +28,14 @@ export const useMarket = () => {
       queryFn: () => api.get(`user/${id}`).then((res) => res.data),
     });
 
-  const getMarketsNewOrder = (enabled = true) =>
+  const getMarketsNewOrder = (enabled: boolean = true, params?:any) =>
     useQuery({
-      queryKey: [market],
+      queryKey: [market, params],
       queryFn: () =>
-        api.get("order/markets/new-orders").then((res) => res.data),
+        api.get("order/markets/new-orders", { params }).then((res) => res.data),
       enabled,
+      staleTime: 1000 * 60 * 60 * 24,
+      refetchOnWindowFocus: false,
     });
   return {
     createMarket,

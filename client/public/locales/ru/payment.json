@@ -53,6 +53,8 @@
     "to'lanishiKerak": "Подлежит оплате",
     "to'langan": "Оплачено",
     "status": "Статус",
+    "main":"главный",
+    "paymentType":"Тип оплаты",
     "sourceTypes":{
         "courier_payment": "Оплата курьеру",
         "market_payment": "Оплата маркету",

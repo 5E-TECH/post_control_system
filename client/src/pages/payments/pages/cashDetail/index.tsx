@@ -19,8 +19,8 @@ const CashDetail = () => {
   const { t } = useTranslation("payment");
   const { id } = useParams();
   const [form, setForm] = useState({
-    from: new Date().toISOString().split("T")[0],
-    to: new Date().toISOString().split("T")[0],
+    from: "",
+    to: "",
     order: "",
     payment: "",
     summa: "",
@@ -37,7 +37,14 @@ const CashDetail = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "summa") {
+      // faqat raqamlarni qoldiramiz
+      const numericValue = value.replace(/\D/g, "");
+      setForm((prev) => ({ ...prev, summa: numericValue }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   useEffect(() => {
@@ -151,10 +158,14 @@ const CashDetail = () => {
             <div className="grid grid-cols-[repeat(auto-fit,minmax(0,1fr))] w-full gap-4 items-center mt-3">
               <input
                 name="summa"
-                value={form.summa}
+                value={
+                  form.summa
+                    ? new Intl.NumberFormat("uz-UZ").format(Number(form.summa))
+                    : ""
+                }
                 onChange={handleChange}
-                className="border  rounded-md px-2 py-2 border-[#d1cfd4] outline-none hover:border-blue-400 "
-                type="number"
+                className="border rounded-md px-2 py-2 border-[#d1cfd4] outline-none hover:border-blue-400"
+                type="text"
                 placeholder={t("summa")}
               />
               <Select
@@ -166,7 +177,15 @@ const CashDetail = () => {
                 className="mySelect "
                 size="large"
                 options={[
-                  { value: "", label: "to'lov turi", disabled: true },
+                  {
+                    value: "",
+                    label: (
+                      <span style={{ color: "#a0a0a0" }}>
+                        {t("paymentType")}
+                      </span>
+                    ),
+                    disabled: true,
+                  },
                   { value: "cash", label: `${t("cash")}` },
                   { value: "click", label: `${t("click")}` },
                   ...(data?.data?.cashbox?.user?.role === "market"
@@ -209,7 +228,18 @@ const CashDetail = () => {
               />
               <button
                 onClick={() => handleSubmit()}
-                className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0]"
+                disabled={
+                  !form.payment ||
+                  !form.summa ||
+                  Number(form.summa.replace(/\s/g, "")) <= 0
+                }
+                className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
+                  !form.payment ||
+                  !form.summa ||
+                  Number(form.summa.replace(/\s/g, "")) <= 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
+                }`}
               >
                 {t("qabulQilish")}
               </button>

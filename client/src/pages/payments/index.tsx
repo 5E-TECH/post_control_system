@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Eraser, Search } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import Select from "../users/components/select";
 import Popup from "../../shared/ui/Popup";
@@ -150,10 +150,10 @@ const Payments = () => {
         index === self.findIndex((o: any) => o.value === option.value)
     );
 
-  const cashboxType = ["markets", "couriers", "main"];
+  const cashboxType = ["market", "courier", "main"];
   const cashboxOptions = cashboxType.map((status: string) => ({
     value: status,
-    label: status,
+    label: t(`${status}`),
   }));
 
   useEffect(() => {
@@ -216,8 +216,8 @@ const Payments = () => {
               <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
             </div>
             <div className="max-h-[520px] overflow-y-auto">
-              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto cursor-pointer">
-                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+              <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4 scroll-y-auto cursor-pointer">
+                <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
                   <tr>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
@@ -239,12 +239,12 @@ const Payments = () => {
                   </tr>
                 </thead>
 
-                <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
+                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
                   {data?.data?.data?.map((item: any, inx: number) => (
                     <tr
                       key={item?.id}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                      className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] ${
                         item.id == select ? "bg-gray-300 text-black" : ""
                       }`}
                     >
@@ -260,7 +260,7 @@ const Payments = () => {
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
-                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-4 right-4 ${
+                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
                   !select ? "" : "hover:bg-blue-600"
                 }  text-white rounded-md cursor-pointer ${
                   !select ? "opacity-40" : ""
@@ -328,11 +328,11 @@ const Payments = () => {
               <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
             </div>
             <div className="max-h-[520px] overflow-y-auto">
-              <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
-                <thead className="dark:bg-[#3d3759] bg-[#F6F7FB] sticky top-[-2px] uppercase">
+              <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
+                <thead className="dark:bg-[#3d3759] sticky top-[-2px] uppercasev bg-[#9d70ff]">
                   <tr>
                     <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]"> 
+                      <div className="flex items-center justify-between pr-[21px]">
                         #
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
@@ -361,7 +361,7 @@ const Payments = () => {
                     <tr
                       key={inx}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#c3c5ce] dark:border-[#E7E3FCB2]  text-[15px] font-normal ${
+                      className={`border-b-2 border-[#c3c5ce] dark:border-[#E7E3FCB2]  text-[16px] text-[#2E263DB2] ${
                         item.id == select ? "bg-gray-100 text-black" : ""
                       }`}
                     >
@@ -422,11 +422,12 @@ const Payments = () => {
             text={t("cashboxtype")}
             name="cashboxType"
           />
-          <div className="flex min-[1000px]:justify-end">
+          <div className="flex min-[900px]:justify-end">
             <Button
-              className="h-[45px]! w-[150px]! max-[450px]:w-full!"
+              className="w-[150px]! max-[651px]:w-full! h-[45px]!"
               onClick={() => setPaymentFilter(initialState)}
             >
+              <Eraser className="w-4 h-4 mr-2" />
               {t("tozalash")}
             </Button>
           </div>

@@ -11,5 +11,5 @@ export interface PrintOrder {
   items: {
     product: string;
     quantity: number;
-  };
+  }[];
 }
