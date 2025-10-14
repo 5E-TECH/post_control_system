@@ -135,12 +135,10 @@ export class PrinterService {
       comment,
     } = order;
 
-    // 🔹 TSPL — Printerga yuboriladigan text
     const tspl = `
 SIZE 100 mm,60 mm
 GAP 2 mm,0 mm
 CLS
-
 TEXT 325,20,"4",0,1,1,"Beepost"
 TEXT 20,80,"4",0,1,1,"${customerName.length > 20 ? `${customerName.slice(0, 19)}...` : customerName}"
 TEXT 20,120,"4",0,1,1,"${customerPhone}"
@@ -151,18 +149,19 @@ TEXT 20,220,"3",0,1,1,"Tuman: ${district}"
 TEXT 20,260,"3",0,1,1,"Manzil: ${address}"
 TEXT 20,300,"3",0,1,1,"Izoh: ${comment || '-'}"
 TEXT 20,330,"2",0,1,1,"${market}"
-
 QRCODE 560,50,L,8,A,0,"${qrCode}"
 BARCODE 100,370,"128",100,1,0,2,2,"${qrCode}"
-PRINT 1
-`;
+PRINT 1`.trim(); // 🧼 trailing newline olib tashlaydi
 
     console.log(`🖨️ Printing order: ${orderId}`);
     try {
       await axios.post(
         config.PRINTER_LOCAL_URL,
-        { tspl }, // ⚠️ muhim: obyektda yuborish kerak
-        { timeout: 10000 },
+        { tspl },
+        {
+          timeout: 10000,
+          headers: { 'Content-Type': 'application/json' }, // ⚙️ aniq yozamiz
+        },
       );
       console.log(`✅ Printed order: ${orderId}`);
     } catch (err: any) {
