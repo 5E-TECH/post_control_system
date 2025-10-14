@@ -1,4 +1,4 @@
-name: ⚡ Fast CI/CD Deploy (Systemd + pnpm + cache)
+name: CI/CD Deploy with npm (Systemd)
 
 on:
   push:
@@ -11,23 +11,19 @@ jobs:
     environment: Production
 
     steps:
-      # 1️⃣ Checkout
-      - uses: actions/checkout@v4
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      # 2️⃣ Setup Node + pnpm
-      - name: ⚙️ Setup Node.js + pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache-dependency-path: |
-            client/pnpm-lock.yaml
-            server/pnpm-lock.yaml
+          cache: "npm"
 
-      # 3️⃣ Setup GitHub App Token
-      - name: 🔐 Setup GitHub App token
+      # 3️⃣ Generate GitHub App Token (for private repos)
+      - name: Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
         with:
@@ -36,31 +32,33 @@ jobs:
           repository: 5E-TECH/post_control_system
 
       # 4️⃣ Deploy to server
-      - name: 🚀 Deploy to Server
+      - name: Deploy to Production Server
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
           chmod 600 server_key.pem
 
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-            set -e
-
             cd ${{ secrets.APP_PATH }}
-            git fetch origin main
+
+            echo '📦 Pulling latest code...'
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
-            # ✅ Frontend
+            echo '📁 Building client...'
             cd client
-            pnpm install --frozen-lockfile
-            pnpm build
+            rm -rf dist
+            npm ci --legacy-peer-deps
+            npm run build
 
-            # ✅ Backend
+            echo '🧠 Building server...'
             cd ../server
-            pnpm install --frozen-lockfile
-            pnpm build
+            npm ci --legacy-peer-deps
+            npm run build
 
-            # ✅ Restart
+            echo '🔁 Restarting systemd service...'
             sudo systemctl daemon-reload
             sudo systemctl restart nestapp.service
-            sudo systemctl status nestapp --no-pager -l || true
+            sudo systemctl status nestapp --no-pager
+
+            echo '✅ Deployment completed successfully.'
           "
