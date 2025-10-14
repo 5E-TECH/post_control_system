@@ -1,15 +1,29 @@
-import { memo, useEffect } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import Search from "./components/search";
+// import Search from "./components/search";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import EmptyPage from "../../shared/components/empty-page";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 import { useTranslation } from "react-i18next";
+import { debounce } from "../../shared/helpers/DebounceFunc";
+import Skeleton from "./components/search/skeleton";
 
 const TodayOrders = () => {
   const { t } = useTranslation("todayOrderList");
   const navigate = useNavigate();
+  const [searchData, setSearch] = useState<any>(null);
+  const [refech, setRefech] = useState<boolean>(false);
+
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setSearch(value);
+      }, 500),
+    []
+  );
+
+
   const { pathname } = useLocation();
   const role = useSelector((state: RootState) => state.roleSlice);
 
@@ -22,15 +36,16 @@ const TodayOrders = () => {
   const handleProps = (id: string) => {
     navigate(`${id}`);
   };
-
-  const { getMarketsNewOrder } = useMarket();
-  const { data, refetch, isLoading } = getMarketsNewOrder(false);
-
   useEffect(() => {
     if (role.role !== "market" && pathname === "/order/markets/new-orders") {
-      refetch();
+      setRefech(true)
+      // refetch();
     }
   }, [pathname]);
+
+  const { getMarketsNewOrder } = useMarket();
+  const { data, isLoading } = getMarketsNewOrder(refech, searchData ? {search:searchData} : "");
+
 
   if (pathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
@@ -40,12 +55,26 @@ const TodayOrders = () => {
 
   return (
     <section className="flex items-center justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d4b]">
-      {!isLoading && markets?.length > 0 && <Search />}
+      {/* {!isLoading && markets?.length > 0 && ( */}
+      <div className="flex justify-between w-full items-center p-10">
+        <h2 className="text-[20px] font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+          {t("title")}
+        </h2>
+        <form action="">
+          <div className="border border-[#d1cfd4] rounded-md">
+            <input
+              onChange={(e) => debouncedSearch(e.target.value)}
+              className="outline-none px-4 py-3"
+              type="text"
+              placeholder={t("placeholder.search")}
+            />
+          </div>
+        </form>
+      </div>
+      {/* )} */}
       {isLoading ? (
-        <div className="flex justify-center items-center h-[200px]">
-          <p className="text-gray-500 dark:text-gray-300">Loading...</p>
-        </div>
-      ) : markets.length > 0 ? (
+          <Skeleton/>
+      ) : (
         <div className="w-full">
           <table className=" w-full  border-gray-200 shadow-sm ">
             <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
@@ -82,45 +111,51 @@ const TodayOrders = () => {
               </tr>
             </thead>
             <tbody className="">
-              {markets?.map((item: any, inx: number) => (
-                <tr
-                  key={item?.market?.id}
-                  className={`h-[56px] cursor-pointer hover:bg-[#f6f7fb9f] dark:hover:bg-[#3d3759] font-medium dark:text-[#d5d1eb] text-[#2E263DE5] text-[16px]
+              {markets.length > 0 ? (
+                markets?.map((item: any, inx: number) => (
+                  <tr
+                    key={item?.market?.id}
+                    className={`h-[56px] cursor-pointer hover:bg-[#f6f7fb9f] dark:hover:bg-[#3d3759] font-medium dark:text-[#d5d1eb] text-[#2E263DE5] text-[16px]
                   ${
                     inx % 2 === 0
                       ? "bg-white dark:bg-[#2a243a]"
                       : "bg-[#aa85f818] dark:bg-[#342d4a]"
                   }`}
-                  onClick={() => handleProps(item?.market?.id)}
-                >
-                  <td className="pl-10">{inx + 1}</td>
-                  <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.market?.name}
-                  </td>
-                  <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.market?.phone_number
-                      ? `${item?.market?.phone_number
-                          .replace(/\D/g, "")
-                          .replace(
-                            /^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/,
-                            "+$1 $2 $3 $4 $5"
-                          )}`
-                      : ""}
-                  </td>
-                  <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.orderTotalPrice}
-                  </td>
-                  <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.length}
+                    onClick={() => handleProps(item?.market?.id)}
+                  >
+                    <td className="pl-10">{inx + 1}</td>
+                    <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
+                      {item?.market?.name}
+                    </td>
+                    <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                      {item?.market?.phone_number
+                        ? `${item?.market?.phone_number
+                            .replace(/\D/g, "")
+                            .replace(
+                              /^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/,
+                              "+$1 $2 $3 $4 $5"
+                            )}`
+                        : ""}
+                    </td>
+                    <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                      {item?.orderTotalPrice}
+                    </td>
+                    <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                      {item?.length}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5}>
+                    <div className="h-[60vh] flex justify-center items-center">
+                      <EmptyPage />
+                    </div>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
-        </div>
-      ) : (
-        <div className="h-[80vh]">
-          <EmptyPage />
         </div>
       )}
     </section>
