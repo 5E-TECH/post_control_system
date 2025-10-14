@@ -1,4 +1,4 @@
-name: CI/CD Deploy Monorepo (Systemd, Optimized)
+name: CI/CD Deploy Monorepo (Systemd)
 
 on:
   push:
@@ -6,23 +6,18 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  deploy:
+    name: 🚀 Build & Deploy to Production
     runs-on: ubuntu-latest
     environment: Production
 
     steps:
       # 1️⃣ Checkout repository
-      - name: Checkout repository
+      - name: 🧾 Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      # 3️⃣ Setup GitHub App token
-      - name: Setup GitHub App token
+      # 2️⃣ Setup GitHub App token for private repo access
+      - name: 🔐 Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
         with:
@@ -30,49 +25,54 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           repository: 5E-TECH/post_control_system
 
-      # 4️⃣ Install and build FRONTEND (React)
-      - name: Build frontend
-        working-directory: client
-        run: |
-          echo "📦 Installing frontend deps..."
-          npm ci --omit=dev
-          echo "⚙️  Building React app..."
-          npm run build
-
-      # 5️⃣ Install and build BACKEND (NestJS)
-      - name: Build backend
-        working-directory: server
-        run: |
-          echo "📦 Installing backend deps..."
-          npm ci --omit=dev
-          echo "⚙️  Building NestJS app..."
-          npm run build
-
-      # 6️⃣ Prepare build artifacts (for upload)
-      - name: Prepare artifacts
-        run: |
-          mkdir -p artifacts
-          cp -r client/dist artifacts/client
-          cp -r server/dist artifacts/server
-          cp -r server/package*.json artifacts/server/
-          cp -r server/node_modules artifacts/server/node_modules || true
-
-      # 7️⃣ Deploy to remote server
-      - name: Deploy to EC2
+      # 3️⃣ Deploy to server via SSH
+      - name: 🚀 Deploy to Server
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
           chmod 600 server_key.pem
 
-          echo "🚀 Deploying to ${{ secrets.SERVER_IP }}..."
-          rsync -avz --delete -e "ssh -i server_key.pem -o StrictHostKeyChecking=no" \
-            artifacts/client/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/home/ubuntu/post_control_system/client/dist
-
-          rsync -avz --delete -e "ssh -i server_key.pem -o StrictHostKeyChecking=no" \
-            artifacts/server/ ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/home/ubuntu/post_control_system/server/dist
-
-          echo "🔁 Restarting Nest app..."
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            set -e
+
+            echo '📂 Switching to app directory...'
+            cd ${{ secrets.APP_PATH }}
+
+            echo '🔄 Updating repo...'
+            git fetch origin main
+            git reset --hard
+            git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
+
+            # -------------------------
+            # 4️⃣ Build frontend (React)
+            echo '🧱 Building frontend...'
+            cd client
+
+            # Clean previous build
+            [ -d dist ] && rm -rf dist
+
+            # Faster, consistent install
+            npm ci --include=dev
+
+            npm run build
+            echo '✅ Frontend built successfully.'
+
+            # -------------------------
+            # 5️⃣ Build backend (NestJS)
+            echo '🧱 Building backend...'
+            cd ../server
+
+            npm ci --include=dev
+            npm run build
+            echo '✅ Backend built successfully.'
+
+            # -------------------------
+            # 6️⃣ Restart NestJS systemd service
+            echo '🔁 Restarting systemd service...'
             sudo systemctl daemon-reload
             sudo systemctl restart nestapp.service
-            sudo systemctl status nestapp --no-pager
+
+            echo '📋 Checking service status...'
+            sudo systemctl status nestapp --no-pager -l || true
+
+            echo '🎉 Deploy finished successfully!'
           "
