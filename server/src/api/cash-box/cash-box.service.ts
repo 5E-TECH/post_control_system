@@ -152,7 +152,10 @@ export class CashBoxService
     filters?: { fromDate?: string; toDate?: string },
   ) {
     try {
-      const user = await this.userRepo.findOne({ where: { id } });
+      const user = await this.userRepo.findOne({
+        where: { id },
+        relations: ['region'],
+      });
       if (!user) {
         throw new NotFoundException('User not found');
       }

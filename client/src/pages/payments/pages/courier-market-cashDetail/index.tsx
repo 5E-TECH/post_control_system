@@ -16,8 +16,8 @@ const CashDetailMarketCourier = () => {
   const { id } = useParams();
 
   const [form, setForm] = useState({
-    from: new Date().toISOString().split("T")[0],
-    to: new Date().toISOString().split("T")[0],
+    from: "",
+    to: "",
     order: "",
     payment: "",
     summa: "",
