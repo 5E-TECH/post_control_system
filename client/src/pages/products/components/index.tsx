@@ -1,11 +1,12 @@
 import { memo, useState } from "react";
 import upload from "../../../shared/assets/product/upload.png";
+import defaultImage from "../../../shared/assets/product/empty.webp"; // 🔹 bu rasmni default sifatida ishlatamiz
 import { Image } from "antd";
 import { useProduct } from "../../../shared/api/hooks/useProduct";
 import { X } from "lucide-react";
 import { useParams } from "react-router-dom";
 import Popup from "../../../shared/ui/Popup";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
@@ -14,30 +15,21 @@ import { useTranslation } from "react-i18next";
 // ✅ Yup validation
 const schema = yup.object().shape({
   name: yup.string().required("Mahsulot nomi majburiy!"),
-  image: yup
-    .mixed<FileList>()
-    .required("Rasm yuklash majburiy!")
-    .test("fileRequired", "Rasm tanlanmagan!", (value) => {
-      const files = value as FileList;
-      return files && files.length > 0;
-    }),
+  image: yup.mixed<FileList>().notRequired(), // 🔹 endi rasm optional
 });
 
 interface FormValues {
   name: string;
-  image: FileList;
+  image?: FileList;
 }
 
 const AddProduct = () => {
   const { t } = useTranslation("product");
   const { createProduct } = useProduct();
   const [showMarket, setShowMarket] = useState(false);
-
   const { id } = useParams();
-
   const [dragActive, setDragActive] = useState(false);
 
-  // 🔑 react-hook-form
   const {
     register,
     handleSubmit,
@@ -46,7 +38,7 @@ const AddProduct = () => {
     watch,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: yupResolver(schema),
+    resolver: yupResolver(schema) as Resolver<FormValues, any>,
   });
 
   const file = watch("image")?.[0] || null;
@@ -64,23 +56,31 @@ const AddProduct = () => {
   };
 
   const { handleSuccess, handleApiError } = useApiNotification();
-  const onSubmit = async (values: FormValues) => {
-    // if (!market) return
 
+  const onSubmit = async (values: FormValues) => {
     const formData = new FormData();
     formData.append("name", values.name);
     formData.append("market_id", id ? id : "");
-    formData.append("image", values.image[0]);
+
+    // 🔹 Agar foydalanuvchi rasm yuklasa — o‘sha ketadi
+    if (values.image && values.image.length > 0) {
+      formData.append("image", values.image[0]);
+    } else {
+      // 🔹 Aks holda default rasmni yuboramiz
+      const response = await fetch(defaultImage);
+      const blob = await response.blob();
+      formData.append("image", blob, "default.png");
+    }
 
     try {
       createProduct.mutate(formData, {
         onSuccess: () => {
           handleSuccess("Mahsulot muvaffaqiyatli qo'shildi");
+          reset();
         },
         onError: (err: any) =>
           handleApiError(err, "Mahsulot yaratishda xatolik yuz berdi"),
       });
-      reset();
     } catch (err) {
       console.error(err);
     }
@@ -93,10 +93,7 @@ const AddProduct = () => {
           {t("productInformation")}
         </h2>
 
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="flex flex-col gap-5 h-full"
-        >
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5 h-full">
           {/* Name input */}
           <div>
             <input
@@ -153,11 +150,6 @@ const AddProduct = () => {
                     className="absolute top-0 left-0 opacity-0 w-full h-full cursor-pointer"
                   />
                 </div>
-                {errors.image && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.image.message}
-                  </p>
-                )}
               </>
             ) : (
               <div className="flex flex-col items-center gap-2 relative">
