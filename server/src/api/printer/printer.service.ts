@@ -1,17 +1,11 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
-import { writeFile } from 'fs/promises';
 import { CreatePrinterDto } from './dto/create-printer.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { PrintOrder } from 'src/common/utils/types/order.interface';
 import { In } from 'typeorm';
-import { existsSync } from 'fs';
 import axios from 'axios';
 import config from 'src/config';
 
@@ -58,7 +52,16 @@ export class PrinterService {
       }
 
       // 1️⃣ Production backend API’dan order ma’lumotlarini olish
-      const orders = await this.orderRepo.find({ where: { id: In(orderIds) } });
+      const orders = await this.orderRepo.find({
+        where: { id: In(orderIds) },
+        relations: [
+          'customer',
+          'market',
+          'customer.district',
+          'items',
+          'items.product',
+        ],
+      });
 
       // Find orders with client relation
       // const orders = await this.orderRepo.find({
