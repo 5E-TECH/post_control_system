@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { HttpStatus, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import * as cookieParser from 'cookie-parser';
+import cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.exception.filter';
 import config from 'src/config';
 import * as express from 'express';

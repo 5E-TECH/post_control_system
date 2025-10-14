@@ -1,25 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import config from 'src/config';
 
 @Injectable()
 export class Token {
   constructor(private readonly jwtService: JwtService) {}
 
-  generateAccessToken = async (payload: object) => {
+  async generateAccessToken(payload: object): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: config.ACCESS_TOKEN_KEY,
-      expiresIn: config.ACCESS_TOKEN_TIME,
+      expiresIn:
+        config.ACCESS_TOKEN_TIME as unknown as JwtSignOptions['expiresIn'], // ✅
     });
-  };
+  }
 
-  generateRefreshToken = async (payload: object) => {
+  async generateRefreshToken(payload: object): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: config.REFRESH_TOKEN_KEY,
-      expiresIn: config.REFRESH_TOKEN_TIME,
+      expiresIn:
+        config.REFRESH_TOKEN_TIME as unknown as JwtSignOptions['expiresIn'], // ✅
     });
-  };
-
-  
-
+  }
 }

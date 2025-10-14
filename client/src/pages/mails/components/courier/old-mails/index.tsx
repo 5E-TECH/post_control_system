@@ -2,6 +2,7 @@ import { memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
+import MailSkeleton from "../../choose-mail/MailSkeleton";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -19,19 +20,28 @@ const borderColorsByStatus = {
 const CourierOldMails = () => {
   const navigate = useNavigate();
   const { getOldPostsCourier } = usePost();
-  const { data } = getOldPostsCourier();
+  const { data, isLoading } = getOldPostsCourier();
   const posts = Array.isArray(data?.data) ? data?.data : [];
+
+  if(isLoading) {
+    return <MailSkeleton/>
+  }
+
   return posts?.length > 0 ? (
     <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
       {posts?.length ? (
         posts?.map((post: any) => (
           <div
             key={post?.id}
-            className={`min-h-[250px] border ${
+            className={`min-h-[250px] ${
               borderColorsByStatus[
                 post?.status as keyof typeof borderColorsByStatus
               ]
-            } shadow-sm rounded-md bg-[#ffffff] flex flex-col items-center justify-center cursor-pointer dark:bg-[#312D48]`}
+            } shadow-sm rounded-md flex flex-col items-center justify-center cursor-pointer ${
+              post?.status == "canceled"
+                ? "bg-red-500 dark:bg-[#73374d]"
+                : "bg-[#45C1FF] dark:bg-[#2a4c76]"
+            } text-white border-0`}
             onClick={() =>
               navigate(`/courier-mails/${post?.id}?status=${post?.status}`, {
                 state: { regionName: post?.region?.name, hideSend: true },
