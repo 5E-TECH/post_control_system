@@ -38,8 +38,8 @@ interface IForm {
 }
 
 const initialForm: IForm = {
-  from: new Date().toISOString().split("T")[0],
-  to: new Date().toISOString().split("T")[0],
+  from: "",
+  to: "",
   order: "",
   payment: "",
   summa: "",
@@ -266,7 +266,15 @@ const MainDetail = () => {
                 placeholder={t("to'lovTuri")}
                 className="w-[150px]"
                 options={[
-                  { value: "", label: "to'lov turi", disabled: true },
+                  {
+                    value: "",
+                    label: (
+                      <span style={{ color: "#a0a0a0" }}>
+                        {t("paymentType")}
+                      </span>
+                    ),
+                    disabled: true,
+                  },
                   { value: "cash", label: "cash" },
                   { value: "click", label: "click" },
                 ]}
@@ -278,10 +286,7 @@ const MainDetail = () => {
                   name={t("comment")}
                   rules={[{ required: true, message: "Izohni kiriting!" }]}
                 >
-                  <TextArea
-                    placeholder={t("comment")}
-                    autoSize
-                  />
+                  <TextArea placeholder={t("comment")} autoSize />
                 </Form.Item>
               </Form>
 
@@ -338,7 +343,15 @@ const MainDetail = () => {
                 placeholder="To'lov turi"
                 className="w-[150px]"
                 options={[
-                  { value: "", label: "to'lov turi", disabled: true },
+                  {
+                    value: "",
+                    label: (
+                      <span style={{ color: "#a0a0a0" }}>
+                        {t("paymentType")}
+                      </span>
+                    ),
+                    disabled: true,
+                  },
                   { value: "cash", label: `${t("cash")}` },
                   { value: "click", label: `${t("click")}` },
                 ]}
@@ -434,8 +447,8 @@ const MainDetail = () => {
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
           </div>
           <div className="max-h-[520px] overflow-y-auto">
-            <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 cursor-pointer">
-              <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+            <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4 cursor-pointer">
+              <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
                 <tr>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
                     # ID
@@ -452,7 +465,7 @@ const MainDetail = () => {
                     <tr
                       key={item?.id}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] font-medium ${
                         item.id == select ? "bg-gray-100" : ""
                       }`}
                     >
@@ -503,8 +516,8 @@ const MainDetail = () => {
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
           </div>
           <div className="max-h-[520px] overflow-y-auto">
-            <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4 cursor-pointer">
-              <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+            <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4 cursor-pointer">
+              <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
                 <tr>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
                     #
@@ -525,7 +538,7 @@ const MainDetail = () => {
                       <tr
                         key={item?.id}
                         onClick={() => setSelect(item?.id)}
-                        className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                        className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] font-medium ${
                           item.id == select ? "bg-gray-100" : ""
                         }`}
                       >
@@ -576,8 +589,8 @@ const MainDetail = () => {
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
           </div>
           <div className="max-h-[520px] overflow-y-auto">
-            <table className="w-full border-collapse border-4 border-[#f4f5fa] dark:border-[#2E263DB2] mt-4">
-              <thead className="dark:bg-[#3d3759] bg-[#F6F7FB]">
+            <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4">
+              <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
                 <tr>
                   <th className="h-[56px] font-medium text-[13px] text-left px-4">
                     # ID
@@ -595,11 +608,13 @@ const MainDetail = () => {
                   <tr
                     key={inx}
                     onClick={() => setSelect(item?.id)}
-                    className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[15px] font-normal ${
+                    className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] font-medium ${
                       item.id == select ? "bg-gray-100" : ""
                     }`}
                   >
-                    <td className="text-[#8C57FF] pr-10 py-3 pl-5">{inx + 1}</td>
+                    <td className="text-[#8C57FF] pr-10 py-3 pl-5">
+                      {inx + 1}
+                    </td>
                     <td className="py-3 pl-5">{item?.name}</td>
                     <td className="py-3 pl-5">{item?.region?.name}</td>
                   </tr>

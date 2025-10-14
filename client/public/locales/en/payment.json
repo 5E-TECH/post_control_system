@@ -53,6 +53,8 @@
     "to'lanishiKerak": "To be paid",
     "to'langan": "Paid",
     "status": "Status",
+    "main":"main",
+    "paymentType":"payment type",
     "sourceTypes": {
         "courier_payment": "Courier payment",
         "market_payment": "Market payment",
