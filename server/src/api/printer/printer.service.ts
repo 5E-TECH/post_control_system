@@ -13,6 +13,7 @@ import { PrintOrder } from 'src/common/utils/types/order.interface';
 import { In } from 'typeorm';
 import { existsSync } from 'fs';
 import axios from 'axios';
+import config from 'src/config';
 
 @Injectable()
 export class PrinterService {
@@ -57,13 +58,7 @@ export class PrinterService {
       }
 
       // 1️⃣ Production backend API’dan order ma’lumotlarini olish
-      const response = await axios.post(
-        'https://beepost.uz/api/v1/printer/print',
-        { orderIds },
-      );
-
-      // 2️⃣ Ma’lumotni o‘zgaruvchiga yozish
-      const orders = response.data;
+      const orders = await this.orderRepo.find({ where: { id: In(orderIds) } });
 
       // Find orders with client relation
       // const orders = await this.orderRepo.find({
@@ -173,12 +168,14 @@ BARCODE 100,370,"128",100,1,0,2,2,"${qrCode}"
 PRINT 1
 `;
 
-    if (!existsSync(this.printerPath)) {
-      throw new Error('Printer not connected');
-    }
-
-    await writeFile(this.printerPath, tspl);
-    console.log(`✅ Printed order: ${orderId}`);
+    // await writeFile(this.printerPath, tspl);
+    console.log(`Printing progress for order: ${orderId}`);
+    axios
+      .post(config.PRINTER_LOCAL_URL, tspl)
+      .then((res) => console.log(`✅ Printed order: ${orderId}`))
+      .catch((err) => {
+        console.log(err);
+      });
   }
 
   getQueueStatus() {
