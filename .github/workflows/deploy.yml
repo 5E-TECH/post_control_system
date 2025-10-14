@@ -1,4 +1,4 @@
-name: CI/CD Deploy with npm (Systemd)
+name: CI/CD Deploy (Selective Build + Systemd + Cache)
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
     environment: Production
 
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -22,9 +22,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
 
-      # 3️⃣ Generate GitHub App Token (for private repos)
+      # 3️⃣ Generate GitHub App token (for private repo)
       - name: Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
@@ -33,7 +32,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           repository: 5E-TECH/post_control_system
 
-      # 4️⃣ Determine what changed
+      # 4️⃣ Determine changed directories (client/server)
       - name: Determine changed directories
         id: changes
         run: |
@@ -42,7 +41,25 @@ jobs:
           echo "changed=$CHANGED_DIRS" >> $GITHUB_OUTPUT
           echo "Changed dirs: $CHANGED_DIRS"
 
-      # 5️⃣ Deploy to Production Server
+      # 5️⃣ Cache client dependencies
+      - name: Cache client node_modules
+        if: contains(steps.changes.outputs.changed, 'client')
+        uses: actions/cache@v3
+        with:
+          path: client/node_modules
+          key: client-${{ hashFiles('client/package-lock.json') }}
+          restore-keys: client-
+
+      # 6️⃣ Cache server dependencies
+      - name: Cache server node_modules
+        if: contains(steps.changes.outputs.changed, 'server')
+        uses: actions/cache@v3
+        with:
+          path: server/node_modules
+          key: server-${{ hashFiles('server/package-lock.json') }}
+          restore-keys: server-
+
+      # 7️⃣ Deploy to server
       - name: Deploy to Production Server
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
@@ -56,27 +73,25 @@ jobs:
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
-            # Build client only if changed
+            # ===== Build React frontend if changed =====
             if [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
-              echo '📁 Building client...'
+              echo '📁 Building frontend...'
               cd client
-              rm -rf dist
               npm ci --prefer-offline --legacy-peer-deps
-              NODE_OPTIONS='--max-old-space-size=2048' npm run build
-              # Copy build to nginx root (adjust path if needed)
+              NODE_OPTIONS='--max-old-space-size=1024' npm run build
               cp -r dist/* /var/www/html/
               cd ..
-              echo '⚡ Client build deployed.'
+              echo '⚡ Frontend deployed.'
             fi
 
-            # Build server only if changed
+            # ===== Build NestJS backend if changed =====
             if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]]; then
-              echo '🧠 Building server...'
+              echo '🧠 Building backend...'
               cd server
               npm ci --prefer-offline --legacy-peer-deps
-              NODE_OPTIONS='--max-old-space-size=2048' npm run build
+              NODE_OPTIONS='--max-old-space-size=1024' npm run build
               cd ..
-              echo '🔁 Restarting Node server...'
+              echo '🔁 Restarting backend systemd service...'
               sudo systemctl restart nestapp.service
               sudo systemctl status nestapp --no-pager
             fi
