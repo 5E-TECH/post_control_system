@@ -101,7 +101,7 @@ const AllOrders = () => {
     const type = urlType.current;
 
     if (type === "sell") {
-      if (partleSoldShow!) {
+      if (partleSoldShow) {
         const order_item_info = orderItemInfo.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
@@ -141,9 +141,14 @@ const AllOrders = () => {
             onSuccess: () => {
               closePopup();
               handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+              navigate(-1);
             },
             onError: (err: any) =>
-              handleApiError(err, "Buyurtmani sotishda xatolik"),
+            {
+              handleApiError(err, "Buyurtmani sotishda xatolik"), 
+              navigate(-1);
+            } 
+            
           }
         );
       }
@@ -174,9 +179,13 @@ const AllOrders = () => {
             onSuccess: () => {
               closePopup();
               handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
+              navigate(-1);
             },
             onError: (err: any) =>
+            {
               handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
+              navigate(-1);
+            }
           }
         );
       } else {
@@ -186,9 +195,13 @@ const AllOrders = () => {
             onSuccess: () => {
               closePopup();
               handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+              navigate(-1);
             },
             onError: (err: any) =>
+            {
               handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
+              navigate(-1);
+            }
           }
         );
       }

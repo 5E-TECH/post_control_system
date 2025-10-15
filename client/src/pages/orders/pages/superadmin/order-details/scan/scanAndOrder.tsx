@@ -184,26 +184,6 @@ export default function ScanAndOrder() {
     }
   };
 
-  // shu joyni qo‘shasiz (importlar orasiga)
-  const { rollbackOrder } = useOrder();
-
-  // bu funksiya alertBtnYesNo dagi "Ha" tugmasi uchun
-  const handleConfirmRollback = () => {
-    const id = order?.data?.id;
-    if (!id) return;
-
-    rollbackOrder.mutate(id, {
-      onSuccess: () => {
-        handleSuccess("Buyurtma muvaffaqiyatli ortga qaytarildi");
-        setAlertBtnYesNo(false);
-        setIsShow(false);
-      },
-      onError: (err: any) => {
-        handleApiError(err, "Buyurtmani ortga qaytarishda xatolik");
-      },
-    });
-  };
-
   const handleReceiveOrderById = (id: string) => {
     console.log(id);
   };
@@ -332,6 +312,30 @@ export default function ScanAndOrder() {
             </Form.Item>
           </div>
         )}
+        {alertBtnYesNo && (
+          <div className="flex flex-col gap-5 pt-2">
+            <span className="text-center text-[18px] text-red-500">
+              {orderStatus === "sold"
+                ? "Sotilgan"
+                : orderStatus === "cancelled"
+                ? "Bekor qilingan"
+                : ""}{" "}
+              buyurtmani ortga qaytarmoqchimisiz?
+            </span>
+
+            <div className="flex gap-10">
+              <Button
+                className="w-full bg-red-500! text-white! h-[40px]!"
+                onClick={() => setAlertBtnYesNo(false)}
+              >
+                Yo'q
+              </Button>
+              <Button className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!">
+                Ha
+              </Button>
+            </div>
+          </div>
+        )}
 
         <Form initialValues={{}} form={form} onFinish={onFinish}>
           {orderStatus === "waiting" && (
@@ -377,27 +381,26 @@ export default function ScanAndOrder() {
               </div>
             )}
 
-            {alertBtnYesNo && (
+            {alertBtnYesNoWaiting && (
               <div className="flex flex-col gap-5 pt-2">
                 <span className="text-center text-[18px] text-red-500">
-                  {orderStatus === "sold"
-                    ? "Sotilgan"
-                    : orderStatus === "cancelled"
-                    ? "Bekor qilingan"
-                    : ""}{" "}
-                  buyurtmani ortga qaytarmoqchimisiz?
+                  Buyurtmani{" "}
+                  {actionTypeOrder === "sell"
+                    ? "sotmoqchimisiz"
+                    : "bekor qilmoqchimisiz"}
+                  ?
                 </span>
 
                 <div className="flex gap-10">
                   <Button
                     className="w-full bg-red-500! text-white! h-[40px]!"
-                    onClick={() => setAlertBtnYesNo(false)}
+                    onClick={() => setAlertBtnYesNoWaiting(false)}
                   >
                     Yo'q
                   </Button>
                   <Button
+                    onClick={() => form.submit()}
                     className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
-                    onClick={handleConfirmRollback} // ✅ ishlaydigan “Ha” tugmasi
                   >
                     Ha
                   </Button>
