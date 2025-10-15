@@ -26,8 +26,8 @@ import { PrinterModule } from './printer/printer.module';
       url: config.DB_URL,
       // universal path: src yoki dist uchun ishlaydi
       entities: [__dirname + '/../core/entity/*.entity{.ts,.js}'],
-      synchronize: true,
       autoLoadEntities: true,
+      synchronize: true,
     }),
     JwtModule.register({ global: true }),
 
