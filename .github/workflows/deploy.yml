@@ -1,4 +1,4 @@
-name: CI/CD Deploy (Selective Build + Systemd + Cache)
+name: CI/CD Deploy (Full Build + Systemd + Cache)
 
 on:
   push:
@@ -32,34 +32,23 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           repository: 5E-TECH/post_control_system
 
-      # 4️⃣ Determine changed directories (client/server)
-      - name: Determine changed directories
-        id: changes
-        run: |
-          git fetch origin main
-          CHANGED_DIRS=$(git diff --name-only origin/main...HEAD | awk -F/ '{print $1}' | sort -u)
-          echo "changed=$CHANGED_DIRS" >> $GITHUB_OUTPUT
-          echo "Changed dirs: $CHANGED_DIRS"
-
-      # 5️⃣ Cache client dependencies
+      # 4️⃣ Cache client dependencies
       - name: Cache client node_modules
-        if: contains(steps.changes.outputs.changed, 'client')
         uses: actions/cache@v3
         with:
           path: client/node_modules
           key: client-${{ hashFiles('client/package-lock.json') }}
           restore-keys: client-
 
-      # 6️⃣ Cache server dependencies
+      # 5️⃣ Cache server dependencies
       - name: Cache server node_modules
-        if: contains(steps.changes.outputs.changed, 'server')
         uses: actions/cache@v3
         with:
           path: server/node_modules
           key: server-${{ hashFiles('server/package-lock.json') }}
           restore-keys: server-
 
-      # 7️⃣ Deploy to server
+      # 6️⃣ Deploy to server
       - name: Deploy to Production Server
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
@@ -73,28 +62,25 @@ jobs:
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
-            # ===== Build React frontend if changed =====
-            if [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
-              echo '📁 Building frontend...'
-              cd client
-              npm ci --prefer-offline --legacy-peer-deps
-              NODE_OPTIONS='--max-old-space-size=1024' npm run build
-              cp -r dist/* /var/www/html/
-              cd ..
-              echo '⚡ Frontend deployed.'
-            fi
+            # ===== Install & Build Frontend =====
+            echo '📁 Building frontend...'
+            cd client
+            npm ci --prefer-offline --legacy-peer-deps
+            NODE_OPTIONS='--max-old-space-size=1024' npm run build
+            sudo cp -r dist/* /var/www/html/
+            cd ..
+            echo '⚡ Frontend deployed.'
 
-            # ===== Build NestJS backend if changed =====
-            if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]]; then
-              echo '🧠 Building backend...'
-              cd server
-              npm ci --prefer-offline --legacy-peer-deps
-              NODE_OPTIONS='--max-old-space-size=1024' npm run build
-              cd ..
-              echo '🔁 Restarting backend systemd service...'
-              sudo systemctl restart nestapp.service
-              sudo systemctl status nestapp --no-pager
-            fi
+            # ===== Install & Build Backend =====
+            echo '🧠 Building backend...'
+            cd server
+            npm ci --prefer-offline --legacy-peer-deps
+            NODE_OPTIONS='--max-old-space-size=1024' npm run build
+            cd ..
+            
+            echo '🔁 Restarting backend systemd service...'
+            sudo systemctl restart nestapp.service
+            sudo systemctl status nestapp --no-pager
 
             echo '✅ Deployment completed successfully.'
           "
