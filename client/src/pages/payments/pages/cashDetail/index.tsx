@@ -133,7 +133,7 @@ const CashDetail = () => {
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
   return (
-    <div className="px-5 mt-5 flex gap-24">
+    <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
       <div>
         <h2 className="flex items-center mb-5 text-[20px] capitalize">
           {t(`${data?.data?.cashbox?.user?.role}`)} <ChevronRight />
@@ -247,8 +247,8 @@ const CashDetail = () => {
           </div>
         )}
       </div>
-      <div className="grid w-full">
-        <div className="flex flex-row items-center gap-7">
+      <div className="grid w-full max-[550px]:w-[100%]">
+        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%]">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
             <div className="flex gap-5">
@@ -268,12 +268,12 @@ const CashDetail = () => {
                 placeholder={["From", "To"]}
                 format="YYYY-MM-DD"
                 size="large"
-                className="w-[340px] toFROM border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+                className="w-[340px] max-[550px]:w-[100%] toFROM border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
               />
             </div>
           </div>
         </div>
-        <div>
+        <div className="max-md:mb-5">
           <CashboxHistory
             form={form}
             income={data?.data?.income}

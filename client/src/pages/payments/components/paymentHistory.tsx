@@ -13,7 +13,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
   cashboxHistory,
 }) => {
   return (
-    <div className="w-[80%]">
+    <div className="w-[80%] max-md:w-[100%]">
       {/* Filter qismi */}
 
       {/* Income va Outcome qismlari */}

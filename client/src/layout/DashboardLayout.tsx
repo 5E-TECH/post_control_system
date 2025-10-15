@@ -38,7 +38,7 @@ const DashboardLayout = () => {
   }
 
   return (
-    <div className="h-screen grid grid-rows-[auto_1fr_auto] grid-cols-[250px_1fr] max-[650px]:grid-cols-[1fr] bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5] pr-4">
+    <div className="h-screen grid grid-rows-[auto_1fr_auto] grid-cols-[250px_1fr] max-[650px]:grid-cols-[1fr] bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5] pr-4 relative">
       {/* Navbar */}
       <div className="col-span-2">
         <Header />

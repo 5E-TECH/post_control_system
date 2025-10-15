@@ -53,7 +53,7 @@ const CashDetailMarketCourier = () => {
   const raw = Number(data?.data?.myCashbox?.balance || 0);
 
   return (
-    <div className="px-5 mt-5 flex gap-24">
+    <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
       <div>
         <h2 className="flex items-center mb-5 text-[25px] capitalize font-bold">
           {t("cashbox")}
@@ -66,8 +66,8 @@ const CashDetailMarketCourier = () => {
           setShow={setShow}
         />
       </div>
-      <div className="grid w-full">
-        <div className="flex flex-row items-center gap-7">
+      <div className="grid w-full max-[550px]:w-[100%]">
+        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%]">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
             <div className="flex gap-5">
@@ -87,12 +87,12 @@ const CashDetailMarketCourier = () => {
                 placeholder={["From", "To"]}
                 format="YYYY-MM-DD"
                 size="large"
-                className="w-[340px] toFROM border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+                className="w-[340px] max-md:w-[100%] toFROM border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
               />
             </div>
           </div>
         </div>
-        <div>
+        <div className="max-md:mb-5">
           <CashboxHistory
             form={form}
             income={data?.data?.income}
