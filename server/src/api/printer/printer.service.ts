@@ -151,7 +151,7 @@ TEXT 20,300,"3",0,1,1,"Izoh: ${comment || '-'}"
 TEXT 20,330,"2",0,1,1,"${market}"
 QRCODE 560,50,L,8,A,0,"${qrCode}"
 BARCODE 100,370,"128",100,1,0,2,2,"${qrCode}"
-PRINT 1`.trim(); // 🧼 trailing newline olib tashlaydi
+PRINT 1`.trim();
 
     console.log(`🖨️ Printing order: ${orderId}`);
     try {
