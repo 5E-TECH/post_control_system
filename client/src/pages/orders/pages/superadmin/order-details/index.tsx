@@ -6,8 +6,10 @@ import { useParams } from "react-router-dom";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import QRCode from "react-qr-code";
 import { useTranslation } from "react-i18next";
+import { useGlobalScanner } from "../../../../../shared/components/global-scanner";
 
 const OrderDetails = () => {
+  useGlobalScanner();
   const { t } = useTranslation("orderList");
   const { t:st } = useTranslation("status");
   const { id } = useParams();
