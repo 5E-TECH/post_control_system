@@ -9,9 +9,11 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import ConfirmPopup from "../../../../shared/components/confirmPopup";
+import { useGlobalScanner } from "../../../../shared/components/global-scanner";
 import { useTranslation } from "react-i18next";
 
 const OrderView = () => {
+  useGlobalScanner();
   const { t } = useTranslation("todayOrderList");
   const { t: st } = useTranslation("status");
 
