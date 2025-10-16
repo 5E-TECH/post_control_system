@@ -37,23 +37,32 @@ const WaitingOrders = () => {
 
   const [form] = Form.useForm<FieldType>();
   const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
+
+  const [isShow, setIsShow] = useState<boolean>(false);
+  const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
+  const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
+  const [totalPrice, setTotalPrice] = useState<number | string>("");
+
+  const closePopup = () => {
+    setIsShow(false);
+    setPartlySoldShow(false);
+    form.resetFields(); // 🔹 Formani tozalaydi
+    setTotalPrice("");
+    setOrderItemInfo([]);
+  };
+
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const item = order.current;
     const type = urlType.current;
 
     if (type === "sell") {
-      if (partleSoldShow!) {
+      if (partleSoldShow) {
         const order_item_info = orderItemInfo.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
         }));
-        if (
-          totalPrice === undefined ||
-          totalPrice === null ||
-          totalPrice === "" ||
-          Number(totalPrice) < 0
-        ) {
-          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+        if (!totalPrice || Number(totalPrice) < 0) {
+          handleWarning("Buyurtma summasini minimal 0 bo'lishi kerak");
           return;
         }
         const data = {
@@ -66,8 +75,8 @@ const WaitingOrders = () => {
           { id: order.current.id, data },
           {
             onSuccess: () => {
-              setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
+              closePopup();
             },
             onError: (err: any) => {
               handleApiError(err, "Buyurtma qisman sotilishda xatolik");
@@ -79,8 +88,8 @@ const WaitingOrders = () => {
           { id: item?.id as string, data: values },
           {
             onSuccess: () => {
-              setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+              closePopup();
             },
             onError: (err: any) =>
               handleApiError(err, "Buyurtmani sotishda xatolik"),
@@ -93,13 +102,8 @@ const WaitingOrders = () => {
           product_id: item.product_id,
           quantity: item.quantity,
         }));
-        if (
-          totalPrice === undefined ||
-          totalPrice === null ||
-          totalPrice === "" ||
-          Number(totalPrice) < 0
-        ) {
-          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+        if (!totalPrice || Number(totalPrice) < 0) {
+          handleWarning("Buyurtma summasini minimal 0 bo'lishi kerak");
           return;
         }
         const data = {
@@ -112,8 +116,8 @@ const WaitingOrders = () => {
           { id: order.current.id, data },
           {
             onSuccess: () => {
-              setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
+              closePopup();
             },
             onError: (err: any) =>
               handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
@@ -124,8 +128,8 @@ const WaitingOrders = () => {
           { id: item?.id as string, data: values },
           {
             onSuccess: () => {
-              setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+              closePopup();
             },
             onError: (err: any) =>
               handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
@@ -134,6 +138,7 @@ const WaitingOrders = () => {
       }
     }
   };
+
   const handleSellOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
     item: any
@@ -142,6 +147,9 @@ const WaitingOrders = () => {
     order.current = item;
     urlType.current = "sell";
     setIsShow(true);
+    form.resetFields(); // 🔹 yangi buyurtma ochilganda formani tozalaydi
+    setPartlySoldShow(false);
+    setTotalPrice("");
   };
 
   const handleCancelOrder = (
@@ -152,27 +160,19 @@ const WaitingOrders = () => {
     order.current = item;
     urlType.current = "cancel";
     setIsShow(true);
+    form.resetFields();
+    setPartlySoldShow(false);
+    setTotalPrice("");
   };
 
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
-    if (newPage === 1) {
-      removeParam("page");
-    } else {
-      setParam("page", newPage);
-    }
+    if (newPage === 1) removeParam("page");
+    else setParam("page", newPage);
 
-    if (limit === 10) {
-      removeParam("limit");
-    } else {
-      setParam("limit", limit);
-    }
+    if (limit === 10) removeParam("limit");
+    else setParam("limit", limit);
   };
 
-  const [isShow, setIsShow] = useState<boolean>(false);
-  const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
-
-  const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
-  const [totalPrice, setTotalPrice] = useState<number | string>("");
   useEffect(() => {
     if (isShow && order.current) {
       const initialItems = order.current?.items?.map((item: any) => ({
@@ -184,7 +184,6 @@ const WaitingOrders = () => {
     }
   }, [isShow]);
 
-  // Loading and Disabled button
   const getIsPending = () => {
     if (urlType.current === "sell") {
       return partleSoldShow ? partlySellOrder.isPending : sellOrder.isPending;
@@ -198,60 +197,15 @@ const WaitingOrders = () => {
       <table className="w-full">
         <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
           <tr>
-            <th>
-              <div className="flex items-center gap-10 pl-10 pr-5">
-                <span>#</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MIJOZ</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>TEL RAQAMI</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MAZNIL</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>FIRMA</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>HOLATI</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>NARXI</span>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center gap-10">
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>OMBOR</span>
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              </div>
-            </th>
-            <th>
-              <div className="flex items-center justify-center gap-30">
-                <span>HARAKAT</span>
-                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-              </div>
-            </th>
+            <th>#</th>
+            <th>MIJOZ</th>
+            <th>TEL RAQAMI</th>
+            <th>MANZIL</th>
+            <th>FIRMA</th>
+            <th>HOLATI</th>
+            <th>NARXI</th>
+            <th>OMBOR</th>
+            <th>HARAKAT</th>
           </tr>
         </thead>
         <tbody>
@@ -261,46 +215,31 @@ const WaitingOrders = () => {
               key={item?.id}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >
-              <td className="data-cell pl-10" data-cell="#">
-                {inx + 1}
-              </td>
-              <td
-                className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
-                data-cell="MIJOZ ISMI"
-              >
-                {item?.customer?.name}
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.phone_number}
-              </td>
-              <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]">
-                {item?.customer?.district?.name}
-              </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.market?.name}
-              </td>
+              <td className="pl-10">{inx + 1}</td>
+              <td className="pl-10">{item?.customer?.name}</td>
+              <td className="pl-10">{item?.customer?.phone_number}</td>
+              <td className="pl-10">{item?.customer?.district?.name}</td>
+              <td className="pl-10">{item?.market?.name}</td>
               <td className="pl-10">
                 <span className="py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500">
                   {item.status.toUpperCase()}
                 </span>
               </td>
-              <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+              <td className="pl-10">
                 {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
               </td>
-              <td className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
-                {item?.items.length}
-              </td>
-              <td className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
+              <td className="pl-15">{item?.items.length}</td>
+              <td>
                 <div className="flex gap-3">
                   <Button
                     onClick={(e) => handleSellOrder(e, item)}
-                    className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
+                    className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none!"
                   >
                     Sotish
                   </Button>
                   <Button
                     onClick={(e) => handleCancelOrder(e, item)}
-                    className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
+                    className="bg-red-500! text-[#ffffff]! border-none!"
                   >
                     Bekor qilish
                   </Button>
@@ -320,11 +259,12 @@ const WaitingOrders = () => {
           onChange={onChange}
         />
       </div>
-      <Popup isShow={isShow} onClose={() => setIsShow(false)}>
+
+      <Popup isShow={isShow} onClose={closePopup}>
         <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8">
           <X
             className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
-            onClick={() => setIsShow(false)}
+            onClick={closePopup}
           />
           {partleSoldShow && (
             <h2 className="text-center pt-3 text-[20px]">
@@ -338,20 +278,18 @@ const WaitingOrders = () => {
           >
             <p>
               <span className="font-semibold">Mijoz ismi:</span>{" "}
-              <span>{order.current?.customer?.name || "—"}</span>
+              {order.current?.customer?.name || "—"}
             </p>
             <p>
-              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
-              <span>{order.current?.customer?.phone_number || "—"}</span>
+              <span className="font-semibold">Tel raqam:</span>{" "}
+              {order.current?.customer?.phone_number || "—"}
             </p>
             <p>
               <span className="font-semibold">Umumiy summa:</span>{" "}
-              <span>
-                {order.current?.total_price
-                  ? order.current.total_price.toLocaleString("uz-UZ")
-                  : "0"}{" "}
-                so'm
-              </span>
+              {order.current?.total_price
+                ? order.current.total_price.toLocaleString("uz-UZ")
+                : "0"}{" "}
+              so'm
             </p>
           </div>
 
@@ -359,24 +297,17 @@ const WaitingOrders = () => {
             <div className="flex flex-col">
               {orderItemInfo.map((item, index) => (
                 <div
-                  key={item.productId}
+                  key={item.product_id}
                   className="pt-4 flex gap-10 justify-between"
                 >
                   <Form.Item className="flex-1!">
                     <Select
-                      className="!h-[40px] custom-select-dropdown-bright"
-                      dropdownClassName="dark-dropdown"
+                      className="!h-[40px]"
                       value={item.product_id}
                       disabled
-                      options={[
-                        {
-                          label: item.name,
-                          value: item.product_id,
-                        },
-                      ]}
+                      options={[{ label: item.name, value: item.product_id }]}
                     />
                   </Form.Item>
-
                   <div className="flex gap-2 items-center mb-6 select-none">
                     <Plus
                       className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
@@ -391,10 +322,9 @@ const WaitingOrders = () => {
                       className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
                       onClick={() => {
                         const updated = [...orderItemInfo];
-                        if (updated[index].quantity > 0) {
+                        if (updated[index].quantity > 0)
                           updated[index].quantity -= 1;
-                          setOrderItemInfo(updated);
-                        }
+                        setOrderItemInfo(updated);
                       }}
                     />
                   </div>
@@ -407,41 +337,39 @@ const WaitingOrders = () => {
                   placeholder="To'lov summasi"
                   value={totalPrice}
                   onChange={(e) => {
-                    const rawValue = e.target.value.replace(/\D/g, "");
+                    const raw = e.target.value.replace(/\D/g, "");
                     const formatted = new Intl.NumberFormat("uz-UZ").format(
-                      Number(rawValue || 0)
+                      Number(raw || 0)
                     );
                     setTotalPrice(formatted);
                   }}
-                ></Input>
+                />
               </Form.Item>
             </div>
           )}
 
-          <Form initialValues={{}} form={form} onFinish={onFinish}>
-            <div className={`pt-${partleSoldShow ? 0 : 3}`}>
-              <span className="">Izoh</span>
-              <Form.Item name="comment">
-                <Input.TextArea
-                  className="py-4! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
-                  placeholder="Izoh qoldiring (ixtiyoriy)"
-                  style={{ resize: "none" }}
+          <Form form={form} onFinish={onFinish}>
+            <div>
+              <Form.Item name="extraCost" className="py-4!">
+              <span>Qo'shimcha (pul)</span>
+                <InputNumber
+                  placeholder="Qo'shimcha pul"
+                  className="h-[40px]! w-full!"
+                  formatter={(v) =>
+                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
+                  }
+                  parser={(v) => v?.replace(/,/g, "") || ""}
                 />
               </Form.Item>
             </div>
 
-            <div>
-              <span>Qo'shimcha (pul)</span>
-              <Form.Item name="extraCost">
-                <InputNumber
-                  placeholder="Qo'shimcha pul"
-                  className="h-[40px]! w-full!"
-                  formatter={(value) =>
-                    value
-                      ? value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                      : ""
-                  }
-                  parser={(value) => value?.replace(/,/g, "") || ""}
+            <div className={`pt-${partleSoldShow ? 0 : 3}`}>
+              <Form.Item name="comment">
+              <span>Izoh</span>
+                <Input.TextArea
+                  className="py-4!"
+                  placeholder="Izoh qoldiring (ixtiyoriy)"
+                  style={{ resize: "none" }}
                 />
               </Form.Item>
             </div>
@@ -458,7 +386,7 @@ const WaitingOrders = () => {
                   urlType.current === "sell"
                     ? "bg-[var(--color-bg-sy)]!"
                     : "bg-red-500!"
-                } bg-[var(--color-bg-sy)]! text-[#ffffff]!`}
+                } text-[#ffffff]!`}
               >
                 {urlType.current === "sell" ? "Sotish" : "Bekor qilish"}
               </Button>
