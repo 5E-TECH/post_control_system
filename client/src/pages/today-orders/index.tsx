@@ -13,7 +13,6 @@ const TodayOrders = () => {
   const { t } = useTranslation("todayOrderList");
   const navigate = useNavigate();
   const [searchData, setSearch] = useState<any>(null);
-  const [refech, setRefech] = useState<boolean>(false);
 
   const debouncedSearch = useMemo(
     () =>
@@ -36,16 +35,16 @@ const TodayOrders = () => {
   const handleProps = (id: string) => {
     navigate(`${id}`);
   };
-  useEffect(() => {
-    if (role.role !== "market" && pathname === "/order/markets/new-orders") {
-      setRefech(true)
-      // refetch();
-    }
-  }, [pathname]);
+  const enabled = role.role !== "market";
+
 
   const { getMarketsNewOrder } = useMarket();
-  const { data, isLoading } = getMarketsNewOrder(refech, searchData ? {search:searchData} : "");
-
+  const { data, isLoading,refetch } = getMarketsNewOrder(enabled, searchData ? {search:searchData} : "");
+  useEffect(() => {
+  if (enabled) {
+    refetch();
+  }
+}, [pathname]);
 
   if (pathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
