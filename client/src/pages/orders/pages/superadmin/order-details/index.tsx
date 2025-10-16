@@ -44,8 +44,13 @@ const OrderDetails = () => {
               status={data?.data?.status}
             />
           </div>
-          <div>
-            <QRCode size={160} value={token} />
+          <div className="bg-white dark:bg-white p-4 inline-block w-[200px]">
+            <QRCode
+              size={160}
+              value={token}
+              bgColor="#ffffff" // har doim oq
+              fgColor="#000000" // chiziqlar qora
+            />
           </div>
         </div>
 
