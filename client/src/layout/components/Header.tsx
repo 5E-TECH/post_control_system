@@ -217,7 +217,7 @@ const Header = () => {
                     </a>
                   </div>
                   <div className="">
-                    <span className="">
+                    <span className="text-[15px]">
                       © 2025, Made with ❤️ by{" "}
                       <span className="font-semibold">Ye77i grup</span>
                     </span>

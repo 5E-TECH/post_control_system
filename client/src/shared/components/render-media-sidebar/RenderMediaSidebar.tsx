@@ -6,6 +6,7 @@ import {
   History,
   House,
   MailOpen,
+  QrCode,
   ShoppingBag,
   SquareDashedMousePointer,
   UserRound,
@@ -252,7 +253,7 @@ const Navbar = ({ role }: { role: string }) => {
         );
       case "courier":
         return (
-          <div className="flex justify-evenly px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
+          <div className="flex justify-evenly px-3 fixed bottom-1.5 w-full min-[650px]:hidden ">
             <NavLink
               to={"/"}
               className={({ isActive }) =>
@@ -280,7 +281,13 @@ const Navbar = ({ role }: { role: string }) => {
             >
               <ShoppingBag />
             </NavLink>
-
+            <div></div>
+            <NavLink
+              to={"/scan"}
+              className={`flex items-center justify-center w-17 h-17 rounded-[50%] transition-all bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] absolute bottom-2`}
+            >
+              <QrCode className="w-5 h-5" />
+            </NavLink>
             <NavLink
               to={"/courier-mails"}
               className={({ isActive }) =>
@@ -296,7 +303,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/payments"}
+              to={"/cash-box"}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -307,20 +314,6 @@ const Navbar = ({ role }: { role: string }) => {
               }
             >
               <FileText />
-            </NavLink>
-
-            <NavLink
-              to={"/history"}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
-            >
-              <History />
             </NavLink>
           </div>
         );

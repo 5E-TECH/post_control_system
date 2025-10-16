@@ -197,7 +197,7 @@ const Payments = () => {
         </div>
 
         <Popup isShow={showMarket} onClose={() => hendlerClose()}>
-          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative ">
+          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
             <button
               onClick={() => setShowMarket(false)}
               className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
@@ -244,7 +244,7 @@ const Payments = () => {
                     <tr
                       key={item?.id}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] ${
+                      className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] dark:text-white ${
                         item.id == select ? "bg-gray-300 text-black" : ""
                       }`}
                     >
@@ -361,7 +361,7 @@ const Payments = () => {
                     <tr
                       key={inx}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#c3c5ce] dark:border-[#E7E3FCB2]  text-[16px] text-[#2E263DB2] ${
+                      className={`border-b-2 border-[#c3c5ce] dark:border-[#E7E3FCB2]  text-[16px] text-[#2E263DB2] dark:text-white ${
                         item.id == select ? "bg-gray-100 text-black" : ""
                       }`}
                     >

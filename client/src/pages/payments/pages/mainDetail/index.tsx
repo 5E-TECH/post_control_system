@@ -171,7 +171,7 @@ const MainDetail = () => {
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
   return (
-    <div className="px-5 mt-5 flex gap-24">
+    <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
       <div>
         <h2 className="flex items-center mb-5 text-[30px] font-medium capitalize">
           {t("title")}
@@ -411,7 +411,7 @@ const MainDetail = () => {
                 separator={
                   <span className="mx-2 text-xl flex items-center">→</span>
                 }
-                className="w-[340px] border border-[#E5E7EB] rounded-lg px-5 py-[6px] outline-none"
+                className="w-[340px] max-[550px]:w-[100%] border border-[#E5E7EB] rounded-lg px-5 py-[6px] outline-none"
               />
             </div>
           </div>
