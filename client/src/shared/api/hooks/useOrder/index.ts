@@ -42,6 +42,12 @@ export const useOrder = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
+  const courierReceiveOrderByScanerById = useMutation({
+    mutationFn: (id: string) =>
+      api.patch(`post/receive/order/${id}`).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
+  });
+
   const getOrders = (params?: any) =>
     useQuery({
       queryKey: [order, params],
@@ -131,5 +137,6 @@ export const useOrder = () => {
     getOrderById,
     updateOrdersUserAddress,
     updateOrdersUserPhoneAndName,
+    courierReceiveOrderByScanerById,
   };
 };

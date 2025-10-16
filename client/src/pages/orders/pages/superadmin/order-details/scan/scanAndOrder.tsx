@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type { RootState } from "../../../../../../app/store";
 import Popup from "../../../../../../shared/ui/Popup";
 import { AlertCircle, Minus, Plus, X } from "lucide-react";
-import { Button, Form, Input, InputNumber, Select, type FormProps } from "antd";
+import { Button, Form, Input, InputNumber, message, Select, type FormProps } from "antd";
 import type { FieldType } from "../../../../components/courier/waiting-orders";
 import { useOrder } from "../../../../../../shared/api/hooks/useOrder";
 import { useApiNotification } from "../../../../../../shared/hooks/useApiNotification";
@@ -26,6 +26,16 @@ export default function ScanAndOrder() {
   const [actionTypeOrder, setActionTypeOrder] = useState<
     "sell" | "cancel" | null
   >(null);
+  const [isModalOpen, _] = useState(false);
+
+  const navigate = useNavigate()
+
+   useEffect(() => {
+     if (!isModalOpen) {
+       form.resetFields(["extraCost", "comment"]);
+     }
+   }, [isModalOpen]);
+
 
   useEffect(() => {
     if (isShow && order?.data) {
@@ -84,7 +94,12 @@ export default function ScanAndOrder() {
     fetchOrder();
   }, [token, authToken]);
 
-  const { sellOrder, cancelOrder, partlySellOrder } = useOrder();
+  const {
+    sellOrder,
+    cancelOrder,
+    partlySellOrder,
+    courierReceiveOrderByScanerById,
+  } = useOrder();
   const [form] = Form.useForm<FieldType>();
 
   const id = order?.data?.id;
@@ -116,9 +131,11 @@ export default function ScanAndOrder() {
             onSuccess: () => {
               setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
+              navigate(-1)
             },
             onError: (err: any) => {
               handleApiError(err, "Buyurtma qisman sotilishda xatolik");
+              navigate(-1);
             },
           }
         );
@@ -129,9 +146,11 @@ export default function ScanAndOrder() {
             onSuccess: () => {
               setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+              navigate(-1);
             },
             onError: (err: any) => {
               handleApiError(err, "Buyurtmani sotishda xatolik");
+              navigate(-1);
             },
           }
         );
@@ -163,9 +182,14 @@ export default function ScanAndOrder() {
             onSuccess: () => {
               setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
+              navigate(-1);
             },
             onError: (err: any) =>
+            {
               handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
+                navigate(-1);
+            }
+            
           }
         );
       } else {
@@ -175,9 +199,12 @@ export default function ScanAndOrder() {
             onSuccess: () => {
               setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+              navigate(-1);
             },
-            onError: (err: any) =>
+            onError: (err: any) => {
               handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
+              navigate(-1);
+            }
           }
         );
       }
@@ -185,8 +212,24 @@ export default function ScanAndOrder() {
   };
 
   const handleReceiveOrderById = (id: string) => {
-    console.log(id);
+    if (!id) {
+      message.warning("Buyurtma ID topilmadi!");
+      return;
+    }
+
+    courierReceiveOrderByScanerById.mutate(id, {
+      onSuccess: () => {
+        message.success("Buyurtma muvaffaqiyatli qabul qilindi!");
+        navigate(-1)
+      },
+      onError: (err) => {
+        console.error(err);
+        message.error("Buyurtma qabul qilishda xatolik yuz berdi!");
+        navigate(-1)
+      },
+    });
   };
+
 
   const handleSellOrder = () => {
     setAlertBtnYesNoWaiting(true);
@@ -206,7 +249,10 @@ export default function ScanAndOrder() {
       <div className="w-[350px] shadow-lg rounded-md bg-[#ffffff] flex flex-col justify-between pt-6 px-8">
         <X
           className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
-          onClick={() => setIsShow(false)}
+          onClick={() => {
+            setIsShow(false);
+            navigate(-1);
+          }}
         />
 
         {/* Umumiy content */}
@@ -341,7 +387,7 @@ export default function ScanAndOrder() {
           {orderStatus === "waiting" && (
             <div className="pt-1">
               <div>
-                <span className="">Izoh</span>
+                <span>Izoh</span>
                 <Form.Item name="comment">
                   <Input.TextArea
                     className="py-4! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
