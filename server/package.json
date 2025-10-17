@@ -43,6 +43,7 @@
     "escpos-usb": "^3.0.0-alpha.4",
     "fs-extra": "^11.3.2",
     "jsonwebtoken": "^9.0.2",
+    "mqtt": "^5.14.1",
     "multer": "^2.0.1",
     "nest-winston": "^1.10.2",
     "nestjs-telegraf": "^2.9.1",

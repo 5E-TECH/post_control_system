@@ -6,7 +6,7 @@ export class UpdateAdminDto {
   @ApiPropertyOptional({ example: 'Akmal Abdullaev' })
   @IsOptional()
   @IsString()
-  full_name?: string;
+  name?: string;
 
   @ApiPropertyOptional({ example: '+998901234567' })
   @IsOptional()
