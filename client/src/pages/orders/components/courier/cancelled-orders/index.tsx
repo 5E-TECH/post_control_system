@@ -33,7 +33,11 @@ const CancelledOrders = () => {
   const { getCourierOrders } = useOrder();
 
   const { mutate: cancelPost, isPending } = usePost().canceledPost();
-  const { data, refetch } = getCourierOrders({ status: "cancelled" });
+  const { data, refetch } = getCourierOrders({
+    status: "cancelled",
+    page,
+    limit,
+  });
   const total = data?.data?.total || 0;
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
