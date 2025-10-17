@@ -13,6 +13,7 @@ import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
+import type { AxiosError } from "axios";
 
 const { RangePicker } = DatePicker;
 
@@ -71,7 +72,7 @@ const CashDetail = () => {
   );
   const { data: marketData } = getMarkets(
     form.payment == "click_to_market",
-    { search, limit:0 } // agar hooking search param qabul qilsa
+    { search, limit: 0 } // agar hooking search param qabul qilsa
   );
 
   const debouncedSearch = debounce((value: string) => {
@@ -109,8 +110,12 @@ const CashDetail = () => {
           });
           refetch();
         },
-        onError: (err) =>
-          handleApiError(err, "To'lov yaratishda xatolik yuz berdi"),
+        onError: (error) => {
+          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const msg =
+            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+          handleApiError(err, `${msg}`);
+        },
       });
     } else {
       createPaymentCourier.mutate(dataCourier, {
@@ -126,8 +131,12 @@ const CashDetail = () => {
           });
           refetch();
         },
-        onError: (err) =>
-          handleApiError(err, "To'lov yaratishda xatolik yuz berdi"),
+        onError: (error) => {
+          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const msg =
+            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+          handleApiError(err, `${msg}`);
+        }
       });
     }
   };

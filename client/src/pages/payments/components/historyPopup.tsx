@@ -18,51 +18,65 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-end justify-center z-50"
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#28243d] w-[40%] h-[85%] rounded-t-2xl shadow-lg animate-slide-up-slow"
+        className="bg-white dark:bg-[#28243d] w-[45%] max-h-[85%] rounded-2xl shadow-2xl p-6 transform transition-all scale-100 animate-fade-in overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-center items-center border-b px-4 py-2 relative">
+        {/* Header */}
+        <div className="flex justify-center items-center border-b pb-3 relative">
           <h2 className="text-xl font-semibold">{t("to'lovTarixi")}</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-red-500 text-[25px] absolute top-1 right-5"
+            className="text-gray-500 hover:text-red-500 text-[25px] absolute top-0 right-2"
           >
             ✕
           </button>
         </div>
 
-        <div className="p-4 overflow-y-auto space-y-4 capitalize">
+        {/* Kontent */}
+        <div className="mt-4 space-y-4 capitalize">
           {/* Umumiy ma’lumot */}
           <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow">
             <h3 className="font-semibold text-lg mb-2 text-blue-600 dark:text-blue-400">
               {t("umumiyMa'lumot")}
             </h3>
             <p className="flex">
-              <span className="w-[50%] font-semibold">{t("operationType")}:</span>
-              <span>{data?.data?.operation_type}</span>
+              <span className="w-[50%] font-semibold">
+                {t("operationType")}:
+              </span>
+              <span
+                className={`${
+                  data?.data?.operation_type === "income"
+                    ? "text-green-500"
+                    : "text-red-500"
+                }`}
+              >
+                {t(`${data?.data?.operation_type}`)}
+              </span>
             </p>
             <p className="flex">
               <span className="w-[50%] font-semibold">{t("sourceType")}:</span>
-              <span>{data?.data?.source_type}</span>
+              <span>{t(`sourceTypes.${data?.data?.source_type}`)}</span>
             </p>
             <p className="flex">
               <span className="w-[50%] font-semibold">{t("amount")}:</span>
               <span
-                className={` text-green-600 ${
+                className={`${
                   data?.data?.operation_type === "expense"
                     ? "text-red-500"
-                    : "text-green-500"
-                }`}
+                    : "text-green-600"
+                } font-semibold`}
               >
                 {data?.data?.amount?.toLocaleString()}
               </span>
             </p>
             <p className="flex">
-              <span className="w-[50%] font-semibold">{t("afterBalance")}:</span>
+              <span className="w-[50%] font-semibold">
+                {t("afterBalance")}:
+              </span>
               <span className="text-indigo-600">
                 {data?.data?.balance_after?.toLocaleString()}
               </span>
@@ -111,17 +125,21 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
               onClick={() =>
                 navigate(`/orders/order-detail/${data?.data?.order?.id}`)
               }
-              className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow cursor-pointer"
+              className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition"
             >
               <h3 className="font-semibold text-lg mb-2 text-green-600 dark:text-green-400">
                 {t("buyurtma")}
               </h3>
               <p className="flex">
-                <span className="w-[50%] font-semibold">{t("umumiyNarx")}:</span>
+                <span className="w-[50%] font-semibold">
+                  {t("umumiyNarx")}:
+                </span>
                 <span>{data?.data?.order?.total_price}</span>
               </p>
               <p className="flex">
-                <span className="w-[50%] font-semibold">{t("to'lanishiKerak")}:</span>
+                <span className="w-[50%] font-semibold">
+                  {t("to'lanishiKerak")}:
+                </span>
                 <span>{data?.data?.order?.to_be_paid}</span>
               </p>
               <p className="flex">
