@@ -12,6 +12,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
+import { debounce } from "../../../../shared/helpers/DebounceFunc";
 
 const { RangePicker } = DatePicker;
 
@@ -27,6 +28,8 @@ const CashDetail = () => {
     market: "",
     comment: "",
   });
+
+  const [search, setSearch] = useState("");
 
   const params = {
     fromDate: form.from,
@@ -67,8 +70,13 @@ const CashDetail = () => {
     params
   );
   const { data: marketData } = getMarkets(
-    form.payment == "click_to_market" ? true : false
+    form.payment == "click_to_market",
+    { search, limit:0 } // agar hooking search param qabul qilsa
   );
+
+  const debouncedSearch = debounce((value: string) => {
+    setSearch(value);
+  }, 500);
 
   const { handleApiError } = useApiNotification();
   const handleSubmit = () => {
@@ -174,7 +182,7 @@ const CashDetail = () => {
                   setForm((prev) => ({ ...prev, payment: value }))
                 }
                 placeholder={t("to'lovTuri")}
-                className="mySelect "
+                className="mySelect w-full !h-[42px] !rounded-md"
                 size="large"
                 options={[
                   {
@@ -200,14 +208,23 @@ const CashDetail = () => {
               />
               {form.payment == "click_to_market" && (
                 <Select
+                  showSearch
+                  filterOption={false}
+                  onSearch={debouncedSearch}
                   value={form.market}
                   onChange={(value) =>
                     setForm((prev) => ({ ...prev, market: value }))
                   }
                   placeholder={t("marketniTanlang")}
-                  className="w-[150px]"
+                  className="w-[150px] !h-[42px] !rounded-md"
                   options={[
-                    { value: "", label: "Market tanlang", disabled: true },
+                    {
+                      value: "",
+                      label: (
+                        <span style={{ color: "#a0a0a0" }}>Market tanlang</span>
+                      ),
+                      disabled: true,
+                    },
                     ...(marketData?.data?.data?.map((item: any) => ({
                       value: item.id,
                       label: item.name,
@@ -218,7 +235,7 @@ const CashDetail = () => {
             </div>
             <div className="mt-5">
               <TextArea
-                className="myTextArea"
+                className="myTextArea !h-[42px] !rounded-md"
                 name="comment"
                 size="large"
                 value={form.comment}
@@ -235,13 +252,16 @@ const CashDetail = () => {
                 }
                 className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
                   !form.payment ||
+                  (form.payment == "click_to_market" && !form.market) ||
                   !form.summa ||
                   Number(form.summa.replace(/\s/g, "")) <= 0
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                     : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
                 }`}
               >
-                {t("qabulQilish")}
+                {data?.data?.cashbox?.user?.role === "market"
+                  ? `${t("qabulQilish")}`
+                  : `${t("to'lash")}`}
               </button>
             </div>
           </div>

@@ -170,6 +170,19 @@ const MainDetail = () => {
 
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
+  const handleClose = () => {
+    setShowMarket(false);
+    setShowCurier(false);
+    setshowAdminAndRegistrator(false);
+    setSelect(null);
+  };
+
+  const hendleCloce = () => {
+    setForm(initialForm)
+    setSpand(false)
+    setMaosh(false)
+  }
+
   return (
     <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
       <div>
@@ -293,12 +306,23 @@ const MainDetail = () => {
               <div className="flex gap-5">
                 <button
                   onClick={() => handleSubmit()}
-                  className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0] text-white"
+                  disabled={
+                    !form.payment ||
+                    !form.summa ||
+                    Number(form.summa.replace(/\s/g, "")) <= 0
+                  }
+                  className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
+                    !form.payment ||
+                    !form.summa ||
+                    Number(form.summa.replace(/\s/g, "")) <= 0
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
+                  }`}
                 >
                   {t("qabulQilish")}
                 </button>
                 <button
-                  onClick={() => setSpand(false)}
+                  onClick={() => hendleCloce()}
                   className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
                 >
                   {t("bekorQilish")}
@@ -372,12 +396,23 @@ const MainDetail = () => {
               <div className="flex gap-5">
                 <button
                   onClick={() => handleSalarySubmit()}
-                  className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0] text-white"
+                  disabled={
+                    !form.payment ||
+                    !form.summa ||
+                    Number(form.summa.replace(/\s/g, "")) <= 0
+                  }
+                  className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
+                    !form.payment ||
+                    !form.summa ||
+                    Number(form.summa.replace(/\s/g, "")) <= 0
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
+                  }`}
                 >
                   {t("qabulQilish")}
                 </button>
                 <button
-                  onClick={() => setMaosh(false)}
+                  onClick={() => hendleCloce()}
                   className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
                 >
                   {t("bekorQilish")}
@@ -427,10 +462,10 @@ const MainDetail = () => {
       </div>
 
       {/* === POPUP MARKET === */}
-      <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
+      <Popup isShow={showMarket} onClose={() => handleClose()}>
         <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
           <button
-            onClick={() => setShowMarket(false)}
+            onClick={() => handleClose()}
             className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
           >
             <X size={30} />
@@ -493,13 +528,10 @@ const MainDetail = () => {
         </div>
       </Popup>
 
-      <Popup
-        isShow={showAdminAndRegistrator}
-        onClose={() => setshowAdminAndRegistrator(false)}
-      >
+      <Popup isShow={showAdminAndRegistrator} onClose={() => handleClose()}>
         <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative pt-5">
           <button
-            onClick={() => setshowAdminAndRegistrator(false)}
+            onClick={() => handleClose()}
             className="cursor-pointer hover:bg-gray-200 text-red-500 p-2 rounded flex items-center justify-center absolute top-2 right-2"
           >
             <X size={22} />
@@ -569,10 +601,10 @@ const MainDetail = () => {
       </Popup>
 
       {/* === POPUP CURIER === */}
-      <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>
+      <Popup isShow={showCurier} onClose={() => handleClose()}>
         <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
           <button
-            onClick={() => setShowCurier(false)}
+            onClick={() => handleClose()}
             className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
           >
             <X size={30} />
