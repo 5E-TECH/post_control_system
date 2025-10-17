@@ -32,7 +32,7 @@ const WaitingOrders = () => {
   const limit = Number(getParam("limit") || 10);
   const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
     useOrder();
-  const { data } = getCourierOrders({ status: "waiting" });
+  const { data } = getCourierOrders({ status: "waiting", page, limit });
   const total = data?.data?.total || 0;
 
   const [form] = Form.useForm<FieldType>();
@@ -351,7 +351,7 @@ const WaitingOrders = () => {
           <Form form={form} onFinish={onFinish}>
             <div>
               <Form.Item name="extraCost" className="py-4!">
-              <span>Qo'shimcha (pul)</span>
+                <span>Qo'shimcha (pul)</span>
                 <InputNumber
                   placeholder="Qo'shimcha pul"
                   className="h-[40px]! w-full!"
@@ -365,7 +365,7 @@ const WaitingOrders = () => {
 
             <div className={`pt-${partleSoldShow ? 0 : 3}`}>
               <Form.Item name="comment">
-              <span>Izoh</span>
+                <span>Izoh</span>
                 <Input.TextArea
                   className="py-4!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"
