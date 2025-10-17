@@ -179,7 +179,7 @@ const OrderView = () => {
               t("createdAt"),
             ].map((header, idx) => (
               <th key={idx}>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pl-10">
                   {idx !== 0 && (
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   )}
