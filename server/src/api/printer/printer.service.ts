@@ -6,13 +6,13 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { PrintOrder } from 'src/common/utils/types/order.interface';
 import { In } from 'typeorm';
-import axios from 'axios';
-import config from 'src/config';
+import mqtt from 'mqtt'; // ✅ kerak
 
 @Injectable()
 export class PrinterService {
   private readonly queue: PrintOrder[] = [];
   private isPrinting = false;
+  private client; // ✅ added
 
   constructor(
     @InjectRepository(OrderEntity)
@@ -21,6 +21,15 @@ export class PrinterService {
 
   onModuleInit() {
     console.log('🖨️ PrinterService initialized');
+
+    // ✅ MQTT clientni faqat 1 marta yaratamiz (har orderda emas)
+    this.client = mqtt.connect('mqtt://test.mosquitto.org');
+    this.client.on('connect', () => {
+      console.log('📡 MQTT brokerga ulandi');
+    });
+    this.client.on('error', (err) => {
+      console.error('❌ MQTT xato:', err.message);
+    });
   }
 
   async printMultiple(ordersInfoDto: CreatePrinterDto) {
@@ -30,7 +39,6 @@ export class PrinterService {
         throw new BadRequestException('⚠️ No orders provided');
       }
 
-      // format helpers
       const formatPhoneNumber = (phone: string): string => {
         const cleaned = phone.replace(/\D/g, '');
         if (cleaned.startsWith('998') && cleaned.length === 12) {
@@ -48,7 +56,6 @@ export class PrinterService {
         return num.toLocaleString('en-US') + " so'm";
       };
 
-      // 🔹 Orderlarni bazadan olish
       const orders = await this.orderRepo.find({
         where: { id: In(orderIds) },
         relations: [
@@ -64,7 +71,6 @@ export class PrinterService {
         throw new BadRequestException('Hech qanday buyurtma topilmadi');
       }
 
-      // 🔹 Har bir orderni printing queue’ga qo‘shamiz
       for (const order of orders) {
         const printingOrder: PrintOrder = {
           orderId: order.id,
@@ -109,7 +115,7 @@ export class PrinterService {
 
       try {
         await this.printSingle(order);
-        await new Promise((r) => setTimeout(r, 2000)); // delay
+        await new Promise((r) => setTimeout(r, 2000));
       } catch (error: any) {
         console.error(
           `❌ Print error for order ${order.orderId}:`,
@@ -122,6 +128,7 @@ export class PrinterService {
     console.log('🕓 All queued prints completed');
   }
 
+  // ✅ To‘g‘rilangan funksiya (bitta global MQTT client orqali publish)
   private async printSingle(order: PrintOrder): Promise<void> {
     const {
       orderId,
@@ -154,16 +161,14 @@ BARCODE 100,370,"128",100,1,0,2,2,"${qrCode}"
 PRINT 1`.trim();
 
     console.log(`🖨️ Printing order: ${orderId}`);
+
     try {
-      await axios.post(
-        config.PRINTER_LOCAL_URL,
-        { tspl },
-        {
-          timeout: 10000,
-          headers: { 'Content-Type': 'application/json' }, // ⚙️ aniq yozamiz
-        },
-      );
-      console.log(`✅ Printed order: ${orderId}`);
+      if (this.client.connected) {
+        this.client.publish('beepost/printer/print', tspl); // ✅ asosiy o‘zgarish
+        console.log(`📤 MQTT orqali yuborildi (${orderId})`);
+      } else {
+        console.error('⚠️ MQTT ulanmagan, yuborilmadi');
+      }
     } catch (err: any) {
       console.error(
         `❌ Print error for order ${orderId}:`,

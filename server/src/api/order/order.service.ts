@@ -906,6 +906,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }),
       );
 
+      if (sellOrderDto.extraCost) {
+        const extraCostMarket = queryRunner.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.EXTRA_COST,
+            amount: sellOrderDto.extraCost,
+            balance_after: marketCashbox.balance,
+            comment: finalComment,
+            created_by: courier.id,
+          },
+        );
+
+        await queryRunner.manager.save(extraCostMarket);
+      }
+
       // ✅ Courier cashbox update
       courierCashbox.balance += courier_to_be_paid;
       await queryRunner.manager.save(courierCashbox);
@@ -922,6 +940,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           created_by: courier.id,
         }),
       );
+
+      if (sellOrderDto.extraCost) {
+        const extraCostCourier = queryRunner.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.EXTRA_COST,
+            amount: sellOrderDto.extraCost,
+            balance_after: courierCashbox.balance,
+            comment: finalComment,
+            created_by: courier.id,
+          },
+        );
+
+        await queryRunner.manager.save(extraCostCourier);
+      }
 
       await queryRunner.commitTransaction();
       return successRes({ id: order.id }, 200, 'Order sold');
@@ -1565,7 +1601,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
         .createQueryBuilder('p')
-        .where('p.created_at BETWEEN :start AND :end', { start, end })
+        .where('p.updated_at BETWEEN :start AND :end', { start, end })
         .getMany();
 
       const uniqueCourierIds = Array.from(
@@ -1736,7 +1772,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // 1️⃣ Shu davrdagi barcha postlar
       const allPosts = await this.postRepo
         .createQueryBuilder('p')
-        .where('p.created_at BETWEEN :start AND :end', { start, end })
+        .where('p.updated_at BETWEEN :start AND :end', { start, end })
         .andWhere('p.courier_id = :courierId', { courierId: user.id })
         .getMany();
 

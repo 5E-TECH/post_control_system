@@ -711,10 +711,10 @@ export class CashBoxService
         toDate = toUzbekistanTimestamp(filters.toDate, true);
       }
 
-      qb.andWhere('h.created_at BETWEEN :fromDate AND :toDate', {
-        fromDate,
-        toDate,
-      });
+      // qb.andWhere('h.created_at BETWEEN :fromDate AND :toDate', {
+      //   fromDate,
+      //   toDate,
+      // });
 
       // operation type
       if (filters?.operationType) {
