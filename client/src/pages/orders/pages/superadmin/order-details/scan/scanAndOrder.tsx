@@ -4,11 +4,26 @@ import { useNavigate, useParams } from "react-router-dom";
 import type { RootState } from "../../../../../../app/store";
 import Popup from "../../../../../../shared/ui/Popup";
 import { AlertCircle, Minus, Plus, X } from "lucide-react";
-import { Button, Form, Input, InputNumber, message, Select, type FormProps } from "antd";
+import {
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  message,
+  Select,
+  type FormProps,
+} from "antd";
 import type { FieldType } from "../../../../components/courier/waiting-orders";
 import { useOrder } from "../../../../../../shared/api/hooks/useOrder";
 import { useApiNotification } from "../../../../../../shared/hooks/useApiNotification";
 import { BASE_URL } from "../../../../../../shared/const";
+
+interface OrderItem {
+  product_id: string;
+  name: string;
+  quantity: number;
+  maxQuantity?: number; // 👈 optional — chunki serverdan kelmasligi mumkin
+}
 
 export default function ScanAndOrder() {
   const { token } = useParams();
@@ -17,7 +32,7 @@ export default function ScanAndOrder() {
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
-  const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
+  const [orderItemInfo, setOrderItemInfo] = useState<OrderItem[]>([]);
   const [totalPrice, setTotalPrice] = useState<number | string>("");
   const [isShow, setIsShow] = useState<boolean>(true);
   const [alertBtnYesNo, setAlertBtnYesNo] = useState<boolean>(false);
@@ -28,14 +43,13 @@ export default function ScanAndOrder() {
   >(null);
   const [isModalOpen, _] = useState(false);
 
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-   useEffect(() => {
-     if (!isModalOpen) {
-       form.resetFields(["extraCost", "comment"]);
-     }
-   }, [isModalOpen]);
-
+  useEffect(() => {
+    if (!isModalOpen) {
+      form.resetFields(["extraCost", "comment"]);
+    }
+  }, [isModalOpen]);
 
   useEffect(() => {
     if (isShow && order?.data) {
@@ -99,7 +113,9 @@ export default function ScanAndOrder() {
     cancelOrder,
     partlySellOrder,
     courierReceiveOrderByScanerById,
+    rollbackOrder,
   } = useOrder();
+
   const [form] = Form.useForm<FieldType>();
 
   const id = order?.data?.id;
@@ -131,7 +147,7 @@ export default function ScanAndOrder() {
             onSuccess: () => {
               setIsShow(false);
               handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
-              navigate(-1)
+              navigate(-1);
             },
             onError: (err: any) => {
               handleApiError(err, "Buyurtma qisman sotilishda xatolik");
@@ -184,12 +200,10 @@ export default function ScanAndOrder() {
               handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
               navigate(-1);
             },
-            onError: (err: any) =>
-            {
+            onError: (err: any) => {
               handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
                 navigate(-1);
-            }
-            
+            },
           }
         );
       } else {
@@ -203,8 +217,8 @@ export default function ScanAndOrder() {
             },
             onError: (err: any) => {
               handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
-              navigate(-1);
-            }
+                navigate(-1);
+            },
           }
         );
       }
@@ -220,16 +234,15 @@ export default function ScanAndOrder() {
     courierReceiveOrderByScanerById.mutate(id, {
       onSuccess: () => {
         message.success("Buyurtma muvaffaqiyatli qabul qilindi!");
-        navigate(-1)
+        navigate(-1);
       },
       onError: (err) => {
         console.error(err);
         message.error("Buyurtma qabul qilishda xatolik yuz berdi!");
-        navigate(-1)
+        navigate(-1);
       },
     });
   };
-
 
   const handleSellOrder = () => {
     setAlertBtnYesNoWaiting(true);
@@ -239,6 +252,46 @@ export default function ScanAndOrder() {
   const handleCancelOrder = () => {
     setAlertBtnYesNoWaiting(true);
     setActionTypeOrder("cancel");
+  };
+
+  // let maxQuantity:number;
+
+  
+
+  useEffect(() => {
+    if (isShow && order?.data) {
+      const initialItems = order?.data?.items?.map((item: any) => ({
+        product_id: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity,
+        maxQuantity: item.quantity, // ✅ shu joyda to‘g‘ridan-to‘g‘ri beramiz
+      }));
+      setOrderItemInfo(initialItems || []);
+    }
+  }, [isShow, order]);
+
+
+  const handleMinus = (index: number) => {
+    setOrderItemInfo((prev) =>
+      prev.map((item, i) => {
+        if (i === index && item.quantity > 1) {
+          return { ...item, quantity: item.quantity - 1 };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handlePlus = (index: number) => {
+    setOrderItemInfo((prev) => {
+      const updated = prev.map((item, i) => {
+        if (i === index && item.quantity < (item.maxQuantity ?? Infinity)) {
+          return { ...item, quantity: item.quantity + 1 };
+        }
+        return item;
+      });
+      return updated;
+    });
   };
 
   if (loading) return <div>Yuklanmoqda...</div>;
@@ -319,24 +372,29 @@ export default function ScanAndOrder() {
                 </Form.Item>
 
                 <div className="flex gap-2 items-center mb-6 select-none">
-                  <Plus
-                    className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                    onClick={() => {
-                      const updated = [...orderItemInfo];
-                      updated[index].quantity += 1;
-                      setOrderItemInfo(updated);
-                    }}
-                  />
-                  <span className="text-[20px]">{item.quantity}</span>
+                  {/* MINUS */}
                   <Minus
-                    className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                    onClick={() => {
-                      const updated = [...orderItemInfo];
-                      if (updated[index].quantity > 0) {
-                        updated[index].quantity -= 1;
-                        setOrderItemInfo(updated);
-                      }
-                    }}
+                    className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                      item.quantity <= 1
+                        ? "opacity-30 cursor-not-allowed"
+                        : "hover:opacity-70"
+                    }`}
+                    onClick={() => handleMinus(index)}
+                  />
+
+                  {/* MIQDOR */}
+                  <span className="text-[20px] w-[25px] text-center">
+                    {item.quantity}
+                  </span>
+
+                  {/* PLUS */}
+                  <Plus
+                    className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                      item.quantity >= (item.maxQuantity ?? Infinity)
+                        ? "opacity-30 cursor-not-allowed"
+                        : "hover:opacity-70"
+                    }`}
+                    onClick={() => handlePlus(index)}
                   />
                 </div>
               </div>
@@ -376,7 +434,27 @@ export default function ScanAndOrder() {
               >
                 Yo'q
               </Button>
-              <Button className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!">
+              <Button
+                className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]"
+                onClick={() => {
+                  rollbackOrder.mutate(id, {
+                    onSuccess: () => {
+                      handleSuccess(
+                        "✅ Buyurtma muvaffaqiyatli 'kutilmoqda' holatiga qaytarildi!"
+                      );
+                      navigate(-1);
+                    },
+                    onError: (err: any) => {
+                      handleApiError(
+                        err,
+                        "❌ Xatolik! Buyurtma kutilmoqdaga qaytarilmadi."
+                      );
+                      navigate(-1);
+                    },
+                  }); // 🔹 so‘rov yuboriladi
+                }}
+                loading={rollbackOrder.isPending}
+              >
                 Ha
               </Button>
             </div>
@@ -386,17 +464,6 @@ export default function ScanAndOrder() {
         <Form initialValues={{}} form={form} onFinish={onFinish}>
           {orderStatus === "waiting" && (
             <div className="pt-1">
-              <div>
-                <span>Izoh</span>
-                <Form.Item name="comment">
-                  <Input.TextArea
-                    className="py-4! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
-                    placeholder="Izoh qoldiring (ixtiyoriy)"
-                    style={{ resize: "none" }}
-                  />
-                </Form.Item>
-              </div>
-
               <div>
                 <span>Qo'shimcha (pul)</span>
                 <Form.Item name="extraCost">
@@ -409,6 +476,17 @@ export default function ScanAndOrder() {
                         : ""
                     }
                     parser={(value) => value?.replace(/,/g, "") || ""}
+                  />
+                </Form.Item>
+              </div>
+
+              <div>
+                <span>Izoh</span>
+                <Form.Item name="comment">
+                  <Input.TextArea
+                    className="py-4! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
+                    placeholder="Izoh qoldiring (ixtiyoriy)"
+                    style={{ resize: "none" }}
                   />
                 </Form.Item>
               </div>
@@ -486,7 +564,10 @@ export default function ScanAndOrder() {
                   <AlertCircle />
                 </Button>
 
-                <Button className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!">
+                <Button
+                  className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
+                  onClick={() => setAlertBtnYesNo((p) => !p)}
+                >
                   Buyurtmani qaytarish
                 </Button>
               </div>

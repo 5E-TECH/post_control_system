@@ -30,6 +30,7 @@ export const useOrder = () => {
       api.post(`order/rollback/${id}`).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
+  
   const partlySellOrder = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.post(`order/partly-sell/${id}`, data).then((res) => res.data),
