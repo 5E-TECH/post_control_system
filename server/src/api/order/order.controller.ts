@@ -226,8 +226,10 @@ export class OrderController {
     @CurrentUser() user: JwtPayload,
     @Query('status') status: string,
     @Query('search') search: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number
   ) {
-    return this.orderService.allCouriersOrders(user, { status, search });
+    return this.orderService.allCouriersOrders(user, { status, search, page, limit });
   }
 
   @ApiOperation({ summary: 'Sell order' })
