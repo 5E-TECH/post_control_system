@@ -17,13 +17,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2️⃣ Setup Node.js (no cache here)
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 3️⃣ Generate GitHub App token (for private repo)
+      # 3️⃣ Generate GitHub App token
       - name: Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
@@ -32,16 +32,16 @@ jobs:
           private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           repository: 5E-TECH/post_control_system
 
-      # 4️⃣ Determine changed directories (client/server)
+      # 4️⃣ Determine changed directories (safe version)
       - name: Determine changed directories
         id: changes
         run: |
-          git fetch origin main --depth=2
-          CHANGED_DIRS=$(git diff --name-only origin/main...HEAD | awk -F/ '{print $1}' | sort -u | tr '\n' ' ')
+          git fetch --deepen=20
+          CHANGED_DIRS=$(git diff --name-only HEAD~1 HEAD | awk -F/ '{print $1}' | sort -u | tr '\n' ' ')
           echo "changed=$CHANGED_DIRS" >> $GITHUB_OUTPUT
           echo "🧾 Changed directories: $CHANGED_DIRS"
 
-      # 5️⃣ Cache client dependencies
+      # 5️⃣ Cache client node_modules
       - name: Cache client node_modules
         if: contains(steps.changes.outputs.changed, 'client')
         uses: actions/cache@v3
@@ -50,7 +50,7 @@ jobs:
           key: client-${{ hashFiles('client/package-lock.json') }}
           restore-keys: client-
 
-      # 6️⃣ Cache server dependencies
+      # 6️⃣ Cache server node_modules
       - name: Cache server node_modules
         if: contains(steps.changes.outputs.changed, 'server')
         uses: actions/cache@v3
@@ -61,9 +61,13 @@ jobs:
 
       # 7️⃣ Deploy to Production Server
       - name: Deploy to Production Server
+        env:
+          CHANGED_DIRS: ${{ steps.changes.outputs.changed }}
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
           chmod 600 server_key.pem
+
+          echo "🚀 Deploying — changed dirs: $CHANGED_DIRS"
 
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             set -e
@@ -73,13 +77,13 @@ jobs:
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
-            echo '🧾 Changed directories: ${{ steps.changes.outputs.changed }}'
+            echo '🧾 Changed directories: $CHANGED_DIRS'
 
-            # ===== Always clean build directories =====
+            # Clean build dirs always
             rm -rf client/dist client/build server/dist
 
             # ===== Build React frontend if changed =====
-            if [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
+            if [[ '$CHANGED_DIRS' == *'client'* ]]; then
               echo '📁 Building frontend...'
               cd client
               npm ci --prefer-offline --legacy-peer-deps
@@ -91,7 +95,7 @@ jobs:
             fi
 
             # ===== Build NestJS backend if changed =====
-            if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]]; then
+            if [[ '$CHANGED_DIRS' == *'server'* ]]; then
               echo '🧠 Building backend...'
               cd server
               npm ci --prefer-offline --legacy-peer-deps
@@ -99,8 +103,8 @@ jobs:
               cd ..
             fi
 
-            # ===== Restart backend if relevant code changed =====
-            if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]] || [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
+            # ===== Restart backend if needed =====
+            if [[ '$CHANGED_DIRS' == *'server'* ]] || [[ '$CHANGED_DIRS' == *'client'* ]]; then
               echo '🔁 Restarting backend systemd service...'
               sudo systemctl restart nestapp.service
               sudo systemctl status nestapp --no-pager
