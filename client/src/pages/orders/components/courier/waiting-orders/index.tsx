@@ -16,6 +16,8 @@ import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import Popup from "../../../../../shared/ui/Popup";
 import { AlertCircle, Minus, Plus, X } from "lucide-react";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 export type FieldType = {
   comment?: string;
@@ -32,7 +34,8 @@ const WaitingOrders = () => {
   const limit = Number(getParam("limit") || 10);
   const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
     useOrder();
-  const { data } = getCourierOrders({ status: "waiting", page, limit });
+  const search = useSelector((state: RootState) => state.setUserFilter.search);
+  const { data } = getCourierOrders({ status: "waiting", search, page, limit });
   const total = data?.data?.total || 0;
 
   const [form] = Form.useForm<FieldType>();

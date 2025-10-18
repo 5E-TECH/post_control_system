@@ -6,6 +6,8 @@ import EmptyPage from "../../../../../shared/components/empty-page";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useNavigate } from "react-router-dom";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const CancelledOrders = () => {
   const navigate = useNavigate();
@@ -33,8 +35,11 @@ const CancelledOrders = () => {
   const { getCourierOrders } = useOrder();
 
   const { mutate: cancelPost, isPending } = usePost().canceledPost();
+  const search = useSelector((state: RootState) => state.setUserFilter.search);
+
   const { data, refetch } = getCourierOrders({
     status: "cancelled",
+    search,
     page,
     limit,
   });

@@ -18,6 +18,8 @@ import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 import Popup from "../../../../../shared/ui/Popup";
 import type { FieldType } from "../waiting-orders";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -62,8 +64,8 @@ const AllOrders = () => {
     }
   };
   // Pagination end
-
-  const { data } = getCourierOrders({ page, limit });
+  const search = useSelector((state: RootState) => state.setUserFilter.search);
+  const { data } = getCourierOrders({ search, page, limit });
 
   const total = data?.data?.total || 0;
 
