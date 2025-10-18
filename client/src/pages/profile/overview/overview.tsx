@@ -1,12 +1,12 @@
-import { memo, useState } from 'react';
-import { Image, Spin } from 'antd';
-import Avatar from '../../../shared/assets/profile-image/Avatar.png';
-import Vector from '../../../shared/assets/profile-image/Vector.svg';
-import Star from '../../../shared/assets/profile-image/star.svg';
-import { useProfile } from '../../../shared/api/hooks/useProfile';
-import EditProfileModal from '../ui/Popap';
-import { setEditing } from '../../../shared/lib/features/profile/profileEditSlice';
-import { useDispatch } from 'react-redux';
+import { memo, useState } from "react";
+import { Image, Spin } from "antd";
+import Avatar from "../../../shared/assets/profile-image/Avatar.png";
+import Vector from "../../../shared/assets/profile-image/Vector.svg";
+import Star from "../../../shared/assets/profile-image/star.svg";
+import { useProfile } from "../../../shared/api/hooks/useProfile";
+import EditProfileModal from "../ui/Popap";
+import { setEditing } from "../../../shared/lib/features/profile/profileEditSlice";
+import { useDispatch } from "react-redux";
 
 const Overview = () => {
   const dispatch = useDispatch();
@@ -28,8 +28,7 @@ const Overview = () => {
     <div className="flex flex-col  px-4 md:px-8 lg:px-16">
       <div className="flex flex-col  px-4 md:px-8 lg:px-16">
         <div className="flex flex-col md:flex-row w-full  mx-auto flex-grow gap-6 mt-8">
-
-
+          {/* for prod test */}
           <div className="w-full md:w-[380px] lg:w-[420px] p-4 flex flex-col items-center justify-between bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md">
             <div className="flex flex-col items-center">
               <Image
@@ -44,11 +43,10 @@ const Overview = () => {
               <h2
                 className={`mt-3 px-3 py-1 text-sm md:text-[15px] rounded-2xl 
             ${
-              user?.status === 'active'
-                ? 'bg-green-500/20 text-green-600'
-                : 'bg-red-500/17 text-[#FF4C51]'
-            }`}
-              >
+              user?.status === "active"
+                ? "bg-green-500/20 text-green-600"
+                : "bg-red-500/17 text-[#FF4C51]"
+            }`}>
                 {user?.status}
               </h2>
             </div>
@@ -76,7 +74,6 @@ const Overview = () => {
             </div>
           </div>
 
-          
           {user && (
             <div className="flex-1 bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md p-6 flex flex-col justify-between">
               <div>
@@ -159,11 +156,10 @@ const Overview = () => {
                     dispatch(
                       setEditing({
                         phone_number: user?.phone_number,
-                      }),
+                      })
                     );
                   }}
-                  className="hover:bg-[#9b72f5] w-[100px] border-none bg-[#8C57FF] px-4 h-[38px] rounded-[6px] text-white"
-                >
+                  className="hover:bg-[#9b72f5] w-[100px] border-none bg-[#8C57FF] px-4 h-[38px] rounded-[6px] text-white">
                   Edit
                 </button>
               </div>
@@ -200,15 +196,15 @@ const Overview = () => {
 
         <ul className="space-y-2 text-gray-700 dark:text-gray-300 text-left">
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{' '}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
             10 Users
           </li>
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{' '}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
             Up to 10 GB storage
           </li>
           <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{' '}
+            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>{" "}
             Basic Support
           </li>
         </ul>

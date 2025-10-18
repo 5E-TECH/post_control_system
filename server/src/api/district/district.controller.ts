@@ -13,21 +13,27 @@ export class DistrictController {
   constructor(private readonly districtService: DistrictService) {}
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.COURIER,
+  )
   @Get()
   getAll() {
     return this.districtService.findAll();
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.COURIER)
   @Get(':id')
   getById(@Param('id') id: string) {
     return this.districtService.findById(id);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.COURIER)
   @Patch(':id')
   update(
     @Param('id') id: string,
