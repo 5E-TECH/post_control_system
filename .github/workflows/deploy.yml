@@ -11,11 +11,11 @@ jobs:
     environment: Production
 
     steps:
-      # 1️⃣ Checkout code
+      # 1️⃣ Checkout the latest code
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 1
+          fetch-depth: 0 # <-- Important for proper diff detection
 
       # 2️⃣ Setup Node.js
       - name: Setup Node.js
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 20
 
-      # 3️⃣ Generate GitHub App token (for private repo)
+      # 3️⃣ Generate GitHub App token
       - name: Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
@@ -59,27 +59,31 @@ jobs:
           key: server-${{ hashFiles('server/package-lock.json') }}
           restore-keys: server-
 
-      # 7️⃣ Deploy to server
+      # 7️⃣ Deploy to production server
       - name: Deploy to Production Server
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
           chmod 600 server_key.pem
 
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-            
+            set -e
             cd ${{ secrets.APP_PATH }}
 
             echo '📦 Pulling latest code...'
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
 
+            echo '🧾 Changed directories: ${{ steps.changes.outputs.changed }}'
+
             # ===== Build React frontend if changed =====
             if [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
               echo '📁 Building frontend...'
               cd client
               npm ci --prefer-offline --legacy-peer-deps
+              rm -rf dist build
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
-              cp -r dist/* /var/www/html/
+              sudo rm -rf /var/www/html/*
+              sudo cp -r dist/* /var/www/html/
               cd ..
               echo '⚡️ Frontend deployed.'
             fi
@@ -89,8 +93,13 @@ jobs:
               echo '🧠 Building backend...'
               cd server
               npm ci --prefer-offline --legacy-peer-deps
+              rm -rf dist
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
               cd ..
+            fi
+
+            # ===== Always restart backend if any relevant code changed =====
+            if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]] || [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
               echo '🔁 Restarting backend systemd service...'
               sudo systemctl restart nestapp.service
               sudo systemctl status nestapp --no-pager
