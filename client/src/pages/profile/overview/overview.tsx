@@ -28,7 +28,6 @@ const Overview = () => {
     <div className="flex flex-col  px-4 md:px-8 lg:px-16">
       <div className="flex flex-col  px-4 md:px-8 lg:px-16">
         <div className="flex flex-col md:flex-row w-full  mx-auto flex-grow gap-6 mt-8">
-          {/* for prod test */}
           <div className="w-full md:w-[380px] lg:w-[420px] p-4 flex flex-col items-center justify-between bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md">
             <div className="flex flex-col items-center">
               <Image
