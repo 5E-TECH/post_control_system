@@ -31,6 +31,7 @@
     "createOrder": "Buyurtma yaratish",
     "customerInfo": "Mijoz ma'lumotlari",
     "customerForm": {
+        "phone": "Telefon raqam",
         "region": "Viloyat",
         "district": "Tuman",
         "name": "Ism",

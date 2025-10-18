@@ -65,7 +65,7 @@ const ProductInfo = () => {
 
         <div className="flex gap-5 px-5">
           <div className="flex flex-col w-1/2">
-            <span className="font-normal text-[14px] text-[#2E263DB2] dark:text-[#B1ADC7]">
+            <span className="font-normal text-[14px] text-[#2E263DB2] dark:text-[#CBC7E1]">
               {t("productInfo.totalPrice")}
             </span>
             <Form.Item className="!mt-1">
@@ -90,7 +90,7 @@ const ProductInfo = () => {
                 type="text"
                 placeholder={t("productInfo.totalPricePlaceholder")}
                 className="!h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! 
-         dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+         dark:placeholder:text-[#E7E3FC66]! dark:text-[#CBC7E1]!"
               />
             </Form.Item>
           </div>
@@ -129,7 +129,7 @@ const ProductInfo = () => {
               value={formData.comment}
               onChange={handleChange}
               rows={3} // 🔹 balandlikni nazorat qiladi
-              className="!pt-2 !pb-2 !pl-3 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
+              className="!pt-2 !pb-2 !pl-3 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#CBC7E1]!"
               placeholder={t("productInfo.commentPlaceholder")}
             />
           </Form.Item>

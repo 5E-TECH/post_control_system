@@ -171,7 +171,6 @@ const OrderItems = () => {
                     dropdownClassName="dark-dropdown"
                     showSearch
                     filterOption={false}
-
                   />
                 </Form.Item>
 
@@ -187,7 +186,7 @@ const OrderItems = () => {
                     }}
                     type="number"
                     placeholder={t("orderItems.quantity")}
-                    className=" !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#E7E3FC66]!"
+                    className=" !h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FC66]! dark:text-[#CBC7E1]!"
                   />
                 </Form.Item>
               </div>
@@ -202,8 +201,11 @@ const OrderItems = () => {
           ))}
         </div>
 
-        <div className="px-5 pb-5" >
-          <Button onClick={addItem} className="!w-[183px] !h-[40px] !bg-[var(--color-bg-sy)] !text-[white] !font-medium !text-[15px] dark:border-none! hover:opacity-85!">
+        <div className="px-5 pb-5">
+          <Button
+            onClick={addItem}
+            className="!w-[183px] !h-[40px] !bg-[var(--color-bg-sy)] !text-[white] !font-medium !text-[15px] dark:border-none! hover:opacity-85!"
+          >
             <Plus className="w-[17px] h-[17px]" />
             {t("orderItems.addAnotherItem")}
           </Button>
