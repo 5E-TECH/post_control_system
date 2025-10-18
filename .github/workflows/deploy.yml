@@ -11,11 +11,11 @@ jobs:
     environment: Production
 
     steps:
-      # 1️⃣ Checkout the latest code
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # <-- Important for proper diff detection
+          fetch-depth: 2 # ensure last commit history is available
 
       # 2️⃣ Setup Node.js
       - name: Setup Node.js
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 20
 
-      # 3️⃣ Generate GitHub App token
+      # 3️⃣ Generate GitHub App token (for private repo)
       - name: Setup GitHub App token
         uses: tibdex/github-app-token@v1
         id: generate_token
@@ -40,6 +40,10 @@ jobs:
           PREV_SHA=$(git rev-parse HEAD~1)
           CURR_SHA=$(git rev-parse HEAD)
           CHANGED_DIRS=$(git diff --name-only $PREV_SHA $CURR_SHA | awk -F/ '{print $1}' | sort -u)
+
+          # Join multiline values into a single space-separated line
+          CHANGED_DIRS=$(echo "$CHANGED_DIRS" | tr '\n' ' ')
+
           echo "changed=$CHANGED_DIRS" >> $GITHUB_OUTPUT
           echo "Changed dirs: $CHANGED_DIRS"
 
@@ -61,7 +65,7 @@ jobs:
           key: server-${{ hashFiles('server/package-lock.json') }}
           restore-keys: server-
 
-      # 7️⃣ Deploy to production server
+      # 7️⃣ Deploy to Production Server
       - name: Deploy to Production Server
         run: |
           echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
@@ -69,8 +73,8 @@ jobs:
 
           ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
             set -e
-            cd ${{ secrets.APP_PATH }}
 
+            cd ${{ secrets.APP_PATH }}
             echo '📦 Pulling latest code...'
             git reset --hard
             git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
@@ -84,8 +88,7 @@ jobs:
               npm ci --prefer-offline --legacy-peer-deps
               rm -rf dist build
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
-              sudo rm -rf /var/www/html/*
-              sudo cp -r dist/* /var/www/html/
+              cp -r dist/* /var/www/html/
               cd ..
               echo '⚡️ Frontend deployed.'
             fi
@@ -98,13 +101,15 @@ jobs:
               rm -rf dist
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
               cd ..
+              echo '🔁 Restarting backend systemd service...'
+              sudo systemctl restart nestapp.service
+              sudo systemctl status nestapp --no-pager
             fi
 
             # ===== Always restart backend if any relevant code changed =====
             if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]] || [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
-              echo '🔁 Restarting backend systemd service...'
-              sudo systemctl restart nestapp.service
-              sudo systemctl status nestapp --no-pager
+              echo '🔁 Ensuring backend restart...'
+              sudo systemctl restart nestapp.service || true
             fi
 
             echo '✅ Deployment completed successfully.'
