@@ -6,8 +6,10 @@ import { useParams } from "react-router-dom";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import QRCode from "react-qr-code";
 import { useTranslation } from "react-i18next";
+import { useGlobalScanner } from "../../../../../shared/components/global-scanner";
 
 const OrderDetails = () => {
+  useGlobalScanner();
   const { t } = useTranslation("orderList");
   const { t:st } = useTranslation("status");
   const { id } = useParams();
@@ -42,8 +44,13 @@ const OrderDetails = () => {
               status={data?.data?.status}
             />
           </div>
-          <div>
-            <QRCode size={160} value={token} />
+          <div className="bg-white dark:bg-white p-4 inline-block w-[200px]">
+            <QRCode
+              size={160}
+              value={token}
+              bgColor="#ffffff" // har doim oq
+              fgColor="#000000" // chiziqlar qora
+            />
           </div>
         </div>
 

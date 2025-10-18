@@ -91,14 +91,18 @@ const Dashboards = () => {
     ? couriersData
     : couriersData.slice(0, 10);
 
-  let titleText = `📊 ${t("title")}`;
-  if (fromDate && toDate && fromDate !== toDate) {
-    titleText = `📊 ${fromDate} dan - ${toDate} gacha statistikasi`;
-  } else if (fromDate && !toDate) {
-    titleText = `📊 ${fromDate} dan boshlab statistikasi`;
-  } else if (!fromDate && toDate) {
-    titleText = `📊 ${toDate} gacha statistikasi`;
-  }
+ let titleText = `📊 ${t("title")}`;
+
+ if (fromDate && toDate && fromDate === toDate) {
+   titleText = `📊 ${fromDate} sanadagi statistika`;
+ } else if (fromDate && toDate && fromDate !== toDate) {
+   titleText = `📊 ${fromDate} dan - ${toDate} gacha statistikasi`;
+ } else if (fromDate && !toDate) {
+   titleText = `📊 ${fromDate} dan boshlab statistikasi`;
+ } else if (!fromDate && toDate) {
+   titleText = `📊 ${toDate} gacha statistikasi`;
+ }
+
 
   return (
     <div className="w-full p-6 dark:bg-[#312D48] min-h-screen transition">

@@ -23,6 +23,7 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import { useTranslation } from "react-i18next";
+import type { AxiosError } from "axios";
 
 const { RangePicker } = DatePicker;
 
@@ -141,8 +142,12 @@ const MainDetail = () => {
           setSpand(false);
           setForm(initialForm);
         },
-        onError: (err: any) =>
-          handleApiError(err, "Pul yechishda xatolik yuz berdi"),
+        onError: (error) => {
+          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const msg =
+            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+          handleApiError(err, `${msg}`);
+        },
       }
     );
   };
@@ -162,16 +167,33 @@ const MainDetail = () => {
           setMaosh(false);
           setForm(initialForm);
         },
-        onError: (err: any) =>
-          handleApiError(err, "Kassaga pul qo'shishda xatolik yuz berdi"),
+        onError: (error) => {
+          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const msg =
+            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+          handleApiError(err, `${msg}`);
+        }
       }
     );
   };
 
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
+  const handleClose = () => {
+    setShowMarket(false);
+    setShowCurier(false);
+    setshowAdminAndRegistrator(false);
+    setSelect(null);
+  };
+
+  const hendleCloce = () => {
+    setForm(initialForm);
+    setSpand(false);
+    setMaosh(false);
+  };
+
   return (
-    <div className="px-5 mt-5 flex gap-24">
+    <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
       <div>
         <h2 className="flex items-center mb-5 text-[30px] font-medium capitalize">
           {t("title")}
@@ -293,12 +315,23 @@ const MainDetail = () => {
               <div className="flex gap-5">
                 <button
                   onClick={() => handleSubmit()}
-                  className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0] text-white"
+                  disabled={
+                    !form.payment ||
+                    !form.summa ||
+                    Number(form.summa.replace(/\s/g, "")) <= 0
+                  }
+                  className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
+                    !form.payment ||
+                    !form.summa ||
+                    Number(form.summa.replace(/\s/g, "")) <= 0
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
+                  }`}
                 >
                   {t("qabulQilish")}
                 </button>
                 <button
-                  onClick={() => setSpand(false)}
+                  onClick={() => hendleCloce()}
                   className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
                 >
                   {t("bekorQilish")}
@@ -372,12 +405,23 @@ const MainDetail = () => {
               <div className="flex gap-5">
                 <button
                   onClick={() => handleSalarySubmit()}
-                  className="mt-5 bg-[#9D70FF] py-1.5 px-3 rounded-md hover:bg-[#9d70ffe0] text-white"
+                  disabled={
+                    !form.payment ||
+                    !form.summa ||
+                    Number(form.summa.replace(/\s/g, "")) <= 0
+                  }
+                  className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
+                    !form.payment ||
+                    !form.summa ||
+                    Number(form.summa.replace(/\s/g, "")) <= 0
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
+                  }`}
                 >
                   {t("qabulQilish")}
                 </button>
                 <button
-                  onClick={() => setMaosh(false)}
+                  onClick={() => hendleCloce()}
                   className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
                 >
                   {t("bekorQilish")}
@@ -390,6 +434,22 @@ const MainDetail = () => {
 
       {/* === FILTERS & HISTORY === */}
       <div className="w-full">
+        {form.from == "" && (
+          <h2 className="mb-5 text-[20px] font-medium">Bugungi o'tkazmalar</h2>
+        )}
+
+        {form.from !== "" && form.from === form.to && (
+          <h2 className="mb-5 text-[20px] font-medium">
+            {form.from} kungi o'tkazmalar
+          </h2>
+        )}
+
+        {form.from !== "" && form.from !== form.to && (
+          <h2 className="mb-5 text-[20px] font-medium">
+            {form.from} <span className="text-[15px]">dan ,</span> {form.to}{" "}
+            <span className="text-[15px]">gacha</span> o'tkazmalar
+          </h2>
+        )}
         <div className="flex flex-row items-center gap-7">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
@@ -411,7 +471,7 @@ const MainDetail = () => {
                 separator={
                   <span className="mx-2 text-xl flex items-center">→</span>
                 }
-                className="w-[340px] border border-[#E5E7EB] rounded-lg px-5 py-[6px] outline-none"
+                className="w-[340px] max-[550px]:w-[100%] border border-[#E5E7EB] rounded-lg px-5 py-[6px] outline-none"
               />
             </div>
           </div>
@@ -427,15 +487,18 @@ const MainDetail = () => {
       </div>
 
       {/* === POPUP MARKET === */}
-      <Popup isShow={showMarket} onClose={() => setShowMarket(false)}>
-        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
+      <Popup isShow={showMarket} onClose={() => handleClose()}>
+        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
           <button
-            onClick={() => setShowMarket(false)}
+            onClick={() => handleClose()}
             className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
           >
             <X size={30} />
           </button>
+
           <h1 className="font-bold text-left pt-10">{t("berilishiKerak")}</h1>
+
+          {/* Qidiruv input */}
           <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
             <input
               defaultValue={form.search}
@@ -446,44 +509,61 @@ const MainDetail = () => {
             />
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
           </div>
-          <div className="max-h-[520px] overflow-y-auto">
-            <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4 cursor-pointer">
-              <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
-                <tr>
-                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    # ID
-                  </th>
-                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    {t("marketName")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                {
-                  // Array.isArray(marketData?.data?.items) &&
-                  marketData?.data?.data?.map((item: any, inx: number) => (
+
+          {/* Jadval qismi */}
+          <div className="mt-4 rounded-md border border-[#9d70ff1f] dark:border-[#2E263DB2] overflow-hidden">
+            {/* Jadval headeri */}
+            <div className="overflow-hidden">
+              <table className="w-full border-collapse cursor-pointer">
+                <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
+                  <tr>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        # ID
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[201px]">
+                        {t("marketName")}
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+              </table>
+            </div>
+
+            {/* Scroll qismi */}
+            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
+              <table className="w-full border-collapse cursor-pointer">
+                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
+                  {marketData?.data?.data?.map((item: any, inx: number) => (
                     <tr
                       key={item?.id}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] font-medium ${
-                        item.id == select ? "bg-gray-100" : ""
+                      className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] dark:text-white ${
+                        item.id == select ? "bg-gray-300 text-black" : ""
                       }`}
                     >
-                      <td className="text-[#8C57FF] py-3 pl-5">{inx + 1}</td>
-                      <td className="py-3 pl-5">{item?.name}salom</td>
+                      <td className="text-[#8C57FF] pr-10 py-3 pl-5">
+                        {inx + 1}
+                      </td>
+                      <td className="pr-26 py-3">{item?.name}</td>
                     </tr>
-                  ))
-                }
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="absolute bottom-4 right-4">
+
+          {/* Tanlash tugmasi */}
+          <div className="flex justify-end py-2">
             <button
               disabled={!select ? true : false}
               onClick={() => handleNavigate()}
-              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700${
+              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
                 !select ? "" : "hover:bg-blue-600"
-              }  text-white rounded-md cursor-pointer ${
+              } text-white rounded-md cursor-pointer ${
                 !select ? "opacity-40" : ""
               }`}
             >
@@ -493,18 +573,18 @@ const MainDetail = () => {
         </div>
       </Popup>
 
-      <Popup
-        isShow={showAdminAndRegistrator}
-        onClose={() => setshowAdminAndRegistrator(false)}
-      >
-        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative pt-5">
+      <Popup isShow={showAdminAndRegistrator} onClose={() => handleClose()}>
+        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
           <button
-            onClick={() => setshowAdminAndRegistrator(false)}
-            className="cursor-pointer hover:bg-gray-200 text-red-500 p-2 rounded flex items-center justify-center absolute top-2 right-2"
+            onClick={() => handleClose()}
+            className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
           >
-            <X size={22} />
+            <X size={30} />
           </button>
-          <h1 className="font-bold text-left">{t("hodimniTanlang")}</h1>
+
+          <h1 className="font-bold text-left pt-10">{t("hodimniTanlang")}</h1>
+
+          {/* Qidiruv input */}
           <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
             <input
               defaultValue={form.search}
@@ -515,48 +595,68 @@ const MainDetail = () => {
             />
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
           </div>
-          <div className="max-h-[520px] overflow-y-auto">
-            <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4 cursor-pointer">
-              <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
-                <tr>
-                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    #
-                  </th>
-                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    {t("hodimName")}
-                  </th>
-                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    {t("rol")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                {
-                  // Array.isArray(marketData?.data?.items) &&
-                  adminAndRegisterData?.data?.data?.map(
+
+          {/* Jadval qismi */}
+          <div className="mt-4 rounded-md border border-[#9d70ff1f] dark:border-[#2E263DB2] overflow-hidden">
+            {/* Jadval sarlavhasi (thead) */}
+            <div className="overflow-hidden">
+              <table className="w-full border-collapse cursor-pointer">
+                <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
+                  <tr>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        #
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        {t("hodimName")}
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        {t("rol")}
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+              </table>
+            </div>
+
+            {/* Scroll qilinuvchi tbody */}
+            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
+              <table className="w-full border-collapse cursor-pointer">
+                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
+                  {adminAndRegisterData?.data?.data?.map(
                     (item: any, inx: number) => (
                       <tr
                         key={item?.id}
                         onClick={() => setSelect(item?.id)}
-                        className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] font-medium ${
-                          item.id == select ? "bg-gray-100" : ""
+                        className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] dark:text-white ${
+                          item.id == select ? "bg-gray-300 text-black" : ""
                         }`}
                       >
-                        <td className="text-[#8C57FF] pl-4 py-3">{inx + 1}</td>
-                        <td className="py-3 pl-4">{item?.name}</td>
-                        <td className="py-3 pl-4">{item?.role}</td>
+                        <td className="text-[#8C57FF] pr-10 pl-5 py-3">
+                          {inx + 1}
+                        </td>
+                        <td className="pr-26 py-3 pl-20">{item?.name}</td>
+                        <td className="pr-26 py-3">{item?.role}</td>
                       </tr>
                     )
-                  )
-                }
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="py-2 text-right">
+
+          {/* Tanlash tugmasi */}
+          <div className="flex justify-end py-2">
             <button
               disabled={!select}
               onClick={() => handleNavigateProfile()}
-              className={`px-3 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-3 right-3 ${
+              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
                 !select ? "" : "hover:bg-blue-600"
               } text-white rounded-md cursor-pointer ${
                 !select ? "opacity-40" : ""
@@ -569,15 +669,20 @@ const MainDetail = () => {
       </Popup>
 
       {/* === POPUP CURIER === */}
-      <Popup isShow={showCurier} onClose={() => setShowCurier(false)}>
-        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
+      <Popup isShow={showCurier} onClose={() => handleClose()}>
+        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
+          {/* Yopish tugmasi */}
           <button
-            onClick={() => setShowCurier(false)}
+            onClick={() => handleClose()}
             className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
           >
             <X size={30} />
           </button>
+
+          {/* Sarlavha */}
           <h1 className="font-bold text-left pt-10">{t("olinishiKerak")}</h1>
+
+          {/* Qidiruv */}
           <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
             <input
               defaultValue={form.search}
@@ -588,47 +693,77 @@ const MainDetail = () => {
             />
             <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
           </div>
-          <div className="max-h-[520px] overflow-y-auto">
-            <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4">
-              <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
-                <tr>
-                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    # ID
-                  </th>
-                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    {t("courierName")}
-                  </th>
-                  <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                    {t("region")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                {courierData?.data.map((item: any, inx: number) => (
-                  <tr
-                    key={inx}
-                    onClick={() => setSelect(item?.id)}
-                    className={`border-b-2 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] font-medium ${
-                      item.id == select ? "bg-gray-100" : ""
-                    }`}
-                  >
-                    <td className="text-[#8C57FF] pr-10 py-3 pl-5">
-                      {inx + 1}
-                    </td>
-                    <td className="py-3 pl-5">{item?.name}</td>
-                    <td className="py-3 pl-5">{item?.region?.name}</td>
+
+          {/* Jadval qismi */}
+          <div className="mt-4 rounded-md border border-[#9d70ff1f] dark:border-[#2E263DB2] overflow-hidden">
+            {/* Jadval headeri (qotib turadigan qism) */}
+            <div className="overflow-hidden">
+              <table className="w-full border-collapse cursor-pointer">
+                <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
+                  <tr>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        # ID
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]" />
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        {t("courierName")}
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]" />
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        {t("region")}
+                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]" />
+                      </div>
+                    </th>
+                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                      <div className="flex items-center justify-between pr-[21px]">
+                        {t("olinishiKerakSumma")}
+                      </div>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+              </table>
+            </div>
+
+            {/* Scroll bo‘luvchi tbody qismi */}
+            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
+              <table className="w-full border-collapse cursor-pointer">
+                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
+                  {courierData?.data?.map((item: any, inx: number) => (
+                    <tr
+                      key={inx}
+                      onClick={() => setSelect(item?.id)}
+                      className={`border-b-1 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] font-medium ${
+                        item.id == select
+                          ? "bg-gray-300 text-black"
+                          : "hover:bg-blue-100 dark:hover:bg-[#3d3759]"
+                      }`}
+                    >
+                      <td className="text-[#8C57FF] pr-10 py-3 pl-5">
+                        {inx + 1}
+                      </td>
+                      <td className="py-3 pl-5">{item?.name}</td>
+                      <td className="py-3 pl-5">{item?.region?.name}</td>
+                      <td className="py-3 pl-5">{item?.cashbox?.balance}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="absolute bottom-4 right-4">
+
+          {/* Tanlash tugmasi */}
+          <div className="flex justify-end py-2">
             <button
               disabled={!select ? true : false}
               onClick={() => handleNavigate()}
-              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700${
+              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
                 !select ? "" : "hover:bg-blue-600"
-              }  text-white rounded-md cursor-pointer ${
+              } text-white rounded-md cursor-pointer ${
                 !select ? "opacity-40" : ""
               }`}
             >

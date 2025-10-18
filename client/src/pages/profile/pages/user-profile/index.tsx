@@ -19,6 +19,9 @@ const UserProfile = () => {
 
   const [form] = Form.useForm();
 
+  // Local state to control formatted phone input display
+  const [phoneDisplay, setPhoneDisplay] = useState<string>("+998 ");
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -29,11 +32,125 @@ const UserProfile = () => {
 
   const user = data?.data;
 
+  // helper: remove all non-digits and keep leading + if present
+  const normalizePhone = (phone?: string | null) => {
+    if (!phone) return "";
+    // remove non-digits
+    const digits = phone.replace(/\D/g, "");
+    // If already contains country code 998 at start, ensure prefix +998
+    if (digits.startsWith("998")) {
+      return `+${digits.slice(0, 3)}${digits.slice(3) ? digits.slice(3) : ""}`; // +998...
+    }
+    // If user input like 90..., assume it's local mobile number (9 digits)
+    if (digits.length === 9) {
+      return `+998${digits}`;
+    }
+    // Fallback: if shorter/longer, try to return with + and digits
+    return `+${digits}`;
+  };
+
+  // helper: format display as "+998 XX XXX XX XX"
+  const formatPhoneForDisplay = (raw?: string | null) => {
+    // Get only digits
+    let digits = (raw || "").replace(/\D/g, "");
+
+    // If digits start with 998, strip it for grouping
+    if (digits.startsWith("998")) {
+      digits = digits.slice(3);
+    }
+
+    // If user pasted full like +998990000000, above removed 998 -> left 990000000 (9 digits)
+    // Ensure we only take up to 9 digits for formatting
+    digits = digits.slice(0, 9);
+
+    const parts: string[] = [];
+    if (digits.length >= 2) {
+      parts.push(digits.slice(0, 2)); // XX
+    } else if (digits.length > 0) {
+      parts.push(digits);
+    }
+
+    if (digits.length > 2) {
+      const rest = digits.slice(2); // remaining 7
+      // next 3
+      if (rest.length >= 3) {
+        parts.push(rest.slice(0, 3)); // XXX
+        if (rest.length > 3) {
+          const rest2 = rest.slice(3);
+          if (rest2.length >= 2) {
+            parts.push(rest2.slice(0, 2)); // XX
+            if (rest2.length > 2) {
+              parts.push(rest2.slice(2, 4)); // XX (maybe 0-2 digits)
+            }
+          } else {
+            parts.push(rest2);
+          }
+        }
+      } else {
+        parts.push(rest);
+      }
+    }
+
+    // Join into "+998 " + groups separated by space
+    const grouped = parts.join(" ");
+    return grouped ? `+998 ${grouped}` : "+998 ";
+  };
+
+  // When opening modal, prefill phone formatted and keep in local state
+  const handleOpenModal = () => {
+    form.setFieldsValue({
+      name: user.name,
+      phone_number: formatPhoneForDisplay(user.phone_number || "+998"),
+      password: "",
+      ...(user.role === "market" || user.role === "courier"
+        ? {
+            tariff_center: Number(user.tariff_center) || 0,
+            tariff_home: Number(user.tariff_home) || 0,
+          }
+        : {}),
+    });
+
+    // set phoneDisplay state too
+    setPhoneDisplay(formatPhoneForDisplay(user.phone_number || "+998"));
+
+    setOpen(true);
+    dispatch(
+      setEditing({
+        phone_number: user?.phone_number,
+      })
+    );
+  };
+
+  // Input change handler to keep formatted appearance while storing formatted value in form
+  const handlePhoneInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    // Normalize input as user types: allow deleting/backspace; format accordingly
+    const formatted = formatPhoneForDisplay(raw);
+    setPhoneDisplay(formatted);
+    // Update form field to keep consistency
+    form.setFieldsValue({ phone_number: formatted });
+  };
+
   const handleUpdate = (values: any) => {
     const payload: any = { ...values };
 
-    if (payload.full_name === user.name) delete payload.full_name;
-    if (payload.phone_number === user.phone_number) delete payload.phone_number;
+    // Normalize phone for backend: +998990000000
+    if (payload.phone_number) {
+      const normalized = normalizePhone(payload.phone_number);
+      // If normalized is just "+", treat as empty
+      if (normalized === "+") {
+        delete payload.phone_number;
+      } else {
+        payload.phone_number = normalized;
+      }
+    }
+
+    // Normalize user.phone_number for comparison
+    const userPhoneNormalized = normalizePhone(user?.phone_number);
+
+    // Compare normalized values to avoid unnecessary update
+    if (payload.name === user.name) delete payload.name;
+    if (payload.phone_number === userPhoneNormalized) delete payload.phone_number;
     if (!payload.password) delete payload.password;
 
     if (Object.keys(payload).length === 0) {
@@ -58,26 +175,6 @@ const UserProfile = () => {
     );
   };
 
-  const handleOpenModal = () => {
-    form.setFieldsValue({
-      full_name: user.name,
-      phone_number: user.phone_number,
-      password: "",
-      ...(user.role === "market" || user.role === "courier"
-        ? {
-            tariff_center: Number(user.tariff_center) || 0,
-            tariff_home: Number(user.tariff_home) || 0,
-          }
-        : {}),
-    });
-    setOpen(true);
-    dispatch(
-      setEditing({
-        phone_number: user?.phone_number,
-      })
-    );
-  };
-
   return (
     <div className="flex flex-col px-4 md:px-8 lg:px-16">
       <div className="flex flex-col md:flex-row w-full mx-auto flex-grow gap-6 mt-8">
@@ -94,7 +191,7 @@ const UserProfile = () => {
               {user?.name}
             </h2>
             <h2
-              className={`mt-3 px-3 py-1 text-sm md:text-[15px] rounded-2xl ${
+              className={`mt-3 px-3 py-name1 text-sm md:text-[15px] rounded-2xl ${
                 user?.status === "active"
                   ? "bg-green-500/20 text-green-600"
                   : "bg-red-500/17 text-[#FF4C51]"
@@ -135,13 +232,13 @@ const UserProfile = () => {
               <div className="w-full border border-[#2E263D1F] my-3"></div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                {user.name && (
+                {user?.name && (
                   <div className="flex flex-col">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                       Full Name
                     </span>
                     <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      {user.name}
+                      {user?.name}
                     </span>
                   </div>
                 )}
@@ -250,12 +347,17 @@ const UserProfile = () => {
           footer={null}
         >
           <Form form={form} layout="vertical" onFinish={handleUpdate}>
-            <Form.Item label="Name" name="full_name">
+            <Form.Item label="Name" name="name">
               <Input />
             </Form.Item>
 
             <Form.Item label="Phone Number" name="phone_number">
-              <Input />
+              <Input
+                value={phoneDisplay}
+                onChange={handlePhoneInputChange}
+                maxLength={20}
+                placeholder="+998 99 000 00 00"
+              />
             </Form.Item>
 
             {(user.role === "market" || user.role === "courier") && (

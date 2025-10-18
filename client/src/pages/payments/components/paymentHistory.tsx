@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import HistoryPopup from "./historyPopup";
 
 type Props = {
   form: { from: string; to: string };
@@ -12,8 +13,15 @@ const CashboxHistoryComponent: React.FC<Props> = ({
   outcome,
   cashboxHistory,
 }) => {
+  const [showHistory, setShowHistory] = useState(false);
+  const [select, setSelect] = useState("");
+
+  const handleHistoryPopup = (id: string) => {
+    setSelect(id);
+    setShowHistory(true);
+  };
   return (
-    <div className="w-[80%]">
+    <div className="w-[80%] max-md:w-[100%]">
       {/* Filter qismi */}
 
       {/* Income va Outcome qismlari */}
@@ -34,6 +42,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
       <div className="h-[520px] w-full mt-5 px-8 py-4 bg-[#ede8ff] dark:bg-[#3D3759] shadow-md rounded-lg overflow-y-auto">
         {cashboxHistory?.map((item: any, inx: number) => (
           <div
+            onClick={() => handleHistoryPopup(item.id)}
             key={inx}
             className="flex gap-20 mb-3 border-b border-gray-300 justify-between"
           >
@@ -53,7 +62,9 @@ const CashboxHistoryComponent: React.FC<Props> = ({
             <div>
               <strong
                 className={` text-[25px] ${
-                  item?.operation_type == "expense" ? "text-red-500" : "text-[#068822] dark:text-green-500"
+                  item?.operation_type == "expense"
+                    ? "text-red-500"
+                    : "text-[#068822] dark:text-green-500"
                 }`}
               >
                 {item?.operation_type == "expense" ? "-" : "+"}{" "}
@@ -66,6 +77,9 @@ const CashboxHistoryComponent: React.FC<Props> = ({
           </div>
         ))}
       </div>
+      {showHistory && (
+        <HistoryPopup id={select} onClose={() => setShowHistory(false)} />
+      )}
     </div>
   );
 };

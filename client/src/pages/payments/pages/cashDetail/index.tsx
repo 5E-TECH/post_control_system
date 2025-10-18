@@ -12,6 +12,8 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
+import { debounce } from "../../../../shared/helpers/DebounceFunc";
+import type { AxiosError } from "axios";
 
 const { RangePicker } = DatePicker;
 
@@ -27,6 +29,8 @@ const CashDetail = () => {
     market: "",
     comment: "",
   });
+
+  const [search, setSearch] = useState("");
 
   const params = {
     fromDate: form.from,
@@ -67,8 +71,13 @@ const CashDetail = () => {
     params
   );
   const { data: marketData } = getMarkets(
-    form.payment == "click_to_market" ? true : false
+    form.payment == "click_to_market",
+    { search, limit: 0 } // agar hooking search param qabul qilsa
   );
+
+  const debouncedSearch = debounce((value: string) => {
+    setSearch(value);
+  }, 500);
 
   const { handleApiError } = useApiNotification();
   const handleSubmit = () => {
@@ -101,8 +110,12 @@ const CashDetail = () => {
           });
           refetch();
         },
-        onError: (err) =>
-          handleApiError(err, "To'lov yaratishda xatolik yuz berdi"),
+        onError: (error) => {
+          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const msg =
+            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+          handleApiError(err, `${msg}`);
+        },
       });
     } else {
       createPaymentCourier.mutate(dataCourier, {
@@ -118,8 +131,12 @@ const CashDetail = () => {
           });
           refetch();
         },
-        onError: (err) =>
-          handleApiError(err, "To'lov yaratishda xatolik yuz berdi"),
+        onError: (error) => {
+          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const msg =
+            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+          handleApiError(err, `${msg}`);
+        }
       });
     }
   };
@@ -133,7 +150,7 @@ const CashDetail = () => {
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
   return (
-    <div className="px-5 mt-5 flex gap-24">
+    <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
       <div>
         <h2 className="flex items-center mb-5 text-[20px] capitalize">
           {t(`${data?.data?.cashbox?.user?.role}`)} <ChevronRight />
@@ -174,7 +191,7 @@ const CashDetail = () => {
                   setForm((prev) => ({ ...prev, payment: value }))
                 }
                 placeholder={t("to'lovTuri")}
-                className="mySelect "
+                className="mySelect w-full !h-[42px] !rounded-md"
                 size="large"
                 options={[
                   {
@@ -200,14 +217,23 @@ const CashDetail = () => {
               />
               {form.payment == "click_to_market" && (
                 <Select
+                  showSearch
+                  filterOption={false}
+                  onSearch={debouncedSearch}
                   value={form.market}
                   onChange={(value) =>
                     setForm((prev) => ({ ...prev, market: value }))
                   }
                   placeholder={t("marketniTanlang")}
-                  className="w-[150px]"
+                  className="w-[150px] !h-[42px] !rounded-md"
                   options={[
-                    { value: "", label: "Market tanlang", disabled: true },
+                    {
+                      value: "",
+                      label: (
+                        <span style={{ color: "#a0a0a0" }}>Market tanlang</span>
+                      ),
+                      disabled: true,
+                    },
                     ...(marketData?.data?.data?.map((item: any) => ({
                       value: item.id,
                       label: item.name,
@@ -218,7 +244,7 @@ const CashDetail = () => {
             </div>
             <div className="mt-5">
               <TextArea
-                className="myTextArea"
+                className="myTextArea !h-[42px] !rounded-md"
                 name="comment"
                 size="large"
                 value={form.comment}
@@ -235,20 +261,23 @@ const CashDetail = () => {
                 }
                 className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
                   !form.payment ||
+                  (form.payment == "click_to_market" && !form.market) ||
                   !form.summa ||
                   Number(form.summa.replace(/\s/g, "")) <= 0
                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                     : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
                 }`}
               >
-                {t("qabulQilish")}
+                {data?.data?.cashbox?.user?.role === "market"
+                  ? `${t("qabulQilish")}`
+                  : `${t("to'lash")}`}
               </button>
             </div>
           </div>
         )}
       </div>
-      <div className="grid w-full">
-        <div className="flex flex-row items-center gap-7">
+      <div className="grid w-full max-[550px]:w-[100%]">
+        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%]">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
             <div className="flex gap-5">
@@ -268,12 +297,12 @@ const CashDetail = () => {
                 placeholder={["From", "To"]}
                 format="YYYY-MM-DD"
                 size="large"
-                className="w-[340px] toFROM border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+                className="w-[340px] max-[550px]:w-[100%] toFROM border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
               />
             </div>
           </div>
         </div>
-        <div>
+        <div className="max-md:mb-5">
           <CashboxHistory
             form={form}
             income={data?.data?.income}

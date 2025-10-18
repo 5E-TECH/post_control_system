@@ -4,7 +4,7 @@ import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 export class UpdateCourierDto {
   @IsOptional()
   @IsString()
-  full_name?: string;
+  name?: string;
 
   @IsOptional()
   @IsString()

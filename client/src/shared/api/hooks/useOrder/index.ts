@@ -30,6 +30,7 @@ export const useOrder = () => {
       api.post(`order/rollback/${id}`).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
+  
   const partlySellOrder = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.post(`order/partly-sell/${id}`, data).then((res) => res.data),
@@ -39,6 +40,12 @@ export const useOrder = () => {
   const receiveOrderByScanerById = useMutation({
     mutationFn: (id: string) =>
       api.post(`order/receive/${id}`).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
+  });
+
+  const courierReceiveOrderByScanerById = useMutation({
+    mutationFn: (id: string) =>
+      api.patch(`post/receive/order/${id}`).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
@@ -131,5 +138,6 @@ export const useOrder = () => {
     getOrderById,
     updateOrdersUserAddress,
     updateOrdersUserPhoneAndName,
+    courierReceiveOrderByScanerById,
   };
 };

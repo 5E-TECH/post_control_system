@@ -226,8 +226,15 @@ export class OrderController {
     @CurrentUser() user: JwtPayload,
     @Query('status') status: string,
     @Query('search') search: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
   ) {
-    return this.orderService.allCouriersOrders(user, { status, search });
+    return this.orderService.allCouriersOrders(user, {
+      status,
+      search,
+      page,
+      limit,
+    });
   }
 
   @ApiOperation({ summary: 'Sell order' })
@@ -289,7 +296,7 @@ export class OrderController {
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order partly sold' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Delete(':id')
   delete(@Param('id') id: string) {
     return this.orderService.remove(id);
