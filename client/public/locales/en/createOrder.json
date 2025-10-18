@@ -31,6 +31,7 @@
     "createOrder": "Create Order",
     "customerInfo": "Customer Info",
     "customerForm": {
+        "phone": "Phone number",
         "region": "Region",
         "district": "District",
         "name": "Name",
