@@ -17,6 +17,7 @@ import { UpdateRegionDto } from './dto/update-region.dto';
 export class RegionController {
   constructor(private readonly regionService: RegionService) {}
 
+  // twst deploy
   @Get()
   getAll() {
     return this.regionService.findAll();
