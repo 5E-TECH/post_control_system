@@ -1,4 +1,13 @@
-import { Button, Form, Input, InputNumber, Select, type FormProps } from "antd";
+import {
+  Button,
+  Form,
+  Input,
+  InputNumber,
+  Pagination,
+  Select,
+  type FormProps,
+  type PaginationProps,
+} from "antd";
 import { AlertCircle, Minus, Plus, X } from "lucide-react";
 import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
@@ -8,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 import Popup from "../../../../../shared/ui/Popup";
 import type { FieldType } from "../waiting-orders";
+import { useParamsHook } from "../../../../../shared/hooks/useParams";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -32,7 +42,31 @@ const AllOrders = () => {
     rollbackOrder,
     partlySellOrder,
   } = useOrder();
-  const { data } = getCourierOrders();
+
+  // Pagination start
+  const { getParam, setParam, removeParam } = useParamsHook();
+  const page = Number(getParam("page") || 1);
+  const limit = Number(getParam("limit") || 10);
+
+  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
+    if (newPage === 1) {
+      removeParam("page");
+    } else {
+      setParam("page", newPage);
+    }
+
+    if (limit === 10) {
+      removeParam("limit");
+    } else {
+      setParam("limit", limit);
+    }
+  };
+  // Pagination end
+
+  const { data } = getCourierOrders({ page, limit });
+
+  const total = data?.data?.total || 0;
+
   const [isShow, setIsShow] = useState<boolean>(false);
   const [isShowModal, setIsShowModal] = useState<boolean>(false);
   const orderId = useRef<string | null>(null);
@@ -143,12 +177,9 @@ const AllOrders = () => {
               handleSuccess("Buyurtma muvaffaqiyatli sotildi");
               navigate(-1);
             },
-            onError: (err: any) =>
-            {
-              handleApiError(err, "Buyurtmani sotishda xatolik"), 
-              navigate(-1);
-            } 
-            
+            onError: (err: any) => {
+              handleApiError(err, "Buyurtmani sotishda xatolik"), navigate(-1);
+            },
           }
         );
       }
@@ -181,11 +212,10 @@ const AllOrders = () => {
               handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
               navigate(-1);
             },
-            onError: (err: any) =>
-            {
+            onError: (err: any) => {
               handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
-              navigate(-1);
-            }
+                navigate(-1);
+            },
           }
         );
       } else {
@@ -197,11 +227,10 @@ const AllOrders = () => {
               handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
               navigate(-1);
             },
-            onError: (err: any) =>
-            {
+            onError: (err: any) => {
               handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
-              navigate(-1);
-            }
+                navigate(-1);
+            },
           }
         );
       }
@@ -365,6 +394,16 @@ const AllOrders = () => {
           })}
         </tbody>
       </table>
+
+      <div className="flex justify-center">
+        <Pagination
+          showSizeChanger
+          current={page}
+          total={total}
+          pageSize={limit}
+          onChange={onChange}
+        />
+      </div>
 
       <ConfirmPopup
         isShow={isShowModal}

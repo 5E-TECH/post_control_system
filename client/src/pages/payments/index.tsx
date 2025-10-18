@@ -204,7 +204,10 @@ const Payments = () => {
             >
               <X size={30} />
             </button>
+
             <h1 className="font-bold text-left pt-10">{t("berilishiKerak")}</h1>
+
+            {/* qidiruv */}
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
                 defaultValue={search}
@@ -215,54 +218,66 @@ const Payments = () => {
               />
               <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
             </div>
-            <div className="max-h-[520px] overflow-y-auto">
-              <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4 scroll-y-auto cursor-pointer">
-                <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
-                  <tr>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        #
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("marketName")}
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("berilishiKerakSumma")}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
 
-                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
-                  {data?.data?.data?.map((item: any, inx: number) => (
-                    <tr
-                      key={item?.id}
-                      onClick={() => setSelect(item?.id)}
-                      className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] dark:text-white ${
-                        item.id == select ? "bg-gray-300 text-black" : ""
-                      }`}
-                    >
-                      <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                      <td className="pr-26 py-3 ">{item?.name}</td>
-                      <td className="pr-26 py-3">{item?.cashbox?.balance}</td>
+            {/* jadval qismi */}
+            <div className="mt-4 rounded-md border border-[#9d70ff1f] dark:border-[#2E263DB2] overflow-hidden">
+              {/* jadval headeri (qotib turadigan qism) */}
+              <div className="overflow-hidden">
+                <table className="w-full border-collapse cursor-pointer">
+                  <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
+                    <tr>
+                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                        <div className="flex items-center justify-between pr-[21px]">
+                          #
+                          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                        </div>
+                      </th>
+                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                        <div className="flex items-center justify-between pr-[21px]">
+                          {t("marketName")}
+                          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                        </div>
+                      </th>
+                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                        <div className="flex items-center justify-between pr-[21px]">
+                          {t("berilishiKerakSumma")}
+                        </div>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                </table>
+              </div>
+
+              {/* scroll bo‘luvchi tbody qismi */}
+              <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
+                <table className="w-full border-collapse cursor-pointer">
+                  <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
+                    {data?.data?.data?.map((item: any, inx: number) => (
+                      <tr
+                        key={item?.id}
+                        onClick={() => setSelect(item?.id)}
+                        className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] dark:text-white ${
+                          item.id == select ? "bg-gray-300 text-black" : ""
+                        }`}
+                      >
+                        <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
+                        <td className="pr-26 py-3">{item?.name}</td>
+                        <td className="pr-26 py-3">{item?.cashbox?.balance}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            {/* tanlash tugmasi */}
             <div className="flex justify-end py-2">
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
                 className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
                   !select ? "" : "hover:bg-blue-600"
-                }  text-white rounded-md cursor-pointer ${
+                } text-white rounded-md cursor-pointer ${
                   !select ? "opacity-40" : ""
                 }`}
               >
@@ -309,14 +324,19 @@ const Payments = () => {
         </div>
 
         <Popup isShow={showCurier} onClose={() => hendlerClose()}>
-          <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative">
+          <div className="bg-white rounded-md w-[1000px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
+            {/* Yopish tugmasi */}
             <button
               onClick={() => setShowCurier(false)}
               className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
             >
               <X size={30} />
             </button>
+
+            {/* Sarlavha */}
             <h1 className="font-bold text-left pt-10">{t("olinishiKerak")}</h1>
+
+            {/* Qidiruv */}
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
                 defaultValue={search}
@@ -327,60 +347,73 @@ const Payments = () => {
               />
               <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
             </div>
-            <div className="max-h-[520px] overflow-y-auto">
-              <table className="w-full border-collapse border-4 border-[#9d70ff1f] dark:border-[#2E263DB2] mt-4 scroll-y-auto">
-                <thead className="dark:bg-[#3d3759] sticky top-[-2px] uppercasev bg-[#9d70ff]">
-                  <tr>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        #
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("courierName")}
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("region")}
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("olinishiKerakSumma")}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
 
-                <tbody className="text-[14px] font-normal text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F]">
-                  {courierData?.data.map((item: any, inx: number) => (
-                    <tr
-                      key={inx}
-                      onClick={() => setSelect(item?.id)}
-                      className={`border-b-2 border-[#c3c5ce] dark:border-[#E7E3FCB2]  text-[16px] text-[#2E263DB2] dark:text-white ${
-                        item.id == select ? "bg-gray-100 text-black" : ""
-                      }`}
-                    >
-                      <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
-                      <td className="pr-26 py-3">{item?.name}</td>
-                      <td className="pr-10 py-3">{item?.region?.name}</td>
-                      <td className="pr-10 py-3">{item?.cashbox?.balance}</td>
+            {/* Jadval qismi */}
+            <div className="mt-4 rounded-md border border-[#9d70ff1f] dark:border-[#2E263DB2] overflow-hidden">
+              {/* jadval headeri (qotib turadigan qism) */}
+              <div className="overflow-hidden">
+                <table className="w-full border-collapse cursor-pointer">
+                  <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
+                    <tr>
+                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                        <div className="flex items-center justify-between pr-[21px]">
+                          #
+                          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                        </div>
+                      </th>
+                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                        <div className="flex items-center justify-between pr-[21px]">
+                          {t("courierName")}
+                          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                        </div>
+                      </th>
+                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                        <div className="flex items-center justify-between pr-[21px]">
+                          {t("region")}
+                          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                        </div>
+                      </th>
+                      <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                        <div className="flex items-center justify-between pr-[21px]">
+                          {t("olinishiKerakSumma")}
+                        </div>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                </table>
+              </div>
+
+              {/* scroll bo‘luvchi tbody qismi */}
+              <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
+                <table className="w-full border-collapse cursor-pointer">
+                  <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
+                    {courierData?.data?.map((item: any, inx: number) => (
+                      <tr
+                        key={item?.id}
+                        onClick={() => setSelect(item?.id)}
+                        className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] dark:text-white ${
+                          item.id == select ? "bg-gray-300 text-black" : ""
+                        }`}
+                      >
+                        <td className="text-[#8C57FF] pr-10 py-3">{inx + 1}</td>
+                        <td className="pr-26 py-3">{item?.name}</td>
+                        <td className="pr-26 py-3">{item?.region?.name}</td>
+                        <td className="pr-26 py-3">{item?.cashbox?.balance}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="absolute bottom-4 right-4">
+
+            {/* Tanlash tugmasi */}
+            <div className="flex justify-end py-2">
               <button
                 disabled={!select ? true : false}
                 onClick={() => handleNavigate()}
-                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700${
+                className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
                   !select ? "" : "hover:bg-blue-600"
-                }  text-white rounded-md cursor-pointer ${
+                } text-white rounded-md cursor-pointer ${
                   !select ? "opacity-40" : ""
                 }`}
               >
@@ -392,8 +425,8 @@ const Payments = () => {
       </div>
 
       <div className="mt-12 mx-5">
-        <h1 className="text-xl font-semibold mb-3">{t("filters")}</h1>
-        <div className="grid grid-cols-5 gap-6 pt-[16px] max-[1000px]:grid-cols-3 max-[750px]:grid-cols-2 max-[450px]:grid-cols-1">
+        <h1 className="text-xl font-semibold mb-3">{t("filter")}</h1>
+        <div className="grid grid-cols-5 gap-6 pt-[16px] max-[1000px]:grid-cols-3 max-[750px]:grid-cols-2 max-[450px]:grid-cols-1 capitalize">
           <Select
             value={paymentFilter.operationType}
             onChange={handleChange}

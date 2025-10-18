@@ -227,9 +227,14 @@ export class OrderController {
     @Query('status') status: string,
     @Query('search') search: string,
     @Query('page') page: number,
-    @Query('limit') limit: number
+    @Query('limit') limit: number,
   ) {
-    return this.orderService.allCouriersOrders(user, { status, search, page, limit });
+    return this.orderService.allCouriersOrders(user, {
+      status,
+      search,
+      page,
+      limit,
+    });
   }
 
   @ApiOperation({ summary: 'Sell order' })
