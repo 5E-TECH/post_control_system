@@ -1,4 +1,4 @@
-name: CI/CD Deploy (Selective Build + Permissions Fix)
+name: CI/CD Deploy (Selective Build + Systemd + Cache)
 
 on:
   push:
@@ -11,107 +11,100 @@ jobs:
     environment: Production
 
     steps:
-      # 1️⃣ Checkout latest code
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
-      # 2️⃣ Setup Node.js
+      # 2️⃣ Setup Node.js (no cache here)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
-      # 3️⃣ Determine changed directories
+      # 3️⃣ Generate GitHub App token (for private repo)
+      - name: Setup GitHub App token
+        uses: tibdex/github-app-token@v1
+        id: generate_token
+        with:
+          app_id: ${{ secrets.GH_APP_ID }}
+          private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          repository: 5E-TECH/post_control_system
+
+      # 4️⃣ Determine changed directories (client/server)
       - name: Determine changed directories
         id: changes
         run: |
           git fetch origin main --depth=2
-          echo "Changed directories:"
-          CHANGED_DIRS=$(git diff --name-only HEAD~1 HEAD | cut -d'/' -f1 | sort -u | grep -E 'client|server' || true)
-          echo "$CHANGED_DIRS"
+          CHANGED_DIRS=$(git diff --name-only origin/main...HEAD | awk -F/ '{print $1}' | sort -u | tr '\n' ' ')
+          echo "changed=$CHANGED_DIRS" >> $GITHUB_OUTPUT
+          echo "🧾 Changed directories: $CHANGED_DIRS"
 
-          if echo "$CHANGED_DIRS" | grep -q "client"; then
-            echo "client_changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "client_changed=false" >> $GITHUB_OUTPUT
-          fi
-
-          if echo "$CHANGED_DIRS" | grep -q "server"; then
-            echo "server_changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "server_changed=false" >> $GITHUB_OUTPUT
-          fi
-
-      # 4️⃣ Build client if changed
-      - name: Build client
-        if: steps.changes.outputs.client_changed == 'true'
-        working-directory: ./client
-        run: |
-          echo "📦 Installing dependencies for client..."
-          npm ci
-          echo "⚙️ Building client..."
-          npm run build
-
-      # 5️⃣ Build server if changed
-      - name: Build server
-        if: steps.changes.outputs.server_changed == 'true'
-        working-directory: ./server
-        run: |
-          echo "📦 Installing dependencies for server..."
-          npm ci
-          echo "⚙️ Building server..."
-          npm run build || echo "No build step found for server."
-
-      # 6️⃣ Deploy to remote server via SSH
-      - name: Deploy to production server
-        uses: appleboy/ssh-action@v1.0.3
+      # 5️⃣ Cache client dependencies
+      - name: Cache client node_modules
+        if: contains(steps.changes.outputs.changed, 'client')
+        uses: actions/cache@v3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script_stop: true
-          script: |
-            echo "🚀 Starting deployment on remote server..."
+          path: client/node_modules
+          key: client-${{ hashFiles('client/package-lock.json') }}
+          restore-keys: client-
 
-            cd /var/www/post_control_system || exit 1
+      # 6️⃣ Cache server dependencies
+      - name: Cache server node_modules
+        if: contains(steps.changes.outputs.changed, 'server')
+        uses: actions/cache@v3
+        with:
+          path: server/node_modules
+          key: server-${{ hashFiles('server/package-lock.json') }}
+          restore-keys: server-
 
-            echo "📦 Pulling latest code..."
-            git fetch origin main
-            git reset --hard origin/main
+      # 7️⃣ Deploy to Production Server
+      - name: Deploy to Production Server
+        run: |
+          echo "${{ secrets.SERVER_SSH_KEY }}" > server_key.pem
+          chmod 600 server_key.pem
 
-            # Ensure permissions
-            echo "🧾 Fixing permissions..."
-            sudo mkdir -p /var/www/html
-            sudo chown -R $USER:$USER /var/www/html
+          ssh -i server_key.pem -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            set -e
 
-            # Deploy frontend if changed
-            if [ "${{ steps.changes.outputs.client_changed }}" = "true" ]; then
-              echo "⚙️ Building frontend..."
+            cd ${{ secrets.APP_PATH }}
+            echo '📦 Pulling latest code...'
+            git reset --hard
+            git pull https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/5E-TECH/post_control_system.git main
+
+            echo '🧾 Changed directories: ${{ steps.changes.outputs.changed }}'
+
+            # ===== Always clean build directories =====
+            rm -rf client/dist client/build server/dist
+
+            # ===== Build React frontend if changed =====
+            if [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
+              echo '📁 Building frontend...'
               cd client
-              npm ci
-              npm run build
-              echo "📤 Deploying frontend..."
+              npm ci --prefer-offline --legacy-peer-deps
+              NODE_OPTIONS='--max-old-space-size=1024' npm run build
               sudo rm -rf /var/www/html/*
               sudo cp -r dist/* /var/www/html/
-              echo "✅ Frontend deployed."
               cd ..
-            else
-              echo "🟡 No frontend changes detected."
+              echo '⚡️ Frontend deployed.'
             fi
 
-            # Deploy backend if changed
-            if [ "${{ steps.changes.outputs.server_changed }}" = "true" ]; then
-              echo "⚙️ Restarting server..."
+            # ===== Build NestJS backend if changed =====
+            if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]]; then
+              echo '🧠 Building backend...'
               cd server
-              npm ci
-              npm run build || echo "No build step found."
-              pm2 reload all || pm2 restart all
-              echo "✅ Backend deployed."
-            else
-              echo "🟡 No backend changes detected."
+              npm ci --prefer-offline --legacy-peer-deps
+              NODE_OPTIONS='--max-old-space-size=1024' npm run build
+              cd ..
             fi
 
-            echo "✅ Deployment completed successfully."
+            # ===== Restart backend if relevant code changed =====
+            if [[ '${{ steps.changes.outputs.changed }}' == *'server'* ]] || [[ '${{ steps.changes.outputs.changed }}' == *'client'* ]]; then
+              echo '🔁 Restarting backend systemd service...'
+              sudo systemctl restart nestapp.service
+              sudo systemctl status nestapp --no-pager
+            fi
+
+            echo '✅ Deployment completed successfully.'
+          "
