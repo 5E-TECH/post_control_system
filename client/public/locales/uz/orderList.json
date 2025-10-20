@@ -58,5 +58,14 @@
     "viloyat": "Viloyat",
     "tuman": "Tuman",
     "manzil": "Manzil"
-  }
+  },
+  "kutilayotganBuyurtmalar": "Kutilayotgan Buyurtmalar",
+  "hammaBuyurtmalar": "Hamma buyurtmalar",
+  "bekorBuyurtmalar": "Bekor qilingan Buyurtmalar",
+  "mijoz": "mijoz",
+  "stock": "ombor",
+  "harakat": "harakat",
+  "sotish": "Sotish",
+  "popupTitle": "Buyurtmani ortga qaytarasizmi?",
+  "send": "Buyurtmalarni yuborish"
 }

@@ -282,6 +282,13 @@ const Navbar = ({ role }: { role: string }) => {
               <ShoppingBag />
             </NavLink>
             <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
             <NavLink
               to={"/scan"}
               className={`flex items-center justify-center w-17 h-17 rounded-[50%] transition-all bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] absolute bottom-2`}
