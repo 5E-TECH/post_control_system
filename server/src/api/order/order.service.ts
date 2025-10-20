@@ -770,7 +770,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // search filter
       if (query.search) {
         qb.andWhere(
-          '(customer.name ILIKE :search OR customer.phone ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
           { search: `%${query.search}%` },
         );
       }
