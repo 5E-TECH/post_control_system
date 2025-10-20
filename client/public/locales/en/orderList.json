@@ -58,5 +58,14 @@
     "viloyat": "Region",
     "tuman": "District",
     "manzil": "Address"
-  }
+  },
+  "kutilayotganBuyurtmalar": "Pending Orders",
+  "hammaBuyurtmalar": "All Orders",
+  "bekorBuyurtmalar": "Cancelled Orders",
+  "mijoz": "Customer",
+  "stock": "Stock",
+  "harakat": "Action",
+  "sotish": "Sale",
+  "popupTitle": "Are you sure you want to cancel the order?",
+  "send":"Send orders"
 }

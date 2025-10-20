@@ -6,11 +6,14 @@ import EmptyPage from "../../../../../shared/components/empty-page";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useNavigate } from "react-router-dom";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
+import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 
 const CancelledOrders = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("orderList");
+  const { t: st } = useTranslation("status");
 
   // Pagination start
   const { getParam, setParam, removeParam } = useParamsHook();
@@ -72,7 +75,7 @@ const CancelledOrders = () => {
   return data?.data?.data?.length > 0 ? (
     <div>
       <table className="w-full">
-        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
+        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
           <tr>
             {data?.data?.data?.length ? (
               <th className="p-[20px] flex items-center">
@@ -109,43 +112,43 @@ const CancelledOrders = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MIJOZ</span>
+                <span>{t("mijoz")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>TEL RAQAMI</span>
+                <span>{t("phone")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MANZIL</span>
+                <span>{t("detail.address")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>FIRMA</span>
+                <span>{t("market")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>HOLATI</span>
+                <span>{t("status")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>NARXI</span>
+                <span>{t("price")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>OMBOR</span>
+                <span>{t("stock")}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
@@ -192,7 +195,7 @@ const CancelledOrders = () => {
                 <span
                   className={`py-2 px-3 rounded-2xl text-[13px] text-white bg-[#FB2C36]`}
                 >
-                  {item.status.toUpperCase()}
+                  {st(`${item.status}`)}
                 </span>
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
@@ -222,7 +225,7 @@ const CancelledOrders = () => {
           onClick={handleClick}
           className="w-[180px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!"
         >
-          Buyurtmalarni yuborish
+          {t("send")}
         </Button>
       </div>
     </div>
