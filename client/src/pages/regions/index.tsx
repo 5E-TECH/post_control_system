@@ -17,9 +17,11 @@ const Regions = () => {
     <div className="relative">
       {role === "courier" ? (
         <RegionMap regionName={region} />
+        
       ) : (
         <UzbekistanMap />
       )}
+      
 
       <button
         onClick={() => navigate("districts")}

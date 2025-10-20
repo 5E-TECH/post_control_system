@@ -31,6 +31,7 @@
     "createOrder": "Создать заказ",
     "customerInfo": "Информация о клиенте",
     "customerForm": {
+        "phone": "Номер телефона",
         "region": "Регион",
         "district": "Район",
         "name": "Имя",

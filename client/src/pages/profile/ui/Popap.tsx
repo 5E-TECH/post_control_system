@@ -129,7 +129,7 @@ const EditProfileModal = ({
           />
         </Form.Item>
 
-        <Form.Item label="Name" name="name">
+        <Form.Item label="Name">
           <Input placeholder="Name" />
         </Form.Item>
 
