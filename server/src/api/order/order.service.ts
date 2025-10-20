@@ -840,13 +840,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ? courier.tariff_center
           : courier.tariff_home;
 
-      const to_be_paid = sellOrderDto.extraCost
-        ? order.total_price - sellOrderDto.extraCost - marketTarif
-        : order.total_price - marketTarif;
+      const to_be_paid = Number(order.total_price) - Number(marketTarif);
 
-      const courier_to_be_paid = sellOrderDto.extraCost
-        ? order.total_price - sellOrderDto.extraCost - courierTarif
-        : order.total_price - courierTarif;
+      const courier_to_be_paid =
+        Number(order.total_price) - Number(courierTarif);
 
       const finalComment = generateComment(
         order.comment || '',
@@ -854,37 +851,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         sellOrderDto.extraCost || 0,
       );
 
-      // ✅ Order status va balans
-      if (marketCashbox.balance < 0) {
-        // Qarz mavjud
-        const qoplash = marketCashbox.balance + to_be_paid;
-        if (qoplash <= 0) {
-          // To‘liq yopildi
-          Object.assign(order, {
-            status: Order_status.PAID,
-            to_be_paid,
-            paid_amount: to_be_paid,
-          });
-        } else {
-          // Qisman yopildi
-          Object.assign(order, {
-            status: Order_status.PARTLY_PAID,
-            to_be_paid,
-            paid_amount: to_be_paid + marketCashbox.balance, // salbiy balansni hisobga oladi
-          });
-        }
-      } else {
-        // Hali to‘lanmagan
-        Object.assign(order, {
-          status: Order_status.SOLD,
-          to_be_paid,
-          paid_amount: 0,
-        });
-      }
-
       Object.assign(order, {
+        status: Order_status.SOLD,
+        to_be_paid,
         comment: finalComment,
-        sold_at: order.sold_at ?? Date.now(),
+        sold_at: Date.now(),
       });
 
       await queryRunner.manager.save(order);
@@ -906,24 +877,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }),
       );
 
-      if (sellOrderDto.extraCost) {
-        const extraCostMarket = queryRunner.manager.create(
-          CashboxHistoryEntity,
-          {
-            operation_type: Operation_type.EXPENSE,
-            cashbox_id: marketCashbox.id,
-            source_id: order.id,
-            source_type: Source_type.EXTRA_COST,
-            amount: sellOrderDto.extraCost,
-            balance_after: marketCashbox.balance,
-            comment: finalComment,
-            created_by: courier.id,
-          },
-        );
-
-        await queryRunner.manager.save(extraCostMarket);
-      }
-
       // ✅ Courier cashbox update
       courierCashbox.balance += courier_to_be_paid;
       await queryRunner.manager.save(courierCashbox);
@@ -942,6 +895,34 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       if (sellOrderDto.extraCost) {
+        // Market cashboxdan qo'shimcha xarajatni ayiramiz
+        marketCashbox.balance -= Number(sellOrderDto.extraCost);
+        await queryRunner.manager.save(marketCashbox);
+
+        // Market cashboxga history yozamiz
+        const extraCostMarket = queryRunner.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.EXTRA_COST,
+            amount: sellOrderDto.extraCost,
+            balance_after: marketCashbox.balance,
+            comment: finalComment,
+            created_by: courier.id,
+          },
+        );
+        // Market cashbox uchun historyni saqlaymiz
+        await queryRunner.manager.save(extraCostMarket);
+
+        // ==================================
+
+        // Courier cashboxdan qo'shimcha xarajatni ayiramiz
+        courierCashbox.balance -= Number(sellOrderDto.extraCost);
+        await queryRunner.manager.save(courierCashbox);
+
+        // Courier kassasiga hisyory yozamiz
         const extraCostCourier = queryRunner.manager.create(
           CashboxHistoryEntity,
           {
@@ -955,7 +936,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             created_by: courier.id,
           },
         );
-
+        // Kurier kassasi uchun tarixni saqlaymiz
         await queryRunner.manager.save(extraCostCourier);
       }
 
@@ -1328,82 +1309,161 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const rollbackComment = `[ROLLBACK] ${order.comment || ''}`;
 
-      // SOLD → pulni qaytarish
-      if (order.status === Order_status.SOLD && order.to_be_paid > 0) {
-        marketCashbox.balance -= order.to_be_paid;
-        await queryRunner.manager.save(marketCashbox);
+      const marketTarif =
+        order.where_deliver === Where_deliver.CENTER
+          ? market.tariff_center
+          : market.tariff_home;
 
+      const courierTarif =
+        order.where_deliver === Where_deliver.CENTER
+          ? courier.tariff_center
+          : courier.tariff_home;
+
+      // Qo'shimcha xarajatni olish (agar mavjud bo‘lsa)
+      const extraCostHistory = await queryRunner.manager.findOne(
+        CashboxHistoryEntity,
+        {
+          where: {
+            source_id: order.id,
+            source_type: Source_type.EXTRA_COST,
+            cashbox_id: marketCashbox.id,
+          },
+          order: { created_at: 'DESC' },
+        },
+      );
+
+      // === ROLLBACK FOR SOLD ===
+      if (order.status === Order_status.SOLD) {
+        const marketDiff = Number(order.total_price) - Number(marketTarif);
+        const courierDiff = Number(order.total_price) - Number(courierTarif);
+
+        // Market kassasidan ayrish
+        marketCashbox.balance -= marketDiff;
+        await queryRunner.manager.save(marketCashbox);
         await queryRunner.manager.save(
           queryRunner.manager.create(CashboxHistoryEntity, {
             operation_type: Operation_type.EXPENSE,
             cashbox_id: marketCashbox.id,
             source_id: order.id,
             source_type: Source_type.CORRECTION,
-            amount: order.to_be_paid,
+            amount: marketDiff,
             balance_after: marketCashbox.balance,
             comment: rollbackComment,
             created_by: user.id,
           }),
         );
 
-        courierCashbox.balance -= order.to_be_paid;
+        // Courier kassasidan ayrish
+        courierCashbox.balance -= courierDiff;
         await queryRunner.manager.save(courierCashbox);
-
         await queryRunner.manager.save(
           queryRunner.manager.create(CashboxHistoryEntity, {
             operation_type: Operation_type.EXPENSE,
             cashbox_id: courierCashbox.id,
             source_id: order.id,
             source_type: Source_type.CORRECTION,
-            amount: order.to_be_paid,
+            amount: courierDiff,
             balance_after: courierCashbox.balance,
             comment: rollbackComment,
             created_by: user.id,
           }),
         );
-      }
 
-      // CANCELLED → extraCost qaytarish
-      // CANCELLED → extraCost qaytarish
-      if (order.status === Order_status.CANCELLED) {
-        // CashboxHistory dan topamiz
-        const extraCostHistory = await queryRunner.manager.findOne(
-          CashboxHistoryEntity,
-          {
-            where: {
-              source_id: order.id,
-              source_type: Source_type.EXTRA_COST,
-            },
-            order: { created_at: 'DESC' }, // eng oxirgi yozuvni olish uchun
-          },
-        );
+        // Qo'shimcha xarajat rollback (agar mavjud va vaqti yaqin bo‘lsa)
+        const soldTime = Number(order.sold_at);
+        const extraCostTime = Number(extraCostHistory?.created_at);
+        const diff = Math.abs(soldTime - extraCostTime);
 
-        if (extraCostHistory && extraCostHistory.amount > 0) {
-          marketCashbox.balance += extraCostHistory.amount;
+        if (extraCostHistory && diff <= 5000) {
+          const extraAmount = Number(extraCostHistory.amount);
+
+          // Market kassasiga qaytarish
+          marketCashbox.balance += extraAmount;
           await queryRunner.manager.save(marketCashbox);
-
           await queryRunner.manager.save(
             queryRunner.manager.create(CashboxHistoryEntity, {
               operation_type: Operation_type.INCOME,
               cashbox_id: marketCashbox.id,
               source_id: order.id,
               source_type: Source_type.CORRECTION,
-              amount: extraCostHistory.amount,
+              amount: extraAmount,
               balance_after: marketCashbox.balance,
-              comment: rollbackComment,
+              comment: "Qo'shimcha xarajat orqaga qaytarildi",
+              created_by: user.id,
+            }),
+          );
+
+          // Courier kassasiga qaytarish
+          courierCashbox.balance += extraAmount;
+          await queryRunner.manager.save(courierCashbox);
+          await queryRunner.manager.save(
+            queryRunner.manager.create(CashboxHistoryEntity, {
+              operation_type: Operation_type.INCOME,
+              cashbox_id: courierCashbox.id,
+              source_id: order.id,
+              source_type: Source_type.CORRECTION,
+              amount: extraAmount,
+              balance_after: courierCashbox.balance,
+              comment: "Qo'shimcha xarajat orqaga qaytarildi",
               created_by: user.id,
             }),
           );
         }
       }
 
-      // PARTLY_SOLD / PARTLY_CANCELLED → faqat status rollback
-      order.status = Order_status.WAITING;
-      order.sold_at = null;
+      // === ROLLBACK FOR CANCELLED ===
+      if (order.status === Order_status.CANCELLED && extraCostHistory) {
+        const orderLastUpdateTime = Number(order.updated_at);
+        const extraCostTime = Number(extraCostHistory?.created_at);
+        const diff = Math.abs(orderLastUpdateTime - extraCostTime);
+
+        if (diff <= 5000) {
+          const extraAmount = Number(extraCostHistory.amount);
+
+          marketCashbox.balance += extraAmount;
+          await queryRunner.manager.save(marketCashbox);
+          await queryRunner.manager.save(
+            queryRunner.manager.create(CashboxHistoryEntity, {
+              operation_type: Operation_type.INCOME,
+              cashbox_id: marketCashbox.id,
+              source_id: order.id,
+              source_type: Source_type.CORRECTION,
+              amount: extraAmount,
+              balance_after: marketCashbox.balance,
+              comment:
+                "Bekor qilingan buyurtmaga yozilgan qo'shimcha xarajat orqaga qaytarildi",
+              created_by: user.id,
+            }),
+          );
+
+          courierCashbox.balance += extraAmount;
+          await queryRunner.manager.save(courierCashbox);
+          await queryRunner.manager.save(
+            queryRunner.manager.create(CashboxHistoryEntity, {
+              operation_type: Operation_type.INCOME,
+              cashbox_id: courierCashbox.id,
+              source_id: order.id,
+              source_type: Source_type.CORRECTION,
+              amount: extraAmount,
+              balance_after: courierCashbox.balance,
+              comment:
+                "Bekor qilingan buyurtmaga yozilgan qo'shimcha xarajat orqaga qaytarildi",
+              created_by: user.id,
+            }),
+          );
+        }
+      }
+
+      // === Update order status ===
+      Object.assign(order, {
+        status: Order_status.WAITING,
+        sold_at: null,
+        to_be_paid: 0,
+      });
       await queryRunner.manager.save(order);
 
       await queryRunner.commitTransaction();
-      return successRes({}, 200, 'Order WAITING ga qaytarildi');
+      return successRes({}, 200, 'Order WAITING holatiga qaytarildi');
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw catchError(err);
@@ -1598,83 +1658,84 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const start = Number(startDate);
       const end = Number(endDate);
 
-      // 1️⃣ Shu davrdagi barcha postlar
-      const allPosts = await this.postRepo
-        .createQueryBuilder('p')
-        .where('p.updated_at BETWEEN :start AND :end', { start, end })
-        .getMany();
-
-      const uniqueCourierIds = Array.from(
-        new Set(allPosts.map((post) => post.courier_id).filter(Boolean)),
-      );
-
-      if (uniqueCourierIds.length === 0) {
-        return successRes([], 200, 'No couriers found in this period');
-      }
-
-      // 2️⃣ Kuryerlarni olish
-      const allCouriers = await this.userRepo.find({
-        where: { id: In(uniqueCourierIds), role: Roles.COURIER },
-      });
-
-      const courierWithStats: {
-        courier: any;
-        totalOrders: number;
-        soldOrders: number;
-        successRate: number;
-      }[] = [];
-
       const validStatuses = [
         Order_status.SOLD,
         Order_status.PAID,
         Order_status.PARTLY_PAID,
       ];
 
-      // 3️⃣ Har bir kuryer uchun hisoblash
-      for (const courier of allCouriers) {
-        // Shu kuryerning postlari
-        const courierPosts = allPosts.filter(
-          (post) => post.courier_id === courier.id,
-        );
-        const postIds = courierPosts.map((p) => p.id);
+      // 🔹 1. Faqat so‘nggi 30 kun ichida yangilangan postlarni olish
+      const recentThreshold = end - 30 * 24 * 60 * 60 * 1000;
 
-        if (postIds.length === 0) {
-          courierWithStats.push({
-            courier,
-            totalOrders: 0,
-            soldOrders: 0,
-            successRate: 0,
-          });
-          continue;
+      const recentPosts = await this.postRepo
+        .createQueryBuilder('p')
+        .where('p.updated_at > :threshold', { threshold: recentThreshold })
+        .select(['p.id', 'p.courier_id'])
+        .getMany();
+
+      if (recentPosts.length === 0) {
+        return successRes([], 200, 'No couriers found in this period');
+      }
+
+      const courierMap = new Map<string, string[]>(); // courier_id -> [post_ids]
+      for (const p of recentPosts) {
+        if (!courierMap.has(p.courier_id)) courierMap.set(p.courier_id, []);
+        courierMap.get(p.courier_id)!.push(p.id);
+      }
+
+      const courierIds = Array.from(courierMap.keys());
+      const allCouriers = await this.userRepo.find({
+        where: { id: In(courierIds), role: Roles.COURIER },
+      });
+
+      // 🔹 2. Shu postlarga tegishli orderlarni olish (asosiy filtr)
+      const orders = await this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.post_id IN (:...postIds)', {
+          postIds: recentPosts.map((p) => p.id),
+        })
+        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
+        .select(['o.id', 'o.status', 'o.post_id', 'o.sold_at', 'o.created_at'])
+        .getMany();
+
+      // 🔹 3. Natijani kuryerlar bo‘yicha guruhlash
+      const statsByCourier: Record<number, { total: number; sold: number }> =
+        {};
+
+      for (const order of orders) {
+        const post = recentPosts.find((p) => p.id === order.post_id);
+        if (!post) continue;
+        const courierId = post.courier_id;
+        if (!statsByCourier[courierId])
+          statsByCourier[courierId] = { total: 0, sold: 0 };
+
+        statsByCourier[courierId].total++;
+        if (
+          validStatuses.includes(order.status) &&
+          order.sold_at && // ✅ null emasligini tekshiradi
+          order.sold_at >= start &&
+          order.sold_at <= end
+        ) {
+          statsByCourier[courierId].sold++;
         }
+      }
 
-        // 🔹 Shu kuryerning berilgan davrdagi barcha orderlari
-        const totalOrders = await this.orderRepo
-          .createQueryBuilder('o')
-          .where('o.post_id IN (:...postIds)', { postIds })
-          .andWhere('o.created_at BETWEEN :start AND :end', { start, end })
-          .getCount();
-
-        // 🔹 Shu kuryerning sotilgan orderlari
-        const soldOrders = await this.orderRepo
-          .createQueryBuilder('o')
-          .where('o.post_id IN (:...postIds)', { postIds })
-          .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
-          .andWhere('o.status IN (:...validStatuses)', { validStatuses })
-          .getCount();
-
+      // 🔹 4. Yakuniy natija tuzish
+      const courierWithStats = allCouriers.map((courier) => {
+        const stats = statsByCourier[courier.id] ?? { total: 0, sold: 0 };
         const successRate =
-          totalOrders > 0
-            ? Number(((soldOrders * 100) / totalOrders).toFixed(2))
+          stats.total > 0
+            ? Number(((stats.sold * 100) / stats.total).toFixed(2))
             : 0;
 
-        courierWithStats.push({
+        return {
           courier,
-          totalOrders,
-          soldOrders,
+          totalOrders: stats.total,
+          soldOrders: stats.sold,
           successRate,
-        });
-      }
+        };
+      });
+
       courierWithStats.sort((a, b) => b.successRate - a.successRate);
 
       return successRes(courierWithStats, 200, 'Couriers stats(sorted)');
@@ -1769,24 +1830,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const start = Number(startDate);
       const end = Number(endDate);
 
-      // 1️⃣ Shu davrdagi barcha postlar
-      const allPosts = await this.postRepo
-        .createQueryBuilder('p')
-        .where('p.updated_at BETWEEN :start AND :end', { start, end })
-        .andWhere('p.courier_id = :courierId', { courierId: user.id })
-        .getMany();
-
       const validStatuses = [
         Order_status.SOLD,
         Order_status.PAID,
         Order_status.PARTLY_PAID,
       ];
 
-      // 3️⃣ Har bir kuryer uchun hisoblash
-      // for (const post of allPosts) {
+      // 🔹 1. Faqat shu kuryerning OXIRGI faol postlari (masalan, so'nggi 30 kun ichida yangilangan)
+      const recentThreshold = end - 30 * 24 * 60 * 60 * 1000; // 30 kun oldingi timestamp
 
-      const postIds = allPosts.map((p) => p.id);
+      const courierPosts = await this.postRepo
+        .createQueryBuilder('p')
+        .where('p.courier_id = :courierId', { courierId: user.id })
+        .andWhere('p.updated_at > :threshold', { threshold: recentThreshold })
+        .select(['p.id'])
+        .getMany();
 
+      const postIds = courierPosts.map((p) => p.id);
       if (postIds.length === 0) {
         return successRes(
           {
@@ -1801,42 +1861,39 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // 🔹 Shu kuryerning berilgan davrdagi barcha orderlari
-      const totalOrders = await this.orderRepo
+      // 🔹 2. Shu postlar ichidagi shu davrdagi orderlar
+      const orderQuery = this.orderRepo
         .createQueryBuilder('o')
         .where('o.post_id IN (:...postIds)', { postIds })
-        .andWhere('o.created_at BETWEEN :start AND :end', { start, end })
-        .getCount();
+        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end });
 
-      // 🔹 Shu kuryerning sotilgan orderlari
-      const soldOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.post_id IN (:...postIds)', { postIds })
-        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
-        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
-        .getCount();
-
-      const canceledOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.post_id IN (:...postIds)', { postIds })
-        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
-        .andWhere('o.status IN (:...statuses)', {
-          statuses: [Order_status.CANCELLED],
-        })
-        .getCount();
-
-      const allSoldOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.post_id IN (:...postIds)', { postIds })
-        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
-        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
-        .getMany();
-
-      let profit: number = 0;
+      const [totalOrders, soldOrders, canceledOrders, soldOrderEntities] =
+        await Promise.all([
+          orderQuery.getCount(),
+          this.orderRepo
+            .createQueryBuilder('o')
+            .where('o.post_id IN (:...postIds)', { postIds })
+            .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+            .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+            .getCount(),
+          this.orderRepo
+            .createQueryBuilder('o')
+            .where('o.post_id IN (:...postIds)', { postIds })
+            .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
+            .andWhere('o.status = :status', { status: Order_status.CANCELLED })
+            .getCount(),
+          this.orderRepo
+            .createQueryBuilder('o')
+            .where('o.post_id IN (:...postIds)', { postIds })
+            .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
+            .andWhere('o.status IN (:...validStatuses)', { validStatuses })
+            .getMany(),
+        ]);
 
       const courier = await this.userRepo.findOne({ where: { id: user.id } });
 
-      for (const order of allSoldOrders) {
+      let profit = 0;
+      for (const order of soldOrderEntities) {
         profit +=
           order.where_deliver === Where_deliver.ADDRESS
             ? Number(courier?.tariff_home ?? 0)
