@@ -250,3 +250,12 @@
 .animate-slide-up-slow {
   animation: slide-up-slow .3s ease-in-out forwards;
 }
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
