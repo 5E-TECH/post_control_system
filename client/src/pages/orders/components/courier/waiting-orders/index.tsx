@@ -16,6 +16,9 @@ import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import Popup from "../../../../../shared/ui/Popup";
 import { AlertCircle, Minus, Plus, X } from "lucide-react";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 export type FieldType = {
   comment?: string;
@@ -23,6 +26,9 @@ export type FieldType = {
 };
 
 const WaitingOrders = () => {
+  const { t } = useTranslation("orderList");
+  const { t:st } = useTranslation("status");
+
   const navigate = useNavigate();
   const order = useRef<any | null>(null);
   const urlType = useRef<string | null>(null);
@@ -32,7 +38,8 @@ const WaitingOrders = () => {
   const limit = Number(getParam("limit") || 10);
   const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
     useOrder();
-  const { data } = getCourierOrders({ status: "waiting", page, limit });
+  const search = useSelector((state: RootState) => state.setUserFilter.search);
+  const { data } = getCourierOrders({ status: "waiting", search, page, limit });
   const total = data?.data?.total || 0;
 
   const [form] = Form.useForm<FieldType>();
@@ -195,17 +202,17 @@ const WaitingOrders = () => {
   return data?.data?.data?.length > 0 ? (
     <div>
       <table className="w-full">
-        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
+        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
           <tr>
             <th>#</th>
-            <th>MIJOZ</th>
-            <th>TEL RAQAMI</th>
-            <th>MANZIL</th>
-            <th>FIRMA</th>
-            <th>HOLATI</th>
-            <th>NARXI</th>
-            <th>OMBOR</th>
-            <th>HARAKAT</th>
+            <th>{t("mijoz")}</th>
+            <th>{t("phone")}</th>
+            <th>{t("detail.address")}</th>
+            <th>{t("market")}</th>
+            <th>{t("status")}</th>
+            <th>{t("price")}</th>
+            <th>{t("stock")}</th>
+            <th>{t("harakat")}</th>
           </tr>
         </thead>
         <tbody>
@@ -222,7 +229,7 @@ const WaitingOrders = () => {
               <td className="pl-10">{item?.market?.name}</td>
               <td className="pl-10">
                 <span className="py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500">
-                  {item.status.toUpperCase()}
+                  {st(`${item.status}`)}
                 </span>
               </td>
               <td className="pl-10">
@@ -235,13 +242,13 @@ const WaitingOrders = () => {
                     onClick={(e) => handleSellOrder(e, item)}
                     className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none!"
                   >
-                    Sotish
+                    {t("sotish")}
                   </Button>
                   <Button
                     onClick={(e) => handleCancelOrder(e, item)}
                     className="bg-red-500! text-[#ffffff]! border-none!"
                   >
-                    Bekor qilish
+                    {t("detail.cancel")}
                   </Button>
                 </div>
               </td>

@@ -18,6 +18,9 @@ import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 import Popup from "../../../../../shared/ui/Popup";
 import type { FieldType } from "../waiting-orders";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
+import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const statusColors: Record<string, string> = {
   new: "bg-blue-500",
@@ -33,6 +36,8 @@ const statusColors: Record<string, string> = {
 };
 
 const AllOrders = () => {
+  const { t } = useTranslation("orderList");
+  const { t: st } = useTranslation("status");
   const navigate = useNavigate();
 
   const {
@@ -62,8 +67,8 @@ const AllOrders = () => {
     }
   };
   // Pagination end
-
-  const { data } = getCourierOrders({ page, limit });
+  const search = useSelector((state: RootState) => state.setUserFilter.search);
+  const { data } = getCourierOrders({ search, page, limit });
 
   const total = data?.data?.total || 0;
 
@@ -274,49 +279,49 @@ const AllOrders = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MIJOZ</span>
+                <span>{t("mijoz")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>TEL RAQAMI</span>
+                <span>{t("phone")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>MANZIL</span>
+                <span>{t("detail.address")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>FIRMA</span>
+                <span>{t("market")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>HOLATI</span>
+                <span>{t("status")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>NARXI</span>
+                <span>{t("price")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>OMBOR</span>
+                <span>{t("stock")}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
             <th>
               <div className="flex items-center justify-center gap-30">
-                <span>HARAKAT</span>
+                <span>{t("harakat")}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
@@ -355,7 +360,7 @@ const AllOrders = () => {
                       statusColors[item.status] || "bg-slate-400"
                     }`}
                   >
-                    {item.status.toUpperCase()}
+                    {st(`${item.status}`)}
                   </span>
                 </td>
                 <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
@@ -371,13 +376,13 @@ const AllOrders = () => {
                         onClick={(e) => handleSellOrder(e, item)}
                         className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                       >
-                        Sotish
+                        {t("sotish")}
                       </Button>
                       <Button
                         onClick={(e) => handleCancelOrder(e, item)}
                         className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                       >
-                        Bekor qilish
+                        {t("detail.cancel")}
                       </Button>
                     </div>
                   ) : item?.status === "sold" ||
@@ -409,7 +414,7 @@ const AllOrders = () => {
         isShow={isShowModal}
         onCancel={() => setIsShowModal(false)}
         onConfirm={handleConfirm}
-        description="Buyurtmani ortga qaytarasizmi?"
+        description={t("popupTitle")}
       />
 
       <Popup isShow={isShow} onClose={closePopup}>

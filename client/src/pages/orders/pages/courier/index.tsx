@@ -2,19 +2,22 @@ import { memo } from "react";
 import Select from "../../components/select/select";
 import SearchInput from "../../../users/components/search-input";
 import { NavLink, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 const CourierOrders = () => {
+  const { t } = useTranslation("orderList");
+
   return (
     <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
       <h1 className="font-medium text-[20px] text-[#2E263DE5] dark:text-[#D4D0E9] px-5">
-        Bugungi buyurtmalar
+        {t("title")}
       </h1>
 
       <div className="flex justify-between px-5 pt-5 pb-7 items-center">
         <div className="flex gap-5">
-          <Select name="from" placeholder="From" className="w-[150px]"></Select>
+          <Select name="from" placeholder={t("placeholder.startDate")} className="w-[180px]"></Select>
 
-          <Select name="to" placeholder="To" className="w-[180px]"></Select>
+          <Select name="to" placeholder={t("placeholder.endDate")} className="w-[180px]"></Select>
         </div>
 
         <div className="flex gap-6">
@@ -29,7 +32,7 @@ const CourierOrders = () => {
               } pb-1`
             }
           >
-            Kutilayotgan buyurtmalar
+            {t("kutilayotganBuyurtmalar")}
           </NavLink>
 
           <NavLink
@@ -42,7 +45,7 @@ const CourierOrders = () => {
               } pb-1`
             }
           >
-            Hamma buyurtmalar
+            {t("hammaBuyurtmalar")}
           </NavLink>
 
           <NavLink
@@ -55,12 +58,12 @@ const CourierOrders = () => {
               } pb-1`
             }
           >
-            Bekor qilingan buyurtmalar
+            {t("bekorBuyurtmalar")}
           </NavLink>
         </div>
 
         <div>
-          <SearchInput placeholder="Buyurtmani qidirish..." />
+          <SearchInput placeholder={t("placeholder.searchOrder")} />
         </div>
       </div>
 
