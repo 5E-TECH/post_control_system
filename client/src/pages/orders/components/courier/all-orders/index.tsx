@@ -400,7 +400,7 @@ const AllOrders = () => {
         </tbody>
       </table>
 
-      <div className="flex justify-center">
+      <div className="flex justify-center mb-5">
         <Pagination
           showSizeChanger
           current={page}
