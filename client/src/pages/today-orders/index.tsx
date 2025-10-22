@@ -53,7 +53,7 @@ const TodayOrders = () => {
   const markets = data?.data || [];
 
   return (
-    <section className="flex items-center justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d4b]">
+    <section className="flex items-center justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d48]">
       {/* {!isLoading && markets?.length > 0 && ( */}
       <div className="flex justify-between w-full items-center p-10">
         <h2 className="text-[20px] font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5]">
