@@ -28,12 +28,12 @@ const CourierOldMails = () => {
   }
 
   return posts?.length > 0 ? (
-    <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
+    <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10 max-sm:grid-cols-1">
       {posts?.length ? (
         posts?.map((post: any) => (
           <div
             key={post?.id}
-            className={`min-h-[250px] ${
+            className={`min-h-[250px] border border-red-500  ${
               borderColorsByStatus[
                 post?.status as keyof typeof borderColorsByStatus
               ]
