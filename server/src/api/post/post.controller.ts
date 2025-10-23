@@ -112,8 +112,11 @@ export class PostController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
   @Get('orders/:id')
-  getAllOrdersByPostId(@Param('id') id: string) {
-    return this.postService.getPostsOrders(id);
+  getAllOrdersByPostId(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.postService.getPostsOrders(id, user);
   }
 
   @ApiOperation({ summary: 'Get rejected orders by post id' })
