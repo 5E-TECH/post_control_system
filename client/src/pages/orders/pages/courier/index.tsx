@@ -13,14 +13,25 @@ const CourierOrders = () => {
         {t("title")}
       </h1>
 
-      <div className="flex justify-between px-5 pt-5 pb-7 items-center">
-        <div className="flex gap-5">
-          <Select name="from" placeholder={t("placeholder.startDate")} className="w-[180px]"></Select>
+      <div className="flex justify-between px-5 pt-5 pb-7 max-[650px]:pb-0  items-center max-[650px]:flex-col">
+        <div className="min-[650px]:hidden transition-all mb-5 w-full">
+          <SearchInput className="w-full" placeholder={t("placeholder.searchOrder")} />
+        </div>
+        <div className="flex gap-5 max-[650px]:w-[100%] max-[650px]:mb-5">
+          <Select
+            name="from"
+            placeholder={t("placeholder.startDate")}
+            className="w-[180px]"
+          ></Select>
 
-          <Select name="to" placeholder={t("placeholder.endDate")} className="w-[180px]"></Select>
+          <Select
+            name="to"
+            placeholder={t("placeholder.endDate")}
+            className="w-[180px]"
+          ></Select>
         </div>
 
-        <div className="flex gap-6">
+        <div className="flex gap-6 max-md:mb-5">
           <NavLink
             end
             to="/courier-orders/orders"
@@ -62,7 +73,7 @@ const CourierOrders = () => {
           </NavLink>
         </div>
 
-        <div>
+        <div className="max-[650px]:hidden transition-all">
           <SearchInput placeholder={t("placeholder.searchOrder")} />
         </div>
       </div>

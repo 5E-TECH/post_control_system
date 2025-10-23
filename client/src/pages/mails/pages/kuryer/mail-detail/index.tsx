@@ -73,8 +73,8 @@ const CourierMailDetail = () => {
   return (
     <div className="flex flex-col gap-5 p-5 h-[800px]">
       <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
-        <div className="flex justify-between px-5 pt-5">
-          <h1 className="text-2xl mt-1">
+        <div className="flex justify-between px-5 pt-5 max-[650px]:flex-col">
+          <h1 className="text-2xl mt-1 max-[650px]:mb-5 ">
             <span>{regionName}</span> buyurtmalari
           </h1>
           <SearchInput placeholder="Qidiruv..." />

@@ -234,11 +234,14 @@ export class PostService {
     }
   }
 
-  async getPostsOrders(id: string) {
+  async getPostsOrders(id: string, user: JwtPayload) {
     try {
-      const allOrdersByPostId = await this.orderRepo.find({
+      const post = await this.postRepo.findOne({ where: { id } });
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+      let allOrdersByPostId = await this.orderRepo.find({
         where: [{ post_id: id }, { canceled_post_id: id }],
-
         relations: [
           'customer',
           'market',
@@ -247,6 +250,12 @@ export class PostService {
           'items.product',
         ],
       });
+
+      if (post.status === Post_status.SENT && user.role === Roles.COURIER) {
+        allOrdersByPostId = allOrdersByPostId.filter(
+          (o) => o.status === Order_status.ON_THE_ROAD,
+        );
+      }
 
       let homeOrders: number = 0;
       let centerOrders: number = 0;
@@ -291,82 +300,110 @@ export class PostService {
     }
   }
 
-  async sendPost(id: string, sendPostDto: SendPostDto): Promise<object> {
+  async sendPost(id: string, dto: SendPostDto): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      const post = await this.postRepo.findOne({
+      const { orderIds, courierId } = dto;
+
+      /**
+       * 1️⃣ Postni topish
+       */
+      const post = await queryRunner.manager.findOne(PostEntity, {
         where: { id },
       });
       if (!post) throw new NotFoundException('Post not found');
 
-      const { orderIds, courierId } = sendPostDto;
-
-      const isExistCourier = await this.userRepo.findOne({
+      /**
+       * 2️⃣ Kuryerni tekshirish
+       */
+      const courier = await queryRunner.manager.findOne(UserEntity, {
         where: { id: courierId, role: Roles.COURIER },
       });
-      if (!isExistCourier) throw new NotFoundException('Courier not found');
+      if (!courier) throw new NotFoundException('Courier not found');
 
-      if (!orderIds || orderIds.length === 0) {
-        throw new BadRequestException('You can not send empty post');
-      }
+      /**
+       * 3️⃣ Order IDs tekshirish
+       */
+      if (!orderIds || orderIds.length === 0)
+        throw new BadRequestException('You can not send an empty post');
 
-      // 1. Post ichidagi barcha orderlarni olish
-      const oldOrders = await this.orderRepo.find({
+      /**
+       * 4️⃣ Eski va yangi orderlarni olish
+       */
+      const oldOrders = await queryRunner.manager.find(OrderEntity, {
         where: { post_id: id },
       });
+      const newOrders = await queryRunner.manager.findBy(OrderEntity, {
+        id: In(orderIds),
+      });
 
-      // 2. DTO dan kelgan orderlarni olish
-      const newOrders = await this.orderRepo.findBy({ id: In(orderIds) });
-
-      if (newOrders.length !== orderIds.length) {
+      if (newOrders.length !== orderIds.length)
         throw new BadRequestException('Some orders not found');
+
+      /**
+       * 5️⃣ Postdan chiqarilgan orderlarni topish (removedOrders)
+       * - status o‘zgartirilmaydi
+       * - faqat post_id null qilinadi
+       */
+      const removedOrders = oldOrders.filter((o) => !orderIds.includes(o.id));
+      for (const order of removedOrders) {
+        order.post_id = null;
+        await queryRunner.manager.save(order);
       }
 
-      // 3. Eski post ichidagi, lekin DTO da bo‘lmagan orderlarni ajratib olish
-      const removedOrders = oldOrders.filter((o) => !orderIds.includes(o.id));
-
-      // 4. DTO ichidagi orderlarni update qilish
+      /**
+       * 6️⃣ Yangi orderlarni ON_THE_ROAD holatiga o‘tkazish
+       */
       for (const order of newOrders) {
+        order.post_id = post.id;
         order.status = Order_status.ON_THE_ROAD;
         await queryRunner.manager.save(order);
       }
 
-      // 5. DTO ichida bo‘lmagan orderlarni null qilish
-      for (const order of removedOrders) {
-        order.post_id = null;
-        order.status = Order_status.RECEIVED; // yoki siz xohlagan default status
-        await queryRunner.manager.save(order);
-      }
-
-      // 6. Post ichidagi jami narx va quantity qaytadan hisoblash
-      const updatedOrders = await this.orderRepo.find({
-        where: { post: { id: post.id } },
+      /**
+       * 7️⃣ Postning yangilangan ichki buyurtmalarini olish
+       */
+      const activeOrders = await queryRunner.manager.find(OrderEntity, {
+        where: { post_id: id },
       });
 
-      const total_price = updatedOrders.reduce(
-        (acc, o) => acc + o.total_price,
+      const total_price = activeOrders.reduce(
+        (sum, o) => sum + Number(o.total_price),
         0,
       );
-      const quantity = updatedOrders.length;
+      const quantity = activeOrders.length;
 
-      Object.assign(post, {
-        courier_id: courierId,
-        post_total_price: total_price,
-        order_quantity: quantity,
-        status: Post_status.SENT,
-      });
+      /**
+       * 8️⃣ Bo‘sh post jo‘natilmasin!
+       */
+      if (quantity === 0) {
+        throw new BadRequestException(
+          'Post cannot be empty. At least one order is required.',
+        );
+      }
 
+      /**
+       * 9️⃣ Postni yangilash
+       */
+      post.courier_id = courierId;
+      post.post_total_price = total_price;
+      post.order_quantity = quantity;
+      post.status = Post_status.SENT;
       await queryRunner.manager.save(post);
+
+      /**
+       * 🔟 Natijani qaytarish
+       */
       const updatedPost = await queryRunner.manager.findOne(PostEntity, {
         where: { id },
         relations: ['courier'],
       });
 
       await queryRunner.commitTransaction();
-      return successRes(updatedPost, 200, 'Post updated successfully');
+      return successRes(updatedPost, 200, 'Post sent successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

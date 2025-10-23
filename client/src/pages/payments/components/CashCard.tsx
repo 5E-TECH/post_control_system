@@ -42,7 +42,7 @@ export const CashboxCard = ({ raw, show, setShow }: Props) => {
 
           <button
             onClick={() => setShow((prev) => !prev)}
-            className="ml-2 p-2 rounded-full hover:bg-white/10"
+            className="ml-2 p-2 cursor-pointer rounded-full hover:bg-white/10"
             aria-label={show ? "Hide balance" : "Show balance"}
             title={show ? "Hide balance" : "Show balance"}
           >

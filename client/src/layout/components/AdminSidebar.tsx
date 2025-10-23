@@ -14,7 +14,7 @@ import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 
 const AdminSidebar = () => {
-  const { t } = useTranslation(['sidebar'])
+  const { t } = useTranslation(["sidebar"]);
 
   const links = [
     { to: "/", icon: <House />, label: t("dashboard"), end: true },
