@@ -257,7 +257,7 @@ const WaitingOrders = () => {
         </tbody>
       </table>
 
-      <div className="flex justify-center pt-5">
+      <div className="flex justify-center pt-5 pb-5">
         <Pagination
           showSizeChanger
           current={page}
