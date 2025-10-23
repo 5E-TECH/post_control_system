@@ -919,13 +919,37 @@ export class UserService {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
     try {
+      /**
+       * 1️⃣ Mijozni topish
+       */
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id, role: Roles.CUSTOMER },
       });
-      if (!customer) {
-        throw new NotFoundException('Customer not found');
+      if (!customer) throw new NotFoundException('Customer not found');
+
+      /**
+       * 2️⃣ Mijozning buyurtmasini topish
+       */
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { customer_id: customer.id },
+      });
+      if (!order) throw new NotFoundException('User order not found');
+
+      /**
+       * 3️⃣ Faqat NEW yoki RECEIVED holatdagi buyurtmada manzilni o‘zgartirish mumkin
+       */
+      const editableStatuses = [Order_status.NEW, Order_status.RECEIVED];
+      if (!editableStatuses.includes(order.status)) {
+        throw new BadRequestException(
+          'You can not change the address for this order',
+        );
       }
+
+      /**
+       * 4️⃣ Tuman (district)ni tekshirish va yangilash
+       */
       if (dto.district_id) {
         const district = await queryRunner.manager.findOne(DistrictEntity, {
           where: { id: dto.district_id },
@@ -934,79 +958,85 @@ export class UserService {
         customer.district_id = dto.district_id;
       }
 
-      if (dto.address) customer.address = dto.address;
+      /**
+       * 5️⃣ Manzilni (address) yangilash
+       */
+      if (dto.address) {
+        customer.address = dto.address;
+      }
 
       await queryRunner.manager.save(customer);
 
+      /**
+       * 6️⃣ Yangilangan mijozni district bilan birga qayta olish
+       */
       const updatedCustomer = await queryRunner.manager.findOne(UserEntity, {
         where: { id, role: Roles.CUSTOMER },
         relations: ['district'],
       });
-      if (!updatedCustomer) {
-        throw new NotFoundException('Customer not found');
-      }
+      if (!updatedCustomer) throw new NotFoundException('Customer not found');
 
-      const customerOrder = await queryRunner.manager.findOne(OrderEntity, {
-        where: { customer_id: customer.id },
-      });
-      if (!customerOrder) {
-        throw new NotFoundException('Users order not found');
-      }
+      /**
+       * 7️⃣ Agar buyurtma RECEIVED bo‘lsa va post mavjud bo‘lsa — Postni yangilash
+       */
+      if (order.status === Order_status.RECEIVED && order.post_id) {
+        const assignedRegion = updatedCustomer.district?.assigned_region;
+        if (!assignedRegion)
+          throw new BadRequestException('District has no assigned region');
 
-      if (
-        customerOrder.status === Order_status.RECEIVED &&
-        customerOrder.post_id
-      ) {
-        let hasNewPost = await queryRunner.manager.findOne(PostEntity, {
-          where: {
-            region_id: updatedCustomer.district.assigned_region,
-            status: Post_status.NEW,
-          },
+        // 🔹 Shu region uchun yangi yoki mavjud NEW holatdagi postni topamiz
+        let newPost = await queryRunner.manager.findOne(PostEntity, {
+          where: { region_id: assignedRegion, status: Post_status.NEW },
         });
-        if (!hasNewPost) {
-          hasNewPost = queryRunner.manager.create(PostEntity, {
-            region_id: updatedCustomer.district.assigned_region,
+
+        // 🔹 Agar topilmasa, yangisini yaratamiz
+        if (!newPost) {
+          newPost = queryRunner.manager.create(PostEntity, {
+            region_id: assignedRegion,
             qr_code_token: generateCustomToken(),
             post_total_price: 0,
             order_quantity: 0,
             status: Post_status.NEW,
           });
-          hasNewPost = await queryRunner.manager.save(hasNewPost);
+          newPost = await queryRunner.manager.save(newPost);
         }
-        const oldPost = await queryRunner.manager.findOne(PostEntity, {
-          where: { id: customerOrder.post_id },
-        });
-        if (!oldPost) {
-          throw new NotFoundException('Old post not found');
-        }
-        customerOrder.post_id = hasNewPost.id;
-        await queryRunner.manager.save(customerOrder);
 
-        if (
-          Number(oldPost.post_total_price) ===
-            Number(customerOrder.total_price) &&
-          oldPost.order_quantity === 1
-        ) {
+        // 🔹 Eski postni topamiz
+        const oldPost = await queryRunner.manager.findOne(PostEntity, {
+          where: { id: order.post_id },
+        });
+        if (!oldPost) throw new NotFoundException('Old post not found');
+
+        // 🔹 Buyurtmani yangi postga o‘tkazamiz
+        order.post_id = newPost.id;
+        await queryRunner.manager.save(order);
+
+        // 🔹 Eski postni yangilaymiz yoki o‘chiramiz
+        const remainingTotal =
+          Number(oldPost.post_total_price) - Number(order.total_price);
+        const remainingQuantity = oldPost.order_quantity - 1;
+
+        if (remainingQuantity <= 0 || remainingTotal <= 0) {
           await queryRunner.manager.delete(PostEntity, { id: oldPost.id });
         } else {
-          oldPost.post_total_price -= customerOrder.total_price;
-          oldPost.order_quantity--;
+          oldPost.post_total_price = remainingTotal;
+          oldPost.order_quantity = remainingQuantity;
           await queryRunner.manager.save(oldPost);
         }
 
-        hasNewPost.post_total_price =
-          Number(hasNewPost.post_total_price) +
-          Number(customerOrder.total_price);
-        hasNewPost.order_quantity++;
-        await queryRunner.manager.save(hasNewPost);
+        // 🔹 Yangi postni yangilaymiz
+        newPost.post_total_price =
+          Number(newPost.post_total_price) + Number(order.total_price);
+        newPost.order_quantity += 1;
+        await queryRunner.manager.save(newPost);
       }
 
+      /**
+       * 8️⃣ Hammasi muvaffaqiyatli bo‘lsa — transaction commit qilinadi
+       */
       await queryRunner.commitTransaction();
-      return successRes(
-        updatedCustomer,
-        200,
-        'Customer updated (district/address)',
-      );
+
+      return successRes(updatedCustomer, 200, 'Customer updated successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
