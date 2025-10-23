@@ -85,7 +85,7 @@ const Dashboard: React.FC = () => {
                     bugungiHolat >= 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                   {t("current_situation")}
+                  {t("current_situation")}
                 </h2>
                 <div
                   className={`text-4xl font-bold ${
@@ -152,7 +152,7 @@ const Dashboard: React.FC = () => {
                   </BarChart>
                 </ResponsiveContainer>
                 <div className="mt-6 pt-6 rounded-xl p-4 dark:bg-[#312D48]">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="text-center">
                       <div className="text-sm font-medium text-gray-600 mb-1 dark:text-white">
                         {t("balans")}
@@ -186,7 +186,7 @@ const Dashboard: React.FC = () => {
             <h3 className="text-xl font-bold text-gray-800 mb-6 dark:text-white">
               {t("title")}
             </h3>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Markets */}
               <div className="rounded-xl shadow-lg p-4">
                 <h4 className="text-lg font-bold text-gray-800 mb-4 text-center dark:text-white">
@@ -197,7 +197,7 @@ const Dashboard: React.FC = () => {
                     <SkeletonBox key={i} className="w-full h-6 mb-2" />
                   ))
                 ) : (
-                  <div className="overflow-y-scroll h-[395px] custom-scrollbar">
+                  <div className="overflow-x-auto overflow-y-scroll h-[395px] custom-scrollbar">
                     <table className="w-full border-collapse relative">
                       <thead className="sticky top-0 bg-white dark:bg-[var(--color-dark-bg-py)] z-10">
                         <tr>
@@ -274,10 +274,7 @@ const Dashboard: React.FC = () => {
                       </thead>
                       <tbody>
                         {couriers?.map((c: any, idx: number) => (
-                          <tr
-                            key={idx}
-                            className="border-b border-gray-200"
-                          >
+                          <tr key={idx} className="border-b border-gray-200">
                             <td className="data-cell p-3" data-cell="NAME">
                               <div className="font-semibold text-gray-600 dark:text-white">
                                 {c.name}
@@ -331,7 +328,7 @@ const Dashboard: React.FC = () => {
                     balans >= 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                   {t("totalBalans")}
+                  {t("totalBalans")}
                 </h4>
                 <div
                   className={`text-3xl font-bold ${

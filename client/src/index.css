@@ -100,9 +100,8 @@
 }
 
 .dark .dark-dropdown .ant-select-item-option-active {
-  background-color: #312d4b !important;
-  transition: all;
-}
+  background-color: #312d4b !important;transition: all;
+  }
 
 .scroll-order-items::-webkit-scrollbar {
   display: none;
