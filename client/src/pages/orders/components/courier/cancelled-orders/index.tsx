@@ -208,7 +208,7 @@ const CancelledOrders = () => {
           ))}
         </tbody>
       </table>
-      <div className="flex justify-center">
+      <div className="flex justify-center mb-5">
         <Pagination
           showSizeChanger
           current={page}
@@ -218,12 +218,12 @@ const CancelledOrders = () => {
         />
       </div>
 
-      <div className="flex justify-end px-5">
+      <div className="flex justify-end px-5 mb-5 max-[650px]:w-full">
         <Button
           disabled={isPending}
           loading={isPending}
           onClick={handleClick}
-          className="w-[180px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!"
+          className="w-[180px]! max-[650px]:w-full! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!"
         >
           {t("send")}
         </Button>

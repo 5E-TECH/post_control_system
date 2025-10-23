@@ -44,7 +44,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
           <div
             onClick={() => handleHistoryPopup(item.id)}
             key={inx}
-            className="flex gap-20 mb-3 border-b border-gray-300 justify-between"
+            className="flex cursor-pointer gap-20 mb-3 border-b border-gray-300 justify-between"
           >
             <div>
               <h3 className="text-[25px] font-medium">

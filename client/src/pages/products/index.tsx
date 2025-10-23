@@ -100,7 +100,7 @@ const Products = () => {
   if (pathname.startsWith('/products/create')) return <Outlet />;
 
   return !permission ? (
-    <div className="mt-6 w-full">
+    <div className="mt-6 w-full dark:bg-[#312d48]">
       <h2 className="text-2xl font-medium ml-4 mb-5">{t('title')}</h2>
 
       {/* Filter va Add product qismi */}
