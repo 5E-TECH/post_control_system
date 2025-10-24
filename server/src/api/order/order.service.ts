@@ -404,6 +404,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id },
         relations: ['items', 'items.product', 'market', 'customer'],
       });
+      console.log(newOrder);
+
       if (!newOrder) {
         throw new NotFoundException('Order not found');
       }

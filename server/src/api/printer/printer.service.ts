@@ -56,16 +56,22 @@ export class PrinterService {
         return num.toLocaleString('en-US') + " so'm";
       };
 
-      const orders = await this.orderRepo.find({
-        where: { id: In(orderIds) },
-        relations: [
-          'customer',
-          'market',
-          'customer.district',
-          'items',
-          'items.product',
-        ],
-      });
+      const formatDate = (date: number | string): string => {
+        const createdDate = new Date(Number(date) || Date.now());
+        return createdDate.toLocaleDateString('uz-UZ');
+      };
+
+      const orders = await this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .where('order.id IN (:...ids)', { ids: orderIds })
+        .getMany();
+
+      console.log(orders);
 
       if (!orders.length) {
         throw new BadRequestException('Hech qanday buyurtma topilmadi');
@@ -82,6 +88,7 @@ export class PrinterService {
           district: order.customer?.district?.name ?? 'N/A',
           address: order.customer?.address ?? 'N/A',
           qrCode: order.qr_code_token ?? '',
+          created_time: formatDate(order.created_at),
           items: (order.items || []).map((i) => ({
             product: i.product?.name ?? 'N/A',
             quantity: i.quantity ?? 1,
@@ -114,8 +121,8 @@ export class PrinterService {
       if (!order) continue;
 
       try {
-        await new Promise((r) => setTimeout(r, 5000));
         await this.printSingle(order);
+        await new Promise((r) => setTimeout(r, 5000));
       } catch (error: any) {
         console.error(
           `❌ Print error for order ${order.orderId}:`,
@@ -140,24 +147,28 @@ export class PrinterService {
       address,
       market,
       comment,
+      created_time,
+      items,
     } = order;
 
     const tspl = `
 SIZE 100 mm,60 mm
 GAP 2 mm,0 mm
 CLS
-TEXT 325,20,"4",0,1,1,"Beepost"
+TEXT 175,20,"4",0,1,1,"Beepost"
+TEXT 350,20,"3",0,1,1,"(${created_time})"
 TEXT 20,80,"4",0,1,1,"${customerName.length > 20 ? `${customerName.slice(0, 19)}...` : customerName}"
 TEXT 20,120,"4",0,1,1,"${customerPhone}"
 TEXT 20,150,"3",0,1,1,"-----------------------------"
 TEXT 20,180,"3",0,1,1,"Narxi:"
 TEXT 160,180,"3",0,1,1,"${orderPrice}"
 TEXT 20,220,"3",0,1,1,"Tuman: ${district}"
-TEXT 20,260,"3",0,1,1,"Manzil: ${address}"
-TEXT 20,300,"3",0,1,1,"Izoh: ${comment || '-'}"
-TEXT 20,330,"2",0,1,1,"${market}"
+TEXT 20,260,"3",0,1,1,"Manzil: ${address || '-'}"
+TEXT 20,300,"3",0,1,1,"Mahsulot: ${items[0].product}-${items[0].quantity}"
+TEXT 20,340,"3",0,1,1,"Izoh: ${comment || '-'}"
+TEXT 20,370,"2",0,1,1,"Jo'natuvchi: ${market}"
 QRCODE 560,50,L,8,A,0,"${qrCode}"
-BARCODE 100,370,"128",100,1,0,2,2,"${qrCode}"
+BARCODE 100,400,"128",50,1,0,2,2,"${qrCode}"
 PRINT 1`.trim();
 
     console.log(`🖨️ Printing order: ${orderId}`);
