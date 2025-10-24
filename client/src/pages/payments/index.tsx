@@ -328,7 +328,7 @@ const Payments = () => {
     
     {/* Close button */}
     <button
-      onClick={() => setShowCurier(false)}
+      onClick={() => hendlerClose()}
       className="absolute top-3 right-3 text-gray-500 hover:text-red-500 transition-colors"
     >
       <X size={24} />

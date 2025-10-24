@@ -3,6 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import MailSkeleton from "../../choose-mail/MailSkeleton";
+import { useDispatch } from "react-redux";
+import {
+  setHideSend,
+  setRegionName,
+} from "../../../../../shared/lib/features/regionSlice";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -19,12 +24,20 @@ const borderColorsByStatus = {
 
 const CourierOldMails = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
   const { getOldPostsCourier } = usePost();
   const { data, isLoading } = getOldPostsCourier();
   const posts = Array.isArray(data?.data) ? data?.data : [];
 
-  if(isLoading) {
-    return <MailSkeleton/>
+  const handleNavigate = (post: any) => {
+    navigate(`/courier-mails/${post?.id}`);
+    dispatch(setRegionName(post?.region?.name));
+    dispatch(setHideSend(true));
+  };
+
+  if (isLoading) {
+    return <MailSkeleton />;
   }
 
   return posts?.length > 0 ? (
@@ -42,11 +55,7 @@ const CourierOldMails = () => {
                 ? "bg-red-500 dark:bg-[#73374d]"
                 : "bg-[#45C1FF] dark:bg-[#2a4c76]"
             } text-white border-0`}
-            onClick={() =>
-              navigate(`/courier-mails/${post?.id}?status=${post?.status}`, {
-                state: { regionName: post?.region?.name, hideSend: true },
-              })
-            }
+            onClick={() => handleNavigate(post)}
           >
             <p>{post?.status}</p>
             <h1 className="text-[30px]">
