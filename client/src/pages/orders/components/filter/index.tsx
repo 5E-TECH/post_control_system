@@ -125,7 +125,7 @@ const Filter = () => {
         />
         <div className="flex min-[900px]:justify-end">
           <Button
-            className="w-[150px]! max-[651px]:w-full! h-[45px]!"
+            className="w-[150px]! max-[651px]:w-full! h-[45px]! dark:bg-[#342d4a]! dark:text-gray-300!"
             onClick={handleClear}
           >
             <Eraser className="w-4 h-4 mr-2" />
@@ -142,7 +142,10 @@ const Filter = () => {
         >
           <DatePicker.RangePicker
             format="YYYY-MM-DD"
-            className="w-full h-[38px]"
+            className="w-full h-[38px] 
+      dark:bg-[#342d4a]! 
+      dark:[&_.ant-picker-input>input]:text-white! 
+      dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
             onChange={handleDateChange}
             placeholder={[t("placeholder.startDate"), t("placeholder.endDate")]}
           />
