@@ -1,6 +1,5 @@
 import { memo, useEffect, useState } from "react";
 import {
-  useLocation,
   useNavigate,
   useParams,
   useSearchParams,
@@ -10,11 +9,17 @@ import { Trash } from "lucide-react";
 import { Button } from "antd";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const CourierMailDetail = () => {
+const regionName = useSelector((state: RootState) => state.region);
+
   const { id } = useParams();
-  const { state } = useLocation();
-  const regionName = state?.regionName;
+  console.log("2222222222222222",regionName);
+  
+  // const { state } = useLocation();
+  // const regionName = state.regionName;
 
   const { getPostById, receivePost } = usePost();
   const { mutate: receivePostsByPostId, isPending } = receivePost();
@@ -68,14 +73,15 @@ const CourierMailDetail = () => {
     }
   }, [postData]);
 
-  const hideSend = state?.hideSend;
+  const hideSend = regionName.hideSend;  
+
 
   return (
     <div className="flex flex-col gap-5 p-5 h-[800px]">
       <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
         <div className="flex justify-between px-5 pt-5 max-[650px]:flex-col">
           <h1 className="text-2xl mt-1 max-[650px]:mb-5 ">
-            <span>{regionName}</span> buyurtmalari
+            <span>{regionName.regionName}</span> buyurtmalari
           </h1>
           <SearchInput placeholder="Qidiruv..." />
         </div>
@@ -104,7 +110,7 @@ const CourierMailDetail = () => {
                 ) : null}
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    MIJOZ ISMI
+                    MIJOZ ISMIiiiiii
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
