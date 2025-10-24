@@ -327,7 +327,7 @@ const Payments = () => {
           <div className="bg-white rounded-md w-[1000px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
             {/* Yopish tugmasi */}
             <button
-              onClick={() => setShowCurier(false)}
+              onClick={() => hendlerClose()}
               className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
             >
               <X size={30} />
