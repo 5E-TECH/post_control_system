@@ -8,6 +8,7 @@ export interface PrintOrder {
   district: string;
   address: string;
   qrCode: string;
+  created_time: string;
   items: {
     product: string;
     quantity: number;

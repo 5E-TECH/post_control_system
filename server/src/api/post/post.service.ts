@@ -431,6 +431,9 @@ export class PostService {
       if (!post) {
         throw new NotFoundException('Post not found');
       }
+      if (post.status != Post_status.SENT) {
+        throw new BadRequestException('Can not reveive post with this status!');
+      }
 
       // DTO orqali kelgan order_id lar
       const waitingOrderIds = ordersArrayDto.order_ids;
@@ -600,6 +603,11 @@ export class PostService {
 
       if (!post) {
         throw new NotFoundException('Post not found');
+      }
+      if (post.status != Post_status.CANCELED) {
+        throw new BadRequestException(
+          'Post with this status can not be received!',
+        );
       }
 
       // DTO orqali kelgan order_id lar
