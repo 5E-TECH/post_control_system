@@ -102,6 +102,13 @@ const Filter = () => {
       <div className="w-full grid grid-cols-4 gap-5 max-[900px]:grid-cols-3 max-[750px]:grid-cols-2 max-[350px]:grid-cols-1">
         {role !== "market" && (
           <Select
+            showSearch
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              String(option?.label ?? "")
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }
             value={form.marketId}
             onChange={handleSelectChange("marketId")}
             placeholder={t("placeholder.selectMarket")}
@@ -109,13 +116,22 @@ const Filter = () => {
             options={marketOptions}
           />
         )}
+
         <Select
+          showSearch
+          optionFilterProp="label"
+          filterOption={(input, option) =>
+            String(option?.label ?? "")
+              .toLowerCase()
+              .includes(input.toLowerCase())
+          }
           value={form.regionId}
           onChange={handleSelectChange("regionId")}
           placeholder={t("placeholder.selectRegion")}
           className="w-full h-[45px]!"
           options={regionOptions}
         />
+
         <Select
           value={form.status}
           onChange={handleSelectChange("status")}
