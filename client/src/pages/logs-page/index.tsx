@@ -4,7 +4,7 @@ import animationData from "../../shared/assets/animation/Developer cyan.json"; /
 
 const LogsPage = () => {
   return (
-    <div className="flex flex-col items-center justify-center h-[80vh] bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col items-center justify-center h-[80vh] bg-gray-50 dark:bg-[#312d48]">
       <div className="w-[300px] md:w-[400px]">
         <Lottie animationData={animationData} loop={true} />
       </div>

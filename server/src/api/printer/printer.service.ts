@@ -114,8 +114,8 @@ export class PrinterService {
       if (!order) continue;
 
       try {
+        await new Promise((r) => setTimeout(r, 5000));
         await this.printSingle(order);
-        await new Promise((r) => setTimeout(r, 2000));
       } catch (error: any) {
         console.error(
           `❌ Print error for order ${order.orderId}:`,

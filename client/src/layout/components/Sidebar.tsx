@@ -15,10 +15,10 @@ import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 
 const Sidebar = () => {
-  const { t } = useTranslation(['sidebar'])
+  const { t } = useTranslation(["sidebar"]);
 
   const links = [
-    { to: "/", icon: <House />, label: t("dashboard"), end: true },
+    { to: "/", icon: <House />, label: t("dashboard") },
     { to: "/orders", icon: <ShoppingBag />, label: t("orders") },
     {
       to: "/order/markets/new-orders",

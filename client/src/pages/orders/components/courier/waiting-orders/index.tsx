@@ -355,10 +355,14 @@ const WaitingOrders = () => {
             </div>
           )}
 
-          <Form form={form} onFinish={onFinish}>
+          <Form form={form} onFinish={onFinish} layout="vertical">
             <div>
-              <Form.Item name="extraCost" className="py-4!">
-                <span>Qo'shimcha (pul)</span>
+              <Form.Item
+                name="extraCost"
+                className="py-4!"
+                label="Qo'shimcha (pul)"
+              >
+                {/* <span>Qo'shimcha (pul)</span> */}
                 <InputNumber
                   placeholder="Qo'shimcha pul"
                   className="h-[40px]! w-full!"
@@ -371,8 +375,8 @@ const WaitingOrders = () => {
             </div>
 
             <div className={`pt-${partleSoldShow ? 0 : 3}`}>
-              <Form.Item name="comment">
-                <span>Izoh</span>
+              <Form.Item name="comment" label="Izoh">
+                {/* <span>Izoh</span> */}
                 <Input.TextArea
                   className="py-4!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"

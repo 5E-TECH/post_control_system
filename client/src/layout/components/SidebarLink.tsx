@@ -7,11 +7,11 @@ interface SidebarLinkProps {
   end?: boolean;
 }
 
-const SidebarLink: React.FC<SidebarLinkProps> = ({ to, icon, label, end }) => {
+const SidebarLink: React.FC<SidebarLinkProps> = ({ to, icon, label }) => {
   return (
     <NavLink
       to={to}
-      end={end}
+      // end={end}
       className={({ isActive }) =>
         `flex gap-2 pl-5.5 py-2 ${
           isActive

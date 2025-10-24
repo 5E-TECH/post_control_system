@@ -894,6 +894,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }),
       );
 
+      console.log(sellOrderDto.extraCost, 'AAAAAAAAAAAAAa');
+
       if (sellOrderDto.extraCost) {
         // Market cashboxdan qo'shimcha xarajatni ayiramiz
         marketCashbox.balance -= Number(sellOrderDto.extraCost);
@@ -980,6 +982,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         cancelOrderDto.comment,
         cancelOrderDto.extraCost,
       );
+      console.log(cancelOrderDto.extraCost, 'BBBBBBBBBBBBBB');
+
       if (cancelOrderDto.extraCost) {
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
           where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
