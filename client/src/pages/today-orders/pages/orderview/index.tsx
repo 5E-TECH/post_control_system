@@ -37,6 +37,7 @@ const OrderView = () => {
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
   const [deleteId, setDeleteId] = useState("");
+  const [isPrintDisabled, setIsPrintDisabled] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const navigate = useNavigate();
   const [_, setOpenMenuId] = useState("");
@@ -85,16 +86,35 @@ const OrderView = () => {
       },
     });
   };
+  // const handlePrint = () => {
+  //   const orderids = {
+  //     orderIds: selectedIds,
+  //   };
+  //   createPrint.mutate(orderids, {
+  //     onSuccess: () => {
+  //       handleSuccess("Chop etildi");
+  //     },
+  //     onError: (err: any) => {
+  //       handleApiError(err, "Chop etishda hatolik yuz berdi");
+  //     },
+  //   });
+  // };
+
   const handlePrint = () => {
-    const orderids = {
-      orderIds: selectedIds,
-    };
+    if (isPrintDisabled) return; // 🔒 agar allaqachon bosilgan bo‘lsa, qaytadi
+
+    setIsPrintDisabled(true); // ⛔ bosilgandan so‘ng tugma bloklanadi
+
+    const orderids = { orderIds: selectedIds };
     createPrint.mutate(orderids, {
       onSuccess: () => {
         handleSuccess("Chop etildi");
       },
       onError: (err: any) => {
         handleApiError(err, "Chop etishda hatolik yuz berdi");
+      },
+      onSettled: () => {
+        setTimeout(() => setIsPrintDisabled(false), 10000); // ⏳ 10 soniyadan keyin qayta yoqiladi
       },
     });
   };
@@ -141,9 +161,12 @@ const OrderView = () => {
         </div>{" "}
         <button
           onClick={() => handlePrint()}
-          className="border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff]"
+          disabled={isPrintDisabled}
+          className={`border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff] ${
+            isPrintDisabled ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         >
-          Chop etish
+          {isPrintDisabled ? "Kutayapti..." : "Chop etish"}
         </button>
       </div>
       <div className="w-full">
