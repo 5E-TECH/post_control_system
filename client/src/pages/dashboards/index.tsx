@@ -133,7 +133,11 @@ const Dashboards = () => {
                       dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
                     );
                   }}
-                  className="w-full"
+                  className="w-full 
+             dark:bg-[#342d4a]! 
+             dark:border-[#4b3b6a]! 
+             dark:[&_.ant-picker-input>input]:text-white! 
+             dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
                 />
               </div>
             </div>
@@ -224,8 +228,7 @@ const Dashboards = () => {
               </>
             )}
 
-            {(role === "superadmin" ||
-              role === "admin" ) && (
+            {(role === "superadmin" || role === "admin") && (
               <>
                 <StatCard
                   icon={<ShoppingCart size={20} />}

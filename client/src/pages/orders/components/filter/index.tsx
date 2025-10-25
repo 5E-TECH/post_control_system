@@ -102,6 +102,13 @@ const Filter = () => {
       <div className="w-full grid grid-cols-4 gap-5 max-[900px]:grid-cols-3 max-[750px]:grid-cols-2 max-[350px]:grid-cols-1">
         {role !== "market" && (
           <Select
+            showSearch
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              String(option?.label ?? "")
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }
             value={form.marketId}
             onChange={handleSelectChange("marketId")}
             placeholder={t("placeholder.selectMarket")}
@@ -109,13 +116,22 @@ const Filter = () => {
             options={marketOptions}
           />
         )}
+
         <Select
+          showSearch
+          optionFilterProp="label"
+          filterOption={(input, option) =>
+            String(option?.label ?? "")
+              .toLowerCase()
+              .includes(input.toLowerCase())
+          }
           value={form.regionId}
           onChange={handleSelectChange("regionId")}
           placeholder={t("placeholder.selectRegion")}
           className="w-full h-[45px]!"
           options={regionOptions}
         />
+
         <Select
           value={form.status}
           onChange={handleSelectChange("status")}
@@ -125,7 +141,7 @@ const Filter = () => {
         />
         <div className="flex min-[900px]:justify-end">
           <Button
-            className="w-[150px]! max-[651px]:w-full! h-[45px]!"
+            className="w-[150px]! max-[651px]:w-full! h-[45px]! dark:bg-[#342d4a]! dark:text-gray-300!"
             onClick={handleClear}
           >
             <Eraser className="w-4 h-4 mr-2" />
@@ -142,7 +158,10 @@ const Filter = () => {
         >
           <DatePicker.RangePicker
             format="YYYY-MM-DD"
-            className="w-full h-[38px]"
+            className="w-full h-[38px] 
+      dark:bg-[#342d4a]! 
+      dark:[&_.ant-picker-input>input]:text-white! 
+      dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
             onChange={handleDateChange}
             placeholder={[t("placeholder.startDate"), t("placeholder.endDate")]}
           />
