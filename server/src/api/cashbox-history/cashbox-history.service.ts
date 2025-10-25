@@ -38,7 +38,13 @@ export class CashboxHistoryService {
     try {
       const cashboxHistory = await this.cashboxRepo.findOne({
         where: { id },
-        relations: ['cashbox', 'createdByUser', 'order'],
+        relations: [
+          'cashbox',
+          'createdByUser',
+          'order',
+          'order.customer',
+          'order.customer.district',
+        ],
       });
       if (!cashboxHistory) {
         throw new NotFoundException('CashboxHistory not found by id: ', id);
