@@ -64,8 +64,6 @@ const CourierRefusedMails = () => {
                   minute: "2-digit",
                 })}
             </h1>
-
-            <h3>salommmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm</h3>
             <p className="text-[22px]">
               <span>{post?.order_quantity}</span> ta buyurtmalar
             </p>
