@@ -404,6 +404,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id },
         relations: ['items', 'items.product', 'market', 'customer'],
       });
+      console.log(newOrder);
+
       if (!newOrder) {
         throw new NotFoundException('Order not found');
       }
@@ -793,11 +795,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async sellOrder(
-    user: JwtPayload,
-    id: string,
-    sellOrderDto: SellCancelOrderDto,
-  ) {
+  async sellOrder(user: JwtPayload, id: string, sellDto: SellCancelOrderDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -806,6 +804,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id },
       });
       if (!order) throw new NotFoundException('Order not found');
+
+      console.log(sellDto);
 
       const marketId = order.user_id;
       const market = await queryRunner.manager.findOne(UserEntity, {
@@ -847,8 +847,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const finalComment = generateComment(
         order.comment || '',
-        sellOrderDto.comment || '',
-        sellOrderDto.extraCost || 0,
+        sellDto.comment || '',
+        sellDto.extraCost || 0,
       );
 
       Object.assign(order, {
@@ -894,11 +894,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }),
       );
 
-      console.log(sellOrderDto.extraCost, 'AAAAAAAAAAAAAa');
+      console.log(sellDto.extraCost, 'AAAAAAAAAAAAAa');
 
-      if (sellOrderDto.extraCost) {
+      if (sellDto.extraCost) {
         // Market cashboxdan qo'shimcha xarajatni ayiramiz
-        marketCashbox.balance -= Number(sellOrderDto.extraCost);
+        marketCashbox.balance -= Number(sellDto.extraCost);
         await queryRunner.manager.save(marketCashbox);
 
         // Market cashboxga history yozamiz
@@ -909,7 +909,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             cashbox_id: marketCashbox.id,
             source_id: order.id,
             source_type: Source_type.EXTRA_COST,
-            amount: sellOrderDto.extraCost,
+            amount: sellDto.extraCost,
             balance_after: marketCashbox.balance,
             comment: finalComment,
             created_by: courier.id,
@@ -921,7 +921,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // ==================================
 
         // Courier cashboxdan qo'shimcha xarajatni ayiramiz
-        courierCashbox.balance -= Number(sellOrderDto.extraCost);
+        courierCashbox.balance -= Number(sellDto.extraCost);
         await queryRunner.manager.save(courierCashbox);
 
         // Courier kassasiga hisyory yozamiz
@@ -932,7 +932,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             cashbox_id: courierCashbox.id,
             source_id: order.id,
             source_type: Source_type.EXTRA_COST,
-            amount: sellOrderDto.extraCost,
+            amount: sellDto.extraCost,
             balance_after: courierCashbox.balance,
             comment: finalComment,
             created_by: courier.id,
@@ -943,7 +943,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
-      return successRes({ id: order.id }, 200, 'Order sold');
+      return successRes({}, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

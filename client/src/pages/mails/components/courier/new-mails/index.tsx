@@ -3,6 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import MailSkeleton from "../../choose-mail/MailSkeleton";
+import { useDispatch } from "react-redux";
+import {
+  setHideSend,
+  setRegionName,
+} from "../../../../../shared/lib/features/regionSlice";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -19,12 +24,20 @@ const borderColorsByStatus = {
 
 const CourierNewMails = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
   const { getAllPosts } = usePost();
   const { data, isLoading } = getAllPosts("on-the-road");
   const posts = Array.isArray(data?.data) ? data?.data : [];
 
-  if(isLoading) {
-    return <MailSkeleton/>
+  const handleNavigate = (post: any) => {
+    navigate(`/courier-mails/${post?.id}`);
+    dispatch(setRegionName(post?.region?.name));
+    dispatch(setHideSend(false));
+  };
+
+  if (isLoading) {
+    return <MailSkeleton />;
   }
 
   return (
@@ -38,11 +51,7 @@ const CourierNewMails = () => {
                 post?.status as keyof typeof borderColorsByStatus
               ]
             } shadow-2xl rounded-md flex flex-col items-center justify-center cursor-pointer bg-green-500 dark:bg-[#3f692e] text-white`}
-            onClick={() =>
-              navigate(`/courier-mails/${post?.id}`, {
-                state: { regionName: post?.region?.name },
-              })
-            }
+            onClick={() => handleNavigate(post)}
           >
             <h1 className="text-[30px]">
               {post?.created_at &&

@@ -3,6 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import MailSkeleton from "../../choose-mail/MailSkeleton";
+import { useDispatch } from "react-redux";
+import {
+  setHideSend,
+  setRegionName,
+} from "../../../../../shared/lib/features/regionSlice";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -19,9 +24,18 @@ const borderColorsByStatus = {
 
 const CourierRefusedMails = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { getRejectedPostsCourier } = usePost();
   const { data, isLoading } = getRejectedPostsCourier();
   const posts = Array.isArray(data?.data) ? data?.data : [];
+
+  const handleNavigate = (post: any) => {
+    console.log("11111111111111111111", post?.region?.name);
+    navigate(`/courier-mails/${post?.id}`);
+
+    dispatch(setRegionName(post?.region?.name));
+    dispatch(setHideSend(true));
+  };
 
   if (isLoading) {
     return <MailSkeleton />;
@@ -38,11 +52,7 @@ const CourierRefusedMails = () => {
                 post?.status as keyof typeof borderColorsByStatus
               ]
             } shadow-2xl rounded-md flex flex-col items-center justify-center cursor-pointer bg-red-500 dark:bg-[#73374d] text-white`}
-            onClick={() =>
-              navigate(`/courier-mails/${post?.id}`, {
-                state: { regionName: post?.region?.name, hideSend: true },
-              })
-            }
+            onClick={() => handleNavigate(post)}
           >
             <h1 className="text-[30px]">
               {post?.created_at &&
@@ -55,6 +65,7 @@ const CourierRefusedMails = () => {
                 })}
             </h1>
 
+            <h3>salommmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm</h3>
             <p className="text-[22px]">
               <span>{post?.order_quantity}</span> ta buyurtmalar
             </p>

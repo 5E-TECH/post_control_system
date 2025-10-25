@@ -185,6 +185,7 @@
   th {
     display: none;
   }
+  
 
   td {
     display: grid;
@@ -210,6 +211,20 @@
 
   tr:last-child {
     border-bottom: 0;
+  }
+
+  /* 🌙 Dark mode (faqat <html class="dark"> bo‘lsa ishlaydi) */
+  .dark td {
+    border-bottom: 1px solid #374151;
+    color: #ffffff;
+  }
+
+  .dark td::before {
+    color: #d1d5db;
+  }
+
+  .dark tr {
+    border-bottom: 10px solid #374151;
   }
 }
 
