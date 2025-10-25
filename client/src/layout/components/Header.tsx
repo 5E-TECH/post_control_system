@@ -77,7 +77,7 @@ const Header = () => {
         >
           <QrCode className="h-[25px] w-[25px]" />
         </div>
-        <div className="max-[400px]:hidden">
+        <div className="max-[300px]:hidden">
           <Space wrap>
             <Select
               defaultValue={localStorage.getItem("i18nextLng")}
