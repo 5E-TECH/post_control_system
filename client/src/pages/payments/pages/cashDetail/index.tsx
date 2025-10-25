@@ -150,7 +150,7 @@ const CashDetail = () => {
   const raw = Number(data?.data?.cashbox?.balance || 0);
 
   return (
-    <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
+    <div className="px-5 mt-5 flex gap-24 max-md:flex-col  ">
       <div>
         <h2 className="flex items-center mb-5 text-[20px] capitalize">
           {t(`${data?.data?.cashbox?.user?.role}`)} <ChevronRight />
@@ -276,8 +276,8 @@ const CashDetail = () => {
           </div>
         )}
       </div>
-      <div className="grid w-full max-[550px]:w-[100%]">
-        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%]">
+      <div className="grid w-full max-[550px]:w-full">
+        <div className="flex flex-row items-center gap-7 max-[550px]:flex-col max-[550px]:w-[100%]">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
             <div className="flex gap-5">
