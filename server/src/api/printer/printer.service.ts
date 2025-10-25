@@ -23,7 +23,12 @@ export class PrinterService {
     console.log('🖨️ PrinterService initialized');
 
     // ✅ MQTT clientni faqat 1 marta yaratamiz (har orderda emas)
-    this.client = mqtt.connect('mqtt://test.mosquitto.org');
+    this.client = mqtt.connect('mqtt://13.234.20.96:1883', {
+      username: 'shodiyor',
+      password: 'root',
+      reconnectPeriod: 2000,
+      connectTimeout: 5000,
+    });
     this.client.on('connect', () => {
       console.log('📡 MQTT brokerga ulandi');
     });
