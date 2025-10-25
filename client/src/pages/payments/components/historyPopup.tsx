@@ -15,6 +15,8 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { FaMoneyBillWave } from 'react-icons/fa';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../app/store';
 
 interface IProps {
   id: string | null;
@@ -31,8 +33,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
 
   const info = data?.data;
   const isIncome = info?.operation_type === 'income';
-  console.log(info);
-  
+  const user = useSelector((state: RootState) => state.roleSlice);
 
   return (
     <div
@@ -192,19 +193,42 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                 </h3>
                 <div className="space-y-2 text-sm sm:text-base">
                   <p className="flex justify-between">
+                    <span className="font-medium">{t('Tuman')}:</span>
+                    <span>{info?.order?.customer?.district?.name}</span>
+                  </p>
+
+                  <p className="flex justify-between">
+                    <span className="font-medium">{t('Telefon nomer')}:</span>
+                    <span>{info?.order?.customer?.phone_number}</span>
+                  </p>
+
+                  <p className="flex justify-between">
                     <span className="font-medium">{t('umumiyNarx')}:</span>
                     <span>{info?.order?.total_price}</span>
                   </p>
-                  <p className="flex justify-between">
-                    <span className="font-medium">{t("to'lanishiKerak")}:</span>
-                    <span>{info?.order?.to_be_paid}</span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="font-medium">{t("to'langan")}:</span>
-                    <span className="text-green-700 font-semibold">
-                      {info?.order?.paid_amount}
-                    </span>
-                  </p>
+
+                  {/* Faqat courier bo‘lmaganda ko‘rsatiladi */}
+                  {user?.role !== 'courier' && (
+                    <p className="flex justify-between">
+                      <span className="font-medium">
+                        {t("to'lanishiKerak")}:
+                      </span>
+                      <span>{info?.order?.to_be_paid}</span>
+                    </p>
+                  )}
+
+
+
+                  {/* Faqat courier bo‘lmaganda ko‘rsatiladi */}
+                  {user?.role !== 'courier' && (
+                    <p className="flex justify-between">
+                      <span className="font-medium">{t("to'langan")}:</span>
+                      <span className="text-green-700 font-semibold">
+                        {info?.order?.paid_amount}
+                      </span>
+                    </p>
+                  )}
+
                   <p className="flex justify-between items-center">
                     <span className="font-medium">{t('status')}:</span>
                     <span
@@ -220,13 +244,11 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                 </div>
               </div>
             )}
-            
           </div>
         )}
       </div>
     </div>
   );
-  
 };
 
 export default memo(HistoryPopup);
