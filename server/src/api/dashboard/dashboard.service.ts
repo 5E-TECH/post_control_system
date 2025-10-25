@@ -6,10 +6,14 @@ import {
   getUzbekistanDayRange,
   toUzbekistanTimestamp,
 } from 'src/common/utils/date.util';
+import { MyLogger } from 'src/logger/logger.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly orderStats: OrderService) {}
+  constructor(
+    private readonly orderStats: OrderService,
+    private readonly logger: MyLogger,
+  ) {}
   async getOverview(filter: { startDate?: string; endDate?: string }) {
     try {
       let { startDate, endDate } = filter;
