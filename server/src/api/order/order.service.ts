@@ -523,7 +523,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       this.logger.log(`receiveNewOrders: ${order_ids}`, 'Order service');
 
-      // 1️⃣ Faqat NEW statusdagi orderlarni olish
+      // 1️⃣ Faqat NEW statusdagi orderlarni olish uchun
       const qb = queryRunner.manager
         .createQueryBuilder(OrderEntity, 'order')
         .leftJoinAndSelect('order.customer', 'customer')
