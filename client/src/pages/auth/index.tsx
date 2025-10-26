@@ -6,7 +6,7 @@ import { api } from "../../shared/api";
 import { setToken } from "../../shared/lib/features/login/authSlice";
 import { setId, setRegion, setRole } from "../../shared/lib/features/roleSlice";
 import Suspensee from "../../shared/ui/Suspensee";
-
+// Test for deployment
 const Auth = () => {
   const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.authSlice.token);
@@ -23,9 +23,13 @@ const Auth = () => {
       .get("user/profile") // 🔑 backendda token tekshirish
       .then((res) => {
         setValid(true); // token to‘g‘ri bo‘lsa
-        dispatch(setRole(res.data.data.role))
-        dispatch(setId(res.data.data.id))
-        {res?.data?.data?.region?.name ? dispatch(setRegion(res?.data?.data?.region?.name)) : ""}
+        dispatch(setRole(res.data.data.role));
+        dispatch(setId(res.data.data.id));
+        {
+          res?.data?.data?.region?.name
+            ? dispatch(setRegion(res?.data?.data?.region?.name))
+            : "";
+        }
       })
       .catch(() => {
         dispatch(setToken(null)); // ❌ noto‘g‘ri token → localStorage va reduxdan o‘chir
@@ -34,7 +38,12 @@ const Auth = () => {
       .finally(() => setLoading(false));
   }, [token, dispatch]);
 
-  if (loading) return <div><Suspensee/></div>;
+  if (loading)
+    return (
+      <div>
+        <Suspensee />
+      </div>
+    );
 
   return valid ? <Outlet /> : <Navigate replace to="/login" />;
 };
