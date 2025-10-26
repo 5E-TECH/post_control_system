@@ -1,18 +1,28 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
-
 interface RegionNameState {
   regionName: string | null;
   hideSend: boolean | null;
 }
 
-const regionName = localStorage.getItem("regionName");
-const hideSend = localStorage.getItem("hideSend");
+// 🔒 Xavfsiz JSON parse funksiyasi
+const safeParse = <T,>(value: string | null): T | null => {
+  if (!value || value === "undefined" || value === "null") return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
 
+const regionName = safeParse<string>(localStorage.getItem("regionName"));
+const hideSend = safeParse<boolean>(localStorage.getItem("hideSend"));
+
+console.log(regionName);
 
 const initialState: RegionNameState = {
-  regionName: regionName ? JSON.parse(regionName) :  null,
-  hideSend: hideSend ? JSON.parse(hideSend) : null,
+  regionName,
+  hideSend,
 };
 
 const regionSlice = createSlice({
