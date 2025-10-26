@@ -156,25 +156,59 @@ export class PrinterService {
       items,
     } = order;
 
+    const maxLineLength = 40;
+    let productLines: string[] = [];
+    let currentLine = '';
+
+    for (const item of items) {
+      const text = `${item.product}-${item.quantity}, `;
+      if ((currentLine + text).length > maxLineLength) {
+        productLines.push(currentLine.trim());
+        currentLine = text;
+      } else {
+        currentLine += text;
+      }
+    }
+
+    // ⚠️ Eng muhim: oxirgi qatorni ham qo‘shamiz
+    if (currentLine.trim()) {
+      productLines.push(currentLine.trim());
+    }
+
+    let y = 300;
+    const productTextLines = productLines
+      .map((line, i) => {
+        const prefix = i === 0 ? 'Mahsulot: ' : '           ';
+        const result = `TEXT 20,${y},"3",0,1,1,"${prefix}${line}"`;
+        y += 30;
+        return result;
+      })
+      .join('\n');
+
     const tspl = `
 SIZE 100 mm,60 mm
 GAP 2 mm,0 mm
 CLS
 TEXT 175,20,"4",0,1,1,"Beepost"
 TEXT 350,20,"3",0,1,1,"(${created_time})"
-TEXT 20,80,"4",0,1,1,"${customerName.length > 20 ? `${customerName.slice(0, 19)}...` : customerName}"
+TEXT 20,80,"4",0,1,1,"${
+      customerName.length > 20
+        ? `${customerName.slice(0, 19)}...`
+        : customerName
+    }"
 TEXT 20,120,"4",0,1,1,"${customerPhone}"
 TEXT 20,150,"3",0,1,1,"-----------------------------"
 TEXT 20,180,"3",0,1,1,"Narxi:"
 TEXT 160,180,"3",0,1,1,"${orderPrice}"
 TEXT 20,220,"3",0,1,1,"Tuman: ${district}"
 TEXT 20,260,"3",0,1,1,"Manzil: ${address || '-'}"
-TEXT 20,300,"3",0,1,1,"Mahsulot: ${items[0].product}-${items[0].quantity}"
-TEXT 20,340,"3",0,1,1,"Izoh: ${comment || '-'}"
-TEXT 20,370,"2",0,1,1,"Jo'natuvchi: ${market}"
+${productTextLines}
+TEXT 20,${y},"3",0,1,1,"Izoh: ${comment || '-'}"
+TEXT 20,${y + 30},"2",0,1,1,"Jo'natuvchi: ${market}"
 QRCODE 560,50,L,8,A,0,"${qrCode}"
-BARCODE 100,400,"128",50,1,0,2,2,"${qrCode}"
-PRINT 1`.trim();
+BARCODE 100,${y + 60},"128",50,1,0,2,2,"${qrCode}"
+PRINT 1
+`.trim();
 
     console.log(`🖨️ Printing order: ${orderId}`);
 
