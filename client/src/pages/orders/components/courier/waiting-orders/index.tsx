@@ -268,7 +268,7 @@ const WaitingOrders = () => {
       </div>
 
       <Popup isShow={isShow} onClose={closePopup}>
-        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8">
+        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8 dark:bg-[#312D4B]">
           <X
             className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
             onClick={closePopup}
@@ -316,15 +316,6 @@ const WaitingOrders = () => {
                     />
                   </Form.Item>
                   <div className="flex gap-2 items-center mb-6 select-none">
-                    <Plus
-                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                      onClick={() => {
-                        const updated = [...orderItemInfo];
-                        updated[index].quantity += 1;
-                        setOrderItemInfo(updated);
-                      }}
-                    />
-                    <span className="text-[20px]">{item.quantity}</span>
                     <Minus
                       className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
                       onClick={() => {
@@ -334,6 +325,16 @@ const WaitingOrders = () => {
                         setOrderItemInfo(updated);
                       }}
                     />
+                    
+                    <Plus
+                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
+                      onClick={() => {
+                        const updated = [...orderItemInfo];
+                        updated[index].quantity += 1;
+                        setOrderItemInfo(updated);
+                      }}
+                    />
+                    <span className="text-[20px]">{item.quantity}</span>
                   </div>
                 </div>
               ))}
@@ -359,13 +360,13 @@ const WaitingOrders = () => {
             <div>
               <Form.Item
                 name="extraCost"
-                className="py-4!"
+                className="dark:[&_.ant-form-item-label>label]:text-[#E7E3FC]! py-4!"
                 label="Qo'shimcha (pul)"
               >
                 {/* <span>Qo'shimcha (pul)</span> */}
                 <InputNumber
                   placeholder="Qo'shimcha pul"
-                  className="h-[40px]! w-full!"
+                  className="!border !border-gray-500 h-[40px]! w-full!"
                   formatter={(v) =>
                     v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
                   }
@@ -375,10 +376,18 @@ const WaitingOrders = () => {
             </div>
 
             <div className={`pt-${partleSoldShow ? 0 : 3}`}>
-              <Form.Item name="comment" label="Izoh">
+              <Form.Item
+                name="comment"
+                label="Izoh"
+                className="dark:[&_.ant-form-item-label>label]:text-[#E7E3FC]! py-4!"
+              >
                 {/* <span>Izoh</span> */}
                 <Input.TextArea
-                  className="py-4!"
+                  className="py-4!
+      dark:bg-[#312D4B]! 
+      dark:border-[#E7E3FC38]! 
+      dark:placeholder:text-[#A9A5C0]! 
+      dark:text-[#E7E3FC]!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"
                   style={{ resize: "none" }}
                 />
