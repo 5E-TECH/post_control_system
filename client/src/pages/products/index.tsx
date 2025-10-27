@@ -92,7 +92,7 @@ const Products = () => {
   const { pathname } = useLocation();
 
   const marketOptions = data?.data?.data?.map((item: any) => (
-    <option key={item.id} value={item.id}>
+    <option key={item.id} value={item.id} className='dark:bg-[#312d48]'>
       {item.name}
     </option>
   ));
