@@ -132,7 +132,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                 >
                   <button
                     onClick={() => handlePoup(item.id, item.name)}
-                    className="hover:text-red-500"
+                    className="hover:text-red-500 cursor-pointer"
                   >
                     <Trash />
                   </button>
