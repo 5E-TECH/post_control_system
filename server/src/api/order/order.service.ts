@@ -894,8 +894,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }),
       );
 
-      console.log(sellDto.extraCost, 'AAAAAAAAAAAAAa');
-
       if (sellDto.extraCost) {
         // Market cashboxdan qo'shimcha xarajatni ayiramiz
         marketCashbox.balance -= Number(sellDto.extraCost);
@@ -1147,13 +1145,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           : courier.tariff_home;
 
       // 🔎 6. Calculate payments
-      const to_be_paid: number = extraCost
-        ? totalPrice - extraCost - marketTarif
-        : totalPrice - marketTarif;
+      const to_be_paid: number = totalPrice - marketTarif;
 
-      const courier_to_be_paid: number = extraCost
-        ? totalPrice - extraCost - courierTarif
-        : totalPrice - courierTarif;
+      const courier_to_be_paid: number = totalPrice - courierTarif;
 
       // 🔎 7. Calculate sold product quantity
       const soldProductQuantity = order_item_info.reduce(
@@ -1229,6 +1223,52 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }),
       );
 
+      if (extraCost) {
+        // Market cashboxdan qo'shimcha xarajatni ayiramiz
+        marketCashbox.balance -= Number(extraCost);
+        await queryRunner.manager.save(marketCashbox);
+
+        // Market cashboxga history yozamiz
+        const extraCostMarket = queryRunner.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.EXTRA_COST,
+            amount: extraCost,
+            balance_after: marketCashbox.balance,
+            comment: finalComment,
+            created_by: courier.id,
+          },
+        );
+        // Market cashbox uchun historyni saqlaymiz
+        await queryRunner.manager.save(extraCostMarket);
+
+        // ==================================
+
+        // Courier cashboxdan qo'shimcha xarajatni ayiramiz
+        courierCashbox.balance -= Number(extraCost);
+        await queryRunner.manager.save(courierCashbox);
+
+        // Courier kassasiga hisyory yozamiz
+        const extraCostCourier = queryRunner.manager.create(
+          CashboxHistoryEntity,
+          {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.EXTRA_COST,
+            amount: extraCost,
+            balance_after: courierCashbox.balance,
+            comment: finalComment,
+            created_by: courier.id,
+          },
+        );
+        // Kurier kassasi uchun tarixni saqlaymiz
+        await queryRunner.manager.save(extraCostCourier);
+      }
+
       // 🔎 10. Create CANCELLED order for remaining items
       const remainingItems = oldOrderItems.filter((item) => item.quantity > 0);
       const remainingQuantity = remainingItems.reduce(
@@ -1240,7 +1280,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         user_id: order.user_id,
         customer_id: order.customer_id, // ✅ same customer
         comment: 'Qolgan mahsulotlar bekor qilindi',
-        total_price: 0,
+        total_price: order.total_price - totalPrice,
         to_be_paid: 0,
         where_deliver: order.where_deliver,
         status: Order_status.CANCELLED,
