@@ -20,6 +20,7 @@ import paginationSlice from "../shared/lib/features/paginationProductSlice";
 import clearEditItem from "../shared/lib/features/updateSlice";
 import setEditItem from "../shared/lib/features/updateSlice";
 import regionSlice from "../shared/lib/features/regionSlice";
+import sidebarSlice from "../shared/lib/features/sidebarSlice";
 
 export const store = configureStore({
   reducer: {
@@ -44,6 +45,7 @@ export const store = configureStore({
     setEditItem,
     clearEditItem,
     region: regionSlice,
+    sidebar: sidebarSlice,
   },
 });
 

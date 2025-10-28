@@ -1,4 +1,6 @@
 import { NavLink } from "react-router-dom";
+import type { RootState } from "../../app/store";
+import { useSelector } from "react-redux";
 
 interface SidebarLinkProps {
   to: string;
@@ -8,6 +10,9 @@ interface SidebarLinkProps {
 }
 
 const SidebarLink: React.FC<SidebarLinkProps> = ({ to, icon, label }) => {
+
+  const sidebarRedux = useSelector((state: RootState) => state.sidebar);
+
   return (
     <NavLink
       to={to}
@@ -20,7 +25,10 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({ to, icon, label }) => {
         }`
       }>
       {icon}
+      {
+        sidebarRedux.isOpen && 
       <span>{label}</span>
+      }
     </NavLink>
   );
 };

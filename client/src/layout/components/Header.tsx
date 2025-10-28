@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Languages,
   LogOut,
   Menu,
@@ -16,15 +17,26 @@ import { Select, Space } from "antd";
 import { memo, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  closeSidebar,
+  openSidebar,
+} from "../../shared/lib/features/sidebarSlice";
+import type { RootState } from "../../app/store";
 
 const Header = () => {
   const { t, i18n } = useTranslation(["header"]);
+  const [sidebar, setSidebar] = useState(true);
+  const dispatch = useDispatch();
   const [dark, setDark] = useState(() => {
     const stored = localStorage.getItem("darkMode");
     return stored ? JSON.parse(stored) : false;
   });
 
   const { mutate: signOut } = useSignOut();
+  const sidebarRedux = useSelector((state: RootState) => state.sidebar);
+
+  console.log(sidebarRedux.isOpen);
 
   useEffect(() => {
     if (dark) {
@@ -43,16 +55,36 @@ const Header = () => {
     i18n.changeLanguage(value);
   };
 
+  const handleDispatch = () => {
+    if (sidebar) {
+      dispatch(openSidebar());
+      setSidebar(false);
+    } else {
+      dispatch(closeSidebar());
+      setSidebar(true);
+    }
+  };
+
   return (
     <div className="w-full h-16 pl-8 pr-3 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
       {/* Logo */}
-      <div className="h-16 flex items-center gap-3">
+      <div className="h-16 flex items-center gap-30">
         <NavLink to={"/"} className="flex items-center gap-3">
           <div>
             <img src={logo} alt="logo" className="h-8" />
           </div>
           <span className="text-xl font-semibold">Beepost</span>
         </NavLink>
+        <button
+          onClick={handleDispatch}
+          className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300"
+        >
+          <ArrowLeft
+            className={`transition-transform duration-300 ${
+              !sidebarRedux.isOpen ? "rotate-180" : "rotate-0"
+            }`}
+          />
+        </button>
       </div>
 
       {/* Search */}
