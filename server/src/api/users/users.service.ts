@@ -1126,7 +1126,7 @@ export class UserService {
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
       return successRes(
-        { access_token: accessToken, refresh_token: refreshToken },
+        { access_token: accessToken },
         200,
         'Logged in successfully',
       );

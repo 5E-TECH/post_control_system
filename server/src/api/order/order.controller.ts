@@ -206,13 +206,26 @@ export class OrderController {
     return this.orderService.receiveWithScaner(id);
   }
 
-  @ApiOperation({ summary: 'All orders for market' })
+  @ApiOperation({
+    summary: 'All orders for market with search/filter/pagination',
+  })
   @ApiResponse({ status: 200, description: 'All orders for current market' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET)
-  @Get('market/all-orders')
-  allMarketsOrders(@CurrentUser() user: JwtPayload) {
-    return this.orderService.allMarketsOrders(user);
+  @Get('market/all/my-orders')
+  allMarketsOrders(
+    @CurrentUser() user: JwtPayload,
+    @Query()
+    query: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    return this.orderService.allMarketsOrders(user, query);
   }
 
   @ApiOperation({ summary: "Courier's orders" })

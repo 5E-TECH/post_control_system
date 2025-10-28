@@ -707,12 +707,67 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async allMarketsOrders(user: JwtPayload) {
+  async allMarketsOrders(
+    user: JwtPayload,
+    query: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
     try {
-      const allMyOrders = await this.orderRepo.find({
-        where: { user_id: user.id },
-      });
-      return successRes(allMyOrders, 200, 'All my orsers');
+      const { page = 1, limit = 10, search, status, fromDate, toDate } = query;
+
+      const qb = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .where('order.user_id = :userId', { userId: user.id });
+
+      // 🔍 Search by customer name or order ID
+      if (search) {
+        qb.andWhere(
+          '(LOWER(customer.full_name) LIKE LOWER(:search) OR CAST(order.id AS TEXT) LIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🎯 Filter by order status
+      if (status) {
+        qb.andWhere('order.status = :status', { status });
+      }
+
+      // 📅 Filter by date range
+      if (fromDate && toDate) {
+        qb.andWhere('order.created_at BETWEEN :from AND :to', {
+          from: fromDate,
+          to: toDate,
+        });
+      }
+
+      // 📄 Pagination
+      qb.skip((page - 1) * limit).take(limit);
+
+      // 🔢 Total count for pagination info
+      const [data, total] = await qb.getManyAndCount();
+
+      return successRes(
+        {
+          data,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+        200,
+        'All market orders fetched successfully',
+      );
     } catch (error) {
       return catchError(error);
     }
