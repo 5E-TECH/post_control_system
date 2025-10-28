@@ -56,7 +56,7 @@ const Details: FC<IProps> = ({
       name: item.product.name,
     }))
   );
-   
+
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const { updateOrders } = useOrder();
@@ -176,25 +176,27 @@ const Details: FC<IProps> = ({
             </h2>
           </div>
 
-          {/* To‘lanishi kerak */}
-          <div className="flex gap-3">
-            <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-              {t("detail.to_be_paid")}:
-            </h2>
-            <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
-              {Number(to_be_paid).toLocaleString("uz-UZ")} so'm
-            </h2>
-          </div>
+          {role !== "courier" && (
+            <>
+              <div className="flex gap-3">
+                <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+                  {t("detail.to_be_paid")}:
+                </h2>
+                <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
+                  {Number(to_be_paid).toLocaleString("uz-UZ")} so'm
+                </h2>
+              </div>
 
-          {/* To‘langan */}
-          <div className="flex gap-3">
-            <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-              {t("detail.paid_amount")}:
-            </h2>
-            <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
-              {Number(paid_amount).toLocaleString("uz-UZ")} so'm
-            </h2>
-          </div>
+              <div className="flex gap-3">
+                <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+                  {t("detail.paid_amount")}:
+                </h2>
+                <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
+                  {Number(paid_amount).toLocaleString("uz-UZ")} so'm
+                </h2>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

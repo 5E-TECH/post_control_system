@@ -24,6 +24,7 @@ import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import { useTranslation } from "react-i18next";
 import type { AxiosError } from "axios";
+import CustomCalendar from "../../../../shared/components/customDate";
 
 const { RangePicker } = DatePicker;
 
@@ -61,6 +62,15 @@ const MainDetail = () => {
   const { handleApiError } = useApiNotification();
 
   const navigate = useNavigate();
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -172,7 +182,7 @@ const MainDetail = () => {
           const msg =
             err.response?.data?.error?.message || "Xatolik yuz berdi!";
           handleApiError(err, `${msg}`);
-        }
+        },
       }
     );
   };
@@ -450,33 +460,54 @@ const MainDetail = () => {
             <span className="text-[15px]">gacha</span> o'tkazmalar
           </h2>
         )}
-        <div className="flex flex-row items-center gap-7">
+        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
-            <div className="flex gap-5">
-              <RangePicker
-                value={[
-                  form.from ? dayjs(form.from) : null,
-                  form.to ? dayjs(form.to) : null,
-                ]}
-                onChange={(dates) => {
-                  setForm((prev) => ({
-                    ...prev,
-                    from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
-                    to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
-                  }));
-                }}
-                placeholder={["From", "To"]}
-                format="YYYY-MM-DD"
-                separator={
-                  <span className="mx-2 text-xl flex items-center">→</span>
-                }
-                className="w-[340px] max-[550px]:w-[100%] border border-[#E5E7EB] rounded-lg px-5 py-[6px] outline-none"
-              />
+            <div className="flex gap-5 max-[640px]:gap-0  w-full">
+              {isMobile ? (
+                // Mobile uchun custom date inputs (faqat text input + popup)
+                <div className="flex flex-col gap-2 w-full">
+                  <CustomCalendar
+                    from={form.from ? dayjs(form.from) : null}
+                    to={form.to ? dayjs(form.to) : null}
+                    setFrom={(date: any) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        from: date.format("YYYY-MM-DD"),
+                      }))
+                    }
+                    setTo={(date: any) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        to: date.format("YYYY-MM-DD"),
+                      }))
+                    }
+                  />
+                </div>
+              ) : (
+                // Desktop uchun Antd RangePicker
+                <RangePicker
+                  value={[
+                    form.from ? dayjs(form.from) : null,
+                    form.to ? dayjs(form.to) : null,
+                  ]}
+                  onChange={(dates) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                      to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                    }));
+                  }}
+                  placeholder={["From", "To"]}
+                  format="YYYY-MM-DD"
+                  size="large"
+                  className="w-[340px] max-md:w-[100%] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+                />
+              )}
             </div>
           </div>
         </div>
-        <div className="">
+        <div className="max-md:mb-5">
           <CashboxHistory
             form={form}
             income={data?.data?.income}

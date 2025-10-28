@@ -14,6 +14,7 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 import { useTranslation } from "react-i18next";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import type { AxiosError } from "axios";
+import CustomCalendar from "../../../../shared/components/customDate";
 
 const { RangePicker } = DatePicker;
 
@@ -29,6 +30,15 @@ const CashDetail = () => {
     market: "",
     comment: "",
   });
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const [search, setSearch] = useState("");
 
@@ -136,7 +146,7 @@ const CashDetail = () => {
           const msg =
             err.response?.data?.error?.message || "Xatolik yuz berdi!";
           handleApiError(err, `${msg}`);
-        }
+        },
       });
     }
   };
@@ -277,28 +287,66 @@ const CashDetail = () => {
         )}
       </div>
       <div className="grid w-full max-[550px]:w-full">
-        <div className="flex flex-row items-center gap-7 max-[550px]:flex-col max-[550px]:w-[100%]">
+        {form.from == "" && (
+          <h2 className="mb-5 text-[20px] font-medium">Bugungi o'tkazmalar</h2>
+        )}
+
+        {form.from !== "" && form.from === form.to && (
+          <h2 className="mb-5 text-[20px] font-medium">
+            {form.from} kungi o'tkazmalar
+          </h2>
+        )}
+
+        {form.from !== "" && form.from !== form.to && (
+          <h2 className="mb-5 text-[20px] font-medium">
+            {form.from} <span className="text-[15px]">dan ,</span> {form.to}{" "}
+            <span className="text-[15px]">gacha</span> o'tkazmalar
+          </h2>
+        )}
+        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
-            <div className="flex gap-5">
-              {/* RangePicker bilan custom */}
-              <RangePicker
-                value={[
-                  form.from ? dayjs(form.from) : null,
-                  form.to ? dayjs(form.to) : null,
-                ]}
-                onChange={(dates) => {
-                  setForm((prev) => ({
-                    ...prev,
-                    from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
-                    to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
-                  }));
-                }}
-                placeholder={["From", "To"]}
-                format="YYYY-MM-DD"
-                size="large"
-                className="w-[340px] max-[550px]:w-[100%] toFROM border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
-              />
+            <div className="flex gap-5 max-[640px]:gap-0  w-full">
+              {isMobile ? (
+                // Mobile uchun custom date inputs (faqat text input + popup)
+                <div className="flex flex-col gap-2 w-full">
+                  <CustomCalendar
+                    from={form.from ? dayjs(form.from) : null}
+                    to={form.to ? dayjs(form.to) : null}
+                    setFrom={(date: any) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        from: date.format("YYYY-MM-DD"),
+                      }))
+                    }
+                    setTo={(date: any) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        to: date.format("YYYY-MM-DD"),
+                      }))
+                    }
+                  />
+                </div>
+              ) : (
+                // Desktop uchun Antd RangePicker
+                <RangePicker
+                  value={[
+                    form.from ? dayjs(form.from) : null,
+                    form.to ? dayjs(form.to) : null,
+                  ]}
+                  onChange={(dates) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                      to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                    }));
+                  }}
+                  placeholder={["From", "To"]}
+                  format="YYYY-MM-DD"
+                  size="large"
+                  className="w-[340px] max-md:w-[100%] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+                />
+              )}
             </div>
           </div>
         </div>
