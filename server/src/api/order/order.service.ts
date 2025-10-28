@@ -840,16 +840,159 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ? courier.tariff_center
           : courier.tariff_home;
 
-      const to_be_paid = Number(order.total_price) - Number(marketTarif);
-
-      const courier_to_be_paid =
-        Number(order.total_price) - Number(courierTarif);
+      let to_be_paid: number;
+      let courier_to_be_paid: number;
 
       const finalComment = generateComment(
         order.comment || '',
         sellDto.comment || '',
         sellDto.extraCost || 0,
       );
+
+      if (order.total_price === 0) {
+        to_be_paid = 0;
+        courier_to_be_paid = 0;
+
+        marketCashbox.balance -= marketTarif;
+        await queryRunner.manager.save(marketCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.SELL,
+            amount: marketTarif,
+            balance_after: marketCashbox.balance,
+            comment: `0 so'mlik mahsulot sotuvi!`,
+            created_by: courier.id,
+          }),
+        );
+
+        courierCashbox.balance -= courierTarif;
+        await queryRunner.manager.save(courierCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.SELL,
+            amount: courierTarif,
+            balance_after: courierCashbox.balance,
+            comment: `0 so'm lik mahsulot sotuvi`,
+            created_by: courier.id,
+          }),
+        );
+      } else if (order.total_price < courierTarif) {
+        to_be_paid = 0;
+        courier_to_be_paid = 0;
+
+        marketCashbox.balance =
+          marketCashbox.balance - (marketTarif - order.total_price);
+        await queryRunner.manager.save(marketCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.SELL,
+            amount: marketTarif - order.total_price,
+            balance_after: marketCashbox.balance,
+            comment: `${order.total_price} so'mlik mahsulot sotuvi`,
+            created_by: courier.id,
+          }),
+        );
+
+        courierCashbox.balance =
+          courierCashbox.balance - (courierTarif - order.total_price);
+        await queryRunner.manager.save(courierCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.SELL,
+            amount: courierTarif - order.total_price,
+            balance_after: courierCashbox.balance,
+            comment: `${order.total_price} so'mlik mahsulot sotuvi`,
+            created_by: courier.id,
+          }),
+        );
+      } else if (order.total_price < marketTarif) {
+        to_be_paid = 0;
+        courier_to_be_paid = order.total_price - courierTarif;
+
+        marketCashbox.balance =
+          marketCashbox.balance - (marketTarif - order.total_price);
+        await queryRunner.manager.save(marketCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.SELL,
+            amount: marketTarif - order.total_price,
+            balance_after: marketCashbox.balance,
+            comment: `${order.total_price} so'mlik mahsulot sotuvi`,
+            created_by: courier.id,
+          }),
+        );
+
+        courierCashbox.balance = courierCashbox.balance + courier_to_be_paid;
+        await queryRunner.manager.save(courierCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.INCOME,
+            cashbox_id: courierCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.SELL,
+            amount: courier_to_be_paid,
+            balance_after: courierCashbox.balance,
+            comment: `${order.total_price} so'mlik mahsulot sotuvi`,
+            created_by: courier.id,
+          }),
+        );
+      } else {
+        to_be_paid = Number(order.total_price) - Number(marketTarif);
+        courier_to_be_paid = Number(order.total_price) - Number(courierTarif);
+
+        marketCashbox.balance += to_be_paid;
+        await queryRunner.manager.save(marketCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.INCOME,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.SELL,
+            amount: to_be_paid,
+            balance_after: marketCashbox.balance,
+            comment: finalComment,
+            created_by: courier.id,
+          }),
+        );
+
+        courierCashbox.balance += courier_to_be_paid;
+        await queryRunner.manager.save(courierCashbox);
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.INCOME,
+            cashbox_id: courierCashbox.id,
+            source_type: Source_type.SELL,
+            source_id: order.id,
+            amount: courier_to_be_paid,
+            balance_after: courierCashbox.balance,
+            comment: finalComment,
+            created_by: courier.id,
+          }),
+        );
+      }
 
       Object.assign(order, {
         status: Order_status.SOLD,
@@ -859,40 +1002,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
 
       await queryRunner.manager.save(order);
-
-      // ✅ Market cashbox update
-      marketCashbox.balance += to_be_paid;
-      await queryRunner.manager.save(marketCashbox);
-
-      await queryRunner.manager.save(
-        queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.INCOME,
-          cashbox_id: marketCashbox.id,
-          source_id: order.id,
-          source_type: Source_type.SELL,
-          amount: to_be_paid,
-          balance_after: marketCashbox.balance,
-          comment: finalComment,
-          created_by: courier.id,
-        }),
-      );
-
-      // ✅ Courier cashbox update
-      courierCashbox.balance += courier_to_be_paid;
-      await queryRunner.manager.save(courierCashbox);
-
-      await queryRunner.manager.save(
-        queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.INCOME,
-          cashbox_id: courierCashbox.id,
-          source_type: Source_type.SELL,
-          source_id: order.id,
-          amount: courier_to_be_paid,
-          balance_after: courierCashbox.balance,
-          comment: finalComment,
-          created_by: courier.id,
-        }),
-      );
 
       if (sellDto.extraCost) {
         // Market cashboxdan qo'shimcha xarajatni ayiramiz
