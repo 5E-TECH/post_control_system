@@ -37,8 +37,10 @@ const DashboardLayout = () => {
       sidebar = null;
   }
 
+    const sidebarRedux = useSelector((state: RootState) => state.sidebar);
+
   return (
-    <div className="h-screen grid grid-rows-[auto_1fr_auto] grid-cols-[250px_1fr] max-[650px]:grid-cols-[1fr] bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5] pr-4 relative">
+    <div className={`h-screen grid grid-rows-[auto_1fr_auto] max-[650px]:grid-cols-[1fr] bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] dark:text-[#E7E3FCE5] pr-4 relative transition-all duration-300 ease-in-out ${!sidebarRedux.isOpen ? "grid-cols-[60px_1fr]" : "grid-cols-[250px_1fr]" }`}>
       {/* Navbar */}
       <div className="col-span-2">
         <Header />
