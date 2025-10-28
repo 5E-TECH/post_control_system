@@ -96,7 +96,8 @@ const OrderView = () => {
     default:
       query = { data: { data: [], total: 0 } };
   }
-
+  console.log("salom");
+  
   const { data, isLoading } = query;
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
   const total = data?.data?.total || 0;
