@@ -299,7 +299,7 @@ export default function ScanAndOrder() {
 
   return (
     <Popup isShow={isShow}>
-      <div className="w-[350px] shadow-lg rounded-md bg-[#ffffff] flex flex-col justify-between pt-6 px-8">
+      <div className="w-[350px] shadow-lg rounded-md dark:bg-[#312d48] bg-[#ffffff] flex flex-col justify-between pt-6 px-8">
         <X
           className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
           onClick={() => {
