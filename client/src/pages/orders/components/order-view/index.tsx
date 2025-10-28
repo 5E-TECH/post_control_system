@@ -11,6 +11,7 @@ import { exportToExcel } from "../../../../shared/helpers/export-download-excel"
 import { resetDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { BASE_URL } from "../../../../shared/const";
+import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 
 const statusColors: Record<string, string> = {
   new: "bg-sky-500",
@@ -43,7 +44,8 @@ const OrderView = () => {
   const { t: st } = useTranslation("status");
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { getOrders, getMarketsByMyNewOrders } = useOrder();
+  const { getOrders } = useOrder();
+  const {getMarketsAllNewOrder} = useMarket()
 
   const user = useSelector((state: RootState) => state.roleSlice);
   const filters = useSelector((state: RootState) => state.setFilter);
@@ -89,7 +91,7 @@ const OrderView = () => {
       query = getOrders(queryParams);
       break;
     case "market":
-      query = getMarketsByMyNewOrders(queryParams);
+      query = getMarketsAllNewOrder(queryParams);
       break;
     default:
       query = { data: { data: [], total: 0 } };
@@ -106,61 +108,73 @@ const OrderView = () => {
   };
 
   // Excel yuklash
-  useEffect(() => {
-    const downloadExcel = async () => {
-      try {
-        const isFiltered = Object.keys(cleanedFilters).length > 0;
-        const response = await fetch(
-          `${BASE_URL}order?page=1&limit=0&${new URLSearchParams(
-            cleanedFilters
-          )}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
-            },
-          }
-        );
-        const rawText = await response.text();
-        let data;
-        try {
-          data = JSON.parse(rawText);
-        } catch {
-          throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
-        }
-        const orders = data?.data?.data;
-        const exportData = orders?.map((order: any, inx: number) => ({
-          N: inx + 1,
-          Viloyat: order?.customer?.district?.region?.name,
-          Tuman: order?.customer?.district?.name,
-          Firma: order?.market?.name,
-          Mahsulot: order?.items
-            ?.map((item: any) => item.product.name)
-            ?.join(", "),
-          "Telefon raqam": order?.customer?.phone_number,
-          Narxi: Number((order?.total_price ?? 0) / 1000),
-          Holati: statusLabels[order?.status],
-          Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        }));
-        exportToExcel(
-          exportData || [],
-          isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
-        );
-        handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
-      } catch (err) {
-        handleApiError(err, "Excel yuklashda xatolik");
-      } finally {
-        dispatch(resetDownload());
-      }
-    };
+// const user = useSelector((state: RootState) => state.roleSlice);
 
-    if (triggerDownload.triggerDownload) downloadExcel();
-  }, [triggerDownload, dispatch, cleanedFilters]);
+useEffect(() => {
+  const downloadExcel = async () => {
+    try {
+      const isFiltered = Object.keys(cleanedFilters).length > 0;
+
+      // 🔥 URL ni rolga qarab belgilaymiz
+      let url = `${BASE_URL}order`;
+      if (user?.role === "market") {
+        url = `${BASE_URL}order/market/all-orders`;
+      } else if (user?.role === "courier") {
+        url = `${BASE_URL}order/courier/orders`;
+      }
+
+      const response = await fetch(
+        `${url}?page=1&limit=0&${new URLSearchParams(cleanedFilters)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
+          },
+        }
+      );
+
+      const rawText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
+      }
+
+      const orders = data?.data?.data;
+      const exportData = orders?.map((order: any, inx: number) => ({
+        N: inx + 1,
+        Viloyat: order?.customer?.district?.region?.name,
+        Tuman: order?.customer?.district?.name,
+        Firma: order?.market?.name,
+        Mahsulot: order?.items?.map((item: any) => item.product.name)?.join(", "),
+        "Telefon raqam": order?.customer?.phone_number,
+        Narxi: Number((order?.total_price ?? 0) / 1000),
+        Holati: statusLabels[order?.status],
+        Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      }));
+
+      exportToExcel(
+        exportData || [],
+        isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
+      );
+
+      handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+    } catch (err) {
+      handleApiError(err, "Excel yuklashda xatolik");
+    } finally {
+      dispatch(resetDownload());
+    }
+  };
+
+  if (triggerDownload.triggerDownload) downloadExcel();
+}, [triggerDownload, dispatch, cleanedFilters, user?.role]);
+
 
   return (
     <div className="w-full bg-white py-1 dark:bg-[#312d4b] min-[650px]:overflow-x-auto">
