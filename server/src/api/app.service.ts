@@ -19,7 +19,7 @@ export default class Application {
     app.useLogger(myLogger);
 
     // ✅ Static files (uploads)
-    const uploadDir = '/home/ubuntu/uploads';
+    const uploadDir = '/Users/abdulfattoh/Desktop/uploads';
     app.use('/uploads', express.static(uploadDir));
 
     // Public folder (agar bo‘lsa)

@@ -38,7 +38,7 @@ import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 
 // ✅ Absolute path
-const uploadDir = '/home/ubuntu/uploads';
+const uploadDir = '/Users/abdulfattoh/Desktop/uploads';
 
 // Multer storage
 const storage = diskStorage({
