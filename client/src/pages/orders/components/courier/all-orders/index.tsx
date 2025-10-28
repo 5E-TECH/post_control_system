@@ -329,14 +329,12 @@ const AllOrders = () => {
         </thead>
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => {
-            console.log(item.id);
 
             return (
               <tr
-                onClick={(e) => {
-                  console.log(e);
+                onClick={() => {
 
-                  navigate(`/order/order-detail/${item.id}`);
+                  navigate(`/orders/order-detail/${item.id}`); 
                 }}
                 key={item?.id}
                 className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
