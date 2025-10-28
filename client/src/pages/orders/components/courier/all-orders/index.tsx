@@ -418,7 +418,7 @@ const AllOrders = () => {
       <Popup isShow={isShow} onClose={closePopup}>
         <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8 dark:bg-[#312D4B]">
           <X
-            className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
+            className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200 dark:hover:bg-[#1e2939]"
             onClick={closePopup}
           />
           {partleSoldShow && (
