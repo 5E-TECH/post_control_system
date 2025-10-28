@@ -16,8 +16,8 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
     const [currentMonth, setCurrentMonth] = useState(dayjs());
     const [currentMonthTo, setCurrentMonthTo] = useState(dayjs());
 
-    const toggleFrom = () => setIsFromOpen(!isFromOpen);
-    const toggleTo = () => setIsToOpen(!isToOpen);
+    const toggleFrom = () => { setIsFromOpen(!isFromOpen), setIsToOpen(false)};
+    const toggleTo = () => {setIsToOpen(!isToOpen), setIsFromOpen(false)};
 
     const handlePrevMonth = (isFrom: boolean) => {
       if (isFrom) setCurrentMonth(currentMonth.subtract(1, "month"));
@@ -59,10 +59,10 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
     const weekDays = ["D", "S", "Ch", "P", "J", "Sh", "Y"];
 
     return (
-      <div className="p-5 flex justify-center w-full">
+      <div className=" flex justify-center w-full">
         <div className="w-[400px] max-sm:w-full">
           {/* <h2 className="text-xl font-semibold mb-3">Sana oralig‘ini tanlang</h2> */}
-          <div className="flex flex-col sm:flex-row gap-3  w-full">
+          <div className="flex flex-row sm:flex-row gap-3  w-full">
             {/* From Input */}
             <div className="relative flex-1 w-full">
               <input
@@ -74,7 +74,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
               />
               {isFromOpen && (
-                <div className="absolute top-full left-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3">
+                <div className="absolute top-full left-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%]">
                   <div className="flex justify-between items-center mb-2">
                     <button
                       onClick={() => handlePrevMonth(true)}
@@ -133,7 +133,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
               />
               {isToOpen && (
-                <div className="absolute top-full left-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3">
+                <div className="absolute top-full right-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[180%]">
                   <div className="flex justify-between items-center mb-2">
                     <button
                       onClick={() => handlePrevMonth(false)}
