@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { House, ShoppingBag, MailOpen, FileText, History } from "lucide-react";
+import { House, ShoppingBag, MailOpen, Calendar1, Apple } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
@@ -11,9 +11,9 @@ const RegistratorSidebar = () => {
   const links = [
     { to: "/", icon: <House />, label: t("dashboard"), end: true },
     { to: "/orders", icon: <ShoppingBag />, label: t("orders") },
-    { to: "/order/markets/new-orders", icon: <History />, label: t("new_orders") },
+    { to: "/order/markets/new-orders", icon: <Calendar1 />, label: t("new_orders") },
     { to: "/mails", icon: <MailOpen />, label: t("mails") },
-    { to: "/products", icon: <FileText />, label: t("products") },
+    { to: "/products", icon: <Apple />, label: t("products") },
   ];
     const sidebarRedux = useSelector((state: RootState) => state.sidebar);
 
