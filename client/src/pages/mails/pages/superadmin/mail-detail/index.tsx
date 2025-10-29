@@ -12,10 +12,13 @@ import SearchInput from "../../../../users/components/search-input";
 import Popup from "../../../../../shared/ui/Popup";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import { exportToExcel } from "../../../../../shared/helpers/export-download-excel";
+import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 
 const MailDetail = () => {
+  const dispatch = useDispatch();
   const { t } = useTranslation("mails");
 
   const { id } = useParams();
@@ -23,7 +26,7 @@ const MailDetail = () => {
   const regionName = state?.regionName;
   const search = useSelector((state: RootState) => state.resetUserFilter.search);
   console.log(search);
-  
+
 
   const { getPostById, sendAndGetCouriersByPostId, sendPost } = usePost();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
@@ -86,8 +89,36 @@ const MailDetail = () => {
             { id, data: post },
             {
               onSuccess: (res) => {
+                console.log(res.data);
+
                 const courierName = res?.data?.courier?.name;
                 handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
+
+                try {
+                  const mails = res?.data?.newOrders;
+                  console.log("mails", mails);
+
+                  const exportData = mails?.map((mail: any, inx: number) => ({
+                    N: inx + 1,
+                    // Tuman: mail?.customer?.district?.name,
+                    // Firma: mail?.market?.name,
+                    // "Telefon raqam": mail?.customer?.phone_number,
+                    Narxi: Number((mail?.total_price ?? 0) / 1000),
+                    Holati: '',
+                  }));
+
+                  exportToExcel(
+                    exportData || [],
+                    "pochtalar"
+                  );
+
+                  handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+                } catch (error) {
+                  handleApiError(error, "Excel yuklashda xatolik");
+                } finally {
+                  dispatch(resetDownload());
+                }
+
                 navigate("/mails");
               },
               onError: (err: any) =>
@@ -125,8 +156,36 @@ const MailDetail = () => {
       { id: id as string, data: post },
       {
         onSuccess: (res) => {
+          console.log(res);
+
           const courierName = res?.data?.courier?.name;
           handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
+
+          try {
+            const mails = res?.data?.newOrders;
+            console.log("mails", mails);
+
+            const exportData = mails?.map((mail: any, inx: number) => ({
+              N: inx + 1,
+              // Tuman: mail?.customer?.district?.name,
+              // Firma: mail?.market?.name,
+              // "Telefon raqam": mail?.customer?.phone_number,
+              Narxi: Number((mail?.total_price ?? 0) / 1000),
+              Holati: '',
+            }));
+
+            exportToExcel(
+              exportData || [],
+              "pochtalar"
+            );
+
+            handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+          } catch (error) {
+            handleApiError(error, "Excel yuklashda xatolik");
+          } finally {
+            dispatch(resetDownload());
+          }
+
           navigate("/mails");
         },
         onError: (err: any) =>
@@ -240,7 +299,7 @@ const MailDetail = () => {
                 {!hideSend ? (
                   <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
-                    {t("harakatlar")}
+                      {t("harakatlar")}
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
@@ -316,7 +375,7 @@ const MailDetail = () => {
             onClick={() => handleClick(id as string)}
             className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
           >
-           {t("pochtanijonatish")}
+            {t("pochtanijonatish")}
           </Button>
         </div>
       ) : null}
@@ -342,11 +401,10 @@ const MailDetail = () => {
                   </div>
 
                   <Button
-                    className={`${
-                      selectedCourierId === courier?.id
-                        ? "bg-[var(--color-bg-sy)]! text-white!"
-                        : ""
-                    }`}
+                    className={`${selectedCourierId === courier?.id
+                      ? "bg-[var(--color-bg-sy)]! text-white!"
+                      : ""
+                      }`}
                     onClick={() => handleSelectedCourier(courier?.id)}
                   >
                     {selectedCourierId === courier?.id ? (
