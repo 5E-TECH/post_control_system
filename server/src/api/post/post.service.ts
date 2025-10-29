@@ -336,8 +336,9 @@ export class PostService {
       const oldOrders = await queryRunner.manager.find(OrderEntity, {
         where: { post_id: id },
       });
-      const newOrders = await queryRunner.manager.findBy(OrderEntity, {
-        id: In(orderIds),
+      const newOrders = await queryRunner.manager.find(OrderEntity, {
+        where: { id: In(orderIds) },
+        relations: ['market', 'customer', 'customer.district'],
       });
 
       if (newOrders.length !== orderIds.length)
@@ -399,7 +400,7 @@ export class PostService {
        */
       const updatedPost = await queryRunner.manager.findOne(PostEntity, {
         where: { id },
-        relations: ['courier'],
+        relations: ['courier', 'region'],
       });
 
       await queryRunner.commitTransaction();
