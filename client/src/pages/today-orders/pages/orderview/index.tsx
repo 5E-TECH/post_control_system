@@ -138,6 +138,15 @@ const OrderView = () => {
     });
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(
+      (prev) =>
+        prev.includes(id)
+          ? prev.filter((item) => item !== id) // agar bor bo‘lsa — olib tashla
+          : [...prev, id] // yo‘q bo‘lsa — qo‘sh
+    );
+  };
+
   return (
     <div
       onClick={() => setOpenMenuId("")}
@@ -219,7 +228,14 @@ const OrderView = () => {
                 <th>
                   <div className="flex items-center gap-10">
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    <span>{t("address")}</span>
+                    <span>{t("viloyat")}</span>
+                  </div>
+                </th>
+
+                <th>
+                  <div className="flex items-center gap-10">
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <span>{t("tuman")}</span>
                   </div>
                 </th>
 
@@ -238,7 +254,7 @@ const OrderView = () => {
                 <th>
                   <div className="flex items-center gap-10">
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    <span>{t("stock")}</span>
+                    <span>{t("delivery")}</span>
                   </div>
                 </th>
                 <th>
@@ -253,23 +269,16 @@ const OrderView = () => {
             <tbody className="cursor-pointer">
               {data?.data?.data?.map((item: any, inx: number) => (
                 <tr
+                  onClick={() => toggleSelect(item.id)}
                   key={item?.id}
-                  className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759]"
+                  className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] select-none"
                 >
                   <td className="pl-10">
                     <input
                       type="checkbox"
-                      onClick={(e) => e.stopPropagation()}
-                      checked={item?.id ? selectedIds.includes(item.id) : false}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedIds([...selectedIds, item.id]);
-                        } else {
-                          setSelectedIds(
-                            selectedIds.filter((id) => id !== item.id)
-                          );
-                        }
-                      }}
+                      onClick={(e) => e.stopPropagation()} // table row click bilan to‘qnashmasin
+                      checked={selectedIds.includes(item.id)}
+                      onChange={() => toggleSelect(item.id)}
                     />
                   </td>
                   <td className="pl-10">{inx + 1}</td>
@@ -287,7 +296,11 @@ const OrderView = () => {
                       : ""}{" "}
                   </td>
                   <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.customer?.address?.split(" ").slice(0, 2).join(" ")}
+                    {item?.customer?.district?.region?.name}
+                  </td>
+
+                  <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
+                    {item?.customer?.district?.name}
                   </td>
 
                   <td className="pl-10">
@@ -302,7 +315,7 @@ const OrderView = () => {
                     UZS
                   </td>
                   <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                    {item?.items?.length}
+                    {t(`${item?.where_deliver}`)}
                   </td>
                   <td className="relative pl-10 text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
                     <button

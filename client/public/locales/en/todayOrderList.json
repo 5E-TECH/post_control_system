@@ -6,11 +6,14 @@
     "market": "Market",
     "phone": "Phone",
     "totalPrice": "Total Price",
-    "stock": "Stock",
+    "delivery": "Where",
     "customer": "Customer",
-    "address": "Address",
+    "viloyat": "Region",
+    "tuman": "District",
     "status": "Status",
     "price": "Price",
     "action": "Action",
-    "qabulQilish": "Accept"
+    "qabulQilish": "Accept",
+    "center":"To the center",
+    "address":"Up to home"
 }
