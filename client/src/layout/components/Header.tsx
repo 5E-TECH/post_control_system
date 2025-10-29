@@ -77,7 +77,7 @@ const Header = () => {
         </NavLink>
         <button
           onClick={handleDispatch}
-          className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300"
+          className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300 cursor-pointer"
         >
           <ArrowLeft
             className={`transition-transform duration-300 ${

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { House, ShoppingBag, FileText, Apple,History } from "lucide-react";
+import { House, ShoppingBag, Apple, Calendar1, CreditCard } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
@@ -18,11 +18,11 @@ const MarketSidebar = () => {
     // { to: "/clients", icon: <MailOpen />, label: t("clients") },
     {
       to: "/order/markets/new-orders",
-      icon: <History />,
+      icon: <Calendar1 />,
       label: t("new_orders"),
     },
     { to: "/products", icon: <Apple />, label: t("products") },
-    { to: "/cash-box", icon: <FileText />, label: t("payments") },
+    { to: "/cash-box", icon: <CreditCard />, label: t("payments") },
   ];
       const sidebarRedux = useSelector((state: RootState) => state.sidebar);
 
