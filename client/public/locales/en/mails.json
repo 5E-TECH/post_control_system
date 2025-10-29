@@ -20,5 +20,7 @@
   "qidiruv": "Search",
   "tabuyurtmalar": "orders",
   "center": "To the center",
-  "address": "Up to home"
+  "address": "Up to home",
+  "accept": "Receive mail",
+  "orders":"orders"
 }

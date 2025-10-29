@@ -247,24 +247,27 @@ const MailDetail = () => {
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
-                {!hideSend ? (
-                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      {t("time")}
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
-                ) : null}
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    {t("time")}
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
               {postData?.map((order: any) => (
-                <tr key={order?.id} onClick={() => toggleSelect(order.id)} className="select-none">
+                <tr
+                  key={order?.id}
+                  onClick={() => toggleSelect(order.id)}
+                  className="select-none"
+                >
                   {!hideSend ? (
                     <td className="p-[20px] flex items-center">
                       {" "}
                       <input
                         type="checkbox"
+                        className="w-[18px] h-[18px] rounded-sm"
                         onClick={(e) => e.stopPropagation()} // table row click bilan to‘qnashmasin
                         checked={selectedIds.includes(order.id)}
                         onChange={() => toggleSelect(order.id)}
@@ -294,7 +297,9 @@ const MailDetail = () => {
                     {t(`${order?.where_deliver}`)}
                   </td>
                   <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {new Date(Number(order?.created_at)).toLocaleDateString()}
+                    {new Date(Number(order?.created_at)).toLocaleDateString(
+                      "uz-UZ"
+                    )}
                   </td>
                 </tr>
               ))}

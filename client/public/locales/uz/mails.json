@@ -20,5 +20,7 @@
   "delivery": "Qayergacha",
   "tabuyurtmalar": "ta buyurtmalar",
   "center": "Markazgacha",
-  "address": "Uygacha"
+  "address": "Uygacha",
+  "accept":"Pochtani qabul qilish",
+  "orders":"tu buyurtmalar"
 }
