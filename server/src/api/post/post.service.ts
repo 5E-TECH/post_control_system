@@ -355,10 +355,15 @@ export class PostService {
         await queryRunner.manager.save(order);
       }
 
+      const postTotalInfo = {
+        total: newOrders.length,
+        sum: 0,
+      };
       /**
        * 6️⃣ Yangi orderlarni ON_THE_ROAD holatiga o‘tkazish
        */
       for (const order of newOrders) {
+        postTotalInfo.sum += order.total_price;
         order.post_id = post.id;
         order.status = Order_status.ON_THE_ROAD;
         await queryRunner.manager.save(order);
@@ -405,7 +410,7 @@ export class PostService {
 
       await queryRunner.commitTransaction();
       return successRes(
-        { updatedPost, newOrders },
+        { updatedPost, newOrders, postTotalInfo },
         200,
         'Post sent successfully',
       );
