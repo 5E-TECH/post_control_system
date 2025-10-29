@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { Check, Trash } from "lucide-react";
+import { Check } from "lucide-react";
 import {
   useLocation,
   useNavigate,
@@ -21,9 +21,10 @@ const MailDetail = () => {
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
-  const search = useSelector((state: RootState) => state.resetUserFilter.search);
+  const search = useSelector(
+    (state: RootState) => state.resetUserFilter.search
+  );
   console.log(search);
-  
 
   const { getPostById, sendAndGetCouriersByPostId, sendPost } = usePost();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
@@ -135,6 +136,15 @@ const MailDetail = () => {
     );
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(
+      (prev) =>
+        prev.includes(id)
+          ? prev.filter((item) => item !== id) // agar bor bo‘lsa — olib tashla
+          : [...prev, id] // yo‘q bo‘lsa — qo‘sh
+    );
+  };
+
   const hideSend = state?.hideSend;
 
   return (
@@ -233,14 +243,14 @@ const MailDetail = () => {
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    {t("dona")}
+                    {t("delivery")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 {!hideSend ? (
                   <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                     <div className="flex items-center justify-between pr-[21px]">
-                    {t("harakatlar")}
+                      {t("time")}
                       <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                     </div>
                   </th>
@@ -249,25 +259,15 @@ const MailDetail = () => {
             </thead>
             <tbody>
               {postData?.map((order: any) => (
-                <tr key={order?.id}>
+                <tr key={order?.id} onClick={() => toggleSelect(order.id)} className="select-none">
                   {!hideSend ? (
                     <td className="p-[20px] flex items-center">
                       {" "}
                       <input
                         type="checkbox"
-                        className="w-[18px] h-[18px] rounded-sm"
-                        checked={
-                          order?.id ? selectedIds.includes(order.id) : false
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedIds([...selectedIds, order.id]);
-                          } else {
-                            setSelectedIds(
-                              selectedIds.filter((id) => id !== order.id)
-                            );
-                          }
-                        }}
+                        onClick={(e) => e.stopPropagation()} // table row click bilan to‘qnashmasin
+                        checked={selectedIds.includes(order.id)}
+                        onChange={() => toggleSelect(order.id)}
                       />
                     </td>
                   ) : null}
@@ -291,16 +291,11 @@ const MailDetail = () => {
                     {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}
                   </td>
                   <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {order?.items?.length}
+                    {t(`${order?.where_deliver}`)}
                   </td>
-
-                  {!hideSend ? (
-                    <td className="w-[254px] h-[56px] pl-[19px] text-left">
-                      <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
-                        <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
-                      </div>
-                    </td>
-                  ) : null}
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {new Date(Number(order?.created_at)).toLocaleDateString()}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -316,7 +311,7 @@ const MailDetail = () => {
             onClick={() => handleClick(id as string)}
             className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
           >
-           {t("pochtanijonatish")}
+            {t("pochtanijonatish")}
           </Button>
         </div>
       ) : null}

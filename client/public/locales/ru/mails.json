@@ -10,12 +10,15 @@
     "market": "Маркет",
     "pulMiqdori": "Сумма",
     "dona": "Количество",
-    "harakatlar": "Действия",
+    "time": "Время создания",
     "pochtanijonatish":"Отправить почту",
     "uygacha":"До дома",
     "markazgacha":"до центра",
     "ta":"шт",
     "so'm":"сумма",
     "qidiruv":"поиск",
-    "tabuyurtmalar":"Заказы"
+    "tabuyurtmalar":"Заказы",
+    "center":"До центра",
+    "address":"До дома",
+    "delivery": "До какого"
 }
