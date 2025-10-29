@@ -36,9 +36,10 @@ import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
+import config from 'src/config';
 
 // ✅ Absolute path
-const uploadDir = '/Users/abdulfattoh/Desktop/uploads';
+const uploadDir = config.UPLOAD_URL;
 
 // Multer storage
 const storage = diskStorage({
