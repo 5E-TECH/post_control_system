@@ -469,9 +469,12 @@ export class PostService {
         { status: Post_status.RECEIVED },
       );
 
-      await queryRunner.commitTransaction();
+      const allOrdersInThePost = await queryRunner.manager.find(OrderEntity, {
+        where: { id: In(waitingOrderIds) },
+      });
 
-      return successRes({}, 200, 'Post received successfully');
+      await queryRunner.commitTransaction();
+      return successRes(allOrdersInThePost, 200, 'Post received successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
