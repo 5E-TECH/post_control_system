@@ -403,7 +403,11 @@ export class PostService {
       });
 
       await queryRunner.commitTransaction();
-      return successRes(updatedPost, 200, 'Post sent successfully');
+      return successRes(
+        { updatedPost, newOrders },
+        200,
+        'Post sent successfully',
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
