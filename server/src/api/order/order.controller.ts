@@ -46,8 +46,11 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Post()
-  createOrder(@Body() creteOrderDto: CreateOrderDto) {
-    return this.orderService.createOrder(creteOrderDto);
+  createOrder(
+    @Body() creteOrderDto: CreateOrderDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orderService.createOrder(creteOrderDto, user);
   }
 
   @ApiOperation({ summary: 'List orders with filters' })

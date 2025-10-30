@@ -172,7 +172,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async createOrder(createOrderDto: CreateOrderDto): Promise<Object> {
+  async createOrder(
+    createOrderDto: CreateOrderDto,
+    user: JwtPayload,
+  ): Promise<Object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -191,6 +194,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!market) {
         throw new NotFoundException('Market not found');
+      }
+
+      if (user.role === Roles.MARKET && !market.add_order) {
+        throw new BadRequestException('You can not create order and product');
       }
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
