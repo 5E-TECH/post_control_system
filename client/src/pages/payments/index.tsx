@@ -36,11 +36,12 @@ const Payments = () => {
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
   const id = user.id;
+  const { pathname } = useLocation();
   useEffect(() => {
     if (role === 'courier' || role === 'market') {
       navigate(`cash-detail/${id}`);
     }
-  }, [user, role]);
+  }, [user, role, pathname]);
 
   const [showMarket, setShowMarket] = useState(false);
   const [showCurier, setShowCurier] = useState(false);
@@ -51,7 +52,6 @@ const Payments = () => {
     useState<IPaymentFilter>(initialState);
 
   const navigate = useNavigate();
-  const { pathname } = useLocation();
 
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();

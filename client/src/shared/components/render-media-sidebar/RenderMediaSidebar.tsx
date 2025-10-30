@@ -1,10 +1,9 @@
 import { NavLink } from "react-router-dom";
 import {
   Apple,
-  CarFront,
+  Calendar1,
   CreditCard,
   FileText,
-  History,
   House,
   MailOpen,
   QrCode,
@@ -160,7 +159,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <CreditCard />
             </NavLink>
 
             <NavLink
@@ -174,13 +173,13 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <History />
+              <Scale />
             </NavLink>
           </div>
         );
       case "registrator":
         return (
-          <div className="flex justify-center px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
+          <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
             <NavLink
               to={"/"}
               className={({ isActive }) =>
@@ -220,7 +219,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <CarFront />
+              <Calendar1 />
             </NavLink>
 
             <NavLink
@@ -248,7 +247,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <Apple />
             </NavLink>
           </div>
         );
@@ -321,7 +320,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <CreditCard />
             </NavLink>
           </div>
         );
@@ -381,7 +380,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <ShoppingBag />
+              <Calendar1 />
             </NavLink>
 
             <NavLink
@@ -409,7 +408,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <CreditCard />
             </NavLink>
           </div>
         );

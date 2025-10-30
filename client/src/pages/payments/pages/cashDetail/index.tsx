@@ -1,7 +1,6 @@
 import { memo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
-import { ChevronRight } from "lucide-react";
 import { Select, DatePicker } from "antd";
 import TextArea from "antd/es/input/TextArea";
 import { CashboxCard } from "../../components/CashCard";
@@ -163,10 +162,7 @@ const CashDetail = () => {
     <div className="px-5 mt-5 flex gap-24 max-md:flex-col  ">
       <div>
         <h2 className="flex items-center mb-5 text-[20px] capitalize">
-          {t(`${data?.data?.cashbox?.user?.role}`)} <ChevronRight />
-          <span className="text-[22px] font-bold">
-            {data?.data?.cashbox?.user?.name}
-          </span>
+          {t("cashbox")}
         </h2>
         <CashboxCard
           role={"market"}
@@ -288,19 +284,19 @@ const CashDetail = () => {
       </div>
       <div className="grid w-full max-[550px]:w-full">
         {form.from == "" && (
-          <h2 className="mb-5 text-[20px] font-medium">Bugungi o'tkazmalar</h2>
+          <h2 className="mb-5 text-[20px] font-medium">{t("today")}</h2>
         )}
 
         {form.from !== "" && form.from === form.to && (
           <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} kungi o'tkazmalar
+            {form.from} {t("day")}
           </h2>
         )}
 
         {form.from !== "" && form.from !== form.to && (
           <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} <span className="text-[15px]">dan ,</span> {form.to}{" "}
-            <span className="text-[15px]">gacha</span> o'tkazmalar
+            {form.from} <span className="text-[15px]">{t("dan")}</span> {form.to}{" "}
+            <span className="text-[15px]">{t("gacha")}</span> {t("o'tkazmalar")}
           </h2>
         )}
         <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">
@@ -341,7 +337,7 @@ const CashDetail = () => {
                       to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
                     }));
                   }}
-                  placeholder={["From", "To"]}
+                  placeholder={[`${t("start")}`, `${t("end")}`]}
                   format="YYYY-MM-DD"
                   size="large"
                   className="w-[340px] max-md:w-[100%] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"

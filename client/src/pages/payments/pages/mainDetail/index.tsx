@@ -445,19 +445,19 @@ const MainDetail = () => {
       {/* === FILTERS & HISTORY === */}
       <div className="w-full">
         {form.from == "" && (
-          <h2 className="mb-5 text-[20px] font-medium">Bugungi o'tkazmalar</h2>
+          <h2 className="mb-5 text-[20px] font-medium">{t("today")}</h2>
         )}
 
         {form.from !== "" && form.from === form.to && (
           <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} kungi o'tkazmalar
+            {form.from} {t("day")}
           </h2>
         )}
 
         {form.from !== "" && form.from !== form.to && (
           <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} <span className="text-[15px]">dan ,</span> {form.to}{" "}
-            <span className="text-[15px]">gacha</span> o'tkazmalar
+            {form.from} <span className="text-[15px]">{t("dan")}</span> {form.to}{" "}
+            <span className="text-[15px]">{t("gacha")}</span> {t("o'tkazmalar")}
           </h2>
         )}
         <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">
@@ -498,7 +498,7 @@ const MainDetail = () => {
                       to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
                     }));
                   }}
-                  placeholder={["From", "To"]}
+                  placeholder={[`${t("start")}`, `${t("end")}`]}
                   format="YYYY-MM-DD"
                   size="large"
                   className="w-[340px] max-md:w-[100%] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"

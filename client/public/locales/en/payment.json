@@ -56,6 +56,13 @@
     "status": "Status",
     "main":"main",
     "paymentType":"payment type",
+    "today":"Today's transactions",
+    "day":"transactions on",
+    "start":"Start date",
+    "end":"End date",
+    "gacha":"up to",
+    "o'tkazmalar":"transfers",
+    "dan":"from ,",
     "sourceTypes": {
         "courier_payment": "Courier payment",
         "market_payment": "Market payment",
