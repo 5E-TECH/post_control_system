@@ -1,5 +1,6 @@
 import React, { memo, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
+import { useTranslation } from "react-i18next";
 
 type CalendarProps = {
   from: Dayjs | null;
@@ -10,14 +11,20 @@ type CalendarProps = {
 
 const CustomCalendar: React.FC<CalendarProps> = memo(
   ({ from, to, setFrom, setTo }) => {
+    const { t } = useTranslation("payment");
+
     const [isFromOpen, setIsFromOpen] = useState(false);
     const [isToOpen, setIsToOpen] = useState(false);
 
     const [currentMonth, setCurrentMonth] = useState(dayjs());
     const [currentMonthTo, setCurrentMonthTo] = useState(dayjs());
 
-    const toggleFrom = () => { setIsFromOpen(!isFromOpen), setIsToOpen(false)};
-    const toggleTo = () => {setIsToOpen(!isToOpen), setIsFromOpen(false)};
+    const toggleFrom = () => {
+      setIsFromOpen(!isFromOpen), setIsToOpen(false);
+    };
+    const toggleTo = () => {
+      setIsToOpen(!isToOpen), setIsFromOpen(false);
+    };
 
     const handlePrevMonth = (isFrom: boolean) => {
       if (isFrom) setCurrentMonth(currentMonth.subtract(1, "month"));
@@ -70,7 +77,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 readOnly
                 onClick={toggleFrom}
                 value={from ? from.format("YYYY-MM-DD") : ""}
-                placeholder="Boshlanish sanasi"
+                placeholder={`${t("start")}`}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
               />
               {isFromOpen && (
@@ -129,7 +136,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 readOnly
                 onClick={toggleTo}
                 value={to ? to.format("YYYY-MM-DD") : ""}
-                placeholder="Tugash sanasi"
+                placeholder={`${t("end")}`}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
               />
               {isToOpen && (
@@ -185,8 +192,8 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
           </div>
         </div>
       </div>
-    // </div>
-  );
+      // </div>
+    );
   }
 );
 
