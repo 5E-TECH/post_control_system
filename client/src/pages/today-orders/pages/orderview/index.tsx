@@ -1,7 +1,6 @@
 import { Edit, Trash } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import phone from "../../../../shared/assets/order/detail.svg";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { usePost } from "../../../../shared/api/hooks/usePost";
 import { useSelector } from "react-redux";
@@ -42,7 +41,6 @@ const OrderView = () => {
   const navigate = useNavigate();
   const [_, setOpenMenuId] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [searchData, setSearch] = useState<any>(null);
   const { getOrderByMarket, getMarketsByMyNewOrders, deleteOrders } =
     useOrder();
@@ -158,7 +156,7 @@ const OrderView = () => {
             {t("title")}
           </h2>
           <form action="">
-            <div className="border border-[#d1cfd4] max-[650px]:mt-4 rounded-md">
+            <div className="border border-[#d1cfd4] max-[650px]:mt-3 rounded-md">
               <input
                 onChange={(e) => debouncedSearch(e.target.value)}
                 className="outline-none px-4 py-3"
@@ -171,7 +169,7 @@ const OrderView = () => {
         <button
           onClick={() => handlePrint()}
           disabled={isPrintDisabled}
-          className={`border px-5 text-nowrap py-3 rounded-md text-[#8c57ff] border-[#8c57ff] ${
+          className={`border px-5 text-nowrap py-3 max-[650px]:mb-3 rounded-md text-[#8c57ff] border-[#8c57ff] ${
             isPrintDisabled ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
@@ -348,88 +346,7 @@ const OrderView = () => {
             <EmptyPage />
           </div>
         )}
-        {selectedOrder && (
-          <div
-            className="fixed inset-0 bg-[#f4f5fa79] bg-opacity-80 flex items-center justify-center z-50 dark:bg-[#28243d3b]"
-            onClick={() => setSelectedOrder(null)}
-          >
-            <div
-              className="bg-white rounded-lg shadow-lg p-6 w-[500px] relative dark:bg-[#28243d]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                className="absolute top-3 right-3 text-gray-600 hover:text-black"
-                onClick={() => setSelectedOrder(null)}
-              >
-                ✕
-              </button>
-              <div>
-                <div className="flex gap-4 items-center justify-between pr-4 border-b pb-2">
-                  <div className="flex gap-4 items-center">
-                    <h2>Buyurtma</h2>
-                    <div className="bg-[var(--color-bg-sy)] py-0.5 px-1.5 rounded-md">
-                      new
-                    </div>
-                  </div>
-                  <div>
-                    <h2>Sep 10, 2025, 13:20</h2>
-                  </div>
-                </div>
-                <div>
-                  <div className="pt-2">
-                    <table className="w-full">
-                      <thead>
-                        <tr>
-                          <th className="flex justify-between border-b pb-2">
-                            <td>Product</td>
-                            <td>Miqdori</td>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Array.from({ length: 3 }).map((_, inx: number) => (
-                          <tr
-                            key={inx}
-                            className="flex justify-between items-center pr-4 border-b mb-2"
-                          >
-                            <td>
-                              <div className="flex items-center gap-3">
-                                <div>
-                                  <img src={phone} alt="" />
-                                </div>
-                                <div>
-                                  <h2 className="text-[15px]">iphone 15</h2>
-                                  <p className="text-[13px]">Samsung zo'r</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="">1</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="flex justify-end mr-4">
-                      <h2>Tota: 5_000_000 USD</h2>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-between pr-7 mt-5">
-                  <div>
-                    <h2 className="text-[18px]">Customer detail</h2>
-                    <h2 className="text-[15px]">phone: +998913607434</h2>
-                    <h2 className="text-[15px]">address: Namangan, Chortoq</h2>
-                  </div>
-                  <div>
-                    <h2 className="text-[18px]">Shipping Status</h2>
-                    <h2 className="text-[15px]">On the Road</h2>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
         {user?.role !== "market" && data?.data?.data?.length > 0 && (
           <div className="flex justify-end mr-10 mt-5">
             <button
