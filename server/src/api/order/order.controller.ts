@@ -30,6 +30,7 @@ import { OrdersArrayDto } from './dto/orders-array.dto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { SellCancelOrderDto } from './dto/sellCancel-order.dto';
 import { PartlySoldDto } from './dto/partly-sold.dto';
+import { OrderDto } from './dto/orderId.dto';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -205,8 +206,8 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('receive/:id')
-  receiveOrderWithScaner(@Param('id') id: string, @Body() marketId: string) {
-    return this.orderService.receiveWithScaner(id, marketId);
+  receiveOrderWithScaner(@Param('id') id: string, @Body() orderDto: OrderDto) {
+    return this.orderService.receiveWithScaner(id, orderDto);
   }
 
   @ApiOperation({
