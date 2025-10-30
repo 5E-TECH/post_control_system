@@ -83,21 +83,32 @@ const OrderView = () => {
 
   // query
   const queryParams = { page, limit, ...cleanedFilters };
-  let query;
-  switch (role) {
-    case "superadmin":
-    case "admin":
-    case "registrator":
-      query = getOrders(queryParams);
-      break;
-    case "market":
-      query = getMarketsAllNewOrder(queryParams);
-      break;
-    default:
-      query = { data: { data: [], total: 0 } };
-  }
+  // let query;
+  // switch (role) {
+  //   case "superadmin":
+  //   case "admin":
+  //   case "registrator":
+  //     query = getOrders(queryParams);
+  //     break;
+  //   case "market":
+  //     query = getMarketsAllNewOrder(queryParams);
+  //     break;
+  //   default:
+  //     query = { data: { data: [], total: 0 } };
+  // }
+  console.log("salom");
+  
+  // const { data, isLoading } = ;
+  const { data, refetch, isLoading } =
+  role === "market"
+    ? getMarketsAllNewOrder(queryParams)
+    : getOrders(queryParams);
 
-  const { data, isLoading } = query;
+useEffect(() => {
+  if (role === "market") refetch();
+}, [role]);
+
+
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
   const total = data?.data?.total || 0;
 
@@ -118,7 +129,7 @@ useEffect(() => {
       // 🔥 URL ni rolga qarab belgilaymiz
       let url = `${BASE_URL}order`;
       if (user?.role === "market") {
-        url = `${BASE_URL}order/market/all-orders`;
+        url = `${BASE_URL}order/market/all/my-orders`;
       } else if (user?.role === "courier") {
         url = `${BASE_URL}order/courier/orders`;
       }
@@ -132,15 +143,24 @@ useEffect(() => {
         }
       );
 
+      console.log("response", response);
+      
+
       const rawText = await response.text();
+      console.log("rawtext", rawText);
+      
       let data;
       try {
         data = JSON.parse(rawText);
+        console.log("Data", data);
+        
       } catch {
         throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
       }
 
       const orders = data?.data?.data;
+      console.log("orders",orders);
+      
       const exportData = orders?.map((order: any, inx: number) => ({
         N: inx + 1,
         Viloyat: order?.customer?.district?.region?.name,

@@ -66,10 +66,25 @@ export class PrinterService {
         return createdDate.toLocaleDateString('uz-UZ');
       };
 
+      const formatRegion = (regionName: string): string => {
+        let shortName: string;
+        if (regionName.startsWith('toshkent')) {
+          if (regionName.includes('shahri')) {
+            shortName = `${regionName.slice(0, 4)}.sh`;
+          } else {
+            shortName = `${regionName.slice(0, 4)}.vil`;
+          }
+        } else {
+          shortName = `${regionName.slice(0, 3)}`;
+        }
+        return shortName;
+      };
+
       const orders = await this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.assignedToRegion', 'assignedToRegion')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
@@ -90,6 +105,7 @@ export class PrinterService {
           customerPhone: formatPhoneNumber(order.customer?.phone_number ?? ''),
           market: order.market?.name ?? 'N/A',
           comment: order.comment ?? '',
+          region: formatRegion(order.customer.district.assignedToRegion.name),
           district: order.customer?.district?.name ?? 'N/A',
           address: order.customer?.address ?? 'N/A',
           qrCode: order.qr_code_token ?? '',
@@ -148,6 +164,7 @@ export class PrinterService {
       customerName,
       customerPhone,
       qrCode,
+      region,
       district,
       address,
       market,
@@ -200,7 +217,7 @@ TEXT 20,120,"4",0,1,1,"${customerPhone}"
 TEXT 20,150,"3",0,1,1,"-----------------------------"
 TEXT 20,180,"3",0,1,1,"Narxi:"
 TEXT 160,180,"3",0,1,1,"${orderPrice}"
-TEXT 20,220,"3",0,1,1,"Tuman: ${district}"
+TEXT 20,220,"3",0,1,1,"Tuman: ${region} ${district}"
 TEXT 20,260,"3",0,1,1,"Manzil: ${address || '-'}"
 ${productTextLines}
 TEXT 20,${y},"3",0,1,1,"Izoh: ${comment || '-'}"

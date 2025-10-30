@@ -42,7 +42,7 @@ export const useMarket = () => {
     useQuery({
       queryKey: [market, params],
       queryFn: () =>
-        api.get("order/market/all-orders", { params }).then((res) => res.data),
+        api.get("order/market/all/my-orders", { params }).then((res) => res.data),
       enabled,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,

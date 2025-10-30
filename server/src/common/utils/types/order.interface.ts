@@ -5,6 +5,7 @@ export interface PrintOrder {
   customerPhone: string;
   market: string;
   comment: string;
+  region: string;
   district: string;
   address: string;
   qrCode: string;
