@@ -1,5 +1,12 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { AddOrder, Status } from 'src/common/enums';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
+import { Status } from 'src/common/enums';
 
 export class UpdateMarketDto {
   @IsOptional()
@@ -19,8 +26,8 @@ export class UpdateMarketDto {
   status?: Status;
 
   @IsOptional()
-  @IsEnum(AddOrder)
-  add_order?: AddOrder;
+  @IsBoolean()
+  add_order?: boolean;
 
   @IsOptional()
   @IsNumber()

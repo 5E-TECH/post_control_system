@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -32,13 +33,13 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 export class PostController {
   constructor(private readonly postService: PostService) {}
 
-  @ApiOperation({ summary: 'List all posts' })
-  @ApiResponse({ status: 200, description: 'Posts list' })
+  @ApiOperation({ summary: 'List all posts (with pagination)' })
+  @ApiResponse({ status: 200, description: 'Paginated posts list' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
   @Get()
-  findAll() {
-    return this.postService.findAll();
+  findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 8) {
+    return this.postService.findAll(Number(page), Number(limit));
   }
 
   @ApiOperation({ summary: 'List new posts' })
