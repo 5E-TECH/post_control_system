@@ -183,7 +183,7 @@ const OrderView = () => {
           <Skeleton /> // ⬅️ Skelet chiqadi yuklanayotgan paytda
         ) : (
           <table className="w-full">
-            <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:text-[#E7E3FCE5] dark:bg-[#3d3759]">
+            <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
               <tr>
                 {user.role !== "market" && (
                   <th>
@@ -207,9 +207,9 @@ const OrderView = () => {
                     </div>
                   </th>
                 )}
-                <th>
+                <th >
                   <div className="flex items-center gap-10">
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F]  dark:bg-[#524B6C]"></div>
                     <span>#</span>
                   </div>
                 </th>
@@ -273,6 +273,7 @@ const OrderView = () => {
                   key={item?.id}
                   className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] select-none"
                 >
+                  {user.role !== "market" && (
                   <td className="pl-10">
                     <input
                       type="checkbox"
@@ -281,6 +282,7 @@ const OrderView = () => {
                       onChange={() => toggleSelect(item.id)}
                     />
                   </td>
+                  )}
                   <td className="pl-10">{inx + 1}</td>
                   <td className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
                     {item?.customer?.name}
