@@ -38,8 +38,8 @@ export const useOrder = () => {
   });
 
   const receiveOrderByScanerById = useMutation({
-    mutationFn: (id: string) =>
-      api.post(`order/receive/${id}`).then((res) => res.data),
+    mutationFn: ({id, data}:{id: string, data: any}) =>
+      api.post(`order/receive/${id}`, data).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
