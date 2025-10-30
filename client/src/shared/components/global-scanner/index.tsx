@@ -39,6 +39,14 @@ export function useGlobalScanner(refetch?: () => void) {
           refetch?.();
         } catch (err: any) {
           handleApiError(err, "Buyurtma qabul qilishda xatolik!");
+
+          // 🔊 Error tovushni o‘ynatish
+          try {
+            const errorSound = new Audio("/sound/error.mp3");
+            errorSound.play().catch((e) => console.error("Ovoz chiqmadi:", e));
+          } catch (e) {
+            console.error("Ovoz ijrosida xatolik:", e);
+          }
         }
       } else {
         scanned += e.key;
