@@ -181,7 +181,7 @@ const Payments = () => {
 
   return (
     <div className=" dark:bg-[#312d48]">
-      <div className="grid grid-cols-3 gap-14 max-[1050px]:grid-cols-2 max-[800px]:grid-cols-1 text-center text-2xl items-end mx-5 ">
+      <div className="grid grid-cols-3 gap-14 max-[1050px]:grid-cols-2 max-[800px]:grid-cols-1 text-center text-2xl items-end mx-5 max-md:mt-10 ">
         <div
           onClick={() => setShowMarket(true)}
           className="py-15 cursor-pointer rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
