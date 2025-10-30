@@ -46,6 +46,7 @@ import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { BotService } from '../bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
+import { OrderDto } from './dto/orderId.dto';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -322,6 +323,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region.name')
         .where('order.status = :status', { status: Order_status.NEW })
         .andWhere('order.user_id = :userId', { userId: user.id });
 
@@ -649,19 +651,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async receiveWithScaner(id: string, marketId: string) {
+  async receiveWithScaner(id: string, orderDto: OrderDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      if (!marketId) {
+      if (!orderDto.marketId) {
         throw new BadRequestException('Market id is required');
       }
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: {
           qr_code_token: id,
           status: In([Order_status.NEW, Order_status.CANCELLED_SENT]),
-          user_id: marketId,
+          user_id: orderDto.marketId,
         },
       });
       if (!order) {
@@ -735,6 +737,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const qb = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region.name')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .where('order.user_id = :userId', { userId: user.id });

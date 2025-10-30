@@ -16,8 +16,6 @@ import { UpdateRegionDto } from './dto/update-region.dto';
 @Controller('region')
 export class RegionController {
   constructor(private readonly regionService: RegionService) {}
-
-  // changeeeeeeee
   @Get()
   getAll() {
     return this.regionService.findAll();
