@@ -44,6 +44,7 @@ export default function ScanAndOrder() {
   const [isModalOpen, _] = useState(false);
 
   const navigate = useNavigate();
+  const role = useSelector((state: RootState) => state.roleSlice.role);
 
   useEffect(() => {
     if (!isModalOpen) {
@@ -494,7 +495,7 @@ export default function ScanAndOrder() {
           )}
 
           <div className="pb-4">
-            {orderStatus === "on the road" && (
+            {orderStatus === "on the road" && role === "courier" && (
               <div className="w-full pt-5">
                 <Button
                   onClick={() => handleReceiveOrderById(order?.data?.id)}
