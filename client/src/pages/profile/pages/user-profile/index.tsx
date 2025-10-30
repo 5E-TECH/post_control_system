@@ -182,7 +182,7 @@ const UserProfile = () => {
   const onChangeChecked = (checked: boolean, user: any) => {
     const id = user?.id;
     const role = user?.role;
-    const add_order = checked ? "allow" : "forbid";
+    const add_order = checked;
 
     updateUser.mutate(
       { role, id, data: { add_order } },
@@ -323,10 +323,10 @@ const UserProfile = () => {
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                       Add product
                     </span>
-                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                    <span className="px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
                       <Switch
                         className={`${
-                          user?.status === "active"
+                          user?.add_order
                             ? "bg-green-600!"
                             : "bg-[#F76659]!"
                         }`}
