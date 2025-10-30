@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Image, Spin, Modal, Form, Input, Button, InputNumber } from "antd";
+import { Image, Spin, Modal, Form, Input, Button, InputNumber, Switch } from "antd";
 import Avatar from "../../../../shared/assets/profile-image/Avatar.png";
 import Vector from "../../../../shared/assets/profile-image/Vector.svg";
 import Star from "../../../../shared/assets/profile-image/star.svg";
@@ -8,6 +8,7 @@ import { setEditing } from "../../../../shared/lib/features/profile/profileEditS
 import { useParams } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { Check, Copy } from "lucide-react";
+import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -150,7 +151,8 @@ const UserProfile = () => {
 
     // Compare normalized values to avoid unnecessary update
     if (payload.name === user.name) delete payload.name;
-    if (payload.phone_number === userPhoneNormalized) delete payload.phone_number;
+    if (payload.phone_number === userPhoneNormalized)
+      delete payload.phone_number;
     if (!payload.password) delete payload.password;
 
     if (Object.keys(payload).length === 0) {
@@ -171,6 +173,24 @@ const UserProfile = () => {
             setOpen(false);
           });
         },
+      }
+    );
+  };
+
+  const { handleSuccess, handleApiError } = useApiNotification();
+
+  const onChangeChecked = (checked: boolean, user: any) => {
+    const id = user?.id;
+    const role = user?.role;
+    const add_order = checked ? "allow" : "forbid";
+
+    updateUser.mutate(
+      { role, id, data: { add_order } },
+      {
+        onSuccess: () =>
+          handleSuccess(`Foydalanuvchini holati muvaffaqiyatli yangilandi`),
+        onError: (err) =>
+          handleApiError(err, `Foydalanuvchini holatini yangilashda xatolik`),
       }
     );
   };
@@ -294,6 +314,28 @@ const UserProfile = () => {
                     </span>
                     <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
                       {user.phone_number}
+                    </span>
+                  </div>
+                )}
+
+                {user.role === "market"  && (
+                  <div className="flex flex-row items-center mt-4 gap-5">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Add product
+                    </span>
+                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
+                      <Switch
+                        className={`${
+                          user?.status === "active"
+                            ? "bg-green-600!"
+                            : "bg-[#F76659]!"
+                        }`}
+                        checked={user?.add_order}
+                        onChange={(checked, event) => {
+                          event.stopPropagation();
+                          onChangeChecked(checked, user);
+                        }}
+                      />{" "}
                     </span>
                   </div>
                 )}
