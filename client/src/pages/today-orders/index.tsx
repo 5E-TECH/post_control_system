@@ -25,12 +25,11 @@ const TodayOrders = () => {
 
   const { pathname } = useLocation();
   const role = useSelector((state: RootState) => state.roleSlice);
-
   useEffect(() => {
     if (role.role === "market") {
       navigate(`${role.id}`);
     }
-  }, []);
+  }, [pathname]);
 
   const handleProps = (id: string) => {
     navigate(`${id}`);
