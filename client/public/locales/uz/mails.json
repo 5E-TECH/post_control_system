@@ -10,12 +10,17 @@
   "market": "Market",
   "pulMiqdori": "Pul miqdori",
   "dona": "Dona",
-  "harakatlar": "Harakatlar",
+  "time": "Yaratilgan vaqti",
   "pochtanijonatish": "Pochtani jo‘natish",
   "uygacha": "Uyga yetkazish",
   "markazgacha": "Markazgacha",
   "ta": "ta",
   "so'm": "so'm",
   "qidiruv": "Qidiruv",
-  "tabuyurtmalar": "ta buyurtmalar"
+  "delivery": "Qayergacha",
+  "tabuyurtmalar": "ta buyurtmalar",
+  "center": "Markazgacha",
+  "address": "Uygacha",
+  "accept":"Pochtani qabul qilish",
+  "orders":"tu buyurtmalar"
 }
