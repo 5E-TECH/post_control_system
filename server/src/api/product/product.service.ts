@@ -73,6 +73,10 @@ export class ProductService {
         throw new NotFoundException('Market not found');
       }
 
+      if (!isExistMarket.add_order) {
+        throw new BadRequestException('You can not create order and product!');
+      }
+
       const exists = await this.productRepo.findOne({
         where: {
           name,
