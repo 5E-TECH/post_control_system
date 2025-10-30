@@ -38,14 +38,35 @@ export class PostService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async findAll(): Promise<object> {
+  async findAll(page = 1, limit = 10): Promise<object> {
     try {
-      const allPosts = await this.postRepo.find({
+      // Sahifani to‘g‘rilab olamiz
+      const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
+      const skip = (page - 1) * take;
+
+      // 🔎 Umumiy ma’lumotlar
+      const [data, total] = await this.postRepo.findAndCount({
         where: { status: Not(Post_status.NEW) },
         relations: ['region'],
         order: { created_at: 'DESC' },
+        skip,
+        take,
       });
-      return successRes(allPosts, 200, 'All posts');
+
+      // Hisob-kitoblar
+      const totalPages = Math.ceil(total / take);
+
+      return successRes(
+        {
+          data,
+          total,
+          page,
+          totalPages,
+          limit: take,
+        },
+        200,
+        'All posts (paginated)',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -571,16 +592,25 @@ export class PostService {
         throw new NotFoundException('Courier not found');
       }
 
-      const customToken = generateCustomToken();
-      const canceledPost = queryRunner.manager.create(PostEntity, {
-        courier_id: courier.id,
-        region_id: courier.region_id,
-        post_total_price: 0,
-        order_quantity: orders.length,
-        qr_code_token: customToken,
-        status: Post_status.CANCELED,
+      let canceledPost = await queryRunner.manager.findOne(PostEntity, {
+        where: {
+          courier_id: courier.id,
+          status: Post_status.CANCELED,
+        },
       });
-      await queryRunner.manager.save(canceledPost);
+
+      if (!canceledPost) {
+        const customToken = generateCustomToken();
+        canceledPost = queryRunner.manager.create(PostEntity, {
+          courier_id: courier.id,
+          region_id: courier.region_id,
+          post_total_price: 0,
+          order_quantity: orders.length,
+          qr_code_token: customToken,
+          status: Post_status.CANCELED,
+        });
+        await queryRunner.manager.save(canceledPost);
+      }
 
       for (const order of orders) {
         order.canceled_post_id = canceledPost.id;
@@ -601,6 +631,8 @@ export class PostService {
       await queryRunner.release();
     }
   }
+
+  async recCanOrderWithScaner(orderToken: string) {}
 
   async receiveCanceledPost(id: string, ordersArrayDto: ReceivePostDto) {
     const queryRunner = this.dataSource.createQueryRunner();

@@ -642,15 +642,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async receiveWithScaner(id: string) {
+  async receiveWithScaner(id: string, marketId: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      if (!marketId) {
+        throw new BadRequestException('Market id is required');
+      }
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: {
           qr_code_token: id,
           status: In([Order_status.NEW, Order_status.CANCELLED_SENT]),
+          user_id: marketId,
         },
       });
       if (!order) {

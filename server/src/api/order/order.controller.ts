@@ -202,8 +202,8 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('receive/:id')
-  receiveOrderWithScaner(@Param('id') id: string) {
-    return this.orderService.receiveWithScaner(id);
+  receiveOrderWithScaner(@Param('id') id: string, @Body() marketId: string) {
+    return this.orderService.receiveWithScaner(id, marketId);
   }
 
   @ApiOperation({
