@@ -152,13 +152,13 @@ const OrderView = () => {
       onClick={() => setOpenMenuId("")}
       className="bg-white rounded-md m-5 dark:bg-[#312d4b]"
     >
-      <div className="flex justify-between items-center">
-        <div className="flex justify-between w-full items-center p-10">
+      <div className="flex justify-between items-center max-[650px]:flex-col">
+        <div className="flex justify-between w-full items-center p-10 max-[650px]:flex-col">
           <h2 className="text-[20px] font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5]">
             {t("title")}
           </h2>
           <form action="">
-            <div className="border border-[#d1cfd4] rounded-md">
+            <div className="border border-[#d1cfd4] max-[650px]:mt-4 rounded-md">
               <input
                 onChange={(e) => debouncedSearch(e.target.value)}
                 className="outline-none px-4 py-3"
