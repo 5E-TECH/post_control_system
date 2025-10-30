@@ -249,7 +249,7 @@ const Products = () => {
   ) : (
     <div className="flex justify-center items-center h-[65vh]">
       <div className="text-red-500 text-lg font-semibold mt-5 text-[25px]">
-        {'noPermission'}
+        {'no Permission'}
       </div>
     </div>
   );
