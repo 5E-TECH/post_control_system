@@ -1,10 +1,17 @@
 import { useEffect } from "react";
 import { useApiNotification } from "../../hooks/useApiNotification";
 import { useOrder } from "../../api/hooks/useOrder";
+import { useLocation } from "react-router-dom";
 
 export function useGlobalScanner(refetch?: () => void) {
   const { handleApiError, handleSuccess } = useApiNotification();
   const { receiveOrderByScanerById } = useOrder();
+
+  const location = useLocation();
+
+  // URL dan marketId ni ajratib olish
+  const pathParts = location.pathname.split("/");
+  const marketId = pathParts[pathParts.length - 1];
 
   useEffect(() => {
     let scanned = "";
@@ -23,7 +30,11 @@ export function useGlobalScanner(refetch?: () => void) {
             ? tokenValue.split("/").pop()
             : tokenValue;
 
-          await receiveOrderByScanerById.mutateAsync(token as string);
+          await receiveOrderByScanerById.mutateAsync({
+            id: token as string,
+            data: { marketId },
+          });
+
           handleSuccess("Buyurtma muvaffaqiyatli qabul qilindi ✅");
           refetch?.();
         } catch (err: any) {
@@ -40,5 +51,11 @@ export function useGlobalScanner(refetch?: () => void) {
 
     window.addEventListener("keypress", handleKeyPress);
     return () => window.removeEventListener("keypress", handleKeyPress);
-  }, [receiveOrderByScanerById, handleApiError, handleSuccess, refetch]);
+  }, [
+    receiveOrderByScanerById,
+    handleApiError,
+    handleSuccess,
+    refetch,
+    marketId,
+  ]);
 }
