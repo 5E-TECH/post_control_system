@@ -1,22 +1,22 @@
-import { FilePlus, Search, X } from 'lucide-react';
-import { memo, useEffect, useMemo, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import Popup from '../../shared/ui/Popup';
-import { useMarket } from '../../shared/api/hooks/useMarket/useMarket';
-import ProductView from '../../shared/components/product-view';
-import { useProduct } from '../../shared/api/hooks/useProduct';
-import { useDispatch, useSelector } from 'react-redux';
-import type { RootState } from '../../app/store';
-import { debounce } from '../../shared/helpers/DebounceFunc';
-import Select from '../orders/components/select/select';
-import { useProfile } from '../../shared/api/hooks/useProfile';
-import { togglePermission } from '../../shared/lib/features/add-order-permission';
-import { useTranslation } from 'react-i18next';
+import { FilePlus, Search, X } from "lucide-react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import Popup from "../../shared/ui/Popup";
+import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
+import ProductView from "../../shared/components/product-view";
+import { useProduct } from "../../shared/api/hooks/useProduct";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
+import { debounce } from "../../shared/helpers/DebounceFunc";
+import Select from "../orders/components/select/select";
+import { useProfile } from "../../shared/api/hooks/useProfile";
+import { togglePermission } from "../../shared/lib/features/add-order-permission";
+import { useTranslation } from "react-i18next";
 
 const Products = () => {
-  const { t } = useTranslation('product');
+  const { t } = useTranslation("product");
   const [showMarket, setShowMarket] = useState(false);
-  const [select, setSelect] = useState<string | null>('');
+  const [select, setSelect] = useState<string | null>("");
   const [searchProduct, setSearchProduct] = useState<any>(null);
   const [searchPopup, setSearchPopup] = useState<any>(null);
   const [searchByMarket, setSearchByMarket] = useState<any>(undefined);
@@ -24,17 +24,23 @@ const Products = () => {
 
   const { id, role } = useSelector((state: RootState) => state.roleSlice);
   const { page, limit } = useSelector(
-    (state: RootState) => state.paginationSlice,
+    (state: RootState) => state.paginationSlice
   );
+
+  useEffect(() => {
+    return () => {
+      dispatch(togglePermission(false));
+    };
+  }, [dispatch]);
   const permission = useSelector(
-    (state: RootState) => state.togglePermission.value,
+    (state: RootState) => state.togglePermission.value
   );
-  const { refetch } = useProfile().getUser(role === 'market');
+  const { refetch } = useProfile().getUser(role === "market");
 
   const handleCheck = async () => {
     const res = await refetch();
     const addOrder = res.data.data.add_order;
-    if (!addOrder && res.data.data.role === 'market') {
+    if (!addOrder && res.data.data.role === "market") {
       dispatch(togglePermission(true));
       return;
     }
@@ -42,7 +48,7 @@ const Products = () => {
   };
 
   useEffect(() => {
-    if (role === 'market') {
+    if (role === "market") {
       setSelect(id);
     }
   }, [role, id]);
@@ -54,7 +60,7 @@ const Products = () => {
       debounce((value: string) => {
         setSearchProduct(value);
       }, 800),
-    [],
+    []
   );
 
   const popupDebouncedSearch = useMemo(
@@ -62,18 +68,18 @@ const Products = () => {
       debounce((value: string) => {
         setSearchPopup(value);
       }, 800),
-    [],
+    []
   );
 
   const handleNavigate = () => {
     navigate(`create/${select}`);
-    setSelect('');
+    setSelect("");
     setShowMarket(false);
   };
 
   const { getProducts, getMyProducts } = useProduct();
   const { data: productData } =
-    role === 'market'
+    role === "market"
       ? getMyProducts({ search: searchProduct, page, limit })
       : getProducts({
           search: searchProduct,
@@ -84,7 +90,7 @@ const Products = () => {
 
   const { getMarkets } = useMarket();
 
-  const { data } = getMarkets(role !== 'market', {
+  const { data } = getMarkets(role !== "market", {
     search: searchPopup,
     limit: 0,
   });
@@ -92,16 +98,16 @@ const Products = () => {
   const { pathname } = useLocation();
 
   const marketOptions = data?.data?.data?.map((item: any) => (
-    <option key={item.id} value={item.id} className='dark:bg-[#312d48]'>
+    <option key={item.id} value={item.id} className="dark:bg-[#312d48]">
       {item.name}
     </option>
   ));
 
-  if (pathname.startsWith('/products/create')) return <Outlet />;
+  if (pathname.startsWith("/products/create")) return <Outlet />;
 
   return !permission ? (
     <div className="mt-6 w-full dark:bg-[#312d48]">
-      <h2 className="text-2xl font-medium ml-4 mb-5">{t('title')}</h2>
+      <h2 className="text-2xl font-medium ml-4 mb-5">{t("title")}</h2>
 
       {/* Filter va Add product qismi */}
 
@@ -114,7 +120,7 @@ const Products = () => {
               onChange={(e) => {
                 setSearchByMarket(e.target.value);
               }}
-              placeholder={t('placeholder.selectMarket')}
+              placeholder={t("placeholder.selectMarket")}
               className="min-[1100px]:w-[250px] max-[1100px]:w-[250px] max-[800px]:w-full"
             >
               {marketOptions}
@@ -125,14 +131,14 @@ const Products = () => {
               <input
                 onChange={(e) => debouncedSearch(e.target.value)}
                 className="dark:border dark:border-[#eeeeee38] rounded-[7px] w-full h-[40px] border border-[#2E263D38] px-3 pr-10"
-                placeholder={`${t('placeholder.search')}...`}
+                placeholder={`${t("placeholder.search")}...`}
                 type="text"
               />
               <Search className="absolute right-3 top-2.5 w-5 h-5 text-gray-400" />
             </div>
             <button
               onClick={() => {
-                if (role === 'market') {
+                if (role === "market") {
                   handleCheck();
                   // handleNavigate()
                 } else {
@@ -142,7 +148,7 @@ const Products = () => {
               className="px-4 py-2 cursor-pointer bg-[#8C57FF] text-white rounded flex items-center justify-center gap-2"
             >
               <FilePlus size={18} />
-              {t('addProduct')}
+              {t("addProduct")}
             </button>
           </div>
         </div>
@@ -160,14 +166,14 @@ const Products = () => {
 
             {/* Title */}
             <h1 className="font-bold text-left pt-8 text-[#2E263D] dark:text-white">
-              {t('placeholder.selectMarket')}
+              {t("placeholder.selectMarket")}
             </h1>
 
             {/* Search input */}
             <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
               <input
                 type="text"
-                placeholder={`${t('placeholder.search')}...`}
+                placeholder={`${t("placeholder.search")}...`}
                 onChange={(e) => popupDebouncedSearch(e.target.value)}
                 className="w-full bg-transparent font-normal text-[15px] outline-none 
         text-[#2E263D] dark:text-white 
@@ -184,7 +190,7 @@ const Products = () => {
                   №
                 </div>
                 <div className="h-[65px] flex items-center px-4 font-semibold text-[16px] text-[#2E263D] dark:text-white">
-                  {t('popup.market')}
+                  {t("popup.market")}
                 </div>
               </div>
 
@@ -204,7 +210,7 @@ const Products = () => {
                             }
                             className={`grid grid-cols-[70px_1fr] border-b-2 border-[#f4f5fa] dark:border-[#E7E3FC1F] 
                   hover:bg-blue-100 dark:hover:bg-[#3d3759] transition-colors
-                  ${isSelected ? 'bg-blue-200 dark:bg-[#524B6C]' : ''}`}
+                  ${isSelected ? "bg-blue-200 dark:bg-[#524B6C]" : ""}`}
                           >
                             <td className="py-3 px-4 flex items-center">
                               {index + 1}
@@ -228,11 +234,11 @@ const Products = () => {
                 className={`px-3 py-1.5 text-[16px] rounded-md 
           ${
             select
-              ? 'bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 cursor-pointer text-white'
-              : 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
+              ? "bg-blue-500 dark:bg-blue-700 hover:bg-blue-600 cursor-pointer text-white"
+              : "bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed"
           }`}
               >
-                {t('popup.tanlash')}
+                {t("popup.tanlash")}
               </button>
             </div>
           </div>
@@ -249,7 +255,7 @@ const Products = () => {
   ) : (
     <div className="flex justify-center items-center h-[65vh]">
       <div className="text-red-500 text-lg font-semibold mt-5 text-[25px]">
-        {'no Permission'}
+        {"noPermission"}
       </div>
     </div>
   );
