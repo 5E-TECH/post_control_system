@@ -15,6 +15,7 @@ const initialState: ICustomerId = {
     address: "",
     phone_number: "+998 ",
     district_id: null,
+    extra_number:""
   },
   orderItems: null,
   productInfo: {
