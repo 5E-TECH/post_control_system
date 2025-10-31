@@ -148,7 +148,7 @@ export class PostController {
   @ApiResponse({ status: 200, description: 'Order checked' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
-  @Post(':id')
+  @Post('check/:id')
   checkPost(@Param('id') id: string, @Body() postIdDto: PostDto) {
     return this.postService.checkPost(id, postIdDto);
   }
