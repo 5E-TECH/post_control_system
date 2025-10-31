@@ -9,6 +9,7 @@ export interface IProductInfo {
   total_price: number | string;
   where_deliver: string;
   comment?: string;
+  operator?:string
 }
 
 const ProductInfo = () => {
@@ -17,6 +18,7 @@ const ProductInfo = () => {
     total_price: "",
     where_deliver: market?.default_tariff,
     comment: "",
+    operator:""
   };
   const { t } = useTranslation("createOrder");
   const [formData, setFormData] = useState<IProductInfo>(initialState);
@@ -118,6 +120,27 @@ const ProductInfo = () => {
             </Form.Item>
           </div>
         </div>
+
+
+
+        <div className="px-5 pb-1.5">
+          <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
+            {t("Operator")}
+          </span>
+          <Form.Item className="!mt-1">
+            <Input
+              name="operator"
+              value={formData.operator}
+              onChange={handleChange}
+              className="!pt-2 !pb-2 !pl-3 dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#CBC7E1]!"
+              placeholder={t("Operator...")}
+            />
+          </Form.Item>
+        </div>
+
+
+
+
 
         <div className="px-5 pb-1.5">
           <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
