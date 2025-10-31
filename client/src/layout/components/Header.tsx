@@ -1,5 +1,6 @@
 import {
-  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Languages,
   LogOut,
   Menu,
@@ -17,24 +18,16 @@ import { Select, Space } from "antd";
 import { memo, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  closeSidebar,
-  openSidebar,
-} from "../../shared/lib/features/sidebarSlice";
-import type { RootState } from "../../app/store";
+
 
 const Header = () => {
   const { t, i18n } = useTranslation(["header"]);
-  const [sidebar, setSidebar] = useState(true);
-  const dispatch = useDispatch();
   const [dark, setDark] = useState(() => {
     const stored = localStorage.getItem("darkMode");
     return stored ? JSON.parse(stored) : false;
   });
 
   const { mutate: signOut } = useSignOut();
-  const sidebarRedux = useSelector((state: RootState) => state.sidebar);
 
   // console.log(sidebarRedux.isOpen);
 
@@ -55,20 +48,11 @@ const Header = () => {
     i18n.changeLanguage(value);
   };
 
-  const handleDispatch = () => {
-    if (sidebar) {
-      dispatch(openSidebar());
-      setSidebar(false);
-    } else {
-      dispatch(closeSidebar());
-      setSidebar(true);
-    }
-  };
 
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 650);
+    const handleResize = () => setIsMobile(window.innerWidth < 700);
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -85,16 +69,35 @@ const Header = () => {
           <span className="text-xl font-semibold">Beepost</span>
         </NavLink>
         {!isMobile && (
-          <button
-            onClick={handleDispatch}
-            className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300 cursor-pointer absolute left-70"
-          >
-            <ArrowLeft
-              className={`transition-transform duration-300 ${
-                !sidebarRedux.isOpen ? "rotate-180" : "rotate-0"
-              }`}
-            />
-          </button>
+          // <button
+          //   onClick={handleDispatch}
+          //   className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300 cursor-pointer absolute left-70"
+          // >
+          //   <ArrowLeft
+          //     className={`transition-transform duration-300 ${
+          //       !sidebarRedux.isOpen ? "rotate-180" : "rotate-0"
+          //     }`}
+          //   />
+          // </button>
+
+          <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="p-2 rounded-full border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+        >
+          <ChevronLeft size={20} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate(1)}
+          className="p-2 rounded-full border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
+          
         )}
       </div>
 

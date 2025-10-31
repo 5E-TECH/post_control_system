@@ -1333,10 +1333,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           throw new NotFoundException(
             `Product not found in order: ${dtoItem.product_id}`,
           );
-        if (dtoItem.quantity > foundItem.quantity)
-          throw new BadRequestException(
-            `Quantity too high for product ${dtoItem.product_id}`,
-          );
+       
 
         foundItem.quantity -= dtoItem.quantity;
         await queryRunner.manager.save(foundItem);
