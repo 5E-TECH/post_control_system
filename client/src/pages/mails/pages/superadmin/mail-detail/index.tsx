@@ -19,7 +19,6 @@ import { exportCardsToExcel } from "../../../../../shared/helpers/export-downloa
 import { usePostScanner } from "../../../../../shared/components/post-scanner";
 
 const MailDetail = () => {
-  usePostScanner()
   const dispatch = useDispatch();
   const { t } = useTranslation("mails");
 
@@ -35,6 +34,9 @@ const MailDetail = () => {
   const { mutate: sendCouriersToPost, isPending } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
+
+  usePostScanner(undefined, setSelectedIds);
+
   // Dynamic fetching based on status
   const [params] = useSearchParams();
   const status = params.get("status");
