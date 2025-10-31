@@ -73,7 +73,7 @@ const OrderView = () => {
   // filter o'zgarganda sahifa 1 ga tushadi
   useEffect(() => {
     setPage(1);
-    setParam("page", 1);
+    setParam("page",1);
   }, [JSON.stringify(cleanedFilters)]);
 
   // page o'zgarganda URL-ni yangilaymiz
@@ -83,22 +83,8 @@ const OrderView = () => {
 
   // query
   const queryParams = { page, limit, ...cleanedFilters };
-  // let query;
-  // switch (role) {
-  //   case "superadmin":
-  //   case "admin":
-  //   case "registrator":
-  //     query = getOrders(queryParams);
-  //     break;
-  //   case "market":
-  //     query = getMarketsAllNewOrder(queryParams);
-  //     break;
-  //   default:
-  //     query = { data: { data: [], total: 0 } };
-  // }
-  console.log("salom");
 
-  // const { data, isLoading } = ;
+
   const { data, refetch, isLoading } =
     role === "market"
       ? getMarketsAllNewOrder(queryParams)
@@ -109,7 +95,9 @@ const OrderView = () => {
   }, [role]);
 
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
-  const total = data?.data?.total || 0;
+  const total = data?.data?.pagination?.total;
+  console.log('total',total);
+  
 
   // pagination onChange
   const onChange: PaginationProps["onChange"] = (newPage, newLimit) => {
