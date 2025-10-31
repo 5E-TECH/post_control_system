@@ -1,14 +1,14 @@
 import { NavLink } from "react-router-dom";
 import {
   Apple,
-  CarFront,
+  Calendar1,
+  CreditCard,
   FileText,
-  History,
   House,
   MailOpen,
   QrCode,
+  Scale,
   ShoppingBag,
-  SquareDashedMousePointer,
   UserRound,
 } from "lucide-react";
 
@@ -71,7 +71,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <CreditCard />
             </NavLink>
 
             <NavLink
@@ -85,7 +85,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <History />
+              <Scale />{" "}
             </NavLink>
 
             <NavLink
@@ -99,7 +99,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <SquareDashedMousePointer />
+              <FileText />
             </NavLink>
           </div>
         );
@@ -159,7 +159,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <CreditCard />
             </NavLink>
 
             <NavLink
@@ -173,13 +173,13 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <History />
+              <Scale />
             </NavLink>
           </div>
         );
       case "registrator":
         return (
-          <div className="flex justify-center px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
+          <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
             <NavLink
               to={"/"}
               className={({ isActive }) =>
@@ -219,7 +219,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <CarFront />
+              <Calendar1 />
             </NavLink>
 
             <NavLink
@@ -247,7 +247,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <Apple />
             </NavLink>
           </div>
         );
@@ -320,7 +320,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <CreditCard />
             </NavLink>
           </div>
         );
@@ -355,7 +355,7 @@ const Navbar = ({ role }: { role: string }) => {
               <ShoppingBag />
             </NavLink>
 
-            <NavLink
+            {/* <NavLink
               to={"/clients"}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
@@ -367,7 +367,7 @@ const Navbar = ({ role }: { role: string }) => {
               }
             >
               <MailOpen />
-            </NavLink>
+            </NavLink> */}
 
             <NavLink
               to={"/order/markets/new-orders"}
@@ -380,7 +380,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <ShoppingBag />
+              <Calendar1 />
             </NavLink>
 
             <NavLink
@@ -408,7 +408,7 @@ const Navbar = ({ role }: { role: string }) => {
        }`
               }
             >
-              <FileText />
+              <CreditCard />
             </NavLink>
           </div>
         );

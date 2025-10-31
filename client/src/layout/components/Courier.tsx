@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { House, ShoppingBag, MailOpen, FileText } from 'lucide-react';
+import { House, ShoppingBag, MailOpen, CreditCard } from 'lucide-react';
 import SidebarLink from './SidebarLink';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
@@ -16,7 +16,7 @@ const CourierSidebar = () => {
       label: t('orders'),
     },
     { to: '/courier-mails', icon: <MailOpen />, label: t('mails') },
-    { to: '/cash-box', icon: <FileText />, label: t('payments') },
+    { to: '/cash-box', icon: <CreditCard />, label: t('payments') },
   ];
     const sidebarRedux = useSelector((state: RootState) => state.sidebar);
 

@@ -12,10 +12,10 @@ export enum Status {
   INACTIVE = 'inactive',
 }
 
-export enum AddOrder {
-  ALLOW = 'allow',
-  FORBID = 'forbid',
-}
+// export enum AddOrder {
+//   ALLOW = "true",
+//   FORBID = 'forbid',
+// }
 
 export enum PaymentMethod {
   CASH = 'cash',

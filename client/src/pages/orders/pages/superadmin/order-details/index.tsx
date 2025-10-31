@@ -8,10 +8,23 @@ import QRCode from "react-qr-code";
 import { useTranslation } from "react-i18next";
 import { useGlobalScanner } from "../../../../../shared/components/global-scanner";
 
+const statusColors: Record<string, string> = {
+  new: "bg-sky-500",
+  received: "bg-green-600",
+  "on the road": "bg-amber-500",
+  waiting: "bg-orange-400",
+  sold: "bg-violet-600",
+  cancelled: "bg-red-600",
+  paid: "bg-emerald-500",
+  partly_paid: "bg-teal-500",
+  "cancelled (sent)": "bg-gray-500",
+  closed: "bg-zinc-800",
+};
+
 const OrderDetails = () => {
   useGlobalScanner();
   const { t } = useTranslation("orderList");
-  const { t:st } = useTranslation("status");
+  const { t: st } = useTranslation("status");
   const { id } = useParams();
 
   const { getOrderById } = useOrder();
@@ -23,9 +36,13 @@ const OrderDetails = () => {
   return (
     <div className="p-6 bg-white dark:bg-[#28243D]">
       <div className="flex items-center gap-4">
-        <h2 className="text-2xl font-bold">{t("detail.title")}</h2>
+        <h2 className="text-2xl font-medium"><span className="text-3xl font-bold">{data?.data?.market?.name}</span>{" "}{t("detail.title")}</h2>
         <div>
-          <p className="px-4 py-1 bg-blue-500 rounded-2xl text-white">
+          <p
+            className={`px-4 py-1 rounded-2xl text-white ${
+              statusColors[data?.data?.status] || "bg-gray-400"
+            }`}
+          >
             {st(`${data?.data?.status}`)}
           </p>
         </div>

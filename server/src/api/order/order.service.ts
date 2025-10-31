@@ -46,6 +46,7 @@ import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { BotService } from '../bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
+import { OrderDto } from './dto/orderId.dto';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -172,7 +173,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async createOrder(createOrderDto: CreateOrderDto): Promise<Object> {
+  async createOrder(
+    createOrderDto: CreateOrderDto,
+    user: JwtPayload,
+  ): Promise<Object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -191,6 +195,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!market) {
         throw new NotFoundException('Market not found');
+      }
+
+      if (user.role === Roles.MARKET && !market.add_order) {
+        throw new BadRequestException('You can not create order and product');
       }
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
@@ -315,6 +323,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region.name')
         .where('order.status = :status', { status: Order_status.NEW })
         .andWhere('order.user_id = :userId', { userId: user.id });
 
@@ -642,15 +651,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async receiveWithScaner(id: string) {
+  async receiveWithScaner(id: string, orderDto: OrderDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      if (!orderDto.marketId) {
+        throw new BadRequestException('Market id is required');
+      }
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: {
           qr_code_token: id,
           status: In([Order_status.NEW, Order_status.CANCELLED_SENT]),
+          user_id: orderDto.marketId,
         },
       });
       if (!order) {
@@ -714,16 +727,27 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       limit?: number;
       search?: string;
       status?: string;
+      regionId?: string;
       fromDate?: string;
       toDate?: string;
     },
   ) {
     try {
-      const { page = 1, limit = 10, search, status, fromDate, toDate } = query;
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        status,
+        fromDate,
+        toDate,
+        regionId,
+      } = query;
 
       const qb = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .where('order.user_id = :userId', { userId: user.id });
@@ -731,7 +755,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // 🔍 Search by customer name or order ID
       if (search) {
         qb.andWhere(
-          '(LOWER(customer.full_name) LIKE LOWER(:search) OR CAST(order.id AS TEXT) LIKE :search)',
+          '(LOWER(customer.name) LIKE LOWER(:search) OR CAST(order.id AS TEXT) LIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -741,18 +765,26 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         qb.andWhere('order.status = :status', { status });
       }
 
+      // 🌍 Filter by region
+      if (regionId) {
+        qb.andWhere('region.id = :regionId', { regionId });
+      }
+
       // 📅 Filter by date range
       if (fromDate && toDate) {
         qb.andWhere('order.created_at BETWEEN :from AND :to', {
           from: fromDate,
           to: toDate,
         });
+      } else if (fromDate) {
+        qb.andWhere('order.created_at >= :from', { from: fromDate });
+      } else if (toDate) {
+        qb.andWhere('order.created_at <= :to', { to: toDate });
       }
 
       // 📄 Pagination
       qb.skip((page - 1) * limit).take(limit);
 
-      // 🔢 Total count for pagination info
       const [data, total] = await qb.getManyAndCount();
 
       return successRes(

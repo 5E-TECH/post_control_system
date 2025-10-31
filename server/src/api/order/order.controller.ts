@@ -30,6 +30,7 @@ import { OrdersArrayDto } from './dto/orders-array.dto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { SellCancelOrderDto } from './dto/sellCancel-order.dto';
 import { PartlySoldDto } from './dto/partly-sold.dto';
+import { OrderDto } from './dto/orderId.dto';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -46,8 +47,11 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Post()
-  createOrder(@Body() creteOrderDto: CreateOrderDto) {
-    return this.orderService.createOrder(creteOrderDto);
+  createOrder(
+    @Body() creteOrderDto: CreateOrderDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orderService.createOrder(creteOrderDto, user);
   }
 
   @ApiOperation({ summary: 'List orders with filters' })
@@ -202,8 +206,8 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('receive/:id')
-  receiveOrderWithScaner(@Param('id') id: string) {
-    return this.orderService.receiveWithScaner(id);
+  receiveOrderWithScaner(@Param('id') id: string, @Body() orderDto: OrderDto) {
+    return this.orderService.receiveWithScaner(id, orderDto);
   }
 
   @ApiOperation({
@@ -220,6 +224,7 @@ export class OrderController {
       page?: number;
       limit?: number;
       search?: string;
+      regionId?: string;
       status?: string;
       fromDate?: string;
       toDate?: string;

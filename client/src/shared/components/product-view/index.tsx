@@ -73,7 +73,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
     <div className="mt-4 px-4 ">
       <Spin spinning={loading} tip="Loading Products...">
         <table className="w-full">
-          <thead className="h-[54px] bg-[#F6F7FB] dark:bg-[#3D3759] text-left uppercase">
+          <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
             <tr>
               <th className="w-[50px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
@@ -87,12 +87,14 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
+      {}
               <th className="w-[1100px] h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
                 <div className="flex items-center justify-between pr-[21px]">
                   {t("popup.market")}
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C] "></div>
                 </div>
               </th>
+
               <th className="h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
                 <div className="flex items-center justify-between pr-[21px]">
                   {t("action")}

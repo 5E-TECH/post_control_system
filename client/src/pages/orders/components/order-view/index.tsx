@@ -45,7 +45,7 @@ const OrderView = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { getOrders } = useOrder();
-  const {getMarketsAllNewOrder} = useMarket()
+  const { getMarketsAllNewOrder } = useMarket();
 
   const user = useSelector((state: RootState) => state.roleSlice);
   const filters = useSelector((state: RootState) => state.setFilter);
@@ -97,17 +97,16 @@ const OrderView = () => {
   //     query = { data: { data: [], total: 0 } };
   // }
   console.log("salom");
-  
+
   // const { data, isLoading } = ;
   const { data, refetch, isLoading } =
-  role === "market"
-    ? getMarketsAllNewOrder(queryParams)
-    : getOrders(queryParams);
+    role === "market"
+      ? getMarketsAllNewOrder(queryParams)
+      : getOrders(queryParams);
 
-useEffect(() => {
-  if (role === "market") refetch();
-}, [role]);
-
+  useEffect(() => {
+    if (role === "market") refetch();
+  }, [role]);
 
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
   const total = data?.data?.total || 0;
@@ -119,82 +118,81 @@ useEffect(() => {
   };
 
   // Excel yuklash
-// const user = useSelector((state: RootState) => state.roleSlice);
+  // const user = useSelector((state: RootState) => state.roleSlice);
 
-useEffect(() => {
-  const downloadExcel = async () => {
-    try {
-      const isFiltered = Object.keys(cleanedFilters).length > 0;
-
-      // 🔥 URL ni rolga qarab belgilaymiz
-      let url = `${BASE_URL}order`;
-      if (user?.role === "market") {
-        url = `${BASE_URL}order/market/all/my-orders`;
-      } else if (user?.role === "courier") {
-        url = `${BASE_URL}order/courier/orders`;
-      }
-
-      const response = await fetch(
-        `${url}?page=1&limit=0&${new URLSearchParams(cleanedFilters)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
-          },
-        }
-      );
-
-      console.log("response", response);
-      
-
-      const rawText = await response.text();
-      console.log("rawtext", rawText);
-      
-      let data;
+  useEffect(() => {
+    const downloadExcel = async () => {
       try {
-        data = JSON.parse(rawText);
-        console.log("Data", data);
-        
-      } catch {
-        throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
+        const isFiltered = Object.keys(cleanedFilters).length > 0;
+
+        // 🔥 URL ni rolga qarab belgilaymiz
+        let url = `${BASE_URL}order`;
+        if (user?.role === "market") {
+          url = `${BASE_URL}order/market/all/my-orders`;
+        } else if (user?.role === "courier") {
+          url = `${BASE_URL}order/courier/orders`;
+        }
+
+        const response = await fetch(
+          `${url}?page=1&limit=0&${new URLSearchParams(cleanedFilters)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
+            },
+          }
+        );
+
+        console.log("response", response);
+
+        const rawText = await response.text();
+        console.log("rawtext", rawText);
+
+        let data;
+        try {
+          data = JSON.parse(rawText);
+          console.log("Data", data);
+        } catch {
+          throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
+        }
+
+        const orders = data?.data?.data;
+        console.log("orders", orders);
+
+        const exportData = orders?.map((order: any, inx: number) => ({
+          N: inx + 1,
+          Viloyat: order?.customer?.district?.region?.name,
+          Tuman: order?.customer?.district?.name,
+          Firma: order?.market?.name,
+          Mahsulot: order?.items
+            ?.map((item: any) => item.product.name)
+            ?.join(", "),
+          "Telefon raqam": order?.customer?.phone_number,
+          Narxi: Number((order?.total_price ?? 0) / 1000),
+          Holati: statusLabels[order?.status],
+          Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }));
+
+        exportToExcel(
+          exportData || [],
+          isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
+        );
+
+        handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+      } catch (err) {
+        handleApiError(err, "Excel yuklashda xatolik");
+      } finally {
+        dispatch(resetDownload());
       }
+    };
 
-      const orders = data?.data?.data;
-      console.log("orders",orders);
-      
-      const exportData = orders?.map((order: any, inx: number) => ({
-        N: inx + 1,
-        Viloyat: order?.customer?.district?.region?.name,
-        Tuman: order?.customer?.district?.name,
-        Firma: order?.market?.name,
-        Mahsulot: order?.items?.map((item: any) => item.product.name)?.join(", "),
-        "Telefon raqam": order?.customer?.phone_number,
-        Narxi: Number((order?.total_price ?? 0) / 1000),
-        Holati: statusLabels[order?.status],
-        Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      }));
-
-      exportToExcel(
-        exportData || [],
-        isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
-      );
-
-      handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
-    } catch (err) {
-      handleApiError(err, "Excel yuklashda xatolik");
-    } finally {
-      dispatch(resetDownload());
-    }
-  };
-
-  if (triggerDownload.triggerDownload) downloadExcel();
-}, [triggerDownload, dispatch, cleanedFilters, user?.role]);
-
+    if (triggerDownload.triggerDownload) downloadExcel();
+  }, [triggerDownload, dispatch, cleanedFilters, user?.role]);
 
   return (
     <div className="w-full bg-white py-1 dark:bg-[#312d4b] min-[650px]:overflow-x-auto">
@@ -237,9 +235,14 @@ useEffect(() => {
                 }`}
                 onClick={() => navigate(`order-detail/${item.id}`)}
               >
-                <td className="pl-10">{inx + 1}</td>
-                <td className="pl-10">{item?.customer?.name}</td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell="#">
+                  {" "}
+                  {inx + 1}
+                </td>
+                <td className="pl-10" data-cell={t("customer")}>
+                  {item?.customer?.name}
+                </td>
+                <td className="pl-10" data-cell={t("phone")}>
                   {item?.customer?.phone_number
                     ? `${item?.customer.phone_number
                         .replace(/\D/g, "")
@@ -249,12 +252,16 @@ useEffect(() => {
                         )}`
                     : ""}
                 </td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell={t("region")}>
                   {item?.customer?.district?.region?.name}
                 </td>
-                <td className="pl-10">{item?.customer?.district?.name}</td>
-                <td className="pl-10">{item?.market?.name}</td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell={t("district")}>
+                  {item?.customer?.district?.name}
+                </td>
+                <td className="pl-10" data-cell={t("market")}>
+                  {item?.market?.name}
+                </td>
+                <td className="pl-10" data-cell={t("status")}>
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
                       statusColors[item?.status] || "bg-gray-400"
@@ -263,10 +270,10 @@ useEffect(() => {
                     {st(`${item?.status}`)}
                   </span>
                 </td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell={t("price")}>
                   {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
                 </td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell={t("createdAt")}>
                   {(() => {
                     const date = new Date(Number(item?.created_at));
                     const day = String(date.getDate()).padStart(2, "0");

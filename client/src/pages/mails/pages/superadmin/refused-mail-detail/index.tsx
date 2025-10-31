@@ -3,10 +3,12 @@ import { memo, useEffect, useState } from "react";
 import SearchInput from "../../../../users/components/search-input";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
-import { Trash } from "lucide-react";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useTranslation } from "react-i18next";
 
 const RefusedMailDetail = () => {
+  const { t } = useTranslation("mails");
+
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
@@ -41,12 +43,21 @@ const RefusedMailDetail = () => {
     );
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(
+      (prev) =>
+        prev.includes(id)
+          ? prev.filter((item) => item !== id) // agar bor bo‘lsa — olib tashla
+          : [...prev, id] // yo‘q bo‘lsa — qo‘sh
+    );
+  };
+
   return (
     <div className="flex flex-col gap-5 p-5">
       <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
         <div className="flex justify-between px-5 pt-5">
           <h1 className="text-2xl mt-1">
-            <span>{regionName}</span> buyurtmalari
+            <span>{regionName}</span> {t("buyurtmalari")}
           </h1>
           <SearchInput placeholder="Qidiruv..." />
         </div>
@@ -73,19 +84,19 @@ const RefusedMailDetail = () => {
                 </th>
                 <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    MIJOZ ISMI
+                    {t("mijozIsmi")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    TELEFON RAQAMI
+                    {t("telefonRaqami")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    TUMANI
+                    {t("tumani")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
@@ -97,19 +108,19 @@ const RefusedMailDetail = () => {
                 </th> */}
                 <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    PUL MIQDORI
+                    {t("pulMiqdori")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    DONA
+                    {t("delivery")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[260px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    HARAKATLAR
+                    {t("time")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
@@ -117,24 +128,19 @@ const RefusedMailDetail = () => {
             </thead>
             <tbody>
               {data?.data?.map((order: any) => (
-                <tr key={order?.id}>
+                <tr
+                  key={order?.id}
+                  onClick={() => toggleSelect(order.id)}
+                  className="select-none"
+                >
                   <td className="p-[20px] flex items-center">
                     {" "}
                     <input
                       type="checkbox"
                       className="w-[18px] h-[18px] rounded-sm"
-                      checked={
-                        order?.id ? selectedIds.includes(order.id) : false
-                      }
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedIds([...selectedIds, order.id]);
-                        } else {
-                          setSelectedIds(
-                            selectedIds.filter((id) => id !== order.id)
-                          );
-                        }
-                      }}
+                      onClick={(e) => e.stopPropagation()} // table row click bilan to‘qnashmasin
+                      checked={selectedIds.includes(order.id)}
+                      onChange={() => toggleSelect(order.id)}
                     />
                   </td>
                   <td className="w-[254px] h-[56px] pl-[20px] text-left">
@@ -154,13 +160,12 @@ const RefusedMailDetail = () => {
                     {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}
                   </td>
                   <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {order?.items?.length}
+                    {t(`${order?.where_deliver}`)}
                   </td>
-
-                  <td className="w-[254px] h-[56px] pl-[19px] text-left">
-                    <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
-                      <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
-                    </div>
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {new Date(Number(order?.created_at)).toLocaleDateString(
+                      "uz-UZ"
+                    )}
                   </td>
                 </tr>
               ))}
@@ -176,7 +181,7 @@ const RefusedMailDetail = () => {
           onClick={handleClick}
           className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
         >
-          Po'chtani qabul qilish
+          {t("accept")}
         </Button>
       </div>
     </div>

@@ -6,11 +6,14 @@
     "market": "Bozor",
     "phone": "Telefon",
     "totalPrice": "Umumiy narx",
-    "stock": "Ombor",
+    "delivery": "Qayergacha",
     "customer": "Mijoz",
-    "address": "Manzil",
+    "viloyat": "Viloyat",
+    "tuman": "Tuman",
     "status": "Holat",
     "price": "Narx",
     "action": "Amal",
-    "qabulQilish": "Qabul qilish"
+    "qabulQilish": "Qabul qilish",
+    "center":"Markazgacha",
+    "address":"Uygacha"
 }

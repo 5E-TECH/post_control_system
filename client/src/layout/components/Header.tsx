@@ -65,6 +65,15 @@ const Header = () => {
     }
   };
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 650);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <div className="w-full h-16 pl-8 pr-3 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
       {/* Logo */}
@@ -75,22 +84,24 @@ const Header = () => {
           </div>
           <span className="text-xl font-semibold">Beepost</span>
         </NavLink>
-        <button
-          onClick={handleDispatch}
-          className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300"
-        >
-          <ArrowLeft
-            className={`transition-transform duration-300 ${
-              !sidebarRedux.isOpen ? "rotate-180" : "rotate-0"
-            }`}
-          />
-        </button>
+        {!isMobile && (
+          <button
+            onClick={handleDispatch}
+            className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300 cursor-pointer absolute left-70"
+          >
+            <ArrowLeft
+              className={`transition-transform duration-300 ${
+                !sidebarRedux.isOpen ? "rotate-180" : "rotate-0"
+              }`}
+            />
+          </button>
+        )}
       </div>
 
       {/* Search */}
       <label
         htmlFor="search"
-        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1150px]:hidden"
+        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1400px]:hidden"
       >
         <Search className="text-gray-500" />
         <input

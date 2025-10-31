@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -25,6 +26,7 @@ import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { PostDto } from './dto/postId.dto';
 
 @ApiTags('Posts')
 @ApiBearerAuth()
@@ -32,13 +34,13 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 export class PostController {
   constructor(private readonly postService: PostService) {}
 
-  @ApiOperation({ summary: 'List all posts' })
-  @ApiResponse({ status: 200, description: 'Posts list' })
+  @ApiOperation({ summary: 'List all posts (with pagination)' })
+  @ApiResponse({ status: 200, description: 'Paginated posts list' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
   @Get()
-  findAll() {
-    return this.postService.findAll();
+  findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 8) {
+    return this.postService.findAll(Number(page), Number(limit));
   }
 
   @ApiOperation({ summary: 'List new posts' })
@@ -137,6 +139,18 @@ export class PostController {
   @Patch(':id')
   sendPost(@Param('id') id: string, @Body() orderIdsDto: SendPostDto) {
     return this.postService.sendPost(id, orderIdsDto);
+  }
+
+  @ApiOperation({
+    summary: 'Check post (check the order that is exist or not in the post)',
+  })
+  @ApiParam({ name: 'id', description: 'Order QR token' })
+  @ApiResponse({ status: 200, description: 'Order checked' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('check/:id')
+  checkPost(@Param('id') id: string, @Body() postIdDto: PostDto) {
+    return this.postService.checkPost(id, postIdDto);
   }
 
   @ApiOperation({ summary: 'Receive post (courier)' })
