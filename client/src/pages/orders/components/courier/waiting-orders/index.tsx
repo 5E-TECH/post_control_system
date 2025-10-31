@@ -27,7 +27,7 @@ export type FieldType = {
 
 const WaitingOrders = () => {
   const { t } = useTranslation("orderList");
-  const { t:st } = useTranslation("status");
+  const { t: st } = useTranslation("status");
 
   const navigate = useNavigate();
   const order = useRef<any | null>(null);
@@ -191,12 +191,64 @@ const WaitingOrders = () => {
     }
   }, [isShow]);
 
+  console.log(order.current);
+
   const getIsPending = () => {
     if (urlType.current === "sell") {
       return partleSoldShow ? partlySellOrder.isPending : sellOrder.isPending;
     } else {
       return partleSoldShow ? partlySellOrder.isPending : cancelOrder.isPending;
     }
+  };
+
+  useEffect(() => {
+    if (isShow && order?.current) {
+      const initialItems = order?.current?.items?.map((item: any) => ({
+        product_id: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity, // hozirgi son
+        maxQuantity: item.quantity, // serverdan kelgan quantity – limit sifatida
+      }));
+      setOrderItemInfo(initialItems || []);
+    }
+  }, [isShow, order]);
+
+  const handleMinus = (index: number) => {
+    setOrderItemInfo((prev) => {
+      // Hozirgi umumiy miqdorni hisoblaymiz
+      const totalQuantity = prev.reduce((sum, item) => sum + item.quantity, 0);
+
+      // Agar umumiy son 1 dan katta bo‘lsa, kamaytirishga ruxsat beramiz
+      if (totalQuantity > 1) {
+        return prev.map((item, i) => {
+          if (i === index && item.quantity > 0) {
+            // kamaytirgandan keyin umumiy son 0 bo‘lmasligini tekshiramiz
+            const newTotal = totalQuantity - 1;
+            if (newTotal >= 1) {
+              return { ...item, quantity: item.quantity - 1 };
+            }
+          }
+          return item;
+        });
+      }
+
+      // agar umumiy son 1 bo‘lsa, hech narsa o‘zgartirmaymiz
+      return prev;
+    });
+  };
+
+  const handlePlus = (index: number) => {
+    setOrderItemInfo((prev) =>
+      prev.map((item, i) => {
+        const currentData = order.current?.items?.[i];
+        const max = currentData?.quantity ?? item.maxQuantity ?? Infinity;
+
+        if (i === index && item.quantity < max) {
+          return { ...item, quantity: item.quantity + 1 };
+        }
+        return item;
+      })
+    );
   };
 
   return data?.data?.data?.length > 0 ? (
@@ -269,7 +321,7 @@ const WaitingOrders = () => {
       </div>
 
       <Popup isShow={isShow} onClose={closePopup}>
-        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8 dark:bg-[#312D4B]">
+        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8 dark:bg-[#312D4B] max-md:w-[350px] max-h-[90vh] overflow-hidden overflow-y-auto">
           <X
             className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
             onClick={closePopup}
@@ -289,9 +341,27 @@ const WaitingOrders = () => {
               {order.current?.customer?.name || "—"}
             </p>
             <p>
-              <span className="font-semibold">Tel raqam:</span>{" "}
+              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
               {order.current?.customer?.phone_number || "—"}
             </p>
+            <p>
+              <span className="font-semibold">Tuman:</span>{" "}
+              {order.current?.customer?.district?.name || "—"}
+            </p>
+            <p>
+              <span className="font-semibold">Mahsulotlar nomi:</span>{" "}
+              {order.current?.items
+                ?.map((item: any) => item.product?.name)
+                .join(", ") || "—"}
+            </p>
+            <p>
+              <span className="font-semibold">Mahsulotlar soni:</span>{" "}
+              {order.current?.items?.reduce(
+                (sum: any, item: any) => sum + (item.quantity || 0),
+                0
+              ) || "—"}
+            </p>
+
             <p>
               <span className="font-semibold">Umumiy summa:</span>{" "}
               {order.current?.total_price
@@ -303,42 +373,53 @@ const WaitingOrders = () => {
 
           {partleSoldShow && (
             <div className="flex flex-col">
-              {orderItemInfo.map((item, index) => (
-                <div
-                  key={item.product_id}
-                  className="pt-4 flex gap-10 justify-between"
-                >
-                  <Form.Item className="flex-1!">
-                    <Select
-                      className="!h-[40px]"
-                      value={item.product_id}
-                      disabled
-                      options={[{ label: item.name, value: item.product_id }]}
-                    />
-                  </Form.Item>
-                  <div className="flex gap-2 items-center mb-6 select-none">
-                    <Minus
-                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                      onClick={() => {
-                        const updated = [...orderItemInfo];
-                        if (updated[index].quantity > 0)
-                          updated[index].quantity -= 1;
-                        setOrderItemInfo(updated);
-                      }}
-                    />
-                    
-                    <Plus
-                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                      onClick={() => {
-                        const updated = [...orderItemInfo];
-                        updated[index].quantity += 1;
-                        setOrderItemInfo(updated);
-                      }}
-                    />
-                    <span className="text-[20px]">{item.quantity}</span>
+              <div
+                className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
+                  orderItemInfo.length > 2
+                    ? "max-h-49 overflow-y-auto"
+                    : "overflow-visible"
+                }`}
+              >
+                {orderItemInfo.map((item, index) => (
+                  <div
+                    key={item.product_id}
+                    className="pt-4 flex gap-10 justify-between"
+                  >
+                    <Form.Item className="flex-1!">
+                      <Select
+                        className="!h-[40px]"
+                        value={item.product_id}
+                        disabled
+                        options={[{ label: item.name, value: item.product_id }]}
+                      />
+                    </Form.Item>
+                    <div className="flex gap-2 items-center mb-6 select-none">
+                      <Minus
+                        className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                          item.quantity <= 0 ||
+                          orderItemInfo.reduce(
+                            (sum, i) => sum + i.quantity,
+                            0
+                          ) <= 1
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
+                        }`}
+                        onClick={() => handleMinus(index)}
+                      />
+
+                      <span className="text-[20px]">{item.quantity}</span>
+                      <Plus
+                        className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                          item.quantity >= (item.maxQuantity ?? Infinity)
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
+                        }`}
+                        onClick={() => handlePlus(index)}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
 
               <Form.Item>
                 <Input

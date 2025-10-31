@@ -415,3 +415,17 @@
   background-color: rgba(124, 58, 237, 0.4) !important;
   color: #fff !important;
 }
+
+
+/* fayl: index.css yoki global.css */
+.scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar::-webkit-scrollbar-thumb {
+  background: #9d70ff;
+  border-radius: 10px;
+}
+.scrollbar::-webkit-scrollbar-track {
+  background: #f6f7fb;
+}
+
