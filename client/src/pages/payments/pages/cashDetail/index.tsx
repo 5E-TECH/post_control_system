@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import type { AxiosError } from "axios";
 import CustomCalendar from "../../../../shared/components/customDate";
+import { Loader2 } from "lucide-react";
 
 const { RangePicker } = DatePicker;
 
@@ -261,6 +262,8 @@ const CashDetail = () => {
               <button
                 onClick={() => handleSubmit()}
                 disabled={
+                  createPaymentMarket.isPending ||
+                  createPaymentCourier.isPending ||
                   !form.payment ||
                   !form.summa ||
                   Number(form.summa.replace(/\s/g, "")) <= 0
@@ -274,9 +277,21 @@ const CashDetail = () => {
                     : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
                 }`}
               >
-                {data?.data?.cashbox?.user?.role === "market"
-                  ? `${t("qabulQilish")}`
-                  : `${t("to'lash")}`}
+                {createPaymentMarket.isPending ||
+                createPaymentCourier.isPending ? (
+                  <div className="relative w-full flex justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin absolute" />
+                    <span className="opacity-0">
+                      {data?.data?.cashbox?.user?.role === "market"
+                        ? t("qabulQilish")
+                        : t("to'lash")}
+                    </span>
+                  </div>
+                ) : data?.data?.cashbox?.user?.role === "market" ? (
+                  t("qabulQilish")
+                ) : (
+                  t("to'lash")
+                )}
               </button>
             </div>
           </div>
@@ -295,8 +310,9 @@ const CashDetail = () => {
 
         {form.from !== "" && form.from !== form.to && (
           <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} <span className="text-[15px]">{t("dan")}</span> {form.to}{" "}
-            <span className="text-[15px]">{t("gacha")}</span> {t("o'tkazmalar")}
+            {form.from} <span className="text-[15px]">{t("dan")}</span>{" "}
+            {form.to} <span className="text-[15px]">{t("gacha")}</span>{" "}
+            {t("o'tkazmalar")}
           </h2>
         )}
         <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">

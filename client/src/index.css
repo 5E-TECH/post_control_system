@@ -19,15 +19,15 @@
 .dark .custom-select-dropdown .ant-select-selector {
   background-color: #312d4b !important;
   border-color: rgba(231, 227, 252, 0.22) !important;
-  color: #E7E3FCCC!important;
+  color: #e7e3fccc !important;
 }
 
 .dark .custom-select-dropdown .ant-select-selection-placeholder {
-  color: #E7E3FCCC!important;
+  color: #e7e3fccc !important;
 }
 
 .dark .custom-select-dropdown .ant-select-arrow {
-  color: #E7E3FCCC!important;
+  color: #e7e3fccc !important;
 }
 
 .dark .custom-select-dropdown {
@@ -100,8 +100,9 @@
 }
 
 .dark .dark-dropdown .ant-select-item-option-active {
-  background-color: #312d4b !important;transition: all;
-  }
+  background-color: #312d4b !important;
+  transition: all;
+}
 
 .scroll-order-items::-webkit-scrollbar {
   display: none;
@@ -168,11 +169,11 @@
 }
 
 .dark .custom-password input::placeholder {
-  color: #E7E3FCCC !important;
+  color: #e7e3fccc !important;
 }
 
 .dark .custom-password .ant-input-password-icon {
-  color: #E7E3FCCC !important;
+  color: #e7e3fccc !important;
 }
 
 @media (max-width: 900px) {
@@ -185,7 +186,6 @@
   th {
     display: none;
   }
-  
 
   td {
     display: grid;
@@ -228,23 +228,21 @@
   }
 }
 
-
 /* index.css yoki global.css */
 .dark .ant-input-number {
-  background-color: #312D4B !important;
+  background-color: #312d4b !important;
   border: none !important;
   color: white !important;
 }
 
 .dark .ant-input-number input {
-  background-color: #312D4B !important;
+  background-color: #312d4b !important;
   color: white !important;
 }
 
 .dark .ant-input-number .ant-input-number-input::placeholder {
   color: #9ca3af !important; /* placeholder-gray-400 */
 }
-
 
 @keyframes slide-up-slow {
   0% {
@@ -262,7 +260,7 @@
 }
 
 .animate-slide-up-slow {
-  animation: slide-up-slow .3s ease-in-out forwards;
+  animation: slide-up-slow 0.3s ease-in-out forwards;
 }
 
 @keyframes shine {
@@ -272,4 +270,148 @@
   100% {
     transform: translateX(100%);
   }
+}
+
+/* === RangePicker dark mode === */
+.dark .ant-picker {
+  background-color: #1f1f2e !important;
+  border-color: #3a3a5a !important;
+  color: #ffffff !important;
+}
+
+.dark .ant-picker-input > input {
+  color: #ffffff !important;
+}
+
+/* Placeholder rangi */
+.dark .ant-picker-input > input::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Icon ranglari */
+.dark .ant-picker-suffix,
+.dark .ant-picker-clear {
+  color: #9ca3af !important;
+}
+
+/* Hover va focus holati */
+.dark .ant-picker:hover,
+.dark .ant-picker-focused {
+  border-color: #7c3aed !important;
+}
+
+/* === Calendar (popup) oynasi === */
+.dark .ant-picker-dropdown {
+  background-color: #1f1f2e !important;
+  color: #ffffff !important;
+}
+
+.dark .ant-picker-panel {
+  background-color: #1f1f2e !important;
+  border-color: #3a3a5a !important;
+}
+
+/* Haftaning kunlari */
+.dark .ant-picker-content th {
+  color: #9ca3af !important;
+}
+
+/* Sana katakchalari */
+.dark .ant-picker-cell {
+  color: #d1d5db !important;
+}
+
+/* Bugungi sana */
+.dark
+  .ant-picker-cell-in-view.ant-picker-cell-today
+  .ant-picker-cell-inner::before {
+  border-color: #7c3aed !important;
+}
+
+/* Tanlangan sana */
+.dark .ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner,
+.dark
+  .ant-picker-cell-in-view.ant-picker-cell-range-start
+  .ant-picker-cell-inner,
+.dark
+  .ant-picker-cell-in-view.ant-picker-cell-range-end
+  .ant-picker-cell-inner {
+  background-color: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+/* Tanlangan oraliq (range) ichidagi kunlar */
+.dark .ant-picker-cell-in-view.ant-picker-cell-in-range .ant-picker-cell-inner {
+  background-color: rgba(124, 58, 237, 0.25) !important;
+  color: #ffffff !important;
+}
+
+/* Hover effekti */
+.dark .ant-picker-cell-in-view.ant-picker-cell:hover .ant-picker-cell-inner {
+  background-color: #4c1d95 !important;
+  color: #fff !important;
+}
+
+/* Header (oy/yil tanlash joyi) */
+.dark .ant-picker-header {
+  background-color: #272742 !important;
+  color: #fff !important;
+  border-color: #3a3a5a !important;
+}
+
+.dark .ant-picker-header button {
+  color: #fff !important;
+}
+
+/* Oy va yil tanlash paneli */
+.dark .ant-picker-month-panel,
+.dark .ant-picker-year-panel {
+  background-color: #1f1f2e !important;
+  color: #fff !important;
+}
+
+/* Oy/yil tanlangan holat */
+.dark .ant-picker-month-panel .ant-picker-cell-selected .ant-picker-cell-inner,
+.dark .ant-picker-year-panel .ant-picker-cell-selected .ant-picker-cell-inner {
+  background-color: #7c3aed !important;
+  color: #fff !important;
+}
+
+/* Range separator (ikki sana orasidagi “~” belgisi) */
+.dark .ant-picker-range-separator {
+  color: #9ca3af !important;
+}
+
+/* Oraliq tanlovdagi (range) oradagi sanalar */
+.dark .ant-picker-cell-in-view.ant-picker-cell-in-range .ant-picker-cell-inner {
+  background-color: rgba(124, 58, 237, 0.25) !important; /* Yengil binafsha fon */
+  color: #fff !important;
+}
+
+/* Range boshlanish va tugash sanalari */
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-start .ant-picker-cell-inner,
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-end .ant-picker-cell-inner {
+  background-color: #7c3aed !important; /* To‘liq binafsha */
+  color: #fff !important;
+}
+
+/* Range orasi (hover qilib turganda fon yuradigan joy) */
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-hover-start::after,
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-hover-end::after,
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-hover::after {
+  background: rgba(124, 58, 237, 0.25) !important;
+  opacity: 1 !important;
+}
+
+/* Range hoverdagi chiziqlarni ham tozalab yaxshilaymiz */
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-hover-start::before,
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-hover-end::before {
+  background: rgba(124, 58, 237, 0.25) !important;
+}
+
+/* Range hoverda tanlanayotgan oraliq fonini yaxshilash */
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-hover-start .ant-picker-cell-inner,
+.dark .ant-picker-cell-in-view.ant-picker-cell-range-hover-end .ant-picker-cell-inner {
+  background-color: rgba(124, 58, 237, 0.4) !important;
+  color: #fff !important;
 }
