@@ -62,11 +62,6 @@ const CustomerInfoOrder = () => {
     });
   };
 
-  // const dispatch = useDispatch();
-  // const handleDiscard = () => {
-  //   dispatch(setCustomerData(initialState));
-  // };
-
   return (
     <div className="flex gap-6 px-6 pt-6 max-[1100px]:flex-col max-[1100px]:gap-10">
       <div className="w-fit h-fit pr-[81px]">
@@ -133,12 +128,6 @@ const CustomerInfoOrder = () => {
       <div className="flex flex-col gap-4.5 w-full">
         <CustomerInfo />
         <div className="flex gap-4 justify-end">
-          {/* <Button
-            onClick={handleDiscard}
-            className="w-[110px]! h-[38px]! bg-[#F4F5FA]! border! border-[#8A8D93]! text-[#8A8D93]! hover:opacity-80! dark:bg-[#28243D]!"
-          >
-            {t("discard")}
-          </Button> */}
           <Button
             disabled={createUser.isPending}
             loading={createUser.isPending}
