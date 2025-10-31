@@ -187,6 +187,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order_item_info,
         total_price,
         where_deliver,
+        operator,
         comment,
       } = createOrderDto;
 
@@ -213,6 +214,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const newOrder = queryRunner.manager.create(OrderEntity, {
         user_id: market_id,
         comment,
+        operator,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
         status: Order_status.NEW,
@@ -790,12 +792,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return successRes(
         {
           data,
-          pagination: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-          },
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All market orders fetched successfully',

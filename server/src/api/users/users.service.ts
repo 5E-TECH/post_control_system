@@ -303,7 +303,8 @@ export class UserService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const { name, phone_number, district_id, address } = createCustomerDto;
+      const { name, phone_number, district_id, address, extra_number } =
+        createCustomerDto;
       if (!createCustomerDto.market_id) {
         if (user.role !== Roles.MARKET) {
           throw new BadRequestException('Market not choosen');
@@ -387,6 +388,7 @@ export class UserService {
         role: Roles.CUSTOMER,
         district_id,
         address,
+        extra_number,
       });
       await queryRunner.manager.save(customer);
 

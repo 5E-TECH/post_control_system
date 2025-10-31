@@ -1,8 +1,10 @@
 export interface PrintOrder {
   orderId: string;
   orderPrice: string;
+  operator: string;
   customerName: string;
   customerPhone: string;
+  extraNumber: string;
   market: string;
   comment: string;
   region: string;

@@ -58,6 +58,9 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   address: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  extra_number: string;
+
   @Column({ type: 'boolean', default: false })
   is_deleted: boolean;
 
