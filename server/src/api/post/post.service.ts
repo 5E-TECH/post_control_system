@@ -22,6 +22,7 @@ import {
 import { ReceivePostDto } from './dto/receive-post.dto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import { PostDto } from './dto/postId.dto';
 
 @Injectable()
 export class PostService {
@@ -316,6 +317,28 @@ export class PostService {
         relations: ['customer', 'customer.district', 'items', 'items.product'],
       });
       return successRes(allOrdersByPostId, 200, 'All orders by post id');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async checkPost(id: string, postDto: PostDto) {
+    try {
+      const { postId } = postDto;
+      if (!postId) {
+        throw new BadRequestException('Pochta topilmadi');
+      }
+      const order = await this.orderRepo.findOne({
+        where: {
+          qr_code_token: id,
+          status: Order_status.RECEIVED,
+          post_id: postId,
+        },
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      return successRes({}, 200, "Order checked and it's exist");
     } catch (error) {
       return catchError(error);
     }
