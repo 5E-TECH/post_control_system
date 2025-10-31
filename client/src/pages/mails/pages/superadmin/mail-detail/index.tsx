@@ -16,8 +16,10 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { exportToExcel } from "../../../../../shared/helpers/export-download-excel";
 import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
+import { usePostScanner } from "../../../../../shared/components/post-scanner";
 
 const MailDetail = () => {
+  usePostScanner()
   const dispatch = useDispatch();
   const { t } = useTranslation("mails");
 
@@ -56,7 +58,7 @@ const MailDetail = () => {
 
   useEffect(() => {
     if (postData && !initialized) {
-      setSelectedIds(postData.map((item: any) => item.id));
+      setSelectedIds([]);
       setInitialized(true);
     }
   }, [postData, initialized]);
