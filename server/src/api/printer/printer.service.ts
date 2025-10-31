@@ -229,10 +229,9 @@ TEXT 20,220,"3",0,1,1,"Tuman: ${region} ${district}"
 TEXT 20,260,"3",0,1,1,"Manzil: ${address || '-'}"
 ${productTextLines}
 TEXT 20,${y},"3",0,1,1,"Izoh: ${comment || '-'}"
-TEXT 20,${y + 30},"2",0,1,1,"Jo'natuvchi: ${market}"
+TEXT 20,${y + 30},"2",0,1,1,"Jo'natuvchi: ${market} (${whereDeliver})"
 TEXT 20,${y + 60},"2",0,1,1,"Mutaxasis: ${operator}"
 TEXT 20,${y + 90},"2",0,1,1,"Qo'shimcha raqam: ${extraNumber}"
-TEXT 20,${y + 120},"2",0,1,1,"Yetkazish: ${whereDeliver}"
 QRCODE 560,50,L,8,A,0,"${qrCode}"
 PRINT 1
 `.trim();
