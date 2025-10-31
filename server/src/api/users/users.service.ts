@@ -25,7 +25,7 @@ import { Response } from 'express';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
-import { DataSource, DeepPartial, In, Not } from 'typeorm';
+import { DataSource, DeepPartial, ILike, In, Not } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
@@ -643,14 +643,21 @@ export class UserService {
     }
   }
 
-  async allCouriers(): Promise<object> {
+  async allCouriers(search: string | undefined): Promise<object> {
     try {
       const allCouriers = await this.userRepo.find({
-        where: { role: Roles.COURIER },
+        where: search
+          ? [
+              { role: Roles.COURIER, name: ILike(`%${search}%`) },
+              { role: Roles.COURIER, phone_number: ILike(`%${search}%`) },
+            ]
+          : { role: Roles.COURIER },
         select: ['id', 'name', 'phone_number', 'status', 'created_at'],
         relations: ['cashbox', 'region'],
+        order: { created_at: 'DESC' },
       });
-      return successRes(allCouriers, 200, 'All markets');
+
+      return successRes(allCouriers, 200, 'All couriers');
     } catch (error) {
       return catchError(error);
     }

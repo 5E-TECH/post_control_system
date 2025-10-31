@@ -425,8 +425,8 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('couriers')
-  findAllCouriers() {
-    return this.userService.allCouriers();
+  findAllCouriers(@Query('search') search?: string) {
+    return this.userService.allCouriers(search);
   }
 
   @ApiOperation({
