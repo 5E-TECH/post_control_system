@@ -95,7 +95,7 @@ const OrderView = () => {
   }, [role]);
 
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
-  const total = data?.data?.pagination?.total;
+  const total = data?.data?.total;
   console.log('total',total);
   
 
