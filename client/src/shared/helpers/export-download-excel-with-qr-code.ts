@@ -25,7 +25,7 @@ export const exportCardsToExcel = async (data: any[], fileName: string) => {
     } as const;
 
     // Har bir kartochka 3 ta ustundan foydalanadi (A–C va E–G)
-    const cardWidth = 3;
+    // const cardWidth = 3;
     const cardHeight = 4;
 
     let currentRow = 1;
