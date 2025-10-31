@@ -88,6 +88,12 @@ export const usePost = () => {
         api.post(`post/cancel/receive/${id}`, data).then((res) => res.data),
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
+
+    const checkPost = useMutation({
+        mutationFn: ({id, data}:{id: string, data: any}) =>
+          api.post(`post/check/${id}`, data).then((res) => res.data),
+        onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+      });
   return {
     createPost,
     createPrint,
@@ -101,5 +107,6 @@ export const usePost = () => {
     receivePost,
     canceledPost,
     receiveCanceledPost,
+    checkPost
   };
 };
