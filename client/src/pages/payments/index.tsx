@@ -75,7 +75,9 @@ const Payments = () => {
       limit,
     }
   );
-  const { data } = getMarkets(showMarket, { ...searchParam, limit: 0 });
+
+
+  const { data, refetch:marketRefetch } = getMarkets(showMarket, { ...searchParam, limit: 0 });
   const { data: courierData } = getCourier(showCurier, { ...searchParam });
   const total = cashBoxData?.data?.pagination?.total || 0;
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
@@ -84,7 +86,7 @@ const Payments = () => {
     } else {
       setParam("page", newPage);
     }
-
+    
     if (limit === 10) {
       removeParam("limit");
     } else {
@@ -92,6 +94,9 @@ const Payments = () => {
     }
   };
   // Pagination end
+  useEffect(() => {
+    marketRefetch()
+  },[showMarket])
 
   const handleNavigate = () => {
     navigate(`cash-detail/${select}`);
@@ -235,11 +240,11 @@ cursor-pointer"
               <table className="w-full border-collapse">
                 <thead className="bg-[#9d70ff] dark:bg-[#3d3759] text-white text-sm">
                   <tr>
-                    <th className="h-[40px] text-left px-3 font-medium">#</th>
-                    <th className="h-[40px] text-left px-3 font-medium">
+                    <th className="h-[40px] text-left px-3 pl-10 font-medium">#</th>
+                    <th className="h-[40px] text-left px-3 pl-30 font-medium">
                       {t("marketName")}
                     </th>
-                    <th className="h-[40px] text-left px-3 font-medium">
+                    <th className="h-[40px] text-left px-3 pl-40 font-medium">
                       {t("berilishiKerakSumma")}
                     </th>
                   </tr>
