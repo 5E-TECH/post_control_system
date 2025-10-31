@@ -224,6 +224,7 @@ export class OrderController {
       page?: number;
       limit?: number;
       search?: string;
+      regionId?: string;
       status?: string;
       fromDate?: string;
       toDate?: string;

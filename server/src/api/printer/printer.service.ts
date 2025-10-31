@@ -7,6 +7,7 @@ import { OrderRepository } from 'src/core/repository/order.repository';
 import { PrintOrder } from 'src/common/utils/types/order.interface';
 import { In } from 'typeorm';
 import mqtt from 'mqtt'; // ✅ kerak
+import { Where_deliver } from 'src/common/enums';
 
 @Injectable()
 export class PrinterService {
@@ -91,8 +92,6 @@ export class PrinterService {
         .where('order.id IN (:...ids)', { ids: orderIds })
         .getMany();
 
-      console.log(orders);
-
       if (!orders.length) {
         throw new BadRequestException('Hech qanday buyurtma topilmadi');
       }
@@ -110,6 +109,10 @@ export class PrinterService {
           address: order.customer?.address ?? 'N/A',
           qrCode: order.qr_code_token ?? '',
           created_time: formatDate(order.created_at),
+          whereDeliver:
+            order.where_deliver === Where_deliver.ADDRESS
+              ? 'Uygacha'
+              : 'Markazga',
           items: (order.items || []).map((i) => ({
             product: i.product?.name ?? 'N/A',
             quantity: i.quantity ?? 1,
@@ -170,6 +173,7 @@ export class PrinterService {
       market,
       comment,
       created_time,
+      whereDeliver,
       items,
     } = order;
 
@@ -192,7 +196,7 @@ export class PrinterService {
       productLines.push(currentLine.trim());
     }
 
-    let y = 300;
+    let y = 290;
     const productTextLines = productLines
       .map((line, i) => {
         const prefix = i === 0 ? 'Mahsulot: ' : '           ';
@@ -222,6 +226,7 @@ TEXT 20,260,"3",0,1,1,"Manzil: ${address || '-'}"
 ${productTextLines}
 TEXT 20,${y},"3",0,1,1,"Izoh: ${comment || '-'}"
 TEXT 20,${y + 30},"2",0,1,1,"Jo'natuvchi: ${market}"
+TEXT 20,${y + 60},"128",50,1,0,2,2,"${qrCode}"
 QRCODE 560,50,L,8,A,0,"${qrCode}"
 BARCODE 100,${y + 60},"128",50,1,0,2,2,"${qrCode}"
 PRINT 1
