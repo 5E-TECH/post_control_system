@@ -73,7 +73,10 @@ export class ProductService {
         throw new NotFoundException('Market not found');
       }
 
-      if (!isExistMarket.add_order) {
+      if (
+        currentUser?.role === Roles.MARKET &&
+        isExistMarket.add_order === false
+      ) {
         throw new BadRequestException('You can not create order and product!');
       }
 

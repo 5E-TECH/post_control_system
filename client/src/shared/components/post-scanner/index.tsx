@@ -3,17 +3,17 @@ import { useApiNotification } from "../../hooks/useApiNotification";
 import { useLocation } from "react-router-dom";
 import { usePost } from "../../api/hooks/usePost";
 
-export function usePostScanner(refetch?: () => void) {
+export function usePostScanner(
+  refetch?: () => void,
+  setSelectedIds?: React.Dispatch<React.SetStateAction<string[]>>
+) {
   const { handleApiError, handleSuccess } = useApiNotification();
   const { checkPost } = usePost()
-
   const location = useLocation();
 
   // URL dan marketId ni ajratib olish
   const pathParts = location.pathname.split("/");
   const postId = pathParts[pathParts.length - 1];
-
-  console.log(postId)
 
   useEffect(() => {
     let scanned = "";
@@ -26,30 +26,44 @@ export function usePostScanner(refetch?: () => void) {
 
         if (!tokenValue) return;
 
-        try {
-          // Agar URL bo‘lsa faqat token qismini olamiz
-          const token = tokenValue.startsWith("http")
-            ? tokenValue.split("/").pop()
-            : tokenValue;
+        // Agar URL bo‘lsa faqat token qismini olamiz
+        const token = tokenValue.startsWith("http")
+          ? tokenValue.split("/").pop()
+          : tokenValue;
 
-          await checkPost.mutateAsync({
+          console.log(setSelectedIds);
+          
+
+        checkPost.mutate(
+          {
             id: token as string,
             data: { postId },
-          });
+          },
+          {
+            onSuccess: (res) => {
+              console.log(res);
+              
+              const orderId = res.data.order?.id;
+              console.log("✅ Order ID:", orderId);
 
-          handleSuccess("Buyurtma muvaffaqiyatli qabul qilindi ✅");
-          refetch?.();
-        } catch (err: any) {
-          handleApiError(err, "Buyurtma qabul qilishda xatolik!");
+              if (setSelectedIds) {
+                setSelectedIds((prev) =>
+                  prev.includes(orderId) ? prev : [...prev, orderId]
+                );
+              }
 
-          // 🔊 Error tovushni o‘ynatish
-          try {
-            const errorSound = new Audio("/sound/error.mp3");
-            errorSound.play().catch((e) => console.error("Ovoz chiqmadi:", e));
-          } catch (e) {
-            console.error("Ovoz ijrosida xatolik:", e);
+              handleSuccess("Buyurtma muvaffaqiyatli qabul qilindi ✅");
+              refetch?.();
+            },
+            onError: (err) => {
+              console.log(err);
+              
+              handleApiError(err, "Buyurtma qabul qilishda xatolik!");
+              const errorSound = new Audio("/sound/error.mp3");
+              errorSound.play().catch(() => { });
+            },
           }
-        }
+        );
       } else {
         scanned += e.key;
         clearTimeout(timer);
@@ -67,5 +81,6 @@ export function usePostScanner(refetch?: () => void) {
     handleSuccess,
     refetch,
     postId,
+    setSelectedIds
   ]);
 }

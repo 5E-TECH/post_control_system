@@ -36,7 +36,7 @@ const Header = () => {
   const { mutate: signOut } = useSignOut();
   const sidebarRedux = useSelector((state: RootState) => state.sidebar);
 
-  console.log(sidebarRedux.isOpen);
+  // console.log(sidebarRedux.isOpen);
 
   useEffect(() => {
     if (dark) {

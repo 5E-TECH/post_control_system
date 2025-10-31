@@ -76,12 +76,12 @@ const Districts = () => {
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex flex-wrap items-start gap-5 p-5">
+      <div className="flex flex-wrap  items-start gap-5 p-5 ">
         {regions.map((region) => (
           <Card
             key={region.id}
             title={region.name}
-            className="w-[300px] flex-shrink-0"
+            className="w-[300px]  flex-shrink-0 shadow-md"
             style={{ height: "auto" }}
           >
             <Droppable droppableId={region.id}>

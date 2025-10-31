@@ -339,7 +339,7 @@ export class PostService {
       if (!order) {
         throw new NotFoundException('Order not found');
       }
-      return successRes({ order }, 200, "Order checked and it's exist");
+      return successRes({order}, 200, "Order checked and it's exist");
     } catch (error) {
       return catchError(error);
     }
