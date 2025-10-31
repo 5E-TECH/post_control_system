@@ -14,8 +14,9 @@ import { useApiNotification } from "../../../../../shared/hooks/useApiNotificati
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
-import { exportToExcel } from "../../../../../shared/helpers/export-download-excel";
 import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
+import { exportCardsToExcel } from "../../../../../shared/helpers/export-download-excel-with-qr-code";
+import { usePostScanner } from "../../../../../shared/components/post-scanner";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -33,6 +34,9 @@ const MailDetail = () => {
   const { mutate: sendCouriersToPost, isPending } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
+
+  usePostScanner(undefined, setSelectedIds);
+
   // Dynamic fetching based on status
   const [params] = useSearchParams();
   const status = params.get("status");
@@ -56,7 +60,7 @@ const MailDetail = () => {
 
   useEffect(() => {
     if (postData && !initialized) {
-      setSelectedIds(postData.map((item: any) => item.id));
+      setSelectedIds([]);
       setInitialized(true);
     }
   }, [postData, initialized]);
@@ -88,10 +92,10 @@ const MailDetail = () => {
           sendCouriersToPost(
             { id, data: post },
             {
-              onSuccess: (res) => {
-                console.log(res.data);
+              onSuccess: async (res) => {
+                console.log("res.data", res.data);
 
-                const courierName = res?.data?.courier?.name;
+                const courierName = res?.data?.updatedPost?.courier?.name;
                 handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
 
                 try {
@@ -99,21 +103,25 @@ const MailDetail = () => {
                   console.log("mails", mails);
 
                   const exportData = mails?.map((mail: any, inx: number) => ({
-                    N: inx + 1,
-                    // Tuman: mail?.customer?.district?.name,
-                    // Firma: mail?.market?.name,
-                    // "Telefon raqam": mail?.customer?.phone_number,
-                    Narxi: Number((mail?.total_price ?? 0) / 1000),
-                    Holati: '',
+                    id: inx + 1,
+                    manzil: mail?.customer?.district?.name || "",
+                    mijoz: mail?.customer?.name || "",
+                    telefon: mail?.customer?.phone_number || "",
+                    market: mail?.market?.name || "",
+                    summa: Number((mail?.total_price ?? 0) / 1000),
+                    izoh: mail?.comment || "",
+                    qrCode: mail?.qr_code_token || ""
                   }));
 
-                  exportToExcel(
+                  await exportCardsToExcel(
                     exportData || [],
                     "pochtalar"
                   );
 
                   handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
                 } catch (error) {
+                  console.log(error);
+
                   handleApiError(error, "Excel yuklashda xatolik");
                 } finally {
                   dispatch(resetDownload());
@@ -155,10 +163,10 @@ const MailDetail = () => {
     sendCouriersToPost(
       { id: id as string, data: post },
       {
-        onSuccess: (res) => {
-          console.log(res);
+        onSuccess: async (res) => {
+          console.log("tasdiqlash", res);
 
-          const courierName = res?.data?.courier?.name;
+          const courierName = res?.data?.updatedPost?.courier?.name;
           handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
 
           try {
@@ -167,14 +175,15 @@ const MailDetail = () => {
 
             const exportData = mails?.map((mail: any, inx: number) => ({
               N: inx + 1,
-              // Tuman: mail?.customer?.district?.name,
-              // Firma: mail?.market?.name,
-              // "Telefon raqam": mail?.customer?.phone_number,
+              Tuman: mail?.customer?.district?.name,
+              Firma: mail?.market?.name,
+              "Telefon raqam": mail?.customer?.phone_number,
               Narxi: Number((mail?.total_price ?? 0) / 1000),
               Holati: '',
+              "QR code": mail?.qr_code_token
             }));
 
-            exportToExcel(
+            await exportCardsToExcel(
               exportData || [],
               "pochtalar"
             );

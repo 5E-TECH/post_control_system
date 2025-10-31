@@ -43,6 +43,12 @@ export const useOrder = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
+  const joinPostRefusalProduct = useMutation({
+    mutationFn: (data: {order_ids: string[]}) =>
+      api.post('post/cancel', data).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
+  });
+
   const courierReceiveOrderByScanerById = useMutation({
     mutationFn: (id: string) =>
       api.patch(`post/receive/order/${id}`).then((res) => res.data),
@@ -139,5 +145,6 @@ export const useOrder = () => {
     updateOrdersUserAddress,
     updateOrdersUserPhoneAndName,
     courierReceiveOrderByScanerById,
+    joinPostRefusalProduct,
   };
 };

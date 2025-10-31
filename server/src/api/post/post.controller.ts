@@ -26,6 +26,7 @@ import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { PostDto } from './dto/postId.dto';
 
 @ApiTags('Posts')
 @ApiBearerAuth()
@@ -138,6 +139,18 @@ export class PostController {
   @Patch(':id')
   sendPost(@Param('id') id: string, @Body() orderIdsDto: SendPostDto) {
     return this.postService.sendPost(id, orderIdsDto);
+  }
+
+  @ApiOperation({
+    summary: 'Check post (check the order that is exist or not in the post)',
+  })
+  @ApiParam({ name: 'id', description: 'Order QR token' })
+  @ApiResponse({ status: 200, description: 'Order checked' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('check/:id')
+  checkPost(@Param('id') id: string, @Body() postIdDto: PostDto) {
+    return this.postService.checkPost(id, postIdDto);
   }
 
   @ApiOperation({ summary: 'Receive post (courier)' })

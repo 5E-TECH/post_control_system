@@ -44,6 +44,7 @@ export default function ScanAndOrder() {
   const [isModalOpen, _] = useState(false);
 
   const navigate = useNavigate();
+  const role = useSelector((state: RootState) => state.roleSlice.role);
 
   useEffect(() => {
     if (!isModalOpen) {
@@ -114,6 +115,7 @@ export default function ScanAndOrder() {
     partlySellOrder,
     courierReceiveOrderByScanerById,
     rollbackOrder,
+    joinPostRefusalProduct
   } = useOrder();
 
   const [form] = Form.useForm<FieldType>();
@@ -255,6 +257,20 @@ export default function ScanAndOrder() {
   };
 
   // let maxQuantity:number;
+
+  const joinPostRefusalProducts = (order_ids: string) => {
+    joinPostRefusalProduct.mutate({order_ids: [order_ids]}, {
+      onSuccess: () => {
+        message.success("Buyurtma muvaffaqiyatli pochtaga qo'shildi!");
+        navigate(-1);
+      },
+      onError: (err) => {
+        console.error(err);
+        message.error("Buyurtmani pochtaga qo'shishda xatolik yuz berdi!");
+        navigate(-1);
+      },
+    })
+  }
 
   useEffect(() => {
     if (isShow && order?.data) {
@@ -518,7 +534,7 @@ export default function ScanAndOrder() {
           )}
 
           <div className="pb-4">
-            {orderStatus === "on the road" && (
+            {orderStatus === "on the road" && role === "courier" && (
               <div className="w-full pt-5">
                 <Button
                   onClick={() => handleReceiveOrderById(order?.data?.id)}
@@ -587,13 +603,6 @@ export default function ScanAndOrder() {
                 >
                   <AlertCircle />
                 </Button>
-
-                <Button
-                  className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
-                  onClick={() => setAlertBtnYesNo((p) => !p)}
-                >
-                  Buyurtmani qaytarish
-                </Button>
               </div>
             )}
 
@@ -606,7 +615,7 @@ export default function ScanAndOrder() {
                   <AlertCircle />
                 </Button>
 
-                <Button className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!">
+                <Button className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!" onClick={() => joinPostRefusalProducts(id)}>
                   Buyurtmani qaytarish
                 </Button>
               </div>

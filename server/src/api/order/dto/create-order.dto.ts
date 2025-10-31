@@ -37,8 +37,16 @@ export class CreateOrderDto {
     description: 'Array of order items with product, quantity, price, etc.',
     type: 'array',
     example: [
-      { product_id: '11111111-2222-3333-4444-555555555555', quantity: 2, price: 15000 },
-      { product_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', quantity: 1, price: 23000 },
+      {
+        product_id: '11111111-2222-3333-4444-555555555555',
+        quantity: 2,
+        price: 15000,
+      },
+      {
+        product_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        quantity: 1,
+        price: 23000,
+      },
     ],
   })
   @IsNotEmpty()
@@ -60,8 +68,19 @@ export class CreateOrderDto {
   @IsEnum(Where_deliver)
   where_deliver: Where_deliver;
 
-  @ApiPropertyOptional({ description: 'Additional comment for the order', example: 'Please deliver after 6 PM' })
+  @ApiPropertyOptional({
+    description: 'Additional comment for the order',
+    example: 'Please deliver after 6 PM',
+  })
   @IsOptional()
   @IsString()
   comment?: string;
+
+  @ApiPropertyOptional({
+    description: 'Additional comment for the order',
+    example: 'Please deliver after 6 PM',
+  })
+  @IsOptional()
+  @IsString()
+  operator?: string;
 }

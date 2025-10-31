@@ -187,6 +187,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order_item_info,
         total_price,
         where_deliver,
+        operator,
         comment,
       } = createOrderDto;
 
@@ -213,6 +214,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const newOrder = queryRunner.manager.create(OrderEntity, {
         user_id: market_id,
         comment,
+        operator,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
         status: Order_status.NEW,
@@ -727,18 +729,27 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       limit?: number;
       search?: string;
       status?: string;
+      regionId?: string;
       fromDate?: string;
       toDate?: string;
     },
   ) {
     try {
-      const { page = 1, limit = 10, search, status, fromDate, toDate } = query;
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        status,
+        fromDate,
+        toDate,
+        regionId,
+      } = query;
 
       const qb = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('customer.district', 'district')
-        .leftJoinAndSelect('district.region', 'region.name')
+        .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .where('order.user_id = :userId', { userId: user.id });
@@ -746,7 +757,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // 🔍 Search by customer name or order ID
       if (search) {
         qb.andWhere(
-          '(LOWER(customer.full_name) LIKE LOWER(:search) OR CAST(order.id AS TEXT) LIKE :search)',
+          '(LOWER(customer.name) LIKE LOWER(:search) OR CAST(order.id AS TEXT) LIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -756,29 +767,35 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         qb.andWhere('order.status = :status', { status });
       }
 
+      // 🌍 Filter by region
+      if (regionId) {
+        qb.andWhere('region.id = :regionId', { regionId });
+      }
+
       // 📅 Filter by date range
       if (fromDate && toDate) {
         qb.andWhere('order.created_at BETWEEN :from AND :to', {
           from: fromDate,
           to: toDate,
         });
+      } else if (fromDate) {
+        qb.andWhere('order.created_at >= :from', { from: fromDate });
+      } else if (toDate) {
+        qb.andWhere('order.created_at <= :to', { to: toDate });
       }
 
       // 📄 Pagination
       qb.skip((page - 1) * limit).take(limit);
 
-      // 🔢 Total count for pagination info
       const [data, total] = await qb.getManyAndCount();
 
       return successRes(
         {
           data,
-          pagination: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-          },
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All market orders fetched successfully',
