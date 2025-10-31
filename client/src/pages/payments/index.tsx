@@ -378,14 +378,14 @@ cursor-pointer"
               <table className="w-full border-collapse">
                 <thead className="bg-gradient-to-r from-[#9d70ff] to-[#7b4dff] dark:from-[#3d3759] dark:to-[#4a4370] text-white text-sm">
                   <tr>
-                    <th className="h-[44px] text-left px-3 font-medium">#</th>
-                    <th className="h-[44px] text-left px-3 font-medium">
+                    <th className="h-[44px] text-left px-3 pl-7 font-medium">#</th>
+                    <th className="h-[44px] text-left px-3 pr-30 pl-15 font-medium">
                       {t("courierName")}
                     </th>
-                    <th className="h-[44px] text-left px-3 font-medium">
+                    <th className="h-[44px] text-left px-3 pl-20 font-medium">
                       {t("region")}
                     </th>
-                    <th className="h-[44px] text-left px-3 font-medium">
+                    <th className="h-[44px] text-left px-3 pl-20 font-medium">
                       {t("olinishiKerakSumma")}
                     </th>
                   </tr>
@@ -421,7 +421,7 @@ cursor-pointer"
                         </td>
 
                         <td
-                          className="px-3 py-2 text-[#2E263DB2] dark:text-[#E7E3FCB2]"
+                          className="px-3 py-2 pr-15 text-[#2E263DB2] dark:text-[#E7E3FCB2]"
                           data-cell={t("region")}
                         >
                           {item?.region?.name}
