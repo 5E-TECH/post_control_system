@@ -81,7 +81,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
               />
               {isFromOpen && (
-                <div className="absolute top-full left-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%]">
+                <div className="absolute top-full left-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%] dark:bg-[#28243D]">
                   <div className="flex justify-between items-center mb-2">
                     <button
                       onClick={() => handlePrevMonth(true)}
@@ -117,7 +117,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                           className={`w-8 h-8 rounded-full ${
                             isSelected
                               ? "bg-blue-500 text-white"
-                              : "hover:bg-blue-100"
+                              : "hover:bg-blue-100 dark:hover:bg-blue-500"
                           }`}
                         >
                           {day ? day.date() : ""}
@@ -140,7 +140,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
               />
               {isToOpen && (
-                <div className="absolute top-full right-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%]">
+                <div className="absolute top-full right-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%] dark:bg-[#28243D]">
                   <div className="flex justify-between items-center mb-2">
                     <button
                       onClick={() => handlePrevMonth(false)}
@@ -178,7 +178,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                           className={`w-8 h-8 rounded-full ${
                             isSelected
                               ? "bg-blue-500 text-white"
-                              : "hover:bg-blue-100"
+                              : "hover:bg-blue-100 dark:hover:bg-blue-500"
                           }`}
                         >
                           {day ? day.date() : ""}
