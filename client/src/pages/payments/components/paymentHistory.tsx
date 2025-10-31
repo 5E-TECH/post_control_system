@@ -25,13 +25,13 @@ const CashboxHistoryComponent: React.FC<Props> = ({
       {/* Filter qismi */}
 
       {/* Income va Outcome qismlari */}
-      <div className="grid grid-cols-2 gap-5 mt-10 justify-between max-sm:w-[100%] max-sm:grid-cols-1">
-        <div className="bg-[#0688221A] px-6 py-5 w-[50%] max-sm:w-[100%]">
+      <div className="grid grid-cols-2 gap-5 mt-10 justify-between max-sm:w-[100%] max-[1400px]:grid-cols-1">
+        <div className="bg-[#0688221A] px-6 py-5 w-[100%] max-sm:w-[100%]">
           <strong className="text-[#068822] dark:text-green-500 text-[20px] max-sm:text-[15px]">
             + {(income ?? 0).toLocaleString("uz-UZ")} UZS
           </strong>
         </div>
-        <div className="bg-[#B80D0D1A] px-6 py-5 w-[50%] max-sm:w-[100%]">
+        <div className="bg-[#B80D0D1A] px-6 py-5 w-[100%] max-sm:w-[100%]">
           <strong className="text-[#B80D0D] dark:text-red-500 line-clamp-1 text-[20px] max-sm:text-[15px]">
             - {(outcome ?? 0).toLocaleString("uz-UZ")} UZS
           </strong>
