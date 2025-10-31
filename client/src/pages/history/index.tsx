@@ -70,7 +70,7 @@ const Dashboard: React.FC = () => {
   const chartMax = maxValue * 1.2;
 
   return (
-    <div className="w-full min-h-screen p-4 sm:p-6 md:p-8 overflow-x-hidden">
+    <div className="w-full p-4 sm:p-6 md:p-8 overflow-x-hidden">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left side */}
         <div className="space-y-6">
