@@ -1,13 +1,14 @@
-import { Pagination, Spin, type PaginationProps } from "antd";
-import { Trash } from "lucide-react";
-import { memo, useEffect, useState, type FC } from "react";
-import { useProduct } from "../../api/hooks/useProduct";
-import ConfirmPopup from "../confirmPopup";
-import { useApiNotification } from "../../hooks/useApiNotification";
-import { useParamsHook } from "../../hooks/useParams";
-import { useDispatch } from "react-redux";
-import { setLimit, setPage } from "../../lib/features/paginationProductSlice";
-import { useTranslation } from "react-i18next";
+import { Pagination, Spin, type PaginationProps } from 'antd';
+import { Trash } from 'lucide-react';
+import { memo, useEffect, useState, type FC } from 'react';
+import { useProduct } from '../../api/hooks/useProduct';
+import ConfirmPopup from '../confirmPopup';
+import { useApiNotification } from '../../hooks/useApiNotification';
+import { useParamsHook } from '../../hooks/useParams';
+import { useDispatch, useSelector } from 'react-redux';
+import { setLimit, setPage } from '../../lib/features/paginationProductSlice';
+import { useTranslation } from 'react-i18next';
+import type { RootState } from '../../../app/store';
 
 interface IProps {
   data: any;
@@ -15,7 +16,7 @@ interface IProps {
 }
 
 const ProductView: FC<IProps> = ({ data, total }) => {
-  const { t } = useTranslation("product");
+  const { t } = useTranslation('product');
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
   const [popup, setPopup] = useState(false);
@@ -25,26 +26,28 @@ const ProductView: FC<IProps> = ({ data, total }) => {
   } | null>(null);
 
   const { getParam, setParam, removeParam } = useParamsHook();
-  const page = Number(getParam("page") || 1);
-  const limit = Number(getParam("limit") || 10);
+  const page = Number(getParam('page') || 1);
+  const limit = Number(getParam('limit') || 10);
 
-  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
+  const onChange: PaginationProps['onChange'] = (newPage, limit) => {
     if (newPage === 1) {
       dispatch(setPage(newPage));
-      removeParam("page");
+      removeParam('page');
     } else {
       dispatch(setPage(newPage));
-      setParam("page", newPage);
+      setParam('page', newPage);
     }
 
     if (limit === 10) {
       dispatch(setLimit(limit));
-      removeParam("limit");
+      removeParam('limit');
     } else {
       dispatch(setLimit(limit));
-      setParam("limit", limit);
+      setParam('limit', limit);
     }
   };
+
+  const user = useSelector((state: RootState) => state.roleSlice);
 
   const { deleteProduct } = useProduct();
   const { handleSuccess, handleApiError } = useApiNotification();
@@ -73,7 +76,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
     <div className="mt-4 px-4 ">
       <Spin spinning={loading} tip="Loading Products...">
         <table className="w-full">
-          <thead className="h-[54px] bg-[#F6F7FB] dark:bg-[#3D3759] text-left uppercase">
+          <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
             <tr>
               <th className="w-[50px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                 <div className="flex items-center justify-between pr-[21px]">
@@ -83,19 +86,22 @@ const ProductView: FC<IProps> = ({ data, total }) => {
               </th>
               <th className="w-[308px] h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
                 <div className="flex items-center justify-between pr-[21px]">
-                  {t("productName")}
+                  {t('productName')}
                   <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 </div>
               </th>
-              <th className="w-[1100px] h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
-                <div className="flex items-center justify-between pr-[21px]">
-                  {t("popup.market")}
-                  <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C] "></div>
-                </div>
-              </th>
+              {user.role !== 'market' && (
+                <th className="w-[1100px] h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    {t('popup.market')}
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C] "></div>
+                  </div>
+                </th>
+              )}
+
               <th className="h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
                 <div className="flex items-center justify-between pr-[21px]">
-                  {t("action")}
+                  {t('action')}
                 </div>
               </th>
             </tr>
@@ -121,10 +127,11 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                     </div>
                   </div>
                 </td>
-
-                <td className="data-cell p-3 pl-5" data-cell="MARKET">
-                  {item?.user?.name}
-                </td>
+                {user.role !== 'market' && (
+                  <td className="data-cell p-3 pl-5" data-cell="MARKET">
+                    {item?.user?.name}
+                  </td>
+                )}
 
                 <td
                   className="data-cell p-3 flex items-center pl-5"
@@ -132,7 +139,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                 >
                   <button
                     onClick={() => handlePoup(item.id, item.name)}
-                    className="hover:text-red-500"
+                    className="hover:text-red-500 cursor-pointer"
                   >
                     <Trash />
                   </button>

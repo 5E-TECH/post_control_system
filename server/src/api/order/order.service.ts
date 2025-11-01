@@ -46,6 +46,7 @@ import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { BotService } from '../bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
+import { OrderDto } from './dto/orderId.dto';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -172,7 +173,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async createOrder(createOrderDto: CreateOrderDto): Promise<Object> {
+  async createOrder(
+    createOrderDto: CreateOrderDto,
+    user: JwtPayload,
+  ): Promise<Object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -183,6 +187,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order_item_info,
         total_price,
         where_deliver,
+        operator,
         comment,
       } = createOrderDto;
 
@@ -191,6 +196,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!market) {
         throw new NotFoundException('Market not found');
+      }
+
+      if (user.role === Roles.MARKET && !market.add_order) {
+        throw new BadRequestException('You can not create order and product');
       }
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
@@ -205,6 +214,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const newOrder = queryRunner.manager.create(OrderEntity, {
         user_id: market_id,
         comment,
+        operator,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
         status: Order_status.NEW,
@@ -315,6 +325,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region.name')
         .where('order.status = :status', { status: Order_status.NEW })
         .andWhere('order.user_id = :userId', { userId: user.id });
 
@@ -404,7 +415,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id },
         relations: ['items', 'items.product', 'market', 'customer'],
       });
-      console.log(newOrder);
 
       if (!newOrder) {
         throw new NotFoundException('Order not found');
@@ -521,7 +531,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_ids } = ordersArray;
 
-      this.logger.log(`receiveNewOrders: ${order_ids}`, 'Order service');
+      // this.logger.log(`receiveNewOrders: ${order_ids}`, 'Order service');
 
       // 1️⃣ Faqat NEW statusdagi orderlarni olish uchun
       const qb = queryRunner.manager
@@ -604,10 +614,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // Orderni shu postga bog‘lash
         order.status = Order_status.RECEIVED;
         order.post_id = post.id;
-        this.logger.log(
-          `order status updated: ${order.status}`,
-          'Order service',
-        );
+        // this.logger.log(
+        //   `order status updated: ${order.status}`,
+        //   'Order service',
+        // );
 
         // Statistikalarni vaqtincha yangilash
         post.post_total_price =
@@ -643,15 +653,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async receiveWithScaner(id: string) {
+  async receiveWithScaner(id: string, orderDto: OrderDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      if (!orderDto.marketId) {
+        throw new BadRequestException('Market id is required');
+      }
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: {
           qr_code_token: id,
           status: In([Order_status.NEW, Order_status.CANCELLED_SENT]),
+          user_id: orderDto.marketId,
         },
       });
       if (!order) {
@@ -708,12 +722,84 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async allMarketsOrders(user: JwtPayload) {
+  async allMarketsOrders(
+    user: JwtPayload,
+    query: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+      regionId?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
     try {
-      const allMyOrders = await this.orderRepo.find({
-        where: { user_id: user.id },
-      });
-      return successRes(allMyOrders, 200, 'All my orsers');
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        status,
+        fromDate,
+        toDate,
+        regionId,
+      } = query;
+
+      const qb = this.orderRepo
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('customer.district', 'district')
+        .leftJoinAndSelect('district.region', 'region')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .where('order.user_id = :userId', { userId: user.id });
+
+      // 🔍 Search by customer name or order ID
+      if (search) {
+        qb.andWhere(
+          '(LOWER(customer.name) LIKE LOWER(:search) OR CAST(order.id AS TEXT) LIKE :search)',
+          { search: `%${search}%` },
+        );
+      }
+
+      // 🎯 Filter by order status
+      if (status) {
+        qb.andWhere('order.status = :status', { status });
+      }
+
+      // 🌍 Filter by region
+      if (regionId) {
+        qb.andWhere('region.id = :regionId', { regionId });
+      }
+
+      // 📅 Filter by date range
+      if (fromDate && toDate) {
+        qb.andWhere('order.created_at BETWEEN :from AND :to', {
+          from: fromDate,
+          to: toDate,
+        });
+      } else if (fromDate) {
+        qb.andWhere('order.created_at >= :from', { from: fromDate });
+      } else if (toDate) {
+        qb.andWhere('order.created_at <= :to', { to: toDate });
+      }
+
+      // 📄 Pagination
+      qb.skip((page - 1) * limit).take(limit);
+
+      const [data, total] = await qb.getManyAndCount();
+
+      return successRes(
+        {
+          data,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+        200,
+        'All market orders fetched successfully',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -799,34 +885,59 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
+
+    const updateCashbox = async (
+      cashbox: CashEntity,
+      operation: Operation_type,
+      amount: number,
+      sourceId: string,
+      sourceType: Source_type,
+      comment: string,
+      createdBy: string,
+    ) => {
+      // Balansni yangilash
+      cashbox.balance += operation === Operation_type.INCOME ? amount : -amount;
+      await queryRunner.manager.save(cashbox);
+
+      // Tarix yozuvini qo'shish
+      const history = queryRunner.manager.create(CashboxHistoryEntity, {
+        operation_type: operation,
+        cashbox_id: cashbox.id,
+        source_id: sourceId,
+        source_type: sourceType,
+        amount,
+        balance_after: cashbox.balance,
+        comment,
+        created_by: createdBy,
+      });
+      await queryRunner.manager.save(history);
+    };
+
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
       if (!order) throw new NotFoundException('Order not found');
 
-      console.log(sellDto);
-
       const marketId = order.user_id;
-      const market = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: marketId, role: Roles.MARKET },
-      });
-      if (!market) throw new NotFoundException('Market not found');
+      const [market, marketCashbox, courier, courierCashbox] =
+        await Promise.all([
+          queryRunner.manager.findOne(UserEntity, {
+            where: { id: marketId, role: Roles.MARKET },
+          }),
+          queryRunner.manager.findOne(CashEntity, {
+            where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
+          }),
+          queryRunner.manager.findOne(UserEntity, { where: { id: user.id } }),
+          queryRunner.manager.findOne(CashEntity, {
+            where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: user.id },
+          }),
+        ]);
 
-      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
-      });
+      if (!market) throw new NotFoundException('Market not found');
       if (!marketCashbox)
         throw new NotFoundException('Market cashbox not found');
-
-      const courier = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: user.id },
-      });
       if (!courier) throw new NotFoundException('Courier not found');
-
-      const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier.id },
-      });
       if (!courierCashbox)
         throw new NotFoundException('Courier cashbox not found');
 
@@ -840,106 +951,138 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ? courier.tariff_center
           : courier.tariff_home;
 
-      const to_be_paid = Number(order.total_price) - Number(marketTarif);
-
-      const courier_to_be_paid =
-        Number(order.total_price) - Number(courierTarif);
-
       const finalComment = generateComment(
         order.comment || '',
         sellDto.comment || '',
         sellDto.extraCost || 0,
       );
 
+      let to_be_paid = 0;
+      let courier_to_be_paid = 0;
+
+      const price = Number(order.total_price);
+
+      // === CASE 1: 0 so'mlik ===
+      if (price === 0) {
+        await updateCashbox(
+          marketCashbox,
+          Operation_type.EXPENSE,
+          marketTarif,
+          order.id,
+          Source_type.SELL,
+          '0 so‘mlik mahsulot sotuvi',
+          courier.id,
+        );
+        await updateCashbox(
+          courierCashbox,
+          Operation_type.EXPENSE,
+          courierTarif,
+          order.id,
+          Source_type.SELL,
+          '0 so‘mlik mahsulot sotuvi',
+          courier.id,
+        );
+      }
+      // === CASE 2: total_price < courierTarif ===
+      else if (price < courierTarif) {
+        await updateCashbox(
+          marketCashbox,
+          Operation_type.EXPENSE,
+          marketTarif - price,
+          order.id,
+          Source_type.SELL,
+          `${price} so'mlik mahsulot sotuvi`,
+          courier.id,
+        );
+        await updateCashbox(
+          courierCashbox,
+          Operation_type.EXPENSE,
+          courierTarif - price,
+          order.id,
+          Source_type.SELL,
+          `${price} so'mlik mahsulot sotuvi`,
+          courier.id,
+        );
+      }
+      // === CASE 3: total_price < marketTarif ===
+      else if (price < marketTarif) {
+        courier_to_be_paid = price - courierTarif;
+        await updateCashbox(
+          marketCashbox,
+          Operation_type.EXPENSE,
+          marketTarif - price,
+          order.id,
+          Source_type.SELL,
+          `${price} so'mlik mahsulot sotuvi`,
+          courier.id,
+        );
+        await updateCashbox(
+          courierCashbox,
+          Operation_type.INCOME,
+          courier_to_be_paid,
+          order.id,
+          Source_type.SELL,
+          `${price} so'mlik mahsulot sotuvi`,
+          courier.id,
+        );
+      }
+      // === CASE 4: Normal case ===
+      else {
+        to_be_paid = price - marketTarif;
+        courier_to_be_paid = price - courierTarif;
+
+        await updateCashbox(
+          marketCashbox,
+          Operation_type.INCOME,
+          to_be_paid,
+          order.id,
+          Source_type.SELL,
+          finalComment,
+          courier.id,
+        );
+        await updateCashbox(
+          courierCashbox,
+          Operation_type.INCOME,
+          courier_to_be_paid,
+          order.id,
+          Source_type.SELL,
+          finalComment,
+          courier.id,
+        );
+      }
+
+      // === Update order ===
       Object.assign(order, {
         status: Order_status.SOLD,
         to_be_paid,
         comment: finalComment,
         sold_at: Date.now(),
       });
-
       await queryRunner.manager.save(order);
 
-      // ✅ Market cashbox update
-      marketCashbox.balance += to_be_paid;
-      await queryRunner.manager.save(marketCashbox);
-
-      await queryRunner.manager.save(
-        queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.INCOME,
-          cashbox_id: marketCashbox.id,
-          source_id: order.id,
-          source_type: Source_type.SELL,
-          amount: to_be_paid,
-          balance_after: marketCashbox.balance,
-          comment: finalComment,
-          created_by: courier.id,
-        }),
-      );
-
-      // ✅ Courier cashbox update
-      courierCashbox.balance += courier_to_be_paid;
-      await queryRunner.manager.save(courierCashbox);
-
-      await queryRunner.manager.save(
-        queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.INCOME,
-          cashbox_id: courierCashbox.id,
-          source_type: Source_type.SELL,
-          source_id: order.id,
-          amount: courier_to_be_paid,
-          balance_after: courierCashbox.balance,
-          comment: finalComment,
-          created_by: courier.id,
-        }),
-      );
-
-      console.log(sellDto.extraCost, 'AAAAAAAAAAAAAa');
-
+      // === Extra cost (agar bo‘lsa) ===
       if (sellDto.extraCost) {
-        // Market cashboxdan qo'shimcha xarajatni ayiramiz
-        marketCashbox.balance -= Number(sellDto.extraCost);
-        await queryRunner.manager.save(marketCashbox);
-
-        // Market cashboxga history yozamiz
-        const extraCostMarket = queryRunner.manager.create(
-          CashboxHistoryEntity,
-          {
-            operation_type: Operation_type.EXPENSE,
-            cashbox_id: marketCashbox.id,
-            source_id: order.id,
-            source_type: Source_type.EXTRA_COST,
-            amount: sellDto.extraCost,
-            balance_after: marketCashbox.balance,
-            comment: finalComment,
-            created_by: courier.id,
-          },
-        );
-        // Market cashbox uchun historyni saqlaymiz
-        await queryRunner.manager.save(extraCostMarket);
-
-        // ==================================
-
-        // Courier cashboxdan qo'shimcha xarajatni ayiramiz
-        courierCashbox.balance -= Number(sellDto.extraCost);
-        await queryRunner.manager.save(courierCashbox);
-
-        // Courier kassasiga hisyory yozamiz
-        const extraCostCourier = queryRunner.manager.create(
-          CashboxHistoryEntity,
-          {
-            operation_type: Operation_type.EXPENSE,
-            cashbox_id: courierCashbox.id,
-            source_id: order.id,
-            source_type: Source_type.EXTRA_COST,
-            amount: sellDto.extraCost,
-            balance_after: courierCashbox.balance,
-            comment: finalComment,
-            created_by: courier.id,
-          },
-        );
-        // Kurier kassasi uchun tarixni saqlaymiz
-        await queryRunner.manager.save(extraCostCourier);
+        const extra = Number(sellDto.extraCost);
+        await Promise.all([
+          updateCashbox(
+            marketCashbox,
+            Operation_type.EXPENSE,
+            extra,
+            order.id,
+            Source_type.EXTRA_COST,
+            finalComment,
+            courier.id,
+          ),
+          updateCashbox(
+            courierCashbox,
+            Operation_type.EXPENSE,
+            extra,
+            order.id,
+            Source_type.EXTRA_COST,
+            finalComment,
+            courier.id,
+          ),
+        ]);
       }
 
       await queryRunner.commitTransaction();
@@ -982,7 +1125,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         cancelOrderDto.comment,
         cancelOrderDto.extraCost,
       );
-      console.log(cancelOrderDto.extraCost, 'BBBBBBBBBBBBBB');
+      // console.log(cancelOrderDto.extraCost, 'BBBBBBBBBBBBBB');
 
       if (cancelOrderDto.extraCost) {
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
@@ -1093,49 +1236,72 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
+    const updateCashbox = async (
+      cashbox: CashEntity,
+      operation: Operation_type,
+      amount: number,
+      sourceId: string,
+      sourceType: Source_type,
+      comment: string,
+      createdBy: string,
+    ) => {
+      cashbox.balance += operation === Operation_type.INCOME ? amount : -amount;
+      await queryRunner.manager.save(cashbox);
+
+      const history = queryRunner.manager.create(CashboxHistoryEntity, {
+        operation_type: operation,
+        cashbox_id: cashbox.id,
+        source_id: sourceId,
+        source_type: sourceType,
+        amount,
+        balance_after: cashbox.balance,
+        comment,
+        created_by: createdBy,
+      });
+      await queryRunner.manager.save(history);
+    };
+
     try {
       const { order_item_info, totalPrice, extraCost, comment } = partlySoldDto;
 
-      // 🔎 1. Check order (must be WAITING)
+      // 1️⃣ Check order
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id, status: Order_status.WAITING },
       });
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
 
-      // 🔎 2. Get old items
+      // 2️⃣ Load items
       const oldOrderItems = await queryRunner.manager.find(OrderItemEntity, {
         where: { orderId: order.id },
       });
 
-      // 🔎 3. Market + cashbox
-      const market = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: order.user_id, role: Roles.MARKET },
-      });
-      if (!market) throw new NotFoundException('Market not found');
+      // 3️⃣ Get users & cashboxes
+      const [market, marketCashbox, courier, courierCashbox] =
+        await Promise.all([
+          queryRunner.manager.findOne(UserEntity, {
+            where: { id: order.user_id, role: Roles.MARKET },
+          }),
+          queryRunner.manager.findOne(CashEntity, {
+            where: {
+              cashbox_type: Cashbox_type.FOR_MARKET,
+              user_id: order.user_id,
+            },
+          }),
+          queryRunner.manager.findOne(UserEntity, { where: { id: user.id } }),
+          queryRunner.manager.findOne(CashEntity, {
+            where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: user.id },
+          }),
+        ]);
 
-      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: {
-          cashbox_type: Cashbox_type.FOR_MARKET,
-          user_id: order.user_id,
-        },
-      });
+      if (!market) throw new NotFoundException('Market not found');
       if (!marketCashbox)
         throw new NotFoundException('Market cashbox not found');
-
-      // 🔎 4. Courier + cashbox
-      const courier = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: user.id },
-      });
       if (!courier) throw new NotFoundException('Courier not found');
-
-      const courierCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: { cashbox_type: Cashbox_type.FOR_COURIER, user_id: courier.id },
-      });
       if (!courierCashbox)
         throw new NotFoundException('Courier cashbox not found');
 
-      // 🔎 5. Tariffs
+      // 4️⃣ Tariffs
       const marketTarif =
         order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
@@ -1146,123 +1312,201 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ? courier.tariff_center
           : courier.tariff_home;
 
-      // 🔎 6. Calculate payments
-      const to_be_paid: number = extraCost
-        ? totalPrice - extraCost - marketTarif
-        : totalPrice - marketTarif;
+      // 5️⃣ Common vars
+      const price = Number(totalPrice);
+      let to_be_paid = 0;
+      let courier_to_be_paid = 0;
 
-      const courier_to_be_paid: number = extraCost
-        ? totalPrice - extraCost - courierTarif
-        : totalPrice - courierTarif;
+      const finalComment = generateComment(
+        order.comment || '',
+        comment || '',
+        extraCost || 0,
+        ['Buyurtmaning bir qismi sotildi'],
+      );
 
-      // 🔎 7. Calculate sold product quantity
-      const soldProductQuantity = order_item_info.reduce(
-        (acc, item) => acc + item.quantity,
+      // 🧩 Jami sonlar solishtiriladi
+      const totalOldQty = oldOrderItems.reduce((acc, i) => acc + i.quantity, 0);
+      const totalNewQty = order_item_info.reduce(
+        (acc, i) => acc + i.quantity,
         0,
       );
 
-      // 🔎 8. Update old items (reduce quantities)
-      for (const dtoItem of order_item_info) {
-        const foundItem = oldOrderItems.find(
-          (i) => i.productId === dtoItem.product_id,
-        );
-        if (!foundItem) {
-          throw new NotFoundException(
-            `Product not found in order: ${dtoItem.product_id}`,
+      // 6️⃣ Update items (faqat kamaygan holatda)
+      if (totalNewQty < totalOldQty) {
+        for (const oldItem of oldOrderItems) {
+          const dtoItem = order_item_info.find(
+            (i) => i.product_id === oldItem.productId,
           );
+          if (!dtoItem)
+            throw new NotFoundException(
+              `Product not found in request: ${oldItem.productId}`,
+            );
+
+          // faqat kamaygan bo‘lsa ayiramiz
+          if (dtoItem.quantity < oldItem.quantity) {
+            oldItem.quantity = dtoItem.quantity;
+            await queryRunner.manager.save(oldItem);
+          }
         }
-        if (dtoItem.quantity > foundItem.quantity) {
-          throw new BadRequestException(
-            `Product quantity (${dtoItem.quantity}) exceeds original quantity`,
-          );
-        }
-        foundItem.quantity -= dtoItem.quantity;
-        await queryRunner.manager.save(foundItem);
       }
 
-      // 🔎 9. Update original order → SOLD
-      const finalComment = generateComment(order.comment, comment, extraCost, [
-        'Buyurtmaning bir qismi sotildi',
-      ]);
+      // 7️⃣ Cashbox logikasi (o‘zgarmagan)
+      if (price === 0) {
+        await updateCashbox(
+          marketCashbox,
+          Operation_type.EXPENSE,
+          marketTarif,
+          order.id,
+          Source_type.SELL,
+          `0 so‘mlik mahsulot qisman sotuvi`,
+          courier.id,
+        );
+        await updateCashbox(
+          courierCashbox,
+          Operation_type.EXPENSE,
+          courierTarif,
+          order.id,
+          Source_type.SELL,
+          `0 so‘mlik mahsulot qisman sotuvi`,
+          courier.id,
+        );
+      } else if (price < courierTarif) {
+        await updateCashbox(
+          marketCashbox,
+          Operation_type.EXPENSE,
+          marketTarif - price,
+          order.id,
+          Source_type.SELL,
+          `${price} so‘mlik mahsulot qisman sotuvi`,
+          courier.id,
+        );
+        await updateCashbox(
+          courierCashbox,
+          Operation_type.EXPENSE,
+          courierTarif - price,
+          order.id,
+          Source_type.SELL,
+          `${price} so‘mlik mahsulot qisman sotuvi`,
+          courier.id,
+        );
+      } else if (price < marketTarif) {
+        courier_to_be_paid = price - courierTarif;
+        await updateCashbox(
+          marketCashbox,
+          Operation_type.EXPENSE,
+          marketTarif - price,
+          order.id,
+          Source_type.SELL,
+          `${price} so‘mlik mahsulot qisman sotuvi`,
+          courier.id,
+        );
+        await updateCashbox(
+          courierCashbox,
+          Operation_type.INCOME,
+          courier_to_be_paid,
+          order.id,
+          Source_type.SELL,
+          `${price} so‘mlik mahsulot qisman sotuvi`,
+          courier.id,
+        );
+      } else {
+        to_be_paid = price - marketTarif;
+        courier_to_be_paid = price - courierTarif;
 
+        await updateCashbox(
+          marketCashbox,
+          Operation_type.INCOME,
+          to_be_paid,
+          order.id,
+          Source_type.SELL,
+          finalComment,
+          courier.id,
+        );
+        await updateCashbox(
+          courierCashbox,
+          Operation_type.INCOME,
+          courier_to_be_paid,
+          order.id,
+          Source_type.SELL,
+          finalComment,
+          courier.id,
+        );
+      }
+
+      // 8️⃣ Order update
       Object.assign(order, {
         status: Order_status.SOLD,
         to_be_paid,
-        totalPrice,
+        total_price: price,
         comment: finalComment,
-        product_quantity: soldProductQuantity,
+        product_quantity: totalNewQty,
         sold_at: order.sold_at ?? Date.now(),
       });
       await queryRunner.manager.save(order);
 
-      // Market cashbox update
-      marketCashbox.balance += to_be_paid;
-      await queryRunner.manager.save(marketCashbox);
+      // 9️⃣ Extra cost
+      if (extraCost) {
+        const cost = Number(extraCost);
+        await Promise.all([
+          updateCashbox(
+            marketCashbox,
+            Operation_type.EXPENSE,
+            cost,
+            order.id,
+            Source_type.EXTRA_COST,
+            finalComment,
+            courier.id,
+          ),
+          updateCashbox(
+            courierCashbox,
+            Operation_type.EXPENSE,
+            cost,
+            order.id,
+            Source_type.EXTRA_COST,
+            finalComment,
+            courier.id,
+          ),
+        ]);
+      }
 
-      await queryRunner.manager.save(
-        queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.INCOME,
-          cashbox_id: marketCashbox.id,
-          source_id: order.id,
-          source_type: Source_type.SELL,
-          amount: to_be_paid,
-          balance_after: marketCashbox.balance,
-          comment: finalComment,
-          created_by: courier.id,
-        }),
-      );
-
-      // Courier cashbox update
-      courierCashbox.balance += courier_to_be_paid;
-      await queryRunner.manager.save(courierCashbox);
-
-      await queryRunner.manager.save(
-        queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.INCOME,
-          cashbox_id: courierCashbox.id,
-          source_id: order.id,
-          source_type: Source_type.SELL,
-          amount: courier_to_be_paid,
-          balance_after: courierCashbox.balance,
-          comment: finalComment,
-          created_by: courier.id,
-        }),
-      );
-
-      // 🔎 10. Create CANCELLED order for remaining items
-      const remainingItems = oldOrderItems.filter((item) => item.quantity > 0);
-      const remainingQuantity = remainingItems.reduce(
-        (acc, item) => acc + item.quantity,
-        0,
-      );
-
-      const cancelledOrder = queryRunner.manager.create(OrderEntity, {
-        user_id: order.user_id,
-        customer_id: order.customer_id, // ✅ same customer
-        comment: 'Qolgan mahsulotlar bekor qilindi',
-        total_price: 0,
-        to_be_paid: 0,
-        where_deliver: order.where_deliver,
-        status: Order_status.CANCELLED,
-        qr_code_token: generateCustomToken(),
-        parent_order_id: id,
-        product_quantity: remainingQuantity,
-        post_id: order.post_id,
-      });
-      await queryRunner.manager.save(cancelledOrder);
-
-      for (const item of remainingItems) {
-        await queryRunner.manager.save(
-          queryRunner.manager.create(OrderItemEntity, {
-            productId: item.productId,
-            quantity: item.quantity,
-            orderId: cancelledOrder.id,
-          }),
+      // 🔟 Cancel order faqat kamaygan holatda
+      if (totalNewQty < totalOldQty) {
+        const remainingItems = oldOrderItems.filter((i) => i.quantity > 0);
+        const remainingQty = remainingItems.reduce(
+          (acc, i) => acc + i.quantity,
+          0,
         );
+
+        if (remainingItems.length > 0) {
+          const cancelledOrder = queryRunner.manager.create(OrderEntity, {
+            user_id: order.user_id,
+            customer_id: order.customer_id,
+            comment: 'Qolgan mahsulotlar bekor qilindi',
+            total_price: order.total_price - price,
+            to_be_paid: 0,
+            where_deliver: order.where_deliver,
+            status: Order_status.CANCELLED,
+            qr_code_token: generateCustomToken(),
+            parent_order_id: id,
+            product_quantity: remainingQty,
+            post_id: order.post_id,
+          });
+          await queryRunner.manager.save(cancelledOrder);
+
+          for (const item of remainingItems) {
+            await queryRunner.manager.save(
+              queryRunner.manager.create(OrderItemEntity, {
+                productId: item.productId,
+                quantity: item.quantity,
+                orderId: cancelledOrder.id,
+              }),
+            );
+          }
+        }
       }
 
       await queryRunner.commitTransaction();
-      return successRes({ order, cancelledOrder }, 200, 'Order qisman sotildi');
+      return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

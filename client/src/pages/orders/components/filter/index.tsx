@@ -1,6 +1,6 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { statusOptions } from "../../../../shared/static/order";
-import { ArrowRight, Eraser} from "lucide-react";
+import { ArrowRight, Eraser } from "lucide-react";
 import { Button, DatePicker, Select, Space } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { useProfile } from "../../../../shared/api/hooks/useProfile";
@@ -17,13 +17,23 @@ import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import { requestDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { RiFileExcel2Line } from "react-icons/ri";
-
+import CustomCalendar from "../../../../shared/components/customDate";
+import dayjs from "dayjs";
 
 const Filter = () => {
   const { t } = useTranslation("orderList");
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { role } = useSelector((state: RootState) => state.roleSlice);
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const { getMarkets } = useMarket();
   const { data } = getMarkets(role !== "market", { limit: 0 });
@@ -151,21 +161,49 @@ const Filter = () => {
       </div>
 
       <div className="w-full flex flex-wrap gap-4 justify-between items-center pt-5 border-[#F6F7FB] dark:border-[#595572] max-[800px]:flex-col max-[800px]:gap-5">
-        <Space
-          direction="vertical"
-          size={10}
-          className="h-[38px]! max-[800px]:w-full"
-        >
-          <DatePicker.RangePicker
-            format="YYYY-MM-DD"
-            className="w-full h-[38px] 
+        {!isMobile ? (
+          <Space
+            direction="vertical"
+            size={10}
+            className="h-[38px]! max-[800px]:w-full"
+          >
+            <DatePicker.RangePicker
+              format="YYYY-MM-DD"
+              className="w-full h-[38px] 
       dark:bg-[#342d4a]! 
       dark:[&_.ant-picker-input>input]:text-white! 
       dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
-            onChange={handleDateChange}
-            placeholder={[t("placeholder.startDate"), t("placeholder.endDate")]}
-          />
-        </Space>
+              onChange={handleDateChange}
+              placeholder={[
+                t("placeholder.startDate"),
+                t("placeholder.endDate"),
+              ]}
+            />
+          </Space>
+        ) : (
+          <div className="flex flex-col gap-2 w-full">
+            <CustomCalendar
+              from={form.startDate ? dayjs(form.startDate) : null}
+              to={form.endDate ? dayjs(form.endDate) : null}
+              setFrom={(date: any) =>
+                dispatch(
+                  setFilter({
+                    name: "startDate",
+                    value: date ? date.format("YYYY-MM-DD") : "",
+                  })
+                )
+              }
+              setTo={(date: any) =>
+                dispatch(
+                  setFilter({
+                    name: "endDate",
+                    value: date ? date.format("YYYY-MM-DD") : "",
+                  })
+                )
+              }
+            />
+          </div>
+        )}
 
         <div className="flex items-center gap-5 flex-wrap max-[800px]:w-full">
           <Button

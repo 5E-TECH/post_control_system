@@ -37,16 +37,16 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2 sm:p-4 md:p-6"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#1e1b2f] w-[45%] max-h-[90%] rounded-2xl shadow-2xl p-6 transform transition-all scale-100 animate-fade-in overflow-y-auto border border-gray-200 dark:border-gray-700 relative"
+        className="bg-white dark:bg-[#1e1b2f] w-full sm:w-[90%] md:w-[70%] lg:w-[50%] xl:w-[45%] max-h-[90%] rounded-2xl shadow-2xl p-4 sm:p-6 transform transition-all scale-100 animate-fade-in overflow-y-auto border border-gray-200 dark:border-gray-700 relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex justify-center items-center border-b border-gray-300 dark:border-gray-600 pb-3 relative">
-          <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2 text-center">
             <FileText className="w-6 h-6" />
             {t("to'lovTarixi")}
           </h2>
@@ -80,14 +80,14 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
           /* === MAIN CONTENT === */
           <div className="mt-5 space-y-6 capitalize">
             {/* Umumiy ma’lumot */}
-            <div className="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-900 shadow-md">
-              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
+            <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-800 dark:to-gray-900 shadow-md">
+              <h3 className="font-semibold text-lg sm:text-xl mb-3 flex items-center gap-2 text-blue-600 dark:text-blue-400">
                 <Info className="w-5 h-5" />
                 {t("umumiyMa'lumot")}
               </h3>
 
               <div className="space-y-2 text-sm sm:text-base">
-                <p className="flex justify-between">
+                <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('operationType')}:</span>
                   <span
                     className={`flex items-center gap-1 font-semibold ${
@@ -103,7 +103,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                   </span>
                 </p>
 
-                <p className="flex justify-between">
+                <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('sourceType')}:</span>
                   <span className="flex items-center gap-1">
                     <CreditCard size={16} />
@@ -111,7 +111,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                   </span>
                 </p>
 
-                <p className="flex justify-between">
+                <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('amount')}:</span>
                   <span
                     className={`font-semibold flex items-center gap-1 ${
@@ -123,7 +123,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                   </span>
                 </p>
 
-                <p className="flex justify-between">
+                <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('afterBalance')}:</span>
                   <span className="text-indigo-600 font-semibold">
                     {info?.balance_after?.toLocaleString()}
@@ -131,15 +131,15 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                 </p>
 
                 {info?.comment && (
-                  <p className="flex justify-between">
+                  <p className="flex justify-between flex-wrap">
                     <span className="font-medium">{t('comment')}:</span>
-                    <span className="italic text-gray-600 dark:text-gray-300">
+                    <span className="italic text-gray-600 dark:text-gray-300 break-all text-right">
                       {info?.comment}
                     </span>
                   </p>
                 )}
 
-                <p className="flex justify-between">
+                <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('paymentDate')}:</span>
                   <span className="flex items-center gap-1">
                     <Calendar size={16} />
@@ -150,17 +150,17 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
             </div>
 
             {/* Foydalanuvchi */}
-            <div className="p-4 rounded-xl bg-gradient-to-br from-orange-50 to-yellow-100 dark:from-gray-800 dark:to-gray-900 shadow-md">
-              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 text-orange-600 dark:text-orange-400">
+            <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-orange-50 to-yellow-100 dark:from-gray-800 dark:to-gray-900 shadow-md">
+              <h3 className="font-semibold text-lg sm:text-xl mb-3 flex items-center gap-2 text-orange-600 dark:text-orange-400">
                 <UserCheck className="w-5 h-5" />
                 {t('foydalanuvchi')}
               </h3>
               <div className="space-y-2 text-sm sm:text-base">
-                <p className="flex justify-between">
+                <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('ism')}:</span>
                   <span>{info?.createdByUser?.name}</span>
                 </p>
-                <p className="flex justify-between">
+                <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('phone')}:</span>
                   <span className="flex items-center gap-1">
                     <Phone size={16} />
@@ -170,7 +170,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                     )}
                   </span>
                 </p>
-                <p className="flex justify-between">
+                <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('rol')}:</span>
                   <span className="capitalize">
                     {info?.createdByUser?.role}
@@ -185,51 +185,46 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                 onClick={() =>
                   navigate(`/orders/order-detail/${info?.order?.id}`)
                 }
-                className="p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-800 dark:to-gray-900 shadow-md cursor-pointer hover:scale-[1.02] transition-transform"
+                className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-800 dark:to-gray-900 shadow-md cursor-pointer hover:scale-[1.02] transition-transform"
               >
-                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2 text-green-600 dark:text-green-400">
+                <h3 className="font-semibold text-lg sm:text-xl mb-3 flex items-center gap-2 text-green-600 dark:text-green-400">
                   <ShoppingCart className="w-5 h-5" />
                   {t('buyurtma')}
                 </h3>
                 <div className="space-y-2 text-sm sm:text-base">
-                  <p className="flex justify-between">
+                  <p className="flex justify-between flex-wrap">
                     <span className="font-medium">{t('Tuman')}:</span>
                     <span>{info?.order?.customer?.district?.name}</span>
                   </p>
 
-                  <p className="flex justify-between">
+                  <p className="flex justify-between flex-wrap">
                     <span className="font-medium">{t('Telefon nomer')}:</span>
                     <span>{info?.order?.customer?.phone_number}</span>
                   </p>
 
-                  <p className="flex justify-between">
+                  <p className="flex justify-between flex-wrap">
                     <span className="font-medium">{t('umumiyNarx')}:</span>
                     <span>{info?.order?.total_price}</span>
                   </p>
 
-                  {/* Faqat courier bo‘lmaganda ko‘rsatiladi */}
                   {user?.role !== 'courier' && (
-                    <p className="flex justify-between">
-                      <span className="font-medium">
-                        {t("to'lanishiKerak")}:
-                      </span>
-                      <span>{info?.order?.to_be_paid}</span>
-                    </p>
+                    <>
+                      <p className="flex justify-between flex-wrap">
+                        <span className="font-medium">
+                          {t("to'lanishiKerak")}:
+                        </span>
+                        <span>{info?.order?.to_be_paid}</span>
+                      </p>
+                      <p className="flex justify-between flex-wrap">
+                        <span className="font-medium">{t("to'langan")}:</span>
+                        <span className="text-green-700 font-semibold">
+                          {info?.order?.paid_amount}
+                        </span>
+                      </p>
+                    </>
                   )}
 
-
-
-                  {/* Faqat courier bo‘lmaganda ko‘rsatiladi */}
-                  {user?.role !== 'courier' && (
-                    <p className="flex justify-between">
-                      <span className="font-medium">{t("to'langan")}:</span>
-                      <span className="text-green-700 font-semibold">
-                        {info?.order?.paid_amount}
-                      </span>
-                    </p>
-                  )}
-
-                  <p className="flex justify-between items-center">
+                  <p className="flex justify-between items-center flex-wrap">
                     <span className="font-medium">{t('status')}:</span>
                     <span
                       className={`px-2 py-0.5 rounded text-white font-medium ${

@@ -1,23 +1,20 @@
 import { memo, useEffect, useState } from "react";
-import {
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import SearchInput from "../../../../users/components/search-input";
-import { Trash } from "lucide-react";
 import { Button } from "antd";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import { useTranslation } from "react-i18next";
 
 const CourierMailDetail = () => {
-const regionName = useSelector((state: RootState) => state.region);
+  const { t } = useTranslation("mails");
+
+  const regionName = useSelector((state: RootState) => state.region);
 
   const { id } = useParams();
-  console.log("2222222222222222",regionName);
-  
+
   // const { state } = useLocation();
   // const regionName = state.regionName;
 
@@ -73,17 +70,26 @@ const regionName = useSelector((state: RootState) => state.region);
     }
   }, [postData]);
 
-  const hideSend = regionName.hideSend;  
+  const hideSend = regionName.hideSend;
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(
+      (prev) =>
+        prev.includes(id)
+          ? prev.filter((item) => item !== id) // agar bor bo‘lsa — olib tashla
+          : [...prev, id] // yo‘q bo‘lsa — qo‘sh
+    );
+  };
 
   return (
     <div className="flex flex-col gap-5 p-5 h-[800px]">
       <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
         <div className="flex justify-between px-5 pt-5 max-[650px]:flex-col">
           <h1 className="text-2xl mt-1 max-[650px]:mb-5 ">
-            <span>{regionName.regionName}</span> buyurtmalari
+            <span>{regionName.regionName}{" "}</span>
+            {t("buyurtmalari")}
           </h1>
-          <SearchInput placeholder="Qidiruv..." />
+          <SearchInput placeholder={`${t("qidiruv")}...`} />
         </div>
 
         <div className="mt-5">
@@ -110,65 +116,59 @@ const regionName = useSelector((state: RootState) => state.region);
                 ) : null}
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    MIJOZ ISMIiiiiii
+                    {t("mijozIsmi")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    TELEFON RAQAMI
+                    {t("telefonRaqami")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    TUMANI
+                    {t("tumani")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    PUL MIQDORI
+                    {t("pulMiqdori")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    DONA
+                    {t("delivery")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
-                {!hideSend ? (
-                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                      HARAKATLAR
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
-                ) : null}
+
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    {t("time")}
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
               {postData?.map((order: any) => (
-                <tr key={order?.id}>
+                <tr
+                  key={order?.id}
+                  onClick={() => toggleSelect(order.id)}
+                  className="select-none"
+                >
                   {!hideSend ? (
                     <td className="p-[20px] flex items-center">
                       {" "}
                       <input
                         type="checkbox"
                         className="w-[18px] h-[18px] rounded-sm"
-                        checked={
-                          order?.id ? selectedIds.includes(order.id) : false
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedIds([...selectedIds, order.id]);
-                          } else {
-                            setSelectedIds(
-                              selectedIds.filter((id) => id !== order.id)
-                            );
-                          }
-                        }}
+                        onClick={(e) => e.stopPropagation()} // table row click bilan to‘qnashmasin
+                        checked={selectedIds.includes(order.id)}
+                        onChange={() => toggleSelect(order.id)}
                       />
                     </td>
                   ) : null}
@@ -189,16 +189,13 @@ const regionName = useSelector((state: RootState) => state.region);
                     {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}
                   </td>
                   <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {order?.items?.length}
+                    {t(`${order?.where_deliver}`)}
                   </td>
-
-                  {!hideSend ? (
-                    <td className="w-[254px] h-[56px] pl-[19px] text-left">
-                      <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
-                        <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
-                      </div>
-                    </td>
-                  ) : null}
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {new Date(Number(order?.created_at)).toLocaleDateString(
+                      "uz-UZ"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

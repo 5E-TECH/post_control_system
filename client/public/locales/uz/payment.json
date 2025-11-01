@@ -56,6 +56,13 @@
     "status": "Holat",
     "main":"asosiy",
     "paymentType":"to'lov turi",
+    "today":"Bugungi o'tkazmalar",
+    "day":"kungi o'tkazmalar",
+    "start":"Boshlanish sanasi",
+    "end":"Tugash sanasi",
+    "gacha":"gacha",
+    "o'tkazmalar":"o'tkazmalar",
+    "dan":"dan ,",
     "sourceTypes":{
         "courier_payment": "Kuryer to'lovi",
         "market_payment": "Market to'lovi",

@@ -47,7 +47,7 @@ const TodayMails = () => {
   }
 
   return (
-    <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10">
+    <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-10">
       {posts?.length ? (
         posts?.map((post: any) => (
           <div

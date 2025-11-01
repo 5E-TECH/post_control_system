@@ -25,12 +25,11 @@ const TodayOrders = () => {
 
   const { pathname } = useLocation();
   const role = useSelector((state: RootState) => state.roleSlice);
-
   useEffect(() => {
     if (role.role === "market") {
       navigate(`${role.id}`);
     }
-  }, []);
+  }, [pathname]);
 
   const handleProps = (id: string) => {
     navigate(`${id}`);
@@ -55,12 +54,12 @@ const TodayOrders = () => {
   return (
     <section className="flex items-center justify-center bg-white flex-col m-5 rounded-md dark:bg-[#312d48]">
       {/* {!isLoading && markets?.length > 0 && ( */}
-      <div className="flex justify-between w-full items-center p-10">
+      <div className="flex justify-between w-full items-center p-10 max-[650px]:flex-col ">
         <h2 className="text-[20px] font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5]">
           {t("title")}
         </h2>
         <form action="">
-          <div className="border border-[#d1cfd4] rounded-md">
+          <div className="border border-[#d1cfd4] rounded-md max-[650px]:mt-3">
             <input
               onChange={(e) => debouncedSearch(e.target.value)}
               className="outline-none px-4 py-3"

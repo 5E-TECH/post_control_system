@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { Check, Trash } from "lucide-react";
+import { Check } from "lucide-react";
 import {
   useLocation,
   useNavigate,
@@ -12,24 +12,31 @@ import SearchInput from "../../../../users/components/search-input";
 import Popup from "../../../../../shared/ui/Popup";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
+import { exportCardsToExcel } from "../../../../../shared/helpers/export-download-excel-with-qr-code";
+import { usePostScanner } from "../../../../../shared/components/post-scanner";
 
 const MailDetail = () => {
+  const dispatch = useDispatch();
   const { t } = useTranslation("mails");
 
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
-  const search = useSelector((state: RootState) => state.resetUserFilter.search);
-  console.log(search);
-  
+  const search = useSelector(
+    (state: RootState) => state.resetUserFilter.search
+  );
 
   const { getPostById, sendAndGetCouriersByPostId, sendPost } = usePost();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
   const { mutate: sendCouriersToPost, isPending } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
+
+  usePostScanner(undefined, setSelectedIds);
+
   // Dynamic fetching based on status
   const [params] = useSearchParams();
   const status = params.get("status");
@@ -53,7 +60,7 @@ const MailDetail = () => {
 
   useEffect(() => {
     if (postData && !initialized) {
-      setSelectedIds(postData.map((item: any) => item.id));
+      setSelectedIds([]);
       setInitialized(true);
     }
   }, [postData, initialized]);
@@ -85,9 +92,41 @@ const MailDetail = () => {
           sendCouriersToPost(
             { id, data: post },
             {
-              onSuccess: (res) => {
-                const courierName = res?.data?.courier?.name;
+              onSuccess: async (res) => {
+                console.log("res.data", res.data);
+
+                const courierName = res?.data?.updatedPost?.courier?.name;
                 handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
+
+                try {
+                  const mails = res?.data?.newOrders;
+                  console.log("mails", mails);
+
+                  const exportData = mails?.map((mail: any, inx: number) => ({
+                    id: inx + 1,
+                    manzil: mail?.customer?.district?.name || "",
+                    mijoz: mail?.customer?.name || "",
+                    telefon: mail?.customer?.phone_number || "",
+                    market: mail?.market?.name || "",
+                    summa: Number((mail?.total_price ?? 0) / 1000),
+                    izoh: mail?.comment || "",
+                    qrCode: mail?.qr_code_token || ""
+                  }));
+
+                  await exportCardsToExcel(
+                    exportData || [],
+                    "pochtalar"
+                  );
+
+                  handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+                } catch (error) {
+                  console.log(error);
+
+                  handleApiError(error, "Excel yuklashda xatolik");
+                } finally {
+                  dispatch(resetDownload());
+                }
+
                 navigate("/mails");
               },
               onError: (err: any) =>
@@ -124,14 +163,52 @@ const MailDetail = () => {
     sendCouriersToPost(
       { id: id as string, data: post },
       {
-        onSuccess: (res) => {
-          const courierName = res?.data?.courier?.name;
+        onSuccess: async (res) => {
+          console.log("tasdiqlash", res);
+
+          const courierName = res?.data?.updatedPost?.courier?.name;
           handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
+
+          try {
+            const mails = res?.data?.newOrders;
+            console.log("mails", mails);
+
+            const exportData = mails?.map((mail: any, inx: number) => ({
+              N: inx + 1,
+              Tuman: mail?.customer?.district?.name,
+              Firma: mail?.market?.name,
+              "Telefon raqam": mail?.customer?.phone_number,
+              Narxi: Number((mail?.total_price ?? 0) / 1000),
+              Holati: '',
+              "QR code": mail?.qr_code_token
+            }));
+
+            await exportCardsToExcel(
+              exportData || [],
+              "pochtalar"
+            );
+
+            handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+          } catch (error) {
+            handleApiError(error, "Excel yuklashda xatolik");
+          } finally {
+            dispatch(resetDownload());
+          }
+
           navigate("/mails");
         },
         onError: (err: any) =>
           handleApiError(err, "Kuryerlarga jo'natishda xatolik yuz berdi."),
       }
+    );
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(
+      (prev) =>
+        prev.includes(id)
+          ? prev.filter((item) => item !== id) // agar bor bo‘lsa — olib tashla
+          : [...prev, id] // yo‘q bo‘lsa — qo‘sh
     );
   };
 
@@ -233,41 +310,34 @@ const MailDetail = () => {
                 </th>
                 <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
                   <div className="flex items-center justify-between pr-[21px]">
-                    {t("dona")}
+                    {t("delivery")}
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
-                {!hideSend ? (
-                  <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                    <div className="flex items-center justify-between pr-[21px]">
-                    {t("harakatlar")}
-                      <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                    </div>
-                  </th>
-                ) : null}
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    {t("time")}
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
               {postData?.map((order: any) => (
-                <tr key={order?.id}>
+                <tr
+                  key={order?.id}
+                  onClick={() => toggleSelect(order.id)}
+                  className="select-none"
+                >
                   {!hideSend ? (
                     <td className="p-[20px] flex items-center">
                       {" "}
                       <input
                         type="checkbox"
                         className="w-[18px] h-[18px] rounded-sm"
-                        checked={
-                          order?.id ? selectedIds.includes(order.id) : false
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedIds([...selectedIds, order.id]);
-                          } else {
-                            setSelectedIds(
-                              selectedIds.filter((id) => id !== order.id)
-                            );
-                          }
-                        }}
+                        onClick={(e) => e.stopPropagation()} // table row click bilan to‘qnashmasin
+                        checked={selectedIds.includes(order.id)}
+                        onChange={() => toggleSelect(order.id)}
                       />
                     </td>
                   ) : null}
@@ -291,16 +361,13 @@ const MailDetail = () => {
                     {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}
                   </td>
                   <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {order?.items?.length}
+                    {t(`${order?.where_deliver}`)}
                   </td>
-
-                  {!hideSend ? (
-                    <td className="w-[254px] h-[56px] pl-[19px] text-left">
-                      <div className="flex gap-2.5 items-center text-[#2E263DB2] dark:text-[#B1ADC7]">
-                        <Trash className="w-[18px] h-[18px] cursor-pointer hover:opacity-80" />
-                      </div>
-                    </td>
-                  ) : null}
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    {new Date(Number(order?.created_at)).toLocaleDateString(
+                      "uz-UZ"
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -316,7 +383,7 @@ const MailDetail = () => {
             onClick={() => handleClick(id as string)}
             className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
           >
-           {t("pochtanijonatish")}
+            {t("pochtanijonatish")}
           </Button>
         </div>
       ) : null}
@@ -342,11 +409,10 @@ const MailDetail = () => {
                   </div>
 
                   <Button
-                    className={`${
-                      selectedCourierId === courier?.id
-                        ? "bg-[var(--color-bg-sy)]! text-white!"
-                        : ""
-                    }`}
+                    className={`${selectedCourierId === courier?.id
+                      ? "bg-[var(--color-bg-sy)]! text-white!"
+                      : ""
+                      }`}
                     onClick={() => handleSelectedCourier(courier?.id)}
                   >
                     {selectedCourierId === courier?.id ? (

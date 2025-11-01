@@ -70,7 +70,7 @@ const Dashboard: React.FC = () => {
   const chartMax = maxValue * 1.2;
 
   return (
-    <div className="w-full p-8  max-h-[100vh]">
+    <div className="w-full p-4 sm:p-6 md:p-8 overflow-x-hidden">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left side */}
         <div className="space-y-6">
@@ -181,8 +181,8 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Right side */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="p-6 rounded-2xl shadow-lg dark:bg-[#312D48]">
+        <div className="lg:col-span-2">
+          <div className="rounded-2xl shadow-lg dark:bg-[#312D48]">
             <h3 className="text-xl font-bold text-gray-800 mb-6 dark:text-white">
               {t("title")}
             </h3>
@@ -235,11 +235,10 @@ const Dashboard: React.FC = () => {
                         <tr>
                           <td className="p-3 font-bold">{t("total")}</td>
                           <td
-                            className={`p-3 text-right font-bold ${
-                              totalMarket >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }`}
+                            className="p-3 text-right font-bold"
+                            style={{
+                              color: totalMarket >= 0 ? "#22c55e" : "#ef4444", // Tailwind green-500 va red-500 ranglari
+                            }}
                           >
                             {Number(totalMarket).toLocaleString()} UZS
                           </td>
@@ -300,11 +299,10 @@ const Dashboard: React.FC = () => {
                         <tr>
                           <td className="p-3 font-bold">{t("total")}</td>
                           <td
-                            className={`p-3 text-right font-bold ${
-                              totalCourier >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }`}
+                            className="p-3 text-right font-bold"
+                            style={{
+                              color: totalCourier >= 0 ? "#22c55e" : "#ef4444", // Tailwind green-500 va red-500 ranglari
+                            }}
                           >
                             {Number(totalCourier).toLocaleString()} UZS
                           </td>

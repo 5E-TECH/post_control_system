@@ -27,7 +27,7 @@ export type FieldType = {
 
 const WaitingOrders = () => {
   const { t } = useTranslation("orderList");
-  const { t:st } = useTranslation("status");
+  const { t: st } = useTranslation("status");
 
   const navigate = useNavigate();
   const order = useRef<any | null>(null);
@@ -191,6 +191,8 @@ const WaitingOrders = () => {
     }
   }, [isShow]);
 
+  console.log(order.current);
+
   const getIsPending = () => {
     if (urlType.current === "sell") {
       return partleSoldShow ? partlySellOrder.isPending : sellOrder.isPending;
@@ -199,63 +201,114 @@ const WaitingOrders = () => {
     }
   };
 
+  useEffect(() => {
+    if (isShow && order?.current) {
+      const initialItems = order?.current?.items?.map((item: any) => ({
+        product_id: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity, // hozirgi son
+        maxQuantity: item.quantity, // serverdan kelgan quantity – limit sifatida
+      }));
+      setOrderItemInfo(initialItems || []);
+    }
+  }, [isShow, order]);
+
+  const handleMinus = (index: number) => {
+    setOrderItemInfo((prev) => {
+      // Hozirgi umumiy miqdorni hisoblaymiz
+      const totalQuantity = prev.reduce((sum, item) => sum + item.quantity, 0);
+
+      // Agar umumiy son 1 dan katta bo‘lsa, kamaytirishga ruxsat beramiz
+      if (totalQuantity > 1) {
+        return prev.map((item, i) => {
+          if (i === index && item.quantity > 0) {
+            // kamaytirgandan keyin umumiy son 0 bo‘lmasligini tekshiramiz
+            const newTotal = totalQuantity - 1;
+            if (newTotal >= 1) {
+              return { ...item, quantity: item.quantity - 1 };
+            }
+          }
+          return item;
+        });
+      }
+
+      // agar umumiy son 1 bo‘lsa, hech narsa o‘zgartirmaymiz
+      return prev;
+    });
+  };
+
+  const handlePlus = (index: number) => {
+    setOrderItemInfo((prev) =>
+      prev.map((item, i) => {
+        const currentData = order.current?.items?.[i];
+        const max = currentData?.quantity ?? item.maxQuantity ?? Infinity;
+
+        if (i === index && item.quantity < max) {
+          return { ...item, quantity: item.quantity + 1 };
+        }
+        return item;
+      })
+    );
+  };
+
   return data?.data?.data?.length > 0 ? (
     <div>
-      <table className="w-full">
-        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
-          <tr>
-            <th>#</th>
-            <th>{t("mijoz")}</th>
-            <th>{t("phone")}</th>
-            <th>{t("detail.address")}</th>
-            <th>{t("market")}</th>
-            <th>{t("status")}</th>
-            <th>{t("price")}</th>
-            <th>{t("stock")}</th>
-            <th>{t("harakat")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.data?.data?.map((item: any, inx: number) => (
-            <tr
-              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
-              key={item?.id}
-              className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
+<table className="w-full">
+  <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
+    <tr>
+      <th>#</th>
+      <th>{t("mijoz")}</th>
+      <th>{t("phone")}</th>
+      <th>{t("detail.address")}</th>
+      <th>{t("market")}</th>
+      <th>{t("status")}</th>
+      <th>{t("price")}</th>
+      <th>{t("stock")}</th>
+      <th>{t("harakat")}</th>
+    </tr>
+  </thead>
+  <tbody>
+    {data?.data?.data?.map((item: any, inx: number) => (
+      <tr
+        onClick={() => navigate(`/orders/order-detail/${item.id}`)}
+        key={item?.id}
+        className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
+      >
+        <td data-cell="#" className="pl-10">{inx + 1}</td>
+        <td data-cell={t("mijoz")} className="pl-10">{item?.customer?.name}</td>
+        <td data-cell={t("phone")} className="pl-10">{item?.customer?.phone_number}</td>
+        <td data-cell={t("detail.address")} className="pl-10">{item?.customer?.district?.name}</td>
+        <td data-cell={t("market")} className="pl-10">{item?.market?.name}</td>
+        <td data-cell={t("status")} className="pl-10">
+          <span className="py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500">
+            {st(`${item.status}`)}
+          </span>
+        </td>
+        <td data-cell={t("price")} className="pl-10">
+          {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+        </td>
+        <td data-cell={t("stock")} className="pl-15">{item?.items.length}</td>
+        <td data-cell={t("harakat")}>
+          <div className="flex gap-3">
+            <Button
+              onClick={(e) => handleSellOrder(e, item)}
+              className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none!"
             >
-              <td className="pl-10">{inx + 1}</td>
-              <td className="pl-10">{item?.customer?.name}</td>
-              <td className="pl-10">{item?.customer?.phone_number}</td>
-              <td className="pl-10">{item?.customer?.district?.name}</td>
-              <td className="pl-10">{item?.market?.name}</td>
-              <td className="pl-10">
-                <span className="py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500">
-                  {st(`${item.status}`)}
-                </span>
-              </td>
-              <td className="pl-10">
-                {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
-              </td>
-              <td className="pl-15">{item?.items.length}</td>
-              <td>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={(e) => handleSellOrder(e, item)}
-                    className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none!"
-                  >
-                    {t("sotish")}
-                  </Button>
-                  <Button
-                    onClick={(e) => handleCancelOrder(e, item)}
-                    className="bg-red-500! text-[#ffffff]! border-none!"
-                  >
-                    {t("detail.cancel")}
-                  </Button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              {t("sotish")}
+            </Button>
+            <Button
+              onClick={(e) => handleCancelOrder(e, item)}
+              className="bg-red-500! text-[#ffffff]! border-none!"
+            >
+              {t("detail.cancel")}
+            </Button>
+          </div>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
 
       <div className="flex justify-center pt-5 pb-5">
         <Pagination
@@ -268,7 +321,7 @@ const WaitingOrders = () => {
       </div>
 
       <Popup isShow={isShow} onClose={closePopup}>
-        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8">
+        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8 dark:bg-[#312D4B] max-md:w-[350px] max-h-[90vh] overflow-hidden overflow-y-auto">
           <X
             className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
             onClick={closePopup}
@@ -288,9 +341,27 @@ const WaitingOrders = () => {
               {order.current?.customer?.name || "—"}
             </p>
             <p>
-              <span className="font-semibold">Tel raqam:</span>{" "}
+              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
               {order.current?.customer?.phone_number || "—"}
             </p>
+            <p>
+              <span className="font-semibold">Tuman:</span>{" "}
+              {order.current?.customer?.district?.name || "—"}
+            </p>
+            <p>
+              <span className="font-semibold">Mahsulotlar nomi:</span>{" "}
+              {order.current?.items
+                ?.map((item: any) => item.product?.name)
+                .join(", ") || "—"}
+            </p>
+            <p>
+              <span className="font-semibold">Mahsulotlar soni:</span>{" "}
+              {order.current?.items?.reduce(
+                (sum: any, item: any) => sum + (item.quantity || 0),
+                0
+              ) || "—"}
+            </p>
+
             <p>
               <span className="font-semibold">Umumiy summa:</span>{" "}
               {order.current?.total_price
@@ -302,41 +373,53 @@ const WaitingOrders = () => {
 
           {partleSoldShow && (
             <div className="flex flex-col">
-              {orderItemInfo.map((item, index) => (
-                <div
-                  key={item.product_id}
-                  className="pt-4 flex gap-10 justify-between"
-                >
-                  <Form.Item className="flex-1!">
-                    <Select
-                      className="!h-[40px]"
-                      value={item.product_id}
-                      disabled
-                      options={[{ label: item.name, value: item.product_id }]}
-                    />
-                  </Form.Item>
-                  <div className="flex gap-2 items-center mb-6 select-none">
-                    <Plus
-                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                      onClick={() => {
-                        const updated = [...orderItemInfo];
-                        updated[index].quantity += 1;
-                        setOrderItemInfo(updated);
-                      }}
-                    />
-                    <span className="text-[20px]">{item.quantity}</span>
-                    <Minus
-                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                      onClick={() => {
-                        const updated = [...orderItemInfo];
-                        if (updated[index].quantity > 0)
-                          updated[index].quantity -= 1;
-                        setOrderItemInfo(updated);
-                      }}
-                    />
+              <div
+                className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
+                  orderItemInfo.length > 2
+                    ? "max-h-49 overflow-y-auto"
+                    : "overflow-visible"
+                }`}
+              >
+                {orderItemInfo.map((item, index) => (
+                  <div
+                    key={item.product_id}
+                    className="pt-4 flex gap-10 justify-between"
+                  >
+                    <Form.Item className="flex-1!">
+                      <Select
+                        className="!h-[40px]"
+                        value={item.product_id}
+                        disabled
+                        options={[{ label: item.name, value: item.product_id }]}
+                      />
+                    </Form.Item>
+                    <div className="flex gap-2 items-center mb-6 select-none">
+                      <Minus
+                        className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                          item.quantity <= 0 ||
+                          orderItemInfo.reduce(
+                            (sum, i) => sum + i.quantity,
+                            0
+                          ) <= 1
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
+                        }`}
+                        onClick={() => handleMinus(index)}
+                      />
+
+                      <span className="text-[20px]">{item.quantity}</span>
+                      <Plus
+                        className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                          item.quantity >= (item.maxQuantity ?? Infinity)
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
+                        }`}
+                        onClick={() => handlePlus(index)}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
 
               <Form.Item>
                 <Input
@@ -359,13 +442,13 @@ const WaitingOrders = () => {
             <div>
               <Form.Item
                 name="extraCost"
-                className="py-4!"
+                className="dark:[&_.ant-form-item-label>label]:text-[#E7E3FC]! py-4!"
                 label="Qo'shimcha (pul)"
               >
                 {/* <span>Qo'shimcha (pul)</span> */}
                 <InputNumber
                   placeholder="Qo'shimcha pul"
-                  className="h-[40px]! w-full!"
+                  className="!border !border-gray-500 h-[40px]! w-full!"
                   formatter={(v) =>
                     v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
                   }
@@ -375,10 +458,18 @@ const WaitingOrders = () => {
             </div>
 
             <div className={`pt-${partleSoldShow ? 0 : 3}`}>
-              <Form.Item name="comment" label="Izoh">
+              <Form.Item
+                name="comment"
+                label="Izoh"
+                className="dark:[&_.ant-form-item-label>label]:text-[#E7E3FC]! py-4!"
+              >
                 {/* <span>Izoh</span> */}
                 <Input.TextArea
-                  className="py-4!"
+                  className="py-4!
+      dark:bg-[#312D4B]! 
+      dark:border-[#E7E3FC38]! 
+      dark:placeholder:text-[#A9A5C0]! 
+      dark:text-[#E7E3FC]!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"
                   style={{ resize: "none" }}
                 />

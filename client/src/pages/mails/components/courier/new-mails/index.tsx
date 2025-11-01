@@ -8,6 +8,7 @@ import {
   setHideSend,
   setRegionName,
 } from "../../../../../shared/lib/features/regionSlice";
+import { useTranslation } from "react-i18next";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -23,6 +24,8 @@ const borderColorsByStatus = {
 };
 
 const CourierNewMails = () => {
+  const { t } = useTranslation("mails");
+
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -65,7 +68,7 @@ const CourierNewMails = () => {
             </h1>
 
             <p className="text-[22px]">
-              <span>{post?.order_quantity}</span> ta buyurtmalar
+              <span>{post?.order_quantity}</span> {t("orders")}
             </p>
             <p className="text-[22px] font-bold">
               <span>

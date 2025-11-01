@@ -12,6 +12,7 @@ import Select from '../orders/components/select/select';
 import { useProfile } from '../../shared/api/hooks/useProfile';
 import { togglePermission } from '../../shared/lib/features/add-order-permission';
 import { useTranslation } from 'react-i18next';
+import { setPage } from '../../shared/lib/features/paginationProductSlice';
 
 const Products = () => {
   const { t } = useTranslation('product');
@@ -22,10 +23,17 @@ const Products = () => {
   const [searchByMarket, setSearchByMarket] = useState<any>(undefined);
   const dispatch = useDispatch();
 
-  const { id, role } = useSelector((state: RootState) => state.roleSlice);
   const { page, limit } = useSelector(
     (state: RootState) => state.paginationSlice,
   );
+  useEffect(() => {
+    return () => {
+      dispatch(togglePermission(false));
+      dispatch(setPage(1));
+    };
+  }, [dispatch]);
+  const { id, role } = useSelector((state: RootState) => state.roleSlice);
+
   const permission = useSelector(
     (state: RootState) => state.togglePermission.value,
   );
@@ -92,7 +100,7 @@ const Products = () => {
   const { pathname } = useLocation();
 
   const marketOptions = data?.data?.data?.map((item: any) => (
-    <option key={item.id} value={item.id}>
+    <option key={item.id} value={item.id} className="dark:bg-[#312d48]">
       {item.name}
     </option>
   ));
@@ -108,17 +116,19 @@ const Products = () => {
       <div className="flex flex-col px-4">
         <div className="flex justify-between max-[1100px]:flex-col max-[1100px]:gap-4">
           <div className="">
-            <Select
-              name="market"
-              value={searchByMarket}
-              onChange={(e) => {
-                setSearchByMarket(e.target.value);
-              }}
-              placeholder={t('placeholder.selectMarket')}
-              className="min-[1100px]:w-[250px] max-[1100px]:w-[250px] max-[800px]:w-full"
-            >
-              {marketOptions}
-            </Select>
+            {role !== 'market' && (
+              <Select
+                name="market"
+                value={searchByMarket}
+                onChange={(e) => {
+                  setSearchByMarket(e.target.value);
+                }}
+                placeholder={t('placeholder.selectMarket')}
+                className="min-[1100px]:w-[250px] max-[1100px]:w-[250px] max-[800px]:w-full"
+              >
+                {marketOptions}
+              </Select>
+            )}
           </div>
           <div className="flex gap-5 min-[800px]:items-center max-[800px]:flex-col">
             <div className="relative w-full min-[1100px]:w-[280px] max-[1100px]:w-[280px] max-[800px]:w-full">

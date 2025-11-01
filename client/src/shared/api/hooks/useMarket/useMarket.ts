@@ -37,10 +37,21 @@ export const useMarket = () => {
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
+
+      const getMarketsAllNewOrder = (params?:any, enabled: boolean = true,) =>
+    useQuery({
+      queryKey: [market, params],
+      queryFn: () =>
+        api.get("order/market/all/my-orders", { params }).then((res) => res.data),
+      enabled,
+      staleTime: 1000 * 60 * 60 * 24,
+      refetchOnWindowFocus: false,
+    });
   return {
     createMarket,
     getMarkets,
     getMarketsNewOrder,
     getMarketByid,
+    getMarketsAllNewOrder
   };
 };

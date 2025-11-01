@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -26,6 +26,7 @@ import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
 import { DatePicker } from "antd";
 
 import dayjs from "dayjs";
+import CustomCalendar from "../../shared/components/customDate";
 
 const { RangePicker } = DatePicker;
 
@@ -41,6 +42,15 @@ const Dashboards = () => {
   const [toDate, setToDate] = useState<string | undefined>(undefined);
   const [showAllMarkets, setShowAllMarkets] = useState(false);
   const [showAllCouriers, setShowAllCouriers] = useState(false);
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Redux'dan role olish
   const role = useSelector((state: RootState) => state.roleSlice.role);
@@ -91,18 +101,17 @@ const Dashboards = () => {
     ? couriersData
     : couriersData.slice(0, 10);
 
- let titleText = `📊 ${t("title")}`;
+  let titleText = `📊 ${t("title")}`;
 
- if (fromDate && toDate && fromDate === toDate) {
-   titleText = `📊 ${fromDate} sanadagi statistika`;
- } else if (fromDate && toDate && fromDate !== toDate) {
-   titleText = `📊 ${fromDate} dan - ${toDate} gacha statistikasi`;
- } else if (fromDate && !toDate) {
-   titleText = `📊 ${fromDate} dan boshlab statistikasi`;
- } else if (!fromDate && toDate) {
-   titleText = `📊 ${toDate} gacha statistikasi`;
- }
-
+  if (fromDate && toDate && fromDate === toDate) {
+    titleText = `📊 ${fromDate} sanadagi statistika`;
+  } else if (fromDate && toDate && fromDate !== toDate) {
+    titleText = `📊 ${fromDate} dan - ${toDate} gacha statistikasi`;
+  } else if (fromDate && !toDate) {
+    titleText = `📊 ${fromDate} dan boshlab statistikasi`;
+  } else if (!fromDate && toDate) {
+    titleText = `📊 ${toDate} gacha statistikasi`;
+  }
 
   return (
     <div className="w-full p-6 dark:bg-[#312D48] min-h-screen transition">
@@ -120,25 +129,42 @@ const Dashboards = () => {
                 <label className="mb-1 text-sm font-medium">
                   {t("dateRange")}
                 </label>
-                <RangePicker
-                  value={[
-                    fromDate ? dayjs(fromDate) : null,
-                    toDate ? dayjs(toDate) : null,
-                  ]}
-                  onChange={(dates) => {
-                    setFromDate(
-                      dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
-                    );
-                    setToDate(
-                      dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
-                    );
-                  }}
-                  className="w-full 
-             dark:bg-[#342d4a]! 
-             dark:border-[#4b3b6a]! 
-             dark:[&_.ant-picker-input>input]:text-white! 
-             dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
-                />
+                {!isMobile ? (
+                  <RangePicker
+                    value={[
+                      fromDate ? dayjs(fromDate) : null,
+                      toDate ? dayjs(toDate) : null,
+                    ]}
+                    onChange={(dates) => {
+                      setFromDate(
+                        dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
+                      );
+                      setToDate(
+                        dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
+                      );
+                    }}
+                    className="w-full 
+                  dark:bg-[#342d4a]! 
+                  dark:border-[#4b3b6a]! 
+                  dark:[&_.ant-picker-input>input]:text-white! 
+                  dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
+                  />
+                ) : (
+                  <div className="flex flex-col gap-2 w-full">
+                    <CustomCalendar
+                      from={fromDate ? dayjs(fromDate) : null}
+                      to={toDate ? dayjs(toDate) : null}
+                      setFrom={(date: any) =>
+                        setFromDate(
+                          date ? date.format("YYYY-MM-DD") : undefined
+                        )
+                      }
+                      setTo={(date: any) =>
+                        setToDate(date ? date.format("YYYY-MM-DD") : undefined)
+                      }
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -380,7 +406,6 @@ const renderCouriersChart = (
   />
 );
 
-
 //Charts
 const ChartWrapper = ({
   title,
@@ -479,7 +504,6 @@ const ChartWrapper = ({
   </div>
 );
 
-
 // 🔹 Top Markets Table
 const renderMarketsTable = (markets: any[]) => (
   <TableWrapper
@@ -547,11 +571,27 @@ const TableWrapper = ({
           }
           return (
             <tr key={item.id ?? inx} className={`hover:bg-gray-50 ${rowStyle}`}>
-              <td className="data-cell p-2 min-[900px]:border text-center" data-cell="#">{medalIcon ?? inx + 1}</td>
-              <td className="data-cell p-2 min-[900px]:border" data-cell="Name">{item[nameKey]}</td>
-              <td className="data-cell p-2 min-[900px]:border" data-cell="Orders">{item[ordersKey]}</td>
-              <td className="data-cell p-2 min-[900px]:border" data-cell="Sold">{item[soldKey]}</td>
-              <td className="data-cell p-2 min-[900px]:border" data-cell="Rate">{item[rateKey]}%</td>
+              <td
+                className="data-cell p-2 min-[900px]:border text-center"
+                data-cell="#"
+              >
+                {medalIcon ?? inx + 1}
+              </td>
+              <td className="data-cell p-2 min-[900px]:border" data-cell="Name">
+                {item[nameKey]}
+              </td>
+              <td
+                className="data-cell p-2 min-[900px]:border"
+                data-cell="Orders"
+              >
+                {item[ordersKey]}
+              </td>
+              <td className="data-cell p-2 min-[900px]:border" data-cell="Sold">
+                {item[soldKey]}
+              </td>
+              <td className="data-cell p-2 min-[900px]:border" data-cell="Rate">
+                {item[rateKey]}%
+              </td>
             </tr>
           );
         })}

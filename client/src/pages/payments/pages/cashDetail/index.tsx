@@ -1,7 +1,6 @@
 import { memo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
-import { ChevronRight } from "lucide-react";
 import { Select, DatePicker } from "antd";
 import TextArea from "antd/es/input/TextArea";
 import { CashboxCard } from "../../components/CashCard";
@@ -14,6 +13,8 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 import { useTranslation } from "react-i18next";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import type { AxiosError } from "axios";
+import CustomCalendar from "../../../../shared/components/customDate";
+import { Loader2 } from "lucide-react";
 
 const { RangePicker } = DatePicker;
 
@@ -29,6 +30,15 @@ const CashDetail = () => {
     market: "",
     comment: "",
   });
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const [search, setSearch] = useState("");
 
@@ -136,7 +146,7 @@ const CashDetail = () => {
           const msg =
             err.response?.data?.error?.message || "Xatolik yuz berdi!";
           handleApiError(err, `${msg}`);
-        }
+        },
       });
     }
   };
@@ -153,10 +163,7 @@ const CashDetail = () => {
     <div className="px-5 mt-5 flex gap-24 max-md:flex-col  ">
       <div>
         <h2 className="flex items-center mb-5 text-[20px] capitalize">
-          {t(`${data?.data?.cashbox?.user?.role}`)} <ChevronRight />
-          <span className="text-[22px] font-bold">
-            {data?.data?.cashbox?.user?.name}
-          </span>
+          {t("cashbox")}
         </h2>
         <CashboxCard
           role={"market"}
@@ -255,6 +262,8 @@ const CashDetail = () => {
               <button
                 onClick={() => handleSubmit()}
                 disabled={
+                  createPaymentMarket.isPending ||
+                  createPaymentCourier.isPending ||
                   !form.payment ||
                   !form.summa ||
                   Number(form.summa.replace(/\s/g, "")) <= 0
@@ -268,37 +277,88 @@ const CashDetail = () => {
                     : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
                 }`}
               >
-                {data?.data?.cashbox?.user?.role === "market"
-                  ? `${t("qabulQilish")}`
-                  : `${t("to'lash")}`}
+                {createPaymentMarket.isPending ||
+                createPaymentCourier.isPending ? (
+                  <div className="relative w-full flex justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin absolute" />
+                    <span className="opacity-0">
+                      {data?.data?.cashbox?.user?.role === "market"
+                        ? t("qabulQilish")
+                        : t("to'lash")}
+                    </span>
+                  </div>
+                ) : data?.data?.cashbox?.user?.role === "market" ? (
+                  t("qabulQilish")
+                ) : (
+                  t("to'lash")
+                )}
               </button>
             </div>
           </div>
         )}
       </div>
       <div className="grid w-full max-[550px]:w-full">
-        <div className="flex flex-row items-center gap-7 max-[550px]:flex-col max-[550px]:w-[100%]">
+        {form.from == "" && (
+          <h2 className="mb-5 text-[20px] font-medium">{t("today")}</h2>
+        )}
+
+        {form.from !== "" && form.from === form.to && (
+          <h2 className="mb-5 text-[20px] font-medium">
+            {form.from} {t("day")}
+          </h2>
+        )}
+
+        {form.from !== "" && form.from !== form.to && (
+          <h2 className="mb-5 text-[20px] font-medium">
+            {form.from} <span className="text-[15px]">{t("dan")}</span>{" "}
+            {form.to} <span className="text-[15px]">{t("gacha")}</span>{" "}
+            {t("o'tkazmalar")}
+          </h2>
+        )}
+        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
-            <div className="flex gap-5">
-              {/* RangePicker bilan custom */}
-              <RangePicker
-                value={[
-                  form.from ? dayjs(form.from) : null,
-                  form.to ? dayjs(form.to) : null,
-                ]}
-                onChange={(dates) => {
-                  setForm((prev) => ({
-                    ...prev,
-                    from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
-                    to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
-                  }));
-                }}
-                placeholder={["From", "To"]}
-                format="YYYY-MM-DD"
-                size="large"
-                className="w-[340px] max-[550px]:w-[100%] toFROM border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
-              />
+            <div className="flex gap-5 max-[640px]:gap-0  w-full">
+              {isMobile ? (
+                // Mobile uchun custom date inputs (faqat text input + popup)
+                <div className="flex flex-col gap-2 w-full">
+                  <CustomCalendar
+                    from={form.from ? dayjs(form.from) : null}
+                    to={form.to ? dayjs(form.to) : null}
+                    setFrom={(date: any) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        from: date.format("YYYY-MM-DD"),
+                      }))
+                    }
+                    setTo={(date: any) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        to: date.format("YYYY-MM-DD"),
+                      }))
+                    }
+                  />
+                </div>
+              ) : (
+                // Desktop uchun Antd RangePicker
+                <RangePicker
+                  value={[
+                    form.from ? dayjs(form.from) : null,
+                    form.to ? dayjs(form.to) : null,
+                  ]}
+                  onChange={(dates) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                      to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                    }));
+                  }}
+                  placeholder={[`${t("start")}`, `${t("end")}`]}
+                  format="YYYY-MM-DD"
+                  size="large"
+                  className="w-[340px] max-md:w-[100%] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+                />
+              )}
             </div>
           </div>
         </div>

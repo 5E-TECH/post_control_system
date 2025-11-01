@@ -22,6 +22,7 @@ import {
 import { ReceivePostDto } from './dto/receive-post.dto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import { PostDto } from './dto/postId.dto';
 
 @Injectable()
 export class PostService {
@@ -38,14 +39,35 @@ export class PostService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async findAll(): Promise<object> {
+  async findAll(page = 1, limit = 10): Promise<object> {
     try {
-      const allPosts = await this.postRepo.find({
+      // Sahifani to‘g‘rilab olamiz
+      const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
+      const skip = (page - 1) * take;
+
+      // 🔎 Umumiy ma’lumotlar
+      const [data, total] = await this.postRepo.findAndCount({
         where: { status: Not(Post_status.NEW) },
         relations: ['region'],
         order: { created_at: 'DESC' },
+        skip,
+        take,
       });
-      return successRes(allPosts, 200, 'All posts');
+
+      // Hisob-kitoblar
+      const totalPages = Math.ceil(total / take);
+
+      return successRes(
+        {
+          data,
+          total,
+          page,
+          totalPages,
+          limit: take,
+        },
+        200,
+        'All posts (paginated)',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -300,6 +322,29 @@ export class PostService {
     }
   }
 
+  async checkPost(id: string, postDto: PostDto) {
+    try {
+      const { postId } = postDto;
+      if (!postId) {
+        throw new BadRequestException('Pochta topilmadi');
+      }
+      const order = await this.orderRepo.findOne({
+        where: {
+          qr_code_token: id,
+          status: Order_status.RECEIVED,
+          post_id: postId,
+        },
+        select: ['id'],
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      return successRes({order}, 200, "Order checked and it's exist");
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async sendPost(id: string, dto: SendPostDto): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -336,8 +381,9 @@ export class PostService {
       const oldOrders = await queryRunner.manager.find(OrderEntity, {
         where: { post_id: id },
       });
-      const newOrders = await queryRunner.manager.findBy(OrderEntity, {
-        id: In(orderIds),
+      const newOrders = await queryRunner.manager.find(OrderEntity, {
+        where: { id: In(orderIds) },
+        relations: ['market', 'customer', 'customer.district'],
       });
 
       if (newOrders.length !== orderIds.length)
@@ -354,10 +400,15 @@ export class PostService {
         await queryRunner.manager.save(order);
       }
 
+      const postTotalInfo = {
+        total: newOrders.length,
+        sum: 0,
+      };
       /**
        * 6️⃣ Yangi orderlarni ON_THE_ROAD holatiga o‘tkazish
        */
       for (const order of newOrders) {
+        postTotalInfo.sum += order.total_price;
         order.post_id = post.id;
         order.status = Order_status.ON_THE_ROAD;
         await queryRunner.manager.save(order);
@@ -399,11 +450,15 @@ export class PostService {
        */
       const updatedPost = await queryRunner.manager.findOne(PostEntity, {
         where: { id },
-        relations: ['courier'],
+        relations: ['courier', 'region'],
       });
 
       await queryRunner.commitTransaction();
-      return successRes(updatedPost, 200, 'Post sent successfully');
+      return successRes(
+        { updatedPost, newOrders, postTotalInfo },
+        200,
+        'Post sent successfully',
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -469,9 +524,12 @@ export class PostService {
         { status: Post_status.RECEIVED },
       );
 
-      await queryRunner.commitTransaction();
+      const allOrdersInThePost = await queryRunner.manager.find(OrderEntity, {
+        where: { id: In(waitingOrderIds) },
+      });
 
-      return successRes({}, 200, 'Post received successfully');
+      await queryRunner.commitTransaction();
+      return successRes(allOrdersInThePost, 200, 'Post received successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -558,16 +616,25 @@ export class PostService {
         throw new NotFoundException('Courier not found');
       }
 
-      const customToken = generateCustomToken();
-      const canceledPost = queryRunner.manager.create(PostEntity, {
-        courier_id: courier.id,
-        region_id: courier.region_id,
-        post_total_price: 0,
-        order_quantity: orders.length,
-        qr_code_token: customToken,
-        status: Post_status.CANCELED,
+      let canceledPost = await queryRunner.manager.findOne(PostEntity, {
+        where: {
+          courier_id: courier.id,
+          status: Post_status.CANCELED,
+        },
       });
-      await queryRunner.manager.save(canceledPost);
+
+      if (!canceledPost) {
+        const customToken = generateCustomToken();
+        canceledPost = queryRunner.manager.create(PostEntity, {
+          courier_id: courier.id,
+          region_id: courier.region_id,
+          post_total_price: 0,
+          order_quantity: orders.length,
+          qr_code_token: customToken,
+          status: Post_status.CANCELED,
+        });
+        await queryRunner.manager.save(canceledPost);
+      }
 
       for (const order of orders) {
         order.canceled_post_id = canceledPost.id;
@@ -588,6 +655,8 @@ export class PostService {
       await queryRunner.release();
     }
   }
+
+  async recCanOrderWithScaner(orderToken: string) {}
 
   async receiveCanceledPost(id: string, ordersArrayDto: ReceivePostDto) {
     const queryRunner = this.dataSource.createQueryRunner();

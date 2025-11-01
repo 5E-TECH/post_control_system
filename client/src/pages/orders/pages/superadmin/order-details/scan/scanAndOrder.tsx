@@ -44,6 +44,7 @@ export default function ScanAndOrder() {
   const [isModalOpen, _] = useState(false);
 
   const navigate = useNavigate();
+  const role = useSelector((state: RootState) => state.roleSlice.role);
 
   useEffect(() => {
     if (!isModalOpen) {
@@ -114,6 +115,7 @@ export default function ScanAndOrder() {
     partlySellOrder,
     courierReceiveOrderByScanerById,
     rollbackOrder,
+    joinPostRefusalProduct
   } = useOrder();
 
   const [form] = Form.useForm<FieldType>();
@@ -256,7 +258,19 @@ export default function ScanAndOrder() {
 
   // let maxQuantity:number;
 
-  
+  const joinPostRefusalProducts = (order_ids: string) => {
+    joinPostRefusalProduct.mutate({order_ids: [order_ids]}, {
+      onSuccess: () => {
+        message.success("Buyurtma muvaffaqiyatli pochtaga qo'shildi!");
+        navigate(-1);
+      },
+      onError: (err) => {
+        console.error(err);
+        message.error("Buyurtmani pochtaga qo'shishda xatolik yuz berdi!");
+        navigate(-1);
+      },
+    })
+  }
 
   useEffect(() => {
     if (isShow && order?.data) {
@@ -270,16 +284,28 @@ export default function ScanAndOrder() {
     }
   }, [isShow, order]);
 
-
   const handleMinus = (index: number) => {
-    setOrderItemInfo((prev) =>
-      prev.map((item, i) => {
-        if (i === index && item.quantity > 1) {
-          return { ...item, quantity: item.quantity - 1 };
-        }
-        return item;
-      })
-    );
+    setOrderItemInfo((prev) => {
+      // Hozirgi umumiy miqdorni hisoblaymiz
+      const totalQuantity = prev.reduce((sum, item) => sum + item.quantity, 0);
+
+      // Agar umumiy son 1 dan katta bo‘lsa, kamaytirishga ruxsat beramiz
+      if (totalQuantity > 1) {
+        return prev.map((item, i) => {
+          if (i === index && item.quantity > 0) {
+            // kamaytirgandan keyin umumiy son 0 bo‘lmasligini tekshiramiz
+            const newTotal = totalQuantity - 1;
+            if (newTotal >= 1) {
+              return { ...item, quantity: item.quantity - 1 };
+            }
+          }
+          return item;
+        });
+      }
+
+      // agar umumiy son 1 bo‘lsa, hech narsa o‘zgartirmaymiz
+      return prev;
+    });
   };
 
   const handlePlus = (index: number) => {
@@ -299,7 +325,7 @@ export default function ScanAndOrder() {
 
   return (
     <Popup isShow={isShow}>
-      <div className="w-[350px] shadow-lg rounded-md bg-[#ffffff] flex flex-col justify-between pt-6 px-8">
+      <div className="w-[350px] shadow-lg rounded-md dark:bg-[#312d48] bg-[#ffffff] flex flex-col justify-between pt-6 px-8 max-h-[90vh] overflow-hidden overflow-y-auto">
         <X
           className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
           onClick={() => {
@@ -336,7 +362,12 @@ export default function ScanAndOrder() {
           </p>
           <p>
             <span className="font-semibold">Mahsulot soni: </span>
-            <span>{order.data?.customer?.phone_number || "—"}</span>
+            <span>
+              {order.data?.items?.reduce(
+                (sum: any, item: any) => sum + (item.quantity || 0),
+                0
+              ) || "—"}
+            </span>
           </p>
           <p>
             <span className="font-semibold">Umumiy summa:</span>{" "}
@@ -351,6 +382,13 @@ export default function ScanAndOrder() {
 
         {partleSoldShow && (
           <div className={`flex flex-col pt-${partleSoldShow ? 3 : 0}`}>
+            <div
+                className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
+                  orderItemInfo.length > 2
+                    ? "max-h-49 overflow-y-auto"
+                    : "overflow-visible"
+                }`}
+              >
             {orderItemInfo.map((item, index) => (
               <div
                 key={item.product_id}
@@ -375,7 +413,8 @@ export default function ScanAndOrder() {
                   {/* MINUS */}
                   <Minus
                     className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
-                      item.quantity <= 1
+                      item.quantity <= 0 ||
+                      orderItemInfo.reduce((sum, i) => sum + i.quantity, 0) <= 1
                         ? "opacity-30 cursor-not-allowed"
                         : "hover:opacity-70"
                     }`}
@@ -399,6 +438,7 @@ export default function ScanAndOrder() {
                 </div>
               </div>
             ))}
+            </div>
 
             <Form.Item>
               <Input
@@ -494,7 +534,7 @@ export default function ScanAndOrder() {
           )}
 
           <div className="pb-4">
-            {orderStatus === "on the road" && (
+            {orderStatus === "on the road" && role === "courier" && (
               <div className="w-full pt-5">
                 <Button
                   onClick={() => handleReceiveOrderById(order?.data?.id)}
@@ -563,13 +603,6 @@ export default function ScanAndOrder() {
                 >
                   <AlertCircle />
                 </Button>
-
-                <Button
-                  className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
-                  onClick={() => setAlertBtnYesNo((p) => !p)}
-                >
-                  Buyurtmani qaytarish
-                </Button>
               </div>
             )}
 
@@ -582,7 +615,7 @@ export default function ScanAndOrder() {
                   <AlertCircle />
                 </Button>
 
-                <Button className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!">
+                <Button className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!" onClick={() => joinPostRefusalProducts(id)}>
                   Buyurtmani qaytarish
                 </Button>
               </div>

@@ -11,6 +11,7 @@ import { exportToExcel } from "../../../../shared/helpers/export-download-excel"
 import { resetDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { BASE_URL } from "../../../../shared/const";
+import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 
 const statusColors: Record<string, string> = {
   new: "bg-sky-500",
@@ -43,7 +44,8 @@ const OrderView = () => {
   const { t: st } = useTranslation("status");
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { getOrders, getMarketsByMyNewOrders } = useOrder();
+  const { getOrders } = useOrder();
+  const { getMarketsAllNewOrder } = useMarket();
 
   const user = useSelector((state: RootState) => state.roleSlice);
   const filters = useSelector((state: RootState) => state.setFilter);
@@ -71,7 +73,7 @@ const OrderView = () => {
   // filter o'zgarganda sahifa 1 ga tushadi
   useEffect(() => {
     setPage(1);
-    setParam("page", 1);
+    setParam("page",1);
   }, [JSON.stringify(cleanedFilters)]);
 
   // page o'zgarganda URL-ni yangilaymiz
@@ -81,23 +83,21 @@ const OrderView = () => {
 
   // query
   const queryParams = { page, limit, ...cleanedFilters };
-  let query;
-  switch (role) {
-    case "superadmin":
-    case "admin":
-    case "registrator":
-      query = getOrders(queryParams);
-      break;
-    case "market":
-      query = getMarketsByMyNewOrders(queryParams);
-      break;
-    default:
-      query = { data: { data: [], total: 0 } };
-  }
 
-  const { data, isLoading } = query;
+
+  const { data, refetch, isLoading } =
+    role === "market"
+      ? getMarketsAllNewOrder(queryParams)
+      : getOrders(queryParams);
+
+  useEffect(() => {
+    if (role === "market") refetch();
+  }, [role]);
+
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
-  const total = data?.data?.total || 0;
+  const total = data?.data?.total;
+  console.log('total',total);
+  
 
   // pagination onChange
   const onChange: PaginationProps["onChange"] = (newPage, newLimit) => {
@@ -106,28 +106,46 @@ const OrderView = () => {
   };
 
   // Excel yuklash
+  // const user = useSelector((state: RootState) => state.roleSlice);
+
   useEffect(() => {
     const downloadExcel = async () => {
       try {
         const isFiltered = Object.keys(cleanedFilters).length > 0;
+
+        // 🔥 URL ni rolga qarab belgilaymiz
+        let url = `${BASE_URL}order`;
+        if (user?.role === "market") {
+          url = `${BASE_URL}order/market/all/my-orders`;
+        } else if (user?.role === "courier") {
+          url = `${BASE_URL}order/courier/orders`;
+        }
+
         const response = await fetch(
-          `${BASE_URL}order?page=1&limit=0&${new URLSearchParams(
-            cleanedFilters
-          )}`,
+          `${url}?page=1&limit=0&${new URLSearchParams(cleanedFilters)}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
             },
           }
         );
+
+        console.log("response", response);
+
         const rawText = await response.text();
+        console.log("rawtext", rawText);
+
         let data;
         try {
           data = JSON.parse(rawText);
+          console.log("Data", data);
         } catch {
           throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
         }
+
         const orders = data?.data?.data;
+        console.log("orders", orders);
+
         const exportData = orders?.map((order: any, inx: number) => ({
           N: inx + 1,
           Viloyat: order?.customer?.district?.region?.name,
@@ -147,10 +165,12 @@ const OrderView = () => {
             minute: "2-digit",
           }),
         }));
+
         exportToExcel(
           exportData || [],
           isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
         );
+
         handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
       } catch (err) {
         handleApiError(err, "Excel yuklashda xatolik");
@@ -160,7 +180,7 @@ const OrderView = () => {
     };
 
     if (triggerDownload.triggerDownload) downloadExcel();
-  }, [triggerDownload, dispatch, cleanedFilters]);
+  }, [triggerDownload, dispatch, cleanedFilters, user?.role]);
 
   return (
     <div className="w-full bg-white py-1 dark:bg-[#312d4b] min-[650px]:overflow-x-auto">
@@ -203,9 +223,14 @@ const OrderView = () => {
                 }`}
                 onClick={() => navigate(`order-detail/${item.id}`)}
               >
-                <td className="pl-10">{inx + 1}</td>
-                <td className="pl-10">{item?.customer?.name}</td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell="#">
+                  {" "}
+                  {inx + 1}
+                </td>
+                <td className="pl-10" data-cell={t("customer")}>
+                  {item?.customer?.name}
+                </td>
+                <td className="pl-10" data-cell={t("phone")}>
                   {item?.customer?.phone_number
                     ? `${item?.customer.phone_number
                         .replace(/\D/g, "")
@@ -215,12 +240,16 @@ const OrderView = () => {
                         )}`
                     : ""}
                 </td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell={t("region")}>
                   {item?.customer?.district?.region?.name}
                 </td>
-                <td className="pl-10">{item?.customer?.district?.name}</td>
-                <td className="pl-10">{item?.market?.name}</td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell={t("district")}>
+                  {item?.customer?.district?.name}
+                </td>
+                <td className="pl-10" data-cell={t("market")}>
+                  {item?.market?.name}
+                </td>
+                <td className="pl-10" data-cell={t("status")}>
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
                       statusColors[item?.status] || "bg-gray-400"
@@ -229,10 +258,10 @@ const OrderView = () => {
                     {st(`${item?.status}`)}
                   </span>
                 </td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell={t("price")}>
                   {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
                 </td>
-                <td className="pl-10">
+                <td className="pl-10" data-cell={t("createdAt")}>
                   {(() => {
                     const date = new Date(Number(item?.created_at));
                     const day = String(date.getDate()).padStart(2, "0");

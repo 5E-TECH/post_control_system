@@ -1,4 +1,6 @@
 import {
+  ChevronLeft,
+  ChevronRight,
   Languages,
   LogOut,
   Menu,
@@ -17,6 +19,7 @@ import { memo, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
 
+
 const Header = () => {
   const { t, i18n } = useTranslation(["header"]);
   const [dark, setDark] = useState(() => {
@@ -25,6 +28,8 @@ const Header = () => {
   });
 
   const { mutate: signOut } = useSignOut();
+
+  // console.log(sidebarRedux.isOpen);
 
   useEffect(() => {
     if (dark) {
@@ -43,22 +48,63 @@ const Header = () => {
     i18n.changeLanguage(value);
   };
 
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 700);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <div className="w-full h-16 pl-8 pr-3 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
       {/* Logo */}
-      <div className="h-16 flex items-center gap-3">
+      <div className="h-16 flex items-center gap-30">
         <NavLink to={"/"} className="flex items-center gap-3">
           <div>
             <img src={logo} alt="logo" className="h-8" />
           </div>
           <span className="text-xl font-semibold">Beepost</span>
         </NavLink>
+        {!isMobile && (
+          // <button
+          //   onClick={handleDispatch}
+          //   className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300 cursor-pointer absolute left-70"
+          // >
+          //   <ArrowLeft
+          //     className={`transition-transform duration-300 ${
+          //       !sidebarRedux.isOpen ? "rotate-180" : "rotate-0"
+          //     }`}
+          //   />
+          // </button>
+
+          <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="p-2 rounded-full border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+        >
+          <ChevronLeft size={20} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate(1)}
+          className="p-2 rounded-full border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
+          
+        )}
       </div>
 
       {/* Search */}
       <label
         htmlFor="search"
-        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1150px]:hidden"
+        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1400px]:hidden"
       >
         <Search className="text-gray-500" />
         <input

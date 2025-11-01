@@ -31,6 +31,9 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   comment: string;
 
+  @Column({ type: 'text', nullable: true })
+  operator: string;
+
   @Column({ type: 'uuid', nullable: true })
   post_id: string | null;
 

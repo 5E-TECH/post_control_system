@@ -10,12 +10,17 @@
   "market": "Market",
   "pulMiqdori": "Amount",
   "dona": "Quantity",
-  "harakatlar": "Actions",
+  "time": "Created At",
   "pochtanijonatish": "Send mail",
   "uygacha": "To home",
   "markazgacha": "To center",
+  "delivery": "Where",
   "ta": "pcs",
   "so'm": "sum",
   "qidiruv": "Search",
-  "tabuyurtmalar": "orders"
+  "tabuyurtmalar": "orders",
+  "center": "To the center",
+  "address": "Up to home",
+  "accept": "Receive mail",
+  "orders":"orders"
 }

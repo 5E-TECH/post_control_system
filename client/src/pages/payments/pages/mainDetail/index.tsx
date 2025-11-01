@@ -4,12 +4,12 @@ import { Form } from "antd";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
-import Popup from "../../../../shared/ui/Popup";
 import {
   BanknoteArrowDown,
   BanknoteArrowUp,
   CircleMinus,
   CirclePlus,
+  Loader2,
   Search,
   Wallet,
   X,
@@ -24,6 +24,8 @@ import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import { useTranslation } from "react-i18next";
 import type { AxiosError } from "axios";
+import CustomCalendar from "../../../../shared/components/customDate";
+import PaymentPopup from "../../../../shared/ui/paymentPopup";
 
 const { RangePicker } = DatePicker;
 
@@ -61,6 +63,15 @@ const MainDetail = () => {
   const { handleApiError } = useApiNotification();
 
   const navigate = useNavigate();
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -172,7 +183,7 @@ const MainDetail = () => {
           const msg =
             err.response?.data?.error?.message || "Xatolik yuz berdi!";
           handleApiError(err, `${msg}`);
-        }
+        },
       }
     );
   };
@@ -316,6 +327,7 @@ const MainDetail = () => {
                 <button
                   onClick={() => handleSubmit()}
                   disabled={
+                    cashboxSpand.isPending ||
                     !form.payment ||
                     !form.summa ||
                     Number(form.summa.replace(/\s/g, "")) <= 0
@@ -328,7 +340,14 @@ const MainDetail = () => {
                       : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
                   }`}
                 >
-                  {t("qabulQilish")}
+                  {cashboxSpand.isPending ? (
+                    <div className="relative w-full flex justify-center">
+                      <Loader2 className="w-5 h-5 animate-spin absolute" />
+                      <span className="opacity-0">{t("qabulQilish")}</span>
+                    </div>
+                  ) : (
+                    t("qabulQilish")
+                  )}
                 </button>
                 <button
                   onClick={() => hendleCloce()}
@@ -406,11 +425,12 @@ const MainDetail = () => {
                 <button
                   onClick={() => handleSalarySubmit()}
                   disabled={
+                    cashboxFill.isPending ||
                     !form.payment ||
                     !form.summa ||
                     Number(form.summa.replace(/\s/g, "")) <= 0
                   }
-                  className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
+                  className={`mt-5 py-1.5 px-3 min-w-[125px] rounded-md transition-colors ${
                     !form.payment ||
                     !form.summa ||
                     Number(form.summa.replace(/\s/g, "")) <= 0
@@ -418,7 +438,14 @@ const MainDetail = () => {
                       : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
                   }`}
                 >
-                  {t("qabulQilish")}
+                  {cashboxFill.isPending ? (
+                    <div className="relative w-full flex justify-center">
+                      <Loader2 className="w-5 h-5 animate-spin absolute" />
+                      <span className="opacity-0">{t("qabulQilish")}</span>
+                    </div>
+                  ) : (
+                    t("qabulQilish")
+                  )}
                 </button>
                 <button
                   onClick={() => hendleCloce()}
@@ -435,48 +462,70 @@ const MainDetail = () => {
       {/* === FILTERS & HISTORY === */}
       <div className="w-full">
         {form.from == "" && (
-          <h2 className="mb-5 text-[20px] font-medium">Bugungi o'tkazmalar</h2>
+          <h2 className="mb-5 text-[20px] font-medium">{t("today")}</h2>
         )}
 
         {form.from !== "" && form.from === form.to && (
           <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} kungi o'tkazmalar
+            {form.from} {t("day")}
           </h2>
         )}
 
         {form.from !== "" && form.from !== form.to && (
           <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} <span className="text-[15px]">dan ,</span> {form.to}{" "}
-            <span className="text-[15px]">gacha</span> o'tkazmalar
+            {form.from} <span className="text-[15px]">{t("dan")}</span>{" "}
+            {form.to} <span className="text-[15px]">{t("gacha")}</span>{" "}
+            {t("o'tkazmalar")}
           </h2>
         )}
-        <div className="flex flex-row items-center gap-7">
+        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">
           <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
           <div className="w-full flex justify-between">
-            <div className="flex gap-5">
-              <RangePicker
-                value={[
-                  form.from ? dayjs(form.from) : null,
-                  form.to ? dayjs(form.to) : null,
-                ]}
-                onChange={(dates) => {
-                  setForm((prev) => ({
-                    ...prev,
-                    from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
-                    to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
-                  }));
-                }}
-                placeholder={["From", "To"]}
-                format="YYYY-MM-DD"
-                separator={
-                  <span className="mx-2 text-xl flex items-center">→</span>
-                }
-                className="w-[340px] max-[550px]:w-[100%] border border-[#E5E7EB] rounded-lg px-5 py-[6px] outline-none"
-              />
+            <div className="flex gap-5 max-[640px]:gap-0  w-full">
+              {isMobile ? (
+                // Mobile uchun custom date inputs (faqat text input + popup)
+                <div className="flex flex-col gap-2 w-full">
+                  <CustomCalendar
+                    from={form.from ? dayjs(form.from) : null}
+                    to={form.to ? dayjs(form.to) : null}
+                    setFrom={(date: any) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        from: date.format("YYYY-MM-DD"),
+                      }))
+                    }
+                    setTo={(date: any) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        to: date.format("YYYY-MM-DD"),
+                      }))
+                    }
+                  />
+                </div>
+              ) : (
+                // Desktop uchun Antd RangePicker
+                <RangePicker
+                  value={[
+                    form.from ? dayjs(form.from) : null,
+                    form.to ? dayjs(form.to) : null,
+                  ]}
+                  onChange={(dates) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                      to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                    }));
+                  }}
+                  placeholder={[`${t("start")}`, `${t("end")}`]}
+                  format="YYYY-MM-DD"
+                  size="large"
+                  className="w-[340px] max-md:w-[100%] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+                />
+              )}
             </div>
           </div>
         </div>
-        <div className="">
+        <div className="max-md:mb-5">
           <CashboxHistory
             form={form}
             income={data?.data?.income}
@@ -487,11 +536,17 @@ const MainDetail = () => {
       </div>
 
       {/* === POPUP MARKET === */}
-      <Popup isShow={showMarket} onClose={() => handleClose()}>
-        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
+      <PaymentPopup isShow={showMarket} onClose={() => handleClose()}>
+        <div className="bg-white dark:bg-[#28243d] rounded-xl shadow-xl w-[900px] h-[680px] px-6 py-6 relative flex flex-col max-md:w-[90%] max-md:h-[600px] transition-all duration-300">
           <button
             onClick={() => handleClose()}
-            className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
+            className="absolute top-4 right-4 flex items-center justify-center 
+w-9 h-9 rounded-md
+bg-[#ef4444] hover:bg-[#dc2626] 
+text-white shadow-lg 
+transition-all duration-200 
+hover:scale-110 active:scale-95
+cursor-pointer"
           >
             <X size={30} />
           </button>
@@ -536,7 +591,7 @@ const MainDetail = () => {
             {/* Scroll qismi */}
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
               <table className="w-full border-collapse cursor-pointer">
-                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
+                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#FFFFFF] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
                   {marketData?.data?.data?.map((item: any, inx: number) => (
                     <tr
                       key={item?.id}
@@ -545,10 +600,16 @@ const MainDetail = () => {
                         item.id == select ? "bg-gray-300 text-black" : ""
                       }`}
                     >
-                      <td className="text-[#8C57FF] pr-10 py-3 pl-5">
+                      <td
+                        className="text-[#8C57FF] pr-10 py-3 pl-5"
+                        data-cell="# ID"
+                      >
                         {inx + 1}
                       </td>
-                      <td className="pr-26 py-3">{item?.name}</td>
+
+                      <td className="pr-26 py-3" data-cell={t("marketName")}>
+                        {item?.name}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -571,13 +632,22 @@ const MainDetail = () => {
             </button>
           </div>
         </div>
-      </Popup>
+      </PaymentPopup>
 
-      <Popup isShow={showAdminAndRegistrator} onClose={() => handleClose()}>
-        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
+      <PaymentPopup
+        isShow={showAdminAndRegistrator}
+        onClose={() => handleClose()}
+      >
+        <div className="bg-white dark:bg-[#28243d] rounded-xl shadow-xl w-[900px] h-[680px] px-6 py-6 relative flex flex-col max-md:w-[90%] max-md:h-[600px] transition-all duration-300">
           <button
             onClick={() => handleClose()}
-            className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
+            className="absolute top-4 right-4 flex items-center justify-center 
+w-9 h-9 rounded-md
+bg-[#ef4444] hover:bg-[#dc2626] 
+text-white shadow-lg 
+transition-all duration-200 
+hover:scale-110 active:scale-95
+cursor-pointer"
           >
             <X size={30} />
           </button>
@@ -628,7 +698,7 @@ const MainDetail = () => {
             {/* Scroll qilinuvchi tbody */}
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
               <table className="w-full border-collapse cursor-pointer">
-                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
+                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#FFFFFF] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
                   {adminAndRegisterData?.data?.data?.map(
                     (item: any, inx: number) => (
                       <tr
@@ -638,11 +708,23 @@ const MainDetail = () => {
                           item.id == select ? "bg-gray-300 text-black" : ""
                         }`}
                       >
-                        <td className="text-[#8C57FF] pr-10 pl-5 py-3">
+                        <td
+                          className="text-[#8C57FF] pr-10 pl-5 py-3"
+                          data-cell="#"
+                        >
                           {inx + 1}
                         </td>
-                        <td className="pr-26 py-3 pl-20">{item?.name}</td>
-                        <td className="pr-26 py-3">{item?.role}</td>
+
+                        <td
+                          className="pr-26 py-3 pl-20"
+                          data-cell={t("hodimName")}
+                        >
+                          {item?.name}
+                        </td>
+
+                        <td className="pr-26 py-3" data-cell={t("rol")}>
+                          {item?.role}
+                        </td>
                       </tr>
                     )
                   )}
@@ -666,15 +748,21 @@ const MainDetail = () => {
             </button>
           </div>
         </div>
-      </Popup>
+      </PaymentPopup>
 
       {/* === POPUP CURIER === */}
-      <Popup isShow={showCurier} onClose={() => handleClose()}>
-        <div className="bg-white rounded-md w-[700px] h-[700px] px-6 dark:bg-[#28243d] relative max-md:w-[400px] max-md:h-[700px]">
+      <PaymentPopup isShow={showCurier} onClose={() => handleClose()}>
+        <div className="bg-white dark:bg-[#28243d] rounded-xl shadow-xl w-[900px] h-[680px] px-6 py-6 relative flex flex-col max-md:w-[90%] max-md:h-[600px] transition-all duration-300">
           {/* Yopish tugmasi */}
           <button
             onClick={() => handleClose()}
-            className="cursor-pointer text-red-500 p-2 absolute right-4 top-2 flex items-center justify-center"
+            className="absolute top-4 right-4 flex items-center justify-center 
+w-9 h-9 rounded-md
+bg-[#ef4444] hover:bg-[#dc2626] 
+text-white shadow-lg 
+transition-all duration-200 
+hover:scale-110 active:scale-95
+cursor-pointer"
           >
             <X size={30} />
           </button>
@@ -732,23 +820,38 @@ const MainDetail = () => {
             {/* Scroll bo‘luvchi tbody qismi */}
             <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
               <table className="w-full border-collapse cursor-pointer">
-                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#E7E3FCB2] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
+                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#FFFFFF] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
                   {courierData?.data?.map((item: any, inx: number) => (
                     <tr
                       key={inx}
                       onClick={() => setSelect(item?.id)}
-                      className={`border-b-1 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] font-medium ${
+                      className={`border-b-1 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] dark:text-[#FFFFFF] font-medium ${
                         item.id == select
                           ? "bg-gray-300 text-black"
                           : "hover:bg-blue-100 dark:hover:bg-[#3d3759]"
                       }`}
                     >
-                      <td className="text-[#8C57FF] pr-10 py-3 pl-5">
+                      <td
+                        className="text-[#8C57FF] pr-10 py-3 pl-5"
+                        data-cell="# ID"
+                      >
                         {inx + 1}
                       </td>
-                      <td className="py-3 pl-5">{item?.name}</td>
-                      <td className="py-3 pl-5">{item?.region?.name}</td>
-                      <td className="py-3 pl-5">{item?.cashbox?.balance}</td>
+
+                      <td className="py-3 pl-5" data-cell={t("courierName")}>
+                        {item?.name}
+                      </td>
+
+                      <td className="py-3 pl-5" data-cell={t("region")}>
+                        {item?.region?.name}
+                      </td>
+
+                      <td
+                        className="py-3 pl-5"
+                        data-cell={t("olinishiKerakSumma")}
+                      >
+                        {item?.cashbox?.balance}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -771,7 +874,7 @@ const MainDetail = () => {
             </button>
           </div>
         </div>
-      </Popup>
+      </PaymentPopup>
     </div>
   );
 };
