@@ -1271,12 +1271,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
 
+      // 🔹 Eski total_price ni saqlab olamiz
+      const oldTotalPrice = Number(order.total_price);
+
       // 2️⃣ Load items
       const oldOrderItems = await queryRunner.manager.find(OrderItemEntity, {
         where: { orderId: order.id },
       });
 
-      // 🔹 Qo‘shimcha: eski itemlarning original nusxasi
+      // 🔹 Eski itemlarning original nusxasi
       const originalOldItems = oldOrderItems.map((i) => ({ ...i }));
 
       // 3️⃣ Get users & cashboxes
@@ -1472,7 +1475,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         ]);
       }
 
-      // 🔟 ✅ To‘g‘rilangan cancel order logikasi (original nusxadan)
+      // 🔟 ✅ To‘g‘rilangan cancel order logikasi
       if (totalNewQty < totalOldQty) {
         const cancelledItems = originalOldItems
           .map((oldItem) => {
@@ -1496,11 +1499,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             0,
           );
 
+          // 🧮 Eski va yangi total_price farqi — bekor qilingan summa
+          const cancelledTotalPrice = oldTotalPrice - Number(price);
+
           const cancelledOrder = queryRunner.manager.create(OrderEntity, {
             user_id: order.user_id,
             customer_id: order.customer_id,
             comment: 'Qisman bekor qilingan mahsulotlar',
-            total_price: order.total_price - price,
+            total_price: cancelledTotalPrice, // ✅ to‘g‘ri qiymat
             to_be_paid: 0,
             where_deliver: order.where_deliver,
             status: Order_status.CANCELLED,
