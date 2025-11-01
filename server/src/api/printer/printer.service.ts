@@ -106,7 +106,7 @@ export class PrinterService {
           extraNumber: order.customer.extra_number,
           market: order.market?.name ?? 'N/A',
           comment: order.comment ?? '',
-          region: formatRegion(order.customer.district.assignedToRegion.name),
+          region: order.customer.district.assignedToRegion.name,
           district: order.customer?.district?.name ?? 'N/A',
           address: order.customer?.address ?? 'N/A',
           qrCode: order.qr_code_token ?? '',
@@ -200,7 +200,7 @@ export class PrinterService {
       productLines.push(currentLine.trim());
     }
 
-    let y = 290;
+    let y = 320;
     const productTextLines = productLines
       .map((line, i) => {
         const prefix = i === 0 ? 'Mahsulot: ' : '           ';
@@ -222,16 +222,16 @@ TEXT 20,80,"4",0,1,1,"${
         : customerName
     }"
 TEXT 20,120,"4",0,1,1,"${customerPhone}"
-TEXT 20,150,"3",0,1,1,"-----------------------------"
-TEXT 20,180,"3",0,1,1,"Narxi:"
-TEXT 160,180,"3",0,1,1,"${orderPrice}"
-TEXT 20,220,"3",0,1,1,"Tuman: ${region} ${district}"
-TEXT 20,260,"3",0,1,1,"Manzil: ${address || '-'}"
+TEXT 20,170,"3",0,1,1,"${extraNumber}"
+TEXT 20,190,"3",0,1,1,"-----------------------------"
+TEXT 20,230,"3",0,1,1,"Narxi:"
+TEXT 160,230,"3",0,1,1,"${orderPrice}"
+TEXT 20,260,"3",0,1,1,"Tuman: ${region} ${district}"
+TEXT 20,290,"3",0,1,1,"Manzil: ${address || '-'}"
 ${productTextLines}
 TEXT 20,${y},"3",0,1,1,"Izoh: ${comment || '-'}"
 TEXT 20,${y + 30},"2",0,1,1,"Jo'natuvchi: ${market} (${whereDeliver})"
 TEXT 20,${y + 60},"2",0,1,1,"Mutaxasis: ${operator}"
-TEXT 20,${y + 90},"2",0,1,1,"Qo'shimcha raqam: ${extraNumber}"
 QRCODE 560,50,L,8,A,0,"${qrCode}"
 PRINT 1
 `.trim();
