@@ -1276,6 +1276,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { orderId: order.id },
       });
 
+      // 🔹 Qo‘shimcha: eski itemlarning original nusxasi
+      const originalOldItems = oldOrderItems.map((i) => ({ ...i }));
+
       // 3️⃣ Get users & cashboxes
       const [market, marketCashbox, courier, courierCashbox] =
         await Promise.all([
@@ -1469,31 +1472,46 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         ]);
       }
 
-      // 🔟 Cancel order faqat kamaygan holatda
+      // 🔟 ✅ To‘g‘rilangan cancel order logikasi (original nusxadan)
       if (totalNewQty < totalOldQty) {
-        const remainingItems = oldOrderItems.filter((i) => i.quantity > 0);
-        const remainingQty = remainingItems.reduce(
-          (acc, i) => acc + i.quantity,
-          0,
-        );
+        const cancelledItems = originalOldItems
+          .map((oldItem) => {
+            const dtoItem = order_item_info.find(
+              (i) => i.product_id === oldItem.productId,
+            );
+            if (!dtoItem) return null;
+            const diff = oldItem.quantity - dtoItem.quantity;
+            return diff > 0
+              ? { productId: oldItem.productId, quantity: diff }
+              : null;
+          })
+          .filter(
+            (item): item is { productId: string; quantity: number } =>
+              item !== null,
+          );
 
-        if (remainingItems.length > 0) {
+        if (cancelledItems.length > 0) {
+          const cancelledQty = cancelledItems.reduce(
+            (acc, i) => acc + i.quantity,
+            0,
+          );
+
           const cancelledOrder = queryRunner.manager.create(OrderEntity, {
             user_id: order.user_id,
             customer_id: order.customer_id,
-            comment: 'Qolgan mahsulotlar bekor qilindi',
+            comment: 'Qisman bekor qilingan mahsulotlar',
             total_price: order.total_price - price,
             to_be_paid: 0,
             where_deliver: order.where_deliver,
             status: Order_status.CANCELLED,
             qr_code_token: generateCustomToken(),
             parent_order_id: id,
-            product_quantity: remainingQty,
+            product_quantity: cancelledQty,
             post_id: order.post_id,
           });
           await queryRunner.manager.save(cancelledOrder);
 
-          for (const item of remainingItems) {
+          for (const item of cancelledItems) {
             await queryRunner.manager.save(
               queryRunner.manager.create(OrderItemEntity, {
                 productId: item.productId,
@@ -1508,6 +1526,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
+      console.log(error);
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
