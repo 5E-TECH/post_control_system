@@ -48,6 +48,7 @@ const CustomerInfoOrder = () => {
       name: customerData?.name,
       address: customerData.address,
       market_id,
+      extra_number:customerData.extra_number
     };
     createUser.mutate(customer, {
       onSuccess: (res) => {
