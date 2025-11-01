@@ -139,7 +139,7 @@ export default function ScanAndOrder() {
         }
         const partlySellData = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).split(",").join("")),
+          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: Number(data?.extraCost),
           comment: data?.comment,
         };
@@ -190,7 +190,7 @@ export default function ScanAndOrder() {
         }
         const partlySellData = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).split(",").join("")),
+          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: Number(data?.extraCost),
           comment: data?.comment,
         };
