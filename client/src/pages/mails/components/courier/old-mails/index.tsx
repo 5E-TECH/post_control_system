@@ -9,6 +9,8 @@ import {
   setRegionName,
 } from "../../../../../shared/lib/features/regionSlice";
 import { useTranslation } from "react-i18next";
+import { Pagination, type PaginationProps } from "antd";
+import { useParamsHook } from "../../../../../shared/hooks/useParams";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -25,13 +27,32 @@ const borderColorsByStatus = {
 
 const CourierOldMails = () => {
   const { t } = useTranslation("mails");
-
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const { getOldPostsCourier } = usePost();
-  const { data, isLoading } = getOldPostsCourier();
-  const posts = Array.isArray(data?.data) ? data?.data : [];
+
+  // ✅ Pagination boshqaruvi
+  const { getParam, setParam, removeParam } = useParamsHook();
+  const page = Number(getParam("page") || 1);
+  const limit = Number(getParam("limit") || 12);
+
+  const onChange: PaginationProps["onChange"] = (newPage, newLimit) => {
+    if (newPage === 1) removeParam("page");
+    else setParam("page", newPage);
+
+    if (newLimit === 8) removeParam("limit");
+    else setParam("limit", newLimit);
+  };
+
+  // ✅ API chaqiruv
+  const { data, isLoading } = getOldPostsCourier({ page, limit });
+  const posts = Array.isArray(data?.data?.data)
+    ? data?.data?.data
+    : Array.isArray(data?.data)
+    ? data?.data
+    : [];
+  const total = data?.data?.total || posts.length;
 
   const handleNavigate = (post: any) => {
     navigate(`/courier-mails/${post?.id}`);
@@ -39,22 +60,20 @@ const CourierOldMails = () => {
     dispatch(setHideSend(true));
   };
 
-  if (isLoading) {
-    return <MailSkeleton />;
-  }
+  if (isLoading) return <MailSkeleton />;
 
   return posts?.length > 0 ? (
-    <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10 max-sm:grid-cols-1">
-      {posts?.length ? (
-        posts?.map((post: any) => (
+    <div>
+      <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 gap-10 max-sm:grid-cols-1">
+        {posts.map((post: any) => (
           <div
             key={post?.id}
-            className={`min-h-[250px] border border-red-500  ${
+            className={`min-h-[250px] border ${
               borderColorsByStatus[
                 post?.status as keyof typeof borderColorsByStatus
               ]
             } shadow-sm rounded-md flex flex-col items-center justify-center cursor-pointer ${
-              post?.status == "canceled"
+              post?.status === "canceled"
                 ? "bg-red-500 dark:bg-[#73374d]"
                 : "bg-[#45C1FF] dark:bg-[#2a4c76]"
             } text-white border-0`}
@@ -82,12 +101,19 @@ const CourierOldMails = () => {
               </span>
             </p>
           </div>
-        ))
-      ) : (
-        <div className="col-span-4 flex justify-center">
-          <div className="text-[22px]">Eski buyurtmalar mavjud emas</div>
-        </div>
-      )}
+        ))}
+      </div>
+
+      {/* ✅ Pagination pastda */}
+      <div className="flex justify-center my-8">
+        <Pagination
+          showSizeChanger
+          current={page}
+          total={total}
+          pageSize={limit}
+          onChange={onChange}
+        />
+      </div>
     </div>
   ) : (
     <div className="col-span-4 flex justify-center h-[65vh] items-center">
