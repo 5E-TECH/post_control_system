@@ -1,7 +1,8 @@
-import { memo, useCallback, useState, type FC } from "react";
+import { memo, useCallback, useEffect, useState, type FC } from "react";
 import { useDispatch } from "react-redux";
 import { setUserFilter } from "../../../../shared/lib/features/user-filters";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
+import { useLocation } from "react-router-dom";
 
 interface Props {
   placeholder: string;
@@ -10,7 +11,15 @@ interface Props {
 
 const SearchInput: FC<Props> = ({ placeholder, className }) => {
   const [search, setSearch] = useState<string>("");
+  const location = useLocation()
   const dispatch = useDispatch();
+  // console.log(location);
+
+  useEffect(() => {
+    setSearch("")
+    dispatch(setUserFilter({ name: "search", value:null }))
+  }, [location.pathname])
+  
   const debouncedSearch = useCallback(
     debounce((value: string) => {
       dispatch(setUserFilter({ name: "search", value }));
