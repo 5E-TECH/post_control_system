@@ -257,6 +257,13 @@ const AllOrders = () => {
     }
   }, [isShow]);
 
+  useEffect(() => {
+    if (search) {
+      setParam("page", 1);
+    }
+  }, [search]);
+
+
   // Loading and Disabled button
   const getIsPending = () => {
     if (urlType.current === "sell") {

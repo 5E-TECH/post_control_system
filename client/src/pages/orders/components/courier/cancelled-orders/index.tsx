@@ -48,6 +48,13 @@ const CancelledOrders = () => {
   });
   const total = data?.data?.total || 0;
 
+  useEffect(() => {
+    if (search) {
+      setParam("page", 1);
+    }
+  }, [search]);
+
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { handleSuccess, handleApiError } = useApiNotification();
   useEffect(() => {

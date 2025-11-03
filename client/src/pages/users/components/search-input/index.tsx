@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useState, type FC } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setUserFilter } from "../../../../shared/lib/features/user-filters";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
-import { useLocation } from "react-router-dom";
+import type { RootState } from "../../../../app/store";
 
 interface Props {
   placeholder: string;
@@ -10,32 +10,40 @@ interface Props {
 }
 
 const SearchInput: FC<Props> = ({ placeholder, className }) => {
-  const [search, setSearch] = useState<string>("");
-  const location = useLocation()
   const dispatch = useDispatch();
-  // console.log(location);
+  const reduxSearch = useSelector(
+    (state: RootState) => state.setFilter.search || ""
+  );
+  const [localSearch, setLocalSearch] = useState(reduxSearch);
 
-  useEffect(() => {
-    setSearch("")
-    dispatch(setUserFilter({ name: "search", value:null }))
-  }, [location.pathname])
-  
   const debouncedSearch = useCallback(
     debounce((value: string) => {
       dispatch(setUserFilter({ name: "search", value }));
-    }, 800),
+      sessionStorage.setItem("courier_search", value); // 🔹 saqlab qo‘yish
+    }, 400),
     [dispatch]
   );
 
+  useEffect(() => {
+    const saved = sessionStorage.getItem("courier_search");
+    if (saved) {
+      setLocalSearch(saved);
+      dispatch(setUserFilter({ name: "search", value: saved }));
+    }
+  }, [dispatch]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLocalSearch(value);
+    debouncedSearch(value);
+  };
+
   return (
-    <div className="">
+    <div>
       <input
         type="text"
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          debouncedSearch(e.target.value);
-        }}
+        value={localSearch}
+        onChange={handleSearchChange}
         placeholder={placeholder}
         className={`border border-[#2E263D66] placeholder:text-[#2E263D66] py-[8px] px-[16px] rounded-md outline-none cursor-pointer dark:border-[#E7E3FC38] dark:placeholder:text-[#E7E3FC38] ${className}`}
       />
