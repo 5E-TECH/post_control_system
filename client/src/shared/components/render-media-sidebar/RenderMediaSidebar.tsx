@@ -398,7 +398,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/payments"}
+              to={"/cash-box"}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
