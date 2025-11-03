@@ -35,11 +35,13 @@ const Payments = () => {
   const { t } = useTranslation("payment");
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
-  const id = user.id;
+  // const id = user.id;
   const { pathname } = useLocation();
+  console.log(role);
+  
   useEffect(() => {
     if (role === "courier" || role === "market") {
-      navigate(`cash-detail/${id}`);
+      navigate(`cash-box`);
     }
   }, [user, role, pathname]);
 
@@ -57,7 +59,7 @@ const Payments = () => {
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
   const searchParam = search
-    ? { search: search } // ✅ faqat search bo‘lsa qo‘shiladi
+    ? { search: search }
     : {};
 
   // Pagination start

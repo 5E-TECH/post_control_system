@@ -196,6 +196,7 @@ const OrderView = () => {
               t("market"),
               t("status"),
               t("price"),
+              t("delivery"),
               t("createdAt"),
             ].map((header, idx) => (
               <th key={idx}>
@@ -260,6 +261,9 @@ const OrderView = () => {
                 </td>
                 <td className="pl-10" data-cell={t("price")}>
                   {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+                </td>
+                <td className="pl-10" data-cell={t("delivery")}>
+                  {t(`${item?.where_deliver}`)}
                 </td>
                 <td className="pl-10" data-cell={t("createdAt")}>
                   {(() => {
