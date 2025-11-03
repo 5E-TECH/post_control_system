@@ -52,7 +52,7 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'bigint', nullable: true })
   sold_at: number | null;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: 'boolean', default: false })
   deleted: boolean;
 
   // 🟢 One Order → Many OrderItems
