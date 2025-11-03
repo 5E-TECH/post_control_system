@@ -18,10 +18,10 @@ export const usePost = () => {
       client.invalidateQueries({ queryKey: [post], refetchType: "active" }),
   });
 
-  const getAllPosts = (path?: string) =>
+  const getAllPosts = (path?: string, params?:any) =>
     useQuery({
-      queryKey: [post, path],
-      queryFn: () => api.get(`post/${path}`).then((res) => res.data),
+      queryKey: [post, path, params],
+      queryFn: () => api.get(`post/${path}`, {  params}).then((res) => res.data),
     });
 
   const getPostById = (id: string, path: string, bool: boolean = true, params?:any) =>
