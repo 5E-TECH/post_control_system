@@ -58,6 +58,13 @@ const WaitingOrders = () => {
     setOrderItemInfo([]);
   };
 
+  useEffect(() => {
+    if (search) {
+      setParam("page", 1);
+    }
+  }, [search]);
+
+
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const item = order.current;
     const type = urlType.current;
