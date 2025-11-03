@@ -1267,10 +1267,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // 1️⃣ Check order
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id, status: Order_status.WAITING },
+        relations: ['items', 'items.product'],
       });
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
 
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: order.customer_id },
+        relations: ['district', 'district.region'],
+      });
+
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id: order?.post_id || '' },
+        relations: ['courier'],
+      });
+
+      const marketId = order.user_id;
       // 🔹 Eski total_price ni saqlab olamiz
       const oldTotalPrice = Number(order.total_price);
 
@@ -1327,7 +1339,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order.comment || '',
         comment || '',
         extraCost || 0,
-        ['Buyurtmaning bir qismi sotildi'],
+        ['Buyurtma arzonroqqa sotildi!'],
       );
 
       // 🧩 Jami sonlar solishtiriladi
@@ -1475,6 +1487,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         ]);
       }
 
+      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
+        where: { market_id: marketId },
+      });
+
       // 🔟 ✅ To‘g‘rilangan cancel order logikasi
       if (totalNewQty < totalOldQty) {
         const cancelledItems = originalOldItems
@@ -1526,8 +1542,52 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               }),
             );
           }
+
+          const canceled = await queryRunner.manager.findOne(OrderEntity, {
+            where: { id: cancelledOrder.id },
+            relations: ['items', 'items.product'],
+          });
+
+          await this.botService.sendMessageToGroup(
+            telegramGroup?.group_id || null,
+            `*⚠️❌ Qisman bekor qilindi!*\n\n` +
+              `👤 *Mijoz:* ${customer?.name}\n` +
+              `📞 *Telefon:* ${customer?.phone_number}\n` +
+              `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
+              `📦 *Buyurtmalar:*\n${canceled?.items
+                .map(
+                  (item, i) =>
+                    `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
+                )
+                .join('\n')}\n\n` +
+              `💰 *Narxi:* ${canceled?.total_price} so‘m\n` +
+              `🕒 *Yaratilgan vaqti:* ${new Date(Number(canceled?.created_at)).toLocaleString('uz-UZ')}\n\n` +
+              `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
+              `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
+              `📝 *Izoh:* ${canceled?.comment || '-'}\n`,
+          );
         }
       }
+
+      await this.botService.sendMessageToGroup(
+        telegramGroup?.group_id || null,
+        `*⚠️ Buyurtma arzonroq sotildi!*\n\n` +
+          `👤 *Mijoz:* ${customer?.name}\n` +
+          `📞 *Telefon:* ${customer?.phone_number}\n` +
+          `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
+          `📦 *Buyurtmalar:*\n${order.items
+            .map(
+              (item, i) =>
+                `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
+            )
+            .join('\n')}\n\n` +
+          `💰 *Oldingi narxi:* ${oldTotalPrice} so‘m\n` +
+          `💰 *Sotilgan narxi:* ${order.total_price} so‘m\n` +
+          `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
+          `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
+          `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
+          `📝 *Izoh:* ${order.comment || '-'}\n`,
+      );
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Order qisman sotildi');
