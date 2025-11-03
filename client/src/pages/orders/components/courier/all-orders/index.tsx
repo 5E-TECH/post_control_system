@@ -273,160 +273,209 @@ const AllOrders = () => {
     }
   };
 
+  useEffect(() => {
+    if (isShow && order?.current) {
+      const initialItems = order?.current?.items?.map((item: any) => ({
+        product_id: item.product.id,
+        name: item.product.name,
+        quantity: item.quantity, // hozirgi son
+        maxQuantity: item.quantity, // serverdan kelgan quantity – limit sifatida
+      }));
+      setOrderItemInfo(initialItems || []);
+    }
+  }, [isShow, order]);
+
+  const handleMinus = (index: number) => {
+    setOrderItemInfo((prev) => {
+      // Hozirgi umumiy miqdorni hisoblaymiz
+      const totalQuantity = prev.reduce((sum, item) => sum + item.quantity, 0);
+
+      // Agar umumiy son 1 dan katta bo‘lsa, kamaytirishga ruxsat beramiz
+      if (totalQuantity > 1) {
+        return prev.map((item, i) => {
+          if (i === index && item.quantity > 0) {
+            // kamaytirgandan keyin umumiy son 0 bo‘lmasligini tekshiramiz
+            const newTotal = totalQuantity - 1;
+            if (newTotal >= 1) {
+              return { ...item, quantity: item.quantity - 1 };
+            }
+          }
+          return item;
+        });
+      }
+
+      // agar umumiy son 1 bo‘lsa, hech narsa o‘zgartirmaymiz
+      return prev;
+    });
+  };
+
+  const handlePlus = (index: number) => {
+    setOrderItemInfo((prev) =>
+      prev.map((item, i) => {
+        const currentData = order.current?.items?.[i];
+        const max = currentData?.quantity ?? item.maxQuantity ?? Infinity;
+
+        if (i === index && item.quantity < max) {
+          return { ...item, quantity: item.quantity + 1 };
+        }
+        return item;
+      })
+    );
+  };
+
   return data?.data?.data?.length > 0 ? (
     <div>
-<table className="w-full">
-  <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
-    <tr>
-      <th>
-        <div className="flex items-center gap-10 pl-10 pr-5">
-          <span>#</span>
-        </div>
-      </th>
-      <th>
-        <div className="flex items-center gap-10">
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-          <span>{t("mijoz")}</span>
-        </div>
-      </th>
-      <th>
-        <div className="flex items-center gap-10">
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-          <span>{t("phone")}</span>
-        </div>
-      </th>
-      <th>
-        <div className="flex items-center gap-10">
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-          <span>{t("detail.address")}</span>
-        </div>
-      </th>
-      <th>
-        <div className="flex items-center gap-10">
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-          <span>{t("market")}</span>
-        </div>
-      </th>
-      <th>
-        <div className="flex items-center gap-10">
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-          <span>{t("status")}</span>
-        </div>
-      </th>
-      <th>
-        <div className="flex items-center gap-10">
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-          <span>{t("price")}</span>
-        </div>
-      </th>
-      <th>
-        <div className="flex items-center gap-10">
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-          <span>{t("stock")}</span>
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-        </div>
-      </th>
-      <th>
-        <div className="flex items-center justify-center gap-30">
-          <span>{t("harakat")}</span>
-          <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-        </div>
-      </th>
-    </tr>
-  </thead>
-
-  <tbody>
-    {data?.data?.data?.map((item: any, inx: number) => {
-      return (
-        <tr
-          onClick={() => {
-            navigate(`/orders/order-detail/${item.id}`);
-          }}
-          key={item?.id}
-          className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
-        >
-          <td className="pl-10" data-cell="#">
-            {inx + 1}
-          </td>
-          <td
-            className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
-            data-cell={t("mijoz")}
-          >
-            {item?.customer?.name}
-          </td>
-          <td
-            className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-            data-cell={t("phone")}
-          >
-            {item?.customer?.phone_number}
-          </td>
-          <td
-            className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
-            data-cell={t("detail.address")}
-          >
-            {item?.customer?.district?.name}
-          </td>
-          <td
-            className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-            data-cell={t("market")}
-          >
-            {item?.market?.name}
-          </td>
-          <td className="pl-10" data-cell={t("status")}>
-            <span
-              className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                statusColors[item.status] || "bg-slate-400"
-              }`}
-            >
-              {st(`${item.status}`)}
-            </span>
-          </td>
-          <td
-            className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-            data-cell={t("price")}
-          >
-            {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
-          </td>
-          <td
-            className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-            data-cell={t("stock")}
-          >
-            {item?.items.length}
-          </td>
-          <td
-            className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-            data-cell={t("harakat")}
-          >
-            {item?.status === "waiting" ? (
-              <div className="flex gap-3">
-                <Button
-                  onClick={(e) => handleSellOrder(e, item)}
-                  className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
-                >
-                  {t("sotish")}
-                </Button>
-                <Button
-                  onClick={(e) => handleCancelOrder(e, item)}
-                  className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
-                >
-                  {t("detail.cancel")}
-                </Button>
+      <table className="w-full">
+        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
+          <tr>
+            <th>
+              <div className="flex items-center gap-10 pl-10 pr-5">
+                <span>#</span>
               </div>
-            ) : item?.status === "sold" ||
-              item?.status === "cancelled" ? (
-              <div className="ml-9">
-                <Button onClick={(e) => handleRollback(e, item?.id)}>
-                  <AlertCircle />
-                </Button>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("mijoz")}</span>
               </div>
-            ) : null}
-          </td>
-        </tr>
-      );
-    })}
-  </tbody>
-</table>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("phone")}</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("detail.address")}</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("market")}</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("status")}</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("price")}</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("stock")}</span>
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center justify-center gap-30">
+                <span>{t("harakat")}</span>
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+              </div>
+            </th>
+          </tr>
+        </thead>
 
+        <tbody>
+          {data?.data?.data?.map((item: any, inx: number) => {
+            return (
+              <tr
+                onClick={() => {
+                  navigate(`/orders/order-detail/${item.id}`);
+                }}
+                key={item?.id}
+                className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
+              >
+                <td className="pl-10" data-cell="#">
+                  {inx + 1}
+                </td>
+                <td
+                  className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t("mijoz")}
+                >
+                  {item?.customer?.name}
+                </td>
+                <td
+                  className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t("phone")}
+                >
+                  {item?.customer?.phone_number}
+                </td>
+                <td
+                  className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t("detail.address")}
+                >
+                  {item?.customer?.district?.name}
+                </td>
+                <td
+                  className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t("market")}
+                >
+                  {item?.market?.name}
+                </td>
+                <td className="pl-10" data-cell={t("status")}>
+                  <span
+                    className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
+                      statusColors[item.status] || "bg-slate-400"
+                    }`}
+                  >
+                    {st(`${item.status}`)}
+                  </span>
+                </td>
+                <td
+                  className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t("price")}
+                >
+                  {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+                </td>
+                <td
+                  className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t("stock")}
+                >
+                  {item?.items.length}
+                </td>
+                <td
+                  className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t("harakat")}
+                >
+                  {item?.status === "waiting" ? (
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={(e) => handleSellOrder(e, item)}
+                        className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
+                      >
+                        {t("sotish")}
+                      </Button>
+                      <Button
+                        onClick={(e) => handleCancelOrder(e, item)}
+                        className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
+                      >
+                        {t("detail.cancel")}
+                      </Button>
+                    </div>
+                  ) : item?.status === "sold" ||
+                    item?.status === "cancelled" ? (
+                    <div className="ml-9">
+                      <Button onClick={(e) => handleRollback(e, item?.id)}>
+                        <AlertCircle />
+                      </Button>
+                    </div>
+                  ) : null}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
 
       <div className="flex justify-center mb-5">
         <Pagination
@@ -446,7 +495,7 @@ const AllOrders = () => {
       />
 
       <Popup isShow={isShow} onClose={closePopup}>
-        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8 dark:bg-[#312D4B]">
+        <div className="w-[400px] bg-[#ffffff] shadow-lg rounded-md relative pb-4 px-8 dark:bg-[#312D4B] max-md:w-[350px] max-h-[90vh] overflow-hidden overflow-y-auto">
           <X
             className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
             onClick={closePopup}
@@ -463,68 +512,88 @@ const AllOrders = () => {
           >
             <p>
               <span className="font-semibold">Mijoz ismi:</span>{" "}
-              <span>{order.current?.customer?.name || "—"}</span>
+              {order.current?.customer?.name || "—"}
             </p>
             <p>
               <span className="font-semibold">Mijoz tel raqami:</span>{" "}
-              <span>{order.current?.customer?.phone_number || "—"}</span>
+              {order.current?.customer?.phone_number || "—"}
             </p>
             <p>
+              <span className="font-semibold">Tuman:</span>{" "}
+              {order.current?.customer?.district?.name || "—"}
+            </p>
+            <p>
+              <span className="font-semibold">Mahsulotlar nomi:</span>{" "}
+              {order.current?.items
+                ?.map((item: any) => item.product?.name)
+                .join(", ") || "—"}
+            </p>
+            <p>
+              <span className="font-semibold">Mahsulotlar soni:</span>{" "}
+              {order.current?.items?.reduce(
+                (sum: any, item: any) => sum + (item.quantity || 0),
+                0
+              ) || "—"}
+            </p>
+
+            <p>
               <span className="font-semibold">Umumiy summa:</span>{" "}
-              <span>
-                {order.current?.total_price
-                  ? order.current.total_price.toLocaleString("uz-UZ")
-                  : "0"}{" "}
-                so'm
-              </span>
+              {order.current?.total_price
+                ? order.current.total_price.toLocaleString("uz-UZ")
+                : "0"}{" "}
+              so'm
             </p>
           </div>
 
           {partleSoldShow && (
             <div className="flex flex-col">
-              {orderItemInfo.map((item, index) => (
-                <div
-                  key={item.productId}
-                  className="pt-4 flex gap-10 justify-between"
-                >
-                  <Form.Item className="flex-1!">
-                    <Select
-                      className="!h-[40px] custom-select-dropdown-bright"
-                      dropdownClassName="dark-dropdown"
-                      value={item.product_id}
-                      disabled
-                      options={[
-                        {
-                          label: item.name,
-                          value: item.product_id,
-                        },
-                      ]}
-                    />
-                  </Form.Item>
+              <div
+                className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
+                  orderItemInfo.length > 2
+                    ? "max-h-49 overflow-y-auto"
+                    : "overflow-visible"
+                }`}
+              >
+                {orderItemInfo.map((item, index) => (
+                  <div
+                    key={item.product_id}
+                    className="pt-4 flex gap-10 justify-between"
+                  >
+                    <Form.Item className="flex-1!">
+                      <Select
+                        className="!h-[40px]"
+                        value={item.product_id}
+                        disabled
+                        options={[{ label: item.name, value: item.product_id }]}
+                      />
+                    </Form.Item>
+                    <div className="flex gap-2 items-center mb-6 select-none">
+                      <Minus
+                        className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                          item.quantity <= 0 ||
+                          orderItemInfo.reduce(
+                            (sum, i) => sum + i.quantity,
+                            0
+                          ) <= 1
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
+                        }`}
+                        onClick={() => handleMinus(index)}
+                      />
 
-                  <div className="flex gap-2 items-center mb-6 select-none">
-                    <Minus
-                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                      onClick={() => {
-                        const updated = [...orderItemInfo];
-                        if (updated[index].quantity > 0) {
-                          updated[index].quantity -= 1;
-                          setOrderItemInfo(updated);
-                        }
-                      }}
-                    />
-                    <Plus
-                      className="h-[20px] w-[20px] cursor-pointer hover:opacity-70"
-                      onClick={() => {
-                        const updated = [...orderItemInfo];
-                        updated[index].quantity += 1;
-                        setOrderItemInfo(updated);
-                      }}
-                    />
-                    <span className="text-[20px]">{item.quantity}</span>
+                      <span className="text-[20px]">{item.quantity}</span>
+                      <Plus
+                        className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                          item.quantity >= (item.maxQuantity ?? Infinity)
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
+                        }`}
+                        onClick={() => handlePlus(index)}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
 
               <Form.Item>
                 <Input
@@ -532,38 +601,32 @@ const AllOrders = () => {
                   placeholder="To'lov summasi"
                   value={totalPrice}
                   onChange={(e) => {
-                    const rawValue = e.target.value.replace(/\D/g, "");
+                    const raw = e.target.value.replace(/\D/g, "");
                     const formatted = new Intl.NumberFormat("uz-UZ").format(
-                      Number(rawValue || 0)
+                      Number(raw || 0)
                     );
                     setTotalPrice(formatted);
                   }}
-                ></Input>
+                />
               </Form.Item>
             </div>
           )}
 
-          <Form
-            initialValues={{}}
-            form={form}
-            onFinish={onFinish}
-            layout="vertical"
-          >
+          <Form form={form} onFinish={onFinish} layout="vertical">
             <div>
               <Form.Item
                 name="extraCost"
-                label="Qo'shimcha (pul)"
                 className="dark:[&_.ant-form-item-label>label]:text-[#E7E3FC]! py-4!"
+                label="Qo'shimcha (pul)"
               >
+                {/* <span>Qo'shimcha (pul)</span> */}
                 <InputNumber
                   placeholder="Qo'shimcha pul"
                   className="!border !border-gray-500 h-[40px]! w-full!"
-                  formatter={(value) =>
-                    value
-                      ? value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                      : ""
+                  formatter={(v) =>
+                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
                   }
-                  parser={(value) => value?.replace(/,/g, "") || ""}
+                  parser={(v) => v?.replace(/,/g, "") || ""}
                 />
               </Form.Item>
             </div>
@@ -574,12 +637,13 @@ const AllOrders = () => {
                 label="Izoh"
                 className="dark:[&_.ant-form-item-label>label]:text-[#E7E3FC]! py-4!"
               >
+                {/* <span>Izoh</span> */}
                 <Input.TextArea
                   className="py-4!
-      dark:bg-[#312D4B]! 
-      dark:border-[#E7E3FC38]! 
-      dark:placeholder:text-[#A9A5C0]! 
-      dark:text-[#E7E3FC]!"
+            dark:bg-[#312D4B]! 
+            dark:border-[#E7E3FC38]! 
+            dark:placeholder:text-[#A9A5C0]! 
+            dark:text-[#E7E3FC]!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"
                   style={{ resize: "none" }}
                 />
@@ -598,7 +662,7 @@ const AllOrders = () => {
                   urlType.current === "sell"
                     ? "bg-[var(--color-bg-sy)]!"
                     : "bg-red-500!"
-                } bg-[var(--color-bg-sy)]! text-[#ffffff]!`}
+                } text-[#ffffff]!`}
               >
                 {urlType.current === "sell" ? "Sotish" : "Bekor qilish"}
               </Button>
