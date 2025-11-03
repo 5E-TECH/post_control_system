@@ -67,5 +67,8 @@
   "harakat": "harakat",
   "sotish": "Sotish",
   "popupTitle": "Buyurtmani ortga qaytarasizmi?",
-  "send": "Buyurtmalarni yuborish"
+  "send": "Buyurtmalarni yuborish",
+  "center": "Markazgacha",
+  "address": "Uygacha",
+  "delivery": "Qayergacha"
 }

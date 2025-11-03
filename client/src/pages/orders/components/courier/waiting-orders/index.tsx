@@ -264,6 +264,7 @@ const WaitingOrders = () => {
             <th>{t("market")}</th>
             <th>{t("status")}</th>
             <th>{t("price")}</th>
+            <th>{t("delivery")}</th>
             <th>{t("stock")}</th>
             <th>{t("harakat")}</th>
           </tr>
@@ -297,6 +298,9 @@ const WaitingOrders = () => {
               </td>
               <td data-cell={t("price")} className="pl-10">
                 {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+              </td>
+              <td data-cell={t("delivery")} className="pl-10">
+                  {t(`${item?.where_deliver}`)}
               </td>
               <td data-cell={t("stock")} className="pl-15">
                 {item?.items.length}
