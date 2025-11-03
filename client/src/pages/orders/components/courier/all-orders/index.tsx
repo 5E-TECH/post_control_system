@@ -372,6 +372,12 @@ const AllOrders = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                <span>{t("delivery")}</span>
+              </div>
+            </th>
+            <th>
+              <div className="flex items-center gap-10">
+                <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                 <span>{t("stock")}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
@@ -436,6 +442,12 @@ const AllOrders = () => {
                   data-cell={t("price")}
                 >
                   {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+                </td>
+                <td
+                  className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t("delivery")}
+                >
+                  {t(`${item?.where_deliver}`)}
                 </td>
                 <td
                   className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"

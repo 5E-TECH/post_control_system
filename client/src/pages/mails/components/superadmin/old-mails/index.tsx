@@ -4,6 +4,8 @@ import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useTranslation } from "react-i18next";
 import MailSkeleton from "../../choose-mail/MailSkeleton";
+import { Pagination, type PaginationProps } from "antd";
+import { useParamsHook } from "../../../../../shared/hooks/useParams";
 
 const borderColorsByStatus = {
   new: "border-gray-400",
@@ -22,16 +24,47 @@ const OldMails = () => {
   const { t } = useTranslation("mails");
   const navigate = useNavigate();
   const { getAllPosts } = usePost();
-  const { data, isLoading } = getAllPosts("");
-  const posts = Array.isArray(data?.data) ? data?.data : [];
+  const { getParam, setParam, removeParam } = useParamsHook();
 
-  if (isLoading) {
-    return <MailSkeleton />;
-  }
-  return (
-    <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-10">
-      {posts.length ? (
-        posts?.map((post: any) => (
+  // ✅ Default qiymatlar
+  const page = Number(getParam("page") || 1);
+  const limit = Number(getParam("limit") || 8); // default 8
+
+  // ✅ API chaqiruv
+  const { data, isLoading } = getAllPosts("", { page, limit });
+
+  const posts = Array.isArray(data?.data?.data)
+    ? data?.data?.data
+    : Array.isArray(data?.data)
+    ? data?.data
+    : [];
+
+  const total = data?.data?.total || posts.length;
+
+  // ✅ Sahifani o‘zgartirish
+  const onChange: PaginationProps["onChange"] = (newPage) => {
+    if (newPage === 1) removeParam("page");
+    else setParam("page", newPage);
+  };
+
+  // ✅ Limitni o‘zgartirish
+  const onShowSizeChange: PaginationProps["onShowSizeChange"] = (
+    _current,
+    newLimit
+  ) => {
+    if (newLimit === 8) removeParam("limit");
+    else setParam("limit", newLimit);
+
+    // Limit o‘zgarsa sahifani 1-ga qaytaramiz
+    removeParam("page");
+  };
+
+  if (isLoading) return <MailSkeleton />;
+
+  return posts?.length > 0 ? (
+    <div>
+      <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-10">
+        {posts.map((post: any) => (
           <div
             key={post?.id}
             className={`min-h-[250px] border ${
@@ -39,7 +72,7 @@ const OldMails = () => {
                 post?.status as keyof typeof borderColorsByStatus
               ]
             } shadow-2xl rounded-md flex flex-col items-center justify-center cursor-pointer ${
-              post?.status == "canceled"
+              post?.status === "canceled"
                 ? "bg-red-500 dark:bg-[#73374d]"
                 : "bg-[#45C1FF] dark:bg-[#2a4c76]"
             } text-white border-0`}
@@ -71,12 +104,26 @@ const OldMails = () => {
                 minute: "2-digit",
               })}
           </div>
-        ))
-      ) : (
-        <div className="col-span-4 flex justify-center h-[65vh] items-center">
-          <EmptyPage />
-        </div>
-      )}
+        ))}
+      </div>
+
+      {/* ✅ Pagination pastda */}
+      <div className="flex justify-center my-8">
+        <Pagination
+          showSizeChanger
+          current={page}
+          total={total}
+          pageSize={limit}
+          onChange={onChange}
+          onShowSizeChange={onShowSizeChange}
+          pageSizeOptions={["8", "16", "32", "64"]}
+          className="cursor-pointer"
+        />
+      </div>
+    </div>
+  ) : (
+    <div className="col-span-4 flex justify-center h-[65vh] items-center">
+      <EmptyPage />
     </div>
   );
 };
