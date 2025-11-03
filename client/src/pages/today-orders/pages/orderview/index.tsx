@@ -271,7 +271,7 @@ const OrderView = () => {
         className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] select-none"
       >
         {user.role !== "market" && (
-          <td data-cell="">
+          <td data-cell="" className="pl-10">
             <input
               type="checkbox"
               onClick={(e) => e.stopPropagation()}
@@ -280,7 +280,7 @@ const OrderView = () => {
             />
           </td>
         )}
-        <td data-cell="#">{inx + 1}</td>
+        <td data-cell="#" className="pl-10">{inx + 1}</td>
         <td data-cell={t("customer")} className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCB2]">
           {item?.customer?.name}
         </td>

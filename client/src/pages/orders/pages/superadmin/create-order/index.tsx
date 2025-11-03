@@ -66,6 +66,7 @@ const CreateOrder = () => {
       total_price: productInfo?.total_price,
       where_deliver: productInfo?.where_deliver,
       comment: productInfo?.comment,
+      operator:productInfo?.operator
     };
     createOrder.mutate(newOrder, {
       onSuccess: () => {

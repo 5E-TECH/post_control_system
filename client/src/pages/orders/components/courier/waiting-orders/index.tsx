@@ -49,6 +49,7 @@ const WaitingOrders = () => {
   const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
   const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
   const [totalPrice, setTotalPrice] = useState<number | string>("");
+  console.log("11111111", totalPrice);
 
   const closePopup = () => {
     setIsShow(false);
@@ -81,7 +82,7 @@ const WaitingOrders = () => {
         }
         const data = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).split(",").join("")),
+          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: Number(values?.extraCost),
           comment: values?.comment,
         };
@@ -122,7 +123,7 @@ const WaitingOrders = () => {
         }
         const data = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).split(",").join("")),
+          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: Number(values?.extraCost),
           comment: values?.comment,
         };
@@ -260,62 +261,73 @@ const WaitingOrders = () => {
 
   return data?.data?.data?.length > 0 ? (
     <div>
-<table className="w-full">
-  <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
-    <tr>
-      <th>#</th>
-      <th>{t("mijoz")}</th>
-      <th>{t("phone")}</th>
-      <th>{t("detail.address")}</th>
-      <th>{t("market")}</th>
-      <th>{t("status")}</th>
-      <th>{t("price")}</th>
-      <th>{t("stock")}</th>
-      <th>{t("harakat")}</th>
-    </tr>
-  </thead>
-  <tbody>
-    {data?.data?.data?.map((item: any, inx: number) => (
-      <tr
-        onClick={() => navigate(`/orders/order-detail/${item.id}`)}
-        key={item?.id}
-        className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
-      >
-        <td data-cell="#" className="pl-10">{inx + 1}</td>
-        <td data-cell={t("mijoz")} className="pl-10">{item?.customer?.name}</td>
-        <td data-cell={t("phone")} className="pl-10">{item?.customer?.phone_number}</td>
-        <td data-cell={t("detail.address")} className="pl-10">{item?.customer?.district?.name}</td>
-        <td data-cell={t("market")} className="pl-10">{item?.market?.name}</td>
-        <td data-cell={t("status")} className="pl-10">
-          <span className="py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500">
-            {st(`${item.status}`)}
-          </span>
-        </td>
-        <td data-cell={t("price")} className="pl-10">
-          {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
-        </td>
-        <td data-cell={t("stock")} className="pl-15">{item?.items.length}</td>
-        <td data-cell={t("harakat")}>
-          <div className="flex gap-3">
-            <Button
-              onClick={(e) => handleSellOrder(e, item)}
-              className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none!"
+      <table className="w-full">
+        <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
+          <tr>
+            <th>#</th>
+            <th>{t("mijoz")}</th>
+            <th>{t("phone")}</th>
+            <th>{t("detail.address")}</th>
+            <th>{t("market")}</th>
+            <th>{t("status")}</th>
+            <th>{t("price")}</th>
+            <th>{t("stock")}</th>
+            <th>{t("harakat")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data?.data?.data?.map((item: any, inx: number) => (
+            <tr
+              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
+              key={item?.id}
+              className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >
-              {t("sotish")}
-            </Button>
-            <Button
-              onClick={(e) => handleCancelOrder(e, item)}
-              className="bg-red-500! text-[#ffffff]! border-none!"
-            >
-              {t("detail.cancel")}
-            </Button>
-          </div>
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
-
+              <td data-cell="#" className="pl-10">
+                {inx + 1}
+              </td>
+              <td data-cell={t("mijoz")} className="pl-10">
+                {item?.customer?.name}
+              </td>
+              <td data-cell={t("phone")} className="pl-10">
+                {item?.customer?.phone_number}
+              </td>
+              <td data-cell={t("detail.address")} className="pl-10">
+                {item?.customer?.district?.name}
+              </td>
+              <td data-cell={t("market")} className="pl-10">
+                {item?.market?.name}
+              </td>
+              <td data-cell={t("status")} className="pl-10">
+                <span className="py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500">
+                  {st(`${item.status}`)}
+                </span>
+              </td>
+              <td data-cell={t("price")} className="pl-10">
+                {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+              </td>
+              <td data-cell={t("stock")} className="pl-15">
+                {item?.items.length}
+              </td>
+              <td data-cell={t("harakat")}>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={(e) => handleSellOrder(e, item)}
+                    className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none!"
+                  >
+                    {t("sotish")}
+                  </Button>
+                  <Button
+                    onClick={(e) => handleCancelOrder(e, item)}
+                    className="bg-red-500! text-[#ffffff]! border-none!"
+                  >
+                    {t("detail.cancel")}
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <div className="flex justify-center pt-5 pb-5">
         <Pagination

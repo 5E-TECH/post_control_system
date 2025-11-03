@@ -32,10 +32,10 @@ export const usePost = () => {
       enabled: bool,
     });
 
-  const getOldPostsCourier = () =>
+  const getOldPostsCourier = (params:any) =>
     useQuery({
-      queryKey: [post],
-      queryFn: () => api.get("post/courier/old-posts").then((res) => res.data),
+      queryKey: [post, params],
+      queryFn: () => api.get("post/courier/old-posts", params).then((res) => res.data),
     });
 
   const getRejectedPostsCourier = () =>

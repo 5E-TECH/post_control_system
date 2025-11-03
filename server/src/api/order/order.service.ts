@@ -1271,10 +1271,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
 
+      // 🔹 Eski total_price ni saqlab olamiz
+      const oldTotalPrice = Number(order.total_price);
+
       // 2️⃣ Load items
       const oldOrderItems = await queryRunner.manager.find(OrderItemEntity, {
         where: { orderId: order.id },
       });
+
+      // 🔹 Eski itemlarning original nusxasi
+      const originalOldItems = oldOrderItems.map((i) => ({ ...i }));
 
       // 3️⃣ Get users & cashboxes
       const [market, marketCashbox, courier, courierCashbox] =
@@ -1324,24 +1330,34 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         ['Buyurtmaning bir qismi sotildi'],
       );
 
-      // 6️⃣ Update items (reduce quantities)
-      for (const dtoItem of order_item_info) {
-        const foundItem = oldOrderItems.find(
-          (i) => i.productId === dtoItem.product_id,
-        );
-        if (!foundItem)
-          throw new NotFoundException(
-            `Product not found in order: ${dtoItem.product_id}`,
-          );
-       
+      // 🧩 Jami sonlar solishtiriladi
+      const totalOldQty = oldOrderItems.reduce((acc, i) => acc + i.quantity, 0);
+      const totalNewQty = order_item_info.reduce(
+        (acc, i) => acc + i.quantity,
+        0,
+      );
 
-        foundItem.quantity -= dtoItem.quantity;
-        await queryRunner.manager.save(foundItem);
+      // 6️⃣ Update items (faqat kamaygan holatda)
+      if (totalNewQty < totalOldQty) {
+        for (const oldItem of oldOrderItems) {
+          const dtoItem = order_item_info.find(
+            (i) => i.product_id === oldItem.productId,
+          );
+          if (!dtoItem)
+            throw new NotFoundException(
+              `Product not found in request: ${oldItem.productId}`,
+            );
+
+          // faqat kamaygan bo‘lsa ayiramiz
+          if (dtoItem.quantity < oldItem.quantity) {
+            oldItem.quantity = dtoItem.quantity;
+            await queryRunner.manager.save(oldItem);
+          }
+        }
       }
 
-      // 7️⃣ Apply same SELL LOGIC as in sellOrder()
+      // 7️⃣ Cashbox logikasi (o‘zgarmagan)
       if (price === 0) {
-        // 0 so'mlik sotuv
         await updateCashbox(
           marketCashbox,
           Operation_type.EXPENSE,
@@ -1361,7 +1377,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           courier.id,
         );
       } else if (price < courierTarif) {
-        // total_price < courier tarif
         await updateCashbox(
           marketCashbox,
           Operation_type.EXPENSE,
@@ -1381,7 +1396,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           courier.id,
         );
       } else if (price < marketTarif) {
-        // total_price < market tarif
         courier_to_be_paid = price - courierTarif;
         await updateCashbox(
           marketCashbox,
@@ -1402,7 +1416,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           courier.id,
         );
       } else {
-        // Normal case
         to_be_paid = price - marketTarif;
         courier_to_be_paid = price - courierTarif;
 
@@ -1427,17 +1440,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // 8️⃣ Order update
-      const soldQuantity = order_item_info.reduce(
-        (acc, item) => acc + item.quantity,
-        0,
-      );
-
       Object.assign(order, {
         status: Order_status.SOLD,
         to_be_paid,
-        totalPrice: price,
+        total_price: price,
         comment: finalComment,
-        product_quantity: soldQuantity,
+        product_quantity: totalNewQty,
         sold_at: order.sold_at ?? Date.now(),
       });
       await queryRunner.manager.save(order);
@@ -1467,43 +1475,64 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         ]);
       }
 
-      // 🔟 Create remaining cancelled order
-      const remainingItems = oldOrderItems.filter((i) => i.quantity > 0);
-      const remainingQty = remainingItems.reduce(
-        (acc, i) => acc + i.quantity,
-        0,
-      );
-
-      if (remainingItems.length > 0) {
-        const cancelledOrder = queryRunner.manager.create(OrderEntity, {
-          user_id: order.user_id,
-          customer_id: order.customer_id,
-          comment: 'Qolgan mahsulotlar bekor qilindi',
-          total_price: order.total_price - price,
-          to_be_paid: 0,
-          where_deliver: order.where_deliver,
-          status: Order_status.CANCELLED,
-          qr_code_token: generateCustomToken(),
-          parent_order_id: id,
-          product_quantity: remainingQty,
-          post_id: order.post_id,
-        });
-        await queryRunner.manager.save(cancelledOrder);
-
-        for (const item of remainingItems) {
-          await queryRunner.manager.save(
-            queryRunner.manager.create(OrderItemEntity, {
-              productId: item.productId,
-              quantity: item.quantity,
-              orderId: cancelledOrder.id,
-            }),
+      // 🔟 ✅ To‘g‘rilangan cancel order logikasi
+      if (totalNewQty < totalOldQty) {
+        const cancelledItems = originalOldItems
+          .map((oldItem) => {
+            const dtoItem = order_item_info.find(
+              (i) => i.product_id === oldItem.productId,
+            );
+            if (!dtoItem) return null;
+            const diff = oldItem.quantity - dtoItem.quantity;
+            return diff > 0
+              ? { productId: oldItem.productId, quantity: diff }
+              : null;
+          })
+          .filter(
+            (item): item is { productId: string; quantity: number } =>
+              item !== null,
           );
+
+        if (cancelledItems.length > 0) {
+          const cancelledQty = cancelledItems.reduce(
+            (acc, i) => acc + i.quantity,
+            0,
+          );
+
+          // 🧮 Eski va yangi total_price farqi — bekor qilingan summa
+          const cancelledTotalPrice = oldTotalPrice - Number(price);
+
+          const cancelledOrder = queryRunner.manager.create(OrderEntity, {
+            user_id: order.user_id,
+            customer_id: order.customer_id,
+            comment: 'Qisman bekor qilingan mahsulotlar',
+            total_price: cancelledTotalPrice, // ✅ to‘g‘ri qiymat
+            to_be_paid: 0,
+            where_deliver: order.where_deliver,
+            status: Order_status.CANCELLED,
+            qr_code_token: generateCustomToken(),
+            parent_order_id: id,
+            product_quantity: cancelledQty,
+            post_id: order.post_id,
+          });
+          await queryRunner.manager.save(cancelledOrder);
+
+          for (const item of cancelledItems) {
+            await queryRunner.manager.save(
+              queryRunner.manager.create(OrderItemEntity, {
+                productId: item.productId,
+                quantity: item.quantity,
+                orderId: cancelledOrder.id,
+              }),
+            );
+          }
         }
       }
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
+      console.log(error);
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
