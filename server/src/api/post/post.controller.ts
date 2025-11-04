@@ -75,8 +75,16 @@ export class PostController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER)
   @Get('courier/old-posts')
-  courierOldPosts(@CurrentUser() user: JwtPayload) {
-    return this.postService.oldPostsForCourier(user);
+  courierOldPosts(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 8,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.postService.oldPostsForCourier(
+      Number(page),
+      Number(limit),
+      user,
+    );
   }
 
   @ApiOperation({ summary: 'Courier rejected posts' })

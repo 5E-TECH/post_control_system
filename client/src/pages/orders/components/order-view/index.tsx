@@ -155,6 +155,7 @@ const OrderView = () => {
             ?.map((item: any) => item.product.name)
             ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
+          Tumani: order?.customer?.name,
           Narxi: Number((order?.total_price ?? 0) / 1000),
           Holati: statusLabels[order?.status],
           Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {

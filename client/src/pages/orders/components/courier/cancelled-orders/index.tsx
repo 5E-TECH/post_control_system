@@ -9,11 +9,14 @@ import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 
 const CancelledOrders = () => {
   const navigate = useNavigate();
   const { t } = useTranslation("orderList");
   const { t: st } = useTranslation("status");
+
+  const [openPopup, setOpenPopup] = useState(false);
 
   // Pagination start
   const { getParam, setParam, removeParam } = useParamsHook();
@@ -180,6 +183,7 @@ const CancelledOrders = () => {
                   type="checkbox"
                   className="w-[18px] h-[18px] rounded-sm"
                   checked={item?.id ? selectedIds.includes(item?.id) : false}
+                  onClick={(e) => e.stopPropagation()}
                   onChange={(e) => {
                     if (e.target.checked) {
                       setSelectedIds([...selectedIds, item?.id]);
@@ -231,7 +235,7 @@ const CancelledOrders = () => {
                 className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
                 data-cell={t("delivery")}
               >
-                  {t(`${item?.where_deliver}`)}
+                {t(`${item?.where_deliver}`)}
               </td>
               <td
                 className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
@@ -258,12 +262,26 @@ const CancelledOrders = () => {
         <Button
           disabled={isPending}
           loading={isPending}
-          onClick={handleClick}
+          onClick={() => setOpenPopup(true)}
           className="w-[180px]! max-[650px]:w-full! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!"
         >
           {t("send")}
         </Button>
       </div>
+      {openPopup && (
+        <ConfirmPopup
+          isShow={openPopup}
+          title="Buyurtmalarni pochtaga qo'shishni tasdiqlaysizmi?"
+          description="Ushbu amalni ortga qaytarib bo‘lmaydi."
+          confirmText="Ha"
+          cancelText="Bekor qilish"
+          onConfirm={() => {
+            handleClick(); // Tasdiqlaganda funksiyani chaqiramiz
+            setOpenPopup(false); // Popup yopiladi
+          }}
+          onCancel={() => setOpenPopup(false)} // Bekor qilganda yopiladi
+        />
+      )}
     </div>
   ) : (
     <div className="h-[65vh]">

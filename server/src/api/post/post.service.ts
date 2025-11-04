@@ -39,7 +39,7 @@ export class PostService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async findAll(page = 1, limit = 10): Promise<object> {
+  async findAll(page: number, limit: number): Promise<object> {
     try {
       // Sahifani to‘g‘rilab olamiz
       const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
@@ -181,17 +181,32 @@ export class PostService {
     }
   }
 
-  async oldPostsForCourier(user: JwtPayload): Promise<object> {
+  async oldPostsForCourier(
+    page: number,
+    limit: number,
+    user: JwtPayload,
+  ): Promise<object> {
     try {
-      const allOldPosts = await this.postRepo.find({
+      const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
+      const skip = (page - 1) * take;
+
+      const [data, total] = await this.postRepo.findAndCount({
         where: {
           status: Not(In([Post_status.SENT, Post_status.NEW])),
           courier_id: user.id,
         },
         relations: ['region'],
         order: { created_at: 'DESC' },
+        skip,
+        take,
       });
-      return successRes(allOldPosts, 200, 'All old posts');
+
+      const totalPages = Math.ceil(total / take);
+      return successRes(
+        { data, total, page, totalPages, limit: take },
+        200,
+        'All old posts',
+      );
     } catch (error) {
       return catchError(error);
     }
