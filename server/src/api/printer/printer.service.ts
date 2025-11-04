@@ -5,7 +5,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { PrintOrder } from 'src/common/utils/types/order.interface';
-import { In } from 'typeorm';
 import mqtt from 'mqtt'; // ✅ kerak
 import { Where_deliver } from 'src/common/enums';
 
@@ -67,18 +66,12 @@ export class PrinterService {
         return createdDate.toLocaleDateString('uz-UZ');
       };
 
-      const formatRegion = (regionName: string): string => {
-        let shortName: string;
-        if (regionName.startsWith('toshkent')) {
-          if (regionName.includes('shahri')) {
-            shortName = `${regionName.slice(0, 4)}.sh`;
-          } else {
-            shortName = `${regionName.slice(0, 4)}.vil`;
-          }
-        } else {
-          shortName = `${regionName.slice(0, 3)}`;
+      const formatRegion = (regionName?: string): string => {
+        if (!regionName) return '';
+        if (regionName.trim().startsWith('Qoraqal')) {
+          return regionName.split(' ')[0];
         }
-        return shortName;
+        return regionName.trim();
       };
 
       const orders = await this.orderRepo
@@ -106,7 +99,7 @@ export class PrinterService {
           extraNumber: order.customer.extra_number,
           market: order.market?.name ?? 'N/A',
           comment: order.comment ?? '',
-          region: order.customer.district.assignedToRegion.name,
+          region: formatRegion(order.customer.district.assignedToRegion.name),
           district: order.customer?.district?.name ?? 'N/A',
           address: order.customer?.address ?? 'N/A',
           qrCode: order.qr_code_token ?? '',
