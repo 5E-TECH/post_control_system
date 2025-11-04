@@ -15,8 +15,8 @@ import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
-import { exportCardsToExcel } from "../../../../../shared/helpers/export-download-excel-with-qr-code";
 import { usePostScanner } from "../../../../../shared/components/post-scanner";
+import { exportToExcel } from "../../../../../shared/helpers/export-download-excel";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -92,7 +92,7 @@ const MailDetail = () => {
           sendCouriersToPost(
             { id, data: post },
             {
-              onSuccess: async (res) => {
+              onSuccess: (res) => {
                 console.log("res.data", res.data);
 
                 const courierName = res?.data?.updatedPost?.courier?.name;
@@ -103,17 +103,17 @@ const MailDetail = () => {
                   console.log("mails", mails);
 
                   const exportData = mails?.map((mail: any, inx: number) => ({
-                    id: inx + 1,
-                    manzil: mail?.customer?.district?.name || "",
-                    mijoz: mail?.customer?.name || "",
-                    telefon: mail?.customer?.phone_number || "",
-                    market: mail?.market?.name || "",
-                    summa: Number((mail?.total_price ?? 0) / 1000),
-                    izoh: mail?.comment || "",
-                    qrCode: mail?.qr_code_token || ""
+                    N: inx + 1,
+                    Mijoz: mail?.customer?.name || "",
+                    "Telefon raqam": mail?.customer?.phone_number,
+                    Firma: mail?.market?.name,
+                    Narxi: Number((mail?.total_price ?? 0) / 1000),
+                    Manzil: mail?.where_deliver || "",
+                    Tuman: mail?.customer?.district?.name,
+                    Izoh: mail?.comment || "",
                   }));
 
-                  await exportCardsToExcel(
+                  exportToExcel(
                     exportData || [],
                     "pochtalar"
                   );
@@ -163,7 +163,7 @@ const MailDetail = () => {
     sendCouriersToPost(
       { id: id as string, data: post },
       {
-        onSuccess: async (res) => {
+        onSuccess: (res) => {
           console.log("tasdiqlash", res);
 
           const courierName = res?.data?.updatedPost?.courier?.name;
@@ -175,15 +175,16 @@ const MailDetail = () => {
 
             const exportData = mails?.map((mail: any, inx: number) => ({
               N: inx + 1,
-              Tuman: mail?.customer?.district?.name,
-              Firma: mail?.market?.name,
+              Mijoz: mail?.customer?.name || "",
               "Telefon raqam": mail?.customer?.phone_number,
+              Firma: mail?.market?.name,
               Narxi: Number((mail?.total_price ?? 0) / 1000),
-              Holati: '',
-              "QR code": mail?.qr_code_token
+              Manzil: mail?.where_deliver || "",
+              Tuman: mail?.customer?.district?.name,
+              Izoh: mail?.comment || "",
             }));
 
-            await exportCardsToExcel(
+            exportToExcel(
               exportData || [],
               "pochtalar"
             );
