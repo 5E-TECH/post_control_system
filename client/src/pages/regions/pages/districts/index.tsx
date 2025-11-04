@@ -96,11 +96,11 @@ const Districts = () => {
   const handleSubmit = () => {
     const id = editDistrictId
     const data = {
-      district_name: editDistrictName
+      name: editDistrictName
     }
     updateDistrictName.mutate({id, data}, {
       onSuccess:() => {
-        alert("Succes")
+        refetch()
       }
     })
     console.log(editDistrictName);
