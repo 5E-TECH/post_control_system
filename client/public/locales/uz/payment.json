@@ -76,5 +76,10 @@
     "bills": "Hisob-fakturalar"
   },
   "tuman": "tuman",
-  "telefon_nomer": "Telefon nomer"
+  "telefon_nomer": "Telefon nomer",
+
+  "delivery": {
+    "center": "Markazga",
+    "address": "Uygacha"
+  }
 }
