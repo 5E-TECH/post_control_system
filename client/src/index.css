@@ -415,3 +415,10 @@
   background-color: rgba(124, 58, 237, 0.4) !important;
   color: #fff !important;
 }
+
+
+.ant-pagination-options-size-changer {
+  cursor: pointer !important;
+}
+
+

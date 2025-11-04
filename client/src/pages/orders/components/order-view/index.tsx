@@ -95,7 +95,7 @@ const OrderView = () => {
   }, [role]);
 
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
-  const total = data?.data?.pagination?.total;
+  const total = data?.data?.total;
   console.log('total',total);
   
 
@@ -155,6 +155,7 @@ const OrderView = () => {
             ?.map((item: any) => item.product.name)
             ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
+          Tumani: order?.customer?.name,
           Narxi: Number((order?.total_price ?? 0) / 1000),
           Holati: statusLabels[order?.status],
           Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {
@@ -196,6 +197,7 @@ const OrderView = () => {
               t("market"),
               t("status"),
               t("price"),
+              t("delivery"),
               t("createdAt"),
             ].map((header, idx) => (
               <th key={idx}>
@@ -260,6 +262,9 @@ const OrderView = () => {
                 </td>
                 <td className="pl-10" data-cell={t("price")}>
                   {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+                </td>
+                <td className="pl-10" data-cell={t("delivery")}>
+                  {t(`${item?.where_deliver}`)}
                 </td>
                 <td className="pl-10" data-cell={t("createdAt")}>
                   {(() => {

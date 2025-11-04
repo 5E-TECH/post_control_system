@@ -35,11 +35,13 @@ const Payments = () => {
   const { t } = useTranslation("payment");
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
-  const id = user.id;
+  // const id = user.id;
   const { pathname } = useLocation();
+  console.log(role);
+  
   useEffect(() => {
     if (role === "courier" || role === "market") {
-      navigate(`cash-detail/${id}`);
+      navigate(`cash-box`);
     }
   }, [user, role, pathname]);
 
@@ -57,7 +59,7 @@ const Payments = () => {
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
   const searchParam = search
-    ? { search: search } // ✅ faqat search bo‘lsa qo‘shiladi
+    ? { search: search }
     : {};
 
   // Pagination start
@@ -75,7 +77,9 @@ const Payments = () => {
       limit,
     }
   );
-  const { data } = getMarkets(showMarket, { ...searchParam, limit: 0 });
+
+
+  const { data, refetch:marketRefetch } = getMarkets(showMarket, { ...searchParam, limit: 0 });
   const { data: courierData } = getCourier(showCurier, { ...searchParam });
   const total = cashBoxData?.data?.pagination?.total || 0;
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
@@ -84,7 +88,7 @@ const Payments = () => {
     } else {
       setParam("page", newPage);
     }
-
+    
     if (limit === 10) {
       removeParam("limit");
     } else {
@@ -92,6 +96,11 @@ const Payments = () => {
     }
   };
   // Pagination end
+  useEffect(() => {
+    if(role === "superadmin" || "admin"){
+      marketRefetch()
+    }
+  },[showMarket])
 
   const handleNavigate = () => {
     navigate(`cash-detail/${select}`);
@@ -235,11 +244,11 @@ cursor-pointer"
               <table className="w-full border-collapse">
                 <thead className="bg-[#9d70ff] dark:bg-[#3d3759] text-white text-sm">
                   <tr>
-                    <th className="h-[40px] text-left px-3 font-medium">#</th>
-                    <th className="h-[40px] text-left px-3 font-medium">
+                    <th className="h-[40px] text-left px-3 pl-10 font-medium">#</th>
+                    <th className="h-[40px] text-left px-3 pl-30 font-medium">
                       {t("marketName")}
                     </th>
-                    <th className="h-[40px] text-left px-3 font-medium">
+                    <th className="h-[40px] text-left px-3 pl-40 font-medium">
                       {t("berilishiKerakSumma")}
                     </th>
                   </tr>
@@ -378,14 +387,14 @@ cursor-pointer"
               <table className="w-full border-collapse">
                 <thead className="bg-gradient-to-r from-[#9d70ff] to-[#7b4dff] dark:from-[#3d3759] dark:to-[#4a4370] text-white text-sm">
                   <tr>
-                    <th className="h-[44px] text-left px-3 font-medium">#</th>
-                    <th className="h-[44px] text-left px-3 font-medium">
+                    <th className="h-[44px] text-left px-3 pl-7 font-medium">#</th>
+                    <th className="h-[44px] text-left px-3 pr-30 pl-15 font-medium">
                       {t("courierName")}
                     </th>
-                    <th className="h-[44px] text-left px-3 font-medium">
+                    <th className="h-[44px] text-left px-3 pl-20 font-medium">
                       {t("region")}
                     </th>
-                    <th className="h-[44px] text-left px-3 font-medium">
+                    <th className="h-[44px] text-left px-3 pl-20 font-medium">
                       {t("olinishiKerakSumma")}
                     </th>
                   </tr>
@@ -421,7 +430,7 @@ cursor-pointer"
                         </td>
 
                         <td
-                          className="px-3 py-2 text-[#2E263DB2] dark:text-[#E7E3FCB2]"
+                          className="px-3 py-2 pr-15 text-[#2E263DB2] dark:text-[#E7E3FCB2]"
                           data-cell={t("region")}
                         >
                           {item?.region?.name}
@@ -506,7 +515,7 @@ cursor-pointer"
           <div>
             <div>
               <table className="w-full border-collapse">
-                <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
+                <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
                   <tr>
                     <th className="h-[56px] font-medium  text-left pl-4">
                       <div className="flex items-center justify-between">
@@ -532,13 +541,13 @@ cursor-pointer"
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px] pl-9">
                         {t("amount")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px] pl-9">
                         {t("paymentDate")}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
@@ -563,7 +572,7 @@ cursor-pointer"
                         </td>
                         <td
                           className="data-cell py-3 flex flex-col"
-                          data-cell="CREATED BY"
+                          data-cell={t("createdBy")}
                         >
                           {item?.createdByUser?.name}
                           <span
@@ -578,7 +587,7 @@ cursor-pointer"
                         </td>
                         <td
                           className="data-cell px-4 py-3"
-                          data-cell="CASHBOX_TYPE"
+                          data-cell={t("cashboxtype")}
                         >
                           <span
                             className={`
@@ -598,13 +607,13 @@ cursor-pointer"
                             item?.payment_method === "cash" ||
                             item?.payment_method === "click"
                               ? t(item?.payment_method)
-                              : "sotuv"}
+                              : t("sotuv")}
                           </span>
                         </td>
 
                         <td
                           className="data-cell px-4 py-3"
-                          data-cell="OPERATION_TYPE"
+                          data-cell={t("operationType")}
                         >
                           <span
                             className={`
@@ -629,7 +638,7 @@ cursor-pointer"
                               ? "text-[#FF4D4F]" // qizil
                               : "text-gray-500" // default rang
                           }`}
-                          data-cell="AMOUNT"
+                          data-cell={t("amount")}
                         >
                           {item?.operation_type === "income"
                             ? "+"
@@ -641,7 +650,7 @@ cursor-pointer"
                         </td>
                         <td
                           className="data-cell px-13 py-3"
-                          data-cell="PAYMENT DATE"
+                          data-cell={t("paymentDate")}
                         >
                           {new Date(Number(item?.created_at)).toLocaleString(
                             "uz-UZ"

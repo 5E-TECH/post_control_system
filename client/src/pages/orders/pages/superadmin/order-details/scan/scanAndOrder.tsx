@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import type { RootState } from "../../../../../../app/store";
 import Popup from "../../../../../../shared/ui/Popup";
-import { AlertCircle, Minus, Plus, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Minus, Plus, X } from "lucide-react";
 import {
   Button,
   Form,
@@ -36,6 +36,8 @@ export default function ScanAndOrder() {
   const [totalPrice, setTotalPrice] = useState<number | string>("");
   const [isShow, setIsShow] = useState<boolean>(true);
   const [alertBtnYesNo, setAlertBtnYesNo] = useState<boolean>(false);
+  const [select, setSelect] = useState("");
+  const [alertBtnYesNoAdd, setAlertBtnYesNoAdd] = useState<boolean>(false);
   const [alertBtnYesNoWaiting, setAlertBtnYesNoWaiting] =
     useState<boolean>(false);
   const [actionTypeOrder, setActionTypeOrder] = useState<
@@ -115,7 +117,7 @@ export default function ScanAndOrder() {
     partlySellOrder,
     courierReceiveOrderByScanerById,
     rollbackOrder,
-    joinPostRefusalProduct
+    joinPostRefusalProduct,
   } = useOrder();
 
   const [form] = Form.useForm<FieldType>();
@@ -139,7 +141,7 @@ export default function ScanAndOrder() {
         }
         const partlySellData = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).split(",").join("")),
+          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: Number(data?.extraCost),
           comment: data?.comment,
         };
@@ -190,7 +192,7 @@ export default function ScanAndOrder() {
         }
         const partlySellData = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).split(",").join("")),
+          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: Number(data?.extraCost),
           comment: data?.comment,
         };
@@ -259,18 +261,21 @@ export default function ScanAndOrder() {
   // let maxQuantity:number;
 
   const joinPostRefusalProducts = (order_ids: string) => {
-    joinPostRefusalProduct.mutate({order_ids: [order_ids]}, {
-      onSuccess: () => {
-        message.success("Buyurtma muvaffaqiyatli pochtaga qo'shildi!");
-        navigate(-1);
-      },
-      onError: (err) => {
-        console.error(err);
-        message.error("Buyurtmani pochtaga qo'shishda xatolik yuz berdi!");
-        navigate(-1);
-      },
-    })
-  }
+    joinPostRefusalProduct.mutate(
+      { order_ids: [order_ids] },
+      {
+        onSuccess: () => {
+          message.success("Buyurtma muvaffaqiyatli pochtaga qo'shildi!");
+          navigate(-1);
+        },
+        onError: (err) => {
+          console.error(err);
+          message.error("Buyurtmani pochtaga qo'shishda xatolik yuz berdi!");
+          navigate(-1);
+        },
+      }
+    );
+  };
 
   useEffect(() => {
     if (isShow && order?.data) {
@@ -284,16 +289,28 @@ export default function ScanAndOrder() {
     }
   }, [isShow, order]);
 
-
   const handleMinus = (index: number) => {
-    setOrderItemInfo((prev) =>
-      prev.map((item, i) => {
-        if (i === index && item.quantity > 1) {
-          return { ...item, quantity: item.quantity - 1 };
-        }
-        return item;
-      })
-    );
+    setOrderItemInfo((prev) => {
+      // Hozirgi umumiy miqdorni hisoblaymiz
+      const totalQuantity = prev.reduce((sum, item) => sum + item.quantity, 0);
+
+      // Agar umumiy son 1 dan katta bo‘lsa, kamaytirishga ruxsat beramiz
+      if (totalQuantity > 1) {
+        return prev.map((item, i) => {
+          if (i === index && item.quantity > 0) {
+            // kamaytirgandan keyin umumiy son 0 bo‘lmasligini tekshiramiz
+            const newTotal = totalQuantity - 1;
+            if (newTotal >= 1) {
+              return { ...item, quantity: item.quantity - 1 };
+            }
+          }
+          return item;
+        });
+      }
+
+      // agar umumiy son 1 bo‘lsa, hech narsa o‘zgartirmaymiz
+      return prev;
+    });
   };
 
   const handlePlus = (index: number) => {
@@ -308,12 +325,24 @@ export default function ScanAndOrder() {
     });
   };
 
-  if (loading) return <div>Yuklanmoqda...</div>;
-  if (error) return <div style={{ color: "red" }}>Error: {error}</div>;
+  if (loading)
+    return (
+      <div className="w-full h-screen flex items-center justify-center text-2xl font-semibold">
+        Yuklanmoqda...
+      </div>
+    );
+
+  if (error)
+    return (
+      <div className="w-full h-screen flex flex-col gap-5 items-center justify-center text-2xl font-semibold text-red-500">
+        Xatolik: {error}
+        <button className=" px-3 py-2 rounded-md flex flex-row gap-2 text-white text-[18px] bg-[#9069FE] cursor-pointer" onClick={() => navigate(-1)}> <ArrowLeft /> Scanerga qaytish</button>
+      </div>
+    );
 
   return (
     <Popup isShow={isShow}>
-      <div className="w-[350px] shadow-lg rounded-md dark:bg-[#312d48] bg-[#ffffff] flex flex-col justify-between pt-6 px-8">
+      <div className="w-[350px] shadow-lg rounded-md dark:bg-[#312d48] bg-[#ffffff] flex flex-col justify-between pt-6 px-8 max-h-[90vh] overflow-hidden overflow-y-auto">
         <X
           className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
           onClick={() => {
@@ -350,7 +379,12 @@ export default function ScanAndOrder() {
           </p>
           <p>
             <span className="font-semibold">Mahsulot soni: </span>
-            <span>{order.data?.customer?.phone_number || "—"}</span>
+            <span>
+              {order.data?.items?.reduce(
+                (sum: any, item: any) => sum + (item.quantity || 0),
+                0
+              ) || "—"}
+            </span>
           </p>
           <p>
             <span className="font-semibold">Umumiy summa:</span>{" "}
@@ -365,54 +399,64 @@ export default function ScanAndOrder() {
 
         {partleSoldShow && (
           <div className={`flex flex-col pt-${partleSoldShow ? 3 : 0}`}>
-            {orderItemInfo.map((item, index) => (
-              <div
-                key={item.product_id}
-                className="pt-4 flex gap-10 justify-between"
-              >
-                <Form.Item className="flex-1!">
-                  <Select
-                    className="!h-[40px] custom-select-dropdown-bright"
-                    dropdownClassName="dark-dropdown"
-                    value={item.product_id}
-                    disabled
-                    options={[
-                      {
-                        label: item.name,
-                        value: item.product_id,
-                      },
-                    ]}
-                  />
-                </Form.Item>
+            <div
+              className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
+                orderItemInfo.length > 2
+                  ? "max-h-49 overflow-y-auto"
+                  : "overflow-visible"
+              }`}
+            >
+              {orderItemInfo.map((item, index) => (
+                <div
+                  key={item.product_id}
+                  className="pt-4 flex gap-10 justify-between"
+                >
+                  <Form.Item className="flex-1!">
+                    <Select
+                      className="!h-[40px] custom-select-dropdown-bright"
+                      dropdownClassName="dark-dropdown"
+                      value={item.product_id}
+                      disabled
+                      options={[
+                        {
+                          label: item.name,
+                          value: item.product_id,
+                        },
+                      ]}
+                    />
+                  </Form.Item>
 
-                <div className="flex gap-2 items-center mb-6 select-none">
-                  {/* MINUS */}
-                  <Minus
-                    className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
-                      item.quantity <= 1
-                        ? "opacity-30 cursor-not-allowed"
-                        : "hover:opacity-70"
-                    }`}
-                    onClick={() => handleMinus(index)}
-                  />
+                  <div className="flex gap-2 items-center mb-6 select-none">
+                    {/* MINUS */}
+                    <Minus
+                      className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                        item.quantity <= 0 ||
+                        orderItemInfo.reduce((sum, i) => sum + i.quantity, 0) <=
+                          1
+                          ? "opacity-30 cursor-not-allowed"
+                          : "hover:opacity-70"
+                      }`}
+                      onClick={() => handleMinus(index)}
+                    />
 
-                  {/* MIQDOR */}
-                  <span className="text-[20px] w-[25px] text-center">
-                    {item.quantity}
-                  </span>
+                    {/* MIQDOR */}
+                    <span className="text-[20px] w-[25px] text-center">
+                      {item.quantity}
+                    </span>
 
-                  {/* PLUS */}
-                  <Plus
-                    className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
-                      item.quantity >= (item.maxQuantity ?? Infinity)
-                        ? "opacity-30 cursor-not-allowed"
-                        : "hover:opacity-70"
-                    }`}
-                    onClick={() => handlePlus(index)}
-                  />
+                    {/* PLUS */}
+                    <Plus
+                      className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
+                        item.quantity >= (item.maxQuantity ?? Infinity)
+                          ? "opacity-30 cursor-not-allowed"
+                          : "hover:opacity-70"
+                      }`}
+                      onClick={() => handlePlus(index)}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
             <Form.Item>
               <Input
@@ -449,7 +493,7 @@ export default function ScanAndOrder() {
                 Yo'q
               </Button>
               <Button
-                className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]"
+                className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
                 onClick={() => {
                   rollbackOrder.mutate(id, {
                     onSuccess: () => {
@@ -580,18 +624,49 @@ export default function ScanAndOrder() {
               </div>
             )}
 
-            {!alertBtnYesNo && orderStatus === "cancelled" && (
-              <div className="pt-4 flex gap-10">
-                <Button
-                  className="w-full h-[40px]!"
-                  onClick={() => setAlertBtnYesNo((p) => !p)}
-                >
-                  <AlertCircle />
-                </Button>
+            {!alertBtnYesNo &&
+              !alertBtnYesNoAdd &&
+              orderStatus === "cancelled" && (
+                <div className="pt-4 flex gap-10">
+                  <Button
+                    className="w-full h-[40px]!"
+                    onClick={() => setAlertBtnYesNo((p) => !p)}
+                  >
+                    <AlertCircle />
+                  </Button>
 
-                <Button className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!" onClick={() => joinPostRefusalProducts(id)}>
-                  Buyurtmani qaytarish
-                </Button>
+                  <Button
+                    className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!"
+                    onClick={() => {
+                      setAlertBtnYesNoAdd((p) => !p), setSelect(id);
+                    }}
+                    // onClick={() => joinPostRefusalProducts(id)}
+                  >
+                    Pochtaga qo'shish
+                  </Button>
+                </div>
+              )}
+
+            {alertBtnYesNoAdd && (
+              <div className="flex flex-col gap-5 pt-2">
+                <span className="text-center text-[18px] text-red-500">
+                  Buyurtmani Pochtaga qo'shmoqchimisiz
+                </span>
+
+                <div className="flex gap-10">
+                  <Button
+                    className="w-full bg-red-500! text-white! h-[40px]!"
+                    onClick={() => setAlertBtnYesNoAdd(false)}
+                  >
+                    Yo'q
+                  </Button>
+                  <Button
+                    onClick={() => joinPostRefusalProducts(select)}
+                    className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
+                  >
+                    Ha
+                  </Button>
+                </div>
               </div>
             )}
           </div>

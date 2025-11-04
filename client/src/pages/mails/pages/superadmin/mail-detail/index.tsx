@@ -56,7 +56,7 @@ const MailDetail = () => {
   }
 
   const { data } = getPostById(id as string, endpoint, condition, search);
-  const postData = data?.data?.allOrdersByPostId;
+  const postData = data?.data?.allOrdersByPostId || data?.data;
 
   useEffect(() => {
     if (postData && !initialized) {
