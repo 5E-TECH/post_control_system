@@ -78,6 +78,12 @@
 
   "tuman": "District",
 
-  "telefon_nomer":"Phone number"
+  "telefon_nomer": "Phone number",
 
+  "delivery": {
+    "center": "center",
+    "address": "address"
+  },
+
+  "sotuv": "selling"
 }
