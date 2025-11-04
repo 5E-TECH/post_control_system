@@ -25,6 +25,7 @@ interface IProps {
 
 const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
   const { t } = useTranslation('payment');
+  const { t:ts } = useTranslation('status');
   const { getCashBoxHistoryById } = useCashBox();
   const { data, isLoading } = getCashBoxHistoryById(id);
   const navigate = useNavigate();
@@ -189,22 +190,31 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
               >
                 <h3 className="font-semibold text-lg sm:text-xl mb-3 flex items-center gap-2 text-green-600 dark:text-green-400">
                   <ShoppingCart className="w-5 h-5" />
-                  {t('buyurtma')}
+                  {t('buyurtma')} {`(${info?.order?.where_deliver}) ${info?.order?.user?.name}`}
                 </h3>
                 <div className="space-y-2 text-sm sm:text-base">
                   <p className="flex justify-between flex-wrap">
-                    <span className="font-medium">{t('Tuman')}:</span>
+                    <span className="font-medium">{t('tuman')}</span>
                     <span>{info?.order?.customer?.district?.name}</span>
                   </p>
 
                   <p className="flex justify-between flex-wrap">
-                    <span className="font-medium">{t('Telefon nomer')}:</span>
-                    <span>{info?.order?.customer?.phone_number}</span>
+                    <span className="font-medium">{t('telefon_nomer')}:</span>
+                    <span>
+                      {info?.order?.customer?.phone_number.replace(
+                        /(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})/,
+                        '$1 $2 $3 $4 $5',
+                      )}
+                    </span>
                   </p>
 
                   <p className="flex justify-between flex-wrap">
                     <span className="font-medium">{t('umumiyNarx')}:</span>
-                    <span>{info?.order?.total_price}</span>
+                    <span className="font-semibold flex items-center gap-1 text-green-600">
+                      <FaMoneyBillWave size={16} />
+
+                      {info?.order?.total_price.toLocaleString()}
+                    </span>
                   </p>
 
                   {user?.role !== 'courier' && (
@@ -213,12 +223,12 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                         <span className="font-medium">
                           {t("to'lanishiKerak")}:
                         </span>
-                        <span>{info?.order?.to_be_paid}</span>
+                        <span>{info?.order?.to_be_paid.toLocaleString()}</span>
                       </p>
                       <p className="flex justify-between flex-wrap">
                         <span className="font-medium">{t("to'langan")}:</span>
                         <span className="text-green-700 font-semibold">
-                          {info?.order?.paid_amount}
+                          {info?.order?.paid_amount.toLocaleString()}
                         </span>
                       </p>
                     </>
@@ -233,7 +243,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                           : 'bg-red-500'
                       }`}
                     >
-                      {info?.order?.status}
+                      {ts(`${info?.order?.status}`)}
                     </span>
                   </p>
                 </div>

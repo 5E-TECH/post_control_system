@@ -9,7 +9,7 @@ import { debounce } from '../../../../shared/helpers/DebounceFunc';
 
 export interface ICustomer {
   phone_number: string;
-  extra_number?: string; // ✅ optional
+  extra_number?: string; 
   region_id?: string | null;
   district_id?: string | null;
   name: string;
@@ -18,7 +18,7 @@ export interface ICustomer {
 
 export const initialState: ICustomer = {
   phone_number: '+998 ',
-  extra_number: '', // ✅ boshlang‘ich qiymat
+  extra_number: '',
   region_id: null,
   district_id: null,
   name: '',
@@ -181,7 +181,7 @@ const CustomerInfocomp = () => {
                   },
                 } as any);
               }}
-              placeholder="+998 XX XXX XX XX"
+              placeholder="+998 "
               className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             />
           </div>
