@@ -1,4 +1,12 @@
-import { Controller, Get, Patch, Param, UseGuards, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Param,
+  UseGuards,
+  Body,
+  Post,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { DistrictService } from './district.service';
 import { UpdateDistrictDto } from './dto/update-district.dto';
@@ -6,6 +14,7 @@ import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { CreateDistrictDto } from './dto/create-district.dto';
 
 @ApiTags('Districts')
 @Controller('district')
@@ -23,6 +32,13 @@ export class DistrictController {
   @Get()
   getAll() {
     return this.districtService.findAll();
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @Post()
+  create(@Body() createDistrictDto: CreateDistrictDto) {
+    return this.districtService.create(createDistrictDto);
   }
 
   @UseGuards(JwtGuard, RolesGuard)

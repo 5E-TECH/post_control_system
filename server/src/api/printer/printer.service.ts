@@ -224,7 +224,7 @@ TEXT 20,290,"3",0,1,1,"Manzil: ${address || '-'}"
 ${productTextLines}
 TEXT 20,${y},"3",0,1,1,"Izoh: ${comment || '-'}"
 TEXT 20,${y + 30},"2",0,1,1,"Jo'natuvchi: ${market} (${whereDeliver})"
-TEXT 20,${y + 60},"2",0,1,1,"Mutaxasis: ${operator}"
+TEXT 20,${y + 60},"2",0,1,1,"Mutaxasis: ${operator || '-'}"
 QRCODE 560,50,L,8,A,0,"${qrCode}"
 PRINT 1
 `.trim();
