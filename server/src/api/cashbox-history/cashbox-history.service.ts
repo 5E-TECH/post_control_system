@@ -42,6 +42,7 @@ export class CashboxHistoryService {
           'cashbox',
           'createdByUser',
           'order',
+          'order.market',
           'order.customer',
           'order.customer.district',
         ],

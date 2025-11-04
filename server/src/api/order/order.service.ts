@@ -103,6 +103,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('customer.district', 'district')
         .leftJoinAndSelect('district.region', 'region')
+        .leftJoinAndSelect('district.assignedToRegion', 'assignedToRegion')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
