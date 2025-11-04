@@ -52,13 +52,13 @@ export function usePostScanner(
                 );
               }
 
-              handleSuccess("Buyurtma muvaffaqiyatli qabul qilindi ✅");
+              handleSuccess("Buyurtma jo'natishga tayyor ✅");
               refetch?.();
             },
             onError: (err) => {
               console.log(err);
               
-              handleApiError(err, "Buyurtma qabul qilishda xatolik!");
+              handleApiError(err, "Buyurtma pochtada topolmadi!");
               const errorSound = new Audio("/sound/error.mp3");
               errorSound.play().catch(() => { });
             },
