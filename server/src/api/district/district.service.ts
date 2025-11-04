@@ -13,6 +13,7 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { regions } from 'src/infrastructure/lib/data/district';
 import { UpdateDistrictDto } from './dto/update-district.dto';
 import { CreateDistrictDto } from './dto/create-district.dto';
+import { UpdateDistrictNameDto } from './dto/update-name.dto';
 
 @Injectable()
 export class DistrictService implements OnModuleInit {
@@ -144,5 +145,19 @@ export class DistrictService implements OnModuleInit {
     }
   }
 
-  // async updateName(updateNameDto: UpdateDistrictNameDto) {}
+  async updateName(id: string, updateNameDto: UpdateDistrictNameDto) {
+    try {
+      const district = await this.districtRepository.findOne({ where: { id } });
+      if (!district) {
+        throw new NotFoundException('District not found');
+      }
+      const { name } = updateNameDto;
+      district.name = name;
+      await this.districtRepository.save(district);
+
+      return successRes({}, 200, 'District name updated');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
 }

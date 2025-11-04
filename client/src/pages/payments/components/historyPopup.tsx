@@ -190,7 +190,8 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
               >
                 <h3 className="font-semibold text-lg sm:text-xl mb-3 flex items-center gap-2 text-green-600 dark:text-green-400">
                   <ShoppingCart className="w-5 h-5" />
-                  {t('buyurtma')} {`(${info?.order?.where_deliver}) ${info?.order?.user?.name}`}
+                  {t('buyurtma')} <span className='text-blue-600'>({t(`delivery.${info?.order?.where_deliver}`)})</span> {info?.order?.market?.name}
+
                 </h3>
                 <div className="space-y-2 text-sm sm:text-base">
                   <p className="flex justify-between flex-wrap">

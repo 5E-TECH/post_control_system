@@ -15,6 +15,7 @@ import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CreateDistrictDto } from './dto/create-district.dto';
+import { UpdateDistrictNameDto } from './dto/update-name.dto';
 
 @ApiTags('Districts')
 @Controller('district')
@@ -56,5 +57,15 @@ export class DistrictController {
     @Body() updateDistrictDto: UpdateDistrictDto,
   ) {
     return this.districtService.update(id, updateDistrictDto);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @Patch('name/:id')
+  updateName(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateDistrictNameDto,
+  ) {
+    return this.districtService.updateName(id, updateDto);
   }
 }
