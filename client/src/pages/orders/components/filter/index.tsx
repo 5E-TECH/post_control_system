@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useState } from "react";
 import { statusOptions } from "../../../../shared/static/order";
 import { ArrowRight, Eraser } from "lucide-react";
-import { Button, DatePicker, Select, Space } from "antd";
+import { Button, DatePicker, Select, Space, Spin } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { useProfile } from "../../../../shared/api/hooks/useProfile";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +24,8 @@ const Filter = () => {
   const { t } = useTranslation("orderList");
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [disabled, setDisabled] = useState(false);
   const { role } = useSelector((state: RootState) => state.roleSlice);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -80,7 +82,13 @@ const Filter = () => {
 
   // excel download
   const handleDownload = () => {
+    setLoading(true);
+    setDisabled(true);
     dispatch(requestDownload());
+    setTimeout(() => {
+      setLoading(false);
+      setDisabled(false);
+    }, 5000);
   };
 
   // options
@@ -208,8 +216,14 @@ const Filter = () => {
         <div className="flex items-center gap-5 flex-wrap max-[800px]:w-full">
           <Button
             onClick={handleDownload}
-            className=" h-[38px]! outline-none text-[16px]! text-white! font-bold! bg-[#08753F]! max-[800px]:w-full!"
+            disabled={disabled}
+            className={`h-[38px]! flex items-center justify-center gap-2 outline-none text-[16px]! font-bold! ${
+              loading
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : "bg-[#08753F]! text-white!"
+            } max-[800px]:w-full!`}
           >
+            {loading && <Spin size="small" />}
             {t("button.export")} <RiFileExcel2Line />
           </Button>
           <input
