@@ -9,7 +9,7 @@ import { debounce } from '../../../../shared/helpers/DebounceFunc';
 
 export interface ICustomer {
   phone_number: string;
-  extra_number?: string; 
+  extra_number?: string;
   region_id?: string | null;
   district_id?: string | null;
   name: string;
@@ -100,6 +100,14 @@ const CustomerInfocomp = () => {
       label: district?.name,
     }));
 
+  const formatFullName = (value: string) => {
+    if (!value) return '';
+    return value
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   return (
     <div className="w-full p-5 rounded-md dark:bg-[#312D48] shadow-lg">
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
@@ -146,7 +154,7 @@ const CustomerInfocomp = () => {
           {/* ✅ Qo‘shimcha raqam (optional) */}
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">
-              {t("Qoshimcha raqam")}
+              {t('Qoshimcha raqam')}
             </label>
             <Input
               name="extra_number"
@@ -194,7 +202,18 @@ const CustomerInfocomp = () => {
             <Input
               name="name"
               value={formData.name}
-              onChange={handleChange}
+              onChange={(e) => {
+                // Bo‘sh joylarga ruxsat berib, so‘zlarni formatlash
+                const rawValue = e.target.value;
+                handleChange({
+                  ...e,
+                  target: {
+                    ...e.target,
+                    name: 'name',
+                    value: formatFullName(rawValue),
+                  },
+                } as any);
+              }}
               placeholder={t('placeholder.name')}
               className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             />
