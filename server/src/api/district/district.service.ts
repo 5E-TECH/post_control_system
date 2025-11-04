@@ -12,6 +12,7 @@ import { RegionRepository } from 'src/core/repository/region.repository';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { regions } from 'src/infrastructure/lib/data/district';
 import { UpdateDistrictDto } from './dto/update-district.dto';
+import { CreateDistrictDto } from './dto/create-district.dto';
 
 @Injectable()
 export class DistrictService implements OnModuleInit {
@@ -48,6 +49,31 @@ export class DistrictService implements OnModuleInit {
           });
         }
       }
+    }
+  }
+
+  async create(createDistrictDto: CreateDistrictDto) {
+    try {
+      const { name, region_id } = createDistrictDto;
+
+      const existRegion = await this.regionRepository.findOne({
+        where: { id: region_id },
+      });
+
+      if (!existRegion) {
+        throw new NotFoundException('Region not found');
+      }
+
+      const newDistrict = this.districtRepository.create({
+        name,
+        region_id,
+        assigned_region: region_id,
+      });
+      await this.districtRepository.save(newDistrict);
+
+      return successRes(newDistrict, 201, 'New district added');
+    } catch (error) {
+      return catchError(error);
     }
   }
 
@@ -117,4 +143,6 @@ export class DistrictService implements OnModuleInit {
       return catchError(error);
     }
   }
+
+  // async updateName(updateNameDto: UpdateDistrictNameDto) {}
 }
