@@ -31,6 +31,9 @@ const Districts = () => {
   const [editRegionId, setEditRegionId] = useState<string | null>(null);
   const [editDistrictId, setEditDistrictId] = useState<string | null>(null);
   const [editDistrictName, setEditDistrictName] = useState<string>("");
+  const [highlightedDistrict, setHighlightedDistrict] = useState<string | null>(
+    null
+  );
 
   const handleAddDistrict = () => {
     const data = {
@@ -39,12 +42,21 @@ const Districts = () => {
     };
     createDistrict.mutate(data, {
       onSuccess: () => {
+        setHighlightedDistrict(openRegionId);
+        setOpenRegionId(null)
         refetch();
+
+        // 3 soniya keyin highlightni olib tashlash
+        setTimeout(() => setHighlightedDistrict(null), 1000);
+
       },
     });
 
-    setOpenRegionId(null);
-    setNewDistict("");
+    setTimeout(() => {
+      setOpenRegionId(null);
+      setEditDistrictId(null);
+      setNewDistict("");
+    }, 5000);
   };
 
   const [regions, setRegions] = useState<RegionType[]>([]);
@@ -84,7 +96,12 @@ const Districts = () => {
       updateDistrict.mutate(
         { id: draggedDistrict.id, data: { assigned_region: destRegion.id } },
         {
-          onSuccess: (data) => console.log("✅ Update success:", data),
+          onSuccess: () => {
+            setHighlightedDistrict(draggedDistrict.id);
+
+            // 3 soniya keyin highlightni olib tashlash
+            setTimeout(() => setHighlightedDistrict(null), 1000);
+          },
           onError: (err) => console.error("❌ Update error:", err),
         }
       );
@@ -94,18 +111,22 @@ const Districts = () => {
   };
 
   const handleSubmit = () => {
-    const id = editDistrictId
+    const id = editDistrictId;
     const data = {
-      name: editDistrictName
-    }
-    updateDistrictName.mutate({id, data}, {
-      onSuccess:() => {
-        refetch()
+      name: editDistrictName,
+    };
+    updateDistrictName.mutate(
+      { id, data },
+      {
+        onSuccess: () => {
+          refetch();
+          setHighlightedDistrict(id);
+          setTimeout(() => setHighlightedDistrict(null), 1000);
+        },
       }
-    })
+    );
     console.log(editDistrictName);
-    setEditDistrictId(null)
-
+    setEditDistrictId(null);
   };
 
   if (isLoading) return <div className="p-5">Loading...</div>;
@@ -163,7 +184,12 @@ const Districts = () => {
                           {...dragProvided.draggableProps}
                           {...dragProvided.dragHandleProps}
                           style={dragProvided.draggableProps.style}
-                          className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-lg cursor-pointer select-none hover:bg-blue-200 active:cursor-grabbing transition"
+                          className={`px-3 py-1 text-sm rounded-lg cursor-pointer select-none transition-colors duration-1000
+    ${
+      highlightedDistrict === district.id
+        ? "bg-[#8B69FE] text-white" // highlight rang
+        : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+    }`}
                         >
                           {
                             <div
