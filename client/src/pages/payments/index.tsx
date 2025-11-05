@@ -207,7 +207,7 @@ const Payments = () => {
         </div>
         {/* berilishi kerak */}
         <PaymentPopup isShow={showMarket} onClose={hendlerClose}>
-          <div className="bg-продажаwhite dark:bg-[#28243d] rounded-xl shadow-lg w-[700px] h-[680px] px-5 py-5 relative flex flex-col max-md:h-[600px] max-md:w-[90%] transition-all duration-300">
+          <div className="bg-white dark:bg-[#28243d] rounded-xl shadow-lg w-[700px] h-[680px] px-5 py-5 relative flex flex-col max-md:h-[600px] max-md:w-[90%] transition-all duration-300">
             {/* Close button */}
             <button
               onClick={hendlerClose}
