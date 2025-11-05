@@ -7,37 +7,37 @@ import {
   Select,
   type FormProps,
   type PaginationProps,
-} from "antd";
-import { AlertCircle, Minus, Plus, X } from "lucide-react";
-import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
-import { useOrder } from "../../../../../shared/api/hooks/useOrder";
-import EmptyPage from "../../../../../shared/components/empty-page";
-import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
-import { useNavigate } from "react-router-dom";
-import ConfirmPopup from "../../../../../shared/components/confirmPopup";
-import Popup from "../../../../../shared/ui/Popup";
-import type { FieldType } from "../waiting-orders";
-import { useParamsHook } from "../../../../../shared/hooks/useParams";
-import { useTranslation } from "react-i18next";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../../../../app/store";
+} from 'antd';
+import { AlertCircle, Minus, Plus, X } from 'lucide-react';
+import { memo, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useOrder } from '../../../../../shared/api/hooks/useOrder';
+import EmptyPage from '../../../../../shared/components/empty-page';
+import { useApiNotification } from '../../../../../shared/hooks/useApiNotification';
+import { useNavigate } from 'react-router-dom';
+import ConfirmPopup from '../../../../../shared/components/confirmPopup';
+import Popup from '../../../../../shared/ui/Popup';
+import type { FieldType } from '../waiting-orders';
+import { useParamsHook } from '../../../../../shared/hooks/useParams';
+import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../../../app/store';
 
 const statusColors: Record<string, string> = {
-  new: "bg-blue-500",
-  received: "bg-green-500",
-  on_the_road: "bg-yellow-500",
-  waiting: "bg-orange-500",
-  sold: "bg-purple-500",
-  cancelled: "bg-red-500",
-  paid: "bg-cyan-500",
-  partly_paid: "bg-pink-500",
-  cancelled_sent: "bg-gray-500",
-  closed: "bg-black",
+  new: 'bg-blue-500',
+  received: 'bg-green-500',
+  on_the_road: 'bg-yellow-500',
+  waiting: 'bg-orange-500',
+  sold: 'bg-purple-500',
+  cancelled: 'bg-red-500',
+  paid: 'bg-cyan-500',
+  partly_paid: 'bg-pink-500',
+  cancelled_sent: 'bg-gray-500',
+  closed: 'bg-black',
 };
 
 const AllOrders = () => {
-  const { t } = useTranslation("orderList");
-  const { t: st } = useTranslation("status");
+  const { t } = useTranslation('orderList');
+  const { t: st } = useTranslation('status');
   const navigate = useNavigate();
 
   const {
@@ -50,20 +50,20 @@ const AllOrders = () => {
 
   // Pagination start
   const { getParam, setParam, removeParam } = useParamsHook();
-  const page = Number(getParam("page") || 1);
-  const limit = Number(getParam("limit") || 10);
+  const page = Number(getParam('page') || 1);
+  const limit = Number(getParam('limit') || 10);
 
-  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
+  const onChange: PaginationProps['onChange'] = (newPage, limit) => {
     if (newPage === 1) {
-      removeParam("page");
+      removeParam('page');
     } else {
-      setParam("page", newPage);
+      setParam('page', newPage);
     }
 
     if (limit === 10) {
-      removeParam("limit");
+      removeParam('limit');
     } else {
-      setParam("limit", limit);
+      setParam('limit', limit);
     }
   };
   // Pagination end
@@ -81,27 +81,27 @@ const AllOrders = () => {
   const urlType = useRef<string | null>(null);
   const handleSellOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    item: any
+    item: any,
   ) => {
     e.stopPropagation();
     order.current = item;
-    urlType.current = "sell";
+    urlType.current = 'sell';
     setIsShow(true);
   };
 
   const handleCancelOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    item: any
+    item: any,
   ) => {
     e.stopPropagation();
     order.current = item;
-    urlType.current = "cancel";
+    urlType.current = 'cancel';
     setIsShow(true);
   };
 
   const handleRollback = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    id: string
+    id: string,
   ) => {
     e.stopPropagation();
     orderId.current = id;
@@ -112,11 +112,11 @@ const AllOrders = () => {
     const id = orderId.current;
     rollbackOrder.mutate(id as string, {
       onSuccess: () => {
-        handleSuccess("Buyurtma muvaffaqiyatli ortga qaytarildi");
+        handleSuccess('Buyurtma muvaffaqiyatli ortga qaytarildi');
         setIsShowModal(false);
       },
       onError: (err: any) =>
-        handleApiError(err, "Buyurtma qaytarilishda xatolik"),
+        handleApiError(err, 'Buyurtma qaytarilishda xatolik'),
     });
   };
 
@@ -124,7 +124,7 @@ const AllOrders = () => {
     form.resetFields();
     setPartlySoldShow(false);
     setOrderItemInfo([]);
-    setTotalPrice("");
+    setTotalPrice('');
     order.current = null;
     urlType.current = null;
   };
@@ -135,11 +135,11 @@ const AllOrders = () => {
   };
 
   const [form] = Form.useForm<FieldType>();
-  const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
+  const onFinish: FormProps<FieldType>['onFinish'] = (values) => {
     const item = order.current;
     const type = urlType.current;
 
-    if (type === "sell") {
+    if (type === 'sell') {
       if (partleSoldShow) {
         const order_item_info = orderItemInfo.map((item) => ({
           product_id: item.product_id,
@@ -149,15 +149,15 @@ const AllOrders = () => {
         if (
           totalPrice === undefined ||
           totalPrice === null ||
-          totalPrice === "" ||
+          totalPrice === '' ||
           Number(totalPrice) < 0
         ) {
-          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+          handleWarning('Buyurtma summasini minimal 0 bolishi kerak');
           return;
         }
         const data = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).split(",").join("")),
+          totalPrice: Number(String(totalPrice).split(',').join('')),
           extraCost: Number(values?.extraCost),
           comment: values?.comment,
         };
@@ -166,12 +166,12 @@ const AllOrders = () => {
           {
             onSuccess: () => {
               closePopup();
-              handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
+              handleSuccess('Buyurtma muvaffaqiyatli qisman sotildi');
             },
             onError: (err: any) => {
-              handleApiError(err, "Buyurtma qisman sotilishda xatolik");
+              handleApiError(err, 'Buyurtma qisman sotilishda xatolik');
             },
-          }
+          },
         );
       } else {
         sellOrder.mutate(
@@ -179,13 +179,13 @@ const AllOrders = () => {
           {
             onSuccess: () => {
               closePopup();
-              handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+              handleSuccess('Buyurtma muvaffaqiyatli sotildi');
               navigate(-1);
             },
             onError: (err: any) => {
-              handleApiError(err, "Buyurtmani sotishda xatolik"), navigate(-1);
+              handleApiError(err, 'Buyurtmani sotishda xatolik'), navigate(-1);
             },
-          }
+          },
         );
       }
     } else {
@@ -197,15 +197,15 @@ const AllOrders = () => {
         if (
           totalPrice === undefined ||
           totalPrice === null ||
-          totalPrice === "" ||
+          totalPrice === '' ||
           Number(totalPrice) < 0
         ) {
-          handleWarning("Buyurtma summasini minimal 0 bolishi kerak");
+          handleWarning('Buyurtma summasini minimal 0 bolishi kerak');
           return;
         }
         const data = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).split(",").join("")),
+          totalPrice: Number(String(totalPrice).split(',').join('')),
           extraCost: Number(values?.extraCost),
           comment: values?.comment,
         };
@@ -214,14 +214,14 @@ const AllOrders = () => {
           {
             onSuccess: () => {
               closePopup();
-              handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
+              handleSuccess('Buyurtma muvaffaqiyatli qisman bekor qilindi');
               navigate(-1);
             },
             onError: (err: any) => {
-              handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
+              handleApiError(err, 'Buyurtmani qisman bekor qilishda xatolik'),
                 navigate(-1);
             },
-          }
+          },
         );
       } else {
         cancelOrder.mutate(
@@ -229,14 +229,14 @@ const AllOrders = () => {
           {
             onSuccess: () => {
               closePopup();
-              handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+              handleSuccess('Buyurtma muvaffaqiyatli bekor qilindi');
               navigate(-1);
             },
             onError: (err: any) => {
-              handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
+              handleApiError(err, 'Buyurtmani bekor qilishda xatolik'),
                 navigate(-1);
             },
-          }
+          },
         );
       }
     }
@@ -245,7 +245,7 @@ const AllOrders = () => {
   const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
 
   const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
-  const [totalPrice, setTotalPrice] = useState<number | string>("");
+  const [totalPrice, setTotalPrice] = useState<number | string>('');
   useEffect(() => {
     if (isShow && order.current) {
       const initialItems = order.current?.items?.map((item: any) => ({
@@ -259,14 +259,13 @@ const AllOrders = () => {
 
   useEffect(() => {
     if (search) {
-      setParam("page", 1);
+      setParam('page', 1);
     }
   }, [search]);
 
-
   // Loading and Disabled button
   const getIsPending = () => {
-    if (urlType.current === "sell") {
+    if (urlType.current === 'sell') {
       return partleSoldShow ? partlySellOrder.isPending : sellOrder.isPending;
     } else {
       return partleSoldShow ? partlySellOrder.isPending : cancelOrder.isPending;
@@ -319,7 +318,7 @@ const AllOrders = () => {
           return { ...item, quantity: item.quantity + 1 };
         }
         return item;
-      })
+      }),
     );
   };
 
@@ -336,55 +335,55 @@ const AllOrders = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("mijoz")}</span>
+                <span>{t('mijoz')}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("phone")}</span>
+                <span>{t('phone')}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("detail.address")}</span>
+                <span>{t('detail.address')}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("market")}</span>
+                <span>{t('market')}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("status")}</span>
+                <span>{t('status')}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("price")}</span>
+                <span>{t('price')}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("delivery")}</span>
+                <span>{t('delivery')}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("stock")}</span>
+                <span>{t('sana')}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
             <th>
               <div className="flex items-center justify-center gap-30">
-                <span>{t("harakat")}</span>
+                <span>{t('harakat')}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
@@ -406,32 +405,32 @@ const AllOrders = () => {
                 </td>
                 <td
                   className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t("mijoz")}
+                  data-cell={t('mijoz')}
                 >
                   {item?.customer?.name}
                 </td>
                 <td
                   className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t("phone")}
+                  data-cell={t('phone')}
                 >
                   {item?.customer?.phone_number}
                 </td>
                 <td
                   className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t("detail.address")}
+                  data-cell={t('detail.address')}
                 >
                   {item?.customer?.district?.name}
                 </td>
                 <td
                   className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t("market")}
+                  data-cell={t('market')}
                 >
                   {item?.market?.name}
                 </td>
-                <td className="pl-10" data-cell={t("status")}>
+                <td className="pl-10" data-cell={t('status')}>
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                      statusColors[item.status] || "bg-slate-400"
+                      statusColors[item.status] || 'bg-slate-400'
                     }`}
                   >
                     {st(`${item.status}`)}
@@ -439,43 +438,48 @@ const AllOrders = () => {
                 </td>
                 <td
                   className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t("price")}
+                  data-cell={t('price')}
                 >
-                  {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+                  {new Intl.NumberFormat('uz-UZ').format(item?.total_price)}
                 </td>
                 <td
                   className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t("delivery")}
+                  data-cell={t('delivery')}
                 >
                   {t(`${item?.where_deliver}`)}
                 </td>
                 <td
-                  className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t("stock")}
+                  className="pl-5 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                  data-cell={t('sana')}
                 >
-                  {item?.items.length}
+                  {new Date(Number(item?.created_at))
+                    .toISOString()
+                    .substring(0, 10)
+                    }
+                
                 </td>
+
                 <td
                   className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t("harakat")}
+                  data-cell={t('harakat')}
                 >
-                  {item?.status === "waiting" ? (
+                  {item?.status === 'waiting' ? (
                     <div className="flex gap-3">
                       <Button
                         onClick={(e) => handleSellOrder(e, item)}
                         className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                       >
-                        {t("sotish")}
+                        {t('sotish')}
                       </Button>
                       <Button
                         onClick={(e) => handleCancelOrder(e, item)}
                         className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                       >
-                        {t("detail.cancel")}
+                        {t('detail.cancel')}
                       </Button>
                     </div>
-                  ) : item?.status === "sold" ||
-                    item?.status === "cancelled" ? (
+                  ) : item?.status === 'sold' ||
+                    item?.status === 'cancelled' ? (
                     <div className="ml-9">
                       <Button onClick={(e) => handleRollback(e, item?.id)}>
                         <AlertCircle />
@@ -503,7 +507,7 @@ const AllOrders = () => {
         isShow={isShowModal}
         onCancel={() => setIsShowModal(false)}
         onConfirm={handleConfirm}
-        description={t("popupTitle")}
+        description={t('popupTitle')}
       />
 
       <Popup isShow={isShow} onClose={closePopup}>
@@ -514,7 +518,7 @@ const AllOrders = () => {
           />
           {partleSoldShow && (
             <h2 className="text-center pt-3 text-[20px]">
-              Qisman {urlType.current === "sell" ? "sotish" : "bekor qilish"}
+              Qisman {urlType.current === 'sell' ? 'sotish' : 'bekor qilish'}
             </h2>
           )}
           <div
@@ -523,36 +527,36 @@ const AllOrders = () => {
             } text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
           >
             <p>
-              <span className="font-semibold">Mijoz ismi:</span>{" "}
-              {order.current?.customer?.name || "—"}
+              <span className="font-semibold">Mijoz ismi:</span>{' '}
+              {order.current?.customer?.name || '—'}
             </p>
             <p>
-              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
-              {order.current?.customer?.phone_number || "—"}
+              <span className="font-semibold">Mijoz tel raqami:</span>{' '}
+              {order.current?.customer?.phone_number || '—'}
             </p>
             <p>
-              <span className="font-semibold">Tuman:</span>{" "}
-              {order.current?.customer?.district?.name || "—"}
+              <span className="font-semibold">Tuman:</span>{' '}
+              {order.current?.customer?.district?.name || '—'}
             </p>
             <p>
-              <span className="font-semibold">Mahsulotlar nomi:</span>{" "}
+              <span className="font-semibold">Mahsulotlar nomi:</span>{' '}
               {order.current?.items
                 ?.map((item: any) => item.product?.name)
-                .join(", ") || "—"}
+                .join(', ') || '—'}
             </p>
             <p>
-              <span className="font-semibold">Mahsulotlar soni:</span>{" "}
+              <span className="font-semibold">Mahsulotlar soni:</span>{' '}
               {order.current?.items?.reduce(
                 (sum: any, item: any) => sum + (item.quantity || 0),
-                0
-              ) || "—"}
+                0,
+              ) || '—'}
             </p>
 
             <p>
-              <span className="font-semibold">Umumiy summa:</span>{" "}
+              <span className="font-semibold">Umumiy summa:</span>{' '}
               {order.current?.total_price
-                ? order.current.total_price.toLocaleString("uz-UZ")
-                : "0"}{" "}
+                ? order.current.total_price.toLocaleString('uz-UZ')
+                : '0'}{' '}
               so'm
             </p>
           </div>
@@ -562,8 +566,8 @@ const AllOrders = () => {
               <div
                 className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
                   orderItemInfo.length > 2
-                    ? "max-h-49 overflow-y-auto"
-                    : "overflow-visible"
+                    ? 'max-h-49 overflow-y-auto'
+                    : 'overflow-visible'
                 }`}
               >
                 {orderItemInfo.map((item, index) => (
@@ -585,10 +589,10 @@ const AllOrders = () => {
                           item.quantity <= 0 ||
                           orderItemInfo.reduce(
                             (sum, i) => sum + i.quantity,
-                            0
+                            0,
                           ) <= 1
-                            ? "opacity-30 cursor-not-allowed"
-                            : "hover:opacity-70"
+                            ? 'opacity-30 cursor-not-allowed'
+                            : 'hover:opacity-70'
                         }`}
                         onClick={() => handleMinus(index)}
                       />
@@ -597,8 +601,8 @@ const AllOrders = () => {
                       <Plus
                         className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
                           item.quantity >= (item.maxQuantity ?? Infinity)
-                            ? "opacity-30 cursor-not-allowed"
-                            : "hover:opacity-70"
+                            ? 'opacity-30 cursor-not-allowed'
+                            : 'hover:opacity-70'
                         }`}
                         onClick={() => handlePlus(index)}
                       />
@@ -613,9 +617,9 @@ const AllOrders = () => {
                   placeholder="To'lov summasi"
                   value={totalPrice}
                   onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, "");
-                    const formatted = new Intl.NumberFormat("uz-UZ").format(
-                      Number(raw || 0)
+                    const raw = e.target.value.replace(/\D/g, '');
+                    const formatted = new Intl.NumberFormat('uz-UZ').format(
+                      Number(raw || 0),
                     );
                     setTotalPrice(formatted);
                   }}
@@ -636,9 +640,9 @@ const AllOrders = () => {
                   placeholder="Qo'shimcha pul"
                   className="!border !border-gray-500 h-[40px]! w-full!"
                   formatter={(v) =>
-                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
+                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''
                   }
-                  parser={(v) => v?.replace(/,/g, "") || ""}
+                  parser={(v) => v?.replace(/,/g, '') || ''}
                 />
               </Form.Item>
             </div>
@@ -657,7 +661,7 @@ const AllOrders = () => {
             dark:placeholder:text-[#A9A5C0]! 
             dark:text-[#E7E3FC]!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"
-                  style={{ resize: "none" }}
+                  style={{ resize: 'none' }}
                 />
               </Form.Item>
             </div>
@@ -671,12 +675,12 @@ const AllOrders = () => {
                 loading={getIsPending()}
                 htmlType="submit"
                 className={`px-5! py-4! ${
-                  urlType.current === "sell"
-                    ? "bg-[var(--color-bg-sy)]!"
-                    : "bg-red-500!"
+                  urlType.current === 'sell'
+                    ? 'bg-[var(--color-bg-sy)]!'
+                    : 'bg-red-500!'
                 } text-[#ffffff]!`}
               >
-                {urlType.current === "sell" ? "Sotish" : "Bekor qilish"}
+                {urlType.current === 'sell' ? 'Sotish' : 'Bekor qilish'}
               </Button>
             </div>
           </Form>
