@@ -33,15 +33,20 @@ const OrderItems = () => {
   const { getProductsByMarket, getProducts, getMyProducts } = useProduct();
   // const { getProductsByMarket, getMyProducts } = useProduct();
 
-  const myProductsQuery = getMyProducts();
-  const marketProductsQuery = getProductsByMarket(marketId as string);
+  const myProductsQuery = getMyProducts(undefined, user.role === "market");
 
+  // faqat `superadmin` (yoki boshqa rol) bo‘lsa `getProductsByMarket` ishlaydi
+  const marketProductsQuery = getProductsByMarket(
+    marketId as string,
+    user.role !== "market"
+  );
+
+  // endi `data` ni rolga qarab tanlaymiz
   const data =
     user.role === "market" ? myProductsQuery.data : marketProductsQuery.data;
-    
 
   console.log("1111111111111111", data);
-  const productNames = data?.data?.data?.map((product: any) => ({
+  const productNames = data?.data?.products?.map((product: any) => ({
     value: product.id,
     label: (
       <div className="flex items-center gap-5">
