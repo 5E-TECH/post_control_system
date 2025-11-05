@@ -224,7 +224,7 @@ export class ProductService {
 
       return successRes(
         {
-          data: products,
+          products,
           total,
           page,
           limit,
