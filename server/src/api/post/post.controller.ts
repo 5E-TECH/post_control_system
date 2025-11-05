@@ -175,6 +175,19 @@ export class PostController {
     return this.postService.receivePost(user, id, receivePostDto);
   }
 
+  @ApiOperation({ summary: 'Receive post with scaner (courier)' })
+  @ApiParam({ name: 'id', description: 'Post ID' })
+  @ApiResponse({ status: 200, description: 'Post received' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Patch('receive/scan/:id')
+  receivePostWithScan(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.postService.receivePostWithScanner(user, id);
+  }
+
   @ApiOperation({ summary: 'Receive order (courier)' })
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order received' })
