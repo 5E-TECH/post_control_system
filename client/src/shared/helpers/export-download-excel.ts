@@ -57,12 +57,6 @@ export const exportToExcel = (data: any[], fileName: string) => {
       const cellValue = row[key] ? row[key].toString() : "";
       return Math.max(max, cellValue.length);
     }, key.length);
-
-    // Agar bu ustun "Izoh" bo‘lsa — uni kengroq qilamiz
-    if (key.toLowerCase().includes("izoh")) {
-      return { wch: 30 }; // Izoh ustuni uchun kenglikni oshiramiz
-    }
-
     return { wch: maxLength + 4 };
   });
   worksheet["!cols"] = columnWidths;
