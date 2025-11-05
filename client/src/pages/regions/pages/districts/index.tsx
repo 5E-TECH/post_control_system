@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { Card } from "antd";
+import { Button, Card, Modal } from "antd";
 import {
   DragDropContext,
   Droppable,
@@ -8,6 +8,7 @@ import {
 } from "@hello-pangea/dnd";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
+import { Pencil, Plus } from "lucide-react";
 
 interface DistrictType {
   id: string;
@@ -23,8 +24,40 @@ interface RegionType {
 
 const Districts = () => {
   const { getRegions } = useRegion();
-  const { updateDistrict } = useDistrict();
-  const { data: apiResponse, isLoading } = getRegions();
+  const { updateDistrict, createDistrict, updateDistrictName } = useDistrict();
+  const { data: apiResponse, refetch, isLoading } = getRegions();
+  const [openRegionId, setOpenRegionId] = useState<string | null>(null);
+  const [newDistrict, setNewDistict] = useState<string>("");
+  const [editRegionId, setEditRegionId] = useState<string | null>(null);
+  const [editDistrictId, setEditDistrictId] = useState<string | null>(null);
+  const [editDistrictName, setEditDistrictName] = useState<string>("");
+  const [highlightedDistrict, setHighlightedDistrict] = useState<string | null>(
+    null
+  );
+
+  const handleAddDistrict = () => {
+    const data = {
+      region_id: openRegionId,
+      name: newDistrict,
+    };
+    createDistrict.mutate(data, {
+      onSuccess: (res) => {
+        const newDistrictId = res?.data?.data?.id;
+        setHighlightedDistrict(newDistrictId);
+        setOpenRegionId(null);
+        refetch();
+
+        // 3 soniya keyin highlightni olib tashlash
+        setTimeout(() => setHighlightedDistrict(null), 1000);
+      },
+    });
+
+    setTimeout(() => {
+      setOpenRegionId(null);
+      setEditDistrictId(null);
+      setNewDistict("");
+    }, 5000);
+  };
 
   const [regions, setRegions] = useState<RegionType[]>([]);
 
@@ -63,13 +96,37 @@ const Districts = () => {
       updateDistrict.mutate(
         { id: draggedDistrict.id, data: { assigned_region: destRegion.id } },
         {
-          onSuccess: (data) => console.log("✅ Update success:", data),
+          onSuccess: () => {
+            setHighlightedDistrict(draggedDistrict.id);
+
+            // 3 soniya keyin highlightni olib tashlash
+            setTimeout(() => setHighlightedDistrict(null), 1000);
+          },
           onError: (err) => console.error("❌ Update error:", err),
         }
       );
 
       return updated;
     });
+  };
+
+  const handleSubmit = () => {
+    const id = editDistrictId;
+    const data = {
+      name: editDistrictName,
+    };
+    updateDistrictName.mutate(
+      { id, data },
+      {
+        onSuccess: () => {
+          refetch();
+          setHighlightedDistrict(id);
+          setTimeout(() => setHighlightedDistrict(null), 1000);
+        },
+      }
+    );
+    console.log(editDistrictName);
+    setEditDistrictId(null);
   };
 
   if (isLoading) return <div className="p-5">Loading...</div>;
@@ -80,7 +137,35 @@ const Districts = () => {
         {regions.map((region) => (
           <Card
             key={region.id}
-            title={region.name}
+            title={
+              <div className="flex justify-between items-center">
+                <span>
+                  {region.name.length > 15
+                    ? region.name.split(" ")[0]
+                    : region.name}
+                </span>{" "}
+                <div className="flex gap-2">
+                  <Button
+                    size="small"
+                    className="flex items-center justify-center w-8 h-8 p-0"
+                    onClick={() => setOpenRegionId(region.id)}
+                  >
+                    <Plus size={15} />
+                  </Button>
+                  <Button
+                    size="small"
+                    className="flex items-center justify-center w-8 h-8 p-0"
+                    onClick={() =>
+                      setEditRegionId(
+                        editRegionId === region.id ? null : region.id
+                      )
+                    }
+                  >
+                    <Pencil />
+                  </Button>
+                </div>
+              </div>
+            }
             className="w-[300px]  flex-shrink-0 shadow-md"
             style={{ height: "auto" }}
           >
@@ -103,9 +188,56 @@ const Districts = () => {
                           {...dragProvided.draggableProps}
                           {...dragProvided.dragHandleProps}
                           style={dragProvided.draggableProps.style}
-                          className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-lg cursor-pointer select-none hover:bg-blue-200 active:cursor-grabbing transition"
+                          className={`px-3 py-1 text-sm rounded-lg cursor-pointer select-none transition-colors duration-1000
+    ${
+      highlightedDistrict === district.id
+        ? "bg-[#8B69FE] text-white" // highlight rang
+        : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+    }`}
                         >
-                          {district.name}
+                          {
+                            <div
+                              onClick={() => {
+                                if (editRegionId) {
+                                  setEditDistrictId(district.id);
+                                  setEditDistrictName(district.name);
+                                }
+                              }}
+                              className="relative"
+                            >
+                              {editDistrictId &&
+                              editDistrictId === district.id ? (
+                                <form
+                                  onSubmit={(e) => {
+                                    e.preventDefault(); // sahifa yangilanmasligi uchun
+                                    handleSubmit(); // bu yerda o‘zingizning funksiyangiz chaqiriladi
+                                  }}
+                                >
+                                  <input
+                                    value={editDistrictName}
+                                    onChange={(e) =>
+                                      setEditDistrictName(e.target.value)
+                                    }
+                                    type="text"
+                                    className="outline-none"
+                                  />
+                                </form>
+                              ) : (
+                                district.name
+                              )}
+                              {editRegionId && editRegionId === region.id && (
+                                <button
+                                  onClick={() => {
+                                    setEditDistrictId(district.id),
+                                      setEditDistrictName(district.name);
+                                  }}
+                                  className="absolute top-[-10px] right-[-18px] rotate-270 cursor-pointer"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                              )}
+                            </div>
+                          }
                         </div>
                       )}
                     </Draggable>
@@ -116,6 +248,22 @@ const Districts = () => {
             </Droppable>
           </Card>
         ))}
+        <Modal
+          title={`${regions.find((r) => r.id === openRegionId)?.name}`}
+          open={!!openRegionId}
+          onCancel={() => setOpenRegionId(null)}
+          onOk={() => handleAddDistrict()}
+          okText="Add"
+          centered
+        >
+          <input
+            value={newDistrict}
+            onChange={(e) => setNewDistict(e.target.value)}
+            type="text"
+            placeholder="Tuman nomini kiriting"
+            className="border rounded-md px-2 py-2"
+          />
+        </Modal>
       </div>
     </DragDropContext>
   );

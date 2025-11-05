@@ -14,7 +14,13 @@ export const useDistrict = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getDistrictById = (id:string, enabled = true) =>
+  const createDistrict = useMutation({
+    mutationFn: (data: any) => api.post(`district`, data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [district], refetchType: "active" }),
+  });
+
+  const getDistrictById = (id: string, enabled = true) =>
     useQuery({
       queryKey: [district],
       queryFn: () => api.get(`district/${id}`).then((res) => res.data),
@@ -23,12 +29,20 @@ export const useDistrict = () => {
       refetchOnWindowFocus: false,
     });
 
-   const updateDistrict = useMutation({
-  mutationFn: ({ id, data }: { id: string; data: any }) =>
-    api.patch(`district/${id}`, data).then((res) => res.data), // 👈 faqat data qaytarayapmiz
-  onSuccess: () => {
-    client.invalidateQueries({ queryKey: [district] });
-  },
-});
-  return { getDistricts, getDistrictById, updateDistrict };
+  const updateDistrict = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      api.patch(`district/${id}`, data).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [district] });
+    },
+  });
+
+  const updateDistrictName = useMutation({
+    mutationFn: ({ id, data }: { id: string | null; data: any }) =>
+      api.patch(`district/name/${id}`, data).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [district] });
+    },
+  });
+  return { getDistricts, getDistrictById, createDistrict, updateDistrictName, updateDistrict };
 };

@@ -148,14 +148,13 @@ const OrderView = () => {
 
         const exportData = orders?.map((order: any, inx: number) => ({
           N: inx + 1,
-          Viloyat: order?.customer?.district?.region?.name,
+          Viloyat: order?.customer?.district?.assignedToRegion?.name,
           Tuman: order?.customer?.district?.name,
           Firma: order?.market?.name,
           Mahsulot: order?.items
             ?.map((item: any) => item.product.name)
             ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
-          Tumani: order?.customer?.name,
           Narxi: Number((order?.total_price ?? 0) / 1000),
           Holati: statusLabels[order?.status],
           Sana: new Date(Number(order?.created_at)).toLocaleString("uz-UZ", {

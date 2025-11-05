@@ -766,8 +766,27 @@ export class PostService {
         );
       }
 
-      // DTO orqali kelgan order_id lar
-      const canceledOrderIds = ordersArrayDto.order_ids;
+      // DTO orqali kelgan order_id lar (uniq va filter)
+      const canceledOrderIds = Array.isArray(ordersArrayDto.order_ids)
+        ? Array.from(new Set(ordersArrayDto.order_ids))
+        : [];
+
+      // Postga tegishli barcha orderlar
+      const allOrders = await queryRunner.manager.find(OrderEntity, {
+        where: { canceled_post_id: post.id },
+      });
+
+      // Tekshiramiz: DTO dagi id'lar haqiqatan ham shu pochtaga tegishlimi?
+      const allOrderIdsForPost = allOrders.map((o) => o.id);
+      const invalidIds = canceledOrderIds.filter(
+        (id) => !allOrderIdsForPost.includes(id),
+      );
+      if (invalidIds.length > 0) {
+        // ixtiyoriy: xato qilib chiqarish yoki shunchaki e'tiborga olmaslik mumkin.
+        throw new BadRequestException(
+          `Some order_ids do not belong to this post: ${invalidIds.join(', ')}`,
+        );
+      }
 
       // Kelgan id-lar => CLOSED
       if (canceledOrderIds.length > 0) {
@@ -778,17 +797,15 @@ export class PostService {
         );
       }
 
-      // Qolgan orderlar => CANCELED
-      const remainingOrders = post.orders.filter(
-        (order) => !canceledOrderIds.includes(order.id),
+      // Qolgan orderlar (id lar) => CANCELED
+      const remainingOrderIds = allOrderIdsForPost.filter(
+        (orderId) => !canceledOrderIds.includes(orderId),
       );
 
-      if (remainingOrders.length > 0) {
-        const remainingIds = remainingOrders.map((o) => o.id);
-
+      if (remainingOrderIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(remainingIds) },
+          { id: In(remainingOrderIds) },
           { status: Order_status.CANCELLED, canceled_post_id: null },
         );
       }

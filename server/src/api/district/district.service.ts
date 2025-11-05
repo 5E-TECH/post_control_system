@@ -12,6 +12,8 @@ import { RegionRepository } from 'src/core/repository/region.repository';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { regions } from 'src/infrastructure/lib/data/district';
 import { UpdateDistrictDto } from './dto/update-district.dto';
+import { CreateDistrictDto } from './dto/create-district.dto';
+import { UpdateDistrictNameDto } from './dto/update-name.dto';
 
 @Injectable()
 export class DistrictService implements OnModuleInit {
@@ -48,6 +50,31 @@ export class DistrictService implements OnModuleInit {
           });
         }
       }
+    }
+  }
+
+  async create(createDistrictDto: CreateDistrictDto) {
+    try {
+      const { name, region_id } = createDistrictDto;
+
+      const existRegion = await this.regionRepository.findOne({
+        where: { id: region_id },
+      });
+
+      if (!existRegion) {
+        throw new NotFoundException('Region not found');
+      }
+
+      const newDistrict = this.districtRepository.create({
+        name,
+        region_id,
+        assigned_region: region_id,
+      });
+      await this.districtRepository.save(newDistrict);
+
+      return successRes(newDistrict, 201, 'New district added');
+    } catch (error) {
+      return catchError(error);
     }
   }
 
@@ -113,6 +140,22 @@ export class DistrictService implements OnModuleInit {
       await this.districtRepository.save(district);
 
       return successRes(district, 200, 'District assigned to new region');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateName(id: string, updateNameDto: UpdateDistrictNameDto) {
+    try {
+      const district = await this.districtRepository.findOne({ where: { id } });
+      if (!district) {
+        throw new NotFoundException('District not found');
+      }
+      const { name } = updateNameDto;
+      district.name = name;
+      await this.districtRepository.save(district);
+
+      return successRes({}, 200, 'District name updated');
     } catch (error) {
       return catchError(error);
     }

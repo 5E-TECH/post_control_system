@@ -73,6 +73,7 @@ export const useProduct = () => {
       client.invalidateQueries({ queryKey: [product] });
     },
   });
+  
 
   const updateProduct = useMutation({
   mutationFn: ({ id, data, isMarket }: { id: string; data: any; isMarket?: boolean }) => {
