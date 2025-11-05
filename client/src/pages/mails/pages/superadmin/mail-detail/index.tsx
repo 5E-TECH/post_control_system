@@ -16,7 +16,7 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { usePostScanner } from "../../../../../shared/components/post-scanner";
-import { exportToExcel } from "../../../../../shared/helpers/export-download-excel";
+import { exportToExcel } from "../../../../../shared/helpers/export-download-excel-with-courier";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -108,14 +108,19 @@ const MailDetail = () => {
                     "Telefon raqam": mail?.customer?.phone_number,
                     Firma: mail?.market?.name,
                     Narxi: Number((mail?.total_price ?? 0) / 1000),
-                    Manzil: mail?.where_deliver || "",
+                    Manzil: mail?.where_deliver == 'center' ? 'Markazgacha' : 'Uygacha',
                     Tuman: mail?.customer?.district?.name,
                     Izoh: mail?.comment || "",
                   }));
 
                   exportToExcel(
                     exportData || [],
-                    "pochtalar"
+                    "pochtalar", {
+                    qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+                    regionName: res?.data?.updatedPost?.region?.name,
+                    courierName,
+                    totalOrders: res?.data?.postTotalInfo?.total,
+                  }
                   );
 
                   handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
@@ -179,15 +184,19 @@ const MailDetail = () => {
               "Telefon raqam": mail?.customer?.phone_number,
               Firma: mail?.market?.name,
               Narxi: Number((mail?.total_price ?? 0) / 1000),
-              Manzil: mail?.where_deliver || "",
+              Manzil: mail?.where_deliver == 'center' ? 'Markazgacha' : 'Uygacha',
               Tuman: mail?.customer?.district?.name,
               Izoh: mail?.comment || "",
             }));
 
             exportToExcel(
               exportData || [],
-              "pochtalar"
-            );
+              "pochtalar", {
+              qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+              regionName: res?.data?.updatedPost?.region?.name,
+              courierName,
+              totalOrders: res?.data?.postTotalInfo?.total,
+            });
 
             handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
           } catch (error) {
