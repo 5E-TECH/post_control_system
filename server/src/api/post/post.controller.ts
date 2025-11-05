@@ -106,6 +106,16 @@ export class PostController {
     return this.postService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Get post by scaner' })
+  @ApiParam({ name: 'id', description: 'Post pq token' })
+  @ApiResponse({ status: 200, description: 'Post data' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @Get(':id')
+  findWithQR(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.postService.findWithQr(id, user);
+  }
+
   @ApiOperation({ summary: 'Get couriers by post id' })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Couriers for post' })

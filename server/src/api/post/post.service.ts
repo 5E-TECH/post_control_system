@@ -243,6 +243,20 @@ export class PostService {
     }
   }
 
+  async findWithQr(id: string, user: JwtPayload): Promise<object> {
+    try {
+      const post = await this.postRepo.findOne({
+        where: { qr_code_token: id },
+      });
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+      return successRes(post, 200, 'Post found');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async findAllCouriers(id: string) {
     try {
       const post = await this.postRepo.findOne({ where: { id } });
