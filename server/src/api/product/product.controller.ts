@@ -123,7 +123,7 @@ export class ProductController {
   @ApiOperation({ summary: 'Get products by market id' })
   @ApiParam({ name: 'marketId', description: 'Market ID' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Get('market/:marketId')
   async findByMarketId(@Param('marketId') marketId: string) {
     return this.productService.findByMarketId(marketId);
