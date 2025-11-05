@@ -190,7 +190,7 @@ export class ProductService {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes(products, 200, `All products of ${market.name}`);
+      return successRes({products}, 200, `All products of ${market.name}`);
     } catch (error) {
       return catchError(error);
     }
