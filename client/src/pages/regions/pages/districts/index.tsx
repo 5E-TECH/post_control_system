@@ -41,14 +41,14 @@ const Districts = () => {
       name: newDistrict,
     };
     createDistrict.mutate(data, {
-      onSuccess: () => {
-        setHighlightedDistrict(openRegionId);
-        setOpenRegionId(null)
+      onSuccess: (res) => {
+        const newDistrictId = res?.data?.data?.id;
+        setHighlightedDistrict(newDistrictId);
+        setOpenRegionId(null);
         refetch();
 
         // 3 soniya keyin highlightni olib tashlash
         setTimeout(() => setHighlightedDistrict(null), 1000);
-
       },
     });
 
@@ -139,7 +139,11 @@ const Districts = () => {
             key={region.id}
             title={
               <div className="flex justify-between items-center">
-                <span>{region.name}</span>
+                <span>
+                  {region.name.length > 15
+                    ? region.name.split(" ")[0]
+                    : region.name}
+                </span>{" "}
                 <div className="flex gap-2">
                   <Button
                     size="small"
