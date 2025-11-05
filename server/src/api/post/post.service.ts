@@ -600,6 +600,47 @@ export class PostService {
     }
   }
 
+  async receivePostWithScanner(user: JwtPayload, id: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { qr_code_token: id, courier_id: user.id },
+      });
+
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+      if (post.status != Post_status.SENT) {
+        throw new BadRequestException('Post can not be received!');
+      }
+
+      const orders = await queryRunner.manager.find(OrderEntity, {
+        where: { post_id: post.id, status: Order_status.ON_THE_ROAD },
+      });
+      if (orders.length === 0) {
+        throw new NotFoundException('There are not orders in this post');
+      }
+
+      orders.forEach(async (order, _) => {
+        order.status = Order_status.RECEIVED;
+        await queryRunner.manager.save(order);
+      });
+
+      post.status = Post_status.RECEIVED;
+      await queryRunner.manager.save(post);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Post received successfully');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async receiveOrderWithScanerCourier(user: JwtPayload, id: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
