@@ -111,7 +111,7 @@ export class PostController {
   @ApiResponse({ status: 200, description: 'Post data' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
-  @Get(':id')
+  @Get('scan/:id')
   findWithQR(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.postService.findWithQr(id, user);
   }
