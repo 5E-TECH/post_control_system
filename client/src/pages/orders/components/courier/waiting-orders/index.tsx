@@ -1,6 +1,6 @@
-import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
-import { useOrder } from "../../../../../shared/api/hooks/useOrder";
-import EmptyPage from "../../../../../shared/components/empty-page";
+import { memo, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useOrder } from '../../../../../shared/api/hooks/useOrder';
+import EmptyPage from '../../../../../shared/components/empty-page';
 import {
   Button,
   Form,
@@ -10,15 +10,15 @@ import {
   Select,
   type FormProps,
   type PaginationProps,
-} from "antd";
-import { useNavigate } from "react-router-dom";
-import { useParamsHook } from "../../../../../shared/hooks/useParams";
-import Popup from "../../../../../shared/ui/Popup";
-import { AlertCircle, Minus, Plus, X } from "lucide-react";
-import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
-import { useTranslation } from "react-i18next";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../../../../app/store";
+} from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { useParamsHook } from '../../../../../shared/hooks/useParams';
+import Popup from '../../../../../shared/ui/Popup';
+import { AlertCircle, Minus, Plus, X } from 'lucide-react';
+import { useApiNotification } from '../../../../../shared/hooks/useApiNotification';
+import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../../../app/store';
 
 export type FieldType = {
   comment?: string;
@@ -26,20 +26,20 @@ export type FieldType = {
 };
 
 const WaitingOrders = () => {
-  const { t } = useTranslation("orderList");
-  const { t: st } = useTranslation("status");
+  const { t } = useTranslation('orderList');
+  const { t: st } = useTranslation('status');
 
   const navigate = useNavigate();
   const order = useRef<any | null>(null);
   const urlType = useRef<string | null>(null);
 
   const { getParam, setParam, removeParam } = useParamsHook();
-  const page = Number(getParam("page") || 1);
-  const limit = Number(getParam("limit") || 10);
+  const page = Number(getParam('page') || 1);
+  const limit = Number(getParam('limit') || 10);
   const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
     useOrder();
   const search = useSelector((state: RootState) => state.setUserFilter.search);
-  const { data } = getCourierOrders({ status: "waiting", search, page, limit });
+  const { data } = getCourierOrders({ status: 'waiting', search, page, limit });
   const total = data?.data?.total || 0;
 
   const [form] = Form.useForm<FieldType>();
@@ -48,29 +48,28 @@ const WaitingOrders = () => {
   const [isShow, setIsShow] = useState<boolean>(false);
   const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
   const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
-  const [totalPrice, setTotalPrice] = useState<number | string>("");
-  console.log("11111111", totalPrice);
+  const [totalPrice, setTotalPrice] = useState<number | string>('');
+  console.log('11111111', totalPrice);
 
   const closePopup = () => {
     setIsShow(false);
     setPartlySoldShow(false);
     form.resetFields(); // 🔹 Formani tozalaydi
-    setTotalPrice("");
+    setTotalPrice('');
     setOrderItemInfo([]);
   };
 
   useEffect(() => {
     if (search) {
-      setParam("page", 1);
+      setParam('page', 1);
     }
   }, [search]);
 
-
-  const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
+  const onFinish: FormProps<FieldType>['onFinish'] = (values) => {
     const item = order.current;
     const type = urlType.current;
 
-    if (type === "sell") {
+    if (type === 'sell') {
       if (partleSoldShow) {
         const order_item_info = orderItemInfo.map((item) => ({
           product_id: item.product_id,
@@ -82,7 +81,7 @@ const WaitingOrders = () => {
         }
         const data = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
+          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, '')),
           extraCost: Number(values?.extraCost),
           comment: values?.comment,
         };
@@ -90,25 +89,25 @@ const WaitingOrders = () => {
           { id: order.current.id, data },
           {
             onSuccess: () => {
-              handleSuccess("Buyurtma muvaffaqiyatli qisman sotildi");
+              handleSuccess('Buyurtma muvaffaqiyatli qisman sotildi');
               closePopup();
             },
             onError: (err: any) => {
-              handleApiError(err, "Buyurtma qisman sotilishda xatolik");
+              handleApiError(err, 'Buyurtma qisman sotilishda xatolik');
             },
-          }
+          },
         );
       } else {
         sellOrder.mutate(
           { id: item?.id as string, data: values },
           {
             onSuccess: () => {
-              handleSuccess("Buyurtma muvaffaqiyatli sotildi");
+              handleSuccess('Buyurtma muvaffaqiyatli sotildi');
               closePopup();
             },
             onError: (err: any) =>
-              handleApiError(err, "Buyurtmani sotishda xatolik"),
-          }
+              handleApiError(err, 'Buyurtmani sotishda xatolik'),
+          },
         );
       }
     } else {
@@ -123,7 +122,7 @@ const WaitingOrders = () => {
         }
         const data = {
           order_item_info,
-          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
+          totalPrice: Number(String(totalPrice).replace(/[^\d]/g, '')),
           extraCost: Number(values?.extraCost),
           comment: values?.comment,
         };
@@ -131,24 +130,24 @@ const WaitingOrders = () => {
           { id: order.current.id, data },
           {
             onSuccess: () => {
-              handleSuccess("Buyurtma muvaffaqiyatli qisman bekor qilindi");
+              handleSuccess('Buyurtma muvaffaqiyatli qisman bekor qilindi');
               closePopup();
             },
             onError: (err: any) =>
-              handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
-          }
+              handleApiError(err, 'Buyurtmani qisman bekor qilishda xatolik'),
+          },
         );
       } else {
         cancelOrder.mutate(
           { id: item?.id as string, data: values },
           {
             onSuccess: () => {
-              handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");
+              handleSuccess('Buyurtma muvaffaqiyatli bekor qilindi');
               closePopup();
             },
             onError: (err: any) =>
-              handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
-          }
+              handleApiError(err, 'Buyurtmani bekor qilishda xatolik'),
+          },
         );
       }
     }
@@ -156,36 +155,36 @@ const WaitingOrders = () => {
 
   const handleSellOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    item: any
+    item: any,
   ) => {
     e.stopPropagation();
     order.current = item;
-    urlType.current = "sell";
+    urlType.current = 'sell';
     setIsShow(true);
     form.resetFields(); // 🔹 yangi buyurtma ochilganda formani tozalaydi
     setPartlySoldShow(false);
-    setTotalPrice("");
+    setTotalPrice('');
   };
 
   const handleCancelOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    item: any
+    item: any,
   ) => {
     e.stopPropagation();
     order.current = item;
-    urlType.current = "cancel";
+    urlType.current = 'cancel';
     setIsShow(true);
     form.resetFields();
     setPartlySoldShow(false);
-    setTotalPrice("");
+    setTotalPrice('');
   };
 
-  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
-    if (newPage === 1) removeParam("page");
-    else setParam("page", newPage);
+  const onChange: PaginationProps['onChange'] = (newPage, limit) => {
+    if (newPage === 1) removeParam('page');
+    else setParam('page', newPage);
 
-    if (limit === 10) removeParam("limit");
-    else setParam("limit", limit);
+    if (limit === 10) removeParam('limit');
+    else setParam('limit', limit);
   };
 
   useEffect(() => {
@@ -202,7 +201,7 @@ const WaitingOrders = () => {
   console.log(order.current);
 
   const getIsPending = () => {
-    if (urlType.current === "sell") {
+    if (urlType.current === 'sell') {
       return partleSoldShow ? partlySellOrder.isPending : sellOrder.isPending;
     } else {
       return partleSoldShow ? partlySellOrder.isPending : cancelOrder.isPending;
@@ -255,7 +254,7 @@ const WaitingOrders = () => {
           return { ...item, quantity: item.quantity + 1 };
         }
         return item;
-      })
+      }),
     );
   };
 
@@ -265,15 +264,15 @@ const WaitingOrders = () => {
         <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
           <tr>
             <th>#</th>
-            <th>{t("mijoz")}</th>
-            <th>{t("phone")}</th>
-            <th>{t("detail.address")}</th>
-            <th>{t("market")}</th>
-            <th>{t("status")}</th>
-            <th>{t("price")}</th>
-            <th>{t("delivery")}</th>
-            <th>{t("stock")}</th>
-            <th>{t("harakat")}</th>
+            <th>{t('mijoz')}</th>
+            <th>{t('phone')}</th>
+            <th>{t('detail.address')}</th>
+            <th>{t('market')}</th>
+            <th>{t('status')}</th>
+            <th>{t('price')}</th>
+            <th>{t('delivery')}</th>
+            <th>{t('sana')}</th>
+            <th>{t('harakat')}</th>
           </tr>
         </thead>
         <tbody>
@@ -286,45 +285,50 @@ const WaitingOrders = () => {
               <td data-cell="#" className="pl-10">
                 {inx + 1}
               </td>
-              <td data-cell={t("mijoz")} className="pl-10">
+              <td data-cell={t('mijoz')} className="pl-10">
                 {item?.customer?.name}
               </td>
-              <td data-cell={t("phone")} className="pl-10">
+              <td data-cell={t('phone')} className="pl-10">
                 {item?.customer?.phone_number}
               </td>
-              <td data-cell={t("detail.address")} className="pl-10">
+              <td data-cell={t('detail.address')} className="pl-10">
                 {item?.customer?.district?.name}
               </td>
-              <td data-cell={t("market")} className="pl-10">
+              <td data-cell={t('market')} className="pl-10">
                 {item?.market?.name}
               </td>
-              <td data-cell={t("status")} className="pl-10">
+              <td data-cell={t('status')} className="pl-10">
                 <span className="py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500">
                   {st(`${item.status}`)}
                 </span>
               </td>
-              <td data-cell={t("price")} className="pl-10">
-                {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
+              <td data-cell={t('price')} className="pl-10">
+                {new Intl.NumberFormat('uz-UZ').format(item?.total_price)}
               </td>
-              <td data-cell={t("delivery")} className="pl-10">
-                  {t(`${item?.where_deliver}`)}
+              <td data-cell={t('delivery')} className="pl-10">
+                {t(`${item?.where_deliver}`)}
               </td>
-              <td data-cell={t("stock")} className="pl-15">
-                {item?.items.length}
+
+              <td data-cell={t('stock')} className="pl-15">
+                {new Date(Number(item?.created_at))
+                  .toISOString()
+                  .substring(0, 10)
+                  }
               </td>
-              <td data-cell={t("harakat")}>
+
+              <td data-cell={t('harakat')}>
                 <div className="flex gap-3">
                   <Button
                     onClick={(e) => handleSellOrder(e, item)}
                     className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none!"
                   >
-                    {t("sotish")}
+                    {t('sotish')}
                   </Button>
                   <Button
                     onClick={(e) => handleCancelOrder(e, item)}
                     className="bg-red-500! text-[#ffffff]! border-none!"
                   >
-                    {t("detail.cancel")}
+                    {t('detail.cancel')}
                   </Button>
                 </div>
               </td>
@@ -351,7 +355,7 @@ const WaitingOrders = () => {
           />
           {partleSoldShow && (
             <h2 className="text-center pt-3 text-[20px]">
-              Qisman {urlType.current === "sell" ? "sotish" : "bekor qilish"}
+              Qisman {urlType.current === 'sell' ? 'sotish' : 'bekor qilish'}
             </h2>
           )}
           <div
@@ -360,36 +364,36 @@ const WaitingOrders = () => {
             } text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
           >
             <p>
-              <span className="font-semibold">Mijoz ismi:</span>{" "}
-              {order.current?.customer?.name || "—"}
+              <span className="font-semibold">Mijoz ismi:</span>{' '}
+              {order.current?.customer?.name || '—'}
             </p>
             <p>
-              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
-              {order.current?.customer?.phone_number || "—"}
+              <span className="font-semibold">Mijoz tel raqami:</span>{' '}
+              {order.current?.customer?.phone_number || '—'}
             </p>
             <p>
-              <span className="font-semibold">Tuman:</span>{" "}
-              {order.current?.customer?.district?.name || "—"}
+              <span className="font-semibold">Tuman:</span>{' '}
+              {order.current?.customer?.district?.name || '—'}
             </p>
             <p>
-              <span className="font-semibold">Mahsulotlar nomi:</span>{" "}
+              <span className="font-semibold">Mahsulotlar nomi:</span>{' '}
               {order.current?.items
                 ?.map((item: any) => item.product?.name)
-                .join(", ") || "—"}
+                .join(', ') || '—'}
             </p>
             <p>
-              <span className="font-semibold">Mahsulotlar soni:</span>{" "}
+              <span className="font-semibold">Mahsulotlar soni:</span>{' '}
               {order.current?.items?.reduce(
                 (sum: any, item: any) => sum + (item.quantity || 0),
-                0
-              ) || "—"}
+                0,
+              ) || '—'}
             </p>
 
             <p>
-              <span className="font-semibold">Umumiy summa:</span>{" "}
+              <span className="font-semibold">Umumiy summa:</span>{' '}
               {order.current?.total_price
-                ? order.current.total_price.toLocaleString("uz-UZ")
-                : "0"}{" "}
+                ? order.current.total_price.toLocaleString('uz-UZ')
+                : '0'}{' '}
               so'm
             </p>
           </div>
@@ -399,8 +403,8 @@ const WaitingOrders = () => {
               <div
                 className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
                   orderItemInfo.length > 2
-                    ? "max-h-49 overflow-y-auto"
-                    : "overflow-visible"
+                    ? 'max-h-49 overflow-y-auto'
+                    : 'overflow-visible'
                 }`}
               >
                 {orderItemInfo.map((item, index) => (
@@ -422,10 +426,10 @@ const WaitingOrders = () => {
                           item.quantity <= 0 ||
                           orderItemInfo.reduce(
                             (sum, i) => sum + i.quantity,
-                            0
+                            0,
                           ) <= 1
-                            ? "opacity-30 cursor-not-allowed"
-                            : "hover:opacity-70"
+                            ? 'opacity-30 cursor-not-allowed'
+                            : 'hover:opacity-70'
                         }`}
                         onClick={() => handleMinus(index)}
                       />
@@ -434,8 +438,8 @@ const WaitingOrders = () => {
                       <Plus
                         className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
                           item.quantity >= (item.maxQuantity ?? Infinity)
-                            ? "opacity-30 cursor-not-allowed"
-                            : "hover:opacity-70"
+                            ? 'opacity-30 cursor-not-allowed'
+                            : 'hover:opacity-70'
                         }`}
                         onClick={() => handlePlus(index)}
                       />
@@ -450,9 +454,9 @@ const WaitingOrders = () => {
                   placeholder="To'lov summasi"
                   value={totalPrice}
                   onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, "");
-                    const formatted = new Intl.NumberFormat("uz-UZ").format(
-                      Number(raw || 0)
+                    const raw = e.target.value.replace(/\D/g, '');
+                    const formatted = new Intl.NumberFormat('uz-UZ').format(
+                      Number(raw || 0),
                     );
                     setTotalPrice(formatted);
                   }}
@@ -473,9 +477,9 @@ const WaitingOrders = () => {
                   placeholder="Qo'shimcha pul"
                   className="!border !border-gray-500 h-[40px]! w-full!"
                   formatter={(v) =>
-                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
+                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''
                   }
-                  parser={(v) => v?.replace(/,/g, "") || ""}
+                  parser={(v) => v?.replace(/,/g, '') || ''}
                 />
               </Form.Item>
             </div>
@@ -494,7 +498,7 @@ const WaitingOrders = () => {
       dark:placeholder:text-[#A9A5C0]! 
       dark:text-[#E7E3FC]!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"
-                  style={{ resize: "none" }}
+                  style={{ resize: 'none' }}
                 />
               </Form.Item>
             </div>
@@ -508,12 +512,12 @@ const WaitingOrders = () => {
                 loading={getIsPending()}
                 htmlType="submit"
                 className={`px-5! py-4! ${
-                  urlType.current === "sell"
-                    ? "bg-[var(--color-bg-sy)]!"
-                    : "bg-red-500!"
+                  urlType.current === 'sell'
+                    ? 'bg-[var(--color-bg-sy)]!'
+                    : 'bg-red-500!'
                 } text-[#ffffff]!`}
               >
-                {urlType.current === "sell" ? "Sotish" : "Bekor qilish"}
+                {urlType.current === 'sell' ? 'Sotish' : 'Bekor qilish'}
               </Button>
             </div>
           </Form>
