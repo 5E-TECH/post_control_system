@@ -11,10 +11,26 @@ import { ArrowLeft } from "lucide-react";
 
 const Footer = () => {
   useTranslation();
-  const [sidebar, setSidebar] = useState(true);
   const dispatch = useDispatch();
-
   const sidebarRedux = useSelector((state: RootState) => state.sidebar);
+  const [sidebar, setSidebar] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Ekran kattaligini tekshirish
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Mobil holatda sidebarni avtomatik yopish
+  useEffect(() => {
+    if (isMobile && sidebarRedux.isOpen) {
+      dispatch(closeSidebar());
+      setSidebar(true);
+    }
+  }, [isMobile]);
 
   const handleDispatch = () => {
     if (sidebar) {
@@ -26,18 +42,19 @@ const Footer = () => {
     }
   };
 
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 700);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   return (
-    <footer className="px-6 fixed bottom-0 w-full left-0 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)] flex items-center justify-between shadow-md max-[650px]:py-4 max-[650px]:hidden">
+    <footer
+      className="
+        fixed bottom-0 left-0 w-full 
+        flex items-center justify-between
+        bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]
+        shadow-md
+        h-[48px] px-6
+        max-[650px]:py-4 max-[650px]:justify-center
+      "
+    >
       <div className="flex items-center gap-2">
+        {/* ArrowLeft tugmasi faqat katta ekranlarda ko‘rinadi */}
         {!isMobile && (
           <button
             onClick={handleDispatch}
@@ -51,7 +68,13 @@ const Footer = () => {
           </button>
         )}
       </div>
-      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 max-[1050px]:hidden">
+
+      {/* Footer yozuvlari va iconlar */}
+      <div
+        className={`flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 ${
+          isMobile ? "justify-center w-full" : "max-[650px]:hidden"
+        }`}
+      >
         <span>
           <Trans
             i18nKey="footer.madeWith"
