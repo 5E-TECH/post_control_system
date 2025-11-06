@@ -14,23 +14,25 @@ const Footer = () => {
   const dispatch = useDispatch();
   const sidebarRedux = useSelector((state: RootState) => state.sidebar);
   const [sidebar, setSidebar] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
-  // Ekran kattaligini tekshirish
+  // Ekran kattaligini kuzatish
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
-    handleResize();
+    const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Mobil holatda sidebarni avtomatik yopish
+  // 768 dan past bo‘lsa sidebar yopiladi
   useEffect(() => {
-    if (isMobile && sidebarRedux.isOpen) {
+    if (windowWidth <= 768 && sidebarRedux.isOpen) {
       dispatch(closeSidebar());
       setSidebar(true);
     }
-  }, [isMobile]);
+  }, [windowWidth, sidebarRedux.isOpen, dispatch]);
+
+  // 649 dan past bo‘lsa footer umuman chiqmasin
+  if (windowWidth <= 649) return null;
 
   const handleDispatch = () => {
     if (sidebar) {
@@ -50,12 +52,11 @@ const Footer = () => {
         bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]
         shadow-md
         h-[48px] px-6
-        max-[650px]:py-4 max-[650px]:justify-center
       "
     >
       <div className="flex items-center gap-2">
-        {/* ArrowLeft tugmasi faqat katta ekranlarda ko‘rinadi */}
-        {!isMobile && (
+        {/* ArrowLeft faqat 768 dan katta bo‘lsa chiqadi */}
+        {windowWidth > 768 && (
           <button
             onClick={handleDispatch}
             className="shadow-md px-2 py-1.5 rounded-md transition-transform duration-300 cursor-pointer absolute bottom-5 left-4"
@@ -70,11 +71,7 @@ const Footer = () => {
       </div>
 
       {/* Footer yozuvlari va iconlar */}
-      <div
-        className={`flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 ${
-          isMobile ? "justify-center w-full" : "max-[650px]:hidden"
-        }`}
-      >
+      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
         <span>
           <Trans
             i18nKey="footer.madeWith"
