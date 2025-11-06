@@ -335,55 +335,55 @@ const AllOrders = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t('mijoz')}</span>
+                <span>{t("mijoz")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t('phone')}</span>
+                <span>{t("phone")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t('detail.address')}</span>
+                <span>{t("detail.address")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t('market')}</span>
+                <span>{t("market")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t('status')}</span>
+                <span>{t("status")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t('price')}</span>
+                <span>{t("price")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t('delivery')}</span>
+                <span>{t("delivery")}</span>
               </div>
             </th>
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t('sana')}</span>
+                <span>{t("sana")}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
             <th>
               <div className="flex items-center justify-center gap-30">
-                <span>{t('harakat')}</span>
+                <span>{t("harakat")}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
@@ -405,32 +405,32 @@ const AllOrders = () => {
                 </td>
                 <td
                   className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t('mijoz')}
+                  data-cell={t("mijoz")}
                 >
                   {item?.customer?.name}
                 </td>
                 <td
                   className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t('phone')}
+                  data-cell={t("phone")}
                 >
                   {item?.customer?.phone_number}
                 </td>
                 <td
                   className="pl-10 text-[#2E263DE5] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t('detail.address')}
+                  data-cell={t("detail.address")}
                 >
                   {item?.customer?.district?.name}
                 </td>
                 <td
                   className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t('market')}
+                  data-cell={t("market")}
                 >
                   {item?.market?.name}
                 </td>
-                <td className="pl-10" data-cell={t('status')}>
+                <td className="pl-10" data-cell={t("status")}>
                   <span
                     className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                      statusColors[item.status] || 'bg-slate-400'
+                      statusColors[item.status] || "bg-slate-400"
                     }`}
                   >
                     {st(`${item.status}`)}
@@ -438,48 +438,46 @@ const AllOrders = () => {
                 </td>
                 <td
                   className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t('price')}
+                  data-cell={t("price")}
                 >
-                  {new Intl.NumberFormat('uz-UZ').format(item?.total_price)}
+                  {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
                 </td>
                 <td
                   className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t('delivery')}
+                  data-cell={t("delivery")}
                 >
                   {t(`${item?.where_deliver}`)}
                 </td>
                 <td
                   className="pl-5 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t('sana')}
+                  data-cell={t("sana")}
                 >
                   {new Date(Number(item?.created_at))
                     .toISOString()
-                    .substring(0, 10)
-                    }
-                
+                    .substring(0, 10)}
                 </td>
 
                 <td
                   className="text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                  data-cell={t('harakat')}
+                  data-cell={t("harakat")}
                 >
-                  {item?.status === 'waiting' ? (
+                  {item?.status === "waiting" ? (
                     <div className="flex gap-3">
                       <Button
                         onClick={(e) => handleSellOrder(e, item)}
                         className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none! hover:opacity-80"
                       >
-                        {t('sotish')}
+                        {t("sotish")}
                       </Button>
                       <Button
                         onClick={(e) => handleCancelOrder(e, item)}
                         className="bg-red-500! text-[#ffffff]! border-none! hover:opacity-80"
                       >
-                        {t('detail.cancel')}
+                        {t("detail.cancel")}
                       </Button>
                     </div>
-                  ) : item?.status === 'sold' ||
-                    item?.status === 'cancelled' ? (
+                  ) : item?.status === "sold" ||
+                    item?.status === "cancelled" ? (
                     <div className="ml-9">
                       <Button onClick={(e) => handleRollback(e, item?.id)}>
                         <AlertCircle />
@@ -507,7 +505,7 @@ const AllOrders = () => {
         isShow={isShowModal}
         onCancel={() => setIsShowModal(false)}
         onConfirm={handleConfirm}
-        description={t('popupTitle')}
+        description={t("popupTitle")}
       />
 
       <Popup isShow={isShow} onClose={closePopup}>
@@ -518,7 +516,7 @@ const AllOrders = () => {
           />
           {partleSoldShow && (
             <h2 className="text-center pt-3 text-[20px]">
-              Qisman {urlType.current === 'sell' ? 'sotish' : 'bekor qilish'}
+              Qisman {urlType.current === "sell" ? "sotish" : "bekor qilish"}
             </h2>
           )}
           <div
@@ -527,36 +525,36 @@ const AllOrders = () => {
             } text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
           >
             <p>
-              <span className="font-semibold">Mijoz ismi:</span>{' '}
-              {order.current?.customer?.name || '—'}
+              <span className="font-semibold">Mijoz ismi:</span>{" "}
+              {order.current?.customer?.name || "—"}
             </p>
             <p>
-              <span className="font-semibold">Mijoz tel raqami:</span>{' '}
-              {order.current?.customer?.phone_number || '—'}
+              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
+              {order.current?.customer?.phone_number || "—"}
             </p>
             <p>
-              <span className="font-semibold">Tuman:</span>{' '}
-              {order.current?.customer?.district?.name || '—'}
+              <span className="font-semibold">Tuman:</span>{" "}
+              {order.current?.customer?.district?.name || "—"}
             </p>
             <p>
-              <span className="font-semibold">Mahsulotlar nomi:</span>{' '}
+              <span className="font-semibold">Mahsulotlar nomi:</span>{" "}
               {order.current?.items
                 ?.map((item: any) => item.product?.name)
-                .join(', ') || '—'}
+                .join(", ") || "—"}
             </p>
             <p>
-              <span className="font-semibold">Mahsulotlar soni:</span>{' '}
+              <span className="font-semibold">Mahsulotlar soni:</span>{" "}
               {order.current?.items?.reduce(
                 (sum: any, item: any) => sum + (item.quantity || 0),
-                0,
-              ) || '—'}
+                0
+              ) || "—"}
             </p>
 
             <p>
-              <span className="font-semibold">Umumiy summa:</span>{' '}
+              <span className="font-semibold">Umumiy summa:</span>{" "}
               {order.current?.total_price
-                ? order.current.total_price.toLocaleString('uz-UZ')
-                : '0'}{' '}
+                ? order.current.total_price.toLocaleString("uz-UZ")
+                : "0"}{" "}
               so'm
             </p>
           </div>
@@ -566,8 +564,8 @@ const AllOrders = () => {
               <div
                 className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
                   orderItemInfo.length > 2
-                    ? 'max-h-49 overflow-y-auto'
-                    : 'overflow-visible'
+                    ? "max-h-49 overflow-y-auto"
+                    : "overflow-visible"
                 }`}
               >
                 {orderItemInfo.map((item, index) => (
@@ -589,10 +587,10 @@ const AllOrders = () => {
                           item.quantity <= 0 ||
                           orderItemInfo.reduce(
                             (sum, i) => sum + i.quantity,
-                            0,
+                            0
                           ) <= 1
-                            ? 'opacity-30 cursor-not-allowed'
-                            : 'hover:opacity-70'
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
                         }`}
                         onClick={() => handleMinus(index)}
                       />
@@ -601,8 +599,8 @@ const AllOrders = () => {
                       <Plus
                         className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
                           item.quantity >= (item.maxQuantity ?? Infinity)
-                            ? 'opacity-30 cursor-not-allowed'
-                            : 'hover:opacity-70'
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
                         }`}
                         onClick={() => handlePlus(index)}
                       />
@@ -617,9 +615,9 @@ const AllOrders = () => {
                   placeholder="To'lov summasi"
                   value={totalPrice}
                   onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, '');
-                    const formatted = new Intl.NumberFormat('uz-UZ').format(
-                      Number(raw || 0),
+                    const raw = e.target.value.replace(/\D/g, "");
+                    const formatted = new Intl.NumberFormat("uz-UZ").format(
+                      Number(raw || 0)
                     );
                     setTotalPrice(formatted);
                   }}
@@ -640,9 +638,9 @@ const AllOrders = () => {
                   placeholder="Qo'shimcha pul"
                   className="!border !border-gray-500 h-[40px]! w-full!"
                   formatter={(v) =>
-                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''
+                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
                   }
-                  parser={(v) => v?.replace(/,/g, '') || ''}
+                  parser={(v) => v?.replace(/,/g, "") || ""}
                 />
               </Form.Item>
             </div>
@@ -661,26 +659,35 @@ const AllOrders = () => {
             dark:placeholder:text-[#A9A5C0]! 
             dark:text-[#E7E3FC]!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"
-                  style={{ resize: 'none' }}
+                  style={{ resize: "none" }}
                 />
               </Form.Item>
             </div>
 
-            <div className="flex justify-between">
-              <Button onClick={() => setPartlySoldShow((p) => !p)}>
-                <AlertCircle />
-              </Button>
+            <div
+              className={`flex ${
+                urlType.current === "sell"
+                  ? "justify-between"
+                  : "justify-center"
+              }`}
+            >
+              {urlType.current === "sell" && (
+                <Button onClick={() => setPartlySoldShow((p) => !p)}>
+                  <AlertCircle />
+                </Button>
+              )}
+
               <Button
                 disabled={getIsPending()}
                 loading={getIsPending()}
                 htmlType="submit"
                 className={`px-5! py-4! ${
-                  urlType.current === 'sell'
-                    ? 'bg-[var(--color-bg-sy)]!'
-                    : 'bg-red-500!'
+                  urlType.current === "sell"
+                    ? "bg-[var(--color-bg-sy)]!"
+                    : "bg-red-500!"
                 } text-[#ffffff]!`}
               >
-                {urlType.current === 'sell' ? 'Sotish' : 'Bekor qilish'}
+                {urlType.current === "sell" ? "Sotish" : "Bekor qilish"}
               </Button>
             </div>
           </Form>

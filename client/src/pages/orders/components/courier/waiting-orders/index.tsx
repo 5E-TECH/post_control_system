@@ -264,15 +264,15 @@ const WaitingOrders = () => {
         <thead className="bg-[#f6f7fb] h-[56px] text-[13px] text-[#2E263DE5] text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
           <tr>
             <th>#</th>
-            <th>{t('mijoz')}</th>
-            <th>{t('phone')}</th>
-            <th>{t('detail.address')}</th>
-            <th>{t('market')}</th>
-            <th>{t('status')}</th>
-            <th>{t('price')}</th>
-            <th>{t('delivery')}</th>
-            <th>{t('sana')}</th>
-            <th>{t('harakat')}</th>
+            <th>{t("mijoz")}</th>
+            <th>{t("phone")}</th>
+            <th>{t("detail.address")}</th>
+            <th>{t("market")}</th>
+            <th>{t("status")}</th>
+            <th>{t("price")}</th>
+            <th>{t("delivery")}</th>
+            <th>{t("sana")}</th>
+            <th>{t("harakat")}</th>
           </tr>
         </thead>
         <tbody>
@@ -285,50 +285,49 @@ const WaitingOrders = () => {
               <td data-cell="#" className="pl-10">
                 {inx + 1}
               </td>
-              <td data-cell={t('mijoz')} className="pl-10">
+              <td data-cell={t("mijoz")} className="pl-10">
                 {item?.customer?.name}
               </td>
-              <td data-cell={t('phone')} className="pl-10">
+              <td data-cell={t("phone")} className="pl-10">
                 {item?.customer?.phone_number}
               </td>
-              <td data-cell={t('detail.address')} className="pl-10">
+              <td data-cell={t("detail.address")} className="pl-10">
                 {item?.customer?.district?.name}
               </td>
-              <td data-cell={t('market')} className="pl-10">
+              <td data-cell={t("market")} className="pl-10">
                 {item?.market?.name}
               </td>
-              <td data-cell={t('status')} className="pl-10">
+              <td data-cell={t("status")} className="pl-10">
                 <span className="py-2 px-3 rounded-2xl text-[13px] text-white bg-orange-500">
                   {st(`${item.status}`)}
                 </span>
               </td>
-              <td data-cell={t('price')} className="pl-10">
-                {new Intl.NumberFormat('uz-UZ').format(item?.total_price)}
+              <td data-cell={t("price")} className="pl-10">
+                {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}
               </td>
-              <td data-cell={t('delivery')} className="pl-10">
+              <td data-cell={t("delivery")} className="pl-10">
                 {t(`${item?.where_deliver}`)}
               </td>
 
-              <td data-cell={t('stock')} className="pl-15">
+              <td data-cell={t("stock")} className="pl-15">
                 {new Date(Number(item?.created_at))
                   .toISOString()
-                  .substring(0, 10)
-                  }
+                  .substring(0, 10)}
               </td>
 
-              <td data-cell={t('harakat')}>
+              <td data-cell={t("harakat")}>
                 <div className="flex gap-3">
                   <Button
                     onClick={(e) => handleSellOrder(e, item)}
                     className="bg-[var(--color-bg-sy)]! text-[#ffffff]! border-none!"
                   >
-                    {t('sotish')}
+                    {t("sotish")}
                   </Button>
                   <Button
                     onClick={(e) => handleCancelOrder(e, item)}
                     className="bg-red-500! text-[#ffffff]! border-none!"
                   >
-                    {t('detail.cancel')}
+                    {t("detail.cancel")}
                   </Button>
                 </div>
               </td>
@@ -355,7 +354,7 @@ const WaitingOrders = () => {
           />
           {partleSoldShow && (
             <h2 className="text-center pt-3 text-[20px]">
-              Qisman {urlType.current === 'sell' ? 'sotish' : 'bekor qilish'}
+              Qisman {urlType.current === "sell" ? "sotish" : "bekor qilish"}
             </h2>
           )}
           <div
@@ -364,36 +363,36 @@ const WaitingOrders = () => {
             } text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
           >
             <p>
-              <span className="font-semibold">Mijoz ismi:</span>{' '}
-              {order.current?.customer?.name || '—'}
+              <span className="font-semibold">Mijoz ismi:</span>{" "}
+              {order.current?.customer?.name || "—"}
             </p>
             <p>
-              <span className="font-semibold">Mijoz tel raqami:</span>{' '}
-              {order.current?.customer?.phone_number || '—'}
+              <span className="font-semibold">Mijoz tel raqami:</span>{" "}
+              {order.current?.customer?.phone_number || "—"}
             </p>
             <p>
-              <span className="font-semibold">Tuman:</span>{' '}
-              {order.current?.customer?.district?.name || '—'}
+              <span className="font-semibold">Tuman:</span>{" "}
+              {order.current?.customer?.district?.name || "—"}
             </p>
             <p>
-              <span className="font-semibold">Mahsulotlar nomi:</span>{' '}
+              <span className="font-semibold">Mahsulotlar nomi:</span>{" "}
               {order.current?.items
                 ?.map((item: any) => item.product?.name)
-                .join(', ') || '—'}
+                .join(", ") || "—"}
             </p>
             <p>
-              <span className="font-semibold">Mahsulotlar soni:</span>{' '}
+              <span className="font-semibold">Mahsulotlar soni:</span>{" "}
               {order.current?.items?.reduce(
                 (sum: any, item: any) => sum + (item.quantity || 0),
-                0,
-              ) || '—'}
+                0
+              ) || "—"}
             </p>
 
             <p>
-              <span className="font-semibold">Umumiy summa:</span>{' '}
+              <span className="font-semibold">Umumiy summa:</span>{" "}
               {order.current?.total_price
-                ? order.current.total_price.toLocaleString('uz-UZ')
-                : '0'}{' '}
+                ? order.current.total_price.toLocaleString("uz-UZ")
+                : "0"}{" "}
               so'm
             </p>
           </div>
@@ -403,8 +402,8 @@ const WaitingOrders = () => {
               <div
                 className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
                   orderItemInfo.length > 2
-                    ? 'max-h-49 overflow-y-auto'
-                    : 'overflow-visible'
+                    ? "max-h-49 overflow-y-auto"
+                    : "overflow-visible"
                 }`}
               >
                 {orderItemInfo.map((item, index) => (
@@ -426,10 +425,10 @@ const WaitingOrders = () => {
                           item.quantity <= 0 ||
                           orderItemInfo.reduce(
                             (sum, i) => sum + i.quantity,
-                            0,
+                            0
                           ) <= 1
-                            ? 'opacity-30 cursor-not-allowed'
-                            : 'hover:opacity-70'
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
                         }`}
                         onClick={() => handleMinus(index)}
                       />
@@ -438,8 +437,8 @@ const WaitingOrders = () => {
                       <Plus
                         className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
                           item.quantity >= (item.maxQuantity ?? Infinity)
-                            ? 'opacity-30 cursor-not-allowed'
-                            : 'hover:opacity-70'
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:opacity-70"
                         }`}
                         onClick={() => handlePlus(index)}
                       />
@@ -454,9 +453,9 @@ const WaitingOrders = () => {
                   placeholder="To'lov summasi"
                   value={totalPrice}
                   onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, '');
-                    const formatted = new Intl.NumberFormat('uz-UZ').format(
-                      Number(raw || 0),
+                    const raw = e.target.value.replace(/\D/g, "");
+                    const formatted = new Intl.NumberFormat("uz-UZ").format(
+                      Number(raw || 0)
                     );
                     setTotalPrice(formatted);
                   }}
@@ -477,9 +476,9 @@ const WaitingOrders = () => {
                   placeholder="Qo'shimcha pul"
                   className="!border !border-gray-500 h-[40px]! w-full!"
                   formatter={(v) =>
-                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''
+                    v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
                   }
-                  parser={(v) => v?.replace(/,/g, '') || ''}
+                  parser={(v) => v?.replace(/,/g, "") || ""}
                 />
               </Form.Item>
             </div>
@@ -498,26 +497,35 @@ const WaitingOrders = () => {
       dark:placeholder:text-[#A9A5C0]! 
       dark:text-[#E7E3FC]!"
                   placeholder="Izoh qoldiring (ixtiyoriy)"
-                  style={{ resize: 'none' }}
+                  style={{ resize: "none" }}
                 />
               </Form.Item>
             </div>
 
-            <div className="flex justify-between">
-              <Button onClick={() => setPartlySoldShow((p) => !p)}>
-                <AlertCircle />
-              </Button>
+            <div
+              className={`flex ${
+                urlType.current === "sell"
+                  ? "justify-between"
+                  : "justify-center"
+              }`}
+            >
+              {urlType.current === "sell" && (
+                <Button onClick={() => setPartlySoldShow((p) => !p)}>
+                  <AlertCircle />
+                </Button>
+              )}
+
               <Button
                 disabled={getIsPending()}
                 loading={getIsPending()}
                 htmlType="submit"
                 className={`px-5! py-4! ${
-                  urlType.current === 'sell'
-                    ? 'bg-[var(--color-bg-sy)]!'
-                    : 'bg-red-500!'
+                  urlType.current === "sell"
+                    ? "bg-[var(--color-bg-sy)]!"
+                    : "bg-red-500!"
                 } text-[#ffffff]!`}
               >
-                {urlType.current === 'sell' ? 'Sotish' : 'Bekor qilish'}
+                {urlType.current === "sell" ? "Sotish" : "Bekor qilish"}
               </Button>
             </div>
           </Form>
