@@ -30,22 +30,18 @@ const OrderItems = () => {
 
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const marketId = market?.id;
-  const { getProductsByMarket, getProducts, getMyProducts } = useProduct();
-  // const { getProductsByMarket, getMyProducts } = useProduct();
+  const { getProductsByMarket, getMyProducts } = useProduct();
 
   const myProductsQuery = getMyProducts(undefined, user.role === "market");
 
-  // faqat `superadmin` (yoki boshqa rol) bo‘lsa `getProductsByMarket` ishlaydi
   const marketProductsQuery = getProductsByMarket(
     marketId as string,
     user.role !== "market"
   );
 
-  // endi `data` ni rolga qarab tanlaymiz
   const data =
     user.role === "market" ? myProductsQuery.data : marketProductsQuery.data;
 
-  console.log("1111111111111111", data);
   const productNames = data?.data?.products?.map((product: any) => ({
     value: product.id,
     label: (
@@ -68,16 +64,13 @@ const OrderItems = () => {
     []
   );
 
-  const { data: products } = getProducts(
-    {
-      search: formDataList.find((item) => item.search)?.search,
-      marketId,
-    },
-    user.role !== "market"
-  );
-  console.log("1111111111111111", data);
+  const searchValue =
+    formDataList.find((item) => item.search)?.search?.toLowerCase() || "";
 
-  const allProducts = products?.data?.items || products?.data?.data;
+  const allProducts = data?.data?.products?.filter((product: any) =>
+    product.name.toLowerCase().includes(searchValue)
+  );
+
   const searchedProducts = allProducts?.map((product: any) => ({
     value: product.id,
     label: (
