@@ -40,6 +40,7 @@ export class CashboxHistoryService {
         where: { id },
         relations: [
           'cashbox',
+          'cashbox.user',
           'createdByUser',
           'order',
           'order.market',
