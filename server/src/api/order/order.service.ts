@@ -183,7 +183,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.startTransaction();
     try {
       const {
-        market_id,
         customer_id,
         order_item_info,
         total_price,
@@ -192,14 +191,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment,
       } = createOrderDto;
 
+      let { market_id } = createOrderDto;
+
       const market = await queryRunner.manager.findOne(UserEntity, {
         where: { id: market_id, role: Roles.MARKET },
       });
+
       if (!market) {
         throw new NotFoundException('Market not found');
       }
+      if (!market_id && user.role === Roles.MARKET) {
+        market_id = user.id;
+      }
 
-      if (user.role === Roles.MARKET && !market.add_order) {
+      if (user.role === Roles.MARKET && user.id != market_id) {
+        throw new BadRequestException('Market Id is not match!');
+      }
+
+      if (user.role === Roles.MARKET && market.add_order) {
         throw new BadRequestException('You can not create order and product');
       }
 
@@ -753,7 +762,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
-        .where('order.user_id = :userId', { userId: user.id });
+        .where('order.user_id = :userId', { userId: user.id })
+        .orderBy('order.created_at', 'DESC');
 
       // 🔍 Search by customer name or order ID
       if (search) {
