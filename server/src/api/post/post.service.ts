@@ -374,6 +374,29 @@ export class PostService {
     }
   }
 
+  async checkCancelPost(id: string, postDto: PostDto) {
+    try {
+      const { postId } = postDto;
+      if (!postId) {
+        throw new BadRequestException('Pochta topilmadi');
+      }
+      const order = await this.orderRepo.findOne({
+        where: {
+          qr_code_token: id,
+          status: Order_status.RECEIVED,
+          canceled_post_id: postId,
+        },
+        select: ['id'],
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      return successRes({ order }, 200, "Order checked and it's exist");
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async sendPost(id: string, dto: SendPostDto): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();

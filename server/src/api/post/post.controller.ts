@@ -171,6 +171,18 @@ export class PostController {
     return this.postService.checkPost(id, postIdDto);
   }
 
+  @ApiOperation({
+    summary: 'Check post (check the order that is exist or not in the post)',
+  })
+  @ApiParam({ name: 'id', description: 'Order QR token' })
+  @ApiResponse({ status: 200, description: 'Order checked' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('check/cancel/:id')
+  checkCanceledPost(@Param('id') id: string, @Body() postIdDto: PostDto) {
+    return this.postService.checkCancelPost(id, postIdDto);
+  }
+
   @ApiOperation({ summary: 'Receive post (courier)' })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Post received' })
