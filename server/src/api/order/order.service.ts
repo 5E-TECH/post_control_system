@@ -786,11 +786,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       let startMs: number | undefined;
       let endMs: number | undefined;
 
-      if (query.startDate) {
-        startMs = toUzbekistanTimestamp(query.startDate, false);
+      if (startDate) {
+        startMs = toUzbekistanTimestamp(startDate, false);
       }
-      if (query.endDate) {
-        endMs = toUzbekistanTimestamp(query.endDate, true);
+      if (endDate) {
+        endMs = toUzbekistanTimestamp(endDate, true);
       }
 
       if (startMs && endMs) {
@@ -897,14 +897,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       if (startMs && endMs) {
-        qb.andWhere('order.created_at BETWEEN :startDate AND :endDate', {
+        qb.andWhere('o.created_at BETWEEN :startDate AND :endDate', {
           startDate: startMs,
           endDate: endMs,
         });
       } else if (startMs) {
-        qb.andWhere('order.created_at >= :startDate', { startDate: startMs });
+        qb.andWhere('o.created_at >= :startDate', { startDate: startMs });
       } else if (endMs) {
-        qb.andWhere('order.created_at <= :endDate', { endDate: endMs });
+        qb.andWhere('o.created_at <= :endDate', { endDate: endMs });
       }
 
       const [allOrders, total] = await qb.getManyAndCount();
