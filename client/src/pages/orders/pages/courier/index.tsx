@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from "react";
 import SearchInput from "../../../users/components/search-input";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ClipboardList, Clock, XCircle } from "lucide-react";
 import dayjs from "dayjs";
@@ -15,6 +15,7 @@ const CourierOrders = () => {
   const { t } = useTranslation("orderList");
   const [isMobile, setIsMobile] = useState(false);
   const dispatch = useDispatch();
+  const location = useLocation();
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 640);
@@ -26,6 +27,10 @@ const CourierOrders = () => {
     from: "",
     to: "",
   });
+
+  useEffect(() => {
+    setForm({ from: "", to: "" });
+  }, [location.pathname]);
 
   dispatch(setDateRange({ from: form.from, to: form.to }));
 
