@@ -4,7 +4,6 @@ import { Button, Pagination, type PaginationProps } from 'antd';
 import { usePost } from '../../../../../shared/api/hooks/usePost';
 import EmptyPage from '../../../../../shared/components/empty-page';
 import { useApiNotification } from '../../../../../shared/hooks/useApiNotification';
-import { useNavigate } from 'react-router-dom';
 import { useParamsHook } from '../../../../../shared/hooks/useParams';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
@@ -12,7 +11,6 @@ import type { RootState } from '../../../../../app/store';
 import ConfirmPopup from '../../../../../shared/components/confirmPopup';
 
 const CancelledOrders = () => {
-  const navigate = useNavigate();
   const { t } = useTranslation('orderList');
   const { t: st } = useTranslation('status');
 
@@ -80,6 +78,14 @@ const CancelledOrders = () => {
         ),
     });
   };
+
+  const toggleSelect = (id:string) => {
+  if (selectedIds.includes(id)) {
+    setSelectedIds(selectedIds.filter((selectedId) => selectedId !== id));
+  } else {
+    setSelectedIds([...selectedIds, id]);
+  }
+};
 
   return data?.data?.data?.length > 0 ? (
     <div>
@@ -173,8 +179,8 @@ const CancelledOrders = () => {
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => (
             <tr
-              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
               key={item?.id}
+               onClick={() => toggleSelect(item.id)}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >
               <td className="p-[20px] flex items-center" data-cell="✓">
