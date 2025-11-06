@@ -246,12 +246,16 @@ export class OrderController {
     @Query('search') search: string,
     @Query('page') page: number,
     @Query('limit') limit: number,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
   ) {
     return this.orderService.allCouriersOrders(user, {
       status,
       search,
       page,
       limit,
+      startDate,
+      endDate,
     });
   }
 
