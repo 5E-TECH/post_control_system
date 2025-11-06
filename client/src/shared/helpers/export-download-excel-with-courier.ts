@@ -29,7 +29,7 @@ export const exportToExcel = async (
 
     // === QR kod (125x125 px)
     if (header?.qrCodeToken) {
-        const qrImageBase64 = await QRCode.toDataURL(header.qrCodeToken, { width: 125 });
+        const qrImageBase64 = await QRCode.toDataURL(`post_${header.qrCodeToken}`, { width: 125 });
         const qrImageId = workbook.addImage({
             base64: qrImageBase64,
             extension: "png",

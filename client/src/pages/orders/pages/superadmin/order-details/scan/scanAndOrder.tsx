@@ -67,6 +67,7 @@ export default function ScanAndOrder() {
 
   const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
   const orderStatus = order?.data?.status;
+  const postStatus = order?.data?.status;
   useEffect(() => {
     if (!token) {
       setError("QR token topilmadi");
@@ -80,7 +81,11 @@ export default function ScanAndOrder() {
       setOrder(null);
 
       try {
-        const res = await fetch(`${BASE_URL}order/qr-code/${token}`, {
+        let url = token.includes("post_")
+          ? `${BASE_URL}post/scan/${token.replace("post_", "")}`
+          : `${BASE_URL}order/qr-code/${token}`;
+
+        const res = await fetch(url, {
           method: "GET",
           headers: {
             Authorization: authToken ? `Bearer ${authToken}` : "",
@@ -101,6 +106,8 @@ export default function ScanAndOrder() {
 
         const data = await res.json();
         setOrder(data);
+        console.log(data);
+
       } catch (err: any) {
         setError(err.message || "Xatolik yuz berdi");
       } finally {
@@ -118,6 +125,7 @@ export default function ScanAndOrder() {
     courierReceiveOrderByScanerById,
     rollbackOrder,
     joinPostRefusalProduct,
+    receivePostByScan
   } = useOrder();
 
   const [form] = Form.useForm<FieldType>();
@@ -340,338 +348,407 @@ export default function ScanAndOrder() {
       </div>
     );
 
+  const confirmPost = (token: string) => {
+    receivePostByScan.mutate(token, {
+      onSuccess: () => {
+        setIsShow(false);
+        handleSuccess("Pochta muvaffaqiyatli qabul qilindi!");
+        navigate(-1);
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Pochtani qabul qilishda xatolik yuz berdi!");
+        navigate(-1);
+      },
+    })
+  }
+
   return (
-    <Popup isShow={isShow}>
-      <div className="w-[350px] shadow-lg rounded-md dark:bg-[#312d48] bg-[#ffffff] flex flex-col justify-between pt-6 px-8 max-h-[90vh] overflow-hidden overflow-y-auto">
-        <X
-          className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
-          onClick={() => {
-            setIsShow(false);
-            navigate(-1);
-          }}
-        />
-
-        {/* Umumiy content */}
-        <div
-          className={`space-y-1 text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
-        >
-          <p>
-            <span className="font-semibold">Mijoz ismi:</span>{" "}
-            <span>{order.data?.customer?.name || "—"}</span>
-          </p>
-          <p>
-            <span className="font-semibold">Mijoz tel raqami:</span>{" "}
-            <span>{order.data?.customer?.phone_number || "—"}</span>
-          </p>
-          <p>
-            <span className="font-semibold">Tumani: </span>
-            <span>{order.data?.customer?.district?.name || "—"}</span>
-          </p>
-          <p>
-            <span className="font-semibold">Mahsulot nomi: </span>
-            <span>
-              {order.data?.items?.length
-                ? order.data.items
-                    .map((item: any) => item.product.name)
-                    .join(", ")
-                : "—"}
-            </span>
-          </p>
-          <p>
-            <span className="font-semibold">Mahsulot soni: </span>
-            <span>
-              {order.data?.items?.reduce(
-                (sum: any, item: any) => sum + (item.quantity || 0),
-                0
-              ) || "—"}
-            </span>
-          </p>
-          <p>
-            <span className="font-semibold">Umumiy summa:</span>{" "}
-            <span>
-              {order.data?.total_price
-                ? order.data.total_price.toLocaleString("uz-UZ")
-                : "0"}{" "}
-              so'm
-            </span>
-          </p>
-        </div>
-
-        {partleSoldShow && (
-          <div className={`flex flex-col pt-${partleSoldShow ? 3 : 0}`}>
-            <div
-              className={`scrollbar shadow-md mb-5 rounded-md px-2 ${
-                orderItemInfo.length > 2
-                  ? "max-h-49 overflow-y-auto"
-                  : "overflow-visible"
-              }`}
-            >
-              {orderItemInfo.map((item, index) => (
-                <div
-                  key={item.product_id}
-                  className="pt-4 flex gap-10 justify-between"
-                >
-                  <Form.Item className="flex-1!">
-                    <Select
-                      className="!h-[40px] custom-select-dropdown-bright"
-                      dropdownClassName="dark-dropdown"
-                      value={item.product_id}
-                      disabled
-                      options={[
-                        {
-                          label: item.name,
-                          value: item.product_id,
-                        },
-                      ]}
-                    />
-                  </Form.Item>
-
-                  <div className="flex gap-2 items-center mb-6 select-none">
-                    {/* MINUS */}
-                    <Minus
-                      className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
-                        item.quantity <= 0 ||
-                        orderItemInfo.reduce((sum, i) => sum + i.quantity, 0) <=
-                          1
-                          ? "opacity-30 cursor-not-allowed"
-                          : "hover:opacity-70"
-                      }`}
-                      onClick={() => handleMinus(index)}
-                    />
-
-                    {/* MIQDOR */}
-                    <span className="text-[20px] w-[25px] text-center">
-                      {item.quantity}
-                    </span>
-
-                    {/* PLUS */}
-                    <Plus
-                      className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${
-                        item.quantity >= (item.maxQuantity ?? Infinity)
-                          ? "opacity-30 cursor-not-allowed"
-                          : "hover:opacity-70"
-                      }`}
-                      onClick={() => handlePlus(index)}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <Form.Item>
-              <Input
-                className="h-[40px]!"
-                placeholder="To'lov summasi"
-                value={totalPrice}
-                onChange={(e) => {
-                  const rawValue = e.target.value.replace(/\D/g, "");
-                  const formatted = new Intl.NumberFormat("uz-UZ").format(
-                    Number(rawValue || 0)
-                  );
-                  setTotalPrice(formatted);
-                }}
-              ></Input>
-            </Form.Item>
-          </div>
-        )}
-        {alertBtnYesNo && (
-          <div className="flex flex-col gap-5 pt-2">
-            <span className="text-center text-[18px] text-red-500">
-              {orderStatus === "sold"
-                ? "Sotilgan"
-                : orderStatus === "cancelled"
-                ? "Bekor qilingan"
-                : ""}{" "}
-              buyurtmani ortga qaytarmoqchimisiz?
-            </span>
-
-            <div className="flex gap-10">
-              <Button
-                className="w-full bg-red-500! text-white! h-[40px]!"
-                onClick={() => setAlertBtnYesNo(false)}
-              >
-                Yo'q
-              </Button>
-              <Button
-                className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
+    <>
+      {
+        token?.includes("post_") ? (
+          <Popup isShow={isShow}>
+            <div className="w-[350px] shadow-lg rounded-md dark:bg-[#312d48] bg-[#ffffff] flex flex-col justify-between pt-6 px-8 max-h-[90vh] overflow-hidden overflow-y-auto">
+              <X
+                className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
                 onClick={() => {
-                  rollbackOrder.mutate(id, {
-                    onSuccess: () => {
-                      handleSuccess(
-                        "✅ Buyurtma muvaffaqiyatli 'kutilmoqda' holatiga qaytarildi!"
-                      );
-                      navigate(-1);
-                    },
-                    onError: (err: any) => {
-                      handleApiError(
-                        err,
-                        "❌ Xatolik! Buyurtma kutilmoqdaga qaytarilmadi."
-                      );
-                      navigate(-1);
-                    },
-                  }); // 🔹 so‘rov yuboriladi
+                  setIsShow(false);
+                  navigate(-1);
                 }}
-                loading={rollbackOrder.isPending}
+              />
+
+              {/* Umumiy content */}
+              <div
+                className={`space-y-1 text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
               >
-                Ha
-              </Button>
-            </div>
-          </div>
-        )}
-
-        <Form initialValues={{}} form={form} onFinish={onFinish}>
-          {orderStatus === "waiting" && (
-            <div className="pt-1">
-              <div>
-                <span>Qo'shimcha (pul)</span>
-                <Form.Item name="extraCost">
-                  <InputNumber
-                    placeholder="Qo'shimcha pul"
-                    className="h-[40px]! w-full!"
-                    formatter={(value) =>
-                      value
-                        ? value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                        : ""
-                    }
-                    parser={(value) => value?.replace(/,/g, "") || ""}
-                  />
-                </Form.Item>
+                <p>
+                  {
+                    postStatus === "sent" ? (
+                      <span className="font-semibold">Ushbu pochtada barcha buyurtmalar borligini tasdiqlaysizmi?</span>
+                    ) : (
+                      <span className="font-semibold">Pochta qabul qilingan!</span>
+                    )
+                  }
+                </p>
               </div>
 
-              <div>
-                <span>Izoh</span>
-                <Form.Item name="comment">
-                  <Input.TextArea
-                    className="py-4! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
-                    placeholder="Izoh qoldiring (ixtiyoriy)"
-                    style={{ resize: "none" }}
-                  />
-                </Form.Item>
-              </div>
-            </div>
-          )}
-
-          <div className="pb-4">
-            {orderStatus === "on the road" && role === "courier" && (
-              <div className="w-full pt-5">
-                <Button
-                  onClick={() => handleReceiveOrderById(order?.data?.id)}
-                  className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
-                >
-                  Qabul qilish
-                </Button>
-              </div>
-            )}
-
-            {alertBtnYesNoWaiting && (
-              <div className="flex flex-col gap-5 pt-2">
-                <span className="text-center text-[18px] text-red-500">
-                  Buyurtmani{" "}
-                  {actionTypeOrder === "sell"
-                    ? "sotmoqchimisiz"
-                    : "bekor qilmoqchimisiz"}
-                  ?
-                </span>
-
-                <div className="flex gap-10">
-                  <Button
-                    className="w-full bg-red-500! text-white! h-[40px]!"
-                    onClick={() => setAlertBtnYesNoWaiting(false)}
-                  >
-                    Yo'q
-                  </Button>
-                  <Button
-                    onClick={() => form.submit()}
-                    className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
-                  >
-                    Ha
-                  </Button>
+              <Form initialValues={{}} form={form} onFinish={onFinish}>
+                <div className="pb-4">
+                  {postStatus === "sent" && role === "courier" && (
+                    <div className="w-full pt-5 flex gap-3">
+                      <Button
+                        onClick={() => {
+                          setIsShow(false);
+                          navigate(-1);
+                        }}
+                        className="w-full h-[40px]!"
+                      >
+                        Bekor qilish
+                      </Button>
+                      <Button
+                        onClick={() => confirmPost(token.replace("post_", ""))}
+                        className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
+                      >
+                        Qabul qilish
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              </Form>
+            </div>
+          </Popup>
+        ) : (
+          <Popup isShow={isShow}>
+            <div className="w-[350px] shadow-lg rounded-md dark:bg-[#312d48] bg-[#ffffff] flex flex-col justify-between pt-6 px-8 max-h-[90vh] overflow-hidden overflow-y-auto">
+              <X
+                className="absolute top-2.5 right-2.5 cursor-pointer hover:bg-gray-200"
+                onClick={() => {
+                  setIsShow(false);
+                  navigate(-1);
+                }}
+              />
 
-            {!alertBtnYesNoWaiting && orderStatus === "waiting" && (
-              <div className="w-full flex gap-5">
-                <Button
-                  className="w-full h-[40px]!"
-                  onClick={() => setPartlySoldShow((p) => !p)}
-                >
-                  <AlertCircle />
-                </Button>
-                <Button
-                  className="w-full h-[40px]! bg-red-500! text-[#ffffff]!"
-                  onClick={handleCancelOrder}
-                >
-                  Bekor qilish
-                </Button>
-                <Button
-                  className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
-                  onClick={handleSellOrder}
-                >
-                  Sotish
-                </Button>
+              {/* Umumiy content */}
+              <div
+                className={`space-y-1 text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5]`}
+              >
+                <p>
+                  <span className="font-semibold">Mijoz ismi:</span>{" "}
+                  <span>{order.data?.customer?.name || "—"}</span>
+                </p>
+                <p>
+                  <span className="font-semibold">Mijoz tel raqami:</span>{" "}
+                  <span>{order.data?.customer?.phone_number || "—"}</span>
+                </p>
+                <p>
+                  <span className="font-semibold">Tumani: </span>
+                  <span>{order.data?.customer?.district?.name || "—"}</span>
+                </p>
+                <p>
+                  <span className="font-semibold">Mahsulot nomi: </span>
+                  <span>
+                    {order.data?.items?.length
+                      ? order.data.items
+                        .map((item: any) => item.product.name)
+                        .join(", ")
+                      : "—"}
+                  </span>
+                </p>
+                <p>
+                  <span className="font-semibold">Mahsulot soni: </span>
+                  <span>
+                    {order.data?.items?.reduce(
+                      (sum: any, item: any) => sum + (item.quantity || 0),
+                      0
+                    ) || "—"}
+                  </span>
+                </p>
+                <p>
+                  <span className="font-semibold">Umumiy summa:</span>{" "}
+                  <span>
+                    {order.data?.total_price
+                      ? order.data.total_price.toLocaleString("uz-UZ")
+                      : "0"}{" "}
+                    so'm
+                  </span>
+                </p>
               </div>
-            )}
 
-            {!alertBtnYesNo && orderStatus === "sold" && (
-              <div className="pt-4 flex gap-10">
-                <Button
-                  className="w-full h-[40px]!"
-                  onClick={() => setAlertBtnYesNo((p) => !p)}
-                >
-                  <AlertCircle />
-                </Button>
-              </div>
-            )}
-
-            {!alertBtnYesNo &&
-              !alertBtnYesNoAdd &&
-              orderStatus === "cancelled" && (
-                <div className="pt-4 flex gap-10">
-                  <Button
-                    className="w-full h-[40px]!"
-                    onClick={() => setAlertBtnYesNo((p) => !p)}
+              {partleSoldShow && (
+                <div className={`flex flex-col pt-${partleSoldShow ? 3 : 0}`}>
+                  <div
+                    className={`scrollbar shadow-md mb-5 rounded-md px-2 ${orderItemInfo.length > 2
+                      ? "max-h-49 overflow-y-auto"
+                      : "overflow-visible"
+                      }`}
                   >
-                    <AlertCircle />
-                  </Button>
+                    {orderItemInfo.map((item, index) => (
+                      <div
+                        key={item.product_id}
+                        className="pt-4 flex gap-10 justify-between"
+                      >
+                        <Form.Item className="flex-1!">
+                          <Select
+                            className="!h-[40px] custom-select-dropdown-bright"
+                            dropdownClassName="dark-dropdown"
+                            value={item.product_id}
+                            disabled
+                            options={[
+                              {
+                                label: item.name,
+                                value: item.product_id,
+                              },
+                            ]}
+                          />
+                        </Form.Item>
 
-                  <Button
-                    className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!"
-                    onClick={() => {
-                      setAlertBtnYesNoAdd((p) => !p), setSelect(id);
-                    }}
-                    // onClick={() => joinPostRefusalProducts(id)}
-                  >
-                    Pochtaga qo'shish
-                  </Button>
+                        <div className="flex gap-2 items-center mb-6 select-none">
+                          {/* MINUS */}
+                          <Minus
+                            className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${item.quantity <= 0 ||
+                              orderItemInfo.reduce((sum, i) => sum + i.quantity, 0) <=
+                              1
+                              ? "opacity-30 cursor-not-allowed"
+                              : "hover:opacity-70"
+                              }`}
+                            onClick={() => handleMinus(index)}
+                          />
+
+                          {/* MIQDOR */}
+                          <span className="text-[20px] w-[25px] text-center">
+                            {item.quantity}
+                          </span>
+
+                          {/* PLUS */}
+                          <Plus
+                            className={`h-[20px] w-[20px] cursor-pointer transition-opacity ${item.quantity >= (item.maxQuantity ?? Infinity)
+                              ? "opacity-30 cursor-not-allowed"
+                              : "hover:opacity-70"
+                              }`}
+                            onClick={() => handlePlus(index)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Form.Item>
+                    <Input
+                      className="h-[40px]!"
+                      placeholder="To'lov summasi"
+                      value={totalPrice}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/\D/g, "");
+                        const formatted = new Intl.NumberFormat("uz-UZ").format(
+                          Number(rawValue || 0)
+                        );
+                        setTotalPrice(formatted);
+                      }}
+                    ></Input>
+                  </Form.Item>
+                </div>
+              )}
+              {alertBtnYesNo && (
+                <div className="flex flex-col gap-5 pt-2">
+                  <span className="text-center text-[18px] text-red-500">
+                    {orderStatus === "sold"
+                      ? "Sotilgan"
+                      : orderStatus === "cancelled"
+                        ? "Bekor qilingan"
+                        : ""}{" "}
+                    buyurtmani ortga qaytarmoqchimisiz?
+                  </span>
+
+                  <div className="flex gap-10">
+                    <Button
+                      className="w-full bg-red-500! text-white! h-[40px]!"
+                      onClick={() => setAlertBtnYesNo(false)}
+                    >
+                      Yo'q
+                    </Button>
+                    <Button
+                      className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
+                      onClick={() => {
+                        rollbackOrder.mutate(id, {
+                          onSuccess: () => {
+                            handleSuccess(
+                              "✅ Buyurtma muvaffaqiyatli 'kutilmoqda' holatiga qaytarildi!"
+                            );
+                            navigate(-1);
+                          },
+                          onError: (err: any) => {
+                            handleApiError(
+                              err,
+                              "❌ Xatolik! Buyurtma kutilmoqdaga qaytarilmadi."
+                            );
+                            navigate(-1);
+                          },
+                        }); // 🔹 so‘rov yuboriladi
+                      }}
+                      loading={rollbackOrder.isPending}
+                    >
+                      Ha
+                    </Button>
+                  </div>
                 </div>
               )}
 
-            {alertBtnYesNoAdd && (
-              <div className="flex flex-col gap-5 pt-2">
-                <span className="text-center text-[18px] text-red-500">
-                  Buyurtmani Pochtaga qo'shmoqchimisiz
-                </span>
+              <Form initialValues={{}} form={form} onFinish={onFinish}>
+                {orderStatus === "waiting" && (
+                  <div className="pt-1">
+                    <div>
+                      <span>Qo'shimcha (pul)</span>
+                      <Form.Item name="extraCost">
+                        <InputNumber
+                          placeholder="Qo'shimcha pul"
+                          className="h-[40px]! w-full!"
+                          formatter={(value) =>
+                            value
+                              ? value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                              : ""
+                          }
+                          parser={(value) => value?.replace(/,/g, "") || ""}
+                        />
+                      </Form.Item>
+                    </div>
 
-                <div className="flex gap-10">
-                  <Button
-                    className="w-full bg-red-500! text-white! h-[40px]!"
-                    onClick={() => setAlertBtnYesNoAdd(false)}
-                  >
-                    Yo'q
-                  </Button>
-                  <Button
-                    onClick={() => joinPostRefusalProducts(select)}
-                    className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
-                  >
-                    Ha
-                  </Button>
+                    <div>
+                      <span>Izoh</span>
+                      <Form.Item name="comment">
+                        <Input.TextArea
+                          className="py-4! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#A9A5C0]! dark:text-[#E7E3FC66]!"
+                          placeholder="Izoh qoldiring (ixtiyoriy)"
+                          style={{ resize: "none" }}
+                        />
+                      </Form.Item>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pb-4">
+                  {orderStatus === "on the road" && role === "courier" && (
+                    <div className="w-full pt-5">
+                      <Button
+                        onClick={() => handleReceiveOrderById(order?.data?.id)}
+                        className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
+                      >
+                        Qabul qilish
+                      </Button>
+                    </div>
+                  )}
+
+                  {alertBtnYesNoWaiting && (
+                    <div className="flex flex-col gap-5 pt-2">
+                      <span className="text-center text-[18px] text-red-500">
+                        Buyurtmani{" "}
+                        {actionTypeOrder === "sell"
+                          ? "sotmoqchimisiz"
+                          : "bekor qilmoqchimisiz"}
+                        ?
+                      </span>
+
+                      <div className="flex gap-10">
+                        <Button
+                          className="w-full bg-red-500! text-white! h-[40px]!"
+                          onClick={() => setAlertBtnYesNoWaiting(false)}
+                        >
+                          Yo'q
+                        </Button>
+                        <Button
+                          onClick={() => form.submit()}
+                          className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
+                        >
+                          Ha
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!alertBtnYesNoWaiting && orderStatus === "waiting" && (
+                    <div className="w-full flex gap-5">
+                      <Button
+                        className="w-full h-[40px]!"
+                        onClick={() => setPartlySoldShow((p) => !p)}
+                      >
+                        <AlertCircle />
+                      </Button>
+                      <Button
+                        className="w-full h-[40px]! bg-red-500! text-[#ffffff]!"
+                        onClick={handleCancelOrder}
+                      >
+                        Bekor qilish
+                      </Button>
+                      <Button
+                        className="w-full h-[40px]! bg-[var(--color-bg-sy)]! text-[#ffffff]!"
+                        onClick={handleSellOrder}
+                      >
+                        Sotish
+                      </Button>
+                    </div>
+                  )}
+
+                  {!alertBtnYesNo && orderStatus === "sold" && (
+                    <div className="pt-4 flex gap-10">
+                      <Button
+                        className="w-full h-[40px]!"
+                        onClick={() => setAlertBtnYesNo((p) => !p)}
+                      >
+                        <AlertCircle />
+                      </Button>
+                    </div>
+                  )}
+
+                  {!alertBtnYesNo &&
+                    !alertBtnYesNoAdd &&
+                    orderStatus === "cancelled" && (
+                      <div className="pt-4 flex gap-10">
+                        <Button
+                          className="w-full h-[40px]!"
+                          onClick={() => setAlertBtnYesNo((p) => !p)}
+                        >
+                          <AlertCircle />
+                        </Button>
+
+                        <Button
+                          className="w-full h-[40px]! bg-yellow-500! text-[#ffffff]!"
+                          onClick={() => {
+                            setAlertBtnYesNoAdd((p) => !p), setSelect(id);
+                          }}
+                        // onClick={() => joinPostRefusalProducts(id)}
+                        >
+                          Pochtaga qo'shish
+                        </Button>
+                      </div>
+                    )}
+
+                  {alertBtnYesNoAdd && (
+                    <div className="flex flex-col gap-5 pt-2">
+                      <span className="text-center text-[18px] text-red-500">
+                        Buyurtmani Pochtaga qo'shmoqchimisiz
+                      </span>
+
+                      <div className="flex gap-10">
+                        <Button
+                          className="w-full bg-red-500! text-white! h-[40px]!"
+                          onClick={() => setAlertBtnYesNoAdd(false)}
+                        >
+                          Yo'q
+                        </Button>
+                        <Button
+                          onClick={() => joinPostRefusalProducts(select)}
+                          className="w-full bg-[var(--color-bg-sy)]! text-white! h-[40px]!"
+                        >
+                          Ha
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
-        </Form>
-      </div>
-    </Popup>
+              </Form>
+            </div>
+          </Popup>
+        )
+      }
+
+    </>
   );
 }
