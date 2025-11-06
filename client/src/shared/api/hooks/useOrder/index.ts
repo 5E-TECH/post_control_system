@@ -30,7 +30,7 @@ export const useOrder = () => {
       api.post(`order/rollback/${id}`).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
-  
+
   const partlySellOrder = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.post(`order/partly-sell/${id}`, data).then((res) => res.data),
@@ -38,13 +38,13 @@ export const useOrder = () => {
   });
 
   const receiveOrderByScanerById = useMutation({
-    mutationFn: ({id, data}:{id: string, data: any}) =>
+    mutationFn: ({ id, data }: { id: string, data: any }) =>
       api.post(`order/receive/${id}`, data).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
   const joinPostRefusalProduct = useMutation({
-    mutationFn: (data: {order_ids: string[]}) =>
+    mutationFn: (data: { order_ids: string[] }) =>
       api.post('post/cancel', data).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
@@ -93,10 +93,11 @@ export const useOrder = () => {
     useQuery({
       queryKey: [order, params],
       queryFn: () =>
-        api.get("order/courier/orders", { params }).then((res) =>  {
+        api.get("order/courier/orders", { params }).then((res) => {
           const orders = res.data;
-         return orders}),
-      
+          return orders
+        }),
+
     });
 
   const deleteOrders = useMutation({
@@ -127,6 +128,13 @@ export const useOrder = () => {
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
+  const receivePostByScan = useMutation({
+    mutationFn: (id: string) =>
+      api.patch(`post/receive/scan/${id}`).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
   return {
     createOrder,
     updateOrders,
@@ -146,5 +154,6 @@ export const useOrder = () => {
     updateOrdersUserPhoneAndName,
     courierReceiveOrderByScanerById,
     joinPostRefusalProduct,
+    receivePostByScan
   };
 };
