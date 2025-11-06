@@ -383,7 +383,7 @@ export class PostService {
       const order = await this.orderRepo.findOne({
         where: {
           qr_code_token: id,
-          status: Order_status.RECEIVED,
+          status: Order_status.CANCELLED_SENT,
           canceled_post_id: postId,
         },
         select: ['id'],
@@ -661,7 +661,7 @@ export class PostService {
       }
 
       orders.forEach(async (order, _) => {
-        order.status = Order_status.RECEIVED;
+        order.status = Order_status.WAITING;
         await queryRunner.manager.save(order);
       });
 
