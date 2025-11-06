@@ -16,10 +16,11 @@ export const useProduct = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [product] }),
   });
 
-  const getProducts = (params?: any) =>
+  const getProducts = (params?: any, enabled: boolean = true) =>
     useQuery({
       queryKey: [product, params],
       queryFn: () => api.get("product", { params }).then((res) => res.data),
+      enabled,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
@@ -33,11 +34,12 @@ export const useProduct = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getMyProducts = (params?: any) =>
+  const getMyProducts = (params?: any, enabled:boolean = true) =>
     useQuery({
       queryKey: [product, params],
       queryFn: () =>
         api.get("product/my-products", { params }).then((res) => res.data),
+      enabled,
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
@@ -73,6 +75,7 @@ export const useProduct = () => {
       client.invalidateQueries({ queryKey: [product] });
     },
   });
+  
 
   const updateProduct = useMutation({
   mutationFn: ({ id, data, isMarket }: { id: string; data: any; isMarket?: boolean }) => {

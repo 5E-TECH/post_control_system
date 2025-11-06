@@ -75,8 +75,16 @@ export class PostController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER)
   @Get('courier/old-posts')
-  courierOldPosts(@CurrentUser() user: JwtPayload) {
-    return this.postService.oldPostsForCourier(user);
+  courierOldPosts(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 8,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.postService.oldPostsForCourier(
+      Number(page),
+      Number(limit),
+      user,
+    );
   }
 
   @ApiOperation({ summary: 'Courier rejected posts' })
@@ -96,6 +104,16 @@ export class PostController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.postService.findOne(id);
+  }
+
+  @ApiOperation({ summary: 'Get post by scaner' })
+  @ApiParam({ name: 'id', description: 'Post pq token' })
+  @ApiResponse({ status: 200, description: 'Post data' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @Get('scan/:id')
+  findWithQR(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.postService.findWithQr(id, user);
   }
 
   @ApiOperation({ summary: 'Get couriers by post id' })
@@ -153,6 +171,18 @@ export class PostController {
     return this.postService.checkPost(id, postIdDto);
   }
 
+  @ApiOperation({
+    summary: 'Check post (check the order that is exist or not in the post)',
+  })
+  @ApiParam({ name: 'id', description: 'Order QR token' })
+  @ApiResponse({ status: 200, description: 'Order checked' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('check/cancel/:id')
+  checkCanceledPost(@Param('id') id: string, @Body() postIdDto: PostDto) {
+    return this.postService.checkCancelPost(id, postIdDto);
+  }
+
   @ApiOperation({ summary: 'Receive post (courier)' })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Post received' })
@@ -165,6 +195,19 @@ export class PostController {
     @Body() receivePostDto: ReceivePostDto,
   ) {
     return this.postService.receivePost(user, id, receivePostDto);
+  }
+
+  @ApiOperation({ summary: 'Receive post with scaner (courier)' })
+  @ApiParam({ name: 'id', description: 'Post ID' })
+  @ApiResponse({ status: 200, description: 'Post received' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Patch('receive/scan/:id')
+  receivePostWithScan(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.postService.receivePostWithScanner(user, id);
   }
 
   @ApiOperation({ summary: 'Receive order (courier)' })

@@ -1,21 +1,21 @@
-import { Eraser, Search } from "lucide-react";
-import React, { useCallback, useState } from "react";
-import Select from "../users/components/select";
-import { X } from "lucide-react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
-import { useCourier } from "../../shared/api/hooks/useCourier";
-import { useCashBox } from "../../shared/api/hooks/useCashbox";
-import CountUp from "react-countup";
-import { useEffect } from "react";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../app/store";
-import { Button, Pagination, type PaginationProps } from "antd";
-import { useParamsHook } from "../../shared/hooks/useParams";
-import HistoryPopup from "./components/historyPopup";
-import { debounce } from "../../shared/helpers/DebounceFunc";
-import { useTranslation } from "react-i18next";
-import PaymentPopup from "../../shared/ui/paymentPopup";
+import { Eraser, Search } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+import Select from '../users/components/select';
+import { X } from 'lucide-react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useMarket } from '../../shared/api/hooks/useMarket/useMarket';
+import { useCourier } from '../../shared/api/hooks/useCourier';
+import { useCashBox } from '../../shared/api/hooks/useCashbox';
+import CountUp from 'react-countup';
+import { useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../app/store';
+import { Button, Pagination, type PaginationProps } from 'antd';
+import { useParamsHook } from '../../shared/hooks/useParams';
+import HistoryPopup from './components/historyPopup';
+import { debounce } from '../../shared/helpers/DebounceFunc';
+import { useTranslation } from 'react-i18next';
+import PaymentPopup from '../../shared/ui/paymentPopup';
 
 export interface IPaymentFilter {
   operationType?: string | null;
@@ -32,15 +32,15 @@ const initialState: IPaymentFilter = {
 };
 
 const Payments = () => {
-  const { t } = useTranslation("payment");
+  const { t } = useTranslation('payment');
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
   // const id = user.id;
   const { pathname } = useLocation();
   console.log(role);
-  
+
   useEffect(() => {
-    if (role === "courier" || role === "market") {
+    if (role === 'courier' || role === 'market') {
       navigate(`cash-box`);
     }
   }, [user, role, pathname]);
@@ -49,7 +49,7 @@ const Payments = () => {
   const [showCurier, setShowCurier] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [select, setSelect] = useState<null | string>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [paymentFilter, setPaymentFilter] =
     useState<IPaymentFilter>(initialState);
 
@@ -58,16 +58,14 @@ const Payments = () => {
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
   const { getCashBoxInfo } = useCashBox();
-  const searchParam = search
-    ? { search: search }
-    : {};
+  const searchParam = search ? { search: search } : {};
 
   // Pagination start
   const { getParam, setParam, removeParam } = useParamsHook();
-  const page = Number(getParam("page") || 1);
-  const limit = Number(getParam("limit") || 10);
+  const page = Number(getParam('page') || 1);
+  const limit = Number(getParam('limit') || 10);
   const { data: cashBoxData, refetch } = getCashBoxInfo(
-    role === "superadmin" || role === "admin",
+    role === 'superadmin' || role === 'admin',
     {
       operationType: paymentFilter.operationType,
       sourceType: paymentFilter.sourceType,
@@ -75,30 +73,34 @@ const Payments = () => {
       cashboxType: paymentFilter.cashboxType,
       page,
       limit,
-    }
+    },
   );
 
-
-  const { data, refetch:marketRefetch } = getMarkets(showMarket, { ...searchParam, limit: 0 });
+  const { data, refetch: marketRefetch } = getMarkets(showMarket, {
+    ...searchParam,
+    limit: 0,
+  });
   const { data: courierData } = getCourier(showCurier, { ...searchParam });
   const total = cashBoxData?.data?.pagination?.total || 0;
-  const onChange: PaginationProps["onChange"] = (newPage, limit) => {
+  const onChange: PaginationProps['onChange'] = (newPage, limit) => {
     if (newPage === 1) {
-      removeParam("page");
+      removeParam('page');
     } else {
-      setParam("page", newPage);
+      setParam('page', newPage);
     }
-    
+
     if (limit === 10) {
-      removeParam("limit");
+      removeParam('limit');
     } else {
-      setParam("limit", limit);
+      setParam('limit', limit);
     }
   };
   // Pagination end
   useEffect(() => {
-    marketRefetch()
-  },[showMarket])
+    if (role === 'superadmin' || 'admin') {
+      marketRefetch();
+    }
+  }, [showMarket]);
 
   const handleNavigate = () => {
     navigate(`cash-detail/${select}`);
@@ -111,37 +113,37 @@ const Payments = () => {
     setShowCurier(false);
     setShowMarket(false);
     setSelect(null);
-    setSearch("");
+    setSearch('');
   };
 
   const debouncedSearch = useCallback(
     debounce((value: string) => {
       setSearch(value);
     }, 500),
-    []
+    [],
   );
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     debouncedSearch(e.target.value);
   };
 
-  const operationType = ["income", "expense"];
+  const operationType = ['income', 'expense'];
   const operationOptions = operationType.map((role: string) => ({
     value: role,
     label: t(`${role}`),
   }));
 
   const sourceType = [
-    "courier_payment",
-    "market_payment",
-    "manual_expense",
-    "manual_income",
-    "correction",
-    "salary",
-    "sell",
-    "cancel",
-    "extra_cost",
-    "bills",
+    'courier_payment',
+    'market_payment',
+    'manual_expense',
+    'manual_income',
+    'correction',
+    'salary',
+    'sell',
+    'cancel',
+    'extra_cost',
+    'bills',
   ];
   const sourceOptions = sourceType.map((status: string) => ({
     value: status,
@@ -155,22 +157,22 @@ const Payments = () => {
     }))
     .filter(
       (option: any, index: any, self: any) =>
-        index === self.findIndex((o: any) => o.value === option.value)
+        index === self.findIndex((o: any) => o.value === option.value),
     );
 
-  const cashboxType = ["market", "courier", "main"];
+  const cashboxType = ['market', 'courier', 'main'];
   const cashboxOptions = cashboxType.map((status: string) => ({
     value: status,
     label: t(`${status}`),
   }));
 
   useEffect(() => {
-    if (role === "admin" || role === "superadmin") {
+    if (role === 'admin' || role === 'superadmin') {
       refetch();
     }
   }, [pathname, paymentFilter]);
 
-  if (pathname.startsWith("/payments/")) {
+  if (pathname.startsWith('/payments/')) {
     return <Outlet />;
   }
 
@@ -193,7 +195,7 @@ const Payments = () => {
           onClick={() => setShowMarket(true)}
           className="py-15 cursor-pointer rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
-          <h3>{t("berilishiKerak")}</h3>
+          <h3>{t('berilishiKerak')}</h3>
           <strong className="block pt-3 text-4xl">
             <CountUp
               end={cashBoxData?.data?.marketCashboxTotal || 0}
@@ -222,7 +224,7 @@ cursor-pointer"
 
             {/* Title */}
             <h1 className="font-semibold text-lg text-[#2E263D] dark:text-white mt-2">
-              {t("berilishiKerak")}
+              {t('berilishiKerak')}
             </h1>
 
             {/* Search box */}
@@ -232,7 +234,7 @@ cursor-pointer"
                 defaultValue={search}
                 onChange={handleSearchChange}
                 type="text"
-                placeholder={`${t("search")}...`}
+                placeholder={`${t('search')}...`}
                 className="w-full bg-transparent text-sm outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
               />
             </div>
@@ -242,12 +244,14 @@ cursor-pointer"
               <table className="w-full border-collapse">
                 <thead className="bg-[#9d70ff] dark:bg-[#3d3759] text-white text-sm">
                   <tr>
-                    <th className="h-[40px] text-left px-3 pl-10 font-medium">#</th>
+                    <th className="h-[40px] text-left px-3 pl-10 font-medium">
+                      #
+                    </th>
                     <th className="h-[40px] text-left px-3 pl-30 font-medium">
-                      {t("marketName")}
+                      {t('marketName')}
                     </th>
                     <th className="h-[40px] text-left px-3 pl-40 font-medium">
-                      {t("berilishiKerakSumma")}
+                      {t('berilishiKerakSumma')}
                     </th>
                   </tr>
                 </thead>
@@ -263,8 +267,8 @@ cursor-pointer"
                         onClick={() => setSelect(item?.id)}
                         className={`transition-all duration-170 hover:bg-[#f4f4f5] dark:hover:bg-[#3c3754] ${
                           item.id === select
-                            ? "bg-[#e2e8ff] dark:bg-[#504a7b]"
-                            : "bg-transparent"
+                            ? 'bg-[#e2e8ff] dark:bg-[#504a7b]'
+                            : 'bg-transparent'
                         } cursor-pointer`}
                       >
                         <td
@@ -276,14 +280,14 @@ cursor-pointer"
 
                         <td
                           className="px-3 py-2 text-[#2E263DB2] dark:text-white"
-                          data-cell={t("marketName")}
+                          data-cell={t('marketName')}
                         >
                           {item?.name}
                         </td>
 
                         <td
                           className="px-3 py-2 text-[#2E263DB2] dark:text-[#E7E3FCB2]"
-                          data-cell={t("berilishiKerakSumma")}
+                          data-cell={t('berilishiKerakSumma')}
                         >
                           {item?.cashbox?.balance?.toLocaleString()}
                         </td>
@@ -301,11 +305,11 @@ cursor-pointer"
                 onClick={handleNavigate}
                 className={`px-5 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
                   select
-                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                    : 'bg-gray-300 text-gray-600 cursor-not-allowed'
                 }`}
               >
-                {t("tanlash")}
+                {t('tanlash')}
               </button>
             </div>
           </div>
@@ -313,15 +317,15 @@ cursor-pointer"
 
         <div
           onClick={() =>
-            navigate("main-cashbox", {
+            navigate('main-cashbox', {
               state: {
-                role: "pochta",
+                role: 'pochta',
               },
             })
           }
           className="h-[250px] mt-4 flex cursor-pointer flex-col justify-center rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
-          <h3>{t("kassadagiMiqdor")}</h3>
+          <h3>{t('kassadagiMiqdor')}</h3>
           <strong className="block pt-3 text-4xl">
             <CountUp
               end={cashBoxData?.data?.mainCashboxTotal || 0}
@@ -336,7 +340,7 @@ cursor-pointer"
           onClick={() => setShowCurier(true)}
           className="py-15 cursor-pointer rounded-[20px] bg-gradient-to-r from-[#041464] to-[#94058E] text-white"
         >
-          <h3>{t("olinishiKerak")}</h3>
+          <h3>{t('olinishiKerak')}</h3>
           <strong className="block pt-3 text-4xl">
             <CountUp
               end={cashBoxData?.data?.courierCashboxTotal || 0}
@@ -365,7 +369,7 @@ cursor-pointer"
 
             {/* Title */}
             <h1 className="font-semibold text-lg text-[#2E263D] dark:text-white mt-2">
-              {t("olinishiKerak")}
+              {t('olinishiKerak')}
             </h1>
 
             {/* Search box */}
@@ -375,7 +379,7 @@ cursor-pointer"
                 defaultValue={search}
                 onChange={handleSearchChange}
                 type="text"
-                placeholder={`${t("search")}...`}
+                placeholder={`${t('search')}...`}
                 className="w-full bg-transparent text-sm outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
               />
             </div>
@@ -385,15 +389,17 @@ cursor-pointer"
               <table className="w-full border-collapse">
                 <thead className="bg-gradient-to-r from-[#9d70ff] to-[#7b4dff] dark:from-[#3d3759] dark:to-[#4a4370] text-white text-sm">
                   <tr>
-                    <th className="h-[44px] text-left px-3 pl-7 font-medium">#</th>
+                    <th className="h-[44px] text-left px-3 pl-7 font-medium">
+                      #
+                    </th>
                     <th className="h-[44px] text-left px-3 pr-30 pl-15 font-medium">
-                      {t("courierName")}
+                      {t('courierName')}
                     </th>
                     <th className="h-[44px] text-left px-3 pl-20 font-medium">
-                      {t("region")}
+                      {t('region')}
                     </th>
                     <th className="h-[44px] text-left px-3 pl-20 font-medium">
-                      {t("olinishiKerakSumma")}
+                      {t('olinishiKerakSumma')}
                     </th>
                   </tr>
                 </thead>
@@ -409,8 +415,8 @@ cursor-pointer"
                         onClick={() => setSelect(item?.id)}
                         className={`transition-all duration-150 hover:bg-[#f4f4f5] dark:hover:bg-[#3c3754] ${
                           item.id === select
-                            ? "bg-[#e2e8ff] dark:bg-[#504a7b]"
-                            : "bg-transparent"
+                            ? 'bg-[#e2e8ff] dark:bg-[#504a7b]'
+                            : 'bg-transparent'
                         } cursor-pointer`}
                       >
                         <td
@@ -422,21 +428,21 @@ cursor-pointer"
 
                         <td
                           className="px-3 py-2 text-[#2E263DB2] dark:text-white"
-                          data-cell={t("courierName")}
+                          data-cell={t('courierName')}
                         >
                           {item?.name}
                         </td>
 
                         <td
                           className="px-3 py-2 pr-15 text-[#2E263DB2] dark:text-[#E7E3FCB2]"
-                          data-cell={t("region")}
+                          data-cell={t('region')}
                         >
                           {item?.region?.name}
                         </td>
 
                         <td
                           className="px-3 py-2 text-[#2E263DB2] dark:text-[#E7E3FCB2] flex items-center gap-1"
-                          data-cell={t("olinishiKerakSumma")}
+                          data-cell={t('olinishiKerakSumma')}
                         >
                           {item?.cashbox?.balance?.toLocaleString()}
                         </td>
@@ -454,11 +460,11 @@ cursor-pointer"
                 onClick={handleNavigate}
                 className={`px-5 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
                   select
-                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                    : 'bg-gray-300 text-gray-600 cursor-not-allowed'
                 }`}
               >
-                {t("tanlash")}
+                {t('tanlash')}
               </button>
             </div>
           </div>
@@ -466,34 +472,34 @@ cursor-pointer"
       </div>
 
       <div className="mt-12 mx-5">
-        <h1 className="text-xl font-semibold mb-3">{t("filter")}</h1>
+        <h1 className="text-xl font-semibold mb-3">{t('filter')}</h1>
         <div className="grid grid-cols-5 gap-6 pt-[16px] max-[1000px]:grid-cols-3 max-[750px]:grid-cols-2 max-[450px]:grid-cols-1 capitalize">
           <Select
             value={paymentFilter.operationType}
             onChange={handleChange}
             options={operationOptions}
-            text={t("operationType")}
+            text={t('operationType')}
             name="operationType"
           />
           <Select
             value={paymentFilter.sourceType}
             onChange={handleChange}
             options={sourceOptions}
-            text={t("sourceType")}
+            text={t('sourceType')}
             name="sourceType"
           />
           <Select
             value={paymentFilter.createdBy}
             onChange={handleChange}
             options={createdByOptions}
-            text={t("createdBy")}
+            text={t('createdBy')}
             name="createdBy"
           />
           <Select
             value={paymentFilter.cashboxType}
             onChange={handleChange}
             options={cashboxOptions}
-            text={t("cashboxtype")}
+            text={t('cashboxtype')}
             name="cashboxType"
           />
           <div className="flex min-[900px]:justify-end">
@@ -502,7 +508,7 @@ cursor-pointer"
               onClick={() => setPaymentFilter(initialState)}
             >
               <Eraser className="w-4 h-4 mr-2" />
-              {t("tozalash")}
+              {t('tozalash')}
             </Button>
           </div>
         </div>
@@ -513,7 +519,7 @@ cursor-pointer"
           <div>
             <div>
               <table className="w-full border-collapse">
-                <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5]">
+                <thead className="bg-[#9d70ff] min-[900px]:h-[56px] text-[16px] text-white text-center dark:bg-[#3d3759] dark:text-[#E7E3FCE5] uppercase">
                   <tr>
                     <th className="h-[56px] font-medium  text-left pl-4">
                       <div className="flex items-center justify-between">
@@ -523,31 +529,31 @@ cursor-pointer"
                     </th>
                     <th className="h-[56px] font-medium text-left">
                       <div className="flex items-center justify-between pr-[21px]">
-                        {t("createdBy")}
+                        {t('createdBy')}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        {t("cashboxtype")}
+                        {t('cashboxtype')}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
                     <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px]">
-                        {t("operationType")}
+                        {t('operationType')}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px] pl-9">
-                        {t("amount")}
+                        {t('amount')}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
+                    <th className="h-[56px] font-medium text-left px-4">
                       <div className="flex items-center justify-between pr-[21px] pl-9">
-                        {t("paymentDate")}
+                        {t('paymentDate')}
                         <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                       </div>
                     </th>
@@ -570,14 +576,14 @@ cursor-pointer"
                         </td>
                         <td
                           className="data-cell py-3 flex flex-col"
-                          data-cell="CREATED BY"
+                          data-cell={t('createdBy')}
                         >
                           {item?.createdByUser?.name}
                           <span
                             className={`text-[13px] ${
-                              item?.createdByUser?.role == "superadmin"
-                                ? "text-green-500"
-                                : "text-blue-500"
+                              item?.createdByUser?.role == 'superadmin'
+                                ? 'text-green-500'
+                                : 'text-blue-500'
                             }`}
                           >
                             {item?.createdByUser?.role}
@@ -585,43 +591,43 @@ cursor-pointer"
                         </td>
                         <td
                           className="data-cell px-4 py-3"
-                          data-cell="CASHBOX_TYPE"
+                          data-cell={t('cashboxtype')}
                         >
                           <span
                             className={`
       px-[12px] py-[2px] rounded-full text-[13px]
       ${
-        item?.payment_method === "click_to_market"
-          ? "text-[#16B1FF] bg-[#16B1FF29]" // ko'k
-          : item?.payment_method === "cash"
-          ? "text-[#16C75F] bg-[#16C75F29]" // yashil
-          : item?.payment_method === "click"
-          ? "text-[#FFC107] bg-[#FFC10729]" // sariq
-          : "text-gray-500 bg-gray-200" // default rang
+        item?.payment_method === 'click_to_market'
+          ? 'text-[#16B1FF] bg-[#16B1FF29]' // ko'k
+          : item?.payment_method === 'cash'
+          ? 'text-[#16C75F] bg-[#16C75F29]' // yashil
+          : item?.payment_method === 'click'
+          ? 'text-[#FFC107] bg-[#FFC10729]' // sariq
+          : 'text-gray-700 bg-gray-200 dark:text-gray-50 dark:bg-[#16B1FF29]' // default rang
       }
     `}
                           >
-                            {item?.payment_method === "click_to_market" ||
-                            item?.payment_method === "cash" ||
-                            item?.payment_method === "click"
+                            {item?.payment_method === 'click_to_market' ||
+                            item?.payment_method === 'cash' ||
+                            item?.payment_method === 'click'
                               ? t(item?.payment_method)
-                              : "sotuv"}
+                              : t('sotuv')}
                           </span>
                         </td>
 
                         <td
                           className="data-cell px-4 py-3"
-                          data-cell="OPERATION_TYPE"
+                          data-cell={t('operationType')}
                         >
                           <span
                             className={`
                                   px-[12px] py-[2px] rounded-full text-[13px]
                                   ${
-                                    item?.operation_type === "income"
-                                      ? "text-[#16C75F] bg-[#16C75F29]" // yashil
-                                      : item?.operation_type === "expense"
-                                      ? "text-[#FF4D4F] bg-[#FF4D4F29]" // qizil
-                                      : "text-gray-500 bg-gray-200" // default rang
+                                    item?.operation_type === 'income'
+                                      ? 'text-[#16C75F] bg-[#16C75F29]' // yashil
+                                      : item?.operation_type === 'expense'
+                                      ? 'text-[#FF4D4F] bg-[#FF4D4F29]' // qizil
+                                      : 'text-gray-500 bg-gray-200' // default rang
                                   }
                                 `}
                           >
@@ -630,32 +636,32 @@ cursor-pointer"
                         </td>
                         <td
                           className={`data-cell px-13 py-3 text-[16px] ${
-                            item?.operation_type === "income"
-                              ? "text-[#16C75F]" // yashil
-                              : item?.operation_type === "expense"
-                              ? "text-[#FF4D4F]" // qizil
-                              : "text-gray-500" // default rang
+                            item?.operation_type === 'income'
+                              ? 'text-[#16C75F]' // yashil
+                              : item?.operation_type === 'expense'
+                              ? 'text-[#FF4D4F]' // qizil
+                              : 'text-gray-500' // default rang
                           }`}
-                          data-cell="AMOUNT"
+                          data-cell={t('amount')}
                         >
-                          {item?.operation_type === "income"
-                            ? "+"
-                            : item?.operation_type === "expense"
-                            ? "-"
-                            : ""}
-                          {Number(item?.amount || 0).toLocaleString("uz-UZ")}{" "}
+                          {item?.operation_type === 'income'
+                            ? '+'
+                            : item?.operation_type === 'expense'
+                            ? '-'
+                            : ''}
+                          {Number(item?.amount || 0).toLocaleString('uz-UZ')}{' '}
                           UZS
                         </td>
                         <td
                           className="data-cell px-13 py-3"
-                          data-cell="PAYMENT DATE"
+                          data-cell={t('paymentDate')}
                         >
                           {new Date(Number(item?.created_at)).toLocaleString(
-                            "uz-UZ"
+                            'uz-UZ',
                           )}
                         </td>
                       </tr>
-                    )
+                    ),
                   )}
                 </tbody>
               </table>

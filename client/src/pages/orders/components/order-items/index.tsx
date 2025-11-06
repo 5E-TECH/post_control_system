@@ -21,16 +21,28 @@ const createInitialState = (): IOrderItems => ({
 });
 
 const OrderItems = () => {
+  const user = useSelector((state: RootState) => state.roleSlice);
   const { t } = useTranslation("createOrder");
   const [formDataList, setFormDataList] = useState<IOrderItems[]>([
     createInitialState(),
   ]);
+  console.log(user.role);
 
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const marketId = market?.id;
-  const { getProductsByMarket, getProducts } = useProduct();
-  const { data } = getProductsByMarket(marketId as string);
-  const productNames = data?.data.map((product: any) => ({
+  const { getProductsByMarket, getMyProducts } = useProduct();
+
+  const myProductsQuery = getMyProducts(undefined, user.role === "market");
+
+  const marketProductsQuery = getProductsByMarket(
+    marketId as string,
+    user.role !== "market"
+  );
+
+  const data =
+    user.role === "market" ? myProductsQuery.data : marketProductsQuery.data;
+
+  const productNames = data?.data?.products?.map((product: any) => ({
     value: product.id,
     label: (
       <div className="flex items-center gap-5">
@@ -52,11 +64,13 @@ const OrderItems = () => {
     []
   );
 
-  const { data: products } = getProducts({
-    search: formDataList.find((item) => item.search)?.search,
-    marketId,
-  });
-  const allProducts = products?.data?.items;
+  const searchValue =
+    formDataList.find((item) => item.search)?.search?.toLowerCase() || "";
+
+  const allProducts = data?.data?.products?.filter((product: any) =>
+    product.name.toLowerCase().includes(searchValue)
+  );
+
   const searchedProducts = allProducts?.map((product: any) => ({
     value: product.id,
     label: (

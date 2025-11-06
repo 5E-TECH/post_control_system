@@ -1,11 +1,12 @@
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { Pagination, type PaginationProps } from "antd";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useParamsHook } from "../../../../shared/hooks/useParams";
 import TableSkeleton from "../ordersTabelSkeleton/ordersTableSkeleton";
 import { useTranslation } from "react-i18next";
+import { setCustomers } from "../../../../shared/lib/features/customerSlice";
 
 const CustomerDetails = () => {
   const { t } = useTranslation("createOrder");
@@ -27,6 +28,18 @@ const CustomerDetails = () => {
 
   const myNewOrders = data?.data?.data || [];
   const total = data?.data?.total || 0;
+
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (myNewOrders?.length) {
+      const formatted = myNewOrders.map((order: any) => ({
+        phone_number: order.customer?.phone_number,
+        name: order.customer?.name,
+      }));
+      dispatch(setCustomers(formatted));
+    }
+  }, [myNewOrders]);
 
   // Pagination onChange
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {

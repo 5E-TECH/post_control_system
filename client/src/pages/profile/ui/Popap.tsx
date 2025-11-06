@@ -1,8 +1,9 @@
-import { memo, useEffect } from "react";
-import { Modal, Form, Input, Button, message } from "antd";
-import { useProfile } from "../../../shared/api/hooks/useProfile";
-import { useDispatch } from "react-redux";
-import { setEditing } from "../../../shared/lib/features/profile/profileEditSlice";
+import { memo, useEffect } from 'react';
+import { Modal, Form, Input, Button, message } from 'antd';
+import { useProfile } from '../../../shared/api/hooks/useProfile';
+import { useDispatch, useSelector } from 'react-redux';
+import { setEditing } from '../../../shared/lib/features/profile/profileEditSlice';
+import type { RootState } from '../../../app/store';
 
 interface EditProfileModalProps {
   open: boolean;
@@ -35,30 +36,30 @@ const EditProfileModal = ({
     try {
       // faqat raqamlarni olib, +998 bilan birlashtirish
       let phone_number = values.phone_number
-        ? values.phone_number.replace(/\D/g, "")
+        ? values.phone_number.replace(/\D/g, '')
         : undefined;
 
-      if (phone_number && !phone_number.startsWith("998")) {
-        phone_number = "998" + phone_number;
+      if (phone_number && !phone_number.startsWith('998')) {
+        phone_number = '998' + phone_number;
       }
 
       const cleanedValues = {
         ...values,
-        phone_number: phone_number ? "+" + phone_number : undefined,
+        phone_number: phone_number ? '+' + phone_number : undefined,
       };
 
       await updateProfil.mutateAsync({
         data: cleanedValues,
-        id: "",
+        id: '',
       });
 
-      message.success("Profil muvaffaqiyatli yangilandi!");
+      message.success('Profil muvaffaqiyatli yangilandi!');
       dispatch(setEditing(null));
       refetch();
       onClose();
       form.resetFields();
     } catch (error) {
-      message.error("Xatolik yuz berdi, qayta urinib ko‘ring!");
+      message.error('Xatolik yuz berdi, qayta urinib ko‘ring!');
       console.error(error);
     }
   };
@@ -68,24 +69,25 @@ const EditProfileModal = ({
       form.resetFields();
       // agar mavjud bo‘lsa, foydalanuvchi raqamini formatlab ko‘rsatish
       if (user?.phone_number) {
-        const digits = user.phone_number.replace(/\D/g, "");
-        let formatted = "+998 ";
-        if (digits.startsWith("998")) {
+        const digits = user.phone_number.replace(/\D/g, '');
+        let formatted = '+998 ';
+        if (digits.startsWith('998')) {
           const rest = digits.slice(3);
           formatted += rest
             .replace(
               /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
               (_: any, a: any, b: any, c: any, d: any) =>
-                [a, b, c, d].filter(Boolean).join(" ")
+                [a, b, c, d].filter(Boolean).join(' '),
             )
             .trim();
         }
-        form.setFieldValue("phone_number", formatted);
+        form.setFieldValue('phone_number', formatted);
       } else {
-        form.setFieldValue("phone_number", "+998 ");
+        form.setFieldValue('phone_number', '+998 ');
       }
     }
   }, [open, form, user]);
+  const role = useSelector((state: RootState) => state.roleSlice);
 
   return (
     <Modal
@@ -107,31 +109,32 @@ const EditProfileModal = ({
             placeholder="+998 99 000 00 00"
             maxLength={17}
             onChange={(e) => {
-              let val = e.target.value.replace(/\D/g, ""); // faqat raqamlar
-              if (val.startsWith("998")) {
+              let val = e.target.value.replace(/\D/g, ''); // faqat raqamlar
+              if (val.startsWith('998')) {
                 val = val.slice(3);
               }
 
               // formatlash
-              let formatted = "+998 ";
+              let formatted = '+998 ';
               if (val.length > 0) {
                 formatted += val
                   .replace(
                     /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
                     (_: any, a: any, b: any, c: any, d: any) =>
-                      [a, b, c, d].filter(Boolean).join(" ")
+                      [a, b, c, d].filter(Boolean).join(' '),
                   )
                   .trim();
               }
 
-              form.setFieldValue("phone_number", formatted);
+              form.setFieldValue('phone_number', formatted);
             }}
           />
         </Form.Item>
-
-        <Form.Item label="Name" name='name'>
-          <Input placeholder="Name" />
-        </Form.Item>
+        {role?.role !== 'market' && role?.role !== 'courier' && (
+          <Form.Item label="Name" name="name">
+            <Input placeholder="Name" />
+          </Form.Item>
+        )}
 
         <Form.Item label="Password" name="password">
           <Input.Password placeholder="Password" />

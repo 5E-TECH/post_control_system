@@ -34,6 +34,12 @@ const CreateOrder = () => {
 
   const navigate = useNavigate();
 
+  const user = useSelector((state: RootState) => state.roleSlice);
+
+  const marketdata = useSelector(
+    (state: RootState) => state.authSlice.marketData
+  );
+
   const { handleApiError, handleWarning } = useApiNotification();
   const handleClick = () => {
     if (
@@ -66,7 +72,7 @@ const CreateOrder = () => {
       total_price: productInfo?.total_price,
       where_deliver: productInfo?.where_deliver,
       comment: productInfo?.comment,
-      operator:productInfo?.operator
+      operator: productInfo?.operator,
     };
     createOrder.mutate(newOrder, {
       onSuccess: () => {
@@ -106,10 +112,12 @@ const CreateOrder = () => {
 
           <div className="flex flex-col">
             <span className="font-medium text-[#2E263DE5] text-[15px] dark:text-[#E7E3FCE5] capitalize">
-              {market?.name}
+              {user.role === "market" ? marketdata.name : market?.name}{" "}
             </span>
             <span className="font-normal text-[#2E263DB2] text-[13px] whitespace-nowrap dark:text-[#AEAAC2]">
-              {market?.phone_number}
+              {user.role === "market"
+                ? marketdata.phone_number
+                : market?.phone_number}{" "}
             </span>
           </div>
         </div>

@@ -46,6 +46,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
       setParam('limit', limit);
     }
   };
+  
 
   const user = useSelector((state: RootState) => state.roleSlice);
 
@@ -99,7 +100,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                 </th>
               )}
 
-              <th className="h-[56px] font-medium text-[13px] pl-[20px] text-left whitespace-nowrap">
+              <th className={`h-[56px] font-medium text-[13px] text-left whitespace-nowrap ${user.role === "market" ? "pl-270" : "pl-[20px]"} `}>
                 <div className="flex items-center justify-between pr-[21px]">
                   {t('action')}
                 </div>
@@ -134,7 +135,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                 )}
 
                 <td
-                  className="data-cell p-3 flex items-center pl-5"
+                  className={`data-cell p-3 flex items-center pl-5 ${user.role === "market" ? "pl-270" : "pl-[20px]"} `}
                   data-cell="ACTION"
                 >
                   <button

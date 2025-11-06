@@ -19,7 +19,7 @@ export class CreateOrderDto {
     format: 'uuid',
     example: '8b2c1a8e-3b6f-4a6e-9a2f-71d8a5c9d123',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsUUID()
   market_id: string;
 

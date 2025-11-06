@@ -15,8 +15,8 @@ import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
-import { exportCardsToExcel } from "../../../../../shared/helpers/export-download-excel-with-qr-code";
 import { usePostScanner } from "../../../../../shared/components/post-scanner";
+import { exportToExcel } from "../../../../../shared/helpers/export-download-excel-with-courier";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -56,7 +56,7 @@ const MailDetail = () => {
   }
 
   const { data } = getPostById(id as string, endpoint, condition, search);
-  const postData = data?.data?.allOrdersByPostId;
+  const postData = data?.data?.allOrdersByPostId || data?.data;
 
   useEffect(() => {
     if (postData && !initialized) {
@@ -92,7 +92,7 @@ const MailDetail = () => {
           sendCouriersToPost(
             { id, data: post },
             {
-              onSuccess: async (res) => {
+              onSuccess: (res) => {
                 console.log("res.data", res.data);
 
                 const courierName = res?.data?.updatedPost?.courier?.name;
@@ -103,19 +103,25 @@ const MailDetail = () => {
                   console.log("mails", mails);
 
                   const exportData = mails?.map((mail: any, inx: number) => ({
-                    id: inx + 1,
-                    manzil: mail?.customer?.district?.name || "",
-                    mijoz: mail?.customer?.name || "",
-                    telefon: mail?.customer?.phone_number || "",
-                    market: mail?.market?.name || "",
-                    summa: Number((mail?.total_price ?? 0) / 1000),
-                    izoh: mail?.comment || "",
-                    qrCode: mail?.qr_code_token || ""
+                    N: inx + 1,
+                    Mijoz: mail?.customer?.name || "",
+                    "Telefon raqam": mail?.customer?.phone_number,
+                    Firma: mail?.market?.name,
+                    Narxi: Number((mail?.total_price ?? 0) / 1000),
+                    Manzil: mail?.where_deliver == 'center' ? 'Markazgacha' : 'Uygacha',
+                    Tuman: mail?.customer?.district?.name,
+                    Izoh: mail?.comment || "",
                   }));
 
-                  await exportCardsToExcel(
+                  exportToExcel(
                     exportData || [],
-                    "pochtalar"
+                    "pochtalar", {
+                    qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+                    regionName: res?.data?.updatedPost?.region?.name,
+                    courierName,
+                    totalOrders: res?.data?.postTotalInfo?.total,
+                    date: res?.data?.updatedPost?.created_at
+                  }
                   );
 
                   handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
@@ -163,7 +169,7 @@ const MailDetail = () => {
     sendCouriersToPost(
       { id: id as string, data: post },
       {
-        onSuccess: async (res) => {
+        onSuccess: (res) => {
           console.log("tasdiqlash", res);
 
           const courierName = res?.data?.updatedPost?.courier?.name;
@@ -175,18 +181,24 @@ const MailDetail = () => {
 
             const exportData = mails?.map((mail: any, inx: number) => ({
               N: inx + 1,
-              Tuman: mail?.customer?.district?.name,
-              Firma: mail?.market?.name,
+              Mijoz: mail?.customer?.name || "",
               "Telefon raqam": mail?.customer?.phone_number,
+              Firma: mail?.market?.name,
               Narxi: Number((mail?.total_price ?? 0) / 1000),
-              Holati: '',
-              "QR code": mail?.qr_code_token
+              Manzil: mail?.where_deliver == 'center' ? 'Markazgacha' : 'Uygacha',
+              Tuman: mail?.customer?.district?.name,
+              Izoh: mail?.comment || "",
             }));
 
-            await exportCardsToExcel(
+            exportToExcel(
               exportData || [],
-              "pochtalar"
-            );
+              "pochtalar", {
+              qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+              regionName: res?.data?.updatedPost?.region?.name,
+              courierName,
+              totalOrders: res?.data?.postTotalInfo?.total,
+              date: res?.data?.updatedPost?.created_at
+            });
 
             handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
           } catch (error) {
@@ -224,7 +236,17 @@ const MailDetail = () => {
           <SearchInput placeholder={`${t("qidiruv")}...`} />
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-6 px-5 max-[901px]:grid-cols-1">
+        <div className={`mt-5 grid gap-6 px-5 max-[901px]:grid-cols-1 ${!hideSend ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {
+            !hideSend ? (
+              <div className={`flex flex-col justify-center items-center border rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] ${selectedIds.length == postData?.length ? 'border-green-500' : 'border-red-500'}`}>
+                <span className={`text-[32px] font-bold ${selectedIds.length == postData?.length ? 'text-green-500' : 'text-red-500'}`}>
+                  {selectedIds.length} / {postData?.length}
+                </span>
+              </div>
+            ) : null
+          }
+
           <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
             <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
               {t("uygacha")}

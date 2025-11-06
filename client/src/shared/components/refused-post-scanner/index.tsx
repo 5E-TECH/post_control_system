@@ -3,12 +3,12 @@ import { useApiNotification } from "../../hooks/useApiNotification";
 import { useLocation } from "react-router-dom";
 import { usePost } from "../../api/hooks/usePost";
 
-export function usePostScanner(
+export function useRefusedPostScanner(
   refetch?: () => void,
   setSelectedIds?: React.Dispatch<React.SetStateAction<string[]>>
 ) {
   const { handleApiError, handleSuccess } = useApiNotification();
-  const { checkPost } = usePost()
+  const { checkRefusedPost } = usePost()
   const location = useLocation();
 
   // URL dan marketId ni ajratib olish
@@ -31,10 +31,10 @@ export function usePostScanner(
           ? tokenValue.split("/").pop()
           : tokenValue;
 
-          console.log(setSelectedIds);
-          
+        console.log(setSelectedIds);
 
-        checkPost.mutate(
+
+        checkRefusedPost.mutate(
           {
             id: token as string,
             data: { postId },
@@ -42,7 +42,7 @@ export function usePostScanner(
           {
             onSuccess: (res) => {
               console.log(res);
-              
+
               const orderId = res.data.order?.id;
               console.log("✅ Order ID:", orderId);
 
@@ -52,12 +52,12 @@ export function usePostScanner(
                 );
               }
 
-              handleSuccess("Buyurtma jo'natishga tayyor ✅");
+              handleSuccess("Buyurtma topildi ✅");
               refetch?.();
             },
             onError: (err) => {
               console.log(err);
-              
+
               handleApiError(err, "Buyurtma pochtada topolmadi!");
               const errorSound = new Audio("/sound/error.mp3");
               errorSound.play().catch(() => { });
@@ -76,7 +76,7 @@ export function usePostScanner(
     window.addEventListener("keypress", handleKeyPress);
     return () => window.removeEventListener("keypress", handleKeyPress);
   }, [
-    checkPost,
+    checkRefusedPost,
     handleApiError,
     handleSuccess,
     refetch,

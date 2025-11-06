@@ -67,8 +67,9 @@
   "harakat": "Action",
   "sotish": "Sale",
   "popupTitle": "Are you sure you want to cancel the order?",
-  "send": "Send orders",
+  "send": "Add to Mail",
   "delivery": "Where",
   "center": "To the center",
-  "address": "Up to home"
+  "address": "Up to home",
+  "sana": "Date"
 }

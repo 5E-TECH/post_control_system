@@ -39,7 +39,7 @@ export class PostService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async findAll(page = 1, limit = 10): Promise<object> {
+  async findAll(page: number, limit: number): Promise<object> {
     try {
       // Sahifani to‘g‘rilab olamiz
       const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
@@ -181,17 +181,32 @@ export class PostService {
     }
   }
 
-  async oldPostsForCourier(user: JwtPayload): Promise<object> {
+  async oldPostsForCourier(
+    page: number,
+    limit: number,
+    user: JwtPayload,
+  ): Promise<object> {
     try {
-      const allOldPosts = await this.postRepo.find({
+      const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
+      const skip = (page - 1) * take;
+
+      const [data, total] = await this.postRepo.findAndCount({
         where: {
           status: Not(In([Post_status.SENT, Post_status.NEW])),
           courier_id: user.id,
         },
         relations: ['region'],
         order: { created_at: 'DESC' },
+        skip,
+        take,
       });
-      return successRes(allOldPosts, 200, 'All old posts');
+
+      const totalPages = Math.ceil(total / take);
+      return successRes(
+        { data, total, page, totalPages, limit: take },
+        200,
+        'All old posts',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -219,6 +234,20 @@ export class PostService {
   async findOne(id: string): Promise<object> {
     try {
       const post = await this.postRepo.findOne({ where: { id } });
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+      return successRes(post, 200, 'Post found');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async findWithQr(id: string, user: JwtPayload): Promise<object> {
+    try {
+      const post = await this.postRepo.findOne({
+        where: { qr_code_token: id },
+      });
       if (!post) {
         throw new NotFoundException('Post not found');
       }
@@ -333,6 +362,29 @@ export class PostService {
           qr_code_token: id,
           status: Order_status.RECEIVED,
           post_id: postId,
+        },
+        select: ['id'],
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      return successRes({ order }, 200, "Order checked and it's exist");
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async checkCancelPost(id: string, postDto: PostDto) {
+    try {
+      const { postId } = postDto;
+      if (!postId) {
+        throw new BadRequestException('Pochta topilmadi');
+      }
+      const order = await this.orderRepo.findOne({
+        where: {
+          qr_code_token: id,
+          status: Order_status.CANCELLED_SENT,
+          canceled_post_id: postId,
         },
         select: ['id'],
       });
@@ -585,6 +637,47 @@ export class PostService {
     }
   }
 
+  async receivePostWithScanner(user: JwtPayload, id: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { qr_code_token: id, courier_id: user.id },
+      });
+
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+      if (post.status != Post_status.SENT) {
+        throw new BadRequestException('Post can not be received!');
+      }
+
+      const orders = await queryRunner.manager.find(OrderEntity, {
+        where: { post_id: post.id, status: Order_status.ON_THE_ROAD },
+      });
+      if (orders.length === 0) {
+        throw new NotFoundException('There are not orders in this post');
+      }
+
+      orders.forEach(async (order, _) => {
+        order.status = Order_status.WAITING;
+        await queryRunner.manager.save(order);
+      });
+
+      post.status = Post_status.RECEIVED;
+      await queryRunner.manager.save(post);
+
+      await queryRunner.commitTransaction();
+      return successRes({}, 200, 'Post received successfully');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async receiveOrderWithScanerCourier(user: JwtPayload, id: string) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -751,8 +844,27 @@ export class PostService {
         );
       }
 
-      // DTO orqali kelgan order_id lar
-      const canceledOrderIds = ordersArrayDto.order_ids;
+      // DTO orqali kelgan order_id lar (uniq va filter)
+      const canceledOrderIds = Array.isArray(ordersArrayDto.order_ids)
+        ? Array.from(new Set(ordersArrayDto.order_ids))
+        : [];
+
+      // Postga tegishli barcha orderlar
+      const allOrders = await queryRunner.manager.find(OrderEntity, {
+        where: { canceled_post_id: post.id },
+      });
+
+      // Tekshiramiz: DTO dagi id'lar haqiqatan ham shu pochtaga tegishlimi?
+      const allOrderIdsForPost = allOrders.map((o) => o.id);
+      const invalidIds = canceledOrderIds.filter(
+        (id) => !allOrderIdsForPost.includes(id),
+      );
+      if (invalidIds.length > 0) {
+        // ixtiyoriy: xato qilib chiqarish yoki shunchaki e'tiborga olmaslik mumkin.
+        throw new BadRequestException(
+          `Some order_ids do not belong to this post: ${invalidIds.join(', ')}`,
+        );
+      }
 
       // Kelgan id-lar => CLOSED
       if (canceledOrderIds.length > 0) {
@@ -763,17 +875,15 @@ export class PostService {
         );
       }
 
-      // Qolgan orderlar => CANCELED
-      const remainingOrders = post.orders.filter(
-        (order) => !canceledOrderIds.includes(order.id),
+      // Qolgan orderlar (id lar) => CANCELED
+      const remainingOrderIds = allOrderIdsForPost.filter(
+        (orderId) => !canceledOrderIds.includes(orderId),
       );
 
-      if (remainingOrders.length > 0) {
-        const remainingIds = remainingOrders.map((o) => o.id);
-
+      if (remainingOrderIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(remainingIds) },
+          { id: In(remainingOrderIds) },
           { status: Order_status.CANCELLED, canceled_post_id: null },
         );
       }

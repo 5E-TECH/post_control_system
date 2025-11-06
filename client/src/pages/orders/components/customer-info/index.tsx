@@ -1,4 +1,4 @@
-import { Input, Select } from 'antd';
+import { Input, Modal, Select } from 'antd';
 import { memo, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { setCustomerData } from '../../../../shared/lib/features/customer_and_market-id';
@@ -9,7 +9,7 @@ import { debounce } from '../../../../shared/helpers/DebounceFunc';
 
 export interface ICustomer {
   phone_number: string;
-  extra_number?: string; // ✅ optional
+  extra_number?: string;
   region_id?: string | null;
   district_id?: string | null;
   name: string;
@@ -18,7 +18,7 @@ export interface ICustomer {
 
 export const initialState: ICustomer = {
   phone_number: '+998 ',
-  extra_number: '', // ✅ boshlang‘ich qiymat
+  extra_number: '',
   region_id: null,
   district_id: null,
   name: '',
@@ -35,6 +35,9 @@ const CustomerInfocomp = () => {
   const { getRegions, getRegionsById } = useRegion();
   const { data: allRegions } = getRegions();
   const dispatch = useDispatch();
+
+  const customers = useSelector((state: RootState) => state.customerSlice.list);
+
 
   const regions = allRegions?.data
     ?.filter((item: any) =>
@@ -68,6 +71,48 @@ const CustomerInfocomp = () => {
     dispatch(setCustomerData(updated));
   };
 
+
+  const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, "");
+    if (val.startsWith("998")) val = val.slice(3);
+    let formatted = "+998 ";
+    if (val.length > 0) {
+      formatted += val
+        .replace(/(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/, (_, a, b, c, d) =>
+          [a, b, c, d].filter(Boolean).join(" ")
+        )
+        .trim();
+    }
+
+    handleChange({
+      ...e,
+      target: {
+        ...e.target,
+        name: "phone_number",
+        value: formatted,
+      },
+    } as any);
+
+    // 🔍 Telefon raqamdan faqat raqamlarni olib solishtiramiz
+    const clearPhone = formatted.replace(/\D/g, "");
+    const existing = customers.find(
+      (c) => c.phone_number.replace(/\D/g, "") === clearPhone
+    );
+
+    if (existing) {
+      Modal.confirm({
+        title: "Bu telefon raqam mavjud",
+        content: `${existing.phone_number} raqamidagi mijoz allaqachon mavjud. Davom etasizmi?`,
+        okText: "Ha, davom etaman",
+        cancelText: "Yo‘q",
+        onCancel: () => {
+          setFormData((prev) => ({ ...prev, phone_number: "+998 " }));
+        },
+      });
+    }
+  };
+
+
   const customerData = useSelector(
     (state: RootState) => state.setCustomerData.customerData,
   );
@@ -100,10 +145,18 @@ const CustomerInfocomp = () => {
       label: district?.name,
     }));
 
+  const formatFullName = (value: string) => {
+    if (!value) return '';
+    return value
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   return (
     <div className="w-full p-5 rounded-md dark:bg-[#312D48] shadow-lg">
       <h1 className="mb-4 font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
-        {t('customerInfo')}
+        {t("customerInfo")}
       </h1>
 
       <div className="flex flex-col gap-4">
@@ -112,37 +165,16 @@ const CustomerInfocomp = () => {
           {/* Asosiy telefon raqami */}
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">
-              {t('customerForm.phone')}
+              {t("customerForm.phone")}
             </label>
             <Input
               name="phone_number"
               value={formData.phone_number}
-              onChange={(e) => {
-                let val = e.target.value.replace(/\D/g, '');
-                if (val.startsWith('998')) val = val.slice(3);
-                let formatted = '+998 ';
-                if (val.length > 0) {
-                  formatted += val
-                    .replace(
-                      /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
-                      (_, a, b, c, d) => [a, b, c, d].filter(Boolean).join(' '),
-                    )
-                    .trim();
-                }
-                handleChange({
-                  ...e,
-                  target: {
-                    ...e.target,
-                    name: 'phone_number',
-                    value: formatted,
-                  },
-                } as any);
-              }}
+              onChange={handlePhoneChange}
               placeholder="+998 90 123 45 67"
               className="h-[45px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:text-[#E7E3FCCC]!"
             />
           </div>
-
           {/* ✅ Qo‘shimcha raqam (optional) */}
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">
@@ -150,25 +182,25 @@ const CustomerInfocomp = () => {
             </label>
             <Input
               name="extra_number"
-              value={formData.extra_number || ''}
+              value={formData.extra_number || ""}
               onChange={(e) => {
-                let raw = e.target.value.replace(/\D/g, '');
+                let raw = e.target.value.replace(/\D/g, "");
 
-                if (raw.startsWith('998')) raw = raw.slice(3);
+                if (raw.startsWith("998")) raw = raw.slice(3);
 
                 if (!raw) {
                   handleChange({
                     ...e,
-                    target: { ...e.target, name: 'extra_number', value: null },
+                    target: { ...e.target, name: "extra_number", value: null },
                   } as any);
                   return;
                 }
 
-                let formatted = '+998 ';
+                let formatted = "+998 ";
                 formatted += raw
                   .replace(
                     /(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/,
-                    (_, a, b, c, d) => [a, b, c, d].filter(Boolean).join(' '),
+                    (_, a, b, c, d) => [a, b, c, d].filter(Boolean).join(" ")
                   )
                   .trim();
 
@@ -176,12 +208,12 @@ const CustomerInfocomp = () => {
                   ...e,
                   target: {
                     ...e.target,
-                    name: 'extra_number',
+                    name: "extra_number",
                     value: formatted,
                   },
                 } as any);
               }}
-              placeholder="+998 XX XXX XX XX"
+              placeholder="+998 "
               className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             />
           </div>
@@ -189,13 +221,24 @@ const CustomerInfocomp = () => {
           {/* Ism */}
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">
-              {t('customerForm.name')}
+              {t("customerForm.name")}
             </label>
             <Input
               name="name"
               value={formData.name}
-              onChange={handleChange}
-              placeholder={t('placeholder.name')}
+              onChange={(e) => {
+                // Bo‘sh joylarga ruxsat berib, so‘zlarni formatlash
+                const rawValue = e.target.value;
+                handleChange({
+                  ...e,
+                  target: {
+                    ...e.target,
+                    name: "name",
+                    value: formatFullName(rawValue),
+                  },
+                } as any);
+              }}
+              placeholder={t("placeholder.name")}
               className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
             />
           </div>
@@ -205,7 +248,7 @@ const CustomerInfocomp = () => {
         <div className="flex gap-4 max-[650px]:flex-col">
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">
-              {t('customerForm.region')}
+              {t("customerForm.region")}
             </label>
             <Select
               value={formData.region_id}
@@ -214,8 +257,8 @@ const CustomerInfocomp = () => {
                   setRegionSearch(searchValue);
                 }, value)
               }
-              onChange={(value) => handleSelectChange('region_id', value)}
-              placeholder={t('placeholder.selectRegion')}
+              onChange={(value) => handleSelectChange("region_id", value)}
+              placeholder={t("placeholder.selectRegion")}
               className="w-full h-[45px]! custom-select-dropdown-bright"
               options={regions}
               dropdownClassName="dark-dropdown"
@@ -226,7 +269,7 @@ const CustomerInfocomp = () => {
 
           <div className="flex-1">
             <label className="block text-xs text-gray-500 mb-1">
-              {t('customerForm.district')}
+              {t("customerForm.district")}
             </label>
             <Select
               value={formData.district_id}
@@ -235,8 +278,8 @@ const CustomerInfocomp = () => {
                   setDistrictSearch(searchValue);
                 }, value)
               }
-              onChange={(value) => handleSelectChange('district_id', value)}
-              placeholder={t('placeholder.selectDistrict')}
+              onChange={(value) => handleSelectChange("district_id", value)}
+              placeholder={t("placeholder.selectDistrict")}
               className="w-full h-[45px]! custom-select-dropdown-bright"
               options={formData?.region_id ? specificDistrictsByRegion : []}
               dropdownClassName="dark-dropdown"
@@ -249,13 +292,13 @@ const CustomerInfocomp = () => {
         {/* Address */}
         <div className="pb-1">
           <label className="block text-xs text-gray-500 mb-1">
-            {t('customerForm.address')}
+            {t("customerForm.address")}
           </label>
           <Input
             name="address"
             value={formData.address}
             onChange={handleChange}
-            placeholder={t('placeholder.address')}
+            placeholder={t("placeholder.address")}
             className="h-[45px]! dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
           />
         </div>

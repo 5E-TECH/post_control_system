@@ -103,6 +103,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('order.customer', 'customer')
         .leftJoinAndSelect('customer.district', 'district')
         .leftJoinAndSelect('district.region', 'region')
+        .leftJoinAndSelect('district.assignedToRegion', 'assignedToRegion')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
@@ -182,7 +183,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.startTransaction();
     try {
       const {
-        market_id,
         customer_id,
         order_item_info,
         total_price,
@@ -191,14 +191,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment,
       } = createOrderDto;
 
+      let { market_id } = createOrderDto;
+
       const market = await queryRunner.manager.findOne(UserEntity, {
         where: { id: market_id, role: Roles.MARKET },
       });
+
       if (!market) {
         throw new NotFoundException('Market not found');
       }
+      if (!market_id && user.role === Roles.MARKET) {
+        market_id = user.id;
+      }
 
-      if (user.role === Roles.MARKET && !market.add_order) {
+      if (user.role === Roles.MARKET && user.id != market_id) {
+        throw new BadRequestException('Market Id is not match!');
+      }
+
+      if (user.role === Roles.MARKET && market.add_order) {
         throw new BadRequestException('You can not create order and product');
       }
 
@@ -730,8 +740,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       search?: string;
       status?: string;
       regionId?: string;
-      fromDate?: string;
-      toDate?: string;
+      startDate?: string;
+      endDate?: string;
     },
   ) {
     try {
@@ -740,8 +750,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         limit = 10,
         search,
         status,
-        fromDate,
-        toDate,
+        startDate,
+        endDate,
         regionId,
       } = query;
 
@@ -752,7 +762,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
-        .where('order.user_id = :userId', { userId: user.id });
+        .where('order.user_id = :userId', { userId: user.id })
+        .orderBy('order.created_at', 'DESC');
 
       // 🔍 Search by customer name or order ID
       if (search) {
@@ -772,16 +783,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         qb.andWhere('region.id = :regionId', { regionId });
       }
 
-      // 📅 Filter by date range
-      if (fromDate && toDate) {
-        qb.andWhere('order.created_at BETWEEN :from AND :to', {
-          from: fromDate,
-          to: toDate,
+      let startMs: number | undefined;
+      let endMs: number | undefined;
+
+      if (startDate) {
+        startMs = toUzbekistanTimestamp(startDate, false);
+      }
+      if (endDate) {
+        endMs = toUzbekistanTimestamp(endDate, true);
+      }
+
+      if (startMs && endMs) {
+        qb.andWhere('order.created_at BETWEEN :startDate AND :endDate', {
+          startDate: startMs,
+          endDate: endMs,
         });
-      } else if (fromDate) {
-        qb.andWhere('order.created_at >= :from', { from: fromDate });
-      } else if (toDate) {
-        qb.andWhere('order.created_at <= :to', { to: toDate });
+      } else if (startMs) {
+        qb.andWhere('order.created_at >= :startDate', { startDate: startMs });
+      } else if (endMs) {
+        qb.andWhere('order.created_at <= :endDate', { endDate: endMs });
       }
 
       // 📄 Pagination
@@ -812,6 +832,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       search?: string;
       page?: number;
       limit?: number;
+      startDate?: string;
+      endDate?: string;
     },
   ) {
     try {
@@ -861,6 +883,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
           { search: `%${query.search}%` },
         );
+      }
+
+      // ✅ Sana filter
+      let startMs: number | undefined;
+      let endMs: number | undefined;
+
+      if (query.startDate) {
+        startMs = toUzbekistanTimestamp(query.startDate, false);
+      }
+      if (query.endDate) {
+        endMs = toUzbekistanTimestamp(query.endDate, true);
+      }
+
+      if (startMs && endMs) {
+        qb.andWhere('o.created_at BETWEEN :startDate AND :endDate', {
+          startDate: startMs,
+          endDate: endMs,
+        });
+      } else if (startMs) {
+        qb.andWhere('o.created_at >= :startDate', { startDate: startMs });
+      } else if (endMs) {
+        qb.andWhere('o.created_at <= :endDate', { endDate: endMs });
       }
 
       const [allOrders, total] = await qb.getManyAndCount();

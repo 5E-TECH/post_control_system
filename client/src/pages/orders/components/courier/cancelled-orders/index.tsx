@@ -4,16 +4,17 @@ import { Button, Pagination, type PaginationProps } from "antd";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import EmptyPage from "../../../../../shared/components/empty-page";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
-import { useNavigate } from "react-router-dom";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 
 const CancelledOrders = () => {
-  const navigate = useNavigate();
   const { t } = useTranslation("orderList");
   const { t: st } = useTranslation("status");
+
+  const [openPopup, setOpenPopup] = useState(false);
 
   // Pagination start
   const { getParam, setParam, removeParam } = useParamsHook();
@@ -39,12 +40,17 @@ const CancelledOrders = () => {
 
   const { mutate: cancelPost, isPending } = usePost().canceledPost();
   const search = useSelector((state: RootState) => state.setUserFilter.search);
+  const { from, to } = useSelector(
+    (state: RootState) => state.dateFilterReducer
+  );
 
   const { data, refetch } = getCourierOrders({
     status: "cancelled",
     search,
     page,
     limit,
+    startDate: from,
+    endDate: to,
   });
   const total = data?.data?.total || 0;
 
@@ -53,7 +59,6 @@ const CancelledOrders = () => {
       setParam("page", 1);
     }
   }, [search]);
-
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { handleSuccess, handleApiError } = useApiNotification();
@@ -77,6 +82,14 @@ const CancelledOrders = () => {
           "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi"
         ),
     });
+  };
+
+  const toggleSelect = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter((selectedId) => selectedId !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
   };
 
   return data?.data?.data?.length > 0 ? (
@@ -161,7 +174,7 @@ const CancelledOrders = () => {
             <th>
               <div className="flex items-center gap-10">
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                <span>{t("stock")}</span>
+                <span>{t("sana")}</span>
                 <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
               </div>
             </th>
@@ -171,8 +184,8 @@ const CancelledOrders = () => {
         <tbody>
           {data?.data?.data?.map((item: any, inx: number) => (
             <tr
-              onClick={() => navigate(`/orders/order-detail/${item.id}`)}
               key={item?.id}
+              onClick={() => toggleSelect(item.id)}
               className="h-[56px] hover:bg-[#f6f7fb] dark:hover:bg-[#3d3759] cursor-pointer"
             >
               <td className="p-[20px] flex items-center" data-cell="✓">
@@ -180,6 +193,7 @@ const CancelledOrders = () => {
                   type="checkbox"
                   className="w-[18px] h-[18px] rounded-sm"
                   checked={item?.id ? selectedIds.includes(item?.id) : false}
+                  onClick={(e) => e.stopPropagation()}
                   onChange={(e) => {
                     if (e.target.checked) {
                       setSelectedIds([...selectedIds, item?.id]);
@@ -231,13 +245,15 @@ const CancelledOrders = () => {
                 className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
                 data-cell={t("delivery")}
               >
-                  {t(`${item?.where_deliver}`)}
+                {t(`${item?.where_deliver}`)}
               </td>
               <td
-                className="pl-15 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
-                data-cell={t("stock")}
+                className="pl-5 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]"
+                data-cell={t("sana")}
               >
-                {item?.items.length}
+                {new Date(Number(item?.created_at))
+                  .toISOString()
+                  .substring(0, 10)}
               </td>
             </tr>
           ))}
@@ -258,12 +274,26 @@ const CancelledOrders = () => {
         <Button
           disabled={isPending}
           loading={isPending}
-          onClick={handleClick}
+          onClick={() => setOpenPopup(true)}
           className="w-[180px]! max-[650px]:w-full! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]! border-none! hover:opacity-85!"
         >
           {t("send")}
         </Button>
       </div>
+      {openPopup && (
+        <ConfirmPopup
+          isShow={openPopup}
+          title="Buyurtmalarni pochtaga qo'shishni tasdiqlaysizmi?"
+          description="Ushbu amalni ortga qaytarib bo‘lmaydi."
+          confirmText="Ha"
+          cancelText="Bekor qilish"
+          onConfirm={() => {
+            handleClick(); // Tasdiqlaganda funksiyani chaqiramiz
+            setOpenPopup(false); // Popup yopiladi
+          }}
+          onCancel={() => setOpenPopup(false)} // Bekor qilganda yopiladi
+        />
+      )}
     </div>
   ) : (
     <div className="h-[65vh]">
