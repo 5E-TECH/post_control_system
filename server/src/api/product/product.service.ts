@@ -190,7 +190,7 @@ export class ProductService {
           product.image_url = this.buildImageUrl(product.image_url);
         }
       });
-      return successRes({products}, 200, `All products of ${market.name}`);
+      return successRes({ products }, 200, `All products of ${market.name}`);
     } catch (error) {
       return catchError(error);
     }
@@ -204,10 +204,9 @@ export class ProductService {
         .andWhere('product.isDeleted = :is_deleted', { is_deleted: false });
 
       if (search) {
-        qb.andWhere(
-          '(product.name ILIKE :search OR product.description ILIKE :search)',
-          { search: `%${search}%` },
-        );
+        qb.andWhere('(product.name ILIKE :search)', {
+          search: `%${search}%`,
+        });
       }
 
       qb.orderBy('product.created_at', 'DESC')
