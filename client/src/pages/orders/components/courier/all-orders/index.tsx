@@ -68,7 +68,8 @@ const AllOrders = () => {
   };
   // Pagination end
   const search = useSelector((state: RootState) => state.setUserFilter.search);
-  const { data } = getCourierOrders({ search, page, limit });
+  const {from, to} = useSelector((state: RootState) => state.dateFilterReducer);
+  const { data } = getCourierOrders({ search, page, limit, startDate:from, endDate:to });
 
   const total = data?.data?.total || 0;
 
