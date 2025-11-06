@@ -92,6 +92,9 @@ const Products = () => {
 
   const { getMarkets } = useMarket();
 
+  console.log(productData);
+
+
   const { data } = getMarkets(role !== 'market', {
     search: searchPopup,
     limit: 0,
@@ -251,7 +254,7 @@ const Products = () => {
 
       <div>
         <ProductView
-          data={productData?.data?.data || productData?.data?.items}
+          data={productData?.data?.products || productData?.data?.items}
           total={productData?.data?.total}
         />
       </div>
