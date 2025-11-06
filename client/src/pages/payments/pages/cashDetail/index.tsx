@@ -1,5 +1,5 @@
 import { memo, useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
 import { Select, DatePicker } from "antd";
 import TextArea from "antd/es/input/TextArea";
@@ -14,13 +14,14 @@ import { useTranslation } from "react-i18next";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import type { AxiosError } from "axios";
 import CustomCalendar from "../../../../shared/components/customDate";
-import { Loader2 } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 
 const { RangePicker } = DatePicker;
 
 const CashDetail = () => {
   const { t } = useTranslation("payment");
   const { id } = useParams();
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     from: "",
     to: "",
@@ -163,7 +164,7 @@ const CashDetail = () => {
     <div className="px-5 mt-5 flex gap-24 max-md:flex-col  ">
       <div>
         <h2 className="flex items-center mb-5 text-[20px] capitalize">
-          {t("cashbox")}
+         <span onClick={() => navigate(-1)} className="cursor-pointer"> {t("cashbox")} </span> <ChevronRight /> <span className="font-bold"> {data?.data?.cashbox?.user?.name}</span>
         </h2>
         <CashboxCard
           role={"market"}
