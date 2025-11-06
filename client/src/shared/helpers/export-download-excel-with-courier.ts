@@ -10,6 +10,7 @@ export const exportToExcel = async (
         regionName?: string;
         courierName?: string;
         totalOrders?: number | string;
+        date?: string
     }
 ) => {
     if (!Array.isArray(data) || data.length === 0) return;
@@ -47,7 +48,7 @@ export const exportToExcel = async (
     }
 
     // === Header ma’lumotlar
-    sheet.getCell("H1").value = "Sana";
+    sheet.getCell("H1").value = header?.date ? new Date(Number(header.date)).toLocaleString('uz-UZ') : '';
     sheet.getCell("H2").value = regionName;
     sheet.getCell("H3").value = courierName;
 
@@ -135,5 +136,5 @@ export const exportToExcel = async (
     const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8",
     });
-    saveAs(blob, `${fileName}.xlsx`);
+    saveAs(blob, `${fileName}-${header?.date ? new Date(Number(header.date)).toLocaleDateString('uz-UZ') : ''}.xlsx`);
 };
