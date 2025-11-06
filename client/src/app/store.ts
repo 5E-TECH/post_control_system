@@ -21,7 +21,8 @@ import clearEditItem from "../shared/lib/features/updateSlice";
 import setEditItem from "../shared/lib/features/updateSlice";
 import regionSlice from "../shared/lib/features/regionSlice";
 import sidebarSlice from "../shared/lib/features/sidebarSlice";
-import customerSlice from "../shared/lib/features/customerSlice"
+import customerSlice from "../shared/lib/features/customerSlice";
+import dateFilterReducer from "../shared/lib/features/datafilterSlice";
 
 export const store = configureStore({
   reducer: {
@@ -47,7 +48,8 @@ export const store = configureStore({
     clearEditItem,
     region: regionSlice,
     sidebar: sidebarSlice,
-    customerSlice
+    customerSlice,
+    dateFilterReducer
   },
 });
 
