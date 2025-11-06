@@ -226,8 +226,8 @@ export class OrderController {
       search?: string;
       regionId?: string;
       status?: string;
-      fromDate?: string;
-      toDate?: string;
+      startDate?: string;
+      endDate?: string;
     },
   ) {
     return this.orderService.allMarketsOrders(user, query);
