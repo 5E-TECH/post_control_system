@@ -73,7 +73,7 @@ const OrderView = () => {
   // filter o'zgarganda sahifa 1 ga tushadi
   useEffect(() => {
     setPage(1);
-    setParam("page",1);
+    setParam("page", 1);
   }, [JSON.stringify(cleanedFilters)]);
 
   // page o'zgarganda URL-ni yangilaymiz
@@ -83,7 +83,6 @@ const OrderView = () => {
 
   // query
   const queryParams = { page, limit, ...cleanedFilters };
-
 
   const { data, refetch, isLoading } =
     role === "market"
@@ -96,8 +95,7 @@ const OrderView = () => {
 
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
   const total = data?.data?.total;
-  console.log('total',total);
-  
+  console.log("total", total);
 
   // pagination onChange
   const onChange: PaginationProps["onChange"] = (newPage, newLimit) => {
@@ -143,7 +141,9 @@ const OrderView = () => {
           throw new Error("❌ Backend JSON emas, HTML qaytaryapti!");
         }
 
-        const orders = data?.data?.data;
+        const orders = data?.data?.data?.filter(
+          (order: any) => order.status !== "new"
+        );
         console.log("orders", orders);
 
         const exportData = orders?.map((order: any, inx: number) => ({
