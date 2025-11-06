@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
+import { useRefusedPostScanner } from "../../../../../shared/components/refused-post-scanner";
 
 const RefusedMailDetail = () => {
   const { t } = useTranslation("mails");
@@ -14,11 +15,12 @@ const RefusedMailDetail = () => {
   const regionName = state?.regionName;
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  useRefusedPostScanner(undefined, setSelectedIds);
 
   const { data } = usePost().getRejectedPostsByPostId(id as string);
   useEffect(() => {
     if (data?.data) {
-      setSelectedIds(data.data.map((item: any) => item.id));
+      setSelectedIds([]);
     }
   }, [data]);
 

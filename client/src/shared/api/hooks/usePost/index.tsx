@@ -18,13 +18,13 @@ export const usePost = () => {
       client.invalidateQueries({ queryKey: [post], refetchType: "active" }),
   });
 
-  const getAllPosts = (path?: string, params?:any) =>
+  const getAllPosts = (path?: string, params?: any) =>
     useQuery({
       queryKey: [post, path, params],
-      queryFn: () => api.get(`post/${path}`, {  params}).then((res) => res.data),
+      queryFn: () => api.get(`post/${path}`, { params }).then((res) => res.data),
     });
 
-  const getPostById = (id: string, path: string, bool: boolean = true, params?:any) =>
+  const getPostById = (id: string, path: string, bool: boolean = true, params?: any) =>
     useQuery({
       queryKey: [post, id, path, params],
       queryFn: () =>
@@ -32,7 +32,7 @@ export const usePost = () => {
       enabled: bool,
     });
 
-  const getOldPostsCourier = (params:any) =>
+  const getOldPostsCourier = (params: any) =>
     useQuery({
       queryKey: [post, params],
       queryFn: () => api.get("post/courier/old-posts", params).then((res) => res.data),
@@ -89,11 +89,17 @@ export const usePost = () => {
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
 
-    const checkPost = useMutation({
-        mutationFn: ({id, data}:{id: string, data: any}) =>
-          api.post(`post/check/${id}`, data).then((res) => res.data),
-        onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
-      });
+  const checkPost = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) =>
+      api.post(`post/check/${id}`, data).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+  });
+
+  const checkRefusedPost = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) =>
+      api.post(`post/check/cancel/${id}`, data).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+  });
   return {
     createPost,
     createPrint,
@@ -107,6 +113,7 @@ export const usePost = () => {
     receivePost,
     canceledPost,
     receiveCanceledPost,
-    checkPost
+    checkPost,
+    checkRefusedPost
   };
 };
