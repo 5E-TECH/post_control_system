@@ -3,11 +3,17 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 interface IState {
   token: string | null;
   user: any;
+  default_tariff: string | null;
+  marketData: any;
 }
 
 const initialState: IState = {
   token: localStorage.getItem("x-auth-token") || null,
   user: null,
+  default_tariff: localStorage.getItem("default_tariff") || null,
+  marketData: localStorage.getItem("marketData")
+    ? JSON.parse(localStorage.getItem("marketData")!)
+    : null,
 };
 
 export const authSlice = createSlice({
@@ -30,8 +36,17 @@ export const authSlice = createSlice({
     setUser: (state, action: PayloadAction<any>) => {
       state.user = action.payload;
     },
+    setTarif: (state, action: PayloadAction<any>) => {
+      localStorage.setItem("default_tariff", action.payload);
+      state.default_tariff = action.payload;
+    },
+    setUserData: (state, action: PayloadAction<any>) => {
+      localStorage.setItem("marketData", JSON.stringify(action.payload));
+      state.marketData = action.payload;
+    },
   },
 });
 
-export const { setToken, removeToken, setUser } = authSlice.actions;
+export const { setToken, removeToken, setUser, setTarif, setUserData } =
+  authSlice.actions;
 export default authSlice.reducer;

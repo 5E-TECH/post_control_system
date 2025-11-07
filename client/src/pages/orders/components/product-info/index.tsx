@@ -20,6 +20,9 @@ const ProductInfo = () => {
     comment: "",
     operator:""
   };
+
+  console.log("11111111111",market);
+  
   const { t } = useTranslation("createOrder");
   const [formData, setFormData] = useState<IProductInfo>(initialState);
 
@@ -38,6 +41,14 @@ const ProductInfo = () => {
   const productInfo = useSelector(
     (state: RootState) => state.setCustomerData.productInfo
   );
+
+  const default_tariff = useSelector(
+    (state: RootState) => state.authSlice.default_tariff
+  );
+
+  console.log(default_tariff);
+  
+  
 
   useEffect(() => {
     const cleanedPrice = Number(
@@ -107,7 +118,7 @@ const ProductInfo = () => {
                 onChange={(value) => handleSelectChange("where_deliver", value)}
                 placeholder={t("productInfo.whereDeliverPlaceholder")}
                 className="!h-[48px] custom-select-dropdown-bright"
-                defaultValue={market?.default_tariff}
+                defaultValue={market?.default_tariff || default_tariff}
                 dropdownClassName="dark-dropdown"
               >
                 <Select.Option value="center">

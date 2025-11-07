@@ -226,8 +226,8 @@ export class OrderController {
       search?: string;
       regionId?: string;
       status?: string;
-      fromDate?: string;
-      toDate?: string;
+      startDate?: string;
+      endDate?: string;
     },
   ) {
     return this.orderService.allMarketsOrders(user, query);
@@ -246,12 +246,16 @@ export class OrderController {
     @Query('search') search: string,
     @Query('page') page: number,
     @Query('limit') limit: number,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
   ) {
     return this.orderService.allCouriersOrders(user, {
       status,
       search,
       page,
       limit,
+      startDate,
+      endDate,
     });
   }
 

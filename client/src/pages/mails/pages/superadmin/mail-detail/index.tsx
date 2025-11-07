@@ -120,6 +120,7 @@ const MailDetail = () => {
                     regionName: res?.data?.updatedPost?.region?.name,
                     courierName,
                     totalOrders: res?.data?.postTotalInfo?.total,
+                    date: res?.data?.updatedPost?.created_at
                   }
                   );
 
@@ -196,6 +197,7 @@ const MailDetail = () => {
               regionName: res?.data?.updatedPost?.region?.name,
               courierName,
               totalOrders: res?.data?.postTotalInfo?.total,
+              date: res?.data?.updatedPost?.created_at
             });
 
             handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
@@ -234,7 +236,17 @@ const MailDetail = () => {
           <SearchInput placeholder={`${t("qidiruv")}...`} />
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-6 px-5 max-[901px]:grid-cols-1">
+        <div className={`mt-5 grid gap-6 px-5 max-[901px]:grid-cols-1 ${!hideSend ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {
+            !hideSend ? (
+              <div className={`flex flex-col justify-center items-center border rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] ${selectedIds.length == postData?.length ? 'border-green-500' : 'border-red-500'}`}>
+                <span className={`text-[32px] font-bold ${selectedIds.length == postData?.length ? 'text-green-500' : 'text-red-500'}`}>
+                  {selectedIds.length} / {postData?.length}
+                </span>
+              </div>
+            ) : null
+          }
+
           <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
             <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
               {t("uygacha")}
