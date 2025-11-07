@@ -25,7 +25,7 @@ interface IProps {
 
 const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
   const { t } = useTranslation('payment');
-  const { t:ts } = useTranslation('status');
+  const { t: ts } = useTranslation('status');
   const { getCashBoxHistoryById } = useCashBox();
   const { data, isLoading } = getCashBoxHistoryById(id);
   const navigate = useNavigate();
@@ -106,9 +106,15 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
 
                 <p className="flex justify-between flex-wrap">
                   <span className="font-medium">{t('sourceType')}:</span>
-                  <span className="flex items-center gap-1">
-                    <CreditCard size={16} />
-                    {t(`sourceTypes.${info?.source_type}`)}
+
+                  <span className="flex flex-col items-end gap-[2px] text-right">
+                    <span className="flex items-center gap-1">
+                      <CreditCard size={16} />
+                      {t(`sourceTypes.${info?.source_type}`)}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      {info?.cashbox?.user?.name}
+                    </span>
                   </span>
                 </p>
 
@@ -188,11 +194,21 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                 }
                 className="p-4 sm:p-5 rounded-xl bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-800 dark:to-gray-900 shadow-md cursor-pointer hover:scale-[1.02] transition-transform"
               >
-                <h3 className="font-semibold text-lg sm:text-xl mb-3 flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <ShoppingCart className="w-5 h-5" />
-                  {t('buyurtma')} <span className='text-blue-600'>({t(`delivery.${info?.order?.where_deliver}`)})</span> {info?.order?.market?.name}
+                <h3 className="font-semibold text-lg sm:text-xl mb-3 flex flex-col text-green-600 dark:text-green-400">
+                  <span className="flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5" />
+                    {t('buyurtma')}{' '}
+                    <span className="text-blue-600">
+                      ({t(`delivery.${info?.order?.where_deliver}`)})
+                    </span>
+                  </span>
 
+                  {/* Market nomi kichikroq qilib pastda */}
+                  <span className="text-xs text-blue-700 dark:text-gray-400 font-medium ">
+                    {info?.order?.market?.name}
+                  </span>
                 </h3>
+
                 <div className="space-y-2 text-sm sm:text-base">
                   <p className="flex justify-between flex-wrap">
                     <span className="font-medium">{t('tuman')}</span>
