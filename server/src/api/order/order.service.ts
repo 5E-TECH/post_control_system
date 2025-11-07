@@ -740,8 +740,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       search?: string;
       status?: string;
       regionId?: string;
-      fromDate?: string;
-      toDate?: string;
+      startDate?: string;
+      endDate?: string;
     },
   ) {
     try {
@@ -750,8 +750,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         limit = 10,
         search,
         status,
-        fromDate,
-        toDate,
+        startDate,
+        endDate,
         regionId,
       } = query;
 
@@ -783,16 +783,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         qb.andWhere('region.id = :regionId', { regionId });
       }
 
-      // 📅 Filter by date range
-      if (fromDate && toDate) {
-        qb.andWhere('order.created_at BETWEEN :from AND :to', {
-          from: fromDate,
-          to: toDate,
+      let startMs: number | undefined;
+      let endMs: number | undefined;
+
+      if (startDate) {
+        startMs = toUzbekistanTimestamp(startDate, false);
+      }
+      if (endDate) {
+        endMs = toUzbekistanTimestamp(endDate, true);
+      }
+
+      if (startMs && endMs) {
+        qb.andWhere('order.created_at BETWEEN :startDate AND :endDate', {
+          startDate: startMs,
+          endDate: endMs,
         });
-      } else if (fromDate) {
-        qb.andWhere('order.created_at >= :from', { from: fromDate });
-      } else if (toDate) {
-        qb.andWhere('order.created_at <= :to', { to: toDate });
+      } else if (startMs) {
+        qb.andWhere('order.created_at >= :startDate', { startDate: startMs });
+      } else if (endMs) {
+        qb.andWhere('order.created_at <= :endDate', { endDate: endMs });
       }
 
       // 📄 Pagination
@@ -823,6 +832,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       search?: string;
       page?: number;
       limit?: number;
+      startDate?: string;
+      endDate?: string;
     },
   ) {
     try {
@@ -872,6 +883,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
           { search: `%${query.search}%` },
         );
+      }
+
+      // ✅ Sana filter
+      let startMs: number | undefined;
+      let endMs: number | undefined;
+
+      if (query.startDate) {
+        startMs = toUzbekistanTimestamp(query.startDate, false);
+      }
+      if (query.endDate) {
+        endMs = toUzbekistanTimestamp(query.endDate, true);
+      }
+
+      if (startMs && endMs) {
+        qb.andWhere('o.created_at BETWEEN :startDate AND :endDate', {
+          startDate: startMs,
+          endDate: endMs,
+        });
+      } else if (startMs) {
+        qb.andWhere('o.created_at >= :startDate', { startDate: startMs });
+      } else if (endMs) {
+        qb.andWhere('o.created_at <= :endDate', { endDate: endMs });
       }
 
       const [allOrders, total] = await qb.getManyAndCount();

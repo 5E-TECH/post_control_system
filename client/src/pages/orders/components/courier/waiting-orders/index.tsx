@@ -39,7 +39,8 @@ const WaitingOrders = () => {
   const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
     useOrder();
   const search = useSelector((state: RootState) => state.setUserFilter.search);
-  const { data } = getCourierOrders({ status: 'waiting', search, page, limit });
+  const {from, to} = useSelector((state: RootState) => state.dateFilterReducer);
+  const { data } = getCourierOrders({ status: 'waiting', search, page, limit, startDate:from, endDate:to  });
   const total = data?.data?.total || 0;
 
   const [form] = Form.useForm<FieldType>();
@@ -49,7 +50,6 @@ const WaitingOrders = () => {
   const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
   const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
   const [totalPrice, setTotalPrice] = useState<number | string>('');
-  console.log('11111111', totalPrice);
 
   const closePopup = () => {
     setIsShow(false);
@@ -198,7 +198,6 @@ const WaitingOrders = () => {
     }
   }, [isShow]);
 
-  console.log(order.current);
 
   const getIsPending = () => {
     if (urlType.current === 'sell') {

@@ -120,6 +120,7 @@ const MailDetail = () => {
                     regionName: res?.data?.updatedPost?.region?.name,
                     courierName,
                     totalOrders: res?.data?.postTotalInfo?.total,
+                    date: res?.data?.updatedPost?.created_at
                   }
                   );
 
@@ -196,6 +197,7 @@ const MailDetail = () => {
               regionName: res?.data?.updatedPost?.region?.name,
               courierName,
               totalOrders: res?.data?.postTotalInfo?.total,
+              date: res?.data?.updatedPost?.created_at
             });
 
             handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");

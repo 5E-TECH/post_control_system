@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
+import { useRefusedPostScanner } from "../../../../../shared/components/refused-post-scanner";
 
 const RefusedMailDetail = () => {
   const { t } = useTranslation("mails");
@@ -14,11 +15,13 @@ const RefusedMailDetail = () => {
   const regionName = state?.regionName;
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  useRefusedPostScanner(undefined, setSelectedIds);
 
   const { data } = usePost().getRejectedPostsByPostId(id as string);
+  const postData = data?.data?.allOrdersByPostId || data?.data;
   useEffect(() => {
     if (data?.data) {
-      setSelectedIds(data.data.map((item: any) => item.id));
+      setSelectedIds([]);
     }
   }, [data]);
 
@@ -52,6 +55,8 @@ const RefusedMailDetail = () => {
     );
   };
 
+  const hideSend = state?.hideSend;
+
   return (
     <div className="flex flex-col gap-5 p-5">
       <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
@@ -60,6 +65,18 @@ const RefusedMailDetail = () => {
             <span>{regionName}</span> {t("buyurtmalari")}
           </h1>
           <SearchInput placeholder="Qidiruv..." />
+        </div>
+
+        <div className={`mt-5 grid gap-6 px-5 max-[901px]:grid-cols-1 ${!hideSend ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {
+            !hideSend ? (
+              <div className={`flex flex-col justify-center items-center border rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] ${selectedIds.length == postData?.length ? 'border-green-500' : 'border-red-500'}`}>
+                <span className={`text-[32px] font-bold ${selectedIds.length == postData?.length ? 'text-green-500' : 'text-red-500'}`}>
+                  {selectedIds.length} / {postData?.length}
+                </span>
+              </div>
+            ) : null
+          }
         </div>
 
         <div className="mt-5">
