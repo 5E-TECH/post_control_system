@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 // ✅ Yup validation
 const schema = yup.object().shape({
   name: yup.string().required("Mahsulot nomi majburiy!"),
-  image: yup.mixed<FileList>().notRequired(), // 🔹 endi rasm optional
+  image: yup.mixed<FileList>().notRequired(),
 });
 
 interface FormValues {
@@ -93,7 +93,9 @@ const AddProduct = () => {
           {t("productInformation")}
         </h2>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5 h-full">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col gap-5 h-full">
           {/* Name input */}
           <div>
             <input
@@ -126,8 +128,7 @@ const AddProduct = () => {
             onDragLeave={(e) => {
               e.preventDefault();
               setDragActive(false);
-            }}
-          >
+            }}>
             {!file ? (
               <>
                 <div className="bg-[#F0EFF0] rounded-md p-2 dark:bg-[#3f3b59] mt-[48px]">
@@ -140,8 +141,7 @@ const AddProduct = () => {
                 <div className="relative mb-[48px]">
                   <button
                     type="button"
-                    className="border border-[#8C57FF] text-[#8C57FF] px-[14px] py-[8px] rounded-md font-medium text-[13px]"
-                  >
+                    className="border border-[#8C57FF] text-[#8C57FF] px-[14px] py-[8px] rounded-md font-medium text-[13px]">
                     {t("browseImage")}
                   </button>
                   <input
@@ -161,8 +161,7 @@ const AddProduct = () => {
                 <button
                   type="button"
                   className="absolute top-1 right-1 bg-red-500 rounded-full text-white"
-                  onClick={() => reset({ image: undefined })}
-                >
+                  onClick={() => reset({ image: undefined })}>
                   <X className="w-[20px] h-[20px]" />
                 </button>
               </div>
@@ -174,14 +173,12 @@ const AddProduct = () => {
             <button
               onClick={() => setShowMarket(true)}
               type="button"
-              className="border px-4 py-2 rounded-md border-[#8A8D93] text-[#8A8D93] font-medium mt-4"
-            >
+              className="border px-4 py-2 rounded-md border-[#8A8D93] text-[#8A8D93] font-medium mt-4">
               {t("discard")}
             </button>
             <button
               type="submit"
-              className="bg-[#8C57FF] text-white px-4 py-2 rounded-md font-medium mt-4"
-            >
+              className="bg-[#8C57FF] text-white px-4 py-2 rounded-md font-medium mt-4">
               {t("save")}
             </button>
           </div>
@@ -195,8 +192,7 @@ const AddProduct = () => {
             <div className="flex justify-end gap-2">
               <button
                 className="px-4 py-2 bg-gray-300 rounded"
-                onClick={() => setShowMarket(false)}
-              >
+                onClick={() => setShowMarket(false)}>
                 Yo‘q
               </button>
               <button
@@ -204,8 +200,7 @@ const AddProduct = () => {
                 onClick={() => {
                   handleDiscard();
                   setShowMarket(false);
-                }}
-              >
+                }}>
                 Ha
               </button>
             </div>
