@@ -361,7 +361,6 @@ export class UserService {
       }
 
       if (assignedToMarket) {
-        // await queryRunner.commitTransaction();
         return successRes(
           isExistClient,
           200,
