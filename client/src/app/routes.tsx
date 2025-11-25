@@ -17,6 +17,7 @@ const AllOrders = lazy(
 const CancelledOrders = lazy(
   () => import("../pages/orders/components/courier/cancelled-orders")
 );
+const TelegramBot = lazy(() => import("../pages/telegram-bot"));
 const Login = lazy(() => import("../pages/login"));
 const Auth = lazy(() => import("../pages/auth"));
 const DashboardLayout = lazy(() => import("../layout/DashboardLayout"));
@@ -116,6 +117,11 @@ const AppRouters = () => {
       path: "/",
       element: <Auth />,
       children: [
+        {
+          path: "bot",
+          element: <TelegramBot />,
+        },
+
         {
           path: "scan",
           element: <ScanPage />,
