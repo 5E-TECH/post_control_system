@@ -768,7 +768,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // 🔍 Search by customer name or order ID
       if (search) {
         qb.andWhere(
-          '(LOWER(customer.name) LIKE LOWER(:search) OR CAST(order.id AS TEXT) LIKE :search)',
+          '(LOWER(customer.name) LIKE LOWER(:search) OR LOWER(customer.phone_number) LIKE :search OR CAST(order.id AS TEXT) LIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -959,9 +959,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
-        where: { id },
+        where: { id, status: Order_status.WAITING },
       });
-      if (!order) throw new NotFoundException('Order not found');
+      if (!order)
+        throw new NotFoundException('Order not found or not in waiting status');
 
       const marketId = order.user_id;
       const [market, marketCashbox, courier, courierCashbox] =
@@ -1656,7 +1657,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!order) throw new NotFoundException('Order not found');
 
-      if (![Order_status.SOLD, Order_status.CANCELLED].includes(order.status)) {
+      if (
+        user.role === Roles.COURIER &&
+        ![Order_status.SOLD, Order_status.CANCELLED].includes(order.status)
+      ) {
+        throw new BadRequestException(
+          `Rollback mumkin emas (status: ${order.status})`,
+        );
+      }
+      if (
+        user.role === Roles.SUPERADMIN &&
+        ![
+          Order_status.SOLD,
+          Order_status.CANCELLED,
+          Order_status.CLOSED,
+          Order_status.PAID,
+          Order_status.PARTLY_PAID,
+        ].includes(order.status)
+      ) {
         throw new BadRequestException(
           `Rollback mumkin emas (status: ${order.status})`,
         );
@@ -1710,7 +1728,90 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       // === ROLLBACK FOR SOLD ===
-      if (order.status === Order_status.SOLD) {
+      if (
+        order.status === Order_status.SOLD ||
+        order.status === Order_status.PAID
+      ) {
+        const marketDiff = Number(order.total_price) - Number(marketTarif);
+        const courierDiff = Number(order.total_price) - Number(courierTarif);
+
+        // Market kassasidan ayrish
+        marketCashbox.balance -= marketDiff;
+        await queryRunner.manager.save(marketCashbox);
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.CORRECTION,
+            amount: marketDiff,
+            balance_after: marketCashbox.balance,
+            comment: rollbackComment,
+            created_by: user.id,
+          }),
+        );
+
+        // Courier kassasidan ayrish
+        courierCashbox.balance -= courierDiff;
+        await queryRunner.manager.save(courierCashbox);
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.CORRECTION,
+            amount: courierDiff,
+            balance_after: courierCashbox.balance,
+            comment: rollbackComment,
+            created_by: user.id,
+          }),
+        );
+
+        // Qo'shimcha xarajat rollback (agar mavjud va vaqti yaqin bo‘lsa)
+        const soldTime = Number(order.sold_at);
+        const extraCostTime = Number(extraCostHistory?.created_at);
+        const diff = Math.abs(soldTime - extraCostTime);
+
+        if (extraCostHistory && diff <= 5000) {
+          const extraAmount = Number(extraCostHistory.amount);
+
+          // Market kassasiga qaytarish
+          marketCashbox.balance += extraAmount;
+          await queryRunner.manager.save(marketCashbox);
+          await queryRunner.manager.save(
+            queryRunner.manager.create(CashboxHistoryEntity, {
+              operation_type: Operation_type.INCOME,
+              cashbox_id: marketCashbox.id,
+              source_id: order.id,
+              source_type: Source_type.CORRECTION,
+              amount: extraAmount,
+              balance_after: marketCashbox.balance,
+              comment: "Qo'shimcha xarajat orqaga qaytarildi",
+              created_by: user.id,
+            }),
+          );
+
+          // Courier kassasiga qaytarish
+          courierCashbox.balance += extraAmount;
+          await queryRunner.manager.save(courierCashbox);
+          await queryRunner.manager.save(
+            queryRunner.manager.create(CashboxHistoryEntity, {
+              operation_type: Operation_type.INCOME,
+              cashbox_id: courierCashbox.id,
+              source_id: order.id,
+              source_type: Source_type.CORRECTION,
+              amount: extraAmount,
+              balance_after: courierCashbox.balance,
+              comment: "Qo'shimcha xarajat orqaga qaytarildi",
+              created_by: user.id,
+            }),
+          );
+        }
+      }
+
+      // === ROLLBACK FOR PARTLY PAID ===
+
+      if (order.status === Order_status.PARTLY_PAID) {
         const marketDiff = Number(order.total_price) - Number(marketTarif);
         const courierDiff = Number(order.total_price) - Number(courierTarif);
 
@@ -1789,7 +1890,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // === ROLLBACK FOR CANCELLED ===
-      if (order.status === Order_status.CANCELLED && extraCostHistory) {
+      if (
+        (order.status === Order_status.CANCELLED && extraCostHistory) ||
+        (order.status === Order_status.CLOSED && extraCostHistory)
+      ) {
         const orderLastUpdateTime = Number(order.updated_at);
         const extraCostTime = Number(extraCostHistory?.created_at);
         const diff = Math.abs(orderLastUpdateTime - extraCostTime);

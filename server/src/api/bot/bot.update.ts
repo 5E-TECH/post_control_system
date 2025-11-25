@@ -40,4 +40,7 @@ export class BotUpdate {
   async hearsSalom(@Ctx() ctx: Context) {
     await ctx.reply('Valeykum assalom!');
   }
+
+  @Hears(/^yangi buyurtma.*/i)
+  async createOrder(@Ctx() ctx: Context) {}
 }

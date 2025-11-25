@@ -4,8 +4,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateBotDto } from './dto/create-bot.dto';
-import { UpdateBotDto } from './dto/update-bot.dto';
 import { Context, Telegraf } from 'telegraf';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,6 +12,8 @@ import { UserRepository } from 'src/core/repository/user.repository';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { InjectBot } from 'nestjs-telegraf';
+import { DataSource } from 'typeorm';
+import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 
 @Injectable()
 export class BotService {
@@ -25,6 +25,8 @@ export class BotService {
     private readonly telegramRepo: TelegramRepository,
 
     @InjectBot() private readonly bot: Telegraf,
+
+    private readonly dataSource: DataSource,
   ) {}
   // async startBot(ctx: Context) {
   //   try {
@@ -35,36 +37,51 @@ export class BotService {
   // }
 
   async addToGroup(text: string, ctx: Context) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     try {
       const groupId = String(ctx.chat?.id);
-      const market = await this.userRepo.findOne({
+      const market = await queryRunner.manager.findOne(UserEntity, {
         where: { market_tg_token: text },
       });
 
       if (!market) {
         throw new NotFoundException('Market not found');
       }
-      const isGroupConnected = await this.telegramRepo.findOne({
-        where: { group_id: groupId },
-      });
+      const isGroupConnected = await queryRunner.manager.findOne(
+        TelegramEntity,
+        {
+          where: { group_id: groupId },
+        },
+      );
       if (isGroupConnected) {
         throw new ConflictException(
           'This bot already activated for this group',
         );
       }
-      const telegram = this.telegramRepo.create({
+      const telegram = queryRunner.manager.create(TelegramEntity, {
         token: text,
         market_id: market?.id,
         group_id: String(ctx.chat?.id),
       });
-      await this.telegramRepo.save(telegram);
+      await queryRunner.manager.save(telegram);
+
+      const telegram_token = 'group_token-' + generateCustomToken();
+      market.market_tg_token = telegram_token;
+      await queryRunner.manager.save(market);
+
+      await queryRunner.commitTransaction();
       return successRes(market, 200, `${market?.name} uchun telegram bot`);
     } catch (error) {
+      await queryRunner.rollbackTransaction();
       const message =
         error?.response?.message ||
         error?.message ||
         'Noma’lum xatolik yuz berdi';
       return { message: message || 'error' };
+    } finally {
+      await queryRunner.release();
     }
   }
 
@@ -85,6 +102,23 @@ export class BotService {
       return { message: message || 'error' };
     }
   }
+
+  // async createOrder(text: string, ctx: Context) {
+  //   const queryRunner = this.dataSource.createQueryRunner();
+  //   await queryRunner.connect();
+  //   await queryRunner.startTransaction();
+  //   try {
+  //     const groupId = String(ctx.chat?.id);
+  //     await queryRunner.manager.findOne(TelegramEntity, {
+  //       where: { group_id: groupId },
+  //     });
+  //   } catch (error) {
+  //     await queryRunner.rollbackTransaction();
+  //     return catchError(error);
+  //   } finally {
+  //     await queryRunner.release();
+  //   }
+  // }
 
   remove(id: number) {
     return `This action removes a #${id} bot`;
