@@ -77,3 +77,8 @@ export enum Manual_payment_methods {
   CASH = 'cash',
   CARD = 'card',
 }
+
+export enum Group_type {
+  CANCEL = 'cancel',
+  CREATE = 'create',
+}
