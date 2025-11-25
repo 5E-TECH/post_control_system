@@ -24,7 +24,7 @@ export class BotService {
     @InjectRepository(TelegramEntity)
     private readonly telegramRepo: TelegramRepository,
 
-    @InjectBot() private readonly bot: Telegraf,
+    @InjectBot('XPrinter') private readonly bot: Telegraf,
 
     private readonly dataSource: DataSource,
   ) {}

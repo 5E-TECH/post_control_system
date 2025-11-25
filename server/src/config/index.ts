@@ -17,7 +17,8 @@ export default {
   REFRESH_TOKEN_TIME: String(process.env.REFRESH_TOKEN_TIME),
 
   BOT_TOKEN: String(process.env.BOT_TOKEN),
+  ORDER_BOT_TOKEN: String(process.env.ORDER_BOT_TOKEN),
   NGROK_AUTHTOKEN: String(process.env.NGROK_AUTHTOKEN),
   PRINTER_LOCAL_URL: String(process.env.PRINTER_LOCAL_URL),
-  UPLOAD_URL: String(process.env.UPLOAD_URL)
+  UPLOAD_URL: String(process.env.UPLOAD_URL),
 };

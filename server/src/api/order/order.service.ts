@@ -44,7 +44,7 @@ import { PostRepository } from 'src/core/repository/post.repository';
 import { MyLogger } from 'src/logger/logger.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
-import { BotService } from '../bot/bot.service';
+import { BotService } from '../bots/notify-bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import { OrderDto } from './dto/orderId.dto';
 
