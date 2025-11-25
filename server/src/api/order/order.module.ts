@@ -15,7 +15,8 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { OrderGateaway } from '../socket/order.gateaway';
 import { PostEntity } from 'src/core/entity/post.entity';
 import { MyLogger } from 'src/logger/logger.service';
-import { BotModule } from '../bot/bot.module';
+import { BotModule } from '../bots/notify-bot/bot.module';
+import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { BotModule } from '../bot/bot.module';
       CashboxHistoryEntity,
       UserEntity,
       PostEntity,
+      TelegramEntity,
     ]),
     CashBoxModule,
     BotModule,
