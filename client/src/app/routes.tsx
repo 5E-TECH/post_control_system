@@ -114,13 +114,13 @@ const AppRouters = () => {
       element: <Login />,
     },
     {
+      path: "bot",
+      element: <TelegramBot />,
+    },
+    {
       path: "/",
       element: <Auth />,
       children: [
-        {
-          path: "bot",
-          element: <TelegramBot />,
-        },
 
         {
           path: "scan",
