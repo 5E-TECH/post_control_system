@@ -28,7 +28,6 @@ import { OrderBotModule } from './bots/order_create-bot/order-bot.module';
       synchronize: true,
     }),
     JwtModule.register({ global: true }),
-
     UsersModule,
     ProductModule,
     CashBoxModule,
@@ -41,7 +40,6 @@ import { OrderBotModule } from './bots/order_create-bot/order-bot.module';
     OrderBotModule,
     DashboardModule,
     LoggerModule,
-
     PrinterModule,
   ],
   providers: [OrderGateaway],

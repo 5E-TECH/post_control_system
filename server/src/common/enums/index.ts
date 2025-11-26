@@ -5,6 +5,7 @@ export enum Roles {
   REGISTRATOR = 'registrator',
   MARKET = 'market',
   CUSTOMER = 'customer',
+  OPERATOR = 'operator',
 }
 
 export enum Status {
