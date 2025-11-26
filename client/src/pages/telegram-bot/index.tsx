@@ -23,7 +23,7 @@ export const initialState: ICustomer = {
 
 const TelegramBot = () => {
   return (
-    <div>
+    <div className="bg-white">
       <h2 className="text-center text-[25px] font-bold">Create Order</h2>
        <div className="flex flex-col gap-4.5 w-full">
               <CustomerInfo />
