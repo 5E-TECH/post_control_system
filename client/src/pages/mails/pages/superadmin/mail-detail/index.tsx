@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Printer, Trash2 } from "lucide-react";
 import {
   useLocation,
   useNavigate,
@@ -17,6 +17,8 @@ import type { RootState } from "../../../../../app/store";
 import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { usePostScanner } from "../../../../../shared/components/post-scanner";
 import { exportToExcel } from "../../../../../shared/helpers/export-download-excel-with-courier";
+import ConfirmPopup from "../../../../../shared/components/confirmPopup";
+import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -29,11 +31,50 @@ const MailDetail = () => {
     (state: RootState) => state.resetUserFilter.search
   );
 
-  const { getPostById, sendAndGetCouriersByPostId, sendPost } = usePost();
+  const role = useSelector((state: RootState) => state.roleSlice.role);
+
+  const { getPostById, sendAndGetCouriersByPostId, sendPost, createPrint } =
+    usePost();
+  const { deleteOrders } = useOrder();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
   const { mutate: sendCouriersToPost, isPending } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
+
+  const [isPrintDisabled, setIsPrintDisabled] = useState(false);
+  const [selected, setSelected] = useState("");
+  const [confirmPopup, setConfirmPopup] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const handlePrint = (id: string) => {
+    // if (id) return; // 🔒 agar allaqachon bosilgan bo‘lsa, qaytadi
+
+    setIsPrintDisabled(true); // ⛔ bosilgandan so‘ng tugma bloklanadi
+
+    const orderids = { orderIds: [id] };
+    createPrint.mutate(orderids, {
+      onSuccess: () => {
+        handleSuccess("Chop etildi");
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Chop etishda hatolik yuz berdi");
+      },
+      onSettled: () => {
+        setTimeout(() => setIsPrintDisabled(false), 10000); // ⏳ 10 soniyadan keyin qayta yoqiladi
+      },
+    });
+  };
+
+  const hanlerDelete = (id: string) => {
+    deleteOrders.mutate(id, {
+      onSuccess: () => {
+        handleSuccess("Order muvaffaqiyatli o'chirildi");
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Orderni o'chirishda xatolik yuz ber");
+      },
+    });
+  };
 
   usePostScanner(undefined, setSelectedIds);
 
@@ -108,21 +149,21 @@ const MailDetail = () => {
                     "Telefon raqam": mail?.customer?.phone_number,
                     Firma: mail?.market?.name,
                     Narxi: Number((mail?.total_price ?? 0) / 1000),
-                    Manzil: mail?.where_deliver == 'center' ? 'Markazgacha' : 'Uygacha',
+                    Manzil:
+                      mail?.where_deliver == "center"
+                        ? "Markazgacha"
+                        : "Uygacha",
                     Tuman: mail?.customer?.district?.name,
                     Izoh: mail?.comment || "",
                   }));
 
-                  exportToExcel(
-                    exportData || [],
-                    "pochtalar", {
+                  exportToExcel(exportData || [], "pochtalar", {
                     qrCodeToken: res?.data?.updatedPost?.qr_code_token,
                     regionName: res?.data?.updatedPost?.region?.name,
                     courierName,
                     totalOrders: res?.data?.postTotalInfo?.total,
-                    date: res?.data?.updatedPost?.created_at
-                  }
-                  );
+                    date: res?.data?.updatedPost?.created_at,
+                  });
 
                   handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
                 } catch (error) {
@@ -185,19 +226,18 @@ const MailDetail = () => {
               "Telefon raqam": mail?.customer?.phone_number,
               Firma: mail?.market?.name,
               Narxi: Number((mail?.total_price ?? 0) / 1000),
-              Manzil: mail?.where_deliver == 'center' ? 'Markazgacha' : 'Uygacha',
+              Manzil:
+                mail?.where_deliver == "center" ? "Markazgacha" : "Uygacha",
               Tuman: mail?.customer?.district?.name,
               Izoh: mail?.comment || "",
             }));
 
-            exportToExcel(
-              exportData || [],
-              "pochtalar", {
+            exportToExcel(exportData || [], "pochtalar", {
               qrCodeToken: res?.data?.updatedPost?.qr_code_token,
               regionName: res?.data?.updatedPost?.region?.name,
               courierName,
               totalOrders: res?.data?.postTotalInfo?.total,
-              date: res?.data?.updatedPost?.created_at
+              date: res?.data?.updatedPost?.created_at,
             });
 
             handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
@@ -236,16 +276,30 @@ const MailDetail = () => {
           <SearchInput placeholder={`${t("qidiruv")}...`} />
         </div>
 
-        <div className={`mt-5 grid gap-6 px-5 max-[901px]:grid-cols-1 ${!hideSend ? 'grid-cols-3' : 'grid-cols-2'}`}>
-          {
-            !hideSend ? (
-              <div className={`flex flex-col justify-center items-center border rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] ${selectedIds.length == postData?.length ? 'border-green-500' : 'border-red-500'}`}>
-                <span className={`text-[32px] font-bold ${selectedIds.length == postData?.length ? 'text-green-500' : 'text-red-500'}`}>
-                  {selectedIds.length} / {postData?.length}
-                </span>
-              </div>
-            ) : null
-          }
+        <div
+          className={`mt-5 grid gap-6 px-5 max-[901px]:grid-cols-1 ${
+            !hideSend ? "grid-cols-3" : "grid-cols-2"
+          }`}
+        >
+          {!hideSend ? (
+            <div
+              className={`flex flex-col justify-center items-center border rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] ${
+                selectedIds.length == postData?.length
+                  ? "border-green-500"
+                  : "border-red-500"
+              }`}
+            >
+              <span
+                className={`text-[32px] font-bold ${
+                  selectedIds.length == postData?.length
+                    ? "text-green-500"
+                    : "text-red-500"
+                }`}
+              >
+                {selectedIds.length} / {postData?.length}
+              </span>
+            </div>
+          ) : null}
 
           <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
             <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
@@ -280,7 +334,7 @@ const MailDetail = () => {
 
         <div className="mt-5">
           <table>
-            <thead className="bg-[#F6F7FB] dark:bg-[#3D3759]">
+            <thead className="bg-[#F6F7FB] dark:bg-[#3D3759] capitalize">
               <tr>
                 {!hideSend ? (
                   <th className="p-[20px] flex items-center">
@@ -342,6 +396,12 @@ const MailDetail = () => {
                     <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
                   </div>
                 </th>
+                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
+                  <div className="flex items-center justify-between pr-[21px]">
+                    {t("action")}
+                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -390,6 +450,32 @@ const MailDetail = () => {
                       "uz-UZ"
                     )}
                   </td>
+                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
+                    <div className="flex gap-5">
+                      <button
+                        disabled={isPrintDisabled && order?.id === selected}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrint(order?.id);
+                          setSelected(order?.id);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Printer />
+                      </button>
+                      {role === "superadmin" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteId(order.id);
+                            setConfirmPopup(true);
+                          }}
+                        >
+                          <Trash2 />
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -409,6 +495,24 @@ const MailDetail = () => {
           </Button>
         </div>
       ) : null}
+
+      {confirmPopup && (
+        <ConfirmPopup
+          isShow={confirmPopup}
+          title="O‘chirishni tasdiqlaysizmi?"
+          description="Bu amalni ortga qaytarib bo‘lmaydi."
+          confirmText="Ha, o‘chirish"
+          cancelText="Bekor qilish"
+          onConfirm={() => {
+            if (deleteId) {
+              hanlerDelete(deleteId); // 🔴 shu joyda API yoki console.log ishlaydi
+            }
+            setDeleteId("");
+            setConfirmPopup(false);
+          }}
+          onCancel={() => setConfirmPopup(false)}
+        />
+      )}
 
       {isShow && (
         <Popup isShow={isShow} onClose={() => setIsShow(false)}>
@@ -431,10 +535,11 @@ const MailDetail = () => {
                   </div>
 
                   <Button
-                    className={`${selectedCourierId === courier?.id
-                      ? "bg-[var(--color-bg-sy)]! text-white!"
-                      : ""
-                      }`}
+                    className={`${
+                      selectedCourierId === courier?.id
+                        ? "bg-[var(--color-bg-sy)]! text-white!"
+                        : ""
+                    }`}
                     onClick={() => handleSelectedCourier(courier?.id)}
                   >
                     {selectedCourierId === courier?.id ? (
