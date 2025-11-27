@@ -2481,12 +2481,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   }
 
   async remove(id: string) {
-    try {
+    try {      
       const order = await this.orderRepo.findOne({
-        where: { id, status: Order_status.NEW },
+        where: { id },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
+      }
+      const acceptedStatuses = [Order_status.NEW, Order_status.RECEIVED]
+      if(!acceptedStatuses.includes(order.status)){
+        throw new BadRequestException('You can not delete...!!!');
       }
       await this.orderRepo.delete(id);
       return successRes({}, 200, 'Order deleted');
