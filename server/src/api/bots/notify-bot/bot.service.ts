@@ -14,6 +14,7 @@ import { TelegramRepository } from 'src/core/repository/telegram-market.reposito
 import { InjectBot } from 'nestjs-telegraf';
 import { DataSource } from 'typeorm';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import config from 'src/config';
 
 @Injectable()
 export class BotService {
@@ -24,7 +25,7 @@ export class BotService {
     @InjectRepository(TelegramEntity)
     private readonly telegramRepo: TelegramRepository,
 
-    @InjectBot('XPrinter') private readonly bot: Telegraf,
+    @InjectBot(config.BOT_NAME) private readonly bot: Telegraf,
 
     private readonly dataSource: DataSource,
   ) {}

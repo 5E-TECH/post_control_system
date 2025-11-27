@@ -64,7 +64,7 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   market_id: string;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'bigint', nullable: true })
   telegram_id: number;
 
   @Column({ type: 'boolean', default: false })
