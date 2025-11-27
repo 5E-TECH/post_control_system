@@ -10,7 +10,7 @@ import config from 'src/config';
 @Module({
   imports: [
     TelegrafModule.forRootAsync({
-      botName: 'XPrinter',
+      botName: config.BOT_NAME,
       useFactory: () => ({
         token: config.BOT_TOKEN,
         include: [BotModule],

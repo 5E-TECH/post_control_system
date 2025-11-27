@@ -31,7 +31,7 @@ export class OrderBotService {
     @InjectRepository(TelegramEntity)
     private readonly telegramRepo: TelegramRepository,
 
-    @InjectBot('Shodiyors') private readonly bot: Telegraf,
+    @InjectBot(config.ORDER_BOT_NAME) private readonly bot: Telegraf,
 
     private readonly token: Token,
     private readonly dataSource: DataSource,
@@ -115,7 +115,7 @@ export class OrderBotService {
     }
   }
 
-  async registerOperator(phone_number: string, ctx: MyContext) {
+  async registerNewOperator(phone_number: string, ctx: MyContext) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -126,7 +126,7 @@ export class OrderBotService {
         },
       });
       if (isExistUser?.status === Status.INACTIVE) {
-        return new BadRequestException('Sorry you have blocked!');
+        throw new BadRequestException('Sorry you have blocked!');
       }
       if (isExistUser) {
         return successRes(
@@ -146,6 +146,12 @@ export class OrderBotService {
       });
 
       await queryRunner.manager.save(operator);
+      await queryRunner.commitTransaction();
+      return successRes(
+        operator,
+        201,
+        "Siz Beepost platoformasida muvofaqiyatli ro'yxatdan o'tdingiz! Pastdagi tugma orqali buyurtma yaratishingiz mumkin!",
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -208,6 +214,22 @@ export class OrderBotService {
       one_time_keyboard: true,
     };
     return number;
+  }
+
+  openWebApp() {
+    const webAppButton = {
+      inline_keyboard: [
+        [
+          {
+            text: '🚀 WebAppni ochish',
+            web_app: {
+              url: 'https://latanya-unusable-andera.ngrok-free.dev/bot',
+            },
+          },
+        ],
+      ],
+    };
+    return webAppButton;
   }
 
   remove(id: number) {

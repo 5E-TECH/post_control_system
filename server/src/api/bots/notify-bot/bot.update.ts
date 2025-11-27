@@ -13,11 +13,12 @@ import {
   Update as TgUpdate,
 } from 'telegraf/typings/core/types/typegram';
 import { BotService } from './bot.service';
+import config from 'src/config';
 
 @Update()
 export class BotUpdate {
   constructor(
-    @InjectBot('XPrinter') private bot: Telegraf<Context>,
+    @InjectBot(config.BOT_NAME) private bot: Telegraf<Context>,
     private readonly botService: BotService,
   ) {}
   @Start()

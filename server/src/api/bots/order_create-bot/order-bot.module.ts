@@ -13,7 +13,7 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
 @Module({
   imports: [
     TelegrafModule.forRootAsync({
-      botName: 'Shodiyors',
+      botName: config.ORDER_BOT_NAME,
       useFactory: () => ({
         token: config.ORDER_BOT_TOKEN,
         include: [OrderBotModule],
