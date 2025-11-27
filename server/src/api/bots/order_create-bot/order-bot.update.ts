@@ -7,13 +7,14 @@ import {
   Start,
   Update,
 } from 'nestjs-telegraf';
-import { Context, NarrowedContext, session, Telegraf } from 'telegraf';
+import { Context, NarrowedContext, Telegraf } from 'telegraf';
 import {
   Message,
   Update as TgUpdate,
 } from 'telegraf/typings/core/types/typegram';
 import { OrderBotService } from './order-bot.service';
 import { MyContext } from './session.interface';
+import { Token } from 'src/infrastructure/lib/token-generator/token';
 
 interface UserData extends Context {
   session: {
@@ -28,33 +29,48 @@ export class OrderBotUpdate {
   constructor(
     @InjectBot('Shodiyors') private bot: Telegraf<UserData>,
     private readonly orderBotService: OrderBotService,
-  ) {
-    bot.use(session());
-  }
+  ) {}
   @Start()
   async start(@Ctx() ctx: Context) {
     if (ctx.chat?.type === 'private') {
-      ctx.reply(
-        `👋 Salom men Beepost buyurtma yaratuvchi botman! Sizda buyurtma yaratish huquqi borligini tasdiqlash uchun menga platformadagi telegram tokenni tashlang`,
-        {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: '🚀 WebAppni ochish',
-                web_app: { url: 'https://latanya-unusable-andera.ngrok-free.dev/bot' },
-              },
-            ],
-          ],
-        },
-      },
-      );
+      try {
+        const response = await this.orderBotService.signInWithTelegram(ctx);
+        console.log('Response', response);
+
+        if (response.statusCode && `${response.statusCode}`.startsWith('2')) {
+          ctx.reply(`👋 Salom siz buyurtma yaratishga tayyorsiz`, {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '🚀 WebAppni ochish',
+                    web_app: {
+                      url: 'https://latanya-unusable-andera.ngrok-free.dev/bot',
+                    },
+                  },
+                ],
+              ],
+            },
+          });
+        } else if (response.statusCode && `${response.statusCode}` === '404') {
+          ctx.reply(
+            `👋 Salom men Beepost buyurtma yaratuvchi botman! Sizda buyurtma yaratish huquqi borligini tasdiqlash uchun menga platformadagi telegram tokenni tashlang`,
+          );
+        } else {
+          ctx.reply(response.message);
+        }
+      } catch (error) {
+        ctx.reply(
+          `${error.message}. Ro'yxatdan o'tishni boshlash uchun menga platformadagi telegram tokenni yuboring`,
+        );
+      }
     }
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
       ctx.reply(
         `👋 Salom men Beepost buyurtma yaratuvchi botman! Ushbu guruhga yaratilgan buyurtmalar haqida xabar jo'natishim uchun menga platformadagi telegram tokenni tashlang`,
       );
     }
+  }
 
   @Hears('salom')
   async hearsSalom(@Ctx() ctx: Context) {

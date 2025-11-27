@@ -17,6 +17,10 @@ import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { MyContext } from './session.interface';
 import { Roles, Status } from 'src/common/enums';
 import config from 'src/config';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+import { Token } from 'src/infrastructure/lib/token-generator/token';
+import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
+import { Response } from 'express';
 
 @Injectable()
 export class OrderBotService {
@@ -29,6 +33,7 @@ export class OrderBotService {
 
     @InjectBot('Shodiyors') private readonly bot: Telegraf,
 
+    private readonly token: Token,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -137,6 +142,7 @@ export class OrderBotService {
         role: Roles.OPERATOR,
         add_order: ctx.session.marketData.add_order,
         market_id: ctx.session.marketData.id,
+        telegram_id: ctx.from?.id,
       });
 
       await queryRunner.manager.save(operator);
@@ -145,6 +151,35 @@ export class OrderBotService {
       return catchError(error);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  async signInWithTelegram(ctx: Context) {
+    try {
+      const user = await this.userRepo.findOne({
+        where: { telegram_id: ctx.from?.id },
+      });
+      if (!user) {
+        throw new NotFoundException("Siz platformadan ro'yxatdan o'tmagansiz!");
+      }
+      if (user.status === Status.INACTIVE) {
+        throw new BadRequestException('Siz ushbu platformadan blocklangansiz');
+      }
+      if (user.role !== Roles.OPERATOR) {
+        throw new BadRequestException(
+          "Kechirasiz siz operator sifatida ro'yxardan o'tmagansiz",
+        );
+      }
+      const { id, role, status } = user;
+      const payload: JwtPayload = { id, role, status };
+      const accessToken = await this.token.generateAccessToken(payload);
+      return successRes(
+        { access_token: accessToken, user },
+        200,
+        'Logged in successfully',
+      );
+    } catch (error) {
+      return catchError(error);
     }
   }
 
