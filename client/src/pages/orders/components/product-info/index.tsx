@@ -14,9 +14,12 @@ export interface IProductInfo {
 
 const ProductInfo = () => {
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
+  const default_tariff = useSelector(
+    (state: RootState) => state.authSlice.default_tariff
+  );
   const initialState: IProductInfo = {
     total_price: "",
-    where_deliver: market?.default_tariff,
+    where_deliver: market?.default_tariff || default_tariff,
     comment: "",
     operator:""
   };
@@ -42,9 +45,7 @@ const ProductInfo = () => {
     (state: RootState) => state.setCustomerData.productInfo
   );
 
-  const default_tariff = useSelector(
-    (state: RootState) => state.authSlice.default_tariff
-  );
+  
 
   console.log(default_tariff);
   

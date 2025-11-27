@@ -36,6 +36,18 @@ export class OrderBotUpdate {
     if (ctx.chat?.type === 'private') {
       ctx.reply(
         `👋 Salom men Beepost buyurtma yaratuvchi botman! Sizda buyurtma yaratish huquqi borligini tasdiqlash uchun menga platformadagi telegram tokenni tashlang`,
+        {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🚀 WebAppni ochish',
+                web_app: { url: 'https://latanya-unusable-andera.ngrok-free.dev/bot' },
+              },
+            ],
+          ],
+        },
+      },
       );
     }
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
@@ -43,11 +55,12 @@ export class OrderBotUpdate {
         `👋 Salom men Beepost buyurtma yaratuvchi botman! Ushbu guruhga yaratilgan buyurtmalar haqida xabar jo'natishim uchun menga platformadagi telegram tokenni tashlang`,
       );
     }
-  }
+
   @Hears('salom')
   async hearsSalom(@Ctx() ctx: Context) {
     await ctx.reply('Valeykum!');
   }
+
   @Hears(/^group_token-.*/i)
   async activateBot(
     @Ctx()
