@@ -39,18 +39,7 @@ export class OrderBotUpdate {
 
         if (response.statusCode && `${response.statusCode}`.startsWith('2')) {
           ctx.reply(`👋 Salom siz buyurtma yaratishga tayyorsiz`, {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: '🚀 WebAppni ochish',
-                    web_app: {
-                      url: 'https://latanya-unusable-andera.ngrok-free.dev/bot',
-                    },
-                  },
-                ],
-              ],
-            },
+            reply_markup: this.orderBotService.openWebApp(),
           });
         } else if (response.statusCode && `${response.statusCode}` === '404') {
           ctx.reply(
@@ -160,13 +149,29 @@ export class OrderBotUpdate {
         );
 
         if (response && `${response.statusCode}`.startsWith('2')) {
-          await ctx.reply('Order yaratish', {
+          await ctx.reply('⏳ Kuting...', {
+            reply_markup: { remove_keyboard: true },
+          });
+          await ctx.reply(`👋 Salom siz buyurtma yaratishga tayyorsiz`, {
             reply_markup: this.orderBotService.openWebApp(),
           });
+          await ctx.reply(
+            'Bu tugma orqali mini app linkini qayta olasiz...!!!',
+            {
+              reply_markup: this.orderBotService.openWebAppbtn(),
+            },
+          );
         }
       } catch (error) {
         await ctx.reply(error.message);
       }
     }
+  }
+
+  @Hears('➕ Add order')
+  async onAddOrder(@Ctx() ctx: Context) {
+    await ctx.reply(`👋 Salom siz buyurtma yaratishga tayyorsiz`, {
+      reply_markup: this.orderBotService.openWebApp(),
+    });
   }
 }

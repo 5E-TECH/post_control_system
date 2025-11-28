@@ -232,6 +232,15 @@ export class OrderBotService {
     return webAppButton;
   }
 
+  openWebAppbtn() {
+    const webAppButton = {
+      keyboard: [[{ text: '➕ Add order',}]],
+      resize_keyboard: true,
+      // one_time_keyboard: true,
+    };
+    return webAppButton;
+  }
+
   remove(id: number) {
     return `This action removes a #${id} bot`;
   }
