@@ -1,40 +1,73 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import OrderItems from "../orders/components/order-items";
 import ProductInfo from "../orders/components/product-info";
 import CustomerInfo from "../orders/components/customer-info";
-import NotFound from "../../shared/ui/NotFound";
+import { useLoginTelegran } from "./service/useTelelgram";
 
 const TelegramBot = () => {
-  const [isTelegram, setIsTelegram] = useState<boolean | null>(null);
+  const [network, setNetwork] = useState<string | null>("Loading...");
+  const [tg, setTg] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const { signinUser } = useLoginTelegran();
 
   useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp;
+    // Telegram script ni yuklab olamiz
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-web-app.js';
+    script.async = true;
+    script.onload = () => {
+      const telegram = (window as any).Telegram?.WebApp;
+      if (telegram) {
+        setTg(telegram);
+        telegram.ready();
+        telegram.expand();
+        
+        const initData = telegram.initData;
+        if (initData) {
+          signinUser.mutate(initData, {
+            onSuccess: () => setNetwork("Success"),
+            onError: () => setNetwork("Error")
+          });
+        } else {
+          setNetwork("No initData");
+        }
+      }
+      setIsLoading(false);
+    };
+    
+    script.onerror = () => {
+      setIsLoading(false);
+      setNetwork("Script load error");
+    };
 
-    if (tg?.initData && tg?.initDataUnsafe?.user) {
-      setIsTelegram(true);
-      tg.ready();
-    } else {
-      setIsTelegram(false);
-    }
-  }, []);
+    document.head.appendChild(script);
 
-  if (isTelegram === null) return null;
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, [signinUser]);
 
-  if (!isTelegram) {
+  if (isLoading) {
+    return <div className="bg-white p-4">Loading Telegram WebApp...</div>;
+  }
+
+  if (!tg) {
     return (
-      <div className="text-center">
-        <NotFound />
+      <div className="bg-white p-4">
+        <h2>Telegram WebApp not available</h2>
+        <p>Please open this page in Telegram app</p>
       </div>
     );
   }
 
   return (
     <div className="bg-white">
-      <h2 className="text-center text-[25px] font-bold">Create Order</h2>
+      <h2 className="text-center text-[25px] font-bold">Create Order {network}</h2>
       <div className="flex flex-col gap-4.5 w-full">
         <CustomerInfo />
       </div>
-      <div className="flex flex-col  w-full">
+      <div className="flex flex-col w-full">
         <OrderItems />
         <ProductInfo />
       </div>
