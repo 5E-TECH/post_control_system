@@ -47,6 +47,7 @@ import { TelegramRepository } from 'src/core/repository/telegram-market.reposito
 import { BotService } from '../bots/notify-bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import { OrderDto } from './dto/orderId.dto';
+import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -260,6 +261,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
       return successRes(newOrder, 201, 'New order created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createOrderByBot(
+    body: { dto: CreateOrderByBotDto; initData: string },
+    user: JwtPayload,
+  ) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -2481,15 +2498,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   }
 
   async remove(id: string) {
-    try {      
+    try {
       const order = await this.orderRepo.findOne({
         where: { id },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
       }
-      const acceptedStatuses = [Order_status.NEW, Order_status.RECEIVED]
-      if(!acceptedStatuses.includes(order.status)){
+      const acceptedStatuses = [Order_status.NEW, Order_status.RECEIVED];
+      if (!acceptedStatuses.includes(order.status)) {
         throw new BadRequestException('You can not delete...!!!');
       }
       await this.orderRepo.delete(id);
