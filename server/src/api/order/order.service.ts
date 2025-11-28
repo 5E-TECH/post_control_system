@@ -269,14 +269,37 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async createOrderByBot(
-    body: { dto: CreateOrderByBotDto; initData: string },
-    user: JwtPayload,
-  ) {
+  async createOrderByBot(dto: CreateOrderByBotDto, user: JwtPayload) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      const {
+        name,
+        phone_number,
+        district_id,
+        address,
+        order_item_info,
+        total_price,
+        where_deliver,
+        comment,
+        extra_number,
+        operator,
+      } = dto;
+      const currentOperator = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: user.id },
+      });
+      if (!currentOperator) {
+        throw new NotFoundException('Operator not found');
+      }
+      const customer = queryRunner.manager.create(UserEntity, {
+        name,
+        phone_number,
+        district_id,
+        role: Roles.CUSTOMER,
+        address,
+        extra_number,
+      });
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
