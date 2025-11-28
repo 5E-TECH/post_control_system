@@ -39,6 +39,7 @@ import { CreateMarketDto } from './dto/create-market.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { TelegramInitData } from './dto/initData.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -237,7 +238,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Login with telegram' })
   @ApiResponse({ status: 200, description: 'Loggen in with telegram' })
   @Post('telegram/signin')
-  telegramLogin(@Body() initData: string) {
+  telegramLogin(@Body() initData: TelegramInitData) {
     return this.userService.loginTelegram(initData);
   }
 

@@ -332,7 +332,7 @@ export class OrderController {
   @AcceptRoles(Roles.OPERATOR)
   @Post('telegram/bot/create')
   botOrderCreate(
-    @Body() body: { dto: CreateOrderByBotDto; initData: string },
+    @Body() body: CreateOrderByBotDto,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.orderService.createOrderByBot(body, user);

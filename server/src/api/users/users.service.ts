@@ -46,6 +46,7 @@ import { UpdateMarketDto } from './dto/update-market.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
+import { TelegramInitData } from './dto/initData.dto';
 
 @Injectable()
 export class UserService {
@@ -1144,9 +1145,10 @@ export class UserService {
     }
   }
 
-  async loginTelegram(initData: string) {
+  async loginTelegram(initData: TelegramInitData) {
     try {
-      const params = new URLSearchParams(initData);
+      const { data } = initData;
+      const params = new URLSearchParams(data);
       const userStr = params.get('user');
       if (!userStr) {
         throw new BadRequestException('No initData found');
