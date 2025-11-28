@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -1133,6 +1134,38 @@ export class UserService {
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
+      return successRes(
+        { access_token: accessToken },
+        200,
+        'Logged in successfully',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async loginTelegram(initData: string) {
+    try {
+      const params = new URLSearchParams(initData);
+      const userStr = params.get('user');
+      if (!userStr) {
+        throw new BadRequestException('No initData found');
+      }
+      const user = JSON.parse(userStr);
+
+      const isRegisteredUser = await this.userRepo.findOne({
+        where: { telegram_id: user.id },
+      });
+
+      if (!isRegisteredUser) {
+        throw new UnauthorizedException(
+          'You have not registred for this platform',
+        );
+      }
+      const { id, role, status } = isRegisteredUser;
+      const payload: JwtPayload = { id, role, status };
+      const accessToken = await this.token.generateAccessToken(payload);
+
       return successRes(
         { access_token: accessToken },
         200,

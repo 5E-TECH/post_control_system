@@ -234,6 +234,13 @@ export class UsersController {
     return this.userService.signInUser(signInuser, res);
   }
 
+  @ApiOperation({ summary: 'Login with telegram' })
+  @ApiResponse({ status: 200, description: 'Loggen in with telegram' })
+  @Post('telegram/signin')
+  telegramLogin(@Body() initData: string) {
+    return this.userService.loginTelegram(initData);
+  }
+
   @ApiOperation({
     summary: 'User sign out',
     description: 'Sign out user and clear JWT token',

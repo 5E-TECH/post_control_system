@@ -31,6 +31,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { SellCancelOrderDto } from './dto/sellCancel-order.dto';
 import { PartlySoldDto } from './dto/partly-sold.dto';
 import { OrderDto } from './dto/orderId.dto';
+import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -322,5 +323,18 @@ export class OrderController {
   @Delete(':id')
   delete(@Param('id') id: string) {
     return this.orderService.remove(id);
+  }
+
+  @ApiOperation({ summary: 'Create order by telegram bot' })
+  @ApiBody({ type: CreateOrderByBotDto })
+  @ApiResponse({ status: 201, description: 'Order created by bot' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.OPERATOR)
+  @Post('telegram/bot/create')
+  botOrderCreate(
+    @Body() body: { dto: CreateOrderByBotDto; initData: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orderService.createOrderByBot(body, user);
   }
 }
