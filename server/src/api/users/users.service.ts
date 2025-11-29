@@ -1147,7 +1147,9 @@ export class UserService {
 
   async loginTelegram(initData: TelegramInitData) {
     try {
+      
       const { data } = initData;
+      console.log(initData);
       const params = new URLSearchParams(data);
       const userStr = params.get('user');
       if (!userStr) {
