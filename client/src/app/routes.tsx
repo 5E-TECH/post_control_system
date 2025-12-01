@@ -124,7 +124,7 @@ const AppRouters = () => {
       element:<AuthTelegram/>,
       children:[
         {
-          path:"orderbot",
+          index:true,
           element:<CreateOrderBot/>
         },
       ]
