@@ -29,6 +29,7 @@ export class DistrictController {
     Roles.REGISTRATOR,
     Roles.MARKET,
     Roles.COURIER,
+    Roles.OPERATOR,
   )
   @Get()
   getAll() {
@@ -43,7 +44,13 @@ export class DistrictController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.COURIER, Roles.MARKET)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.COURIER,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
   @Get(':id')
   getById(@Param('id') id: string) {
     return this.districtService.findById(id);

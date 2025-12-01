@@ -131,7 +131,7 @@ export class ProductController {
 
   @ApiOperation({ summary: 'Get my products (market role)' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.MARKET)
+  @AcceptRoles(Roles.MARKET, Roles.OPERATOR)
   @Get('/my-products')
   async myProducts(
     @CurrentUser() user: JwtPayload,

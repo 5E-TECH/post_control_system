@@ -300,6 +300,48 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         address,
         extra_number,
       });
+      await queryRunner.manager.save(customer);
+
+      const qr_code_token = generateCustomToken();
+
+      const newOrder = queryRunner.manager.create(OrderEntity, {
+        customer_id: customer.id,
+        user_id: currentOperator.market_id,
+        operator: operator ? operator : currentOperator.name,
+        total_price,
+        where_deliver: where_deliver || Where_deliver.CENTER,
+        status: Order_status.NEW,
+        qr_code_token,
+        comment,
+      });
+      await queryRunner.manager.save(newOrder);
+
+      let product_quantity: number = 0;
+      for (const o_item of order_item_info) {
+        const isExistProduct = await queryRunner.manager.findOne(
+          ProductEntity,
+          {
+            where: { id: o_item.product_id },
+          },
+        );
+        if (!isExistProduct) {
+          throw new NotFoundException('Product not found');
+        }
+        const newOrderItem = queryRunner.manager.create(OrderItemEntity, {
+          productId: o_item.product_id,
+          quantity: o_item.quantity,
+          orderId: newOrder.id,
+        });
+        await queryRunner.manager.save(newOrderItem);
+        product_quantity += Number(o_item.quantity);
+      }
+
+      Object.assign(newOrder, {
+        product_quantity,
+      });
+
+      await queryRunner.commitTransaction();
+      return successRes(newOrder, 201, 'New order created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
