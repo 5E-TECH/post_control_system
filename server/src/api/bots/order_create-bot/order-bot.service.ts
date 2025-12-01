@@ -21,6 +21,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
 import { Response } from 'express';
+import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 
 @Injectable()
 export class OrderBotService {
@@ -35,6 +36,7 @@ export class OrderBotService {
 
     private readonly token: Token,
     private readonly dataSource: DataSource,
+    private readonly bcrypt: BcryptEncryption,
   ) {}
 
   async addToGroup(text: string, ctx: Context) {
@@ -139,10 +141,11 @@ export class OrderBotService {
           `Siz ushbu platformada allaqachon ${isExistUser.role} sifatida ro'yxatdan o'tgansiz`,
         );
       }
+      const hashedPassword = await this.bcrypt.encrypt(config.ADMIN_PASSWORD);
       const operator = queryRunner.manager.create(UserEntity, {
         name: ctx.session.name,
         phone_number: contact,
-        password: config.ADMIN_PASSWORD,
+        password: hashedPassword,
         role: Roles.OPERATOR,
         add_order: ctx.session.marketData.add_order,
         market_id: ctx.session.marketData.id,
