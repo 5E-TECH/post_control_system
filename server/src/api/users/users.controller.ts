@@ -451,6 +451,7 @@ export class UsersController {
     Roles.COURIER,
     Roles.REGISTRATOR,
     Roles.MARKET,
+    Roles.OPERATOR
   )
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload) {

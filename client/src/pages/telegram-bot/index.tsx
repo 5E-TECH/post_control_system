@@ -1,8 +1,8 @@
 import { memo, useState, useEffect } from "react";
-import OrderItems from "../orders/components/order-items";
-import ProductInfo from "../orders/components/product-info";
-import CustomerInfo from "../orders/components/customer-info";
 import { useLoginTelegran } from "./service/useTelelgram";
+import { useDispatch } from "react-redux";
+import { setToken } from "../../shared/lib/features/login/authSlice";
+import { useNavigate } from "react-router-dom";
 
 const TelegramBot = () => {
   const [network, setNetwork] = useState<string | null>("Loading...");
@@ -12,54 +12,57 @@ const TelegramBot = () => {
   const [payload, setPayload] = useState<any>(null);
   const [responseData, setResponseData] = useState<any>(null);
 
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   const { signinUser } = useLoginTelegran();
 
   useEffect(() => {
-    // Telegram script ni yuklab olamiz
-    const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-web-app.js";
-    script.async = true;
-    script.onload = () => {
-      const telegram = (window as any).Telegram?.WebApp;
-      if (telegram) {
-        setTg(telegram);
-        telegram.ready();
-        telegram.expand();
+  const script = document.createElement("script");
+  script.src = "https://telegram.org/js/telegram-web-app.js";
+  script.async = true;
 
-        const data = { data: telegram.initData };
-        setPayload(data);
-        if (data) {
-          signinUser.mutate(data, {
-            onSuccess: () => setNetwork("Success"),
-            onError: (err: any) => {
-              setNetwork("Error");
-              setError(err?.message || "Authentication failed");
-            },
-            onSettled: (result: any, error: any) => {
-              const backendResponse =
-                result || error?.response?.data || error?.response || error;
+  script.onload = () => {
+    const telegram = (window as any).Telegram?.WebApp;
+    if (!telegram) return;
 
-              setResponseData(backendResponse);
-            },
-          });
-        } else {
-          setNetwork("No initData");
-        }
-      }
-      setIsLoading(false);
-    };
+    setTg(telegram);
+    telegram.ready();
+    telegram.expand();
 
-    script.onerror = () => {
-      setIsLoading(false);
-      setNetwork("Script load error");
-    };
+    const data = { data: telegram.initData };
+    setPayload(data);
 
-    document.head.appendChild(script);
+    signinUser.mutate(data, {
+      onSuccess: (res: any) => {
+        dispatch(setToken(res?.data?.data?.access_token));
+        setResponseData(res?.data?.data?.access_token)
+        navigate("/authtelegram");
+      },
+      onError: (err: any) => {
+        setError(err?.message || "Authentication failed");
+      },
+      // onSettled: () => {
+      //   // const backendResponse =
+      //   //   result || error?.response?.data || error?.response || error;
+      //   setResponseData("salom");
+      // },
+    });
 
-    return () => {
-      document.head.removeChild(script);
-    };
-  }, [signinUser]);
+    setIsLoading(false);
+  };
+
+  script.onerror = () => {
+    setIsLoading(false);
+    setNetwork("Script load error");
+  };
+
+  document.head.appendChild(script);
+
+  return () => {
+    document.head.removeChild(script);
+  };
+}, []);  // <-- faqat bir marta ishlasin
 
   if (isLoading) {
     return <div className="bg-white p-4">Loading Telegram WebApp...</div>;
@@ -102,13 +105,7 @@ const TelegramBot = () => {
           </pre>
         </>
       )}
-      <div className="flex flex-col gap-4.5 w-full">
-        <CustomerInfo />
-      </div>
-      <div className="flex flex-col w-full">
-        <OrderItems />
-        <ProductInfo />
-      </div>
+      
     </div>
   );
 };
