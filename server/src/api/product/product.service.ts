@@ -198,9 +198,19 @@ export class ProductService {
 
   async getMyProducts(user: JwtPayload, search?: string, page = 1, limit = 10) {
     try {
+      const currentUser = await this.userRepo.findOne({
+        where: { id: user.id },
+      });
+      if (!currentUser) {
+        throw new NotFoundException('User not found');
+      }
+      const userId =
+        currentUser.role === Roles.MARKET
+          ? currentUser.id
+          : currentUser.market_id;
       const qb = this.productRepo
         .createQueryBuilder('product')
-        .where('product.user_id = :userId', { userId: user.id })
+        .where('product.user_id = :userId', { userId })
         .andWhere('product.isDeleted = :is_deleted', { is_deleted: false });
 
       if (search) {

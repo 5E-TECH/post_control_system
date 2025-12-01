@@ -122,7 +122,8 @@ export class OrderBotService {
     try {
       const isExistUser = await queryRunner.manager.findOne(UserEntity, {
         where: {
-          phone_number,
+          phone_number: `+${phone_number}`,
+          is_deleted: false,
         },
       });
       if (isExistUser?.status === Status.INACTIVE) {
@@ -137,7 +138,7 @@ export class OrderBotService {
       }
       const operator = queryRunner.manager.create(UserEntity, {
         name: ctx.session.name,
-        phone_number,
+        phone_number: `+${phone_number}`,
         password: config.ADMIN_PASSWORD,
         role: Roles.OPERATOR,
         add_order: ctx.session.marketData.add_order,
@@ -234,7 +235,7 @@ export class OrderBotService {
 
   openWebAppbtn() {
     const webAppButton = {
-      keyboard: [[{ text: '➕ Add order',}]],
+      keyboard: [[{ text: '➕ Add order' }]],
       resize_keyboard: true,
       // one_time_keyboard: true,
     };
