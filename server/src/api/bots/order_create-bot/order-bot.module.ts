@@ -9,6 +9,7 @@ import { OrderBotService } from './order-bot.service';
 import { session } from 'telegraf';
 import { MySession } from './session.interface';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
+import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 
 @Module({
   imports: [
@@ -29,6 +30,6 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
     }),
     TypeOrmModule.forFeature([UserEntity, TelegramEntity]),
   ],
-  providers: [OrderBotUpdate, OrderBotService, Token],
+  providers: [OrderBotUpdate, OrderBotService, Token, BcryptEncryption],
 })
 export class OrderBotModule {}
