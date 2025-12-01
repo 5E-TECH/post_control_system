@@ -4,7 +4,6 @@ import { Outlet } from "react-router-dom";
 import type { RootState } from "../../../app/store";
 import { api } from "../../../shared/api";
 import { setId, setRole } from "../../../shared/lib/features/roleSlice";
-import { setToken } from "../../../shared/lib/features/login/authSlice";
 import Suspensee from "../../../shared/ui/Suspensee";
 // import NotFound from "../../../shared/ui/NotFound";
 
