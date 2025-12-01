@@ -120,9 +120,12 @@ export class OrderBotService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      const contact = phone_number.startsWith('+')
+        ? phone_number
+        : `+${phone_number}`;
       const isExistUser = await queryRunner.manager.findOne(UserEntity, {
         where: {
-          phone_number: `+${phone_number}`,
+          phone_number: contact,
           is_deleted: false,
         },
       });
@@ -138,7 +141,7 @@ export class OrderBotService {
       }
       const operator = queryRunner.manager.create(UserEntity, {
         name: ctx.session.name,
-        phone_number: `+${phone_number}`,
+        phone_number: contact,
         password: config.ADMIN_PASSWORD,
         role: Roles.OPERATOR,
         add_order: ctx.session.marketData.add_order,
