@@ -18,51 +18,51 @@ const TelegramBot = () => {
   const { signinUser } = useLoginTelegran();
 
   useEffect(() => {
-  const script = document.createElement("script");
-  script.src = "https://telegram.org/js/telegram-web-app.js";
-  script.async = true;
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-web-app.js";
+    script.async = true;
 
-  script.onload = () => {
-    const telegram = (window as any).Telegram?.WebApp;
-    if (!telegram) return;
+    script.onload = () => {
+      const telegram = (window as any).Telegram?.WebApp;
+      if (!telegram) return;
 
-    setTg(telegram);
-    telegram.ready();
-    telegram.expand();
+      setTg(telegram);
+      telegram.ready();
+      telegram.expand();
 
-    const data = { data: telegram.initData };
-    setPayload(data);
+      const data = { data: telegram.initData };
+      setPayload(data);
 
-    signinUser.mutate(data, {
-      onSuccess: (res: any) => {
-        dispatch(setToken(res?.data?.data?.access_token));
-        setResponseData(res?.data?.data?.access_token)
-        navigate("/authtelegram");
-      },
-      onError: (err: any) => {
-        setError(err?.message || "Authentication failed");
-      },
-      // onSettled: () => {
-      //   // const backendResponse =
-      //   //   result || error?.response?.data || error?.response || error;
-      //   setResponseData("salom");
-      // },
-    });
+      signinUser.mutate(data, {
+        onSuccess: (res: any) => {
+          dispatch(setToken({ access_token: res?.data?.data?.access_token }));
+          setResponseData(res?.data?.data?.access_token);
+          navigate("/authtelegram");
+        },
+        onError: (err: any) => {
+          setError(err?.message || "Authentication failed");
+        },
+        // onSettled: () => {
+        //   // const backendResponse =
+        //   //   result || error?.response?.data || error?.response || error;
+        //   setResponseData("salom");
+        // },
+      });
 
-    setIsLoading(false);
-  };
+      setIsLoading(false);
+    };
 
-  script.onerror = () => {
-    setIsLoading(false);
-    setNetwork("Script load error");
-  };
+    script.onerror = () => {
+      setIsLoading(false);
+      setNetwork("Script load error");
+    };
 
-  document.head.appendChild(script);
+    document.head.appendChild(script);
 
-  return () => {
-    document.head.removeChild(script);
-  };
-}, []);  // <-- faqat bir marta ishlasin
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []); // <-- faqat bir marta ishlasin
 
   if (isLoading) {
     return <div className="bg-white p-4">Loading Telegram WebApp...</div>;
@@ -105,7 +105,6 @@ const TelegramBot = () => {
           </pre>
         </>
       )}
-      
     </div>
   );
 };
