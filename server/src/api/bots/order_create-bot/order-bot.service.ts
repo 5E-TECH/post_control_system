@@ -19,8 +19,6 @@ import { Group_type, Roles, Status } from 'src/common/enums';
 import config from 'src/config';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
-import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
-import { Response } from 'express';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 
 @Injectable()
