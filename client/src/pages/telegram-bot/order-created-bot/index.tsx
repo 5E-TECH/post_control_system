@@ -58,7 +58,7 @@ const CreateOrderBot = () => {
   return (
     <div className="bg-white">
       <div className="flex flex-col gap-4.5 w-full">
-        <h2 className="text-center text-[25px] font-bold">Create Order</h2>
+        <h2 className="text-center text-[25px] font-bold">Buyurtma qo'shish</h2>
         <CustomerInfo />
       </div>
 
@@ -67,12 +67,12 @@ const CreateOrderBot = () => {
         <ProductInfo />
       </div>
 
-      <div className="mt-5 text-center mb-5">
+      <div className="p-5 text-center mb-5 w-full">
         <Button
           onClick={handleShowData}
-          className="!w-[200px] !h-[45px] !text-[16px] !font-bold !text-white !bg-[#9069fe]"
+          className="!w-full !h-[45px] !text-[16px] !font-bold !text-white !bg-[#9069fe]"
         >
-          Create Order
+          Buyurtmani qo'shish
         </Button>
       </div>
     </div>
