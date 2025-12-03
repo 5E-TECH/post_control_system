@@ -289,6 +289,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         extra_number,
         operator,
       } = dto;
+
+      this.logger.log(dto, 'Incoming DTO');
+
       const currentOperator = await queryRunner.manager.findOne(UserEntity, {
         where: { id: user.id },
       });
