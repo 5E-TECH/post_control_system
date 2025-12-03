@@ -24,13 +24,16 @@ const ProductInfo = () => {
   const default_tariff = useSelector(
     (state: RootState) => state.authSlice.default_tariff
   );
+  const OperatorName = useSelector(
+    (state: RootState) => state.roleSlice.name
+  );
   const initialState: IProductInfo = {
     total_price: "",
     where_deliver: market?.default_tariff || default_tariff,
     comment: "",
-    operator:""
+    operator:OperatorName || ""
   };
-
+  
   console.log("11111111111",market);
   
   const { t } = useTranslation("createOrder");

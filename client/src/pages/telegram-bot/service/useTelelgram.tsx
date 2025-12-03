@@ -11,11 +11,6 @@ export const useLoginTelegran = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [loginTelegram] }),
   });
 
-//   const signinMarket = useMutation({
-//     mutationFn: (data: any) => api.post("market/signin", data),
-//     onSuccess: () => client.invalidateQueries({ queryKey: [login] }),
-//   });
-
   return {
     signinUser
   };

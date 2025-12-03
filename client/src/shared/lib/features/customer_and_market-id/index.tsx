@@ -17,7 +17,7 @@ const initialState: ICustomerId = {
     district_id: null,
     extra_number:""
   },
-  orderItems: null,
+  orderItems: [],
   productInfo: {
     total_price: "",
     where_deliver: "",
@@ -32,11 +32,11 @@ export const customerIdSlice = createSlice({
     setCustomerData: (state, actions: PayloadAction<ICustomer | null>) => {
       state.customerData = actions.payload;
     },
-    setOrderItems: (state, actions: PayloadAction<IOrderItems[]>) => {
+    setOrderItems: (state, actions: PayloadAction<IOrderItems[] | null>) => {
       state.orderItems = actions.payload;
     },
     resetOrderItems: (state) => {
-      state.orderItems = null;
+      state.orderItems = [];
     },
     setProductInfo: (state, actions: PayloadAction<IProductInfo | null>) => {
       state.productInfo = actions.payload;
