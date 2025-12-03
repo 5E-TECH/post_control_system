@@ -14,6 +14,10 @@ import { OrderGateaway } from '../socket/order.gateaway';
 import { MyLogger } from 'src/logger/logger.service';
 import { BotModule } from '../bots/notify-bot/bot.module';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { OrderBotModule } from '../bots/order_create-bot/order-bot.module';
+import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
+import { Token } from 'src/infrastructure/lib/token-generator/token';
+import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 
 @Module({
   imports: [
@@ -28,9 +32,10 @@ import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
       TelegramEntity,
     ]),
     BotModule,
+    OrderBotModule
   ],
   controllers: [DashboardController],
-  providers: [DashboardService, OrderService, OrderGateaway, MyLogger],
+  providers: [DashboardService, OrderService, OrderGateaway, MyLogger, OrderBotService, Token, BcryptEncryption],
   exports: [MyLogger],
 })
 export class DashboardModule {}
