@@ -1,12 +1,20 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import { Button } from "antd";
 import CustomerInfo from "../../orders/components/customer-info";
 import OrderItems from "../../orders/components/order-items";
 import ProductInfo from "../../orders/components/product-info";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../app/store";
+import { useOrder } from "../../../shared/api/hooks/useOrder";
+import {
+  resetOrderItems,
+  setCustomerData,
+  setProductInfo,
+} from "../../../shared/lib/features/customer_and_market-id";
+import { useApiNotification } from "../../../shared/hooks/useApiNotification";
 
 const CreateOrderBot = () => {
+  const { createOrderBot } = useOrder();
   const customerData = useSelector(
     (state: RootState) => state.setCustomerData.customerData
   );
@@ -16,51 +24,57 @@ const CreateOrderBot = () => {
   const productInfo = useSelector(
     (state: RootState) => state.setCustomerData.productInfo
   );
-
-  const [showData, setShowData] = useState(false);
+  const dispatch = useDispatch();
+  const { handleSuccess } = useApiNotification();
 
   const handleShowData = () => {
-    setShowData(true);
+    const data = {
+      name: customerData?.name,
+      phone_number: customerData?.phone_number,
+      district_id: customerData?.district_id,
+      extra_number: customerData?.extra_number,
+      address: customerData?.address,
+
+      order_item_info: (orderItems || []).map((item) => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+      })),
+      total_price: productInfo?.total_price,
+      where_deliver: productInfo?.where_deliver,
+      comment: productInfo?.comment,
+      operator: productInfo?.operator,
+    };
+
+    createOrderBot.mutate(data, {
+      onSuccess: () => {
+        handleSuccess("Buyurtma muvaffaqiyatli qo'shildi");
+        dispatch(setCustomerData(null));
+        dispatch(resetOrderItems());
+        dispatch(setProductInfo(null));
+      },
+    });
   };
 
   return (
-    <div className="bg-white p-5">
-      <h2 className="text-center text-[25px] font-bold mb-5">
-        Create Order
-      </h2>
-
+    <div className="bg-white">
       <div className="flex flex-col gap-4.5 w-full">
+        <h2 className="text-center text-[25px] font-bold">Create Order</h2>
         <CustomerInfo />
       </div>
 
-      <div className="flex flex-col w-full gap-4.5 mt-5">
+      <div className="flex flex-col w-full">
         <OrderItems />
         <ProductInfo />
       </div>
 
-      <div className="mt-5 text-center">
+      <div className="mt-5 text-center mb-5">
         <Button
-          type="primary"
           onClick={handleShowData}
-          className="!w-[200px] !h-[45px] !text-[16px] font-medium"
+          className="!w-[200px] !h-[45px] !text-[16px] !font-bold !text-white !bg-[#9069fe]"
         >
-          Show Data
+          Create Order
         </Button>
       </div>
-
-      {/* 🔹 UI qismida ma’lumotlarni chiqarish */}
-      {showData && (
-        <div className="mt-5 p-4 border rounded-md bg-gray-50 dark:bg-[#3b334e] dark:text-white">
-          <h3 className="font-medium text-lg mb-2">Customer Info</h3>
-          <pre>{JSON.stringify(customerData, null, 2)}</pre>
-
-          <h3 className="font-medium text-lg mt-4 mb-2">Order Items</h3>
-          <pre>{JSON.stringify(orderItems, null, 2)}</pre>
-
-          <h3 className="font-medium text-lg mt-4 mb-2">Product Info</h3>
-          <pre>{JSON.stringify(productInfo, null, 2)}</pre>
-        </div>
-      )}
     </div>
   );
 };

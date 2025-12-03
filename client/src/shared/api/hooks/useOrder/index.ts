@@ -11,6 +11,11 @@ export const useOrder = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
+  const createOrderBot = useMutation({
+    mutationFn: (data: any) => api.post("order/telegram/bot/create", data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
+  });
+
   const sellOrder = useMutation({
     mutationFn: ({ id, data }: { id: string; data?: any }) =>
       api.post(`order/sell/${id}`, data).then((res) => res.data),
@@ -154,6 +159,7 @@ export const useOrder = () => {
     updateOrdersUserPhoneAndName,
     courierReceiveOrderByScanerById,
     joinPostRefusalProduct,
-    receivePostByScan
+    receivePostByScan,
+    createOrderBot
   };
 };

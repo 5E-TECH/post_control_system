@@ -1,11 +1,11 @@
-import { Input, Modal, Select } from 'antd';
-import { memo, useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { setCustomerData } from '../../../../shared/lib/features/customer_and_market-id';
-import { useRegion } from '../../../../shared/api/hooks/useRegion/useRegion';
-import type { RootState } from '../../../../app/store';
-import { useTranslation } from 'react-i18next';
-import { debounce } from '../../../../shared/helpers/DebounceFunc';
+import { Input, Modal, Select } from "antd";
+import { memo, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { setCustomerData } from "../../../../shared/lib/features/customer_and_market-id";
+import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
+import type { RootState } from "../../../../app/store";
+import { useTranslation } from "react-i18next";
+import { debounce } from "../../../../shared/helpers/DebounceFunc";
 
 export interface ICustomer {
   phone_number: string;
@@ -17,20 +17,20 @@ export interface ICustomer {
 }
 
 export const initialState: ICustomer = {
-  phone_number: '+998 ',
-  extra_number: '',
+  phone_number: "+998 ",
+  extra_number: "",
   region_id: null,
   district_id: null,
-  name: '',
-  address: '',
+  name: "",
+  address: "",
 };
 
 const CustomerInfocomp = () => {
-  const { t } = useTranslation('createOrder');
+  const { t } = useTranslation("createOrder");
   const [formData, setFormData] = useState<ICustomer>(initialState);
 
-  const [regionSearch, setRegionSearch] = useState('');
-  const [districtSearch, setDistrictSearch] = useState('');
+  const [regionSearch, setRegionSearch] = useState("");
+  const [districtSearch, setDistrictSearch] = useState("");
 
   const { getRegions, getRegionsById } = useRegion();
   const { data: allRegions } = getRegions();
@@ -38,12 +38,11 @@ const CustomerInfocomp = () => {
 
   const customers = useSelector((state: RootState) => state.customerSlice.list);
 
-
   const regions = allRegions?.data
     ?.filter((item: any) =>
       regionSearch
         ? item.name.toLowerCase().includes(regionSearch.toLowerCase())
-        : true,
+        : true
     )
     .map((item: any) => ({
       value: item.id,
@@ -55,7 +54,7 @@ const CustomerInfocomp = () => {
       debounce((callback: (val: string) => void, value: string) => {
         callback(value);
       }, 500),
-    [],
+    []
   );
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -70,7 +69,6 @@ const CustomerInfocomp = () => {
     setFormData(updated);
     dispatch(setCustomerData(updated));
   };
-
 
   const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/\D/g, "");
@@ -112,9 +110,8 @@ const CustomerInfocomp = () => {
     }
   };
 
-
   const customerData = useSelector(
-    (state: RootState) => state.setCustomerData.customerData,
+    (state: RootState) => state.setCustomerData.customerData
   );
 
   useEffect(() => {
@@ -122,23 +119,25 @@ const CustomerInfocomp = () => {
       setFormData({
         ...initialState,
         ...customerData,
-        extra_number: customerData.extra_number || '',
+        extra_number: customerData.extra_number || "",
       });
     } else {
       setFormData(initialState);
     }
+    setRegionSearch("");
+    setDistrictSearch("");
   }, [customerData]);
 
   const { data } = getRegionsById(
     formData?.region_id as string,
-    !!formData?.region_id,
+    !!formData?.region_id
   );
 
   const specificDistrictsByRegion = data?.data?.districts
     ?.filter((district: any) =>
       districtSearch
         ? district.name.toLowerCase().includes(districtSearch.toLowerCase())
-        : true,
+        : true
     )
     .map((district: any) => ({
       value: district?.id,
@@ -146,11 +145,11 @@ const CustomerInfocomp = () => {
     }));
 
   const formatFullName = (value: string) => {
-    if (!value) return '';
+    if (!value) return "";
     return value
-      .split(' ')
+      .split(" ")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .join(" ");
   };
 
   return (

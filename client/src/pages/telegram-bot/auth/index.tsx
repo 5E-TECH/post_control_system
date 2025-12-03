@@ -3,8 +3,13 @@ import { useSelector, useDispatch } from "react-redux";
 import { Outlet } from "react-router-dom";
 import type { RootState } from "../../../app/store";
 import { api } from "../../../shared/api";
-import { setId, setRole } from "../../../shared/lib/features/roleSlice";
+import {
+  setId,
+  setRole,
+  setName,
+} from "../../../shared/lib/features/roleSlice";
 import Suspensee from "../../../shared/ui/Suspensee";
+import { setTarif } from "../../../shared/lib/features/login/authSlice";
 
 const AuthTelegram = () => {
   const dispatch = useDispatch();
@@ -13,12 +18,10 @@ const AuthTelegram = () => {
   const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
 
-  const [errorData, setErrorData] = useState<any>(null);
 
   useEffect(() => {
     if (!token) {
       setLoading(false);
-      setErrorData("TOKEN YO‘Q");
       return;
     }
 
@@ -26,16 +29,13 @@ const AuthTelegram = () => {
       .get("user/profile")
       .then((res) => {
         setValid(true);
-
+        dispatch(setTarif(res?.data?.data?.default_tariff));
         dispatch(setRole(res.data.data.role));
         dispatch(setId(res.data.data.id));
+        dispatch(setName(res?.data?.data?.name));
       })
-      .catch((err) => {
+      .catch(() => {
         setValid(false);
-
-        if (err?.response) setErrorData(err.response.data);
-        else if (err?.message) setErrorData(err.message);
-        else setErrorData("Unknown error");
       })
       .finally(() => setLoading(false));
   }, [token, dispatch]);
@@ -49,11 +49,7 @@ const AuthTelegram = () => {
   // 🔴 ERROR → xato UI
   return (
     <div className="p-3 bg-white">
-      <h2 className="text-lg font-bold mb-2">Auth ERROR</h2>
-
-      <pre className="bg-red-100 p-2 rounded text-sm">
-        {JSON.stringify(errorData, null, 2)}
-      </pre>
+      <Suspensee />
     </div>
   );
 };
