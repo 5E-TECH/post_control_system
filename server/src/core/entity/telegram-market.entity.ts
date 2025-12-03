@@ -10,7 +10,7 @@ export class TelegramEntity extends BaseEntity {
   @Column({ type: String })
   group_id: string;
 
-  @Column({ type: 'enum', enum: Group_type })
+  @Column({ type: 'enum', enum: Group_type, nullable: true })
   group_type: Group_type;
 
   @Column({ type: 'varchar' })
