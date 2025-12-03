@@ -15,6 +15,7 @@ import { InjectBot } from 'nestjs-telegraf';
 import { DataSource } from 'typeorm';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import config from 'src/config';
+import { Group_type } from 'src/common/enums';
 
 @Injectable()
 export class BotService {
@@ -53,7 +54,7 @@ export class BotService {
       const isGroupConnected = await queryRunner.manager.findOne(
         TelegramEntity,
         {
-          where: { group_id: groupId },
+          where: { group_id: groupId, group_type: Group_type.CANCEL || null },
         },
       );
       if (isGroupConnected) {
@@ -65,6 +66,7 @@ export class BotService {
         token: text,
         market_id: market?.id,
         group_id: String(ctx.chat?.id),
+        group_type: Group_type.CANCEL,
       });
       await queryRunner.manager.save(telegram);
 
