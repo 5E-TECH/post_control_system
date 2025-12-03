@@ -49,6 +49,7 @@ import { BotService } from '../bots/notify-bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import { OrderDto } from './dto/orderId.dto';
 import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
+import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -81,6 +82,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     private readonly dataSource: DataSource,
     private readonly orderGateaway: OrderGateaway,
     private readonly botService: BotService,
+    private readonly orderBotService: OrderBotService,
   ) {
     super(orderRepo);
   }
@@ -340,6 +342,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       Object.assign(newOrder, {
         product_quantity,
       });
+
+      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
+        where: { market_id: newOrder.user_id, group_type: Group_type.CREATE},
+      });
+      // created_at string yoki bigint bo'lishi mumkin
+
+      // console.log(telegramGroup);
+
+      await this.orderBotService.sendMessageToCreateGroup(
+        telegramGroup?.group_id || null,
+        `*✅ Yangi buyurtma!*\n\n` +
+          `👤 *Mijoz:* ${customer?.name}\n` +
+          `📞 *Telefon:* ${customer?.phone_number}\n` +
+          `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
+          `📦 *Buyurtmalar:*\n${newOrder.items
+            .map(
+              (item, i) =>
+                `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
+            )
+            .join('\n')}\n\n` +
+          `💰 *Narxi:* ${newOrder.total_price} so‘m\n` +
+          `🕒 *Yaratilgan vaqti:* ${new Date(Number(newOrder.created_at)).toLocaleString('uz-UZ')}\n\n` +
+          `🧑‍💻 *Operator:* ${newOrder.operator || '-'}\n\n` +
+          `📝 *Izoh:* ${newOrder.comment || '-'}\n`,
+      );
+
 
       await queryRunner.commitTransaction();
       return successRes(newOrder, 201, 'New order created');

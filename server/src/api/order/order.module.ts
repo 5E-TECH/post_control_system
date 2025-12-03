@@ -17,6 +17,8 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { MyLogger } from 'src/logger/logger.service';
 import { BotModule } from '../bots/notify-bot/bot.module';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { OrderBotModule } from '../bots/order_create-bot/order-bot.module';
+import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 
 @Module({
   imports: [
@@ -32,10 +34,12 @@ import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
     ]),
     CashBoxModule,
     BotModule,
+    OrderBotModule
   ],
   controllers: [OrderController],
   providers: [
     OrderService,
+    OrderBotService,
     ProductService,
     BcryptEncryption,
     Token,
