@@ -385,6 +385,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.commitTransaction();
       return successRes(order, 201, 'New order created');
     } catch (error) {
+      this.logger.log(error);
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
