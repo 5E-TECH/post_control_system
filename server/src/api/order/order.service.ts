@@ -298,7 +298,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!currentOperator) {
         throw new NotFoundException('Operator not found');
       }
-      const customer = queryRunner.manager.create(UserEntity, {
+      const newCustomer = queryRunner.manager.create(UserEntity, {
         name,
         phone_number,
         district_id,
@@ -306,7 +306,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         address,
         extra_number,
       });
-      await queryRunner.manager.save(customer);
+      await queryRunner.manager.save(newCustomer);
+
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: newCustomer.id },
+        relations: ['district', 'district.region'],
+      });
+
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
 
       const qr_code_token = generateCustomToken();
 
