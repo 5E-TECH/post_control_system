@@ -343,8 +343,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         product_quantity,
       });
 
+      await queryRunner.manager.save(newOrder);
+
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id: newOrder.id },
+        relations: ['items', 'items.product'],
+      });
+
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
       const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: newOrder.user_id, group_type: Group_type.CREATE},
+        where: { market_id: order.user_id, group_type: Group_type.CREATE },
       });
       // created_at string yoki bigint bo'lishi mumkin
 
@@ -356,21 +367,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           `👤 *Mijoz:* ${customer?.name}\n` +
           `📞 *Telefon:* ${customer?.phone_number}\n` +
           `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
-          `📦 *Buyurtmalar:*\n${newOrder.items
+          `📦 *Buyurtmalar:*\n${order.items
             .map(
               (item, i) =>
                 `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
             )
             .join('\n')}\n\n` +
-          `💰 *Narxi:* ${newOrder.total_price} so‘m\n` +
-          `🕒 *Yaratilgan vaqti:* ${new Date(Number(newOrder.created_at)).toLocaleString('uz-UZ')}\n\n` +
-          `🧑‍💻 *Operator:* ${newOrder.operator || '-'}\n\n` +
-          `📝 *Izoh:* ${newOrder.comment || '-'}\n`,
+          `💰 *Narxi:* ${order.total_price} so‘m\n` +
+          `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
+          `🧑‍💻 *Operator:* ${order.operator || '-'}\n\n` +
+          `📝 *Izoh:* ${order.comment || '-'}\n`,
       );
 
-
       await queryRunner.commitTransaction();
-      return successRes(newOrder, 201, 'New order created');
+      return successRes(order, 201, 'New order created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
