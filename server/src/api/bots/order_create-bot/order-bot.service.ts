@@ -15,7 +15,7 @@ import { InjectBot } from 'nestjs-telegraf';
 import { DataSource } from 'typeorm';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { MyContext } from './session.interface';
-import { Roles, Status } from 'src/common/enums';
+import { Group_type, Roles, Status } from 'src/common/enums';
 import config from 'src/config';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
@@ -55,7 +55,7 @@ export class OrderBotService {
       const isGroupConnected = await queryRunner.manager.findOne(
         TelegramEntity,
         {
-          where: { group_id: groupId },
+          where: { group_id: groupId, group_type: Group_type.CREATE },
         },
       );
       if (isGroupConnected) {
@@ -67,6 +67,7 @@ export class OrderBotService {
         token: text,
         market_id: market?.id,
         group_id: String(ctx.chat?.id),
+        group_type: Group_type.CREATE,
       });
       await queryRunner.manager.save(telegram);
 
@@ -104,6 +105,11 @@ export class OrderBotService {
       if (!market) {
         throw new NotFoundException('Market not found');
       }
+
+      const telegram_token = 'group_token-' + generateCustomToken();
+      market.market_tg_token = telegram_token;
+      await queryRunner.manager.save(market);
+
       return successRes(
         market,
         200,
@@ -196,7 +202,7 @@ export class OrderBotService {
     }
   }
 
-  async sendMessageToGroup(groupId: string | null, message: string) {
+  async sendMessageToCreateGroup(groupId: string | null, message: string) {
     try {
       if (!groupId) {
         throw new BadRequestException('Group not found');

@@ -15,6 +15,7 @@ import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { OrderItemRepository } from 'src/core/repository/order-item.repository';
 import {
   Cashbox_type,
+  Group_type,
   Operation_type,
   Order_status,
   Post_status,
@@ -1319,7 +1320,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
 
       const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: marketId },
+        where: { market_id: marketId, group_type: Group_type.CANCEL || null },
       });
       // created_at string yoki bigint bo'lishi mumkin
 
@@ -1615,7 +1616,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: marketId },
+        where: { market_id: marketId, group_type: Group_type.CANCEL || null },
       });
 
       // 🔟 ✅ To‘g‘rilangan cancel order logikasi

@@ -9,7 +9,6 @@ import {
   IsUUID,
   Min,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Where_deliver } from 'src/common/enums';
 import { OrderItems } from 'src/common/utils/types/order-item.type';
 
