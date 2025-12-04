@@ -14,7 +14,7 @@ export default class Application {
       bufferLogs: true,
     });
 
-    // Logger
+    // Logger chiqadi
     const myLogger = app.get(MyLogger);
     app.useLogger(myLogger);
 
