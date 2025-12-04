@@ -374,9 +374,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // console.log(telegramGroup);
 
       await Promise.all(
-        telegramGroup.map((groupId: any) => {
+        telegramGroup.map((g: TelegramEntity) => {
           return this.orderBotService.sendMessageToCreateGroup(
-            groupId || null,
+            g.group_id || null,
             `*✅ Yangi buyurtma!*\n\n` +
               `👤 *Mijoz:* ${customer?.name}\n` +
               `📞 *Telefon:* ${customer?.phone_number}\n` +
