@@ -5,6 +5,7 @@ export enum Roles {
   REGISTRATOR = 'registrator',
   MARKET = 'market',
   CUSTOMER = 'customer',
+  OPERATOR = 'operator',
 }
 
 export enum Status {
@@ -76,4 +77,9 @@ export enum Post_status {
 export enum Manual_payment_methods {
   CASH = 'cash',
   CARD = 'card',
+}
+
+export enum Group_type {
+  CANCEL = 'cancel',
+  CREATE = 'create',
 }

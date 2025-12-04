@@ -15,6 +15,7 @@ import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { OrderItemRepository } from 'src/core/repository/order-item.repository';
 import {
   Cashbox_type,
+  Group_type,
   Operation_type,
   Order_status,
   Post_status,
@@ -44,9 +45,11 @@ import { PostRepository } from 'src/core/repository/post.repository';
 import { MyLogger } from 'src/logger/logger.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
-import { BotService } from '../bot/bot.service';
+import { BotService } from '../bots/notify-bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import { OrderDto } from './dto/orderId.dto';
+import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
+import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -79,6 +82,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     private readonly dataSource: DataSource,
     private readonly orderGateaway: OrderGateaway,
     private readonly botService: BotService,
+    private readonly orderBotService: OrderBotService,
   ) {
     super(orderRepo);
   }
@@ -261,6 +265,136 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.commitTransaction();
       return successRes(newOrder, 201, 'New order created');
     } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async createOrderByBot(dto: CreateOrderByBotDto, user: JwtPayload) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const {
+        name,
+        phone_number,
+        district_id,
+        address,
+        order_item_info,
+        total_price,
+        where_deliver,
+        comment,
+        extra_number,
+        operator,
+      } = dto;
+
+      this.logger.log(dto, 'Incoming DTO');
+
+      const currentOperator = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: user.id },
+      });
+      if (!currentOperator) {
+        throw new NotFoundException('Operator not found');
+      }
+      const newCustomer = queryRunner.manager.create(UserEntity, {
+        name,
+        phone_number,
+        district_id,
+        role: Roles.CUSTOMER,
+        address,
+        extra_number,
+      });
+      await queryRunner.manager.save(newCustomer);
+
+      const customer = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: newCustomer.id },
+        relations: ['district', 'district.region'],
+      });
+
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+
+      const qr_code_token = generateCustomToken();
+
+      const newOrder = queryRunner.manager.create(OrderEntity, {
+        customer_id: customer.id,
+        user_id: currentOperator.market_id,
+        operator: operator ? operator : currentOperator.name,
+        total_price,
+        where_deliver: where_deliver || Where_deliver.CENTER,
+        status: Order_status.NEW,
+        qr_code_token,
+        comment,
+      });
+      await queryRunner.manager.save(newOrder);
+
+      let product_quantity: number = 0;
+      for (const o_item of order_item_info) {
+        const isExistProduct = await queryRunner.manager.findOne(
+          ProductEntity,
+          {
+            where: { id: o_item.product_id },
+          },
+        );
+        if (!isExistProduct) {
+          throw new NotFoundException('Product not found');
+        }
+        const newOrderItem = queryRunner.manager.create(OrderItemEntity, {
+          productId: o_item.product_id,
+          quantity: o_item.quantity,
+          orderId: newOrder.id,
+        });
+        await queryRunner.manager.save(newOrderItem);
+        product_quantity += Number(o_item.quantity);
+      }
+
+      Object.assign(newOrder, {
+        product_quantity,
+      });
+
+      await queryRunner.manager.save(newOrder);
+
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id: newOrder.id },
+        relations: ['items', 'items.product'],
+      });
+
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
+        where: { market_id: order.user_id, group_type: Group_type.CREATE },
+      });
+      // created_at string yoki bigint bo'lishi mumkin
+
+      // console.log(telegramGroup);
+
+      await this.orderBotService.sendMessageToCreateGroup(
+        telegramGroup?.group_id || null,
+        `*✅ Yangi buyurtma!*\n\n` +
+          `👤 *Mijoz:* ${customer?.name}\n` +
+          `📞 *Telefon:* ${customer?.phone_number}\n` +
+          `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
+          `📦 *Buyurtmalar:*\n${order.items
+            .map(
+              (item, i) =>
+                `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
+            )
+            .join('\n')}\n\n` +
+          `💰 *Narxi:* ${order.total_price} so‘m\n` +
+          `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
+          `🧑‍💻 *Operator:* ${order.operator || '-'}\n\n` +
+          `📝 *Izoh:* ${order.comment || '-'}\n`,
+      );
+
+      await queryRunner.commitTransaction();
+      return successRes(order, 201, 'New order created');
+    } catch (error) {
+      this.logger.log(error);
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
@@ -768,7 +902,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // 🔍 Search by customer name or order ID
       if (search) {
         qb.andWhere(
-          '(LOWER(customer.name) LIKE LOWER(:search) OR CAST(order.id AS TEXT) LIKE :search)',
+          '(LOWER(customer.name) LIKE LOWER(:search) OR LOWER(customer.phone_number) LIKE :search OR CAST(order.id AS TEXT) LIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -959,9 +1093,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
-        where: { id },
+        where: { id, status: Order_status.WAITING },
       });
-      if (!order) throw new NotFoundException('Order not found');
+      if (!order)
+        throw new NotFoundException('Order not found or not in waiting status');
 
       const marketId = order.user_id;
       const [market, marketCashbox, courier, courierCashbox] =
@@ -1236,7 +1371,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
 
       const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: marketId },
+        where: { market_id: marketId, group_type: Group_type.CANCEL || null },
       });
       // created_at string yoki bigint bo'lishi mumkin
 
@@ -1532,7 +1667,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: marketId },
+        where: { market_id: marketId, group_type: Group_type.CANCEL || null },
       });
 
       // 🔟 ✅ To‘g‘rilangan cancel order logikasi
@@ -1656,7 +1791,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!order) throw new NotFoundException('Order not found');
 
-      if (![Order_status.SOLD, Order_status.CANCELLED].includes(order.status)) {
+      if (
+        user.role === Roles.COURIER &&
+        ![Order_status.SOLD, Order_status.CANCELLED].includes(order.status)
+      ) {
+        throw new BadRequestException(
+          `Rollback mumkin emas (status: ${order.status})`,
+        );
+      }
+      if (
+        user.role === Roles.SUPERADMIN &&
+        ![
+          Order_status.SOLD,
+          Order_status.CANCELLED,
+          Order_status.CLOSED,
+          Order_status.PAID,
+          Order_status.PARTLY_PAID,
+        ].includes(order.status)
+      ) {
         throw new BadRequestException(
           `Rollback mumkin emas (status: ${order.status})`,
         );
@@ -1710,7 +1862,90 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       // === ROLLBACK FOR SOLD ===
-      if (order.status === Order_status.SOLD) {
+      if (
+        order.status === Order_status.SOLD ||
+        order.status === Order_status.PAID
+      ) {
+        const marketDiff = Number(order.total_price) - Number(marketTarif);
+        const courierDiff = Number(order.total_price) - Number(courierTarif);
+
+        // Market kassasidan ayrish
+        marketCashbox.balance -= marketDiff;
+        await queryRunner.manager.save(marketCashbox);
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: marketCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.CORRECTION,
+            amount: marketDiff,
+            balance_after: marketCashbox.balance,
+            comment: rollbackComment,
+            created_by: user.id,
+          }),
+        );
+
+        // Courier kassasidan ayrish
+        courierCashbox.balance -= courierDiff;
+        await queryRunner.manager.save(courierCashbox);
+        await queryRunner.manager.save(
+          queryRunner.manager.create(CashboxHistoryEntity, {
+            operation_type: Operation_type.EXPENSE,
+            cashbox_id: courierCashbox.id,
+            source_id: order.id,
+            source_type: Source_type.CORRECTION,
+            amount: courierDiff,
+            balance_after: courierCashbox.balance,
+            comment: rollbackComment,
+            created_by: user.id,
+          }),
+        );
+
+        // Qo'shimcha xarajat rollback (agar mavjud va vaqti yaqin bo‘lsa)
+        const soldTime = Number(order.sold_at);
+        const extraCostTime = Number(extraCostHistory?.created_at);
+        const diff = Math.abs(soldTime - extraCostTime);
+
+        if (extraCostHistory && diff <= 5000) {
+          const extraAmount = Number(extraCostHistory.amount);
+
+          // Market kassasiga qaytarish
+          marketCashbox.balance += extraAmount;
+          await queryRunner.manager.save(marketCashbox);
+          await queryRunner.manager.save(
+            queryRunner.manager.create(CashboxHistoryEntity, {
+              operation_type: Operation_type.INCOME,
+              cashbox_id: marketCashbox.id,
+              source_id: order.id,
+              source_type: Source_type.CORRECTION,
+              amount: extraAmount,
+              balance_after: marketCashbox.balance,
+              comment: "Qo'shimcha xarajat orqaga qaytarildi",
+              created_by: user.id,
+            }),
+          );
+
+          // Courier kassasiga qaytarish
+          courierCashbox.balance += extraAmount;
+          await queryRunner.manager.save(courierCashbox);
+          await queryRunner.manager.save(
+            queryRunner.manager.create(CashboxHistoryEntity, {
+              operation_type: Operation_type.INCOME,
+              cashbox_id: courierCashbox.id,
+              source_id: order.id,
+              source_type: Source_type.CORRECTION,
+              amount: extraAmount,
+              balance_after: courierCashbox.balance,
+              comment: "Qo'shimcha xarajat orqaga qaytarildi",
+              created_by: user.id,
+            }),
+          );
+        }
+      }
+
+      // === ROLLBACK FOR PARTLY PAID ===
+
+      if (order.status === Order_status.PARTLY_PAID) {
         const marketDiff = Number(order.total_price) - Number(marketTarif);
         const courierDiff = Number(order.total_price) - Number(courierTarif);
 
@@ -1789,7 +2024,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // === ROLLBACK FOR CANCELLED ===
-      if (order.status === Order_status.CANCELLED && extraCostHistory) {
+      if (
+        (order.status === Order_status.CANCELLED && extraCostHistory) ||
+        (order.status === Order_status.CLOSED && extraCostHistory)
+      ) {
         const orderLastUpdateTime = Number(order.updated_at);
         const extraCostTime = Number(extraCostHistory?.created_at);
         const diff = Math.abs(orderLastUpdateTime - extraCostTime);
@@ -2379,10 +2617,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async remove(id: string) {
     try {
       const order = await this.orderRepo.findOne({
-        where: { id, status: Order_status.NEW },
+        where: { id },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
+      }
+      const acceptedStatuses = [Order_status.NEW, Order_status.RECEIVED];
+      if (!acceptedStatuses.includes(order.status)) {
+        throw new BadRequestException('You can not delete...!!!');
       }
       await this.orderRepo.delete(id);
       return successRes({}, 200, 'Order deleted');

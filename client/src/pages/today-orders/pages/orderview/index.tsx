@@ -1,4 +1,4 @@
-import { Edit, Trash } from "lucide-react";
+import { ChevronRight, Edit, Trash } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
@@ -59,7 +59,8 @@ const OrderView = () => {
     user.role === "market"
       ? getMarketsByMyNewOrders(params)
       : getOrderByMarket(id, params);
-
+  console.log(data);
+  
   useEffect(() => {
     if (data?.data?.total === 0 && searchData == null) {
       navigate(-1);
@@ -152,8 +153,8 @@ const OrderView = () => {
     >
       <div className="flex justify-between items-center max-[650px]:flex-col">
         <div className="flex justify-between w-full items-center p-10 max-[650px]:flex-col">
-          <h2 className="text-[20px] font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-            {t("title")}
+          <h2 className="text-[20px] font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5] flex  items-center">
+            <span onClick={() => navigate(-1)} className="cursor-pointer">{t("title")}</span> <ChevronRight /> <span className="font-bold text-2xl">{data?.message.split("\'s")[0]}</span>
           </h2>
           <form action="">
             <div className="border border-[#d1cfd4] max-[650px]:mt-3 rounded-md">

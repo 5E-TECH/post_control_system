@@ -32,15 +32,15 @@ const OrderItems = () => {
   const marketId = market?.id;
   const { getProductsByMarket, getMyProducts } = useProduct();
 
-  const myProductsQuery = getMyProducts(undefined, user.role === "market");
+  const myProductsQuery = getMyProducts(undefined, user.role === "market" || user.role === "operator");
 
   const marketProductsQuery = getProductsByMarket(
     marketId as string,
-    user.role !== "market"
+    user.role !== "market" && user.role !== "operator" 
   );
 
   const data =
-    user.role === "market" ? myProductsQuery.data : marketProductsQuery.data;
+    user.role === "market" || "operator" ? myProductsQuery.data : marketProductsQuery.data;
 
   const productNames = data?.data?.products?.map((product: any) => ({
     value: product.id,
@@ -141,10 +141,12 @@ const OrderItems = () => {
   );
 
   useEffect(() => {
-    if (orderItems && orderItems.length > 0) {
-      setFormDataList(orderItems);
-    }
-  }, []);
+  if (orderItems && orderItems.length > 0) {
+    setFormDataList(orderItems);
+  } else {
+    setFormDataList([createInitialState()]);
+  }
+}, [orderItems]);
 
   return (
     <div className="bg-[#ffffff] dark:bg-[#312D48] rounded-md shadow-lg">
@@ -163,7 +165,7 @@ const OrderItems = () => {
               </span>
 
               <div className="flex gap-5">
-                <Form.Item className="w-1/2">
+                <Form.Item className="w-1/2 max-[650px]:w-[70%]">
                   <Select
                     value={formData.product_id ?? undefined}
                     onSearch={(value) =>
@@ -188,7 +190,7 @@ const OrderItems = () => {
                   />
                 </Form.Item>
 
-                <Form.Item className="w-1/2">
+                <Form.Item className="w-1/2 max-[650px]:w-[30%]">
                   <Input
                     name="quantity"
                     value={formData.quantity}

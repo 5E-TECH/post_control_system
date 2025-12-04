@@ -5,6 +5,13 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useTranslation } from "react-i18next";
 
+
+const parsePriceToNumber = (value: string | number): number => {
+  if (!value) return 0;
+  const cleaned = String(value).replace(/[^0-9]/g, ""); // faqat raqamlarni oladi
+  return Number(cleaned) || 0;
+};
+
 export interface IProductInfo {
   total_price: number | string;
   where_deliver: string;
@@ -14,13 +21,19 @@ export interface IProductInfo {
 
 const ProductInfo = () => {
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
+  const default_tariff = useSelector(
+    (state: RootState) => state.authSlice.default_tariff
+  );
+  const OperatorName = useSelector(
+    (state: RootState) => state.roleSlice.name
+  );
   const initialState: IProductInfo = {
     total_price: "",
-    where_deliver: market?.default_tariff,
+    where_deliver: market?.default_tariff || default_tariff,
     comment: "",
-    operator:""
+    operator:OperatorName || ""
   };
-
+  
   console.log("11111111111",market);
   
   const { t } = useTranslation("createOrder");
@@ -42,24 +55,20 @@ const ProductInfo = () => {
     (state: RootState) => state.setCustomerData.productInfo
   );
 
-  const default_tariff = useSelector(
-    (state: RootState) => state.authSlice.default_tariff
-  );
+  
 
   console.log(default_tariff);
   
   
 
-  useEffect(() => {
-    const cleanedPrice = Number(
-      String(formData.total_price).split(",").join("")
-    );
-    const data = {
-      ...formData,
-      total_price: Number(cleanedPrice) || 0,
-    };
-    dispatch(setProductInfo(data));
-  }, [formData, dispatch]);
+ useEffect(() => {
+  const cleanedPrice = parsePriceToNumber(formData.total_price);
+  const data = {
+    ...formData,
+    total_price: cleanedPrice,
+  };
+  dispatch(setProductInfo(data));
+}, [formData, dispatch]);
 
   useEffect(() => {
     if (productInfo === null) {

@@ -3,8 +3,16 @@ import { useSelector, useDispatch } from "react-redux";
 import { Navigate, Outlet } from "react-router-dom";
 import type { RootState } from "../../app/store";
 import { api } from "../../shared/api";
-import { setTarif, setToken, setUserData } from "../../shared/lib/features/login/authSlice";
-import { setId, setRegion, setRole } from "../../shared/lib/features/roleSlice";
+import {
+  setTarif,
+  setToken,
+  setUserData,
+} from "../../shared/lib/features/login/authSlice";
+import {
+  setId,
+  setRegion,
+  setRole,
+} from "../../shared/lib/features/roleSlice";
 import Suspensee from "../../shared/ui/Suspensee";
 // Test for deployment
 const Auth = () => {
@@ -26,14 +34,17 @@ const Auth = () => {
         dispatch(setRole(res.data.data.role));
         dispatch(setId(res.data.data.id));
         {
-          res?.data?.data?.role === "market" && (
-            dispatch(setTarif(res?.data?.data?.default_tariff))
-          )
+          res?.data?.data?.role === "market" &&
+            dispatch(setTarif(res?.data?.data?.default_tariff));
         }
         {
-          res?.data?.data?.role === "market" && (
-            dispatch(setUserData({name:res?.data?.data?.name, phone_number:res?.data?.data?.phone_number}))
-          )
+          res?.data?.data?.role === "market" &&
+            dispatch(
+              setUserData({
+                name: res?.data?.data?.name,
+                phone_number: res?.data?.data?.phone_number,
+              })
+            );
         }
         {
           res?.data?.data?.region?.name

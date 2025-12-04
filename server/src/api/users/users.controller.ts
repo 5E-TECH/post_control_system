@@ -39,6 +39,7 @@ import { CreateMarketDto } from './dto/create-market.dto';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateMarketDto } from './dto/update-market.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { TelegramInitData } from './dto/initData.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -232,6 +233,13 @@ export class UsersController {
     @Res({ passthrough: true }) res: Response,
   ) {
     return this.userService.signInUser(signInuser, res);
+  }
+
+  @ApiOperation({ summary: 'Login with telegram' })
+  @ApiResponse({ status: 200, description: 'Loggen in with telegram' })
+  @Post('telegram/signin')
+  telegramLogin(@Body() initData: TelegramInitData) {
+    return this.userService.loginTelegram(initData);
   }
 
   @ApiOperation({
@@ -443,6 +451,7 @@ export class UsersController {
     Roles.COURIER,
     Roles.REGISTRATOR,
     Roles.MARKET,
+    Roles.OPERATOR
   )
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload) {

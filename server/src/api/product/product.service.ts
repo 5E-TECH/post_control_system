@@ -19,7 +19,7 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
-import { BotService } from '../bot/bot.service';
+import { BotService } from '../bots/notify-bot/bot.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 
@@ -198,9 +198,19 @@ export class ProductService {
 
   async getMyProducts(user: JwtPayload, search?: string, page = 1, limit = 10) {
     try {
+      const currentUser = await this.userRepo.findOne({
+        where: { id: user.id },
+      });
+      if (!currentUser) {
+        throw new NotFoundException('User not found');
+      }
+      const userId =
+        currentUser.role === Roles.MARKET
+          ? currentUser.id
+          : currentUser.market_id;
       const qb = this.productRepo
         .createQueryBuilder('product')
-        .where('product.user_id = :userId', { userId: user.id })
+        .where('product.user_id = :userId', { userId })
         .andWhere('product.isDeleted = :is_deleted', { is_deleted: false });
 
       if (search) {

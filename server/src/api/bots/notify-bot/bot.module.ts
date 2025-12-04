@@ -9,10 +9,16 @@ import config from 'src/config';
 
 @Module({
   imports: [
+    TelegrafModule.forRootAsync({
+      botName: config.BOT_NAME,
+      useFactory: () => ({
+        token: config.BOT_TOKEN,
+        include: [BotModule],
+      }),
+    }),
     TypeOrmModule.forFeature([UserEntity, TelegramEntity]),
-    // TelegrafModule.forRoot({ token: config.BOT_TOKEN }),
   ],
   providers: [BotService, BotUpdate],
-  exports: [BotService, TypeOrmModule], // 👈 Bu joyi to‘g‘ri, repository larni ham export qilayapti
+  exports: [BotService],
 })
 export class BotModule {}

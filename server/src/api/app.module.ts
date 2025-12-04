@@ -11,16 +11,14 @@ import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
 import { LoggerModule } from 'src/logger/logger.module';
 import { PostModule } from './post/post.module';
 import { OrderModule } from './order/order.module';
-import { BotModule } from './bot/bot.module';
 import { OrderGateaway } from './socket/order.gateaway';
 import { DashboardModule } from './dashboard/dashboard.module';
-import { TelegrafModule } from 'nestjs-telegraf';
-import { BotUpdate } from './bot/bot.update';
 import { PrinterModule } from './printer/printer.module';
+import { BotModule } from './bots/notify-bot/bot.module';
+import { OrderBotModule } from './bots/order_create-bot/order-bot.module';
 
 @Module({
   imports: [
-    TelegrafModule.forRoot({ token: config.BOT_TOKEN }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: config.DB_URL,
@@ -30,8 +28,6 @@ import { PrinterModule } from './printer/printer.module';
       synchronize: true,
     }),
     JwtModule.register({ global: true }),
-
-    // biznes modullar
     UsersModule,
     ProductModule,
     CashBoxModule,
@@ -41,11 +37,9 @@ import { PrinterModule } from './printer/printer.module';
     PostModule,
     OrderModule,
     BotModule,
+    OrderBotModule,
     DashboardModule,
-
-    // loggerni oxirida yoki avvaliga qo'yish muammo bo'lmaydi — global ekan ishlaydi
     LoggerModule,
-
     PrinterModule,
   ],
   providers: [OrderGateaway],

@@ -61,6 +61,12 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   extra_number: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  market_id: string;
+
+  @Column({ type: 'bigint', nullable: true })
+  telegram_id: number;
+
   @Column({ type: 'boolean', default: false })
   is_deleted: boolean;
 
@@ -117,4 +123,14 @@ export class UserEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'district_id' }) // 🔑 aynan shu kerak
   district: DistrictEntity;
+
+  @ManyToOne(() => UserEntity, (market) => market.operators, {
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'market_id' })
+  market: UserEntity;
+
+  // Inverse side: Market has many Operators
+  @OneToMany(() => UserEntity, (operator) => operator.market)
+  operators: UserEntity[];
 }
