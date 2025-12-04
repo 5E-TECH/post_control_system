@@ -7,8 +7,8 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    // allowedHosts: true, // 👈 Barcha hostlarni ruxsat beradi
-    allowedHosts: ["latanya-unusable-andera.ngrok-free.dev"],
+    allowedHosts: true, // 👈 Barcha hostlarni ruxsat beradi
+    // allowedHosts: ["latanya-unusable-andera.ngrok-free.dev"],
     headers: {
       "ngrok-skip-browser-warning": "any-value",
     }
