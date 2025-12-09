@@ -234,7 +234,7 @@ export class OrderBotService {
           {
             text: '🚀 WebAppni ochish',
             web_app: {
-              url: 'https://beepost.uz/bot',
+              url: 'https://latanya-unusable-andera.ngrok-free.dev/bot',
             },
           },
         ],
