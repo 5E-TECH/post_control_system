@@ -31,7 +31,7 @@ const CreateOrderBot = () => {
   const handleShowData = () => {
     const data = {
       name: customerData?.name,
-      phone_number: customerData?.phone_number,
+      phone_number: customerData?.phone_number.trim(),
       district_id: customerData?.district_id,
       extra_number: customerData?.extra_number,
       address: customerData?.address,
