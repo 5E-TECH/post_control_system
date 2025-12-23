@@ -38,6 +38,13 @@ export class OrderBotService {
     private readonly bcrypt: BcryptEncryption,
   ) {}
 
+  private statusButtonLabel(order: OrderEntity) {
+    const statusText = order.deleted
+      ? 'deleted'
+      : order.status || Order_status.CREATED;
+    return `Holat: ${statusText}`;
+  }
+
   async addToGroup(text: string, ctx: Context) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -235,17 +242,27 @@ export class OrderBotService {
   async sendOrderForApproval(
     groupId: string | null,
     order: OrderEntity,
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    sentMessage?: { chatId: number; messageId: number };
+  }> {
     try {
       if (!groupId) {
         throw new BadRequestException('Group not found');
       }
 
       const message = this.buildOrderMessage(order);
-      await this.bot.telegram.sendMessage(groupId, message, {
+      const sent = await this.bot.telegram.sendMessage(groupId, message, {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
+            [
+              {
+                text: this.statusButtonLabel(order),
+                callback_data: `order:status:${order.id}`,
+              },
+            ],
             [
               {
                 text: '✅ Tasdiqlash',
@@ -260,7 +277,11 @@ export class OrderBotService {
         },
       });
 
-      return { success: true, message: 'Message sent successfully' };
+      return {
+        success: true,
+        message: 'Message sent successfully',
+        sentMessage: { chatId: Number(sent.chat.id), messageId: sent.message_id },
+      };
     } catch (error) {
       const message =
         error?.response?.message ||
@@ -294,12 +315,15 @@ export class OrderBotService {
         throw new NotFoundException('Order not found');
       }
 
-      if (order.status !== Order_status.CREATED) {
+      if (order.deleted || order.status !== Order_status.CREATED) {
         return successRes(order, 200, 'Order already processed');
       }
 
-      order.status =
-        action === 'approve' ? Order_status.NEW : Order_status.CANCELLED;
+      if (action === 'approve') {
+        order.status = Order_status.NEW;
+      } else {
+        order.deleted = true;
+      }
 
       await queryRunner.manager.save(order);
       await queryRunner.commitTransaction();
@@ -309,27 +333,61 @@ export class OrderBotService {
           ? '✅ Buyurtma tasdiqlandi'
           : '❌ Buyurtma bekor qilindi';
 
-      const message = ctx.callbackQuery?.message;
-      const chatId = message?.chat?.id;
-      const messageId = message?.message_id;
-      const originalText =
-        message && 'text' in message ? message.text || '' : '';
+      const statusButton = {
+        text: this.statusButtonLabel(order),
+        callback_data: `order:status:${order.id}`,
+      };
 
-      if (chatId && messageId) {
-        try {
-          await this.bot.telegram.editMessageText(
-            chatId,
-            messageId,
-            undefined,
-            `${originalText}\n\n${statusText}`,
-            {
-              parse_mode: 'Markdown',
-            },
+      const storedMessages = order.create_bot_messages || [];
+      const cbMessage = ctx.callbackQuery?.message;
+      if (cbMessage?.chat?.id && cbMessage?.message_id) {
+        const exists = storedMessages.some(
+          (m) =>
+            m.chatId === Number(cbMessage.chat.id) &&
+            m.messageId === cbMessage.message_id,
+        );
+        if (!exists) {
+          storedMessages.push({
+            chatId: Number(cbMessage.chat.id),
+            messageId: cbMessage.message_id,
+          });
+          await this.dataSource.manager.update(
+            OrderEntity,
+            { id: order.id },
+            { create_bot_messages: storedMessages },
           );
-        } catch (err) {
-          await this.bot.telegram.sendMessage(chatId, statusText);
         }
       }
+
+      const inline_keyboard = [[statusButton]];
+
+      await Promise.all(
+        storedMessages.map(async ({ chatId, messageId }) => {
+          try {
+            await this.bot.telegram.editMessageText(
+              chatId,
+              messageId,
+              undefined,
+              `${this.buildOrderMessage(order)}\n\n${statusText}`,
+              {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard },
+              } as any,
+            );
+          } catch (err) {
+            try {
+              await this.bot.telegram.editMessageReplyMarkup(
+                chatId,
+                messageId,
+                undefined,
+                { inline_keyboard },
+              );
+            } catch {
+              await this.bot.telegram.sendMessage(chatId, statusText);
+            }
+          }
+        }),
+      );
 
       return successRes(order, 200, statusText);
     } catch (error) {
