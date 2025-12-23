@@ -424,31 +424,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ),
         );
       }
-      // console.log(telegramGroup);
-
-      await Promise.all(
-        telegramGroup.map((g: TelegramEntity) => {
-          return this.orderBotService.sendMessageToCreateGroup(
-            g.group_id || null,
-            `*✅ Yangi buyurtma!*\n\n` +
-              `👤 *Mijoz:* ${customer?.name}\n` +
-              `📞 *Telefon:* ${customer?.phone_number}\n` +
-              `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
-              `📦 *Buyurtmalar:*\n${order.items
-                .map(
-                  (item, i) =>
-                    `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
-                )
-                .join('\n')}\n\n` +
-              `💰 *Narxi:* ${order.total_price} so‘m\n` +
-              `🕒 *Yaratilgan vaqti:* ${new Date(
-                Number(order.created_at),
-              ).toLocaleString('uz-UZ')}\n\n` +
-              `🧑‍💻 *Operator:* ${order.operator || '-'}\n\n` +
-              `📝 *Izoh:* ${order.comment || '-'}\n`,
-          );
-        }),
-      );
 
       await queryRunner.commitTransaction();
       return successRes(order, 201, 'New order created');
