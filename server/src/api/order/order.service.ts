@@ -289,7 +289,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
 
       if (telegramGroups.length) {
-        await Promise.all(
+        const sendResults = await Promise.all(
           telegramGroups.map((g) =>
             this.orderBotService.sendOrderForApproval(
               g.group_id || null,
@@ -297,6 +297,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             ),
           ),
         );
+
+        const messageRefs = sendResults
+          .map((res) => res.sentMessage)
+          .filter(Boolean) as { chatId: number; messageId: number }[];
+
+        if (messageRefs.length) {
+          order.create_bot_messages = [
+            ...(order.create_bot_messages || []),
+            ...messageRefs,
+          ];
+          await queryRunner.manager.save(order);
+        }
       }
 
       await queryRunner.commitTransaction();
@@ -415,7 +427,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // created_at string yoki bigint bo'lishi mumkin
 
       if (telegramGroups.length) {
-        await Promise.all(
+        const sendResults = await Promise.all(
           telegramGroups.map((g) =>
             this.orderBotService.sendOrderForApproval(
               g.group_id || null,
@@ -423,6 +435,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             ),
           ),
         );
+
+        const messageRefs = sendResults
+          .map((res) => res.sentMessage)
+          .filter(Boolean) as { chatId: number; messageId: number }[];
+
+        if (messageRefs.length) {
+          order.create_bot_messages = [
+            ...(order.create_bot_messages || []),
+            ...messageRefs,
+          ];
+          await queryRunner.manager.save(order);
+        }
       }
 
       await queryRunner.commitTransaction();

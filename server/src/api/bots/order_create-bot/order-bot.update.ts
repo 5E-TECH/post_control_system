@@ -187,6 +187,11 @@ export class OrderBotUpdate {
 
     const [, action, orderId] = data.split(':');
 
+    if (action === 'status') {
+      await ctx.answerCbQuery('Holat ko‘rsatildi');
+      return;
+    }
+
     if (!action || !orderId) {
       await ctx.answerCbQuery('Noto‘g‘ri buyruq');
       return;
