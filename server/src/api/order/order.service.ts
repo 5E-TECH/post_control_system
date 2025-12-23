@@ -284,14 +284,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Order not found');
       }
 
-      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
+      const telegramGroups = await queryRunner.manager.find(TelegramEntity, {
         where: { market_id: newOrder.user_id, group_type: Group_type.CREATE },
       });
 
-      await this.orderBotService.sendOrderForApproval(
-        telegramGroup?.group_id || null,
-        order,
-      );
+      if (telegramGroups.length) {
+        await Promise.all(
+          telegramGroups.map((g) =>
+            this.orderBotService.sendOrderForApproval(
+              g.group_id || null,
+              order,
+            ),
+          ),
+        );
+      }
 
       await queryRunner.commitTransaction();
       return successRes(newOrder, 201, 'New order created');
@@ -390,22 +396,34 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id: newOrder.id },
-        relations: ['items', 'items.product'],
+        relations: [
+          'items',
+          'items.product',
+          'customer',
+          'customer.district',
+          'customer.district.region',
+        ],
       });
 
       if (!order) {
         throw new NotFoundException('Order not found');
       }
 
-      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
+      const telegramGroups = await queryRunner.manager.find(TelegramEntity, {
         where: { market_id: order.user_id, group_type: Group_type.CREATE },
       });
       // created_at string yoki bigint bo'lishi mumkin
 
-      await this.orderBotService.sendOrderForApproval(
-        telegramGroup?.group_id || null,
-        order,
-      );
+      if (telegramGroups.length) {
+        await Promise.all(
+          telegramGroups.map((g) =>
+            this.orderBotService.sendOrderForApproval(
+              g.group_id || null,
+              order,
+            ),
+          ),
+        );
+      }
 
       await queryRunner.commitTransaction();
       return successRes(order, 201, 'New order created');
