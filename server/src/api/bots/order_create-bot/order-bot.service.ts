@@ -15,11 +15,12 @@ import { InjectBot } from 'nestjs-telegraf';
 import { DataSource } from 'typeorm';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { MyContext } from './session.interface';
-import { Group_type, Roles, Status } from 'src/common/enums';
+import { Group_type, Order_status, Roles, Status } from 'src/common/enums';
 import config from 'src/config';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
+import { OrderEntity } from 'src/core/entity/order.entity';
 
 @Injectable()
 export class OrderBotService {
@@ -200,6 +201,145 @@ export class OrderBotService {
     }
   }
 
+  private buildOrderMessage(order: OrderEntity) {
+    const customerDistrict = order.customer?.district;
+    const regionName = customerDistrict?.region?.name;
+    const districtName = customerDistrict?.name;
+    const addressLine =
+      regionName && districtName
+        ? `${regionName}, ${districtName}`
+        : districtName || regionName || '-';
+
+    const itemsText = order.items
+      ?.map(
+        (item, i) =>
+          `   ${i + 1}. ${item.product?.name || '-'} — ${item.quantity} dona`,
+      )
+      .join('\n');
+
+    return (
+      `*✅ Yangi buyurtma!*\n\n` +
+      `👤 *Mijoz:* ${order.customer?.name || '-'}\n` +
+      `📞 *Telefon:* ${order.customer?.phone_number || '-'}\n` +
+      `📍 *Manzil:* ${addressLine}\n\n` +
+      `📦 *Buyurtmalar:*\n${itemsText || '-'}\n\n` +
+      `💰 *Narxi:* ${order.total_price} so‘m\n` +
+      `🕒 *Yaratilgan vaqti:* ${new Date(
+        Number(order.created_at),
+      ).toLocaleString('uz-UZ')}\n\n` +
+      `🧑‍💻 *Operator:* ${order.operator || '-'}\n\n` +
+      `📝 *Izoh:* ${order.comment || '-'}\n`
+    );
+  }
+
+  async sendOrderForApproval(
+    groupId: string | null,
+    order: OrderEntity,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      if (!groupId) {
+        throw new BadRequestException('Group not found');
+      }
+
+      const message = this.buildOrderMessage(order);
+      await this.bot.telegram.sendMessage(groupId, message, {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '✅ Tasdiqlash',
+                callback_data: `order:approve:${order.id}`,
+              },
+              {
+                text: '❌ Bekor qilish',
+                callback_data: `order:cancel:${order.id}`,
+              },
+            ],
+          ],
+        },
+      });
+
+      return { success: true, message: 'Message sent successfully' };
+    } catch (error) {
+      const message =
+        error?.response?.message ||
+        error?.message ||
+        'Noma’lum xatolik yuz berdi';
+      return { success: false, message: message || 'error' };
+    }
+  }
+
+  async processOrderAction(
+    action: 'approve' | 'cancel',
+    orderId: string,
+    ctx: Context,
+  ) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id: orderId },
+        relations: [
+          'items',
+          'items.product',
+          'customer',
+          'customer.district',
+          'customer.district.region',
+        ],
+      });
+
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      if (order.status !== Order_status.CREATED) {
+        return successRes(order, 200, 'Order already processed');
+      }
+
+      order.status =
+        action === 'approve' ? Order_status.NEW : Order_status.CANCELLED;
+
+      await queryRunner.manager.save(order);
+      await queryRunner.commitTransaction();
+
+      const statusText =
+        action === 'approve'
+          ? '✅ Buyurtma tasdiqlandi'
+          : '❌ Buyurtma bekor qilindi';
+
+      const message = ctx.callbackQuery?.message;
+      const chatId = message?.chat?.id;
+      const messageId = message?.message_id;
+      const originalText =
+        message && 'text' in message ? message.text || '' : '';
+
+      if (chatId && messageId) {
+        try {
+          await this.bot.telegram.editMessageText(
+            chatId,
+            messageId,
+            undefined,
+            `${originalText}\n\n${statusText}`,
+            {
+              parse_mode: 'Markdown',
+            },
+          );
+        } catch (err) {
+          await this.bot.telegram.sendMessage(chatId, statusText);
+        }
+      }
+
+      return successRes(order, 200, statusText);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async sendMessageToCreateGroup(groupId: string | null, message: string) {
     try {
       if (!groupId) {
@@ -234,7 +374,7 @@ export class OrderBotService {
           {
             text: '🚀 WebAppni ochish',
             web_app: {
-              url: 'https://latanya-unusable-andera.ngrok-free.dev/bot',
+              url: 'https://unarousing-unendurably-grayson.ngrok-free.dev/bot',
             },
           },
         ],
