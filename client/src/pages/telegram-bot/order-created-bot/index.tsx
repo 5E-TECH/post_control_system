@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Button } from "antd";
 import CustomerInfo from "../../orders/components/customer-info";
 import OrderItems from "../../orders/components/order-items";
@@ -25,12 +25,13 @@ const CreateOrderBot = () => {
     (state: RootState) => state.setCustomerData.productInfo
   );
   const dispatch = useDispatch();
-  const { handleSuccess } = useApiNotification();
+  const { handleSuccess, handleApiError } = useApiNotification();
+  const [succes, setSucces] = useState(false)
 
   const handleShowData = () => {
     const data = {
       name: customerData?.name,
-      phone_number: customerData?.phone_number,
+      phone_number: customerData?.phone_number.trim(),
       district_id: customerData?.district_id,
       extra_number: customerData?.extra_number,
       address: customerData?.address,
@@ -51,7 +52,11 @@ const CreateOrderBot = () => {
         dispatch(setCustomerData(null));
         dispatch(resetOrderItems());
         dispatch(setProductInfo(null));
+        setSucces(true)
       },
+      onError:(err:any) => {
+        handleApiError(err, "buyurtma kiritishda hatolik yuz berdi")
+      }
     });
   };
 
@@ -72,7 +77,7 @@ const CreateOrderBot = () => {
           onClick={handleShowData}
           className="!w-full !h-[45px] !text-[16px] !font-bold !text-white !bg-[#9069fe]"
         >
-          Buyurtmani qo'shish
+          {succes ? "Buyurtmani qo'shildi" : "Buyurtmani qo'shishshshhs"}
         </Button>
       </div>
     </div>

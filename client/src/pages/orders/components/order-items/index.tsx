@@ -40,7 +40,7 @@ const OrderItems = () => {
   );
 
   const data =
-    user.role === "market" || "operator" ? myProductsQuery.data : marketProductsQuery.data;
+    user.role === "market" || user.role === "operator" ? myProductsQuery.data : marketProductsQuery.data;
 
   const productNames = data?.data?.products?.map((product: any) => ({
     value: product.id,
