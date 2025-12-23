@@ -374,7 +374,7 @@ export class OrderBotService {
           {
             text: '🚀 WebAppni ochish',
             web_app: {
-              url: 'https://latanya-unusable-andera.ngrok-free.dev/bot',
+              url: 'https://unarousing-unendurably-grayson.ngrok-free.dev/bot',
             },
           },
         ],
