@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderItemEntity } from 'src/core/entity/order-item.entity';
+import { ProductEntity } from 'src/core/entity/product.entity';
 import { OrderBotUpdate } from './order-bot.update';
 import { TelegrafModule } from 'nestjs-telegraf';
 import config from 'src/config';
@@ -28,7 +31,13 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
         ],
       }),
     }),
-    TypeOrmModule.forFeature([UserEntity, TelegramEntity]),
+    TypeOrmModule.forFeature([
+      UserEntity,
+      TelegramEntity,
+      OrderEntity,
+      OrderItemEntity,
+      ProductEntity,
+    ]),
   ],
   providers: [OrderBotUpdate, OrderBotService, Token, BcryptEncryption],
 })
