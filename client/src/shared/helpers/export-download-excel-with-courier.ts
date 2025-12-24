@@ -164,10 +164,8 @@ export const exportToExcel = async (
 
   saveAs(
     blob,
-    `${fileRegionNames}_${fileCourierNames}-${
-      header?.date
-        ? formattedDate
-        : ""
+    `${fileName || 'hisobot'}_${fileRegionNames}_${fileCourierNames}-${
+      header?.date ? formattedDate : ""
     }.xlsx`
   );
 };
