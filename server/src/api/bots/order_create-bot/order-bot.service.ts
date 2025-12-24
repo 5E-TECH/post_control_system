@@ -43,10 +43,32 @@ export class OrderBotService {
   ) {}
 
   private statusButtonLabel(order: OrderEntity) {
-    const statusText = order.deleted
+    const status = order.deleted
       ? 'deleted'
       : order.status || Order_status.CREATED;
-    return `${statusText}`;
+
+    const iconMap: Record<string, string> = {
+      [Order_status.CREATED]: '🟡',
+      [Order_status.NEW]: '🟢',
+      [Order_status.RECEIVED]: '📦',
+      [Order_status.ON_THE_ROAD]: '🚚',
+      [Order_status.WAITING]: '⏳',
+      [Order_status.SOLD]: '✅',
+      [Order_status.CANCELLED]: '❌',
+      [Order_status.PAID]: '💰',
+      [Order_status.PARTLY_PAID]: '💸',
+      [Order_status.CANCELLED_SENT]: '📮',
+      [Order_status.CLOSED]: '🔒',
+      deleted: '🗑️',
+    };
+
+    const icon = iconMap[status] || 'ℹ️';
+    return `Holat: ${icon} ${status}`;
+  }
+
+  private formatPrice(value: number | string) {
+    const numeric = Number(value) || 0;
+    return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   }
 
   async syncStatusButton(orderId: string) {
@@ -270,7 +292,7 @@ export class OrderBotService {
       `📞 *Telefon:* ${order.customer?.phone_number || '-'}\n` +
       `📍 *Manzil:* ${addressLine}\n\n` +
       `📦 *Buyurtmalar:*\n${itemsText || '-'}\n\n` +
-      `💰 *Narxi:* ${order.total_price} so‘m\n` +
+      `💰 *Narxi:* ${this.formatPrice(order.total_price)} so‘m\n` +
       `🕒 *Yaratilgan vaqti:* ${new Date(
         Number(order.created_at),
       ).toLocaleString('uz-UZ')}\n\n` +

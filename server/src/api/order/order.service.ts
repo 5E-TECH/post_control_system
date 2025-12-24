@@ -87,6 +87,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     super(orderRepo);
   }
 
+  private formatPrice(value: number | string) {
+    const numeric = Number(value) || 0;
+    return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
+
   async allOrders(query: {
     status?: string;
     marketId?: string;
@@ -1459,7 +1464,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
                 `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
             )
             .join('\n')}\n\n` +
-          `💰 *Narxi:* ${order.total_price} so‘m\n` +
+          `💰 *Narxi:* ${this.formatPrice(order.total_price)} so‘m\n` +
           `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
           `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
           `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
