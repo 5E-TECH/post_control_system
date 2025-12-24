@@ -5,8 +5,6 @@ interface RegionMapProps {
 }
 
 const RegionMap:FC<RegionMapProps> = ({regionName}) => {
-    console.log(regionName);
-    
   return (
     <div>
       <h2>RegionMap</h2>

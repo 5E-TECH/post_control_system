@@ -134,14 +134,12 @@ const MailDetail = () => {
             { id, data: post },
             {
               onSuccess: (res) => {
-                console.log("res.data", res.data);
 
                 const courierName = res?.data?.updatedPost?.courier?.name;
                 handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
 
                 try {
                   const mails = res?.data?.newOrders;
-                  console.log("mails", mails);
 
                   const exportData = mails?.map((mail: any, inx: number) => ({
                     N: inx + 1,
@@ -167,7 +165,6 @@ const MailDetail = () => {
 
                   handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
                 } catch (error) {
-                  console.log(error);
 
                   handleApiError(error, "Excel yuklashda xatolik");
                 } finally {
@@ -211,14 +208,12 @@ const MailDetail = () => {
       { id: id as string, data: post },
       {
         onSuccess: (res) => {
-          console.log("tasdiqlash", res);
 
           const courierName = res?.data?.updatedPost?.courier?.name;
           handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
 
           try {
             const mails = res?.data?.newOrders;
-            console.log("mails", mails);
 
             const exportData = mails?.map((mail: any, inx: number) => ({
               N: inx + 1,

@@ -59,8 +59,6 @@ const OrderView = () => {
     user.role === "market"
       ? getMarketsByMyNewOrders(params)
       : getOrderByMarket(id, params);
-  console.log(data);
-  
   useEffect(() => {
     if (data?.data?.total === 0 && searchData == null) {
       navigate(-1);

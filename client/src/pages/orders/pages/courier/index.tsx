@@ -34,8 +34,6 @@ const CourierOrders = () => {
 
   dispatch(setDateRange({ from: form.from, to: form.to }));
 
-  console.log(form);
-
   return (
     <div className="w-full bg-white py-5 dark:bg-[#312d4b]">
       <h1 className="font-medium text-[20px] text-[#2E263DE5] dark:text-[#D4D0E9] px-5">

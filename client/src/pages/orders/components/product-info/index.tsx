@@ -34,8 +34,6 @@ const ProductInfo = () => {
     operator:OperatorName || ""
   };
   
-  console.log("11111111111",market);
-  
   const { t } = useTranslation("createOrder");
   const [formData, setFormData] = useState<IProductInfo>(initialState);
 
@@ -55,10 +53,6 @@ const ProductInfo = () => {
     (state: RootState) => state.setCustomerData.productInfo
   );
 
-  
-
-  console.log(default_tariff);
-  
   
 
  useEffect(() => {

@@ -18,8 +18,6 @@ const safeParse = <T,>(value: string | null): T | null => {
 const regionName = safeParse<string>(localStorage.getItem("regionName"));
 const hideSend = safeParse<boolean>(localStorage.getItem("hideSend"));
 
-console.log(regionName);
-
 const initialState: RegionNameState = {
   regionName,
   hideSend,

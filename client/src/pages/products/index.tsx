@@ -92,9 +92,6 @@ const Products = () => {
 
   const { getMarkets } = useMarket();
 
-  console.log(productData);
-
-
   const { data } = getMarkets(role !== 'market', {
     search: searchPopup,
     limit: 0,

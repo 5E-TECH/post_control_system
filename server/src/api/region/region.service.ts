@@ -21,7 +21,6 @@ export class RegionService implements OnModuleInit {
         const regionList = regions.map((item) => ({ name: item.name }));
         const regionEntities = this.regionRepository.create(regionList);
         await this.regionRepository.save(regionEntities);
-        console.log(`✅ ${regionList.length} ta viloyat yaratildi`);
       }
     } catch (error) {
       console.error('❌ Viloyatlar yaratishda xatolik:', error);

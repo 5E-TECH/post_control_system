@@ -122,7 +122,6 @@ export class UserService {
         password: hashedPassword,
         role: Roles.ADMIN,
       });
-      console.log('payment date: ', payment_day);
       await queryRunner.manager.save(admin);
       const adminSalary = queryRunner.manager.create(UserSalaryEntity, {
         user_id: admin.id,
@@ -1149,7 +1148,6 @@ export class UserService {
     try {
       
       const { data } = initData;
-      console.log(initData);
       const params = new URLSearchParams(data);
       const userStr = params.get('user');
       if (!userStr) {
