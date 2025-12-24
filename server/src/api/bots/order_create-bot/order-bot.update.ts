@@ -174,4 +174,40 @@ export class OrderBotUpdate {
       reply_markup: this.orderBotService.openWebApp(),
     });
   }
+
+  @On('callback_query')
+  async onCallback(@Ctx() ctx: Context) {
+    const data =
+      (ctx.callbackQuery as any)?.data &&
+      String((ctx.callbackQuery as any)?.data);
+
+    if (!data || !data.startsWith('order:')) {
+      return;
+    }
+
+    const [, action, orderId] = data.split(':');
+
+    if (action === 'status') {
+      // Status button is read-only; just close spinner
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    if (!action || !orderId) {
+      await ctx.answerCbQuery('Noto‘g‘ri buyruq');
+      return;
+    }
+
+    const response = await this.orderBotService.processOrderAction(
+      action as 'approve' | 'cancel',
+      orderId,
+      ctx,
+    );
+
+    const isOk =
+      response && `${(response as any).statusCode}`.startsWith('2');
+    await ctx.answerCbQuery(response.message || '✅', {
+      show_alert: !isOk,
+    });
+  }
 }

@@ -55,6 +55,9 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   deleted: boolean;
 
+  @Column({ type: 'jsonb', nullable: true })
+  create_bot_messages: { chatId: number; messageId: number }[];
+
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order)
   items: OrderItemEntity[];

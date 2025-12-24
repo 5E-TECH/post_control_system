@@ -113,6 +113,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('items.product', 'product')
         .orderBy('order.created_at', 'DESC');
 
+      // CREATED holatdagi buyurtmalar default ro'yxatda ko'rsatilmaydi
+      if (!query.status) {
+        qb.andWhere('order.status != :createdStatus', {
+          createdStatus: Order_status.CREATED,
+        });
+      }
+
       if (query.status) {
         qb.andWhere('order.status = :status', { status: query.status });
       }
@@ -231,7 +238,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         operator,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
-        status: Order_status.NEW,
+        status: Order_status.CREATED,
         qr_code_token,
         customer_id,
       });
@@ -261,6 +268,48 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       Object.assign(newOrder, {
         product_quantity,
       });
+
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id: newOrder.id },
+        relations: [
+          'items',
+          'items.product',
+          'customer',
+          'customer.district',
+          'customer.district.region',
+        ],
+      });
+
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      const telegramGroups = await queryRunner.manager.find(TelegramEntity, {
+        where: { market_id: newOrder.user_id, group_type: Group_type.CREATE },
+      });
+
+      if (telegramGroups.length) {
+        const sendResults = await Promise.all(
+          telegramGroups.map((g) =>
+            this.orderBotService.sendOrderForApproval(
+              g.group_id || null,
+              order,
+            ),
+          ),
+        );
+
+        const messageRefs = sendResults
+          .map((res) => res.sentMessage)
+          .filter(Boolean) as { chatId: number; messageId: number }[];
+
+        if (messageRefs.length) {
+          order.create_bot_messages = [
+            ...(order.create_bot_messages || []),
+            ...messageRefs,
+          ];
+          await queryRunner.manager.save(order);
+        }
+      }
 
       await queryRunner.commitTransaction();
       return successRes(newOrder, 201, 'New order created');
@@ -325,7 +374,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         operator: operator ? operator : currentOperator.name,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
-        status: Order_status.NEW,
+        status: Order_status.CREATED,
         qr_code_token,
         comment,
       });
@@ -359,43 +408,46 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id: newOrder.id },
-        relations: ['items', 'items.product'],
+        relations: [
+          'items',
+          'items.product',
+          'customer',
+          'customer.district',
+          'customer.district.region',
+        ],
       });
 
       if (!order) {
         throw new NotFoundException('Order not found');
       }
 
-      const telegramGroup = await queryRunner.manager.find(TelegramEntity, {
+      const telegramGroups = await queryRunner.manager.find(TelegramEntity, {
         where: { market_id: order.user_id, group_type: Group_type.CREATE },
       });
       // created_at string yoki bigint bo'lishi mumkin
 
-      // console.log(telegramGroup);
+      if (telegramGroups.length) {
+        const sendResults = await Promise.all(
+          telegramGroups.map((g) =>
+            this.orderBotService.sendOrderForApproval(
+              g.group_id || null,
+              order,
+            ),
+          ),
+        );
 
-      await Promise.all(
-        telegramGroup.map((g: TelegramEntity) => {
-          return this.orderBotService.sendMessageToCreateGroup(
-            g.group_id || null,
-            `*✅ Yangi buyurtma!*\n\n` +
-              `👤 *Mijoz:* ${customer?.name}\n` +
-              `📞 *Telefon:* ${customer?.phone_number}\n` +
-              `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
-              `📦 *Buyurtmalar:*\n${order.items
-                .map(
-                  (item, i) =>
-                    `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
-                )
-                .join('\n')}\n\n` +
-              `💰 *Narxi:* ${order.total_price} so‘m\n` +
-              `🕒 *Yaratilgan vaqti:* ${new Date(
-                Number(order.created_at),
-              ).toLocaleString('uz-UZ')}\n\n` +
-              `🧑‍💻 *Operator:* ${order.operator || '-'}\n\n` +
-              `📝 *Izoh:* ${order.comment || '-'}\n`,
-          );
-        }),
-      );
+        const messageRefs = sendResults
+          .map((res) => res.sentMessage)
+          .filter(Boolean) as { chatId: number; messageId: number }[];
+
+        if (messageRefs.length) {
+          order.create_bot_messages = [
+            ...(order.create_bot_messages || []),
+            ...messageRefs,
+          ];
+          await queryRunner.manager.save(order);
+        }
+      }
 
       await queryRunner.commitTransaction();
       return successRes(order, 201, 'New order created');
@@ -794,6 +846,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+      await Promise.all(
+        newOrders.map((o) => this.orderBotService.syncStatusButton(o.id)),
+      );
       return successRes({}, 200, 'Orders received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -863,6 +918,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(newPost);
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -904,6 +960,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('items.product', 'product')
         .where('order.user_id = :userId', { userId: user.id })
         .orderBy('order.created_at', 'DESC');
+
+      if (!status) {
+        qb.andWhere('order.status != :createdStatus', {
+          createdStatus: Order_status.CREATED,
+        });
+      }
 
       // 🔍 Search by customer name or order ID
       if (search) {
@@ -1010,6 +1072,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       } else {
         qb.andWhere('o.status NOT IN (:...excluded)', {
           excluded: [
+            Order_status.CREATED,
             Order_status.NEW,
             Order_status.RECEIVED,
             Order_status.ON_THE_ROAD,
@@ -1271,6 +1334,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1403,6 +1467,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({ id: order.id }, 200, 'Order canceled');
     } catch (error) {
       await queryRunner.rollbackTransaction();
