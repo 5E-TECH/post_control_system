@@ -1306,34 +1306,31 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const currentPaid = Number(order.paid_amount || 0);
-      const remainingToPay = Math.max(Number(to_be_paid) - currentPaid, 0);
+      const netToBePaid = Math.max(Number(to_be_paid) || 0, 0); // target summa o'zgarmaydi
+      const currentPaid = Math.min(
+        Math.max(Number(order.paid_amount) || 0, 0),
+        netToBePaid,
+      );
+      const remainingBeforeDebt = netToBePaid - currentPaid;
       const debtBeforeSale =
         marketBalanceBefore < 0 ? Math.abs(marketBalanceBefore) : 0;
 
-      if (debtBeforeSale > 0) {
-        const usableForDebt = Math.min(remainingToPay, debtBeforeSale);
-        const leftAfterDebt = remainingToPay - usableForDebt;
+      const autoPay = Math.min(remainingBeforeDebt, debtBeforeSale);
+      const paidAfter = Math.min(netToBePaid, currentPaid + autoPay);
+      const remainingAfter = netToBePaid - paidAfter;
 
-        Object.assign(order, {
-          status:
-            leftAfterDebt === 0
-              ? Order_status.PAID
-              : Order_status.PARTLY_PAID,
-          to_be_paid: leftAfterDebt,
-          paid_amount: currentPaid + usableForDebt,
-          comment: finalComment,
-          sold_at: Date.now(),
-        });
-      } else {
-        // Qarzsiz holatda: to'liq sotildi
-        Object.assign(order, {
-          status: Order_status.SOLD,
-          to_be_paid,
-          comment: finalComment,
-          sold_at: Date.now(),
-        });
-      }
+      Object.assign(order, {
+        status:
+          remainingAfter === 0 && paidAfter > 0
+            ? Order_status.PAID
+            : paidAfter > 0
+              ? Order_status.PARTLY_PAID
+              : Order_status.SOLD,
+        to_be_paid: netToBePaid,
+        paid_amount: paidAfter,
+        comment: finalComment,
+        sold_at: Date.now(),
+      });
 
       await queryRunner.manager.save(order);
 
@@ -1733,9 +1730,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // 8️⃣ Order update
+      const netToBePaid = Math.max(Number(to_be_paid) || 0, 0); // target summa o'zgarmaydi
+      const currentPaid = Math.min(
+        Math.max(Number(order.paid_amount) || 0, 0),
+        netToBePaid,
+      );
+      const remainingBeforeDebt = netToBePaid - currentPaid;
+      const debtBeforeSale =
+        marketBalanceBefore < 0 ? Math.abs(marketBalanceBefore) : 0;
+
+      const autoPay = Math.min(remainingBeforeDebt, debtBeforeSale);
+      const paidAfter = Math.min(netToBePaid, currentPaid + autoPay);
+      const remainingAfter = netToBePaid - paidAfter;
+
       Object.assign(order, {
-        status: Order_status.SOLD,
-        to_be_paid,
+        status:
+          remainingAfter === 0 && paidAfter > 0
+            ? Order_status.PAID
+            : paidAfter > 0
+              ? Order_status.PARTLY_PAID
+              : Order_status.SOLD,
+        to_be_paid: netToBePaid,
+        paid_amount: paidAfter,
         total_price: price,
         comment: finalComment,
         product_quantity: totalNewQty,
