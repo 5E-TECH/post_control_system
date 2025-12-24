@@ -4,9 +4,7 @@ interface RegionMapProps {
   regionName: string | null; // masalan "Namangan"
 }
 
-const RegionMap:FC<RegionMapProps> = ({regionName}) => {
-    console.log(regionName);
-    
+const RegionMap:FC<RegionMapProps> = ({ regionName: _regionName }) => {
   return (
     <div>
       <h2>RegionMap</h2>

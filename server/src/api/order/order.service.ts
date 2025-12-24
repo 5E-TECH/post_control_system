@@ -1194,6 +1194,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!courierCashbox)
         throw new NotFoundException('Courier cashbox not found');
 
+      const marketBalanceBefore = Number(marketCashbox.balance);
+
       const marketTarif =
         order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
@@ -1304,13 +1306,35 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // === Update order ===
-      Object.assign(order, {
-        status: Order_status.SOLD,
-        to_be_paid,
-        comment: finalComment,
-        sold_at: Date.now(),
-      });
+      const currentPaid = Number(order.paid_amount || 0);
+      const remainingToPay = Math.max(Number(to_be_paid) - currentPaid, 0);
+      const debtBeforeSale =
+        marketBalanceBefore < 0 ? Math.abs(marketBalanceBefore) : 0;
+
+      if (debtBeforeSale > 0) {
+        const usableForDebt = Math.min(remainingToPay, debtBeforeSale);
+        const leftAfterDebt = remainingToPay - usableForDebt;
+
+        Object.assign(order, {
+          status:
+            leftAfterDebt === 0
+              ? Order_status.PAID
+              : Order_status.PARTLY_PAID,
+          to_be_paid: leftAfterDebt,
+          paid_amount: currentPaid + usableForDebt,
+          comment: finalComment,
+          sold_at: Date.now(),
+        });
+      } else {
+        // Qarzsiz holatda: to'liq sotildi
+        Object.assign(order, {
+          status: Order_status.SOLD,
+          to_be_paid,
+          comment: finalComment,
+          sold_at: Date.now(),
+        });
+      }
+
       await queryRunner.manager.save(order);
 
       // === Extra cost (agar bo‘lsa) ===
@@ -1382,9 +1406,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // console.log(cancelOrderDto.extraCost, 'BBBBBBBBBBBBBB');
 
       if (cancelOrderDto.extraCost) {
-        const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
-          where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
-        });
+      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
+      });
         if (!marketCashbox) {
           throw new NotFoundException('Market cashbox not found');
         }
@@ -1575,6 +1599,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Courier cashbox not found');
 
       // 4️⃣ Tariffs
+      const marketBalanceBefore = Number(marketCashbox.balance);
+
       const marketTarif =
         order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
@@ -1848,7 +1874,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
-      console.log(error);
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {

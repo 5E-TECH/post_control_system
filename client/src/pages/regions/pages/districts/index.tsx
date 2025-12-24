@@ -125,7 +125,6 @@ const Districts = () => {
         },
       }
     );
-    console.log(editDistrictName);
     setEditDistrictId(null);
   };
 

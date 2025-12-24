@@ -20,8 +20,6 @@ export class PrinterService {
   ) {}
 
   onModuleInit() {
-    console.log('🖨️ PrinterService initialized');
-
     // ✅ MQTT clientni faqat 1 marta yaratamiz (har orderda emas)
     this.client = mqtt.connect('mqtt://13.234.20.96:1883', {
       username: 'shodiyor',
@@ -30,7 +28,6 @@ export class PrinterService {
       connectTimeout: 5000,
     });
     this.client.on('connect', () => {
-      console.log('📡 MQTT brokerga ulandi');
     });
     this.client.on('error', (err) => {
       console.error('❌ MQTT xato:', err.message);
@@ -118,7 +115,6 @@ export class PrinterService {
       }
 
       this.runWorkSafely();
-      console.log(`📦 Added ${orders.length} orders to print queue`);
       return { success: true, queued: orders.length };
     } catch (error) {
       return catchError(error);
@@ -151,7 +147,6 @@ export class PrinterService {
     }
 
     this.isPrinting = false;
-    console.log('🕓 All queued prints completed');
   }
 
   // ✅ To‘g‘rilangan funksiya (bitta global MQTT client orqali publish)
@@ -229,12 +224,9 @@ QRCODE 560,50,L,8,A,0,"${qrCode}"
 PRINT 1
 `.trim();
 
-    console.log(`🖨️ Printing order: ${orderId}`);
-
     try {
       if (this.client.connected) {
         this.client.publish('beepost/printer/print', tspl); // ✅ asosiy o‘zgarish
-        console.log(`📤 MQTT orqali yuborildi (${orderId})`);
       } else {
         console.error('⚠️ MQTT ulanmagan, yuborilmadi');
       }

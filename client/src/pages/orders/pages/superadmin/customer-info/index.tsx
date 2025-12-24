@@ -30,8 +30,6 @@ const CustomerInfoOrder = () => {
     (state: RootState) => state.authSlice.marketData
   ); 
 
-  console.log(user.role);
-  
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const market_id = market?.id;
   const { createUser } = useUser("customer");

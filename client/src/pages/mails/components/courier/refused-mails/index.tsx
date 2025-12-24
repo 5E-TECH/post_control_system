@@ -33,7 +33,6 @@ const CourierRefusedMails = () => {
   const posts = Array.isArray(data?.data) ? data?.data : [];
 
   const handleNavigate = (post: any) => {
-    console.log("11111111111111111111", post?.region?.name);
     navigate(`/courier-mails/${post?.id}`);
 
     dispatch(setRegionName(post?.region?.name));

@@ -37,7 +37,6 @@ const Payments = () => {
   const role = user.role;
   // const id = user.id;
   const { pathname } = useLocation();
-  console.log(role);
 
   useEffect(() => {
     if (role === 'courier' || role === 'market') {

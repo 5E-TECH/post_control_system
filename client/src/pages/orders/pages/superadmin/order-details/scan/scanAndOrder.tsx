@@ -106,7 +106,6 @@ export default function ScanAndOrder() {
 
         const data = await res.json();
         setOrder(data);
-        console.log(data);
 
       } catch (err: any) {
         setError(err.message || "Xatolik yuz berdi");

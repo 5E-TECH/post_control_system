@@ -151,6 +151,19 @@ export class OrderBotService {
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      // token ishlatilgan hisoblanadi
+      try {
+        const market = await this.userRepo.findOne({
+          where: { market_tg_token: text },
+        });
+        if (market) {
+          const telegram_token = 'group_token-' + generateCustomToken();
+          market.market_tg_token = telegram_token;
+          await this.userRepo.save(market);
+        }
+      } catch (_) {
+        // ignore
+      }
       const message =
         error?.response?.message ||
         error?.message ||
@@ -177,6 +190,7 @@ export class OrderBotService {
       const telegram_token = 'group_token-' + generateCustomToken();
       market.market_tg_token = telegram_token;
       await queryRunner.manager.save(market);
+      await queryRunner.commitTransaction();
 
       return successRes(
         market,
@@ -185,6 +199,19 @@ export class OrderBotService {
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      // token ishlatilgan hisoblanadi
+      try {
+        const market = await this.userRepo.findOne({
+          where: { market_tg_token: text },
+        });
+        if (market) {
+          const telegram_token = 'group_token-' + generateCustomToken();
+          market.market_tg_token = telegram_token;
+          await this.userRepo.save(market);
+        }
+      } catch (_) {
+        // ignore
+      }
       return catchError(error);
     } finally {
       await queryRunner.release();

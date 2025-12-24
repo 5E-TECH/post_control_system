@@ -26,7 +26,6 @@ const OrderItems = () => {
   const [formDataList, setFormDataList] = useState<IOrderItems[]>([
     createInitialState(),
   ]);
-  console.log(user.role);
 
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const marketId = market?.id;
