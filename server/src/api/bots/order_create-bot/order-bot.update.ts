@@ -188,7 +188,8 @@ export class OrderBotUpdate {
     const [, action, orderId] = data.split(':');
 
     if (action === 'status') {
-      await ctx.answerCbQuery('Holat ko‘rsatildi');
+      // Status button is read-only; just close spinner
+      await ctx.answerCbQuery();
       return;
     }
 
