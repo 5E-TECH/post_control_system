@@ -1845,6 +1845,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
       console.log(error);
@@ -2154,6 +2155,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(order);
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order WAITING holatiga qaytarildi');
     } catch (err) {
       await queryRunner.rollbackTransaction();
