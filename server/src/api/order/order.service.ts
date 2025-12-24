@@ -846,6 +846,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+      await Promise.all(
+        newOrders.map((o) => this.orderBotService.syncStatusButton(o.id)),
+      );
       return successRes({}, 200, 'Orders received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -915,6 +918,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(newPost);
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1330,6 +1334,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1462,6 +1467,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({ id: order.id }, 200, 'Order canceled');
     } catch (error) {
       await queryRunner.rollbackTransaction();

@@ -21,6 +21,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderRepository } from 'src/core/repository/order.repository';
 
 @Injectable()
 export class OrderBotService {
@@ -30,6 +31,9 @@ export class OrderBotService {
 
     @InjectRepository(TelegramEntity)
     private readonly telegramRepo: TelegramRepository,
+
+    @InjectRepository(OrderEntity)
+    private readonly orderRepo: OrderRepository,
 
     @InjectBot(config.ORDER_BOT_NAME) private readonly bot: Telegraf,
 
@@ -42,7 +46,43 @@ export class OrderBotService {
     const statusText = order.deleted
       ? 'deleted'
       : order.status || Order_status.CREATED;
-    return `Holat: ${statusText}`;
+    return `${statusText}`;
+  }
+
+  async syncStatusButton(orderId: string) {
+    try {
+      const order = await this.orderRepo.findOne({
+        where: { id: orderId },
+      });
+
+      if (!order || !order.create_bot_messages?.length) return;
+
+      const inline_keyboard = [
+        [
+          {
+            text: this.statusButtonLabel(order),
+            callback_data: `order:status:${order.id}`,
+          },
+        ],
+      ];
+
+      await Promise.all(
+        order.create_bot_messages.map(async ({ chatId, messageId }) => {
+          try {
+            await this.bot.telegram.editMessageReplyMarkup(
+              chatId,
+              messageId,
+              undefined,
+              { inline_keyboard },
+            );
+          } catch (error) {
+            // fallback: ignore
+          }
+        }),
+      );
+    } catch (error) {
+      // silent fail
+    }
   }
 
   async addToGroup(text: string, ctx: Context) {
