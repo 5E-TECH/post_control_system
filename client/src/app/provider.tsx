@@ -16,7 +16,7 @@ const client = new QueryClient({
 
 const AppProvider = ({ children }: { children: ReactNode }) => {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Provider store={store}>
         <QueryClientProvider client={client}>
           <NotificationProvider>
