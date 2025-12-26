@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { Navigate, Outlet } from "react-router-dom";
 import type { RootState } from "../../app/store";
 import { api } from "../../shared/api";
+import { buildAdminPath } from "../../shared/const";
 import {
   setTarif,
   setToken,
@@ -66,7 +67,7 @@ const Auth = () => {
       </div>
     );
 
-  return valid ? <Outlet /> : <Navigate replace to="/login" />;
+  return valid ? <Outlet /> : <Navigate replace to={buildAdminPath("login")} />;
 };
 
 export default memo(Auth);

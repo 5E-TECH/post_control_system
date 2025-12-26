@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import EmptyPage from "../../../../shared/components/empty-page";
 import Skeleton from "../../components/search/skeleton";
+import { buildAdminPath } from "../../../../shared/const";
 
 const OrderView = () => {
   useGlobalScanner();
@@ -122,14 +123,14 @@ const OrderView = () => {
     };
 
     createPost.mutate(newOrder, {
-      onSuccess: () => {
-        if (selectedIds.length !== data?.data?.data.length) {
-          refetch();
-        } else {
-          setSelectedIds([]);
-          navigate("/order/markets/new-orders");
-        }
-      },
+          onSuccess: () => {
+            if (selectedIds.length !== data?.data?.data.length) {
+              refetch();
+            } else {
+              setSelectedIds([]);
+              navigate(buildAdminPath("order/markets/new-orders"));
+            }
+          },
       onError: (err: any) =>
         handleApiError(err, "Pochtani yaratishda xatolik yuz berdi"),
     });

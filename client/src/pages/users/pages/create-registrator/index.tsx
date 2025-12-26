@@ -5,6 +5,7 @@ import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import { buildAdminPath } from "../../../../shared/const";
 
 type FieldType = {
   first_name: string;
@@ -31,7 +32,7 @@ const CreateRegistrator = () => {
     };
     createUser.mutate(newRegistrator, {
       onSuccess: () => {
-        navigate("/all-users");
+        navigate(buildAdminPath("all-users"));
       },
       onError: (err: any) =>
         handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),

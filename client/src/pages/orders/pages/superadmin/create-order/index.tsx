@@ -15,6 +15,7 @@ import {
 } from "../../../../../shared/lib/features/customer_and_market-id";
 import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { buildAdminPath } from "../../../../../shared/const";
 
 const CreateOrder = () => {
   const { t } = useTranslation("createOrder");
@@ -79,7 +80,7 @@ const CreateOrder = () => {
         dispatch(setCustomerData(null));
         dispatch(resetOrderItems());
         dispatch(setProductInfo(null));
-        navigate("/orders/customer-info");
+        navigate(buildAdminPath("orders/customer-info"));
       },
       onError: (err: any) =>
         handleApiError(err, "Buyurtma yaratishda xatolik yuz berdi"),
