@@ -685,19 +685,22 @@ export default function ScanAndOrder() {
                     </div>
                   )}
 
-                  {!alertBtnYesNo && orderStatus === "sold" && (
-                    <div className="pt-4 flex gap-10">
-                      <Button
-                        className="w-full h-[40px]!"
-                        onClick={() => setAlertBtnYesNo((p) => !p)}
-                      >
-                        <AlertCircle />
-                      </Button>
-                    </div>
-                  )}
+                  {!alertBtnYesNo &&
+                    role === "superadmin" &&
+                    ["paid", "partly_paid"].includes(orderStatus) && (
+                      <div className="pt-4 flex gap-10">
+                        <Button
+                          className="w-full h-[40px]!"
+                          onClick={() => setAlertBtnYesNo((p) => !p)}
+                        >
+                          <AlertCircle />
+                        </Button>
+                      </div>
+                    )}
 
                   {!alertBtnYesNo &&
                     !alertBtnYesNoAdd &&
+                    role === "superadmin" &&
                     orderStatus === "cancelled" && (
                       <div className="pt-4 flex gap-10">
                         <Button
@@ -712,7 +715,6 @@ export default function ScanAndOrder() {
                           onClick={() => {
                             setAlertBtnYesNoAdd((p) => !p), setSelect(id);
                           }}
-                        // onClick={() => joinPostRefusalProducts(id)}
                         >
                           Pochtaga qo'shish
                         </Button>
