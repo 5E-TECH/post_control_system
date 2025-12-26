@@ -369,7 +369,10 @@ export class OrderBotService {
       return {
         success: true,
         message: 'Message sent successfully',
-        sentMessage: { chatId: Number(sent.chat.id), messageId: sent.message_id },
+        sentMessage: {
+          chatId: Number(sent.chat.id),
+          messageId: sent.message_id,
+        },
       };
     } catch (error) {
       const message =
@@ -521,7 +524,7 @@ export class OrderBotService {
           {
             text: '🚀 WebAppni ochish',
             web_app: {
-              url: 'https://unarousing-unendurably-grayson.ngrok-free.dev/bot',
+              url: 'https://beepost.uz/admin/bot',
             },
           },
         ],
