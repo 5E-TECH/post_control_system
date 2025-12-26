@@ -1,1 +1,10 @@
 printer-server/
+# uploads (runtime files)
+uploads/
+server/home/ubuntu/uploads/
+
+# images
+*.png
+*.jpg
+*.jpeg
+
