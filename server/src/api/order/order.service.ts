@@ -1875,8 +1875,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           `Rollback mumkin emas (status: ${order.status})`,
         );
       }
+      const isSuperAdmin = user.role === Roles.SUPERADMIN;
       if (
-        user.role === Roles.SUPERADMIN &&
+        isSuperAdmin &&
         ![
           Order_status.SOLD,
           Order_status.CANCELLED,
@@ -1937,7 +1938,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         },
       );
 
-      // === ROLLBACK FOR SOLD ===
+      // === ROLLBACK FOR SOLD/PAID (courier or superadmin) ===
       if (
         order.status === Order_status.SOLD ||
         order.status === Order_status.PAID
@@ -2019,13 +2020,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
       }
 
-      // === ROLLBACK FOR PARTLY PAID ===
+      // === ROLLBACK FOR PARTLY PAID (superadmin) ===
 
-      if (order.status === Order_status.PARTLY_PAID) {
-        const marketDiff = Number(order.total_price) - Number(marketTarif);
-        const courierDiff = Number(order.total_price) - Number(courierTarif);
+      if (order.status === Order_status.PARTLY_PAID && isSuperAdmin) {
+        const marketDiff = Number(order.paid_amount || 0);
+        const courierDiff = Math.max(
+          Number(order.total_price) - Number(courierTarif),
+          0,
+        );
 
-        // Market kassasidan ayrish
+        // Market kassasidan aynan paid_amount miqdorini ayiramiz
         marketCashbox.balance -= marketDiff;
         await queryRunner.manager.save(marketCashbox);
         await queryRunner.manager.save(
@@ -2041,7 +2045,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           }),
         );
 
-        // Courier kassasidan ayrish
+        // Courier kassasidan sotishda qo'shilgan ulushni ayiramiz
         courierCashbox.balance -= courierDiff;
         await queryRunner.manager.save(courierCashbox);
         await queryRunner.manager.save(
@@ -2065,7 +2069,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         if (extraCostHistory && diff <= 5000) {
           const extraAmount = Number(extraCostHistory.amount);
 
-          // Market kassasiga qaytarish
           marketCashbox.balance += extraAmount;
           await queryRunner.manager.save(marketCashbox);
           await queryRunner.manager.save(
@@ -2081,7 +2084,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             }),
           );
 
-          // Courier kassasiga qaytarish
           courierCashbox.balance += extraAmount;
           await queryRunner.manager.save(courierCashbox);
           await queryRunner.manager.save(
@@ -2146,11 +2148,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // === Update order status ===
-      Object.assign(order, {
-        status: Order_status.WAITING,
-        sold_at: null,
-        to_be_paid: 0,
-      });
+      if (isSuperAdmin && [Order_status.PAID, Order_status.PARTLY_PAID].includes(order.status)) {
+        Object.assign(order, {
+          status: Order_status.WAITING,
+          paid_amount: 0,
+          sold_at: null,
+        });
+      } else {
+        Object.assign(order, {
+          status: Order_status.WAITING,
+          sold_at: null,
+          to_be_paid: 0,
+        });
+      }
       await queryRunner.manager.save(order);
 
       await queryRunner.commitTransaction();
