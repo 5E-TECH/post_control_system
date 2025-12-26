@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Scanner } from "@yudiel/react-qr-scanner";
+import { buildAdminPath } from "../../../../../../shared/const";
 
 export default function ScanPage() {
   const navigate = useNavigate();
   const [_, setData] = useState("");
   const [error, setError] = useState("");
+  const beepAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    beepAudioRef.current = new Audio(`${import.meta.env.BASE_URL}sound/beep.mp3`);
+    beepAudioRef.current.preload = "auto";
+  }, []);
 
   const handleScan = (result: any) => {
     if (result) {
@@ -24,14 +31,15 @@ export default function ScanPage() {
         setError("");
 
         // 🔊 beep ovozi
-        const audio = new Audio("/sound/beep.mp3");
-        audio.play().catch((err) => console.error("Ovoz chiqmadi:", err));
+        beepAudioRef.current
+          ?.play()
+          .catch((err) => console.error("Ovoz chiqmadi:", err));
 
         // tokenni ajratib olish
         const token = scannedValue.split("/").at(-1);
 
         // 🔀 sahifaga yo‘naltirish
-        navigate(`/scan/${token}`);
+        navigate(buildAdminPath(`scan/${token}`));
       }
     }
   };

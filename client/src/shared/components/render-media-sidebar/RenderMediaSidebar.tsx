@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   UserRound,
 } from "lucide-react";
+import { buildAdminPath } from "../../const";
 
 const Navbar = ({ role }: { role: string }) => {
   const renderNav = () => {
@@ -19,7 +20,7 @@ const Navbar = ({ role }: { role: string }) => {
         return (
           <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
             <NavLink
-              to={"/"}
+              to={buildAdminPath()}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -33,7 +34,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/orders"}
+              to={buildAdminPath("orders")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -47,7 +48,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/all-users"}
+              to={buildAdminPath("all-users")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -61,7 +62,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/payments"}
+              to={buildAdminPath("payments")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -75,7 +76,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/m-balance"}
+              to={buildAdminPath("m-balance")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -89,7 +90,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/logs"}
+              to={buildAdminPath("logs")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -107,7 +108,7 @@ const Navbar = ({ role }: { role: string }) => {
         return (
           <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
             <NavLink
-              to={"/"}
+              to={buildAdminPath()}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -121,7 +122,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/orders"}
+              to={buildAdminPath("orders")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -135,7 +136,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/all-users"}
+              to={buildAdminPath("all-users")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -149,7 +150,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/payments"}
+              to={buildAdminPath("payments")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -163,7 +164,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/m-balance"}
+              to={buildAdminPath("m-balance")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -181,7 +182,7 @@ const Navbar = ({ role }: { role: string }) => {
         return (
           <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
             <NavLink
-              to={"/"}
+              to={buildAdminPath()}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -195,7 +196,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/orders"}
+              to={buildAdminPath("orders")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -209,7 +210,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/order/markets/new-orders"}
+              to={buildAdminPath("order/markets/new-orders")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -223,7 +224,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/mails"}
+              to={buildAdminPath("mails")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -237,7 +238,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/products"}
+              to={buildAdminPath("products")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -255,7 +256,7 @@ const Navbar = ({ role }: { role: string }) => {
         return (
           <div className="flex justify-evenly px-3 fixed bottom-1.5 w-full min-[650px]:hidden ">
             <NavLink
-              to={"/"}
+              to={buildAdminPath()}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -269,7 +270,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/courier-orders/orders"}
+              to={buildAdminPath("courier-orders/orders")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -290,13 +291,13 @@ const Navbar = ({ role }: { role: string }) => {
             <div></div>
             <div></div>
             <NavLink
-              to={"/scan"}
+              to={buildAdminPath("scan")}
               className={`flex items-center justify-center w-17 h-17 rounded-[50%] transition-all bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] absolute bottom-2`}
             >
               <QrCode className="w-5 h-5" />
             </NavLink>
             <NavLink
-              to={"/courier-mails"}
+              to={buildAdminPath("courier-mails")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -310,7 +311,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/cash-box"}
+              to={buildAdminPath("cash-box")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -328,7 +329,7 @@ const Navbar = ({ role }: { role: string }) => {
         return (
           <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
             <NavLink
-              to={"/"}
+              to={buildAdminPath()}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -342,7 +343,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/orders"}
+              to={buildAdminPath("orders")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -356,7 +357,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             {/* <NavLink
-              to={"/clients"}
+              to={buildAdminPath("clients")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -370,7 +371,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink> */}
 
             <NavLink
-              to={"/order/markets/new-orders"}
+              to={buildAdminPath("order/markets/new-orders")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -384,7 +385,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/products"}
+              to={buildAdminPath("products")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${
@@ -398,7 +399,7 @@ const Navbar = ({ role }: { role: string }) => {
             </NavLink>
 
             <NavLink
-              to={"/cash-box"}
+              to={buildAdminPath("cash-box")}
               className={({ isActive }) =>
                 `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
        ${

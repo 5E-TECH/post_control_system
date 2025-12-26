@@ -18,7 +18,7 @@ import { Select, Space } from "antd";
 import { memo, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
-
+import { buildAdminPath } from "../../shared/const";
 
 const Header = () => {
   const { t, i18n } = useTranslation(["header"]);
@@ -48,7 +48,6 @@ const Header = () => {
     i18n.changeLanguage(value);
   };
 
-
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -62,7 +61,7 @@ const Header = () => {
     <div className="w-full h-16 pl-8 pr-3 flex justify-between items-center sticky top-0 left-0 z-50 bg-[var(--color-bg-py)] dark:bg-[var(--color-dark-bg-py)]">
       {/* Logo */}
       <div className="h-16 flex items-center gap-30">
-        <NavLink to={"/"} className="flex items-center gap-3">
+        <NavLink to={buildAdminPath()} className="flex items-center gap-3">
           <div>
             <img src={logo} alt="logo" className="h-8" />
           </div>
@@ -81,31 +80,27 @@ const Header = () => {
           // </button>
 
           <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="p-2 rounded-full border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-        >
-          <ChevronLeft size={20} />
-        </button>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="p-2 rounded-full border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+              <ChevronLeft size={20} />
+            </button>
 
-        <button
-          type="button"
-          onClick={() => navigate(1)}
-          className="p-2 rounded-full border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-          
+            <button
+              type="button"
+              onClick={() => navigate(1)}
+              className="p-2 rounded-full border border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+              <ChevronRight size={20} />
+            </button>
+          </div>
         )}
       </div>
 
       {/* Search */}
       <label
         htmlFor="search"
-        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1400px]:hidden"
-      >
+        className="flex items-center gap-3 w-full max-w-xl mx-12 max-[1400px]:hidden">
         <Search className="text-gray-500" />
         <input
           className="w-full bg-white dark:bg-gray-800 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
@@ -118,9 +113,8 @@ const Header = () => {
       {/* Actions */}
       <div className="flex gap-6 items-center">
         <div
-          onClick={() => navigate("scan")}
-          className="cursor-pointer max-[650px]:hidden"
-        >
+          onClick={() => navigate(buildAdminPath("scan"))}
+          className="cursor-pointer max-[650px]:hidden">
           <QrCode className="h-[25px] w-[25px]" />
         </div>
         <div className="max-[300px]:hidden">
@@ -145,12 +139,11 @@ const Header = () => {
           <div className="flex items-center">
             <button
               type="button"
-              onClick={() => navigate("/profile")}
+              onClick={() => navigate(buildAdminPath("profile"))}
               className="p-2 cursor-pointer rounded-full border border-gray-400 dark:border-gray-600 
                bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
                hover:bg-gray-200 dark:hover:bg-gray-700 
-                shadow-sm hover:shadow-md transition-all duration-200"
-            >
+                shadow-sm hover:shadow-md transition-all duration-200">
               <User size={20} />
             </button>
           </div>
@@ -158,8 +151,7 @@ const Header = () => {
           <div className="flex justify-center items-center">
             <button
               onClick={() => signOut()}
-              className="flex items-center cursor-pointer justify-center rounded-full border border-red-500 w-10 h-10 text-red-500 transition hover:bg-red-500 hover:text-white"
-            >
+              className="flex items-center cursor-pointer justify-center rounded-full border border-red-500 w-10 h-10 text-red-500 transition hover:bg-red-500 hover:text-white">
               <LogOut className="w-5 h-5" />
             </button>
           </div>
@@ -174,26 +166,23 @@ const Header = () => {
           <>
             <div
               className="fixed top-0 left-0 w-full h-full bg-black/30 z-40 transition-all"
-              onClick={() => setBurger(false)}
-            ></div>
+              onClick={() => setBurger(false)}></div>
 
             <div className="fixed top-0 right-0 w-[300px] h-screen bg-white transition-all dark:bg-[#28243D] min-[650px]:hidden z-50 p-6 shadow-lg">
               <button
                 className="mb-4 text-right w-full text-gray-800 dark:text-gray-200"
-                onClick={() => setBurger(false)}
-              >
+                onClick={() => setBurger(false)}>
                 <X className="absolute top-4 right-4 w-[20px] h-[20px] dark:text-[var(--color-py)] dark:transition-all transition-all" />
               </button>
               <div className="flex flex-col h-[93vh] justify-between ">
                 <div className="flex flex-col gap-4">
                   <button
                     type="button"
-                    onClick={() => navigate("/profile")}
+                    onClick={() => navigate(buildAdminPath("profile"))}
                     className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-400 dark:border-gray-600
        bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
        hover:bg-gray-200 dark:hover:bg-gray-700 
-        shadow-sm hover:shadow-md transition-all duration-200"
-                  >
+        shadow-sm hover:shadow-md transition-all duration-200">
                     <User className="w-5 h-5" />
                     <span className="text-sm font-medium">Profile</span>
                   </button>
@@ -202,8 +191,7 @@ const Header = () => {
                     className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-400 dark:border-gray-600
        bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
        hover:bg-gray-200 dark:hover:bg-gray-700 
-        shadow-sm hover:shadow-md transition-all duration-200"
-                  >
+        shadow-sm hover:shadow-md transition-all duration-200">
                     {dark ? (
                       <Sun className="w-5 h-5" />
                     ) : (
@@ -214,13 +202,12 @@ const Header = () => {
                     </span>
                   </button>
                   <button
-                    onClick={() => navigate("/scan")}
+                    onClick={() => navigate(buildAdminPath("scan"))}
                     className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-400 dark:border-gray-600
      bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
      hover:bg-gray-200 dark:hover:bg-gray-700 
      shadow-sm hover:shadow-md transition-all duration-200
-     "
-                  >
+     ">
                     <QrCode className="w-5 h-5" />
                     <span className="text-sm font-medium">Scan QR</span>
                   </button>
@@ -228,8 +215,7 @@ const Header = () => {
                     onClick={() => signOut()}
                     className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-red-500 
        text-red-500 hover:bg-red-500 hover:text-white 
-        shadow-sm hover:shadow-md transition-all duration-200"
-                  >
+        shadow-sm hover:shadow-md transition-all duration-200">
                     <LogOut className="w-5 h-5" />
                     <span className="text-sm font-medium">Logout</span>
                   </button>
@@ -241,31 +227,28 @@ const Header = () => {
                       href="https://www.instagram.com/ye77i.tech?igsh=eHpwaDVhb2R5dWtq"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-pink-500"
-                    >
+                      className="hover:text-pink-500">
                       <FaInstagram size={20} />
                     </a>
                     <a
                       href="https://t.me/yetti_tech"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-sky-500"
-                    >
+                      className="hover:text-sky-500">
                       <FaTelegram size={20} />
                     </a>
                     <a
                       href="https://linkedin.com/in/faxriddin_maripov"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-blue-600"
-                    >
+                      className="hover:text-blue-600">
                       <FaLinkedin size={20} />
                     </a>
                   </div>
                   <div className="">
                     <span className="text-[15px]">
                       © 2025, Made with ❤️ by{" "}
-                      <span className="font-semibold">Ye77i grup</span>
+                      <span className="font-semibold">YE77I Tech</span>
                     </span>
                   </div>
                 </div>

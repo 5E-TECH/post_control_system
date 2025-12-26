@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { buildAdminPath } from '../const';
 
 export default function NotFound() {
   return (
@@ -38,7 +39,7 @@ export default function NotFound() {
         transition={{ delay: 0.9 }}
       >
         <Link
-          to="/"
+          to={buildAdminPath()}
           className="relative inline-block px-8 py-3 font-medium group"
         >
           <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-[#8C57FF] to-purple-600 rounded-xl blur-md opacity-70 group-hover:opacity-100 transition duration-300"></span>

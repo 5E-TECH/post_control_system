@@ -14,6 +14,7 @@ import {
 } from "../../shared/lib/features/user-filters";
 import type { RootState } from "../../app/store";
 import { Eraser } from "lucide-react";
+import { buildAdminPath } from "../../shared/const";
 
 const Users = () => {
   const { t } = useTranslation("users");
@@ -21,7 +22,9 @@ const Users = () => {
   const dispatch = useDispatch();
   const form = useSelector((state: RootState) => state.setUserFilter);
 
-  const isChecked = pathname.startsWith("/all-users/create-user");
+  const isChecked = pathname.startsWith(
+    buildAdminPath("all-users/create-user")
+  );
 
   if (isChecked) return <Outlet />;
 

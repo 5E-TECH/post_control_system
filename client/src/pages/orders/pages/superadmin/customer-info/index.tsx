@@ -10,12 +10,13 @@ import CustomerDetails from "../../../components/customer-details";
 // import { setCustomerData } from "../../../../../shared/lib/features/customer_and_market-id";
 import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { buildAdminPath } from "../../../../../shared/const";
 
 const CustomerInfoOrder = () => {
   const { t } = useTranslation("createOrder");
   const { pathname } = useLocation();
 
-  if (pathname.startsWith("/orders/confirm")) {
+  if (pathname.startsWith(buildAdminPath("orders/confirm"))) {
     return <Outlet />;
   }
 
@@ -61,7 +62,7 @@ const CustomerInfoOrder = () => {
     createUser.mutate(customer, {
       onSuccess: (res) => {
         localStorage.setItem("customer", JSON.stringify(res?.data?.data));
-        navigate("/orders/confirm");
+        navigate(buildAdminPath("orders/confirm"));
       },
       onError: (err: any) =>
         handleApiError(

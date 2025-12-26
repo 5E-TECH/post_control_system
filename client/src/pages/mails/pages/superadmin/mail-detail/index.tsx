@@ -19,6 +19,7 @@ import { usePostScanner } from "../../../../../shared/components/post-scanner";
 import { exportToExcel } from "../../../../../shared/helpers/export-download-excel-with-courier";
 import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
+import { buildAdminPath } from "../../../../../shared/const";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -171,7 +172,7 @@ const MailDetail = () => {
                   dispatch(resetDownload());
                 }
 
-                navigate("/mails");
+                navigate(buildAdminPath("mails"));
               },
               onError: (err: any) =>
                 handleApiError(
@@ -242,7 +243,7 @@ const MailDetail = () => {
             dispatch(resetDownload());
           }
 
-          navigate("/mails");
+          navigate(buildAdminPath("mails"));
         },
         onError: (err: any) =>
           handleApiError(err, "Kuryerlarga jo'natishda xatolik yuz berdi."),

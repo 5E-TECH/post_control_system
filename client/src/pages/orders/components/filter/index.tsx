@@ -19,6 +19,7 @@ import { requestDownload } from "../../../../shared/lib/features/excel-download-
 import { RiFileExcel2Line } from "react-icons/ri";
 import CustomCalendar from "../../../../shared/components/customDate";
 import dayjs from "dayjs";
+import { buildAdminPath } from "../../../../shared/const";
 
 const Filter = () => {
   const { t } = useTranslation("orderList");
@@ -77,7 +78,7 @@ const Filter = () => {
       dispatch(togglePermission(true));
       return;
     }
-    navigate("/orders/choose-market");
+    navigate(buildAdminPath("orders/choose-market"));
   };
 
   // excel download

@@ -7,6 +7,7 @@ import { useApiNotification } from "../../../../../shared/hooks/useApiNotificati
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { useTranslation } from "react-i18next";
+import { buildAdminPath } from "../../../../../shared/const";
 
 const CourierMailDetail = () => {
   const { t } = useTranslation("mails");
@@ -35,7 +36,7 @@ const CourierMailDetail = () => {
       {
         onSuccess: () => {
           handleSuccess("Pochtalar muvaffaqiyatli qabul qilindi");
-          navigate("/courier-mails");
+          navigate(buildAdminPath("courier-mails"));
         },
         onError: (err: any) =>
           handleApiError(err, "Pochtalarni qabul qilishda xatolik yuz berdi"),
