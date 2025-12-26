@@ -23,6 +23,9 @@ i18n
         fallbackLng: 'uz',
         debug: false,
         fallbackNS: ['header', 'sidebar', 'dashboard', 'history', 'login'],
+        backend: {
+            loadPath: `${import.meta.env.BASE_URL}locales/{{lng}}/{{ns}}.json`,
+        },
         interpolation: {
             escapeValue: false, // not needed for react as it escapes by default
         }
