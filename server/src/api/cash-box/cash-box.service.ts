@@ -76,7 +76,6 @@ export class CashBoxService
           cashbox_type: Cashbox_type.MAIN,
         });
         await this.cashboxRepo.save(cashe);
-        console.log('Initial cashbox created');
       }
     } catch (error) {
       return catchError(error);

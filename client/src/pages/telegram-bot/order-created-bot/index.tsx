@@ -31,9 +31,9 @@ const CreateOrderBot = () => {
   const handleShowData = () => {
     const data = {
       name: customerData?.name,
-      phone_number: customerData?.phone_number,
+      phone_number: customerData?.phone_number?.replace(/\s/g, ""),
       district_id: customerData?.district_id,
-      extra_number: customerData?.extra_number,
+      extra_number: customerData?.extra_number?.replace(/\s/g, ""),
       address: customerData?.address,
 
       order_item_info: (orderItems || []).map((item) => ({

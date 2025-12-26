@@ -45,7 +45,6 @@ const Details: FC<IProps> = ({
 
   const { getProductsByMarket } = useProduct();
   const { data } = getProductsByMarket(marketId, isProductsOpen);
-  console.log("data", data);
 
   const selectedProduct = data?.data?.products?.find((p: any) => p.id === selectedId);
 

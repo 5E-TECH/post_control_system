@@ -31,9 +31,6 @@ export function useRefusedPostScanner(
           ? tokenValue.split("/").pop()
           : tokenValue;
 
-        console.log(setSelectedIds);
-
-
         checkRefusedPost.mutate(
           {
             id: token as string,
@@ -41,10 +38,7 @@ export function useRefusedPostScanner(
           },
           {
             onSuccess: (res) => {
-              console.log(res);
-
               const orderId = res.data.order?.id;
-              console.log("✅ Order ID:", orderId);
 
               if (setSelectedIds) {
                 setSelectedIds((prev) =>
@@ -56,8 +50,6 @@ export function useRefusedPostScanner(
               refetch?.();
             },
             onError: (err) => {
-              console.log(err);
-
               handleApiError(err, "Buyurtma pochtada topolmadi!");
               const errorSound = new Audio("/sound/error.mp3");
               errorSound.play().catch(() => { });

@@ -17,7 +17,6 @@ export class PrinterController {
 
   @Post('print')
   async printLabel(@Body() printOrderDto: CreatePrinterDto) {
-    console.log(`so'rov keldi`);
     return await this.printerService.printMultiple(printOrderDto);
   }
 }

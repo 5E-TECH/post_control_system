@@ -14,8 +14,6 @@ export const exportToExcel = async (
   }
 ) => {
   if (!Array.isArray(data) || data.length === 0) return;
-  console.log(fileName);
-  
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Hisobot", {
@@ -166,10 +164,8 @@ export const exportToExcel = async (
 
   saveAs(
     blob,
-    `${fileRegionNames}_${fileCourierNames}-${
-      header?.date
-        ? formattedDate
-        : ""
+    `${fileName || 'hisobot'}_${fileRegionNames}_${fileCourierNames}-${
+      header?.date ? formattedDate : ""
     }.xlsx`
   );
 };

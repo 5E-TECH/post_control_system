@@ -87,6 +87,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     super(orderRepo);
   }
 
+  private formatPrice(value: number | string) {
+    const numeric = Number(value) || 0;
+    return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
+
   async allOrders(query: {
     status?: string;
     marketId?: string;
@@ -112,6 +117,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .orderBy('order.created_at', 'DESC');
+
+      // CREATED holatdagi buyurtmalar default ro'yxatda ko'rsatilmaydi
+      if (!query.status) {
+        qb.andWhere('order.status != :createdStatus', {
+          createdStatus: Order_status.CREATED,
+        });
+      }
 
       if (query.status) {
         qb.andWhere('order.status = :status', { status: query.status });
@@ -325,7 +337,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         operator: operator ? operator : currentOperator.name,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
-        status: Order_status.NEW,
+        status: Order_status.CREATED,
         qr_code_token,
         comment,
       });
@@ -359,43 +371,46 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id: newOrder.id },
-        relations: ['items', 'items.product'],
+        relations: [
+          'items',
+          'items.product',
+          'customer',
+          'customer.district',
+          'customer.district.region',
+        ],
       });
 
       if (!order) {
         throw new NotFoundException('Order not found');
       }
 
-      const telegramGroup = await queryRunner.manager.find(TelegramEntity, {
+      const telegramGroups = await queryRunner.manager.find(TelegramEntity, {
         where: { market_id: order.user_id, group_type: Group_type.CREATE },
       });
       // created_at string yoki bigint bo'lishi mumkin
 
-      // console.log(telegramGroup);
+      if (telegramGroups.length) {
+        const sendResults = await Promise.all(
+          telegramGroups.map((g) =>
+            this.orderBotService.sendOrderForApproval(
+              g.group_id || null,
+              order,
+            ),
+          ),
+        );
 
-      await Promise.all(
-        telegramGroup.map((g: TelegramEntity) => {
-          return this.orderBotService.sendMessageToCreateGroup(
-            g.group_id || null,
-            `*✅ Yangi buyurtma!*\n\n` +
-              `👤 *Mijoz:* ${customer?.name}\n` +
-              `📞 *Telefon:* ${customer?.phone_number}\n` +
-              `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
-              `📦 *Buyurtmalar:*\n${order.items
-                .map(
-                  (item, i) =>
-                    `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
-                )
-                .join('\n')}\n\n` +
-              `💰 *Narxi:* ${order.total_price} so‘m\n` +
-              `🕒 *Yaratilgan vaqti:* ${new Date(
-                Number(order.created_at),
-              ).toLocaleString('uz-UZ')}\n\n` +
-              `🧑‍💻 *Operator:* ${order.operator || '-'}\n\n` +
-              `📝 *Izoh:* ${order.comment || '-'}\n`,
-          );
-        }),
-      );
+        const messageRefs = sendResults
+          .map((res) => res.sentMessage)
+          .filter(Boolean) as { chatId: number; messageId: number }[];
+
+        if (messageRefs.length) {
+          order.create_bot_messages = [
+            ...(order.create_bot_messages || []),
+            ...messageRefs,
+          ];
+          await queryRunner.manager.save(order);
+        }
+      }
 
       await queryRunner.commitTransaction();
       return successRes(order, 201, 'New order created');
@@ -794,6 +809,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+      await Promise.all(
+        newOrders.map((o) => this.orderBotService.syncStatusButton(o.id)),
+      );
       return successRes({}, 200, 'Orders received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -863,6 +881,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(newPost);
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -904,6 +923,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('items.product', 'product')
         .where('order.user_id = :userId', { userId: user.id })
         .orderBy('order.created_at', 'DESC');
+
+      if (!status) {
+        qb.andWhere('order.status != :createdStatus', {
+          createdStatus: Order_status.CREATED,
+        });
+      }
 
       // 🔍 Search by customer name or order ID
       if (search) {
@@ -1010,6 +1035,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       } else {
         qb.andWhere('o.status NOT IN (:...excluded)', {
           excluded: [
+            Order_status.CREATED,
             Order_status.NEW,
             Order_status.RECEIVED,
             Order_status.ON_THE_ROAD,
@@ -1126,6 +1152,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!courierCashbox)
         throw new NotFoundException('Courier cashbox not found');
 
+      const marketBalanceBefore = Number(marketCashbox.balance);
+
       const marketTarif =
         order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
@@ -1236,13 +1264,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      // === Update order ===
+      const netToBePaid = Math.max(Number(to_be_paid) || 0, 0); // target summa o'zgarmaydi
+      const currentPaid = Math.min(
+        Math.max(Number(order.paid_amount) || 0, 0),
+        netToBePaid,
+      );
+      const remainingBeforeDebt = netToBePaid - currentPaid;
+      const debtBeforeSale =
+        marketBalanceBefore < 0 ? Math.abs(marketBalanceBefore) : 0;
+
+      const autoPay = Math.min(remainingBeforeDebt, debtBeforeSale);
+      const paidAfter = Math.min(netToBePaid, currentPaid + autoPay);
+      const remainingAfter = netToBePaid - paidAfter;
+
       Object.assign(order, {
-        status: Order_status.SOLD,
-        to_be_paid,
+        status:
+          remainingAfter === 0 && paidAfter > 0
+            ? Order_status.PAID
+            : paidAfter > 0
+              ? Order_status.PARTLY_PAID
+              : Order_status.SOLD,
+        to_be_paid: netToBePaid,
+        paid_amount: paidAfter,
         comment: finalComment,
         sold_at: Date.now(),
       });
+
       await queryRunner.manager.save(order);
 
       // === Extra cost (agar bo‘lsa) ===
@@ -1271,6 +1318,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1313,9 +1361,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // console.log(cancelOrderDto.extraCost, 'BBBBBBBBBBBBBB');
 
       if (cancelOrderDto.extraCost) {
-        const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
-          where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
-        });
+      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
+      });
         if (!marketCashbox) {
           throw new NotFoundException('Market cashbox not found');
         }
@@ -1395,7 +1443,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
                 `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
             )
             .join('\n')}\n\n` +
-          `💰 *Narxi:* ${order.total_price} so‘m\n` +
+          `💰 *Narxi:* ${this.formatPrice(order.total_price)} so‘m\n` +
           `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
           `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
           `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
@@ -1403,6 +1451,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({ id: order.id }, 200, 'Order canceled');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1505,6 +1554,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Courier cashbox not found');
 
       // 4️⃣ Tariffs
+      const marketBalanceBefore = Number(marketCashbox.balance);
+
       const marketTarif =
         order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
@@ -1637,9 +1688,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // 8️⃣ Order update
+      const netToBePaid = Math.max(Number(to_be_paid) || 0, 0); // target summa o'zgarmaydi
+      const currentPaid = Math.min(
+        Math.max(Number(order.paid_amount) || 0, 0),
+        netToBePaid,
+      );
+      const remainingBeforeDebt = netToBePaid - currentPaid;
+      const debtBeforeSale =
+        marketBalanceBefore < 0 ? Math.abs(marketBalanceBefore) : 0;
+
+      const autoPay = Math.min(remainingBeforeDebt, debtBeforeSale);
+      const paidAfter = Math.min(netToBePaid, currentPaid + autoPay);
+      const remainingAfter = netToBePaid - paidAfter;
+
       Object.assign(order, {
-        status: Order_status.SOLD,
-        to_be_paid,
+        status:
+          remainingAfter === 0 && paidAfter > 0
+            ? Order_status.PAID
+            : paidAfter > 0
+              ? Order_status.PARTLY_PAID
+              : Order_status.SOLD,
+        to_be_paid: netToBePaid,
+        paid_amount: paidAfter,
         total_price: price,
         comment: finalComment,
         product_quantity: totalNewQty,
@@ -1775,9 +1845,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
-      console.log(error);
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
@@ -1805,8 +1875,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           `Rollback mumkin emas (status: ${order.status})`,
         );
       }
+      const isSuperAdmin = user.role === Roles.SUPERADMIN;
       if (
-        user.role === Roles.SUPERADMIN &&
+        isSuperAdmin &&
         ![
           Order_status.SOLD,
           Order_status.CANCELLED,
@@ -1867,7 +1938,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         },
       );
 
-      // === ROLLBACK FOR SOLD ===
+      // === ROLLBACK FOR SOLD/PAID (courier or superadmin) ===
       if (
         order.status === Order_status.SOLD ||
         order.status === Order_status.PAID
@@ -1949,13 +2020,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
       }
 
-      // === ROLLBACK FOR PARTLY PAID ===
+      // === ROLLBACK FOR PARTLY PAID (superadmin) ===
 
-      if (order.status === Order_status.PARTLY_PAID) {
-        const marketDiff = Number(order.total_price) - Number(marketTarif);
-        const courierDiff = Number(order.total_price) - Number(courierTarif);
+      if (order.status === Order_status.PARTLY_PAID && isSuperAdmin) {
+        const marketDiff = Number(order.paid_amount || 0);
+        const courierDiff = Math.max(
+          Number(order.total_price) - Number(courierTarif),
+          0,
+        );
 
-        // Market kassasidan ayrish
+        // Market kassasidan aynan paid_amount miqdorini ayiramiz
         marketCashbox.balance -= marketDiff;
         await queryRunner.manager.save(marketCashbox);
         await queryRunner.manager.save(
@@ -1971,7 +2045,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           }),
         );
 
-        // Courier kassasidan ayrish
+        // Courier kassasidan sotishda qo'shilgan ulushni ayiramiz
         courierCashbox.balance -= courierDiff;
         await queryRunner.manager.save(courierCashbox);
         await queryRunner.manager.save(
@@ -1995,7 +2069,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         if (extraCostHistory && diff <= 5000) {
           const extraAmount = Number(extraCostHistory.amount);
 
-          // Market kassasiga qaytarish
           marketCashbox.balance += extraAmount;
           await queryRunner.manager.save(marketCashbox);
           await queryRunner.manager.save(
@@ -2011,7 +2084,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             }),
           );
 
-          // Courier kassasiga qaytarish
           courierCashbox.balance += extraAmount;
           await queryRunner.manager.save(courierCashbox);
           await queryRunner.manager.save(
@@ -2076,14 +2148,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // === Update order status ===
-      Object.assign(order, {
-        status: Order_status.WAITING,
-        sold_at: null,
-        to_be_paid: 0,
-      });
+      if (isSuperAdmin && [Order_status.PAID, Order_status.PARTLY_PAID].includes(order.status)) {
+        Object.assign(order, {
+          status: Order_status.WAITING,
+          paid_amount: 0,
+          sold_at: null,
+        });
+      } else {
+        Object.assign(order, {
+          status: Order_status.WAITING,
+          sold_at: null,
+          to_be_paid: 0,
+        });
+      }
       await queryRunner.manager.save(order);
 
       await queryRunner.commitTransaction();
+      await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order WAITING holatiga qaytarildi');
     } catch (err) {
       await queryRunner.rollbackTransaction();

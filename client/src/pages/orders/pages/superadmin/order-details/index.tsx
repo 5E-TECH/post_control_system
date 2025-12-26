@@ -7,6 +7,8 @@ import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import QRCode from "react-qr-code";
 import { useTranslation } from "react-i18next";
 import { useGlobalScanner } from "../../../../../shared/components/global-scanner";
+import { Button, Modal } from "antd";
+import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
 const statusColors: Record<string, string> = {
   new: "bg-sky-500",
@@ -27,9 +29,26 @@ const OrderDetails = () => {
   const { t: st } = useTranslation("status");
   const { id } = useParams();
 
-  const { getOrderById } = useOrder();
+  const { getOrderById, rollbackOrder } = useOrder();
+  const { handleSuccess, handleApiError } = useApiNotification();
   const { data } = getOrderById(id);
   const token = data?.data?.qr_code_token;
+  const status = data?.data?.status;
+  const role = localStorage.getItem("role");
+  const canRollback =
+    role === "superadmin" &&
+    (status === "paid" || status === "partly_paid");
+
+  const confirmRollback = () => {
+    rollbackOrder.mutate(id as string, {
+      onSuccess: () => {
+        handleSuccess("✅ Buyurtma rollback qilindi");
+      },
+      onError: (err: any) => {
+        handleApiError(err, "❌ Rollback bajarilmadi");
+      },
+    });
+  };
 
   // Agar data hali kelmagan bo‘lsa loader
   if (!data) return <div className="text-center p-10">Loading...</div>;
@@ -46,6 +65,23 @@ const OrderDetails = () => {
             {st(`${data?.data?.status}`)}
           </p>
         </div>
+        {canRollback && (
+          <Button
+            className="ml-auto bg-red-500! text-white! font-semibold!"
+            onClick={() =>
+              Modal.confirm({
+                title: "Rollback qilishni tasdiqlaysizmi?",
+                content:
+                  "To'langan (paid/partly_paid) buyurtma kutilgan holatga qaytariladi, balanslar orqaga o'zgaradi.",
+                okText: "Ha",
+                cancelText: "Yo'q",
+                onOk: confirmRollback,
+              })
+            }
+          >
+            Rollback
+          </Button>
+        )}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-5">
         <div className="lg:col-span-2 flex flex-col gap-6">

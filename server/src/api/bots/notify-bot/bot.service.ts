@@ -30,13 +30,6 @@ export class BotService {
 
     private readonly dataSource: DataSource,
   ) {}
-  // async startBot(ctx: Context) {
-  //   try {
-  //     return `Ushbu guruh idsi: ${ctx.chat?.id} va turi ${ctx.chat?.type}`;
-  //   } catch (error) {
-  //     return error;
-  //   }
-  // }
 
   async addToGroup(text: string, ctx: Context) {
     const queryRunner = this.dataSource.createQueryRunner();
@@ -105,23 +98,6 @@ export class BotService {
       return { message: message || 'error' };
     }
   }
-
-  // async createOrder(text: string, ctx: Context) {
-  //   const queryRunner = this.dataSource.createQueryRunner();
-  //   await queryRunner.connect();
-  //   await queryRunner.startTransaction();
-  //   try {
-  //     const groupId = String(ctx.chat?.id);
-  //     await queryRunner.manager.findOne(TelegramEntity, {
-  //       where: { group_id: groupId },
-  //     });
-  //   } catch (error) {
-  //     await queryRunner.rollbackTransaction();
-  //     return catchError(error);
-  //   } finally {
-  //     await queryRunner.release();
-  //   }
-  // }
 
   remove(id: number) {
     return `This action removes a #${id} bot`;

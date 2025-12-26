@@ -43,6 +43,7 @@ export enum Source_type {
 }
 
 export enum Order_status {
+  CREATED = 'created',
   NEW = 'new',
   RECEIVED = 'received',
   ON_THE_ROAD = 'on the road',
