@@ -4,13 +4,14 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import RegionMap from "./components/regionMap";
+import { buildAdminPath } from "../../shared/const";
 
 const Regions = () => {
   const navigate = useNavigate();
   const { role, region } = useSelector((state: RootState) => state.roleSlice);
 
   const { pathname } = useLocation();
-  if (pathname.startsWith("/regions/")) {
+  if (pathname.startsWith(buildAdminPath("regions/"))) {
     return <Outlet />;
   }
   return (

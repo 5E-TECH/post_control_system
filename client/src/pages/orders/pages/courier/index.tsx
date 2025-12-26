@@ -8,6 +8,7 @@ import CustomCalendar from "../../../../shared/components/customDate";
 import { DatePicker } from "antd";
 import { useDispatch } from "react-redux";
 import { setDateRange } from "../../../../shared/lib/features/datafilterSlice";
+import { buildAdminPath } from "../../../../shared/const";
 
 const { RangePicker } = DatePicker;
 
@@ -105,7 +106,7 @@ const CourierOrders = () => {
           {/* 1️⃣ KUTILAYOTGAN BUYURTMALAR */}
           <NavLink
             end
-            to="/courier-orders/orders"
+            to={buildAdminPath("courier-orders/orders")}
             className={({ isActive }) =>
               `
       text-md font-medium transition duration-200 pb-1
@@ -140,7 +141,7 @@ const CourierOrders = () => {
 
           {/* 2️⃣ HAMMA BUYURTMALAR */}
           <NavLink
-            to="/courier-orders/orders/all"
+            to={buildAdminPath("courier-orders/orders/all")}
             className={({ isActive }) =>
               `
       text-md font-medium transition duration-200 pb-1
@@ -175,7 +176,7 @@ const CourierOrders = () => {
 
           {/* 3️⃣ BEKOR QILINGAN BUYURTMALAR */}
           <NavLink
-            to="/courier-orders/orders/cancelled"
+            to={buildAdminPath("courier-orders/orders/cancelled")}
             className={({ isActive }) =>
               `
       text-md font-medium transition duration-200 pb-1

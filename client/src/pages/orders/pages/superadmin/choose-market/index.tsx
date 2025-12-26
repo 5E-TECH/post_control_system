@@ -11,6 +11,7 @@ import TableSkeleton from "../../../components/ordersTabelSkeleton/ordersTableSk
 import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
+import { buildAdminPath } from "../../../../../shared/const";
 
 const ChooseMarket = () => {
   const { t } = useTranslation("createOrder");
@@ -63,7 +64,7 @@ const ChooseMarket = () => {
   useEffect(() => {
     if (role === "market" && user.id) {
       localStorage.setItem("marketId", user.id);
-      navigate("/orders/customer-info");
+      navigate(buildAdminPath("orders/customer-info"));
     }
   }, [role, user, navigate]);
 
@@ -77,7 +78,7 @@ const ChooseMarket = () => {
     }
 
     localStorage.setItem("market", JSON.stringify(selectedMarket));
-    navigate(`/orders/customer-info`);
+    navigate(buildAdminPath("orders/customer-info"));
   };
 
   return (

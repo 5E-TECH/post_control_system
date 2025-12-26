@@ -8,6 +8,7 @@ import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 import { useTranslation } from "react-i18next";
 import { debounce } from "../../shared/helpers/DebounceFunc";
 import Skeleton from "./components/search/skeleton";
+import { buildAdminPath } from "../../shared/const";
 
 const TodayOrders = () => {
   const { t } = useTranslation("todayOrderList");
@@ -45,7 +46,7 @@ const TodayOrders = () => {
   }
 }, [pathname]);
 
-  if (pathname.startsWith("/order/markets/new-orders/")) {
+  if (pathname.startsWith(buildAdminPath("order/markets/new-orders/"))) {
     return <Outlet />;
   }
 

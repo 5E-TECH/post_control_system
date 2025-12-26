@@ -1,5 +1,6 @@
 import { memo, type FC } from "react";
 import { useNavigate } from "react-router-dom";
+import { buildAdminPath } from "../../../../shared/const";
 
 interface Props {
   text: string;
@@ -10,7 +11,7 @@ const Button: FC<Props> = ({ text, className }) => {
   const navigate = useNavigate();
 
   return (
-    <div onClick={() => navigate("/all-users/create-user")}>
+    <div onClick={() => navigate(buildAdminPath("all-users/create-user"))}>
       <button
         className={`bg-[#8C57FF] text-[#ffffff] px-[18px] py-[8px] rounded-md cursor-pointer hover:opacity-85 ${className}`}
       >

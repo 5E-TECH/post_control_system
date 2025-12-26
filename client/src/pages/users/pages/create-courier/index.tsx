@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import { buildAdminPath } from "../../../../shared/const";
 
 type FieldType = {
   region_id: string;
@@ -33,7 +34,7 @@ const CreateCourier = () => {
     };
     createUser.mutate(newCourier, {
       onSuccess: () => {
-        navigate("/all-users");
+        navigate(buildAdminPath("all-users"));
       },
       onError: (err: any) =>
         handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),

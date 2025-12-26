@@ -17,6 +17,7 @@ import * as yup from "yup";
 
 import { useNetworkState, usePrevious } from "@uidotdev/usehooks";
 import { useTranslation } from "react-i18next";
+import { buildAdminPath } from "../../shared/const/index";
 
 message.config({
   maxCount: 5,
@@ -71,7 +72,7 @@ const Login: FC = () => {
     signinUser.mutate(values, {
       onSuccess: (res) => {
         dispatch(setToken(res?.data?.data));
-        navigate("/");
+        navigate(buildAdminPath());
         setSubmitting(false);
       },
       onError: (err: any) => {
@@ -131,8 +132,7 @@ const Login: FC = () => {
             initialValues={initialValues}
             validationSchema={validationSchema}
             onSubmit={onFinish}
-            enableReinitialize={false}
-          >
+            enableReinitialize={false}>
             {({ handleSubmit, isSubmitting }: FormikProps<ILogin>) => (
               <Form onSubmit={handleSubmit}>
                 <div className="flex items-center justify-center gap-2 text-xl sm:text-2xl mb-6">
@@ -210,8 +210,7 @@ const Login: FC = () => {
                   type="primary"
                   htmlType="submit"
                   size="large"
-                  className="bg-[#8C57FF]! w-full"
-                >
+                  className="bg-[#8C57FF]! w-full">
                   {t("button.submit")}
                 </Button>
               </Form>

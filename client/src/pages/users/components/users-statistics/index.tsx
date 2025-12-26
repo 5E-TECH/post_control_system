@@ -5,6 +5,7 @@ import employers from "../../../../shared/assets/users/employer.svg";
 import { NavLink } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useTranslation } from "react-i18next";
+import { buildAdminPath } from "../../../../shared/const";
 
 const UsersStatistics = () => {
   const { t } = useTranslation("users");
@@ -53,7 +54,7 @@ const UsersStatistics = () => {
         className={({ isActive }) =>
           `${isActive ? "border border-[var(--color-bg-sy)] rounded-md" : ""}`
         }
-        to={"/all-users/markets"}
+        to={buildAdminPath("all-users/markets")}
       >
         <div className="h-[114px] bg-[#ffffff] shadow-lg rounded-md pl-[20px] pr-[20px] flex justify-between dark:bg-[#312D4B]">
           <div className="flex items-center">
@@ -81,7 +82,7 @@ const UsersStatistics = () => {
         className={({ isActive }) =>
           `${isActive ? "border border-[var(--color-bg-sy)] rounded-md" : ""}`
         }
-        to={"/all-users/users"}
+        to={buildAdminPath("all-users/users")}
       >
         <div className="h-[114px] bg-[#ffffff] shadow-lg rounded-md pl-[20px] pr-[20px] flex justify-between dark:bg-[#312D4B]">
           <div className="flex items-center">
