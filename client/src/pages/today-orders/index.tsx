@@ -14,6 +14,10 @@ const TodayOrders = () => {
   const { t } = useTranslation("todayOrderList");
   const navigate = useNavigate();
   const [searchData, setSearch] = useState<any>(null);
+  const base =
+    import.meta.env.BASE_URL && import.meta.env.BASE_URL !== "/"
+      ? import.meta.env.BASE_URL.replace(/\/$/, "")
+      : "";
 
   const debouncedSearch = useMemo(
     () =>
@@ -46,7 +50,12 @@ const TodayOrders = () => {
   }
 }, [pathname]);
 
-  if (pathname.startsWith(buildAdminPath("order/markets/new-orders/", { absolute: true }))) {
+  const normalizedPathname =
+    base && pathname.startsWith(base)
+      ? pathname.slice(base.length) || "/"
+      : pathname;
+
+  if (normalizedPathname.startsWith("/order/markets/new-orders/")) {
     return <Outlet />;
   }
 

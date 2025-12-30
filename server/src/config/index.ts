@@ -23,4 +23,7 @@ export default {
   NGROK_AUTHTOKEN: String(process.env.NGROK_AUTHTOKEN),
   PRINTER_LOCAL_URL: String(process.env.PRINTER_LOCAL_URL),
   UPLOAD_URL: String(process.env.UPLOAD_URL),
+  WEB_APP_URL: String(
+    process.env.WEB_APP_URL || 'https://beepost.uz/admin/bot',
+  ),
 };
