@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../shared/api";
+import { buildAdminPath } from "../../../shared/const";
 
 export const useSignOut = () => {
   const client = useQueryClient();
@@ -11,11 +12,11 @@ export const useSignOut = () => {
 
       localStorage.removeItem("x-auth-token");
 
-      window.location.href = "/login";
+      window.location.href = buildAdminPath("login", { absolute: true });
     },
     onError: () => {
       localStorage.removeItem("x-auth-token");
-      window.location.href = "/login";
+      window.location.href = buildAdminPath("login", { absolute: true });
     },
   });
 };
