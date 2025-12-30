@@ -7,6 +7,11 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 // have a look at the Quick start guide 
 // for passing in lng and translations on init
 
+const base =
+  (import.meta.env.BASE_URL && import.meta.env.BASE_URL !== "/"
+    ? import.meta.env.BASE_URL
+    : "").replace(/\/$/, "");
+
 i18n
     // load translation using http -> see /public/locales (i.e. https://github.com/i18next/react-i18next/tree/master/example/react/public/locales)
     // learn more: https://github.com/i18next/i18next-http-backend
@@ -23,6 +28,10 @@ i18n
         fallbackLng: 'uz',
         debug: false,
         fallbackNS: ['header', 'sidebar', 'dashboard', 'history', 'login'],
+        backend: {
+            // Respect Vite BASE_URL (e.g. /admin/) when loading locale files
+            loadPath: `${base}/locales/{{lng}}/{{ns}}.json`,
+        },
         interpolation: {
             escapeValue: false, // not needed for react as it escapes by default
         }
