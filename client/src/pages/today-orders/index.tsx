@@ -46,7 +46,7 @@ const TodayOrders = () => {
   }
 }, [pathname]);
 
-  if (pathname.startsWith(buildAdminPath("order/markets/new-orders/"))) {
+  if (pathname.startsWith(buildAdminPath("order/markets/new-orders/", { absolute: true }))) {
     return <Outlet />;
   }
 

@@ -9,6 +9,8 @@ import { useTranslation } from "react-i18next";
 import { useGlobalScanner } from "../../../../../shared/components/global-scanner";
 import { Button, Modal } from "antd";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const statusColors: Record<string, string> = {
   new: "bg-sky-500",
@@ -34,7 +36,9 @@ const OrderDetails = () => {
   const { data } = getOrderById(id);
   const token = data?.data?.qr_code_token;
   const status = data?.data?.status;
-  const role = localStorage.getItem("role");
+  const role =
+    useSelector((state: RootState) => state.roleSlice.role) ||
+    localStorage.getItem("role");
   const canRollback =
     role === "superadmin" &&
     (status === "paid" || status === "partly_paid");
