@@ -40,7 +40,7 @@ export class OrderBotService {
     private readonly token: Token,
     private readonly dataSource: DataSource,
     private readonly bcrypt: BcryptEncryption,
-  ) {}
+  ) { }
 
   private statusButtonLabel(order: OrderEntity) {
     const status = order.deleted
