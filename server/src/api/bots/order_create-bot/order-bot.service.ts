@@ -518,13 +518,19 @@ export class OrderBotService {
   }
 
   openWebApp() {
+    const webAppUrl = config.WEB_APP_URL?.replace(/\/$/, '') || '';
+    const url =
+      webAppUrl && !webAppUrl.endsWith('/bot')
+        ? `${webAppUrl}/bot`
+        : webAppUrl || 'https://beepost.uz/admin/bot';
+
     const webAppButton = {
       inline_keyboard: [
         [
           {
             text: '🚀 WebAppni ochish',
             web_app: {
-              url: 'https://beepost.uz/bot',
+              url,
             },
           },
         ],
