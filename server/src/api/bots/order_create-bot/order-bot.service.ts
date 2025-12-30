@@ -40,7 +40,7 @@ export class OrderBotService {
     private readonly token: Token,
     private readonly dataSource: DataSource,
     private readonly bcrypt: BcryptEncryption,
-  ) {}
+  ) { }
 
   private statusButtonLabel(order: OrderEntity) {
     const status = order.deleted
@@ -524,7 +524,7 @@ export class OrderBotService {
           {
             text: '🚀 WebAppni ochish',
             web_app: {
-              url: 'https://beepost.uz/admin/bot',
+              url: 'https://beepost.uz/bot',
             },
           },
         ],
