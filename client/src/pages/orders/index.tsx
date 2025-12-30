@@ -10,7 +10,7 @@ const Orders = () => {
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
   if (role === "superadmin" || role === "admin" || role === "market" || role === "registrator") {
-    if (pathname.startsWith(buildAdminPath("orders/"))) {
+    if (pathname.startsWith(buildAdminPath("orders/", { absolute: true }))) {
       return <Outlet />;
     }
     return (
