@@ -11,7 +11,7 @@ const Regions = () => {
   const { role, region } = useSelector((state: RootState) => state.roleSlice);
 
   const { pathname } = useLocation();
-  if (pathname.startsWith(buildAdminPath("regions/"))) {
+  if (pathname.startsWith(buildAdminPath("regions/", { absolute: true }))) {
     return <Outlet />;
   }
   return (

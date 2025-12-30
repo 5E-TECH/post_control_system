@@ -16,7 +16,7 @@ const CustomerInfoOrder = () => {
   const { t } = useTranslation("createOrder");
   const { pathname } = useLocation();
 
-  if (pathname.startsWith(buildAdminPath("orders/confirm"))) {
+  if (pathname.startsWith(buildAdminPath("orders/confirm", { absolute: true }))) {
     return <Outlet />;
   }
 

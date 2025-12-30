@@ -33,7 +33,7 @@ const TelegramBot = () => {
       signinUser.mutate(data, {
         onSuccess: (res: any) => {
           dispatch(setToken({ access_token: res?.data?.data?.access_token }));
-          navigate(buildAdminPath("authtelegram"));
+          navigate(buildAdminPath("authtelegram", { absolute: true }));
         },
       });
 
