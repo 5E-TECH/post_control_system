@@ -18,6 +18,7 @@ export function usePostScanner(
   useEffect(() => {
     let scanned = "";
     let timer: any = null;
+    const errorSound = new Audio(`${import.meta.env.BASE_URL}sound/error.mp3`);
 
     const handleKeyPress = async (e: KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -51,7 +52,7 @@ export function usePostScanner(
             },
             onError: (err) => {
               handleApiError(err, "Buyurtma pochtada topolmadi!");
-              const errorSound = new Audio("/sound/error.mp3");
+              errorSound.currentTime = 0;
               errorSound.play().catch(() => { });
             },
           }

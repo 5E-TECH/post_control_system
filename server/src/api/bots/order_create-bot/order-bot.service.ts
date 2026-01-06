@@ -22,6 +22,7 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
+import { MyLogger } from 'src/logger/logger.service';
 
 @Injectable()
 export class OrderBotService {
@@ -40,7 +41,8 @@ export class OrderBotService {
     private readonly token: Token,
     private readonly dataSource: DataSource,
     private readonly bcrypt: BcryptEncryption,
-  ) { }
+    private readonly logger: MyLogger,
+  ) {}
 
   private statusButtonLabel(order: OrderEntity) {
     const status = order.deleted
@@ -273,6 +275,7 @@ export class OrderBotService {
       const user = await this.userRepo.findOne({
         where: { telegram_id: ctx.from?.id },
       });
+      this.logger.log('Singning in user: ', `${user}`);
       if (!user) {
         throw new NotFoundException("Siz platformadan ro'yxatdan o'tmagansiz!");
       }
@@ -287,12 +290,14 @@ export class OrderBotService {
       const { id, role, status } = user;
       const payload: JwtPayload = { id, role, status };
       const accessToken = await this.token.generateAccessToken(payload);
+      this.logger.log('Access token with Telegram: ', accessToken);
       return successRes(
         { access_token: accessToken, user },
         200,
         'Logged in successfully',
       );
     } catch (error) {
+      this.logger.log('Telegram sign in Error: ', error);
       return catchError(error);
     }
   }
@@ -519,10 +524,14 @@ export class OrderBotService {
 
   openWebApp() {
     const webAppUrl = config.WEB_APP_URL?.replace(/\/$/, '') || '';
+
+    this.logger.log('Web App url: ', webAppUrl);
     const url =
       webAppUrl && !webAppUrl.endsWith('/bot')
         ? `${webAppUrl}/bot`
         : webAppUrl || 'https://beepost.uz/admin/bot';
+
+    this.logger.log('Custom url: ', url);
 
     const webAppButton = {
       inline_keyboard: [
