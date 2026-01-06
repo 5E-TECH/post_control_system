@@ -16,6 +16,7 @@ export function useGlobalScanner(refetch?: () => void) {
   useEffect(() => {
     let scanned = "";
     let timer: any = null;
+    const errorSound = new Audio(`${import.meta.env.BASE_URL}sound/error.mp3`);
 
     const handleKeyPress = async (e: KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -42,8 +43,10 @@ export function useGlobalScanner(refetch?: () => void) {
 
           // 🔊 Error tovushni o‘ynatish
           try {
-            const errorSound = new Audio("/sound/error.mp3");
-            errorSound.play().catch((e) => console.error("Ovoz chiqmadi:", e));
+            errorSound.currentTime = 0;
+            errorSound
+              .play()
+              .catch((e) => console.error("Ovoz chiqmadi:", e));
           } catch (e) {
             console.error("Ovoz ijrosida xatolik:", e);
           }

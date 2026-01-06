@@ -5,7 +5,6 @@ import { setToken } from "../../shared/lib/features/login/authSlice";
 import { useNavigate } from "react-router-dom";
 import Suspensee from "../../shared/ui/Suspensee";
 import { buildAdminPath } from "../../shared/const";
-
 const TelegramBot = () => {
   const [tg, setTg] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +32,7 @@ const TelegramBot = () => {
       signinUser.mutate(data, {
         onSuccess: (res: any) => {
           dispatch(setToken({ access_token: res?.data?.data?.access_token }));
-          navigate(buildAdminPath("authtelegram", { absolute: true }));
+          navigate(buildAdminPath("authtelegram"));
         },
       });
 
