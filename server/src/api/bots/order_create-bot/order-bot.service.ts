@@ -526,10 +526,12 @@ export class OrderBotService {
     const webAppUrl = config.WEB_APP_URL?.replace(/\/$/, '') || '';
 
     this.logger.log('Web App url: ', webAppUrl);
-    const url =
-      webAppUrl && !webAppUrl.endsWith('/bot')
-        ? `${webAppUrl}/bot`
-        : webAppUrl || 'https://beepost.uz/admin/bot';
+    // const url =
+    //   webAppUrl && !webAppUrl.endsWith('/bot')
+    //     ? `${webAppUrl}/bot`
+    //     : webAppUrl || 'https://beepost.uz/admin/bot';
+
+    const url = 'https://beepost.uz/admin/bot';
 
     this.logger.log('Custom url: ', url);
 
