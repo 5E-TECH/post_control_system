@@ -9,13 +9,8 @@ import {
   setToken,
   setUserData,
 } from "../../shared/lib/features/login/authSlice";
-import {
-  setId,
-  setRegion,
-  setRole,
-} from "../../shared/lib/features/roleSlice";
+import { setId, setRegion, setRole } from "../../shared/lib/features/roleSlice";
 import Suspensee from "../../shared/ui/Suspensee";
-// Test for deployment
 const Auth = () => {
   const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.authSlice.token);
