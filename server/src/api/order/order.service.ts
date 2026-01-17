@@ -50,9 +50,20 @@ import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import { OrderDto } from './dto/orderId.dto';
 import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
 import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
+import {
+  getSafeLimit,
+  PAGINATION,
+} from 'src/common/constants/pagination';
+import * as ExcelJS from 'exceljs';
+import { Response } from 'express';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
+  // In-memory cache for top markets/couriers (30 kunlik aggregation og'ir bo'lgani uchun)
+  private topMarketsCache: { data: any; expireAt: number } | null = null;
+  private topCouriersCache: { data: any; expireAt: number } | null = null;
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 daqiqa
+
   constructor(
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
@@ -93,7 +104,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   }
 
   async allOrders(query: {
-    status?: string;
+    status?: string | string[];
     marketId?: string;
     regionId?: string;
     search?: string;
@@ -101,11 +112,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     endDate?: string;
     page?: number;
     limit?: number;
+    fetchAll?: boolean | string;
   }) {
     try {
-      // 📌 limit default 10, agar 0 bo‘lsa → unlimited
-      let { limit = 10, page = 1 } = query;
-      const unlimited = limit === 0;
+      const page = query.page || 1;
+      // Query params string sifatida keladi, shuning uchun "true" ni ham tekshiramiz
+      const fetchAll =
+        query.fetchAll === true || (query.fetchAll as any) === 'true';
+      const limit = getSafeLimit(query.limit, fetchAll);
 
       const qb = this.orderRepo
         .createQueryBuilder('order')
@@ -116,6 +130,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('order.post', 'post')
+        .leftJoinAndSelect('post.courier', 'courier')
         .orderBy('order.created_at', 'DESC');
 
       // CREATED holatdagi buyurtmalar default ro'yxatda ko'rsatilmaydi
@@ -126,7 +142,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       if (query.status) {
-        qb.andWhere('order.status = :status', { status: query.status });
+        const statusArray = Array.isArray(query.status)
+          ? query.status
+          : [query.status];
+        qb.andWhere('order.status IN (:...statuses)', { statuses: statusArray });
       }
 
       if (query.marketId) {
@@ -166,11 +185,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         qb.andWhere('order.created_at <= :endDate', { endDate: endMs });
       }
 
-      // 🔢 Pagination (faqat limit > 0 bo‘lsa)
-      if (!unlimited) {
-        const skip = (page - 1) * limit;
-        qb.skip(skip).take(limit);
-      }
+      // 🔢 Pagination
+      const skip = (page - 1) * limit;
+      qb.skip(skip).take(limit);
 
       const [data, total] = await qb.getManyAndCount();
 
@@ -178,9 +195,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         {
           data,
           total,
-          page: unlimited ? 1 : page,
-          limit: unlimited ? total : limit,
-          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All orders',
@@ -250,25 +267,35 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.manager.save(newOrder);
 
-      let product_quantity: number = 0;
-      for (const o_item of order_item_info) {
-        const isExistProduct = await queryRunner.manager.findOne(
-          ProductEntity,
-          {
-            where: { id: o_item.product_id },
-          },
-        );
-        if (!isExistProduct) {
-          throw new NotFoundException('Product not found');
+      // ✅ Batch: Barcha productlarni bir so'rovda olish
+      const productIds = order_item_info.map((item) => item.product_id);
+      const existingProducts = await queryRunner.manager.find(ProductEntity, {
+        where: { id: In(productIds) },
+      });
+
+      // Mavjud productlar ro'yxatini yaratish
+      const existingProductIds = new Set(existingProducts.map((p) => p.id));
+
+      // Mavjud bo'lmagan productlarni tekshirish
+      for (const productId of productIds) {
+        if (!existingProductIds.has(productId)) {
+          throw new NotFoundException(`Product not found: ${productId}`);
         }
-        const newOrderItem = queryRunner.manager.create(OrderItemEntity, {
+      }
+
+      // ✅ Batch: Barcha order itemlarni bir vaqtda yaratish va saqlash
+      let product_quantity: number = 0;
+      const orderItems = order_item_info.map((o_item) => {
+        product_quantity += Number(o_item.quantity);
+        return queryRunner.manager.create(OrderItemEntity, {
           productId: o_item.product_id,
           quantity: o_item.quantity,
           orderId: newOrder.id,
         });
-        await queryRunner.manager.save(newOrderItem);
-        product_quantity += Number(o_item.quantity);
-      }
+      });
+
+      // Batch save - bitta so'rovda
+      await queryRunner.manager.save(orderItems);
 
       Object.assign(newOrder, {
         product_quantity,
@@ -343,25 +370,35 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       await queryRunner.manager.save(newOrder);
 
-      let product_quantity: number = 0;
-      for (const o_item of order_item_info) {
-        const isExistProduct = await queryRunner.manager.findOne(
-          ProductEntity,
-          {
-            where: { id: o_item.product_id },
-          },
-        );
-        if (!isExistProduct) {
-          throw new NotFoundException('Product not found');
+      // ✅ Batch: Barcha productlarni bir so'rovda olish
+      const productIds = order_item_info.map((item) => item.product_id);
+      const existingProducts = await queryRunner.manager.find(ProductEntity, {
+        where: { id: In(productIds) },
+      });
+
+      // Mavjud productlar ro'yxatini yaratish
+      const existingProductIds = new Set(existingProducts.map((p) => p.id));
+
+      // Mavjud bo'lmagan productlarni tekshirish
+      for (const productId of productIds) {
+        if (!existingProductIds.has(productId)) {
+          throw new NotFoundException(`Product not found: ${productId}`);
         }
-        const newOrderItem = queryRunner.manager.create(OrderItemEntity, {
+      }
+
+      // ✅ Batch: Barcha order itemlarni bir vaqtda yaratish va saqlash
+      let product_quantity: number = 0;
+      const orderItems = order_item_info.map((o_item) => {
+        product_quantity += Number(o_item.quantity);
+        return queryRunner.manager.create(OrderItemEntity, {
           productId: o_item.product_id,
           quantity: o_item.quantity,
           orderId: newOrder.id,
         });
-        await queryRunner.manager.save(newOrderItem);
-        product_quantity += Number(o_item.quantity);
-      }
+      });
+
+      // Batch save - bitta so'rovda
+      await queryRunner.manager.save(orderItems);
 
       Object.assign(newOrder, {
         product_quantity,
@@ -578,7 +615,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const newOrder = await this.orderRepo.findOne({
         where: { id },
-        relations: ['items', 'items.product', 'market', 'customer'],
+        relations: ['items', 'items.product', 'market', 'customer', 'post', 'post.courier'],
       });
 
       if (!newOrder) {
@@ -897,22 +934,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       page?: number;
       limit?: number;
       search?: string;
-      status?: string;
+      status?: string | string[];
       regionId?: string;
       startDate?: string;
       endDate?: string;
+      fetchAll?: boolean | string;
     },
   ) {
     try {
       const {
         page = 1,
-        limit = 10,
         search,
         status,
         startDate,
         endDate,
         regionId,
       } = query;
+      const fetchAll =
+        query.fetchAll === true || (query.fetchAll as any) === 'true';
+      const limit = getSafeLimit(query.limit, fetchAll);
 
       const qb = this.orderRepo
         .createQueryBuilder('order')
@@ -940,7 +980,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // 🎯 Filter by order status
       if (status) {
-        qb.andWhere('order.status = :status', { status });
+        const statusArray = Array.isArray(status) ? status : [status];
+        qb.andWhere('order.status IN (:...statuses)', { statuses: statusArray });
       }
 
       // 🌍 Filter by region
@@ -993,12 +1034,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async allCouriersOrders(
     user: JwtPayload,
     query: {
-      status?: string;
+      status?: string | string[];
       search?: string;
       page?: number;
       limit?: number;
       startDate?: string;
       endDate?: string;
+      fetchAll?: boolean | string;
     },
   ) {
     try {
@@ -1014,7 +1056,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // pagination params
       const page = query.page && query.page > 0 ? query.page : 1;
-      const limit = query.limit && query.limit > 0 ? query.limit : 10;
+      const fetchAll =
+        query.fetchAll === true || (query.fetchAll as any) === 'true';
+      const limit = getSafeLimit(query.limit, fetchAll);
       const offset = (page - 1) * limit;
 
       const qb = this.orderRepo
@@ -1031,7 +1075,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // status filter
       if (query.status) {
-        qb.andWhere('o.status = :status', { status: query.status });
+        const statusArray = Array.isArray(query.status)
+          ? query.status
+          : [query.status];
+        qb.andWhere('o.status IN (:...statuses)', { statuses: statusArray });
       } else {
         qb.andWhere('o.status NOT IN (:...excluded)', {
           excluded: [
@@ -1423,6 +1470,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id: order?.post_id || '' },
         relations: ['courier'],
       });
+      const operator = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: currentUser.id },
+      });
 
       const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
         where: { market_id: marketId, group_type: Group_type.CANCEL || null },
@@ -1446,7 +1496,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           `💰 *Narxi:* ${this.formatPrice(order.total_price)} so‘m\n` +
           `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
           `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
-          `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
+          `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n` +
+          `👨‍💼 *Operator:* ${operator?.name || '-'}\n\n` +
           `📝 *Izoh:* ${order.comment || '-'}\n`,
       );
 
@@ -1505,6 +1556,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
+      const operator = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: user.id },
+      });
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id: order.customer_id },
@@ -1818,7 +1872,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               `💰 *Narxi:* ${canceled?.total_price} so‘m\n` +
               `🕒 *Yaratilgan vaqti:* ${new Date(Number(canceled?.created_at)).toLocaleString('uz-UZ')}\n\n` +
               `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
-              `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
+              `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n` +
+              `👨‍💼 *Operator:* ${operator?.name || '-'}\n\n` +
               `📝 *Izoh:* ${canceled?.comment || '-'}\n`,
           );
         }
@@ -1840,7 +1895,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           `💰 *Sotilgan narxi:* ${order.total_price} so‘m\n` +
           `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
           `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
-          `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n\n` +
+          `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n` +
+          `👨‍💼 *Operator:* ${operator?.name || '-'}\n\n` +
           `📝 *Izoh:* ${order.comment || '-'}\n`,
       );
 
@@ -2178,81 +2234,68 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const start = Number(startDate);
       const end = Number(endDate);
-      const acceptedCount = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.created_at BETWEEN :start AND :end', {
-          start,
-          end,
-        })
-        .getCount();
 
-      const cancelled = await this.orderRepo
+      // Bitta optimallashtirilgan SQL query - barcha statistikani oladi
+      const statsQuery = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.updated_at BETWEEN :start AND :end', {
+        .select(
+          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end THEN 1 END)`,
+          'acceptedCount',
+        )
+        .addSelect(
+          `COUNT(CASE WHEN o.updated_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          'cancelled',
+        )
+        .addSelect(
+          `COUNT(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...soldStatuses) THEN 1 END)`,
+          'soldAndPaid',
+        )
+        .setParameters({
           start,
           end,
-        })
-        .andWhere('o.status IN (:...statuses)', {
-          statuses: [Order_status.CANCELLED],
-        })
-        .getCount();
-
-      const soldAndPaid = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.sold_at BETWEEN :start AND :end', {
-          start,
-          end,
-        })
-        .andWhere('o.status IN (:...statuses)', {
-          statuses: [
-            Order_status.SOLD,
-            Order_status.PARTLY_PAID,
-            Order_status.PAID,
-          ],
-        })
-        .getCount();
-
-      const allSoldOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.sold_at BETWEEN :start AND :end', {
-          start,
-          end,
-        })
-        .andWhere('o.status IN (:...statuses)', {
-          statuses: [
+          cancelledStatus: Order_status.CANCELLED,
+          soldStatuses: [
             Order_status.SOLD,
             Order_status.PAID,
             Order_status.PARTLY_PAID,
           ],
         })
-        .getMany();
+        .getRawOne();
 
-      let profit = 0;
+      const acceptedCount = Number(statsQuery?.acceptedCount) || 0;
+      const cancelled = Number(statsQuery?.cancelled) || 0;
+      const soldAndPaid = Number(statsQuery?.soldAndPaid) || 0;
 
-      for (const order of allSoldOrders) {
-        const market = await this.userRepo.findOne({
-          where: { id: order.user_id },
-        });
-        let courier: any = null;
+      // Profit hisoblash - bitta optimallashtirilgan query
+      // Market va Courier tarifflarini JOIN qilib olamiz
+      const profitQuery = await this.orderRepo
+        .createQueryBuilder('o')
+        .select(
+          `SUM(
+            CASE
+              WHEN o.where_deliver = :addressType THEN
+                COALESCE(market.tariff_home, 0) - COALESCE(courier.tariff_home, 0)
+              ELSE
+                COALESCE(market.tariff_center, 0) - COALESCE(courier.tariff_center, 0)
+            END
+          )`,
+          'profit',
+        )
+        .leftJoin('o.market', 'market')
+        .leftJoin('o.post', 'post')
+        .leftJoin('post.courier', 'courier')
+        .where('o.sold_at BETWEEN :start AND :end', { start, end })
+        .andWhere('o.status IN (:...soldStatuses)', {
+          soldStatuses: [
+            Order_status.SOLD,
+            Order_status.PAID,
+            Order_status.PARTLY_PAID,
+          ],
+        })
+        .setParameter('addressType', Where_deliver.ADDRESS)
+        .getRawOne();
 
-        if (order.post_id) {
-          const post = await this.postRepo.findOne({
-            where: { id: order.post_id },
-          });
-          if (post?.courier_id) {
-            courier = await this.userRepo.findOne({
-              where: { id: post.courier_id },
-            });
-          }
-        }
-
-        profit +=
-          order.where_deliver === Where_deliver.ADDRESS
-            ? Number(market?.tariff_home ?? 0) -
-              Number(courier?.tariff_home ?? 0)
-            : Number(market?.tariff_center ?? 0) -
-              Number(courier?.tariff_center ?? 0);
-      }
+      const profit = Number(profitQuery?.profit) || 0;
 
       return successRes(
         {
@@ -2366,13 +2409,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         Order_status.PARTLY_PAID,
       ];
 
-      // 🔹 1. Faqat so‘nggi 30 kun ichida yangilangan postlarni olish
-      const recentThreshold = end - 30 * 24 * 60 * 60 * 1000;
-
+      // 🔹 1. Tanlangan sana oralig'ida orderlar mavjud bo'lgan postlarni olish
       const recentPosts = await this.postRepo
         .createQueryBuilder('p')
-        .where('p.updated_at > :threshold', { threshold: recentThreshold })
+        .innerJoin('p.orders', 'o')
+        .where('o.updated_at BETWEEN :start AND :end', { start, end })
         .select(['p.id', 'p.courier_id'])
+        .distinct(true)
         .getMany();
 
       if (recentPosts.length === 0) {
@@ -2448,39 +2491,44 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getTopMarkets(limit = 10) {
     try {
-      // Oxirgi 30 kunlik timestamp (millisekund)
-      const lastMonth = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      if (this.topMarketsCache && this.topMarketsCache.expireAt > now) {
+        return this.topMarketsCache.data;
+      }
 
-      const result = await this.orderRepo
-        .createQueryBuilder('order')
-        .select('market.id', 'market_id')
-        .addSelect('market.name', 'market_name')
-        .addSelect('COUNT(order.id)', 'total_orders')
-        .addSelect(
-          `SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)`,
-          'successful_orders',
-        )
-        .addSelect(
-          `ROUND(
-          (SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)::decimal
-          / NULLIF(COUNT(order.id), 0)) * 100, 2
-        )`,
-          'success_rate',
-        )
-        .innerJoin('order.market', 'market')
-        .where('market.role = :role', { role: Roles.MARKET })
-        .andWhere('order.created_at >= :lastMonth', { lastMonth })
-        .setParameter('statuses', [
-          Order_status.SOLD,
-          Order_status.PAID,
-          Order_status.PARTLY_PAID,
-        ])
-        .groupBy('market.id')
-        .orderBy('success_rate', 'DESC')
-        .limit(limit)
-        .getRawMany();
+      const lastMonth = now - 30 * 24 * 60 * 60 * 1000;
 
-      return successRes(result, 200, 'Top Markets (last 30 days)');
+      const result = await this.orderRepo.query(
+        `
+        SELECT
+          u.id as market_id,
+          u.name as market_name,
+          COUNT(o.id) as total_orders,
+          SUM(CASE WHEN o.status IN ('sold', 'paid', 'partly_paid') THEN 1 ELSE 0 END) as successful_orders,
+          ROUND(
+            (SUM(CASE WHEN o.status IN ('sold', 'paid', 'partly_paid') THEN 1 ELSE 0 END)::decimal
+            / NULLIF(COUNT(o.id), 0)) * 100, 2
+          ) as success_rate
+        FROM "order" o
+        INNER JOIN "users" u ON u.id = o.user_id
+        WHERE u.role = 'market'
+          AND o.created_at >= $1
+        GROUP BY u.id
+        ORDER BY success_rate DESC NULLS LAST
+        LIMIT $2
+        `,
+        [lastMonth, limit],
+      );
+
+      const response = successRes(result, 200, 'Top Markets (last 30 days)');
+
+      // Cache saqlash
+      this.topMarketsCache = {
+        data: response,
+        expireAt: now + this.CACHE_TTL,
+      };
+
+      return response;
     } catch (error) {
       return catchError(error);
     }
@@ -2488,40 +2536,166 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   async getTopCouriers(limit = 10) {
     try {
-      // Oxirgi 30 kunlik timestamp (millisekund)
-      const lastMonth = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      if (this.topCouriersCache && this.topCouriersCache.expireAt > now) {
+        return this.topCouriersCache.data;
+      }
 
-      const result = await this.orderRepo
-        .createQueryBuilder('order')
-        .select('courier.id', 'courier_id')
-        .addSelect('courier.name', 'courier_name')
-        .addSelect('COUNT(order.id)', 'total_orders')
-        .addSelect(
-          `SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)`,
-          'successful_orders',
-        )
-        .addSelect(
-          `ROUND(
-          (SUM(CASE WHEN order.status IN (:...statuses) THEN 1 ELSE 0 END)::decimal
-          / NULLIF(COUNT(order.id), 0)) * 100, 2
-        )`,
-          'success_rate',
-        )
-        .innerJoin('order.post', 'post')
-        .innerJoin('post.courier', 'courier')
-        .where('courier.role = :role', { role: Roles.COURIER })
-        .andWhere('order.created_at >= :lastMonth', { lastMonth })
-        .setParameter('statuses', [
-          Order_status.SOLD,
-          Order_status.PAID,
-          Order_status.PARTLY_PAID,
-        ])
-        .groupBy('courier.id')
-        .orderBy('success_rate', 'DESC')
-        .limit(limit)
-        .getRawMany();
+      const lastMonth = now - 30 * 24 * 60 * 60 * 1000;
 
-      return successRes(result, 200, 'Top Couriers (last 30 days)');
+      const result = await this.orderRepo.query(
+        `
+        SELECT
+          u.id as courier_id,
+          u.name as courier_name,
+          COUNT(o.id) as total_orders,
+          SUM(CASE WHEN o.status IN ('sold', 'paid', 'partly_paid') THEN 1 ELSE 0 END) as successful_orders,
+          ROUND(
+            (SUM(CASE WHEN o.status IN ('sold', 'paid', 'partly_paid') THEN 1 ELSE 0 END)::decimal
+            / NULLIF(COUNT(o.id), 0)) * 100, 2
+          ) as success_rate
+        FROM "order" o
+        INNER JOIN "post" p ON p.id = o.post_id
+        INNER JOIN "users" u ON u.id = p.courier_id
+        WHERE u.role = 'courier'
+          AND o.created_at >= $1
+        GROUP BY u.id
+        ORDER BY success_rate DESC NULLS LAST
+        LIMIT $2
+        `,
+        [lastMonth, limit],
+      );
+
+      const response = successRes(result, 200, 'Top Couriers (last 30 days)');
+
+      // Cache saqlash
+      this.topCouriersCache = {
+        data: response,
+        expireAt: now + this.CACHE_TTL,
+      };
+
+      return response;
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // Daromad statistikasi - kunlik, haftalik, oylik, yillik
+  async getRevenueStats(
+    period: 'daily' | 'weekly' | 'monthly' | 'yearly' = 'daily',
+    startDate?: string,
+    endDate?: string,
+  ) {
+    try {
+      const now = Date.now();
+      let start: number;
+      let end: number;
+      let groupFormat: string;
+      let labelFormat: string;
+
+      // Default oraliqlar
+      if (startDate && endDate) {
+        // String formatdagi sana keladi (YYYY-MM-DD), timestamp ga o'giramiz
+        start = new Date(startDate).setHours(0, 0, 0, 0);
+        end = new Date(endDate).setHours(23, 59, 59, 999);
+      } else {
+        end = now;
+        switch (period) {
+          case 'daily':
+            start = now - 30 * 24 * 60 * 60 * 1000; // Oxirgi 30 kun
+            break;
+          case 'weekly':
+            start = now - 12 * 7 * 24 * 60 * 60 * 1000; // Oxirgi 12 hafta
+            break;
+          case 'monthly':
+            start = now - 12 * 30 * 24 * 60 * 60 * 1000; // Oxirgi 12 oy
+            break;
+          case 'yearly':
+            start = now - 5 * 365 * 24 * 60 * 60 * 1000; // Oxirgi 5 yil
+            break;
+        }
+      }
+
+      // SQL formatlar
+      switch (period) {
+        case 'daily':
+          groupFormat = "TO_CHAR(TO_TIMESTAMP(o.sold_at / 1000), 'YYYY-MM-DD')";
+          labelFormat = 'DD.MM';
+          break;
+        case 'weekly':
+          groupFormat = "TO_CHAR(TO_TIMESTAMP(o.sold_at / 1000), 'IYYY-IW')";
+          labelFormat = 'WW';
+          break;
+        case 'monthly':
+          groupFormat = "TO_CHAR(TO_TIMESTAMP(o.sold_at / 1000), 'YYYY-MM')";
+          labelFormat = 'MM.YYYY';
+          break;
+        case 'yearly':
+          groupFormat = "TO_CHAR(TO_TIMESTAMP(o.sold_at / 1000), 'YYYY')";
+          labelFormat = 'YYYY';
+          break;
+      }
+
+      const result = await this.orderRepo.query(
+        `
+        SELECT
+          ${groupFormat} as period,
+          TO_CHAR(TO_TIMESTAMP(MIN(o.sold_at) / 1000), '${labelFormat}') as label,
+          COUNT(o.id) as orders_count,
+          COALESCE(SUM(
+            CASE WHEN o.where_deliver = 'address' THEN
+              COALESCE(m.tariff_home, 0) - COALESCE(c.tariff_home, 0)
+            ELSE
+              COALESCE(m.tariff_center, 0) - COALESCE(c.tariff_center, 0)
+            END
+          ), 0) as revenue
+        FROM "order" o
+        LEFT JOIN "users" m ON m.id = o.user_id
+        LEFT JOIN "post" p ON p.id = o.post_id
+        LEFT JOIN "users" c ON c.id = p.courier_id
+        WHERE o.status IN ('sold', 'paid', 'partly_paid')
+          AND o.sold_at >= $1
+          AND o.sold_at <= $2
+          AND o.sold_at IS NOT NULL
+        GROUP BY ${groupFormat}
+        ORDER BY period ASC
+        `,
+        [start, end],
+      );
+
+      // Ma'lumotni formatlash
+      const formattedResult = result.map((item: any) => ({
+        period: item.period,
+        label: item.label,
+        ordersCount: Number(item.orders_count) || 0,
+        revenue: Number(item.revenue) || 0,
+      }));
+
+      // Jami daromad
+      const totalRevenue = formattedResult.reduce(
+        (sum: number, item: any) => sum + item.revenue,
+        0,
+      );
+      const totalOrders = formattedResult.reduce(
+        (sum: number, item: any) => sum + item.ordersCount,
+        0,
+      );
+
+      return successRes(
+        {
+          data: formattedResult,
+          summary: {
+            totalRevenue,
+            totalOrders,
+            avgRevenue:
+              formattedResult.length > 0
+                ? Math.round(totalRevenue / formattedResult.length)
+                : 0,
+          },
+        },
+        200,
+        `Revenue stats (${period})`,
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -2538,69 +2712,53 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         Order_status.PARTLY_PAID,
       ];
 
-      // 🔹 1. Faqat shu kuryerning OXIRGI faol postlari (masalan, so'nggi 30 kun ichida yangilangan)
-      const recentThreshold = end - 30 * 24 * 60 * 60 * 1000; // 30 kun oldingi timestamp
-
-      const courierPosts = await this.postRepo
-        .createQueryBuilder('p')
-        .where('p.courier_id = :courierId', { courierId: user.id })
-        .andWhere('p.updated_at > :threshold', { threshold: recentThreshold })
-        .select(['p.id'])
-        .getMany();
-
-      const postIds = courierPosts.map((p) => p.id);
-      if (postIds.length === 0) {
-        return successRes(
-          {
-            totalOrders: 0,
-            soldOrders: 0,
-            canceledOrders: 0,
-            profit: 0,
-            successRate: 0,
-          },
-          200,
-          'Couriers stats',
-        );
-      }
-
-      // 🔹 2. Shu postlar ichidagi shu davrdagi orderlar
-      const orderQuery = this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.post_id IN (:...postIds)', { postIds })
-        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end });
-
-      const [totalOrders, soldOrders, canceledOrders, soldOrderEntities] =
-        await Promise.all([
-          orderQuery.getCount(),
-          this.orderRepo
-            .createQueryBuilder('o')
-            .where('o.post_id IN (:...postIds)', { postIds })
-            .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
-            .andWhere('o.status IN (:...validStatuses)', { validStatuses })
-            .getCount(),
-          this.orderRepo
-            .createQueryBuilder('o')
-            .where('o.post_id IN (:...postIds)', { postIds })
-            .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
-            .andWhere('o.status = :status', { status: Order_status.CANCELLED })
-            .getCount(),
-          this.orderRepo
-            .createQueryBuilder('o')
-            .where('o.post_id IN (:...postIds)', { postIds })
-            .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
-            .andWhere('o.status IN (:...validStatuses)', { validStatuses })
-            .getMany(),
-        ]);
-
+      // Courier ma'lumotlarini olish (tarifflar uchun)
       const courier = await this.userRepo.findOne({ where: { id: user.id } });
+      const tariffHome = Number(courier?.tariff_home ?? 0);
+      const tariffCenter = Number(courier?.tariff_center ?? 0);
 
-      let profit = 0;
-      for (const order of soldOrderEntities) {
-        profit +=
-          order.where_deliver === Where_deliver.ADDRESS
-            ? Number(courier?.tariff_home ?? 0)
-            : Number(courier?.tariff_center ?? 0);
-      }
+      // Statistikani olish (profit alohida hisoblanadi)
+      const statsResult = await this.orderRepo
+        .createQueryBuilder('o')
+        .select(
+          `COUNT(CASE WHEN o.updated_at BETWEEN :start AND :end THEN 1 END)`,
+          'totalOrders',
+        )
+        .addSelect(
+          `COUNT(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) THEN 1 END)`,
+          'soldOrders',
+        )
+        .addSelect(
+          `COUNT(CASE WHEN o.updated_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          'canceledOrders',
+        )
+        .addSelect(
+          `SUM(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) AND o.where_deliver = :addressType THEN 1 ELSE 0 END)`,
+          'addressCount',
+        )
+        .addSelect(
+          `SUM(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) AND o.where_deliver != :addressType THEN 1 ELSE 0 END)`,
+          'centerCount',
+        )
+        .innerJoin('o.post', 'post')
+        .where('post.courier_id = :courierId', { courierId: user.id })
+        .setParameters({
+          start,
+          end,
+          validStatuses,
+          cancelledStatus: Order_status.CANCELLED,
+          addressType: Where_deliver.ADDRESS,
+        })
+        .getRawOne();
+
+      const totalOrders = Number(statsResult?.totalOrders) || 0;
+      const soldOrders = Number(statsResult?.soldOrders) || 0;
+      const canceledOrders = Number(statsResult?.canceledOrders) || 0;
+      const addressCount = Number(statsResult?.addressCount) || 0;
+      const centerCount = Number(statsResult?.centerCount) || 0;
+
+      // Profit ni JS da hisoblash (SQL type xatosidan qochish uchun)
+      const profit = addressCount * tariffHome + centerCount * tariffCenter;
 
       const successRate =
         totalOrders > 0
@@ -2622,79 +2780,60 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const start = Number(startDate);
       const end = Number(endDate);
 
-      // 1️⃣ Shu davrdagi barcha postlar
-      const allOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.created_at BETWEEN :start AND :end', { start, end })
-        .andWhere('o.user_id = :marketId', { marketId: user.id })
-        .getMany();
-
       const validStatuses = [
         Order_status.SOLD,
         Order_status.PAID,
         Order_status.PARTLY_PAID,
       ];
 
-      const orderIds = allOrders.map((o) => o.id);
-
-      if (orderIds.length === 0) {
-        return successRes(
-          {
-            totalOrders: 0,
-            soldOrders: 0,
-            canceledOrders: 0,
-            profit: 0,
-            successRate: 0,
-          },
-          200,
-          'Couriers stats',
-        );
-      }
-
-      // 🔹 Shu marketning sotilgan orderlari
-      const soldOrders = await this.orderRepo
+      // Bitta optimallashtirilgan query - barcha statistikani olish
+      const statsResult = await this.orderRepo
         .createQueryBuilder('o')
-        .where('o.id IN (:...orderIds)', { orderIds })
-        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
-        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
-        .getCount();
-
-      const canceledOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.id IN (:...orderIds)', { orderIds })
-        .andWhere('o.updated_at BETWEEN :start AND :end', { start, end })
-        .andWhere('o.status IN (:...statuses)', {
-          statuses: [Order_status.CANCELLED],
+        .select(
+          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end THEN 1 END)`,
+          'totalOrders',
+        )
+        .addSelect(
+          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end AND o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) THEN 1 END)`,
+          'soldOrders',
+        )
+        .addSelect(
+          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end AND o.updated_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          'canceledOrders',
+        )
+        .addSelect(
+          `SUM(CASE WHEN o.created_at BETWEEN :start AND :end AND o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) THEN o.to_be_paid ELSE 0 END)`,
+          'profit',
+        )
+        .where('o.user_id = :marketId', { marketId: user.id })
+        .setParameters({
+          start,
+          end,
+          validStatuses,
+          cancelledStatus: Order_status.CANCELLED,
         })
-        .getCount();
+        .getRawOne();
 
-      const allSoldOrders = await this.orderRepo
-        .createQueryBuilder('o')
-        .where('o.id IN (:...orderIds)', { orderIds })
-        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end })
-        .andWhere('o.status IN (:...validStatuses)', { validStatuses })
-        .getMany();
-
-      let profit: number = 0;
-      for (const order of allSoldOrders) {
-        profit += order.to_be_paid;
-      }
+      const totalOrders = Number(statsResult?.totalOrders) || 0;
+      const soldOrders = Number(statsResult?.soldOrders) || 0;
+      const canceledOrders = Number(statsResult?.canceledOrders) || 0;
+      const profit = Number(statsResult?.profit) || 0;
 
       const successRate =
-        allOrders.length > 0
-          ? Number(((soldOrders * 100) / allOrders.length).toFixed(2))
+        totalOrders > 0
+          ? Number(((soldOrders * 100) / totalOrders).toFixed(2))
           : 0;
 
       return successRes(
         {
-          totalOrders: allOrders.length,
+          totalOrders,
           soldOrders,
           canceledOrders,
           profit,
           successRate,
         },
         200,
-        'Couriers stats',
+        'Market stats',
       );
     } catch (error) {
       return catchError(error);
@@ -2717,6 +2856,180 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return successRes({}, 200, 'Order deleted');
     } catch (error) {
       return catchError(error);
+    }
+  }
+
+  /**
+   * Export orders to Excel with streaming (katta ma'lumotlar uchun)
+   * Pagination o'rniga cursor-based streaming ishlatiladi
+   */
+  async exportOrdersToExcel(
+    res: Response,
+    filters: {
+      status?: string | string[];
+      marketId?: string;
+      regionId?: string;
+      search?: string;
+      startDate?: string;
+      endDate?: string;
+    },
+  ) {
+    try {
+      // Excel workbook yaratish (streaming mode)
+      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+        stream: res,
+        useStyles: true,
+      });
+
+      const worksheet = workbook.addWorksheet('Orders');
+
+      // Header row
+      worksheet.columns = [
+        { header: 'ID', key: 'id', width: 10 },
+        { header: 'Buyurtma raqami', key: 'order_number', width: 15 },
+        { header: 'Market', key: 'market', width: 20 },
+        { header: 'Mijoz ismi', key: 'customer_name', width: 20 },
+        { header: 'Telefon', key: 'phone', width: 15 },
+        { header: 'Viloyat', key: 'region', width: 15 },
+        { header: 'Tuman', key: 'district', width: 15 },
+        { header: 'Manzil', key: 'address', width: 25 },
+        { header: 'Jami narx', key: 'total_price', width: 15 },
+        { header: "To'langan", key: 'paid_amount', width: 15 },
+        { header: "To'lanishi kerak", key: 'to_be_paid', width: 15 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Yaratilgan sana', key: 'created_at', width: 20 },
+        { header: 'Kuriyer', key: 'courier', width: 20 },
+      ];
+
+      // Header style
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' },
+      };
+
+      // Response headers
+      const filename = `orders_${new Date().toISOString().split('T')[0]}.xlsx`;
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+
+      // Cursor-based pagination bilan ma'lumotlarni olish
+      const BATCH_SIZE = 500;
+      let lastId: string | null = null;
+      let hasMore = true;
+      let rowNumber = 1;
+
+      while (hasMore) {
+        // Query builder
+        const qb = this.orderRepo
+          .createQueryBuilder('order')
+          .leftJoinAndSelect('order.customer', 'customer')
+          .leftJoinAndSelect('customer.district', 'district')
+          .leftJoinAndSelect('district.region', 'region')
+          .leftJoinAndSelect('order.market', 'market')
+          .leftJoinAndSelect('order.post', 'post')
+          .leftJoinAndSelect('post.courier', 'courier')
+          .orderBy('order.id', 'ASC')
+          .take(BATCH_SIZE);
+
+        // Cursor
+        if (lastId) {
+          qb.andWhere('order.id > :lastId', { lastId });
+        }
+
+        // Filters
+        if (filters.status) {
+          const statusArray = Array.isArray(filters.status)
+            ? filters.status
+            : [filters.status];
+          qb.andWhere('order.status IN (:...statuses)', { statuses: statusArray });
+        } else {
+          qb.andWhere('order.status != :createdStatus', {
+            createdStatus: Order_status.CREATED,
+          });
+        }
+
+        if (filters.marketId) {
+          qb.andWhere('order.user_id = :marketId', { marketId: filters.marketId });
+        }
+
+        if (filters.regionId) {
+          qb.andWhere('region.id = :regionId', { regionId: filters.regionId });
+        }
+
+        if (filters.search) {
+          qb.andWhere(
+            '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+            { search: `%${filters.search}%` },
+          );
+        }
+
+        // Date filters
+        if (filters.startDate) {
+          const startMs = toUzbekistanTimestamp(filters.startDate, false);
+          qb.andWhere('order.created_at >= :startDate', { startDate: startMs });
+        }
+        if (filters.endDate) {
+          const endMs = toUzbekistanTimestamp(filters.endDate, true);
+          qb.andWhere('order.created_at <= :endDate', { endDate: endMs });
+        }
+
+        const orders = await qb.getMany();
+
+        if (orders.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        // Ma'lumotlarni Excel ga yozish
+        for (const order of orders) {
+          rowNumber++;
+          const row = worksheet.addRow({
+            id: rowNumber - 1,
+            order_number: order.qr_code_token?.slice(-8) || '-',
+            market: order.market?.name || '-',
+            customer_name: order.customer?.name || '-',
+            phone: order.customer?.phone_number || '-',
+            region: order.customer?.district?.region?.name || '-',
+            district: order.customer?.district?.name || '-',
+            address: order.customer?.address || '-',
+            total_price: order.total_price || 0,
+            paid_amount: order.paid_amount || 0,
+            to_be_paid: order.to_be_paid || 0,
+            status: order.status,
+            created_at: order.created_at
+              ? new Date(Number(order.created_at)).toLocaleString('uz-UZ')
+              : '-',
+            courier: order.post?.courier?.name || '-',
+          });
+
+          // Commit row (memory optimization)
+          row.commit();
+        }
+
+        // Keyingi batch uchun cursor
+        lastId = orders[orders.length - 1].id;
+
+        // Agar olingan ma'lumotlar BATCH_SIZE dan kam bo'lsa, boshqa ma'lumot yo'q
+        if (orders.length < BATCH_SIZE) {
+          hasMore = false;
+        }
+      }
+
+      // Workbook ni yopish va stream'ni tugatish
+      await workbook.commit();
+    } catch (error) {
+      this.logger.error('Excel export error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: 'Excel export failed', error: error.message });
+      }
     }
   }
 }

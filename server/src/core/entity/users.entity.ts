@@ -20,6 +20,11 @@ import { OrderEntity } from './order.entity';
 import { DistrictEntity } from './district.entity';
 
 @Entity('users')
+@Index('IDX_USERS_ROLE', ['role'])
+@Index('IDX_USERS_STATUS', ['status'])
+@Index('IDX_USERS_ROLE_STATUS', ['role', 'status'])
+@Index('IDX_USERS_REGION_ID', ['region_id'])
+@Index('IDX_USERS_DISTRICT_ID', ['district_id'])
 export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   name: string;
@@ -66,6 +71,9 @@ export class UserEntity extends BaseEntity {
 
   @Column({ type: 'bigint', nullable: true })
   telegram_id: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  avatar_id: string;
 
   @Column({ type: 'boolean', default: false })
   is_deleted: boolean;

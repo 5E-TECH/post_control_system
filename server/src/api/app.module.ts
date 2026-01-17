@@ -26,6 +26,21 @@ import { OrderBotModule } from './bots/order_create-bot/order-bot.module';
       entities: [__dirname + '/../core/entity/*.entity{.ts,.js}'],
       autoLoadEntities: true,
       synchronize: true,
+      // Connection Pool sozlamalari - yuqori yuklanish uchun
+      extra: {
+        // Maksimal ulanishlar soni (default: 10)
+        max: 50,
+        // Minimal ulanishlar soni
+        min: 5,
+        // Ulanish olishga kutish vaqti (ms)
+        connectionTimeoutMillis: 10000,
+        // Bo'sh ulanishni yopish vaqti (ms)
+        idleTimeoutMillis: 30000,
+      },
+      // Query timeout (30 sekund)
+      maxQueryExecutionTime: 30000,
+      // Logging (development uchun)
+      logging: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     }),
     JwtModule.register({ global: true }),
     UsersModule,

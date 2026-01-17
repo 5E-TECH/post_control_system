@@ -22,5 +22,13 @@ export const useProfile = () => {
     },
   });
 
-  return { getUser, updateProfil };
+  const updateAvatar = useMutation({
+    mutationFn: (avatar_id: string) =>
+      api.patch(`user/self`, { avatar_id }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [user] });
+    },
+  });
+
+  return { getUser, updateProfil, updateAvatar };
 };

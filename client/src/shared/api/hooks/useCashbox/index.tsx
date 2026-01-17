@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../..";
 
 export const cashbox = "cashbox";
+export const shift = "shift";
 
 export const useCashBox = () => {
   const client = useQueryClient();
@@ -28,7 +29,7 @@ export const useCashBox = () => {
       queryKey: [cashbox, id],
       queryFn: () => api.get(`cashbox-history/${id}`).then((res) => res.data),
       enabled: bool,
-    });  
+    });
 
   const getCashboxMyCashbox = (params?:any) =>
     useQuery({
@@ -64,6 +65,37 @@ export const useCashBox = () => {
     },
   });
 
+  // ==================== SHIFT (SMENA) HOOKS ====================
+
+  const getCurrentShift = () =>
+    useQuery({
+      queryKey: [shift, "current"],
+      queryFn: () => api.get("cashbox/shift/current").then((res) => res.data),
+    });
+
+  const openShift = useMutation({
+    mutationFn: () => api.post("cashbox/shift/open"),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [shift] });
+    },
+  });
+
+  const closeShift = useMutation({
+    mutationFn: (comment?: string) =>
+      api.post("cashbox/shift/close", { comment }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [shift] });
+      client.invalidateQueries({ queryKey: [cashbox] });
+    },
+  });
+
+  const getShiftHistory = (params?: { page?: number; limit?: number }) =>
+    useQuery({
+      queryKey: [shift, "history", params],
+      queryFn: () =>
+        api.get("cashbox/shift/history", { params }).then((res) => res.data),
+    });
+
   return {
     getCashBoxById,
     getCashBoxInfo,
@@ -74,5 +106,10 @@ export const useCashBox = () => {
     createPaymentMarket,
     cashboxSpand,
     cashboxFill,
+    // Shift hooks
+    getCurrentShift,
+    openShift,
+    closeShift,
+    getShiftHistory,
   };
 };

@@ -123,6 +123,24 @@ const OrderDetails = () => {
               id={data?.data?.customer?.id}
             />
           </div>
+
+          {data?.data?.post?.courier && (
+            <div className="bg-white rounded-xl shadow p-6 dark:bg-[#312D4B]">
+              <div className="m-5">
+                <h2 className="font-medium text-[#2E263DE5] text-[18px] dark:text-[#E7E3FCE5]">
+                  {t("detail.courier")}
+                </h2>
+              </div>
+              <div className="m-5">
+                <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
+                  <strong>{t("detail.courierName")}:</strong> {data?.data?.post?.courier?.name}
+                </h2>
+                <h2 className="text-[15px] text-[#2E263DB2] dark:text-[#E7E3FCB2]">
+                  <strong>{t("detail.courierPhone")}:</strong> {data?.data?.post?.courier?.phone_number}
+                </h2>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

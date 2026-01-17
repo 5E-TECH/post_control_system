@@ -9,6 +9,12 @@ export class CashEntity extends BaseEntity {
   @Column({ type: 'int', default: 0 })
   balance: number;
 
+  @Column({ type: 'int', default: 0 })
+  balance_cash: number;
+
+  @Column({ type: 'int', default: 0 })
+  balance_card: number;
+
   @Column({ type: 'enum', enum: Cashbox_type })
   cashbox_type: Cashbox_type;
 

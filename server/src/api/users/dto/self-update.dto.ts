@@ -12,4 +12,8 @@ export class UpdateSelfDto {
   @IsOptional()
   @IsString()
   password?: string;
+
+  @IsOptional()
+  @IsString()
+  avatar_id?: string;
 }

@@ -1,11 +1,15 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Post_status } from 'src/common/enums';
-import { Column, Entity, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { RegionEntity } from './region.entity';
 import { OrderEntity } from './order.entity';
 
 @Entity('post')
+@Index('IDX_POST_STATUS', ['status'])
+@Index('IDX_POST_COURIER_ID', ['courier_id'])
+@Index('IDX_POST_REGION_ID', ['region_id'])
+@Index('IDX_POST_CREATED_AT', ['created_at'])
 export class PostEntity extends BaseEntity {
   @Column({ type: 'uuid', name: 'courier_id', nullable: true })
   courier_id: string;

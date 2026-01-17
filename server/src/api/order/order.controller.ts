@@ -8,7 +8,10 @@ import {
   Delete,
   UseGuards,
   Query,
+  Res,
+  Header,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -81,7 +84,7 @@ export class OrderController {
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.COURIER)
   @Get()
   findAll(
-    @Query('status') status?: string,
+    @Query('status') status?: string | string[],
     @Query('marketId') marketId?: string,
     @Query('regionId') regionId?: string,
     @Query('search') search?: string,
@@ -89,6 +92,7 @@ export class OrderController {
     @Query('endDate') endDate?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('fetchAll') fetchAll?: string,
   ) {
     return this.orderService.allOrders({
       status,
@@ -99,6 +103,7 @@ export class OrderController {
       endDate,
       page,
       limit,
+      fetchAll,
     });
   }
 
@@ -226,9 +231,10 @@ export class OrderController {
       limit?: number;
       search?: string;
       regionId?: string;
-      status?: string;
+      status?: string | string[];
       startDate?: string;
       endDate?: string;
+      fetchAll?: string | boolean;
     },
   ) {
     return this.orderService.allMarketsOrders(user, query);
@@ -243,12 +249,13 @@ export class OrderController {
   @Get('courier/orders')
   getCouriersOrders(
     @CurrentUser() user: JwtPayload,
-    @Query('status') status: string,
+    @Query('status') status: string | string[],
     @Query('search') search: string,
     @Query('page') page: number,
     @Query('limit') limit: number,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Query('fetchAll') fetchAll: string,
   ) {
     return this.orderService.allCouriersOrders(user, {
       status,
@@ -257,6 +264,7 @@ export class OrderController {
       limit,
       startDate,
       endDate,
+      fetchAll,
     });
   }
 
@@ -336,5 +344,36 @@ export class OrderController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.orderService.createOrderByBot(body, user);
+  }
+
+  @ApiOperation({ summary: 'Export orders to Excel (streaming)' })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'marketId', required: false })
+  @ApiQuery({ name: 'regionId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @ApiResponse({ status: 200, description: 'Excel file stream' })
+  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
+  @Get('export/excel')
+  async exportOrdersToExcel(
+    @Res() res: Response,
+    @Query('status') status?: string | string[],
+    @Query('marketId') marketId?: string,
+    @Query('regionId') regionId?: string,
+    @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.orderService.exportOrdersToExcel(res, {
+      status,
+      marketId,
+      regionId,
+      search,
+      startDate,
+      endDate,
+    });
   }
 }

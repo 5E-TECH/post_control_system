@@ -36,16 +36,22 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
       else setCurrentMonthTo(currentMonthTo.add(1, "month"));
     };
 
-    const startOfMonth = (month: Dayjs) => month.startOf("month").day();
     const daysInMonth = (month: Dayjs) => month.daysInMonth();
+
+    // Oyning birinchi kunini olish (Dushanba = 0, Yakshanba = 6)
+    const getStartDayOfWeek = (month: Dayjs) => {
+      const day = month.startOf("month").day(); // 0 = Yakshanba, 1 = Dushanba, ...
+      // Dushanbadan boshlanadigan formatga o'zgartirish
+      return day === 0 ? 6 : day - 1;
+    };
 
     const generateCalendarDays = (month: Dayjs) => {
       const days: (Dayjs | null)[] = [];
-      const startDay = startOfMonth(month);
+      const startDay = getStartDayOfWeek(month);
       const totalDays = daysInMonth(month);
 
       for (let i = 0; i < startDay; i++) days.push(null);
-      for (let i = 1; i <= totalDays; i++) days.push(dayjs(month).date(i));
+      for (let i = 1; i <= totalDays; i++) days.push(month.date(i));
 
       return days;
     };

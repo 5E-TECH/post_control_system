@@ -41,6 +41,7 @@
     "dotenv": "^17.2.3",
     "escpos": "^3.0.0-alpha.6",
     "escpos-usb": "^3.0.0-alpha.4",
+    "exceljs": "^4.4.0",
     "fs-extra": "^11.3.2",
     "jsonwebtoken": "^9.0.2",
     "mqtt": "^5.14.1",

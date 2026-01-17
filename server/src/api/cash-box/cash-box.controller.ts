@@ -8,7 +8,9 @@ import {
   Delete,
   UseGuards,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -50,6 +52,50 @@ export class CasheBoxController {
     @Query('toDate') toDate?: string,
   ) {
     return this.cashBoxService.getMainCashbox({ fromDate, toDate });
+  }
+
+  @ApiOperation({ summary: 'Export main cashbox to Excel' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Excel file downloaded',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('main/export')
+  async exportMainCashbox(
+    @Res() res: Response,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    const buffer = await this.cashBoxService.exportMainCashboxToExcel({
+      fromDate,
+      toDate,
+    });
+
+    const filename = `cashbox-${fromDate || 'daily'}.xlsx`;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(buffer);
   }
 
   @ApiOperation({ summary: 'Get cashbox by user ID' })
@@ -214,5 +260,103 @@ export class CasheBoxController {
     @Body() updateCashboxDto: UpdateCashBoxDto,
   ) {
     return this.cashBoxService.fillTheCashbox(user, updateCashboxDto);
+  }
+
+  // ==================== SHIFT (SMENA) ENDPOINTS ====================
+
+  @ApiOperation({ summary: 'Get current open shift' })
+  @ApiResponse({ status: 200, description: 'Current shift info' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('shift/current')
+  getCurrentShift() {
+    return this.cashBoxService.getCurrentShift();
+  }
+
+  @ApiOperation({ summary: 'Open a new shift' })
+  @ApiResponse({ status: 201, description: 'Shift opened' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('shift/open')
+  openShift(@CurrentUser() user: JwtPayload) {
+    return this.cashBoxService.openShift(user);
+  }
+
+  @ApiOperation({ summary: 'Close current shift' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        comment: { type: 'string', description: 'Optional comment for shift' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Shift closed with report data' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('shift/close')
+  closeShift(
+    @CurrentUser() user: JwtPayload,
+    @Body('comment') comment?: string,
+  ) {
+    return this.cashBoxService.closeShift(user, comment);
+  }
+
+  @ApiOperation({ summary: 'Export shift report to Excel' })
+  @ApiQuery({
+    name: 'shiftId',
+    required: false,
+    type: String,
+    description: 'Shift ID (defaults to last closed shift)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Excel file downloaded',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('shift/export')
+  async exportShift(
+    @Res() res: Response,
+    @Query('shiftId') shiftId?: string,
+  ) {
+    const buffer = await this.cashBoxService.exportShiftToExcel(shiftId);
+
+    const filename = `smena-hisobot-${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(buffer);
+  }
+
+  @ApiOperation({ summary: 'Get shift history' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 10)',
+  })
+  @ApiResponse({ status: 200, description: 'List of shifts' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('shift/history')
+  getShiftHistory(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.getShiftHistory({ page, limit });
   }
 }

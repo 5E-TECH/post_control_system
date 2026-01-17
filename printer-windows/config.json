@@ -1,0 +1,17 @@
+{
+  "mqtt": {
+    "host": "mqtt://13.234.20.96:1883",
+    "username": "shodiyor",
+    "password": "root",
+    "topic": "beepost/printer/print",
+    "reconnectPeriod": 2000,
+    "connectTimeout": 5000
+  },
+  "printer": {
+    "port": "auto"
+  },
+  "app": {
+    "name": "Beepost Printer Service",
+    "logFile": "beepost-printer.log"
+  }
+}

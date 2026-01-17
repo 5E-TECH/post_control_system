@@ -46,6 +46,7 @@ import { UpdateMarketDto } from './dto/update-market.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
+import { getSafeLimit } from 'src/common/constants/pagination';
 import { TelegramInitData } from './dto/initData.dto';
 
 @Injectable()
@@ -414,12 +415,11 @@ export class UserService {
     role?: string;
     page?: number;
     limit?: number;
+    fetchAll?: boolean;
   }): Promise<object> {
     try {
-      let { search, status, role, page = 1, limit = 10 } = filters;
-
-      // Agar limit = 0 bo‘lsa → barcha yozuvlarni olish
-      const unlimited = limit === 0;
+      const { search, status, role, page = 1, fetchAll = false } = filters;
+      const limit = getSafeLimit(filters.limit, fetchAll);
 
       const qb = this.userRepo
         .createQueryBuilder('user')
@@ -446,10 +446,8 @@ export class UserService {
         qb.andWhere('user.role = :role', { role });
       }
 
-      // 🔢 Pagination (faqat limit > 0 bo‘lsa ishlaydi)
-      if (!unlimited) {
-        qb.skip((page - 1) * limit).take(limit);
-      }
+      // 🔢 Pagination
+      qb.skip((page - 1) * limit).take(limit);
 
       const [users, total] = await qb
         .orderBy('user.created_at', 'DESC')
@@ -459,9 +457,9 @@ export class UserService {
         {
           data: users,
           total,
-          page: unlimited ? 1 : Number(page),
-          limit: unlimited ? total : Number(limit),
-          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All users',
@@ -474,9 +472,12 @@ export class UserService {
   async allMarkets(
     search?: string,
     page: number = 1,
-    limit: number = 10,
+    limit?: number,
+    fetchAll: boolean = false,
   ): Promise<object> {
     try {
+      const safeLimit = getSafeLimit(limit, fetchAll);
+
       const query = this.userRepo
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.cashbox', 'cashbox')
@@ -489,7 +490,7 @@ export class UserService {
           'user.default_tariff',
           'user.created_at',
           'user.add_order',
-          'cashbox', // cashboxni to‘liq olish uchun
+          'cashbox', // cashboxni to'liq olish uchun
         ]);
 
       if (search) {
@@ -500,8 +501,8 @@ export class UserService {
       }
 
       // 🟢 Pagination
-      const skip = (page - 1) * limit;
-      query.skip(skip).take(limit);
+      const skip = (page - 1) * safeLimit;
+      query.skip(skip).take(safeLimit);
 
       const [data, total] = await query.getManyAndCount();
 
@@ -510,8 +511,8 @@ export class UserService {
           data,
           total,
           page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+          limit: safeLimit,
+          totalPages: Math.ceil(total / safeLimit),
         },
         200,
         'All markets',
@@ -527,11 +528,11 @@ export class UserService {
     role?: string;
     page?: number;
     limit?: number;
+    fetchAll?: boolean;
   }): Promise<object> {
     try {
-      let { search, status, role, page = 1, limit = 10 } = filters;
-
-      const unlimited = limit === 0;
+      const { search, status, role, page = 1, fetchAll = false } = filters;
+      const limit = getSafeLimit(filters.limit, fetchAll);
 
       const allowedRoles = [Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER];
 
@@ -559,9 +560,7 @@ export class UserService {
       }
 
       // 🔢 Pagination
-      if (!unlimited) {
-        qb.skip((page - 1) * limit).take(limit);
-      }
+      qb.skip((page - 1) * limit).take(limit);
 
       const [users, total] = await qb
         .orderBy('user.created_at', 'DESC')
@@ -571,9 +570,9 @@ export class UserService {
         {
           data: users,
           total,
-          page: unlimited ? 1 : Number(page),
-          limit: unlimited ? total : Number(limit),
-          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All users with roles: SUPERADMIN, ADMIN, COURIER',
@@ -589,11 +588,11 @@ export class UserService {
     role?: string;
     page?: number;
     limit?: number;
+    fetchAll?: boolean;
   }): Promise<object> {
     try {
-      let { search, status, role, page = 1, limit = 10 } = filters;
-
-      const unlimited = limit === 0;
+      const { search, status, role, page = 1, fetchAll = false } = filters;
+      const limit = getSafeLimit(filters.limit, fetchAll);
 
       const allowedRoles = [Roles.REGISTRATOR, Roles.ADMIN];
 
@@ -621,9 +620,7 @@ export class UserService {
       }
 
       // 🔢 Pagination
-      if (!unlimited) {
-        qb.skip((page - 1) * limit).take(limit);
-      }
+      qb.skip((page - 1) * limit).take(limit);
 
       const [users, total] = await qb
         .orderBy('user.created_at', 'DESC')
@@ -633,9 +630,9 @@ export class UserService {
         {
           data: users,
           total,
-          page: unlimited ? 1 : Number(page),
-          limit: unlimited ? total : Number(limit),
-          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All users with roles: REGISTRATOR, ADMIN',
