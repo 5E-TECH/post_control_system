@@ -127,6 +127,10 @@ const Filter = () => {
 
   const handleClear = () => {
     dispatch(resetFilter());
+    // Clear the search input manually
+    if (searchInputRef.current) {
+      searchInputRef.current.value = "";
+    }
   };
 
   // Check if any filter is active
@@ -160,7 +164,7 @@ const Filter = () => {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="sm:hidden p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+              className="sm:hidden p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-pointer"
             >
               {showFilters ? (
                 <ChevronUp className="w-5 h-5" />
@@ -176,6 +180,7 @@ const Filter = () => {
             <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
+                ref={searchInputRef}
                 type="text"
                 name="search"
                 defaultValue={form.search}
@@ -188,7 +193,7 @@ const Filter = () => {
             {/* Add Order Button */}
             <button
               onClick={handleCheck}
-              className="h-10 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-purple-500/25 transition-all whitespace-nowrap"
+              className="h-10 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-medium rounded-xl flex items-center gap-2 hover:shadow-lg hover:shadow-purple-500/25 transition-all whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">{t("button.addOrder")}</span>
@@ -334,7 +339,7 @@ const Filter = () => {
               disabled={!hasActiveFilters}
               className={`h-10 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all ${
                 hasActiveFilters
-                  ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30"
+                  ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 cursor-pointer"
                   : "bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed"
               }`}
             >
@@ -349,7 +354,7 @@ const Filter = () => {
               className={`h-10 px-5 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all ${
                 disabled
                   ? "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                  : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-md hover:shadow-lg hover:shadow-emerald-500/25"
+                  : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-md hover:shadow-lg hover:shadow-emerald-500/25 cursor-pointer"
               }`}
             >
               {loading ? (

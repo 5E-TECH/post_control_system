@@ -19,7 +19,7 @@ import dayjs from "dayjs";
 import CustomCalendar from "../../shared/components/customDate";
 import Leaderboard from "../../shared/components/Leaderboard";
 import SalesChart from "../../shared/components/SalesChart";
-import RevenueChart from "../../shared/components/RevenueChart";
+import AdvancedStatsChart from "../../shared/components/AdvancedStatsChart";
 
 const { RangePicker } = DatePicker;
 
@@ -281,9 +281,9 @@ const Dashboards = () => {
       {/* Role-based Rendering */}
       {(role === "superadmin" || role === "admin" || role === "registrator") && (
         <>
-          {/* Revenue Chart - Full Width */}
+          {/* Advanced Stats Chart - Full Width */}
           <div className="mb-6">
-            <RevenueChart startDate={fromDate} endDate={toDate} />
+            <AdvancedStatsChart startDate={fromDate} endDate={toDate} />
           </div>
 
           {/* Charts Grid */}

@@ -18,7 +18,6 @@ import {
   Store,
   Calendar,
   ChevronRight,
-  Package,
   Truck,
   Home,
 } from "lucide-react";
@@ -201,11 +200,11 @@ const OrderCard = ({
           </span>
         </div>
 
-        {/* Location */}
+        {/* Location - Order district yoki customer district */}
         <div className="flex items-center gap-2 text-sm">
           <MapPin className="w-3.5 h-3.5 text-gray-400" />
           <span className="text-gray-600 dark:text-gray-300 truncate">
-            {item?.customer?.district?.name || "-"}
+            {item?.district?.name || item?.customer?.district?.name || "-"}
           </span>
         </div>
 
@@ -297,7 +296,6 @@ const TableRowSkeleton = () => (
 
 const OrderView = () => {
   const { t } = useTranslation("orderList");
-  const { t: st } = useTranslation("status");
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { getOrders } = useOrder();
@@ -394,8 +392,9 @@ const OrderView = () => {
         );
         const exportData = orders?.map((order: any, inx: number) => ({
           N: inx + 1,
-          Viloyat: order?.customer?.district?.assignedToRegion?.name,
-          Tuman: order?.customer?.district?.name,
+          // Order district yoki customer district (fallback)
+          Viloyat: order?.district?.assignedToRegion?.name || order?.customer?.district?.assignedToRegion?.name,
+          Tuman: order?.district?.name || order?.customer?.district?.name,
           Firma: order?.market?.name,
           Mahsulot: order?.items
             ?.map((item: any) => item.product.name)
@@ -520,7 +519,7 @@ const OrderView = () => {
                     <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
                       <div className="flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                        {item?.customer?.district?.name}
+                        {item?.district?.name || item?.customer?.district?.name || "-"}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">

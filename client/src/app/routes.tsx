@@ -80,6 +80,9 @@ const ChooseMarket = lazy(
 const OrderDetails = lazy(
   () => import("../pages/orders/pages/superadmin/order-details")
 );
+const CustomerDetailPage = lazy(
+  () => import("../pages/orders/pages/superadmin/customer-detail")
+);
 const TodayOrders = lazy(() => import("../pages/today-orders"));
 const TodayMails = lazy(
   () => import("../pages/mails/components/superadmin/today-mails")
@@ -175,6 +178,10 @@ const AppRouters = () => {
                 {
                   path: "order-detail/:id",
                   element: <OrderDetails />,
+                },
+                {
+                  path: "customer/:id",
+                  element: <CustomerDetailPage />,
                 },
               ],
             },

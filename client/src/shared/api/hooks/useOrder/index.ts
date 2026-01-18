@@ -127,6 +127,14 @@ export const useOrder = () => {
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
+  // Order manzilini yangilash (buyurtma uchun alohida manzil)
+  const updateOrderAddress = useMutation({
+    mutationFn: ({ id, data }: { id: string | undefined; data: any }) =>
+      api.patch(`order/${id}/address`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
   const updateOrdersUserPhoneAndName = useMutation({
     mutationFn: ({ id, data }: { id: string | undefined; data: any }) =>
       api.patch(`user/customer/name-phone/${id}`, data).then((res) => res.data),
@@ -161,6 +169,7 @@ export const useOrder = () => {
     courierReceiveOrderByScanerById,
     joinPostRefusalProduct,
     receivePostByScan,
-    createOrderBot
+    createOrderBot,
+    updateOrderAddress
   };
 };

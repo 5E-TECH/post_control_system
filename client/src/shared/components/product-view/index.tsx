@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { setLimit, setPage } from '../../lib/features/paginationProductSlice';
 import { useTranslation } from 'react-i18next';
 import type { RootState } from '../../../app/store';
+import { DEFAULT_PRODUCT_IMAGE } from '../../const';
 
 interface IProps {
   data: any;
@@ -119,9 +120,12 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                 <td className="data-cell p-3 pl-5" data-cell="PRODUCT NAME">
                   <div className="flex items-center gap-3">
                     <img
-                      src={item?.image_url}
+                      src={item?.image_url || DEFAULT_PRODUCT_IMAGE}
                       alt="Product"
-                      className="w-10 h-10 object-contain"
+                      className="w-10 h-10 object-contain rounded-lg bg-gray-100"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
+                      }}
                     />
                     <div>
                       <p className="font-medium">{item?.name}</p>

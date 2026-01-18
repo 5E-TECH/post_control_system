@@ -62,6 +62,34 @@ export const useUser = (path?: string) => {
         api.get("user/except-market", { params }).then((res) => res.data),
     });
 
+  // Customer suggestion by phone number
+  const suggestCustomer = (phone: string, market_id?: string) =>
+    useQuery({
+      queryKey: ["customer-suggest", phone, market_id],
+      queryFn: () =>
+        api
+          .get("user/customer/suggest", { params: { phone, market_id } })
+          .then((res) => res.data),
+      enabled: !!phone && phone.replace(/\D/g, "").length >= 9,
+      staleTime: 30000,
+      retry: false,
+    });
+
+  // Get customer order history
+  const getCustomerOrderHistory = (
+    customerId: string,
+    market_id?: string,
+    enabled = true
+  ) =>
+    useQuery({
+      queryKey: ["customer-history", customerId, market_id],
+      queryFn: () =>
+        api
+          .get(`user/customer/${customerId}/history`, { params: { market_id } })
+          .then((res) => res.data),
+      enabled: enabled && !!customerId,
+    });
+
   return {
     createUser,
     getUser,
@@ -70,5 +98,7 @@ export const useUser = (path?: string) => {
     getUserById,
     updateUser,
     removeUser,
+    suggestCustomer,
+    getCustomerOrderHistory,
   };
 };
