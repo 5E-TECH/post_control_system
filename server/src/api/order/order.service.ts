@@ -49,6 +49,7 @@ import { BotService } from '../bots/notify-bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import { OrderDto } from './dto/orderId.dto';
 import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
+import { UpdateOrderAddressDto } from './dto/update-order-address.dto';
 import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 import {
   getSafeLimit,
@@ -124,9 +125,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const qb = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
-        .leftJoinAndSelect('customer.district', 'district')
-        .leftJoinAndSelect('district.region', 'region')
-        .leftJoinAndSelect('district.assignedToRegion', 'assignedToRegion')
+        .leftJoinAndSelect('customer.district', 'customerDistrict')
+        .leftJoinAndSelect('customerDistrict.region', 'customerRegion')
+        .leftJoinAndSelect('customerDistrict.assignedToRegion', 'customerAssignedRegion')
+        // Order ning o'z district (yetkazib berish manzili)
+        .leftJoinAndSelect('order.district', 'orderDistrict')
+        .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
+        .leftJoinAndSelect('orderDistrict.assignedToRegion', 'orderAssignedRegion')
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
@@ -153,7 +158,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       if (query.regionId) {
-        qb.andWhere('region.id = :regionId', { regionId: query.regionId });
+        // Order district yoki customer district bo'yicha filter
+        qb.andWhere(
+          '(orderRegion.id = :regionId OR (orderDistrict.id IS NULL AND customerRegion.id = :regionId))',
+          { regionId: query.regionId },
+        );
       }
 
       if (query.search) {
@@ -222,6 +231,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where_deliver,
         operator,
         comment,
+        district_id,
+        address,
       } = createOrderDto;
 
       let { market_id } = createOrderDto;
@@ -254,6 +265,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const qr_code_token = generateCustomToken();
 
+      // Agar manzil berilmagan bo'lsa, mijozning default manzilini olish
+      const orderDistrictId = district_id || customer.district_id;
+      const orderAddress = address !== undefined ? address : customer.address;
+
       const newOrder = queryRunner.manager.create(OrderEntity, {
         user_id: market_id,
         comment,
@@ -263,6 +278,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         status: Order_status.NEW,
         qr_code_token,
         customer_id,
+        district_id: orderDistrictId,
+        address: orderAddress,
       });
 
       await queryRunner.manager.save(newOrder);
@@ -768,7 +785,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       const customerMap = new Map(customers.map((c) => [c.id, c]));
 
-      const districtIds = customers.map((c) => c.district_id);
+      // Order dan yoki customer dan district_id olish (order ustunlik qiladi)
+      const districtIds = newOrders.map((o) => {
+        const customer = customerMap.get(o.customer_id);
+        return o.district_id || customer?.district_id;
+      }).filter(Boolean);
+
       const districts = await queryRunner.manager.find(DistrictEntity, {
         where: { id: In(districtIds) },
       });
@@ -783,7 +805,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const newPosts: PostEntity[] = [];
       const postsToUpdate: PostEntity[] = [];
 
-      // 3️⃣ Ordersni postlarga bog‘lash
+      // 3️⃣ Ordersni postlarga bog'lash
       for (const order of newOrders) {
         const customer = customerMap.get(order.customer_id);
         if (!customer)
@@ -791,10 +813,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             `Customer not found for order ${order.id}`,
           );
 
-        const district = districtMap.get(customer.district_id);
+        // Order dan yoki customer dan district_id olish (order ustunlik qiladi)
+        const orderDistrictId = order.district_id || customer.district_id;
+        const district = districtMap.get(orderDistrictId);
         if (!district)
           throw new NotFoundException(
-            `District not found for customer ${customer.id}`,
+            `District not found for order ${order.id}`,
           );
 
         let post = postMap.get(district.assigned_region);
@@ -3030,6 +3054,61 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!res.headersSent) {
         res.status(500).json({ message: 'Excel export failed', error: error.message });
       }
+    }
+  }
+
+  // Buyurtma manzilini yangilash (faqat buyurtma uchun, mijozga tegmaydi)
+  async updateOrderAddress(
+    id: string,
+    updateOrderAddressDto: UpdateOrderAddressDto,
+  ): Promise<Object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id },
+      });
+
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+
+      // Faqat NEW yoki RECEIVED statusdagi orderlarni tahrirlash mumkin
+      if (
+        order.status !== Order_status.NEW &&
+        order.status !== Order_status.RECEIVED
+      ) {
+        throw new BadRequestException(
+          'Bu holatdagi buyurtma manzilini o\'zgartirish mumkin emas',
+        );
+      }
+
+      // District mavjudligini tekshirish
+      if (updateOrderAddressDto.district_id) {
+        const district = await queryRunner.manager.findOne(DistrictEntity, {
+          where: { id: updateOrderAddressDto.district_id },
+        });
+        if (!district) {
+          throw new NotFoundException('District not found');
+        }
+        order.district_id = updateOrderAddressDto.district_id;
+      }
+
+      if (updateOrderAddressDto.address !== undefined) {
+        order.address = updateOrderAddressDto.address;
+      }
+
+      await queryRunner.manager.save(order);
+      await queryRunner.commitTransaction();
+
+      return successRes(order, 200, 'Order address updated');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
     }
   }
 }

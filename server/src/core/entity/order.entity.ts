@@ -4,6 +4,7 @@ import { Column, Entity, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm
 import { OrderItemEntity } from './order-item.entity';
 import { PostEntity } from './post.entity';
 import { UserEntity } from './users.entity';
+import { DistrictEntity } from './district.entity';
 
 @Entity('order')
 @Index('IDX_ORDER_STATUS', ['status'])
@@ -18,6 +19,7 @@ import { UserEntity } from './users.entity';
 @Index('IDX_ORDER_STATUS_SOLD', ['status', 'sold_at'])
 @Index('IDX_ORDER_USER_CREATED', ['user_id', 'created_at'])
 @Index('IDX_ORDER_USER_SOLD', ['user_id', 'sold_at'])
+@Index('IDX_ORDER_DISTRICT_ID', ['district_id'])
 export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
@@ -61,6 +63,13 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   customer_id: string;
 
+  // Buyurtma uchun yetkazib berish manzili
+  @Column({ type: 'uuid', nullable: true })
+  district_id: string;
+
+  @Column({ type: 'text', nullable: true })
+  address: string;
+
   @Column({ type: 'bigint', nullable: true })
   sold_at: number | null;
 
@@ -89,8 +98,15 @@ export class OrderEntity extends BaseEntity {
   market: UserEntity; // Market egasi
 
   @ManyToOne(() => UserEntity, (user) => user.customerOrders, {
-    onDelete: 'CASCADE', // user o‘chsa order o‘chadi
+    onDelete: 'CASCADE', // user o'chsa order o'chadi
   })
   @JoinColumn({ name: 'customer_id' })
   customer: UserEntity; // Buyurtma beruvchi
+
+  // 🟢 Many Orders → One District (yetkazib berish manzili)
+  @ManyToOne(() => DistrictEntity, {
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'district_id' })
+  district: DistrictEntity;
 }

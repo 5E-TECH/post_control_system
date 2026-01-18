@@ -35,6 +35,7 @@ import { SellCancelOrderDto } from './dto/sellCancel-order.dto';
 import { PartlySoldDto } from './dto/partly-sold.dto';
 import { OrderDto } from './dto/orderId.dto';
 import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
+import { UpdateOrderAddressDto } from './dto/update-order-address.dto';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -191,6 +192,20 @@ export class OrderController {
   @Patch(':id')
   editOrder(@Param('id') id: string, @Body() updateOrderDto: UpdateOrderDto) {
     return this.orderService.updateOrder(id, updateOrderDto);
+  }
+
+  @ApiOperation({ summary: 'Update order delivery address' })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiBody({ type: UpdateOrderAddressDto })
+  @ApiResponse({ status: 200, description: 'Order address updated' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
+  @Patch(':id/address')
+  updateOrderAddress(
+    @Param('id') id: string,
+    @Body() updateOrderAddressDto: UpdateOrderAddressDto,
+  ) {
+    return this.orderService.updateOrderAddress(id, updateOrderAddressDto);
   }
 
   @ApiOperation({ summary: 'Receive new orders' })

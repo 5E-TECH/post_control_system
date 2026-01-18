@@ -83,4 +83,22 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   operator?: string;
+
+  @ApiPropertyOptional({
+    description: 'District ID for delivery address',
+    type: String,
+    format: 'uuid',
+    example: '2c3f5b7a-1d9e-44f7-8a1b-0a1d2b3c4d5e',
+  })
+  @IsOptional()
+  @IsUUID(4, { message: "Tuman ID noto'g'ri formatda" })
+  district_id?: string;
+
+  @ApiPropertyOptional({
+    description: 'Delivery address',
+    example: 'Navoiy ko\'chasi, 15-uy',
+  })
+  @IsOptional()
+  @IsString()
+  address?: string;
 }
