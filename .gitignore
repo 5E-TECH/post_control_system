@@ -1,4 +1,5 @@
 printer-server/
+printer-windows/
 # uploads (runtime files)
 uploads/
 server/home/ubuntu/uploads/

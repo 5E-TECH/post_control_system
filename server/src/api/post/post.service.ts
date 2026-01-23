@@ -108,11 +108,11 @@ export class PostService {
           regionPostMap.set(regionId, newPost);
         }
 
-        // keyin statistikani to‘plash uchun
+        // keyin statistikani to'plash uchun
         const post = regionPostMap.get(regionId)!;
         post.post_total_price =
-          (post.post_total_price ?? 0) + (order.total_price ?? 0);
-        post.order_quantity = (post.order_quantity ?? 0) + 1;
+          (Number(post.post_total_price) || 0) + (Number(order.total_price) || 0);
+        post.order_quantity = (Number(post.order_quantity) || 0) + 1;
       }
 
       // 3️⃣ Avval yangi postlarni saqlaymiz (IDlar hosil bo‘lishi uchun)
@@ -457,10 +457,10 @@ export class PostService {
         sum: 0,
       };
       /**
-       * 6️⃣ Yangi orderlarni ON_THE_ROAD holatiga o‘tkazish
+       * 6️⃣ Yangi orderlarni ON_THE_ROAD holatiga o'tkazish
        */
       for (const order of newOrders) {
-        postTotalInfo.sum += order.total_price;
+        postTotalInfo.sum += Number(order.total_price) || 0;
         order.post_id = post.id;
         order.status = Order_status.ON_THE_ROAD;
         await queryRunner.manager.save(order);
@@ -595,7 +595,7 @@ export class PostService {
           order.post_id = newPost.id;
           await queryRunner.manager.save(order);
 
-          totalAdded += order.total_price ?? 0;
+          totalAdded += Number(order.total_price) || 0;
           countAdded += 1;
         }
 
@@ -605,8 +605,8 @@ export class PostService {
             PostEntity,
             { id: newPost.id },
             {
-              order_quantity: (newPost.order_quantity ?? 0) + countAdded,
-              post_total_price: (newPost.post_total_price ?? 0) + totalAdded,
+              order_quantity: (Number(newPost.order_quantity) || 0) + countAdded,
+              post_total_price: (Number(newPost.post_total_price) || 0) + totalAdded,
             },
           );
         }
@@ -786,16 +786,15 @@ export class PostService {
       }
 
       // 6️⃣ Canceled postning mavjud qiymatlarini olish
-      let canceledOrderQt: number = canceledPost.order_quantity ?? 0;
-      let canPostTotalPrice: number =
-        Number(canceledPost.post_total_price) ?? 0;
+      let canceledOrderQt: number = Number(canceledPost.order_quantity) || 0;
+      let canPostTotalPrice: number = Number(canceledPost.post_total_price) || 0;
 
       // 7️⃣ Har bir orderni yangilash
       for (const order of orders) {
         order.canceled_post_id = canceledPost.id;
         order.status = Order_status.CANCELLED_SENT;
         canceledOrderQt++;
-        canPostTotalPrice += Number(order.total_price) ?? 0;
+        canPostTotalPrice += Number(order.total_price) || 0;
       }
 
       // 8️⃣ Orderlarni saqlash

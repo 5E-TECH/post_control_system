@@ -1,14 +1,12 @@
-import { memo, useEffect, useState } from "react";
-import { Check, Printer, Trash2 } from "lucide-react";
+import { memo, useEffect, useMemo, useState } from "react";
+import { Check, Printer, Trash2, ArrowLeft, Search, Package, Home, MapPin, Phone, User, Store, Calendar, Send, Loader2 } from "lucide-react";
 import {
   useLocation,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { Button } from "antd";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
-import SearchInput from "../../../../users/components/search-input";
 import Popup from "../../../../../shared/ui/Popup";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
@@ -20,6 +18,7 @@ import { exportToExcel } from "../../../../../shared/helpers/export-download-exc
 import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import { buildAdminPath } from "../../../../../shared/const";
+import { debounce } from "../../../../../shared/helpers/DebounceFunc";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -28,9 +27,24 @@ const MailDetail = () => {
   const { id } = useParams();
   const { state } = useLocation();
   const regionName = state?.regionName;
-  const search = useSelector(
-    (state: RootState) => state.resetUserFilter.search
+
+  // Local search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const debouncedSetSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setDebouncedSearch(value);
+      }, 400),
+    []
   );
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    debouncedSetSearch(value);
+  };
 
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
@@ -48,9 +62,7 @@ const MailDetail = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handlePrint = (id: string) => {
-    // if (id) return; // 🔒 agar allaqachon bosilgan bo‘lsa, qaytadi
-
-    setIsPrintDisabled(true); // ⛔ bosilgandan so‘ng tugma bloklanadi
+    setIsPrintDisabled(true);
 
     const orderids = { orderIds: [id] };
     createPrint.mutate(orderids, {
@@ -61,7 +73,7 @@ const MailDetail = () => {
         handleApiError(err, "Chop etishda hatolik yuz berdi");
       },
       onSettled: () => {
-        setTimeout(() => setIsPrintDisabled(false), 10000); // ⏳ 10 soniyadan keyin qayta yoqiladi
+        setTimeout(() => setIsPrintDisabled(false), 10000);
       },
     });
   };
@@ -79,7 +91,6 @@ const MailDetail = () => {
 
   usePostScanner(undefined, setSelectedIds);
 
-  // Dynamic fetching based on status
   const [params] = useSearchParams();
   const status = params.get("status");
 
@@ -97,8 +108,21 @@ const MailDetail = () => {
     condition = true;
   }
 
-  const { data } = getPostById(id as string, endpoint, condition, search);
+  const { data, isLoading } = getPostById(id as string, endpoint, condition, debouncedSearch);
   const postData = data?.data?.allOrdersByPostId || data?.data;
+
+  // Filter locally by name or phone
+  const filteredPostData = useMemo(() => {
+    if (!postData || !Array.isArray(postData)) return postData;
+    if (!debouncedSearch) return postData;
+
+    const searchLower = debouncedSearch.toLowerCase();
+    return postData.filter((order: any) => {
+      const name = order?.customer?.name?.toLowerCase() || "";
+      const phone = order?.customer?.phone_number || "";
+      return name.includes(searchLower) || phone.includes(debouncedSearch);
+    });
+  }, [postData, debouncedSearch]);
 
   useEffect(() => {
     if (postData && !initialized) {
@@ -255,199 +279,329 @@ const MailDetail = () => {
     setSelectedIds(
       (prev) =>
         prev.includes(id)
-          ? prev.filter((item) => item !== id) // agar bor bo‘lsa — olib tashla
-          : [...prev, id] // yo‘q bo‘lsa — qo‘sh
+          ? prev.filter((item) => item !== id)
+          : [...prev, id]
     );
   };
 
   const hideSend = state?.hideSend;
 
+  const formatPhone = (phone: string | undefined) => {
+    if (!phone) return "-";
+    const cleaned = phone.replace(/\D/g, "");
+    if (cleaned.length === 12 && cleaned.startsWith("998")) {
+      return `+${cleaned.slice(0, 3)} ${cleaned.slice(3, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8, 10)} ${cleaned.slice(10, 12)}`;
+    }
+    return phone;
+  };
+
+  const formatDate = (timestamp: string | number) => {
+    if (!timestamp) return "-";
+    return new Date(Number(timestamp)).toLocaleDateString("uz-UZ");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-5 p-5 ">
-      <div className="flex flex-col justify-between shadow-lg rounded-md bg-[#ffffff] dark:bg-[#312D48]">
-        <div className="flex justify-between px-5 pt-5">
-          <h1 className="text-2xl mt-1">
-            <span>{regionName}</span> {t("buyurtmalari")}
-          </h1>
-          <SearchInput placeholder={`${t("qidiruv")}...`} />
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col flex-1 overflow-hidden">
+        {/* Header */}
+        <div className="mb-4 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <button
+                onClick={() => navigate(-1)}
+                className="w-10 h-10 rounded-xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-[#3A3650] transition-colors flex-shrink-0"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                    <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  </div>
+                  <span className="truncate">{regionName} {t("buyurtmalari")}</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 ml-10 sm:ml-13">
+                  {filteredPostData?.length || 0} ta buyurtma mavjud
+                </p>
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Ism yoki telefon raqam..."
+                className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A263D] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className={`grid gap-3 sm:gap-4 mt-4 ${!hideSend ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}>
+            {!hideSend && (
+              <div className={`bg-white dark:bg-[#2A263D] rounded-xl p-3 sm:p-4 shadow-sm border ${
+                selectedIds.length === postData?.length
+                  ? "border-emerald-500"
+                  : "border-red-400"
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    selectedIds.length === postData?.length
+                      ? "bg-emerald-100 dark:bg-emerald-900/30"
+                      : "bg-red-100 dark:bg-red-900/30"
+                  }`}>
+                    <Package className={`w-5 h-5 ${
+                      selectedIds.length === postData?.length
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Tanlangan</p>
+                    <p className={`text-lg font-bold ${
+                      selectedIds.length === postData?.length
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}>
+                      {selectedIds.length} / {postData?.length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white dark:bg-[#2A263D] rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100 dark:border-gray-700/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Home className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t("uygacha")}</p>
+                  <p className="text-lg font-bold text-gray-800 dark:text-white">
+                    {data?.data?.homeOrders?.homeOrders ?? 0} ta
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {Number(data?.data?.homeOrders?.homeOrdersTotalPrice || 0).toLocaleString("uz-UZ")} so'm
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-[#2A263D] rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100 dark:border-gray-700/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t("markazgacha")}</p>
+                  <p className="text-lg font-bold text-gray-800 dark:text-white">
+                    {data?.data?.centerOrders?.centerOrders ?? 0} ta
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {Number(data?.data?.centerOrders?.centerOrdersTotalPrice || 0).toLocaleString("uz-UZ")} so'm
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div
-          className={`mt-5 grid gap-6 px-5 max-[901px]:grid-cols-1 ${
-            !hideSend ? "grid-cols-3" : "grid-cols-2"
-          }`}
-        >
-          {!hideSend ? (
-            <div
-              className={`flex flex-col justify-center items-center border rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] ${
-                selectedIds.length == postData?.length
-                  ? "border-green-500"
-                  : "border-red-500"
-              }`}
-            >
-              <span
-                className={`text-[32px] font-bold ${
-                  selectedIds.length == postData?.length
-                    ? "text-green-500"
-                    : "text-red-500"
-                }`}
-              >
-                {selectedIds.length} / {postData?.length}
+        {/* Content */}
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1">
+          {/* Select All Header */}
+          {!hideSend && (
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 flex items-center gap-3 flex-shrink-0">
+              <input
+                type="checkbox"
+                className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                checked={!!postData && selectedIds.length === postData?.length}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedIds(postData.map((item: any) => item.id));
+                  } else {
+                    setSelectedIds([]);
+                  }
+                }}
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Barchasini tanlash
               </span>
             </div>
-          ) : null}
+          )}
 
-          <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
-            <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
-              {t("uygacha")}
-            </span>
-            <span className="text-[22px] font-bold text-[#2E263D] dark:text-[#E7E3FC]">
-              {data?.data?.homeOrders?.homeOrders ?? 0} {t("ta")}
-            </span>
-            <span className="text-[15px] text-gray-500 dark:text-[#A9A5C0]">
-              {data?.data?.homeOrders?.homeOrdersTotalPrice?.toLocaleString(
-                "uz-UZ"
-              ) ?? 0}{" "}
-              {t("so'm")}
-            </span>
-          </div>
+          {/* Orders List */}
+          <div className="p-3 sm:p-4 space-y-3 overflow-y-auto flex-1">
+            {filteredPostData?.map((order: any) => (
+              <div
+                key={order?.id}
+                onClick={() => !hideSend && toggleSelect(order.id)}
+                className={`bg-gray-50 dark:bg-[#3A3650] rounded-xl p-3 sm:p-4 transition-all ${
+                  !hideSend ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-[#4A4660]" : ""
+                } ${selectedIds.includes(order.id) ? "ring-2 ring-indigo-500" : ""}`}
+              >
+                {/* Mobile Layout */}
+                <div className="block sm:hidden">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      {!hideSend && (
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                          checked={selectedIds.includes(order.id)}
+                          onChange={() => toggleSelect(order.id)}
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
+                          {order?.customer?.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          {formatPhone(order?.customer?.phone_number)}
+                        </p>
+                      </div>
+                    </div>
+                    {!hideSend && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          disabled={isPrintDisabled && order?.id === selected}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrint(order?.id);
+                            setSelected(order?.id);
+                          }}
+                          className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50"
+                        >
+                          <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </button>
+                        {role === "superadmin" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteId(order.id);
+                              setConfirmPopup(true);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                      <MapPin className="w-3 h-3 text-gray-400" />
+                      <span className="truncate">{order?.customer?.district?.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                      <Store className="w-3 h-3 text-gray-400" />
+                      <span className="truncate">{order?.market?.name}</span>
+                    </div>
+                    <div className="font-semibold text-gray-800 dark:text-white">
+                      {new Intl.NumberFormat("uz-UZ").format(Number(order?.total_price) || 0)} so'm
+                    </div>
+                    <div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                        order?.where_deliver === "home"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                      }`}>
+                        {order?.where_deliver === "home" ? "Uygacha" : "Markazgacha"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-          <div className="flex flex-col justify-center items-center border border-[var(--color-bg-sy)] rounded-xl py-3 shadow-sm bg-white dark:bg-[#312D4B] dark:border-[#D5D1EB]">
-            <span className="text-[18px] font-medium text-gray-600 dark:text-[#A9A5C0]">
-              {t("markazgacha")}
-            </span>
-            <span className="text-[22px] font-bold text-[#2E263D] dark:text-[#E7E3FC]">
-              {data?.data?.centerOrders?.centerOrders ?? 0} {t("ta")}
-            </span>
-            <span className="text-[15px] text-gray-500 dark:text-[#A9A5C0]">
-              {data?.data?.centerOrders?.centerOrdersTotalPrice?.toLocaleString(
-                "uz-UZ"
-              ) ?? 0}{" "}
-              {t("so'm")}
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <table>
-            <thead className="bg-[#F6F7FB] dark:bg-[#3D3759] capitalize">
-              <tr>
-                {!hideSend ? (
-                  <th className="p-[20px] flex items-center">
-                    <input
-                      type="checkbox"
-                      className="w-[18px] h-[18px] rounded-sm"
-                      checked={
-                        !!postData && selectedIds.length === postData?.length
-                      }
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedIds(postData.map((item: any) => item.id));
-                        } else {
-                          setSelectedIds([]);
-                        }
-                      }}
-                    />
-                  </th>
-                ) : null}
-                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    {t("mijozIsmi")}
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    {t("telefonRaqami")}
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    {t("tumani")}
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    {t("market")}
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    {t("pulMiqdori")}
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    {t("delivery")}
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    {t("time")}
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-                <th className="w-[340px] h-[56px] font-medium text-[13px] pl-[20px] text-left">
-                  <div className="flex items-center justify-between pr-[21px]">
-                    {t("action")}
-                    <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {postData?.map((order: any) => (
-                <tr
-                  key={order?.id}
-                  onClick={() => toggleSelect(order.id)}
-                  className="select-none"
-                >
-                  {!hideSend ? (
-                    <td className="p-[20px] flex items-center">
-                      {" "}
+                {/* Desktop Layout */}
+                <div className="hidden sm:flex items-center justify-between">
+                  <div className="flex items-center gap-4 flex-1">
+                    {!hideSend && (
                       <input
                         type="checkbox"
-                        className="w-[18px] h-[18px] rounded-sm"
-                        onClick={(e) => e.stopPropagation()} // table row click bilan to‘qnashmasin
+                        className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        onClick={(e) => e.stopPropagation()}
                         checked={selectedIds.includes(order.id)}
                         onChange={() => toggleSelect(order.id)}
                       />
-                    </td>
-                  ) : null}
-                  <td className="w-[254px] h-[56px] pl-[20px] text-left">
-                    <span className="font-normal text-[15px] text-[#2E263DB2] dark:text-[#B1ADC7]">
-                      {order?.customer?.name}
-                    </span>
-                  </td>
-                  <td className="w-[254px] h-[56px] pl-[20px] text-left">
-                    <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
-                      {order?.customer?.phone_number}
-                    </span>
-                  </td>
-                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {order?.customer?.district?.name}
-                  </td>
-                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {order?.market?.name}
-                  </td>
-                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {new Intl.NumberFormat("uz-UZ").format(order?.total_price)}
-                  </td>
-                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {t(`${order?.where_deliver}`)}
-                  </td>
-                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    {new Date(Number(order?.created_at)).toLocaleDateString(
-                      "uz-UZ"
                     )}
-                  </td>
-                  <td className="w-[254px] h-[56px] font-normal text-[15px] text-[#2E263DE5] pl-[20px] text-left dark:text-[#D5D1EB]">
-                    <div className="flex gap-5">
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 lg:gap-4 flex-1">
+                      {/* Customer Name */}
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm font-medium text-gray-800 dark:text-white truncate">
+                          {order?.customer?.name}
+                        </span>
+                      </div>
+
+                      {/* Phone */}
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          {formatPhone(order?.customer?.phone_number)}
+                        </span>
+                      </div>
+
+                      {/* District */}
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
+                          {order?.customer?.district?.name}
+                        </span>
+                      </div>
+
+                      {/* Market */}
+                      <div className="flex items-center gap-2">
+                        <Store className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
+                          {order?.market?.name}
+                        </span>
+                      </div>
+
+                      {/* Price */}
+                      <div>
+                        <span className="text-sm font-semibold text-gray-800 dark:text-white">
+                          {new Intl.NumberFormat("uz-UZ").format(Number(order?.total_price) || 0)} so'm
+                        </span>
+                      </div>
+
+                      {/* Delivery */}
+                      <div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
+                          order?.where_deliver === "home"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                        }`}>
+                          {order?.where_deliver === "home" ? <Home className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                          {t(`${order?.where_deliver}`)}
+                        </span>
+                      </div>
+
+                      {/* Date */}
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          {formatDate(order?.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  {!hideSend && (
+                    <div className="flex items-center gap-2 ml-4">
                       <button
                         disabled={isPrintDisabled && order?.id === selected}
                         onClick={(e) => {
@@ -455,9 +609,9 @@ const MailDetail = () => {
                           handlePrint(order?.id);
                           setSelected(order?.id);
                         }}
-                        className="cursor-pointer"
+                        className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50"
                       >
-                        <Printer />
+                        <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       </button>
                       {role === "superadmin" && (
                         <button
@@ -466,42 +620,48 @@ const MailDetail = () => {
                             setDeleteId(order.id);
                             setConfirmPopup(true);
                           }}
+                          className="w-9 h-9 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                         >
-                          <Trash2 />
+                          <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
                         </button>
                       )}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Send Button */}
+          {!hideSend && (
+            <div className="px-4 py-4 border-t border-gray-100 dark:border-gray-700/50 flex-shrink-0">
+              <button
+                disabled={isPending}
+                onClick={() => handleClick(id as string)}
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isPending ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+                {t("pochtanijonatish")}
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {!hideSend ? (
-        <div className="flex justify-end">
-          <Button
-            disabled={isPending}
-            loading={isPending}
-            onClick={() => handleClick(id as string)}
-            className="w-[160px]! h-[37px]! bg-[var(--color-bg-sy)]! text-[#ffffff]! text-[15px]!"
-          >
-            {t("pochtanijonatish")}
-          </Button>
-        </div>
-      ) : null}
 
       {confirmPopup && (
         <ConfirmPopup
           isShow={confirmPopup}
-          title="O‘chirishni tasdiqlaysizmi?"
-          description="Bu amalni ortga qaytarib bo‘lmaydi."
-          confirmText="Ha, o‘chirish"
+          title="O'chirishni tasdiqlaysizmi?"
+          description="Bu amalni ortga qaytarib bo'lmaydi."
+          confirmText="Ha, o'chirish"
           cancelText="Bekor qilish"
           onConfirm={() => {
             if (deleteId) {
-              hanlerDelete(deleteId); // 🔴 shu joyda API yoki console.log ishlaydi
+              hanlerDelete(deleteId);
             }
             setDeleteId("");
             setConfirmPopup(false);
@@ -512,51 +672,68 @@ const MailDetail = () => {
 
       {isShow && (
         <Popup isShow={isShow} onClose={() => setIsShow(false)}>
-          <div className="min-h-[450px] w-[450px] bg-[#ffffff] rounded-md">
-            <h1 className="text-[22px] text-center py-3">Kuryerlar ro'yxati</h1>
+          <div className="min-h-[300px] sm:min-h-[450px] w-[calc(100vw-32px)] sm:w-[450px] max-w-[450px] bg-white dark:bg-[#2A263D] rounded-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 sm:px-6 py-4">
+              <h1 className="text-lg sm:text-xl font-bold text-white">Kuryerlar ro'yxati</h1>
+              <p className="text-xs sm:text-sm text-white/80">Pochtani jo'natish uchun kuryer tanlang</p>
+            </div>
 
-            <div className="grid grid-cols-1 gap-3 p-3">
+            <div className="p-3 sm:p-4 space-y-3 max-h-[60vh] overflow-y-auto">
               {couriers.map((courier: any) => (
                 <div
                   key={courier?.id}
-                  className="p-4 rounded-xl shadow-md flex items-center justify-between hover:shadow-lg transition cursor-pointer"
+                  onClick={() => handleSelectedCourier(courier?.id)}
+                  className={`p-3 sm:p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    selectedCourierId === courier?.id
+                      ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+                      : "border-gray-200 dark:border-gray-700 hover:border-indigo-300"
+                  }`}
                 >
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-800">
-                      {courier?.name}
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                      📞 {courier?.phone_number || "Telefon raqami yo‘q"}
-                    </p>
-                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        selectedCourierId === courier?.id
+                          ? "bg-indigo-500"
+                          : "bg-gray-200 dark:bg-gray-700"
+                      }`}>
+                        <User className={`w-5 h-5 ${
+                          selectedCourierId === courier?.id
+                            ? "text-white"
+                            : "text-gray-600 dark:text-gray-400"
+                        }`} />
+                      </div>
+                      <div>
+                        <h2 className="font-semibold text-gray-800 dark:text-white">
+                          {courier?.name}
+                        </h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <Phone className="w-3 h-3" />
+                          {courier?.phone_number || "Telefon raqami yo'q"}
+                        </p>
+                      </div>
+                    </div>
 
-                  <Button
-                    className={`${
-                      selectedCourierId === courier?.id
-                        ? "bg-[var(--color-bg-sy)]! text-white!"
-                        : ""
-                    }`}
-                    onClick={() => handleSelectedCourier(courier?.id)}
-                  >
-                    {selectedCourierId === courier?.id ? (
-                      <span className="flex items-center gap-1">
-                        Tanlandi <Check className="w-4 h-4 text-green-300" />
-                      </span>
-                    ) : (
-                      "Tanlash"
+                    {selectedCourierId === courier?.id && (
+                      <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center">
+                        <Check className="w-4 h-4 text-white" />
+                      </div>
                     )}
-                  </Button>
+                  </div>
                 </div>
               ))}
 
-              <Button
+              <button
                 disabled={isPending}
-                loading={isPending}
-                className="bg-[var(--color-bg-sy)]! text-white!"
                 onClick={handleConfirmCouriers}
+                className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
               >
+                {isPending ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Check className="w-5 h-5" />
+                )}
                 Tasdiqlash
-              </Button>
+              </button>
             </div>
           </div>
         </Popup>

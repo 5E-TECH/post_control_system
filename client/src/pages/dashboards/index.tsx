@@ -1,25 +1,15 @@
 import { memo, useEffect, useState } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { useChart } from "../../shared/api/hooks/useChart";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import {
   CheckCircle,
   DollarSign,
-  Medal,
   ShoppingCart,
   XCircle,
+  TrendingUp,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { t } from "i18next";
 import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
 import { useMarketStatCard } from "../../shared/api/hooks/useMarketStatCard";
 
@@ -27,6 +17,9 @@ import { DatePicker } from "antd";
 
 import dayjs from "dayjs";
 import CustomCalendar from "../../shared/components/customDate";
+import Leaderboard from "../../shared/components/Leaderboard";
+import SalesChart from "../../shared/components/SalesChart";
+import AdvancedStatsChart from "../../shared/components/AdvancedStatsChart";
 
 const { RangePicker } = DatePicker;
 
@@ -101,87 +94,92 @@ const Dashboards = () => {
     ? couriersData
     : couriersData.slice(0, 10);
 
-  let titleText = `📊 ${t("title")}`;
+  // Success rate hisoblash
+  const totalOrders = dashboard?.acceptedCount || 0;
+  const soldOrders = dashboard?.soldAndPaid || 0;
+  const successRate = totalOrders > 0 ? ((soldOrders / totalOrders) * 100).toFixed(1) : 0;
+
+  let titleText = `${t("title")}`;
 
   if (fromDate && toDate && fromDate === toDate) {
-    titleText = `📊 ${fromDate} sanadagi statistika`;
+    titleText = `${fromDate} - ${t("title")}`;
   } else if (fromDate && toDate && fromDate !== toDate) {
-    titleText = `📊 ${fromDate} dan - ${toDate} gacha statistikasi`;
+    titleText = `${fromDate} - ${toDate}`;
   } else if (fromDate && !toDate) {
-    titleText = `📊 ${fromDate} dan boshlab statistikasi`;
+    titleText = `${fromDate} dan boshlab`;
   } else if (!fromDate && toDate) {
-    titleText = `📊 ${toDate} gacha statistikasi`;
+    titleText = `${toDate} gacha`;
   }
 
   return (
-    <div className="w-full p-6 dark:bg-[#312D48] min-h-screen transition">
+    <div className="w-full p-3 sm:p-6 dark:bg-[#312D48] min-h-screen transition">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 max-[1550px]:flex-col-reverse max-[1550px]:gap-5">
-        <div className="flex flex-wrap gap-6">
-          {isLoading ? (
-            <>
-              <SkeletonBox className="w-40 h-10" />
-              <SkeletonBox className="w-40 h-10" />
-            </>
-          ) : (
-            <div className="flex gap-6">
-              <div className="flex flex-col">
-                <label className="mb-1 text-sm font-medium">
-                  {t("dateRange")}
-                </label>
-                {!isMobile ? (
-                  <RangePicker
-                    value={[
-                      fromDate ? dayjs(fromDate) : null,
-                      toDate ? dayjs(toDate) : null,
-                    ]}
-                    onChange={(dates) => {
-                      setFromDate(
-                        dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
-                      );
-                      setToDate(
-                        dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
-                      );
-                    }}
-                    className="w-full 
-                  dark:bg-[#342d4a]! 
-                  dark:border-[#4b3b6a]! 
-                  dark:[&_.ant-picker-input>input]:text-white! 
-                  dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
-                  />
-                ) : (
-                  <div className="flex flex-col gap-2 w-full">
-                    <CustomCalendar
-                      from={fromDate ? dayjs(fromDate) : null}
-                      to={toDate ? dayjs(toDate) : null}
-                      setFrom={(date: any) =>
-                        setFromDate(
-                          date ? date.format("YYYY-MM-DD") : undefined
-                        )
-                      }
-                      setTo={(date: any) =>
-                        setToDate(date ? date.format("YYYY-MM-DD") : undefined)
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        {/* Title */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+            <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">
+              {titleText}
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+              {t("dateRange")}
+            </p>
+          </div>
         </div>
 
-        {/* O‘rtada title */}
-        <h2 className="text-xl font-bold mr-170 max-[1550px]:mr-0">
-          {titleText}
-        </h2>
+        {/* Date Picker */}
+        <div className="w-full sm:w-auto">
+          {isLoading ? (
+            <SkeletonBox className="w-full sm:w-64 h-10" />
+          ) : (
+            <>
+              {!isMobile ? (
+                <RangePicker
+                  value={[
+                    fromDate ? dayjs(fromDate) : null,
+                    toDate ? dayjs(toDate) : null,
+                  ]}
+                  onChange={(dates) => {
+                    setFromDate(
+                      dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
+                    );
+                    setToDate(
+                      dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
+                    );
+                  }}
+                  className="w-full sm:w-64
+                    dark:bg-[#342d4a]!
+                    dark:border-[#4b3b6a]!
+                    dark:[&_.ant-picker-input>input]:text-white!
+                    dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
+                />
+              ) : (
+                <CustomCalendar
+                  from={fromDate ? dayjs(fromDate) : null}
+                  to={toDate ? dayjs(toDate) : null}
+                  setFrom={(date: any) =>
+                    setFromDate(date ? date.format("YYYY-MM-DD") : undefined)
+                  }
+                  setTo={(date: any) =>
+                    setToDate(date ? date.format("YYYY-MM-DD") : undefined)
+                  }
+                />
+              )}
+            </>
+          )}
+        </div>
       </div>
+
       {/* Stat Cards */}
-      <div className="grid grid-cols-4 gap-6 mb-6 max-xl:grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
         {isLoading ? (
           [...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-[#2A263D] p-6 rounded-2xl">
-              <SkeletonBox className="w-24 h-4 mb-3" />
-              <SkeletonBox className="w-16 h-6" />
+            <div key={i} className="bg-white dark:bg-[#2A263D] p-4 sm:p-6 rounded-2xl">
+              <SkeletonBox className="w-20 h-4 mb-3" />
+              <SkeletonBox className="w-16 h-8" />
             </div>
           ))
         ) : (
@@ -189,33 +187,29 @@ const Dashboards = () => {
             {role === "courier" && (
               <>
                 <StatCard
-                  icon={<ShoppingCart size={20} />}
+                  icon={<ShoppingCart className="w-5 h-5" />}
                   label={t("totalOrders")}
                   value={aboutCourier?.totalOrders || 0}
-                  borderColor="border-gray-400"
+                  gradient="from-blue-500 to-cyan-500"
                 />
                 <StatCard
-                  icon={<CheckCircle size={20} />}
+                  icon={<CheckCircle className="w-5 h-5" />}
                   label={t("solded")}
                   value={aboutCourier?.soldOrders || 0}
-                  borderColor="border-green-500"
-                  textColor="text-green-500"
+                  gradient="from-green-500 to-emerald-500"
                 />
                 <StatCard
-                  icon={<XCircle size={20} />}
+                  icon={<XCircle className="w-5 h-5" />}
                   label={t("cancelled")}
                   value={aboutCourier?.canceledOrders || 0}
-                  borderColor="border-red-500"
-                  textColor="text-red-500"
+                  gradient="from-red-500 to-rose-500"
                 />
                 <StatCard
-                  icon={<DollarSign size={20} />}
+                  icon={<DollarSign className="w-5 h-5" />}
                   label={t("profit")}
-                  value={`${Number(
-                    aboutCourier?.profit || 0
-                  ).toLocaleString()} UZS`}
-                  borderColor="border-yellow-500"
-                  textColor="text-yellow-500"
+                  value={`${Number(aboutCourier?.profit || 0).toLocaleString()}`}
+                  suffix="UZS"
+                  gradient="from-amber-500 to-yellow-500"
                 />
               </>
             )}
@@ -223,33 +217,29 @@ const Dashboards = () => {
             {role === "market" && (
               <>
                 <StatCard
-                  icon={<ShoppingCart size={20} />}
+                  icon={<ShoppingCart className="w-5 h-5" />}
                   label={t("totalOrders")}
                   value={aboutMarket?.totalOrders || 0}
-                  borderColor="border-gray-400"
+                  gradient="from-blue-500 to-cyan-500"
                 />
                 <StatCard
-                  icon={<CheckCircle size={20} />}
+                  icon={<CheckCircle className="w-5 h-5" />}
                   label={t("solded")}
                   value={aboutMarket?.soldOrders || 0}
-                  borderColor="border-green-500"
-                  textColor="text-green-500"
+                  gradient="from-green-500 to-emerald-500"
                 />
                 <StatCard
-                  icon={<XCircle size={20} />}
+                  icon={<XCircle className="w-5 h-5" />}
                   label={t("cancelled")}
                   value={aboutMarket?.canceledOrders || 0}
-                  borderColor="border-red-500"
-                  textColor="text-red-500"
+                  gradient="from-red-500 to-rose-500"
                 />
                 <StatCard
-                  icon={<DollarSign size={20} />}
+                  icon={<DollarSign className="w-5 h-5" />}
                   label={t("profit")}
-                  value={`${Number(
-                    aboutMarket?.profit || 0
-                  ).toLocaleString()} UZS`}
-                  borderColor="border-yellow-500"
-                  textColor="text-yellow-500"
+                  value={`${Number(aboutMarket?.profit || 0).toLocaleString()}`}
+                  suffix="UZS"
+                  gradient="from-amber-500 to-yellow-500"
                 />
               </>
             )}
@@ -257,346 +247,156 @@ const Dashboards = () => {
             {(role === "superadmin" || role === "admin") && (
               <>
                 <StatCard
-                  icon={<ShoppingCart size={20} />}
+                  icon={<ShoppingCart className="w-5 h-5" />}
                   label={t("totalOrders")}
                   value={dashboard?.acceptedCount || 0}
-                  borderColor="border-gray-400"
+                  gradient="from-blue-500 to-cyan-500"
                 />
                 <StatCard
-                  icon={<CheckCircle size={20} />}
+                  icon={<CheckCircle className="w-5 h-5" />}
                   label={t("solded")}
                   value={dashboard?.soldAndPaid || 0}
-                  borderColor="border-green-500"
-                  textColor="text-green-500"
+                  gradient="from-green-500 to-emerald-500"
+                  badge={`${successRate}%`}
                 />
                 <StatCard
-                  icon={<XCircle size={20} />}
+                  icon={<XCircle className="w-5 h-5" />}
                   label={t("cancelled")}
                   value={dashboard?.cancelled || 0}
-                  borderColor="border-red-500"
-                  textColor="text-red-500"
+                  gradient="from-red-500 to-rose-500"
                 />
                 <StatCard
-                  icon={<DollarSign size={20} />}
+                  icon={<DollarSign className="w-5 h-5" />}
                   label={t("profit")}
-                  value={`${Number(
-                    dashboard?.profit || 0
-                  ).toLocaleString()} UZS`}
-                  borderColor="border-yellow-500"
-                  textColor="text-yellow-500"
+                  value={`${Number(dashboard?.profit || 0).toLocaleString()}`}
+                  suffix="UZS"
+                  gradient="from-amber-500 to-yellow-500"
                 />
               </>
             )}
           </>
         )}
       </div>
+
       {/* Role-based Rendering */}
-      {(role === "superadmin" ||
-        role === "admin" ||
-        role === "registrator") && (
+      {(role === "superadmin" || role === "admin" || role === "registrator") && (
         <>
-          <div className="grid grid-cols-2 gap-6 mb-6 max-[1250px]:grid-cols-1">
-            {renderMarketsChart(
-              visibleMarkets,
-              showAllMarkets,
-              setShowAllMarkets
-            )}
-            {renderCouriersChart(
-              visibleCouriers,
-              showAllCouriers,
-              setShowAllCouriers
-            )}
+          {/* Advanced Stats Chart - Full Width */}
+          <div className="mb-6">
+            <AdvancedStatsChart startDate={fromDate} endDate={toDate} />
           </div>
-          <div className="grid grid-cols-2 gap-6 max-[1050px]:grid-cols-1">
-            {renderMarketsTable(markets)}
-            {renderCouriersTable(couriers)}
+
+          {/* Charts Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
+            <SalesChart
+              title={t("marketStatistics")}
+              data={visibleMarkets}
+              type="markets"
+              showAll={showAllMarkets}
+              setShowAll={setShowAllMarkets}
+            />
+            <SalesChart
+              title={t("courierStatistics")}
+              data={visibleCouriers}
+              type="couriers"
+              showAll={showAllCouriers}
+              setShowAll={setShowAllCouriers}
+            />
+          </div>
+
+          {/* Leaderboards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <Leaderboard
+              title={t("topMarkets")}
+              data={markets}
+              type="markets"
+            />
+            <Leaderboard
+              title={t("topCouriers")}
+              data={couriers}
+              type="couriers"
+            />
           </div>
         </>
       )}
+
+      {/* Market faqat marketlar reytingi va o'z statistikasini ko'radi */}
       {role === "market" && (
-        <>
-          {renderMarketsChart(
-            visibleMarkets,
-            showAllMarkets,
-            setShowAllMarkets
-          )}
-          {renderMarketsTable(markets)}
-        </>
+        <div className="space-y-4 sm:space-y-6">
+          <Leaderboard
+            title={t("topMarkets")}
+            data={markets}
+            type="markets"
+          />
+        </div>
       )}
+
+      {/* Courier faqat kuryerlar reytingi va o'z statistikasini ko'radi */}
       {role === "courier" && (
-        <>
-          {renderCouriersChart(
-            visibleCouriers,
-            showAllCouriers,
-            setShowAllCouriers
-          )}
-          {renderCouriersTable(couriers)}
-        </>
+        <div className="space-y-4 sm:space-y-6">
+          <Leaderboard
+            title={t("topCouriers")}
+            data={couriers}
+            type="couriers"
+          />
+        </div>
       )}
     </div>
   );
 };
 
-// 🔹 Stat Card Component
+// Stat Card Component - Redesigned
 const StatCard = ({
   icon,
   label,
   value,
-  borderColor,
-  textColor,
+  gradient,
+  suffix,
+  badge,
 }: {
-  icon: any;
+  icon: React.ReactNode;
   label: string;
-  value: any;
-  borderColor: string;
-  textColor?: string;
+  value: string | number;
+  gradient: string;
+  suffix?: string;
+  badge?: string;
 }) => (
-  <div
-    className={`bg-white dark:bg-[#2A263D] p-6 rounded-2xl border-b-4 ${borderColor}`}
-  >
-    <p className={`flex items-center gap-2 ${textColor ?? "text-gray-500"}`}>
-      {icon} {label}
+  <div className="relative bg-white dark:bg-[#2A263D] p-4 sm:p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
+    {/* Gradient accent */}
+    <div
+      className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${gradient}`}
+    />
+
+    {/* Icon */}
+    <div
+      className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white mb-3 shadow-lg group-hover:scale-105 transition-transform`}
+    >
+      {icon}
+    </div>
+
+    {/* Label */}
+    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-1 truncate">
+      {label}
     </p>
-    <h2 className="text-2xl font-bold">{value}</h2>
-  </div>
-);
 
-// 🔹 Custom Bar for Buyurtmalar + Sotilgan
-const CustomBar = (props: any) => {
-  const { x, y, width, height, payload } = props;
-  const buyurtmalar = payload.buyurtmalar;
-  const sotilgan = payload.sotilgan;
-
-  const soldWidth = buyurtmalar ? (sotilgan / buyurtmalar) * width : 0;
-
-  return (
-    <g>
-      {/* Fon - Buyurtmalar */}
-      <rect x={x} y={y} width={width} height={height} fill="#66B2FF" />
-      {/* Ustiga - Sotilgan */}
-      <rect x={x} y={y} width={soldWidth} height={height} fill="#0047AB" />
-    </g>
-  );
-};
-
-// 🔹 Helper Components (Charts & Tables)
-const renderMarketsChart = (
-  visibleMarkets: any[],
-  showAllMarkets: boolean,
-  setShowAllMarkets: (v: boolean) => void
-) => (
-  <ChartWrapper
-    title={t("marketStatistics")}
-    data={visibleMarkets}
-    showAll={showAllMarkets}
-    setShowAll={setShowAllMarkets}
-  />
-);
-
-const renderCouriersChart = (
-  visibleCouriers: any[],
-  showAllCouriers: boolean,
-  setShowAllCouriers: (v: boolean) => void
-) => (
-  <ChartWrapper
-    title={t("courierStatistics")}
-    data={visibleCouriers}
-    showAll={showAllCouriers}
-    setShowAll={setShowAllCouriers}
-  />
-);
-
-//Charts
-const ChartWrapper = ({
-  title,
-  data,
-  showAll,
-  setShowAll,
-}: {
-  title: string;
-  data: any[];
-  showAll: boolean;
-  setShowAll: (v: boolean) => void;
-}) => (
-  <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow overflow-hidden">
-    <h3 className="text-lg font-semibold mb-4 text-center">{title}</h3>
-    <ResponsiveContainer width="100%" height={Math.max(data.length * 60, 400)}>
-      <BarChart
-        data={data}
-        layout="vertical"
-        margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
-        barCategoryGap="10%" // ✅ barlar orasidagi masofa nisbiy
-        barSize={75}
-      >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis type="number" />
-
-        {/* 🔹 YAxis custom tick */}
-        <YAxis
-          type="category"
-          dataKey="nomi"
-          width={20}
-          tick={({ x, y, payload }) => (
-            <text
-              x={x - 5}
-              y={y}
-              dy={4}
-              textAnchor="end"
-              className="fill-gray-800 dark:fill-gray-100"
-            >
-              {payload.value.length > 4
-                ? payload.value.slice(0, 4) + "..."
-                : payload.value}
-            </text>
-          )}
-        />
-
-        <Tooltip
-          cursor={{ fill: "rgba(0,0,0,0.05)" }}
-          content={({ payload }) => {
-            if (!payload || !payload.length) return null;
-            const item = payload[0].payload;
-            return (
-              <div className="p-2 bg-black text-white rounded text-sm">
-                <p>{item.nomi}</p>
-                <p>
-                  {t("orders")}: {item.buyurtmalar}
-                </p>
-                <p>
-                  {t("solded")}: {item.sotilgan}
-                </p>
-              </div>
-            );
-          }}
-        />
-
-        {/* 🔹 Custom bar */}
-        <Bar dataKey="buyurtmalar" name="Buyurtmalar" shape={<CustomBar />} />
-      </BarChart>
-    </ResponsiveContainer>
-
-    {/* 🔹 Legend qo'lda */}
-    <div className="flex justify-center gap-6 mt-3">
-      <div className="flex items-center gap-2">
-        <span
-          className="w-4 h-4 rounded-sm"
-          style={{ background: "#66B2FF" }}
-        />
-        <span>{t("orders")}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span
-          className="w-4 h-4 rounded-sm"
-          style={{ background: "#0047AB" }}
-        />
-        <span>{t("solded")}</span>
-      </div>
+    {/* Value */}
+    <div className="flex items-baseline gap-1">
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white truncate">
+        {value}
+      </h2>
+      {suffix && (
+        <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+          {suffix}
+        </span>
+      )}
     </div>
 
-    <div className="flex justify-center mt-4">
-      <button
-        onClick={() => setShowAll(!showAll)}
-        className="px-4 py-2 bg-blue-500 text-white rounded-lg cursor-pointer"
-      >
-        {showAll ? t("showLess") : t("showMore")}
-      </button>
-    </div>
-  </div>
-);
-
-// 🔹 Top Markets Table
-const renderMarketsTable = (markets: any[]) => (
-  <TableWrapper
-    title={t("topMarkets")}
-    data={markets}
-    nameKey="market_name"
-    ordersKey="total_orders"
-    soldKey="successful_orders"
-    rateKey="success_rate"
-  />
-);
-
-// 🔹 Top Couriers Table
-const renderCouriersTable = (couriers: any[]) => (
-  <TableWrapper
-    title={t("topCouriers")}
-    data={couriers}
-    nameKey="courier_name"
-    ordersKey="total_orders"
-    soldKey="successful_orders"
-    rateKey="success_rate"
-  />
-);
-
-const TableWrapper = ({
-  title,
-  data,
-  nameKey,
-  ordersKey,
-  soldKey,
-  rateKey,
-}: {
-  title: string;
-  data: any[];
-  nameKey: string;
-  ordersKey: string;
-  soldKey: string;
-  rateKey: string;
-}) => (
-  <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow">
-    <h3 className="text-lg font-semibold mb-4">{title}</h3>
-    <table className="w-full min-[900px]:border">
-      <thead>
-        <tr className="bg-gray-100 dark:bg-[#3B3656] text-left">
-          <th className="p-2 border">#</th>
-          <th className="p-2 border">{t("name")}</th>
-          <th className="p-2 border">{t("orders")}</th>
-          <th className="p-2 border">{t("solded")}</th>
-          <th className="p-2 border">{t("rate")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data?.map((item: any, inx: number) => {
-          let medalIcon = null;
-          let rowStyle = "";
-          if (inx === 0) {
-            medalIcon = <Medal className="text-yellow-500" size={20} />;
-            rowStyle = "text-yellow-500 font-bold";
-          } else if (inx === 1) {
-            medalIcon = <Medal className="text-gray-400" size={20} />;
-            rowStyle = "text-gray-500 font-bold";
-          } else if (inx === 2) {
-            medalIcon = <Medal className="text-amber-700" size={20} />;
-            rowStyle = "text-amber-700 font-bold";
-          }
-          return (
-            <tr key={item.id ?? inx} className={`hover:bg-gray-50 ${rowStyle}`}>
-              <td
-                className="data-cell p-2 min-[900px]:border text-center"
-                data-cell="#"
-              >
-                {medalIcon ?? inx + 1}
-              </td>
-              <td className="data-cell p-2 min-[900px]:border" data-cell="Name">
-                {item[nameKey]}
-              </td>
-              <td
-                className="data-cell p-2 min-[900px]:border"
-                data-cell="Orders"
-              >
-                {item[ordersKey]}
-              </td>
-              <td className="data-cell p-2 min-[900px]:border" data-cell="Sold">
-                {item[soldKey]}
-              </td>
-              <td className="data-cell p-2 min-[900px]:border" data-cell="Rate">
-                {item[rateKey]}%
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    {/* Badge */}
+    {badge && (
+      <div className="absolute top-3 right-3 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs font-semibold rounded-full">
+        {badge}
+      </div>
+    )}
   </div>
 );
 

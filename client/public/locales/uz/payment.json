@@ -81,5 +81,32 @@
   "delivery": {
     "center": "Markazga",
     "address": "Uygacha"
+  },
+  "button": {
+    "export": "Excelga yuklab olish",
+    "openShift": "Smena ochish",
+    "closeShift": "Smenani yopish"
+  },
+  "messages": {
+    "exportSuccess": "Excel fayl muvaffaqiyatli yuklandi",
+    "exportError": "Excel yuklab olishda xatolik yuz berdi",
+    "shiftOpened": "Smena muvaffaqiyatli ochildi!",
+    "shiftClosed": "Smena yopildi va hisobot yuklandi!"
+  },
+  "shiftStatus": {
+    "open": "Smena ochiq",
+    "closed": "Smena yopiq"
+  },
+  "shift": {
+    "closeTitle": "Smenani yopish",
+    "closeWarning": "Smenani yopganingizda avtomatik ravishda Excel hisobot yuklab olinadi.",
+    "comment": "Izoh (ixtiyoriy)",
+    "commentPlaceholder": "Smena haqida izoh...",
+    "closing": "Yopilmoqda...",
+    "close": "Smenani yopish",
+    "notStartedTitle": "Smena boshlanmagan!",
+    "notStartedWarning": "Kassadan pul yechish yoki kiritish uchun avval smenani boshlashingiz kerak. Smena boshlangandan so'ng barcha operatsiyalar qayd etiladi.",
+    "opening": "Ochilmoqda...",
+    "startAndContinue": "Smenani boshlash"
   }
 }

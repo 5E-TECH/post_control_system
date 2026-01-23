@@ -1,6 +1,5 @@
 import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Form } from "antd";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
@@ -9,11 +8,17 @@ import {
   BanknoteArrowUp,
   CircleMinus,
   CirclePlus,
+  Download,
   Loader2,
   Search,
   Wallet,
   X,
+  Clock,
+  Play,
+  Square,
 } from "lucide-react";
+import { BASE_URL } from "../../../../shared/const";
+import { message } from "antd";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useCourier } from "../../../../shared/api/hooks/useCourier";
 import TextArea from "antd/es/input/TextArea";
@@ -60,6 +65,12 @@ const MainDetail = () => {
   const [select, setSelect] = useState<null | string>(null);
   const [kassa, setMaosh] = useState(false);
   const [showAdminAndRegistrator, setshowAdminAndRegistrator] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isClosingShift, setIsClosingShift] = useState(false);
+  const [showShiftConfirm, setShowShiftConfirm] = useState(false);
+  const [shiftComment, setShiftComment] = useState("");
+  const [showShiftWarning, setShowShiftWarning] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"spend" | "fill" | null>(null);
   const { handleApiError } = useApiNotification();
 
   const navigate = useNavigate();
@@ -88,8 +99,11 @@ const MainDetail = () => {
   const [show, setShow] = useState(true);
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
-  const { getCashBoxMain, cashboxSpand, cashboxFill } = useCashBox();
+  const { getCashBoxMain, cashboxSpand, cashboxFill, getCurrentShift, openShift, closeShift } = useCashBox();
   const { getAdminAndRegister } = useUser();
+
+  // Get current shift status
+  const { data: shiftData, refetch: refetchShift } = getCurrentShift();
 
   const searchParam = form.search
     ? { search: form.search } // ✅ faqat search bo‘lsa qo‘shiladi
@@ -163,6 +177,43 @@ const MainDetail = () => {
     );
   };
 
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+
+      const params = new URLSearchParams();
+      if (form.from) params.append("fromDate", form.from);
+      if (form.to) params.append("toDate", form.to);
+
+      const response = await fetch(
+        `${BASE_URL}cashbox/main/export?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cashbox-${form.from || "daily"}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      message.success(t("messages.exportSuccess") || "Excel fayl yuklandi!");
+    } catch (error) {
+      message.error(t("messages.exportError") || "Excel yuklab olishda xatolik!");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleSalarySubmit = () => {
     const data = {
       amount: Number(form.summa.replace(/\D/g, "")),
@@ -189,6 +240,8 @@ const MainDetail = () => {
   };
 
   const raw = Number(data?.data?.cashbox?.balance || 0);
+  const balanceCash = Number(data?.data?.cashbox?.balance_cash || 0);
+  const balanceCard = Number(data?.data?.cashbox?.balance_card || 0);
 
   const handleClose = () => {
     setShowMarket(false);
@@ -203,307 +256,303 @@ const MainDetail = () => {
     setMaosh(false);
   };
 
+  // Smena ochish
+  const handleOpenShift = () => {
+    openShift.mutate(undefined, {
+      onSuccess: () => {
+        message.success(t("messages.shiftOpened") || "Smena ochildi!");
+        refetchShift();
+      },
+      onError: (error) => {
+        const err = error as AxiosError<{ error?: { message?: string } }>;
+        const msg = err.response?.data?.error?.message || "Xatolik yuz berdi!";
+        handleApiError(err, msg);
+      },
+    });
+  };
+
+  // Smena yopish va avtomatik Excel yuklash
+  const handleCloseShift = async () => {
+    setIsClosingShift(true);
+    try {
+      // 1. Smenani yopish
+      await closeShift.mutateAsync(shiftComment);
+
+      // 2. Avtomatik Excel yuklash
+      const response = await fetch(`${BASE_URL}cashbox/shift/export`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `smena-hisobot-${new Date().toISOString().split("T")[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      message.success(t("messages.shiftClosed") || "Smena yopildi va hisobot yuklandi!");
+      setShowShiftConfirm(false);
+      setShiftComment("");
+      refetchShift();
+      refetch();
+    } catch (error) {
+      const err = error as AxiosError<{ error?: { message?: string } }>;
+      const msg = err.response?.data?.error?.message || "Xatolik yuz berdi!";
+      handleApiError(err, msg);
+    } finally {
+      setIsClosingShift(false);
+    }
+  };
+
+  const isShiftOpen = shiftData?.data?.shift?.status === "open";
+
   return (
-    <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
-      <div>
-        <h2 className="flex items-center mb-5 text-[30px] font-medium capitalize">
-          {t("title")}
-        </h2>
-        <CashboxCard
-          role={"superadmin"}
-          name={data?.data?.cashbox?.user?.name}
-          raw={raw}
-          show={show}
-          setShow={setShow}
-        />
-
-        {/* === BUTTONLAR 1 QATORDA === */}
-        <div className="mt-5 flex gap-3 flex-nowrap">
-          <button
-            title={t("kuriyerdanOlish")}
-            onClick={() => setShowCurier(true)}
-            className="rounded-full cursor-pointer p-3 bg-green-500 text-white hover:bg-green-600 transition flex items-center justify-center shadow-md"
-          >
-            <BanknoteArrowDown size={22} />
-          </button>
-          <button
-            title={t("marketgaTo'lash")}
-            onClick={() => setShowMarket(true)}
-            className="rounded-full cursor-pointer p-3 bg-blue-500 text-white hover:bg-blue-600 transition flex items-center justify-center shadow-md"
-          >
-            <BanknoteArrowUp size={22} />
-          </button>
-          <button
-            title={t("kassadanSarflash")}
-            onClick={() => {
-              setSpand(true), setMaosh(false);
-            }}
-            className="rounded-full cursor-pointer p-3 bg-red-500 text-white hover:bg-red-600 transition flex items-center justify-center shadow-md"
-          >
-            <CircleMinus size={22} />
-          </button>
-          <button
-            title={t("kassaniTo'ldirish")}
-            onClick={() => {
-              setMaosh(true), setSpand(false);
-            }}
-            className="rounded-full cursor-pointer p-3 bg-green-500 text-white hover:bg-green-600 transition flex items-center justify-center shadow-md"
-          >
-            <CirclePlus size={22} />
-          </button>
-
-          <button
-            title={t("maoshTo'lash")}
-            onClick={() => setshowAdminAndRegistrator(true)}
-            className="rounded-full cursor-pointer p-3 bg-amber-500 text-white hover:bg-amber-600 transition flex items-center justify-center shadow-md"
-          >
-            <Wallet size={22} />
-          </button>
-        </div>
-
-        {/* === Agar kassadan sarflash bosilsa form chiqadi === */}
-        {spand && (
-          <div className="mt-5">
-            <h2>{t("kassadanSarflash")}</h2>
-            <div className="flex gap-4 items-center mt-3">
-              <input
-                name={t("summa")}
-                value={form.summa}
-                onChange={(e) => {
-                  // faqat raqamlarni olish
-                  const rawValue = e.target.value.replace(/\D/g, "");
-                  // formatlab chiqarish (1,000 → 10,000)
-                  const formatted = new Intl.NumberFormat("uz-UZ").format(
-                    Number(rawValue || 0)
-                  );
-
-                  // state-ni yangilash
-                  handleChange({
-                    ...e,
-                    target: {
-                      ...e.target,
-                      name: "summa",
-                      value: formatted,
-                    },
-                  } as any);
-                }}
-                type="text"
-                placeholder={t("summa")}
-                className="border rounded-md px-2 py-0.75 border-[#d1cfd4] outline-none hover:border-blue-400 w-[150px]"
-              />
-              <Select
-                value={form.payment}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, payment: value }))
-                }
-                placeholder={t("to'lovTuri")}
-                className="w-[150px]"
-                options={[
-                  {
-                    value: "",
-                    label: (
-                      <span style={{ color: "#a0a0a0" }}>
-                        {t("paymentType")}
-                      </span>
-                    ),
-                    disabled: true,
-                  },
-                  { value: "cash", label: "cash" },
-                  { value: "click", label: "click" },
-                ]}
-              />
+    <div className="bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
+      <div className="max-w-screen-2xl mx-auto flex gap-8 lg:gap-16 max-lg:flex-col">
+        <div className="lg:max-w-[520px] w-full">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+              <Wallet className="w-6 h-6 text-white" />
             </div>
-            <div className="mt-5">
-              <Form>
-                <Form.Item
-                  name={t("comment")}
-                  rules={[{ required: true, message: "Izohni kiriting!" }]}
-                >
-                  <TextArea placeholder={t("comment")} autoSize />
-                </Form.Item>
-              </Form>
-
-              <div className="flex gap-5">
-                <button
-                  onClick={() => handleSubmit()}
-                  disabled={
-                    cashboxSpand.isPending ||
-                    !form.payment ||
-                    !form.summa ||
-                    Number(form.summa.replace(/\s/g, "")) <= 0
-                  }
-                  className={`mt-5 py-1.5 px-3 rounded-md transition-colors ${
-                    !form.payment ||
-                    !form.summa ||
-                    Number(form.summa.replace(/\s/g, "")) <= 0
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
-                  }`}
-                >
-                  {cashboxSpand.isPending ? (
-                    <div className="relative w-full flex justify-center">
-                      <Loader2 className="w-5 h-5 animate-spin absolute" />
-                      <span className="opacity-0">{t("qabulQilish")}</span>
-                    </div>
-                  ) : (
-                    t("qabulQilish")
-                  )}
-                </button>
-                <button
-                  onClick={() => hendleCloce()}
-                  className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
-                >
-                  {t("bekorQilish")}
-                </button>
-              </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">
+                {t("title")}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Asosiy kassa boshqaruvi
+              </p>
             </div>
           </div>
-        )}
 
-        {/* === kassani to'ldirishni bosganda === */}
-        {kassa && (
-          <div className="mt-5">
-            <h2>{t("kassagaQo'shish")}</h2>
-            <div className="flex gap-4 items-center mt-3">
-              <input
-                name={t("summa")}
-                value={form.summa}
-                onChange={(e) => {
-                  const rawValue = e.target.value.replace(/\D/g, "");
-                  const formatted = new Intl.NumberFormat("uz-UZ").format(
-                    Number(rawValue || 0)
-                  );
+          <CashboxCard
+            role={"superadmin"}
+            name={data?.data?.cashbox?.user?.name}
+            raw={raw}
+            balanceCash={balanceCash}
+            balanceCard={balanceCard}
+            show={show}
+            setShow={setShow}
+            isMainCashbox={true}
+          />
 
-                  handleChange({
-                    ...e,
-                    target: {
-                      ...e.target,
-                      name: "summa",
-                      value: formatted,
-                    },
-                  } as any);
-                }}
-                type="text"
-                placeholder="summa"
-                className="border rounded-md px-2 py-0.75 border-[#d1cfd4] outline-none hover:border-blue-400 w-[150px]"
-              />
-              <Select
-                value={form.payment}
-                onChange={(value) =>
-                  setForm((prev) => ({ ...prev, payment: value }))
-                }
-                placeholder="To'lov turi"
-                className="w-[150px]"
-                options={[
-                  {
-                    value: "",
-                    label: (
-                      <span style={{ color: "#a0a0a0" }}>
-                        {t("paymentType")}
-                      </span>
-                    ),
-                    disabled: true,
-                  },
-                  { value: "cash", label: `${t("cash")}` },
-                  { value: "click", label: `${t("click")}` },
-                ]}
-              />
-            </div>
-            <div className="mt-5">
-              <Form>
-                <Form.Item
-                  name="comment"
-                  rules={[
-                    { required: true, message: "Izoh kiritish majburiy!" },
-                  ]}
-                >
-                  <TextArea placeholder={`${t("comment")}...`} autoSize />
-                </Form.Item>
-              </Form>
+          {/* === ACTION BUTTONS - Modern Circular Design === */}
+          <div className="mt-8">
+            <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
+              {/* Kuryerdan olish */}
+              <button
+                onClick={() => setShowCurier(true)}
+                className="group flex flex-col items-center gap-2 cursor-pointer"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-emerald-400 via-green-500 to-teal-500 flex items-center justify-center shadow-xl shadow-emerald-500/40 group-hover:shadow-emerald-500/60 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
+                    <BanknoteArrowDown size={24} className="text-white" />
+                  </div>
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
+                  {t("kuriyerdanOlish") || "Kuryerdan"}
+                </span>
+              </button>
 
-              <div className="flex gap-5">
-                <button
-                  onClick={() => handleSalarySubmit()}
-                  disabled={
-                    cashboxFill.isPending ||
-                    !form.payment ||
-                    !form.summa ||
-                    Number(form.summa.replace(/\s/g, "")) <= 0
+              {/* Marketga to'lash */}
+              <button
+                onClick={() => setShowMarket(true)}
+                className="group flex flex-col items-center gap-2 cursor-pointer"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-blue-400 via-indigo-500 to-purple-500 flex items-center justify-center shadow-xl shadow-blue-500/40 group-hover:shadow-blue-500/60 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
+                    <BanknoteArrowUp size={24} className="text-white" />
+                  </div>
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
+                  {t("marketgaTo'lash") || "Marketga"}
+                </span>
+              </button>
+
+              {/* Kassadan sarflash */}
+              <button
+                onClick={() => {
+                  if (!isShiftOpen) {
+                    setPendingAction("spend");
+                    setShowShiftWarning(true);
+                  } else {
+                    setSpand(true);
+                    setMaosh(false);
                   }
-                  className={`mt-5 py-1.5 px-3 min-w-[125px] rounded-md transition-colors ${
-                    !form.payment ||
-                    !form.summa ||
-                    Number(form.summa.replace(/\s/g, "")) <= 0
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-[#9D70FF] hover:bg-[#9d70ffe0] text-white"
-                  }`}
-                >
-                  {cashboxFill.isPending ? (
-                    <div className="relative w-full flex justify-center">
-                      <Loader2 className="w-5 h-5 animate-spin absolute" />
-                      <span className="opacity-0">{t("qabulQilish")}</span>
-                    </div>
-                  ) : (
-                    t("qabulQilish")
-                  )}
-                </button>
+                }}
+                className="group flex flex-col items-center gap-2 cursor-pointer"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-red-400 via-rose-500 to-pink-500 flex items-center justify-center shadow-xl shadow-red-500/40 group-hover:shadow-red-500/60 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
+                    <CircleMinus size={24} className="text-white" />
+                  </div>
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
+                  {t("kassadanSarflash") || "Chiqim"}
+                </span>
+              </button>
+
+              {/* Kassani to'ldirish */}
+              <button
+                onClick={() => {
+                  if (!isShiftOpen) {
+                    setPendingAction("fill");
+                    setShowShiftWarning(true);
+                  } else {
+                    setMaosh(true);
+                    setSpand(false);
+                  }
+                }}
+                className="group flex flex-col items-center gap-2 cursor-pointer"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-green-400 via-emerald-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-green-500/40 group-hover:shadow-green-500/60 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
+                    <CirclePlus size={24} className="text-white" />
+                  </div>
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
+                  {t("kassaniTo'ldirish") || "Kirim"}
+                </span>
+              </button>
+
+              {/* Maosh to'lash */}
+              <button
+                onClick={() => setshowAdminAndRegistrator(true)}
+                className="group flex flex-col items-center gap-2 cursor-pointer"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-yellow-500 flex items-center justify-center shadow-xl shadow-amber-500/40 group-hover:shadow-amber-500/60 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
+                    <Wallet size={24} className="text-white" />
+                  </div>
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
+                  {t("maoshTo'lash") || "Maosh"}
+                </span>
+              </button>
+            </div>
+
+            {/* Secondary Actions - Pills */}
+            <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
+              {/* Excel export */}
+              <button
+                onClick={handleExportExcel}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-indigo-500/10 dark:from-purple-500/20 dark:to-indigo-500/20 text-purple-600 dark:text-purple-400 hover:from-purple-500/20 hover:to-indigo-500/20 transition-all duration-200 cursor-pointer border border-purple-200/50 dark:border-purple-700/50 disabled:opacity-50"
+              >
+                {isExporting ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+                <span className="text-sm font-medium">{t("button.export") || "Excel"}</span>
+              </button>
+
+              {/* Smena tugmasi */}
+              {isShiftOpen ? (
                 <button
-                  onClick={() => hendleCloce()}
-                  className="mt-5 bg-white py-1.5 px-3 rounded-md hover:text-[#9d70ffe0] text-[#9D70FF] border"
+                  onClick={() => setShowShiftConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-orange-500/10 to-red-500/10 dark:from-orange-500/20 dark:to-red-500/20 text-orange-600 dark:text-orange-400 hover:from-orange-500/20 hover:to-red-500/20 transition-all duration-200 cursor-pointer border border-orange-200/50 dark:border-orange-700/50"
                 >
-                  {t("bekorQilish")}
+                  <Square size={16} />
+                  <span className="text-sm font-medium">{t("button.closeShift") || "Smenani yopish"}</span>
                 </button>
-              </div>
+              ) : (
+                <button
+                  onClick={handleOpenShift}
+                  disabled={openShift.isPending}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-teal-500/10 to-cyan-500/10 dark:from-teal-500/20 dark:to-cyan-500/20 text-teal-600 dark:text-teal-400 hover:from-teal-500/20 hover:to-cyan-500/20 transition-all duration-200 cursor-pointer border border-teal-200/50 dark:border-teal-700/50 disabled:opacity-50"
+                >
+                  {openShift.isPending ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Play size={16} />
+                  )}
+                  <span className="text-sm font-medium">{t("button.openShift") || "Smena ochish"}</span>
+                </button>
+              )}
             </div>
           </div>
-        )}
+
+          {/* Smena status ko'rsatgich */}
+          {isShiftOpen && shiftData?.data?.shift && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl border border-green-200 dark:border-green-800 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center">
+                <Clock size={20} className="text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                  {t("shiftStatus.open") || "Smena ochiq"}
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {shiftData.data.shift.openedByUser?.name || ""}
+                </p>
+              </div>
+            </div>
+          )}
+
       </div>
 
       {/* === FILTERS & HISTORY === */}
-      <div className="w-full">
-        {form.from == "" && (
-          <h2 className="mb-5 text-[20px] font-medium">{t("today")}</h2>
-        )}
+      <div className="w-full lg:flex-1">
+        {/* Modern Filter Card */}
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 p-5 mb-6">
+          {/* Header with date info */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                <Clock size={18} className="text-white" />
+              </div>
+              <div>
+                {form.from === "" ? (
+                  <>
+                    <h3 className="font-bold text-gray-800 dark:text-white">{t("today")}</h3>
+                    <p className="text-xs text-gray-400">Bugungi operatsiyalar</p>
+                  </>
+                ) : form.from === form.to ? (
+                  <>
+                    <h3 className="font-bold text-gray-800 dark:text-white">{form.from}</h3>
+                    <p className="text-xs text-gray-400">{t("day")} operatsiyalari</p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-bold text-gray-800 dark:text-white">
+                      {form.from} - {form.to}
+                    </h3>
+                    <p className="text-xs text-gray-400">{t("o'tkazmalar")}</p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
 
-        {form.from !== "" && form.from === form.to && (
-          <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} {t("day")}
-          </h2>
-        )}
-
-        {form.from !== "" && form.from !== form.to && (
-          <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} <span className="text-[15px]">{t("dan")}</span>{" "}
-            {form.to} <span className="text-[15px]">{t("gacha")}</span>{" "}
-            {t("o'tkazmalar")}
-          </h2>
-        )}
-        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">
-          <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
-          <div className="w-full flex justify-between">
-            <div className="flex gap-5 max-[640px]:gap-0  w-full">
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
               {isMobile ? (
-                // Mobile uchun custom date inputs (faqat text input + popup)
-                <div className="flex flex-col gap-2 w-full">
-                  <CustomCalendar
-                    from={form.from ? dayjs(form.from) : null}
-                    to={form.to ? dayjs(form.to) : null}
-                    setFrom={(date: any) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        from: date.format("YYYY-MM-DD"),
-                      }))
-                    }
-                    setTo={(date: any) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        to: date.format("YYYY-MM-DD"),
-                      }))
-                    }
-                  />
-                </div>
+                <CustomCalendar
+                  from={form.from ? dayjs(form.from) : null}
+                  to={form.to ? dayjs(form.to) : null}
+                  setFrom={(date: any) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      from: date.format("YYYY-MM-DD"),
+                    }))
+                  }
+                  setTo={(date: any) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      to: date.format("YYYY-MM-DD"),
+                    }))
+                  }
+                />
               ) : (
-                // Desktop uchun Antd RangePicker
                 <RangePicker
                   value={[
                     form.from ? dayjs(form.from) : null,
@@ -519,232 +568,222 @@ const MainDetail = () => {
                   placeholder={[`${t("start")}`, `${t("end")}`]}
                   format="YYYY-MM-DD"
                   size="large"
-                  className="w-[340px] max-md:w-[100%] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
+                  className="w-full !rounded-xl !border-gray-200 dark:!border-gray-700 hover:!border-purple-400 focus:!border-purple-500"
                 />
               )}
             </div>
+            {(form.from || form.to) && (
+              <button
+                onClick={() => setForm((prev) => ({ ...prev, from: "", to: "" }))}
+                className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            )}
           </div>
         </div>
-        <div className="max-md:mb-5">
-          <CashboxHistory
-            form={form}
-            income={data?.data?.income}
-            outcome={data?.data?.outcome}
-            cashboxHistory={data?.data?.cashboxHistory}
-          />
-        </div>
+
+        {/* History Section */}
+        <CashboxHistory
+          form={form}
+          income={data?.data?.income}
+          outcome={data?.data?.outcome}
+          cashboxHistory={data?.data?.cashboxHistory}
+        />
       </div>
 
       {/* === POPUP MARKET === */}
       <PaymentPopup isShow={showMarket} onClose={() => handleClose()}>
-        <div className="bg-white dark:bg-[#28243d] rounded-xl shadow-xl w-[900px] h-[680px] px-6 py-6 relative flex flex-col max-md:w-[90%] max-md:h-[600px] transition-all duration-300">
-          <button
-            onClick={() => handleClose()}
-            className="absolute top-4 right-4 flex items-center justify-center 
-w-9 h-9 rounded-md
-bg-[#ef4444] hover:bg-[#dc2626] 
-text-white shadow-lg 
-transition-all duration-200 
-hover:scale-110 active:scale-95
-cursor-pointer"
-          >
-            <X size={30} />
-          </button>
-
-          <h1 className="font-bold text-left pt-10">{t("berilishiKerak")}</h1>
-
-          {/* Qidiruv input */}
-          <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
-            <input
-              defaultValue={form.search}
-              onChange={handleSearchChange}
-              type="text"
-              placeholder={`${t("search")}...`}
-              className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
-            />
-            <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
-          </div>
-
-          {/* Jadval qismi */}
-          <div className="mt-4 rounded-md border border-[#9d70ff1f] dark:border-[#2E263DB2] overflow-hidden">
-            {/* Jadval headeri */}
-            <div className="overflow-hidden">
-              <table className="w-full border-collapse cursor-pointer">
-                <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
-                  <tr>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        # ID
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[201px]">
-                        {t("marketName")}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-
-            {/* Scroll qismi */}
-            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
-              <table className="w-full border-collapse cursor-pointer">
-                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#FFFFFF] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
-                  {marketData?.data?.data?.map((item: any, inx: number) => (
-                    <tr
-                      key={item?.id}
-                      onClick={() => setSelect(item?.id)}
-                      className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] dark:text-white ${
-                        item.id == select ? "bg-gray-300 text-black" : ""
-                      }`}
-                    >
-                      <td
-                        className="text-[#8C57FF] pr-10 py-3 pl-5"
-                        data-cell="# ID"
-                      >
-                        {inx + 1}
-                      </td>
-
-                      <td className="pr-26 py-3" data-cell={t("marketName")}>
-                        {item?.name}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[600px] max-md:w-[95%] overflow-hidden max-h-[90vh] flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 px-6 py-5 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <BanknoteArrowUp size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {t("berilishiKerak") || "Marketga to'lash"}
+                  </h2>
+                  <p className="text-sm text-white/70">Marketni tanlang</p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleClose()}
+                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X size={20} className="text-white" />
+              </button>
             </div>
           </div>
 
-          {/* Tanlash tugmasi */}
-          <div className="flex justify-end py-2">
+          {/* Search */}
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <div className="relative">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                defaultValue={form.search}
+                onChange={handleSearchChange}
+                type="text"
+                placeholder={`${t("search") || "Qidirish"}...`}
+                className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] focus:border-blue-400 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto px-3 py-3">
+            <div className="space-y-2">
+              {marketData?.data?.data?.map((item: any, inx: number) => (
+                <div
+                  key={item?.id}
+                  onClick={() => setSelect(item?.id)}
+                  className={`p-4 rounded-xl cursor-pointer transition-all duration-200 ${
+                    item.id === select
+                      ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
+                      : "bg-gray-50 dark:bg-[#312D4B] hover:bg-gray-100 dark:hover:bg-[#3d3759]"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+                      item.id === select ? "bg-white/20" : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                    }`}>
+                      {inx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{item?.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-lg font-bold ${
+                        item.id === select ? "text-white" : "text-blue-600 dark:text-blue-400"
+                      }`}>
+                        {(item?.cashbox?.balance ?? 0).toLocaleString("uz-UZ")}
+                      </p>
+                      <p className={`text-xs ${item.id === select ? "text-white/70" : "text-gray-400"}`}>
+                        UZS
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end flex-shrink-0">
             <button
-              disabled={!select ? true : false}
-              onClick={() => handleNavigate()}
-              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
-                !select ? "" : "hover:bg-blue-600"
-              } text-white rounded-md cursor-pointer ${
-                !select ? "opacity-40" : ""
-              }`}
+              onClick={() => handleClose()}
+              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
             >
-              {t("tanlash")}
+              {t("bekorQilish") || "Bekor qilish"}
+            </button>
+            <button
+              disabled={!select}
+              onClick={() => handleNavigate()}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              {t("tanlash") || "Tanlash"}
             </button>
           </div>
         </div>
       </PaymentPopup>
 
-      <PaymentPopup
-        isShow={showAdminAndRegistrator}
-        onClose={() => handleClose()}
-      >
-        <div className="bg-white dark:bg-[#28243d] rounded-xl shadow-xl w-[900px] h-[680px] px-6 py-6 relative flex flex-col max-md:w-[90%] max-md:h-[600px] transition-all duration-300">
-          <button
-            onClick={() => handleClose()}
-            className="absolute top-4 right-4 flex items-center justify-center 
-w-9 h-9 rounded-md
-bg-[#ef4444] hover:bg-[#dc2626] 
-text-white shadow-lg 
-transition-all duration-200 
-hover:scale-110 active:scale-95
-cursor-pointer"
-          >
-            <X size={30} />
-          </button>
-
-          <h1 className="font-bold text-left pt-10">{t("hodimniTanlang")}</h1>
-
-          {/* Qidiruv input */}
-          <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
-            <input
-              defaultValue={form.search}
-              onChange={handleSearchChange}
-              type="text"
-              placeholder={`${t("search")}...`}
-              className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
-            />
-            <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
+      {/* === ADMIN/REGISTRATOR POPUP === */}
+      <PaymentPopup isShow={showAdminAndRegistrator} onClose={() => handleClose()}>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[600px] max-md:w-[95%] overflow-hidden max-h-[90vh] flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 px-6 py-5 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <Wallet size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {t("hodimniTanlang") || "Hodimni tanlang"}
+                  </h2>
+                  <p className="text-sm text-white/70">Maosh to'lash uchun</p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleClose()}
+                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
           </div>
 
-          {/* Jadval qismi */}
-          <div className="mt-4 rounded-md border border-[#9d70ff1f] dark:border-[#2E263DB2] overflow-hidden">
-            {/* Jadval sarlavhasi (thead) */}
-            <div className="overflow-hidden">
-              <table className="w-full border-collapse cursor-pointer">
-                <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
-                  <tr>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        #
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("hodimName")}
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]"></div>
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("rol")}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-              </table>
+          {/* Search */}
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <div className="relative">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                defaultValue={form.search}
+                onChange={handleSearchChange}
+                type="text"
+                placeholder={`${t("search") || "Qidirish"}...`}
+                className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] focus:border-amber-400 focus:ring-4 focus:ring-amber-100 dark:focus:ring-amber-900/30 outline-none transition-all"
+              />
             </div>
+          </div>
 
-            {/* Scroll qilinuvchi tbody */}
-            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
-              <table className="w-full border-collapse cursor-pointer">
-                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#FFFFFF] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
-                  {adminAndRegisterData?.data?.data?.map(
-                    (item: any, inx: number) => (
-                      <tr
-                        key={item?.id}
-                        onClick={() => setSelect(item?.id)}
-                        className={`border-b-1 border-b-[#444444] border-[#f4f5fa] dark:border-[#E7E3FCB2] font-medium text-[16px] text-[#2E263DB2] dark:text-white ${
-                          item.id == select ? "bg-gray-300 text-black" : ""
-                        }`}
-                      >
-                        <td
-                          className="text-[#8C57FF] pr-10 pl-5 py-3"
-                          data-cell="#"
-                        >
-                          {inx + 1}
-                        </td>
+          {/* List */}
+          <div className="flex-1 overflow-y-auto px-3 py-3">
+            <div className="space-y-2">
+              {adminAndRegisterData?.data?.data?.map((item: any, inx: number) => {
+                const roleColors: Record<string, { bg: string; text: string }> = {
+                  admin: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-600 dark:text-purple-400" },
+                  registrator: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-600 dark:text-blue-400" },
+                };
+                const colors = roleColors[item?.role] || { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400" };
 
-                        <td
-                          className="pr-26 py-3 pl-20"
-                          data-cell={t("hodimName")}
-                        >
-                          {item?.name}
-                        </td>
-
-                        <td className="pr-26 py-3" data-cell={t("rol")}>
+                return (
+                  <div
+                    key={item?.id}
+                    onClick={() => setSelect(item?.id)}
+                    className={`p-4 rounded-xl cursor-pointer transition-all duration-200 ${
+                      item.id === select
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30"
+                        : "bg-gray-50 dark:bg-[#312D4B] hover:bg-gray-100 dark:hover:bg-[#3d3759]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+                        item.id === select ? "bg-white/20" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                      }`}>
+                        {inx + 1}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold">{item?.name}</p>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                          item.id === select ? "bg-white/20 text-white" : colors.bg + " " + colors.text
+                        }`}>
                           {item?.role}
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Tanlash tugmasi */}
-          <div className="flex justify-end py-2">
+          {/* Footer */}
+          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end flex-shrink-0">
+            <button
+              onClick={() => handleClose()}
+              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
+            >
+              {t("bekorQilish") || "Bekor qilish"}
+            </button>
             <button
               disabled={!select}
               onClick={() => handleNavigateProfile()}
-              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
-                !select ? "" : "hover:bg-blue-600"
-              } text-white rounded-md cursor-pointer ${
-                !select ? "opacity-40" : ""
-              }`}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold shadow-lg shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
             >
-              {t("tanlash")}
+              {t("tanlash") || "Tanlash"}
             </button>
           </div>
         </div>
@@ -752,129 +791,519 @@ cursor-pointer"
 
       {/* === POPUP CURIER === */}
       <PaymentPopup isShow={showCurier} onClose={() => handleClose()}>
-        <div className="bg-white dark:bg-[#28243d] rounded-xl shadow-xl w-[900px] h-[680px] px-6 py-6 relative flex flex-col max-md:w-[90%] max-md:h-[600px] transition-all duration-300">
-          {/* Yopish tugmasi */}
-          <button
-            onClick={() => handleClose()}
-            className="absolute top-4 right-4 flex items-center justify-center 
-w-9 h-9 rounded-md
-bg-[#ef4444] hover:bg-[#dc2626] 
-text-white shadow-lg 
-transition-all duration-200 
-hover:scale-110 active:scale-95
-cursor-pointer"
-          >
-            <X size={30} />
-          </button>
-
-          {/* Sarlavha */}
-          <h1 className="font-bold text-left pt-10">{t("olinishiKerak")}</h1>
-
-          {/* Qidiruv */}
-          <div className="flex items-center border border-[#2E263D38] dark:border-[#E7E3FC38] rounded-md px-[12px] py-[10px] mt-4 bg-white dark:bg-[#312D4B]">
-            <input
-              defaultValue={form.search}
-              onChange={handleSearchChange}
-              type="text"
-              placeholder={`${t("search")}`}
-              className="w-full bg-transparent font-normal text-[15px] outline-none text-[#2E263D] dark:text-white placeholder:text-[#2E263D66] dark:placeholder:text-[#E7E3FC66]"
-            />
-            <Search className="w-5 h-5 text-[#2E263D66] dark:text-[#E7E3FC66]" />
-          </div>
-
-          {/* Jadval qismi */}
-          <div className="mt-4 rounded-md border border-[#9d70ff1f] dark:border-[#2E263DB2] overflow-hidden">
-            {/* Jadval headeri (qotib turadigan qism) */}
-            <div className="overflow-hidden">
-              <table className="w-full border-collapse cursor-pointer">
-                <thead className="dark:bg-[#3d3759] bg-[#9d70ff]">
-                  <tr>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        # ID
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]" />
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("courierName")}
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]" />
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("region")}
-                        <div className="w-[2px] h-[14px] bg-[#2E263D1F] dark:bg-[#524B6C]" />
-                      </div>
-                    </th>
-                    <th className="h-[56px] font-medium text-[13px] text-left px-4">
-                      <div className="flex items-center justify-between pr-[21px]">
-                        {t("olinishiKerakSumma")}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-              </table>
-            </div>
-
-            {/* Scroll bo‘luvchi tbody qismi */}
-            <div className="max-h-[420px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 dark:scrollbar-thumb-[#555] dark:scrollbar-track-[#2E263D]">
-              <table className="w-full border-collapse cursor-pointer">
-                <tbody className="text-[16px] text-[#2E263DB2] dark:text-[#FFFFFF] dark:bg-[#312d4b] divide-y divide-[#E7E3FC1F] font-medium">
-                  {courierData?.data?.map((item: any, inx: number) => (
-                    <tr
-                      key={inx}
-                      onClick={() => setSelect(item?.id)}
-                      className={`border-b-1 border-[#f4f5fa] dark:border-[#E7E3FCB2] text-[16px] text-[#2E263DB2] dark:text-[#FFFFFF] font-medium ${
-                        item.id == select
-                          ? "bg-gray-300 text-black"
-                          : "hover:bg-blue-100 dark:hover:bg-[#3d3759]"
-                      }`}
-                    >
-                      <td
-                        className="text-[#8C57FF] pr-10 py-3 pl-5"
-                        data-cell="# ID"
-                      >
-                        {inx + 1}
-                      </td>
-
-                      <td className="py-3 pl-5" data-cell={t("courierName")}>
-                        {item?.name}
-                      </td>
-
-                      <td className="py-3 pl-5" data-cell={t("region")}>
-                        {item?.region?.name}
-                      </td>
-
-                      <td
-                        className="py-3 pl-5"
-                        data-cell={t("olinishiKerakSumma")}
-                      >
-                        {item?.cashbox?.balance}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[650px] max-md:w-[95%] overflow-hidden max-h-[90vh] flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 px-6 py-5 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <BanknoteArrowDown size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {t("olinishiKerak") || "Kuryerdan olish"}
+                  </h2>
+                  <p className="text-sm text-white/70">Kuryerni tanlang</p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleClose()}
+                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X size={20} className="text-white" />
+              </button>
             </div>
           </div>
 
-          {/* Tanlash tugmasi */}
-          <div className="flex justify-end py-2">
+          {/* Search */}
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <div className="relative">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                defaultValue={form.search}
+                onChange={handleSearchChange}
+                type="text"
+                placeholder={`${t("search") || "Qidirish"}...`}
+                className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:focus:ring-emerald-900/30 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto px-3 py-3">
+            <div className="space-y-2">
+              {courierData?.data?.map((item: any, inx: number) => (
+                <div
+                  key={item?.id || inx}
+                  onClick={() => setSelect(item?.id)}
+                  className={`p-4 rounded-xl cursor-pointer transition-all duration-200 ${
+                    item.id === select
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30"
+                      : "bg-gray-50 dark:bg-[#312D4B] hover:bg-gray-100 dark:hover:bg-[#3d3759]"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+                      item.id === select ? "bg-white/20" : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                    }`}>
+                      {inx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{item?.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+                          item.id === select ? "bg-white/20" : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                        }`}>
+                          {item?.region?.name || "—"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={`text-right ${item.id === select ? "" : ""}`}>
+                      <p className={`text-lg font-bold ${
+                        item.id === select ? "text-white" : "text-emerald-600 dark:text-emerald-400"
+                      }`}>
+                        {(item?.cashbox?.balance ?? 0).toLocaleString("uz-UZ")}
+                      </p>
+                      <p className={`text-xs ${item.id === select ? "text-white/70" : "text-gray-400"}`}>
+                        UZS
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end flex-shrink-0">
             <button
-              disabled={!select ? true : false}
-              onClick={() => handleNavigate()}
-              className={`px-6 py-1.5 text-[16px] bg-blue-500 dark:bg-blue-700 absolute bottom-2 right-4 ${
-                !select ? "" : "hover:bg-blue-600"
-              } text-white rounded-md cursor-pointer ${
-                !select ? "opacity-40" : ""
-              }`}
+              onClick={() => handleClose()}
+              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
             >
-              {t("tanlash")}
+              {t("bekorQilish") || "Bekor qilish"}
+            </button>
+            <button
+              disabled={!select}
+              onClick={() => handleNavigate()}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold shadow-lg shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+            >
+              {t("tanlash") || "Tanlash"}
             </button>
           </div>
         </div>
       </PaymentPopup>
+
+      {/* === SMENA BOSHLANMAGAN OGOHLANTIRISH POPUP === */}
+      <PaymentPopup isShow={showShiftWarning} onClose={() => setShowShiftWarning(false)}>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[480px] max-md:w-[95%] overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <Clock size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {t("shift.notStartedTitle") || "Smena boshlanmagan!"}
+                  </h2>
+                  <p className="text-sm text-white/70">Ogohlantirish</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowShiftWarning(false);
+                  setPendingAction(null);
+                }}
+                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="p-6">
+            <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800 mb-6">
+              <p className="text-sm text-orange-700 dark:text-orange-300 leading-relaxed">
+                {t("shift.notStartedWarning") || "Kassadan pul yechish yoki kiritish uchun avval smenani boshlashingiz kerak. Smena boshlangandan so'ng barcha operatsiyalar qayd etiladi."}
+              </p>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end">
+            <button
+              onClick={() => {
+                setShowShiftWarning(false);
+                setPendingAction(null);
+              }}
+              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
+            >
+              {t("bekorQilish") || "Bekor qilish"}
+            </button>
+            <button
+              onClick={() => {
+                setShowShiftWarning(false);
+                openShift.mutate(undefined, {
+                  onSuccess: () => {
+                    message.success(t("messages.shiftOpened") || "Smena ochildi!");
+                    refetchShift();
+                    if (pendingAction === "spend") {
+                      setSpand(true);
+                      setMaosh(false);
+                    } else if (pendingAction === "fill") {
+                      setMaosh(true);
+                      setSpand(false);
+                    }
+                    setPendingAction(null);
+                  },
+                  onError: (error) => {
+                    const err = error as AxiosError<{ error?: { message?: string } }>;
+                    const msg = err.response?.data?.error?.message || "Xatolik yuz berdi!";
+                    handleApiError(err, msg);
+                    setPendingAction(null);
+                  },
+                });
+              }}
+              disabled={openShift.isPending}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-semibold shadow-lg shadow-teal-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer"
+            >
+              {openShift.isPending ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>{t("shift.opening") || "Ochilmoqda..."}</span>
+                </>
+              ) : (
+                <>
+                  <Play size={18} />
+                  <span>{t("shift.startAndContinue") || "Smenani boshlash"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </PaymentPopup>
+
+      {/* === SMENA YOPISH POPUP === */}
+      <PaymentPopup isShow={showShiftConfirm} onClose={() => setShowShiftConfirm(false)}>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[500px] max-md:w-[95%] overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <Square size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {t("shift.closeTitle") || "Smenani yopish"}
+                  </h2>
+                  <p className="text-sm text-white/70">Smena yakunlash</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowShiftConfirm(false)}
+                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 space-y-4">
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                {t("shift.closeWarning") || "Smenani yopganingizda avtomatik ravishda Excel hisobot yuklab olinadi."}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {t("shift.comment") || "Izoh (ixtiyoriy)"}
+              </label>
+              <TextArea
+                value={shiftComment}
+                onChange={(e) => setShiftComment(e.target.value)}
+                placeholder={t("shift.commentPlaceholder") || "Smena haqida izoh..."}
+                autoSize={{ minRows: 2, maxRows: 4 }}
+                className="!rounded-xl !border-2 !border-gray-200 dark:!border-gray-700 !bg-gray-50 dark:!bg-[#312D4B] dark:!text-white"
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end">
+            <button
+              onClick={() => setShowShiftConfirm(false)}
+              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
+            >
+              {t("bekorQilish") || "Bekor qilish"}
+            </button>
+            <button
+              onClick={handleCloseShift}
+              disabled={isClosingShift}
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer"
+            >
+              {isClosingShift ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>{t("shift.closing") || "Yopilmoqda..."}</span>
+                </>
+              ) : (
+                <>
+                  <Square size={18} />
+                  <span>{t("shift.close") || "Smenani yopish"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </PaymentPopup>
+
+      {/* === KASSADAN SARFLASH POPUP === */}
+      <PaymentPopup isShow={spand} onClose={() => hendleCloce()}>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[480px] max-md:w-[95%] overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <CircleMinus size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {t("kassadanSarflash") || "Kassadan sarflash"}
+                  </h2>
+                  <p className="text-sm text-white/70">Chiqim operatsiyasi</p>
+                </div>
+              </div>
+              <button
+                onClick={() => hendleCloce()}
+                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 space-y-5">
+            {/* Summa Input */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {t("summa") || "Summa"} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  value={form.summa}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/\D/g, "");
+                    const formatted = new Intl.NumberFormat("uz-UZ").format(Number(rawValue || 0));
+                    handleChange({
+                      ...e,
+                      target: { ...e.target, name: "summa", value: formatted },
+                    } as any);
+                  }}
+                  type="text"
+                  placeholder="0"
+                  className="w-full px-4 py-3 pr-16 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] focus:border-red-400 focus:ring-4 focus:ring-red-100 dark:focus:ring-red-900/30 outline-none transition-all text-lg font-semibold"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+                  UZS
+                </span>
+              </div>
+            </div>
+
+            {/* Payment Type */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {t("paymentType") || "To'lov turi"} <span className="text-red-500">*</span>
+              </label>
+              <Select
+                value={form.payment || undefined}
+                onChange={(value) => setForm((prev) => ({ ...prev, payment: value }))}
+                placeholder={t("paymentType") || "To'lov turini tanlang"}
+                className="w-full !h-12 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selector]:!border-2 [&_.ant-select-selector]:!border-gray-200 dark:[&_.ant-select-selector]:!border-gray-700 [&_.ant-select-selector]:!bg-gray-50 dark:[&_.ant-select-selector]:!bg-[#312D4B]"
+                size="large"
+                options={[
+                  { value: "cash", label: `💵 ${t("cash") || "Naqd"}` },
+                  { value: "click", label: `💳 ${t("click") || "Click/Karta"}` },
+                ]}
+              />
+            </div>
+
+            {/* Comment */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {t("comment") || "Izoh"}
+              </label>
+              <TextArea
+                value={form.comment}
+                onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
+                placeholder={`${t("comment") || "Izoh"}...`}
+                autoSize={{ minRows: 2, maxRows: 4 }}
+                className="!rounded-xl !border-2 !border-gray-200 dark:!border-gray-700 !bg-gray-50 dark:!bg-[#312D4B] dark:!text-white"
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end">
+            <button
+              onClick={() => hendleCloce()}
+              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
+            >
+              {t("bekorQilish") || "Bekor qilish"}
+            </button>
+            <button
+              onClick={() => handleSubmit()}
+              disabled={
+                cashboxSpand.isPending ||
+                !form.payment ||
+                !form.summa ||
+                Number(form.summa.replace(/\s/g, "")) <= 0
+              }
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600 text-white font-semibold shadow-lg shadow-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer"
+            >
+              {cashboxSpand.isPending ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Yuklanmoqda...</span>
+                </>
+              ) : (
+                <>
+                  <CircleMinus size={18} />
+                  <span>{t("qabulQilish") || "Tasdiqlash"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </PaymentPopup>
+
+      {/* === KASSAGA QO'SHISH POPUP === */}
+      <PaymentPopup isShow={kassa} onClose={() => hendleCloce()}>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[480px] max-md:w-[95%] overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <CirclePlus size={24} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">
+                    {t("kassagaQo'shish") || "Kassaga qo'shish"}
+                  </h2>
+                  <p className="text-sm text-white/70">Kirim operatsiyasi</p>
+                </div>
+              </div>
+              <button
+                onClick={() => hendleCloce()}
+                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 space-y-5">
+            {/* Summa Input */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {t("summa") || "Summa"} <span className="text-emerald-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  value={form.summa}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/\D/g, "");
+                    const formatted = new Intl.NumberFormat("uz-UZ").format(Number(rawValue || 0));
+                    handleChange({
+                      ...e,
+                      target: { ...e.target, name: "summa", value: formatted },
+                    } as any);
+                  }}
+                  type="text"
+                  placeholder="0"
+                  className="w-full px-4 py-3 pr-16 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:focus:ring-emerald-900/30 outline-none transition-all text-lg font-semibold"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+                  UZS
+                </span>
+              </div>
+            </div>
+
+            {/* Payment Type */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {t("paymentType") || "To'lov turi"} <span className="text-emerald-500">*</span>
+              </label>
+              <Select
+                value={form.payment || undefined}
+                onChange={(value) => setForm((prev) => ({ ...prev, payment: value }))}
+                placeholder={t("paymentType") || "To'lov turini tanlang"}
+                className="w-full !h-12 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selector]:!border-2 [&_.ant-select-selector]:!border-gray-200 dark:[&_.ant-select-selector]:!border-gray-700 [&_.ant-select-selector]:!bg-gray-50 dark:[&_.ant-select-selector]:!bg-[#312D4B]"
+                size="large"
+                options={[
+                  { value: "cash", label: `💵 ${t("cash") || "Naqd"}` },
+                  { value: "click", label: `💳 ${t("click") || "Click/Karta"}` },
+                ]}
+              />
+            </div>
+
+            {/* Comment */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {t("comment") || "Izoh"}
+              </label>
+              <TextArea
+                value={form.comment}
+                onChange={(e) => setForm((prev) => ({ ...prev, comment: e.target.value }))}
+                placeholder={`${t("comment") || "Izoh"}...`}
+                autoSize={{ minRows: 2, maxRows: 4 }}
+                className="!rounded-xl !border-2 !border-gray-200 dark:!border-gray-700 !bg-gray-50 dark:!bg-[#312D4B] dark:!text-white"
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end">
+            <button
+              onClick={() => hendleCloce()}
+              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
+            >
+              {t("bekorQilish") || "Bekor qilish"}
+            </button>
+            <button
+              onClick={() => handleSalarySubmit()}
+              disabled={
+                cashboxFill.isPending ||
+                !form.payment ||
+                !form.summa ||
+                Number(form.summa.replace(/\s/g, "")) <= 0
+              }
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold shadow-lg shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer"
+            >
+              {cashboxFill.isPending ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Yuklanmoqda...</span>
+                </>
+              ) : (
+                <>
+                  <CirclePlus size={18} />
+                  <span>{t("qabulQilish") || "Tasdiqlash"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </PaymentPopup>
+      </div>
     </div>
   );
 };

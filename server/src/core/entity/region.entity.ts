@@ -1,14 +1,19 @@
 // region.entity.ts
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, OneToMany, Index } from 'typeorm';
 import { DistrictEntity } from './district.entity';
 import { UserEntity } from './users.entity';
 import { PostEntity } from './post.entity';
 
 @Entity('region')
+@Index('IDX_REGION_SATO_CODE', ['sato_code'])
+@Index('IDX_REGION_NAME', ['name'])
 export class RegionEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   name: string;
+
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  sato_code: string;
 
   // 1-N Region → District
   @OneToMany(() => DistrictEntity, (district) => district.region, {

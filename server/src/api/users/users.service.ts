@@ -46,6 +46,7 @@ import { UpdateMarketDto } from './dto/update-market.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
+import { getSafeLimit } from 'src/common/constants/pagination';
 import { TelegramInitData } from './dto/initData.dto';
 
 @Injectable()
@@ -329,24 +330,33 @@ export class UserService {
         throw new NotFoundException('Market not found');
       }
 
-      const district = await queryRunner.manager.findOne(DistrictEntity, {
-        where: { id: district_id },
-      });
-      if (!district) {
-        throw new NotFoundException('District not found');
-      }
-
+      // Telefon raqam bo'yicha mavjud mijozni qidirish (district_id siz!)
       const isExistClient = await queryRunner.manager.findOne(UserEntity, {
         where: {
           phone_number,
           role: Roles.CUSTOMER,
-          district_id: createCustomerDto.district_id,
         },
         relations: ['customerLinks', 'customerLinks.market'],
       });
 
       let assignedToMarket: boolean = false;
       if (isExistClient) {
+        // Agar mijoz mavjud bo'lsa, ma'lumotlarini yangilash
+        if (name && name !== isExistClient.name) {
+          isExistClient.name = name;
+        }
+        if (extra_number !== undefined) {
+          isExistClient.extra_number = extra_number;
+        }
+        // district_id va address ni saqlash (keyingi buyurtmalar uchun default)
+        if (district_id) {
+          isExistClient.district_id = district_id;
+        }
+        if (address !== undefined) {
+          isExistClient.address = address;
+        }
+        await queryRunner.manager.save(isExistClient);
+
         const isAssignedToMarket = await queryRunner.manager.findOne(
           CustomerMarketEntity,
           {
@@ -362,6 +372,7 @@ export class UserService {
       }
 
       if (assignedToMarket) {
+        await queryRunner.commitTransaction();
         return successRes(
           isExistClient,
           200,
@@ -380,6 +391,17 @@ export class UserService {
 
         await queryRunner.commitTransaction();
         return successRes(isExistClient, 200, 'Client assigned to market');
+      }
+
+      // Yangi mijoz yaratish (faqat telefon raqam yangi bo'lganda)
+      // District tekshirish
+      if (district_id) {
+        const district = await queryRunner.manager.findOne(DistrictEntity, {
+          where: { id: district_id },
+        });
+        if (!district) {
+          throw new NotFoundException('District not found');
+        }
       }
 
       const customer = queryRunner.manager.create(UserEntity, {
@@ -414,12 +436,11 @@ export class UserService {
     role?: string;
     page?: number;
     limit?: number;
+    fetchAll?: boolean;
   }): Promise<object> {
     try {
-      let { search, status, role, page = 1, limit = 10 } = filters;
-
-      // Agar limit = 0 bo‘lsa → barcha yozuvlarni olish
-      const unlimited = limit === 0;
+      const { search, status, role, page = 1, fetchAll = false } = filters;
+      const limit = getSafeLimit(filters.limit, fetchAll);
 
       const qb = this.userRepo
         .createQueryBuilder('user')
@@ -446,10 +467,8 @@ export class UserService {
         qb.andWhere('user.role = :role', { role });
       }
 
-      // 🔢 Pagination (faqat limit > 0 bo‘lsa ishlaydi)
-      if (!unlimited) {
-        qb.skip((page - 1) * limit).take(limit);
-      }
+      // 🔢 Pagination
+      qb.skip((page - 1) * limit).take(limit);
 
       const [users, total] = await qb
         .orderBy('user.created_at', 'DESC')
@@ -459,9 +478,9 @@ export class UserService {
         {
           data: users,
           total,
-          page: unlimited ? 1 : Number(page),
-          limit: unlimited ? total : Number(limit),
-          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All users',
@@ -474,9 +493,12 @@ export class UserService {
   async allMarkets(
     search?: string,
     page: number = 1,
-    limit: number = 10,
+    limit?: number,
+    fetchAll: boolean = false,
   ): Promise<object> {
     try {
+      const safeLimit = getSafeLimit(limit, fetchAll);
+
       const query = this.userRepo
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.cashbox', 'cashbox')
@@ -489,7 +511,7 @@ export class UserService {
           'user.default_tariff',
           'user.created_at',
           'user.add_order',
-          'cashbox', // cashboxni to‘liq olish uchun
+          'cashbox', // cashboxni to'liq olish uchun
         ]);
 
       if (search) {
@@ -500,8 +522,8 @@ export class UserService {
       }
 
       // 🟢 Pagination
-      const skip = (page - 1) * limit;
-      query.skip(skip).take(limit);
+      const skip = (page - 1) * safeLimit;
+      query.skip(skip).take(safeLimit);
 
       const [data, total] = await query.getManyAndCount();
 
@@ -510,8 +532,8 @@ export class UserService {
           data,
           total,
           page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+          limit: safeLimit,
+          totalPages: Math.ceil(total / safeLimit),
         },
         200,
         'All markets',
@@ -527,11 +549,11 @@ export class UserService {
     role?: string;
     page?: number;
     limit?: number;
+    fetchAll?: boolean;
   }): Promise<object> {
     try {
-      let { search, status, role, page = 1, limit = 10 } = filters;
-
-      const unlimited = limit === 0;
+      const { search, status, role, page = 1, fetchAll = false } = filters;
+      const limit = getSafeLimit(filters.limit, fetchAll);
 
       const allowedRoles = [Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER];
 
@@ -559,9 +581,7 @@ export class UserService {
       }
 
       // 🔢 Pagination
-      if (!unlimited) {
-        qb.skip((page - 1) * limit).take(limit);
-      }
+      qb.skip((page - 1) * limit).take(limit);
 
       const [users, total] = await qb
         .orderBy('user.created_at', 'DESC')
@@ -571,9 +591,9 @@ export class UserService {
         {
           data: users,
           total,
-          page: unlimited ? 1 : Number(page),
-          limit: unlimited ? total : Number(limit),
-          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All users with roles: SUPERADMIN, ADMIN, COURIER',
@@ -589,11 +609,11 @@ export class UserService {
     role?: string;
     page?: number;
     limit?: number;
+    fetchAll?: boolean;
   }): Promise<object> {
     try {
-      let { search, status, role, page = 1, limit = 10 } = filters;
-
-      const unlimited = limit === 0;
+      const { search, status, role, page = 1, fetchAll = false } = filters;
+      const limit = getSafeLimit(filters.limit, fetchAll);
 
       const allowedRoles = [Roles.REGISTRATOR, Roles.ADMIN];
 
@@ -621,9 +641,7 @@ export class UserService {
       }
 
       // 🔢 Pagination
-      if (!unlimited) {
-        qb.skip((page - 1) * limit).take(limit);
-      }
+      qb.skip((page - 1) * limit).take(limit);
 
       const [users, total] = await qb
         .orderBy('user.created_at', 'DESC')
@@ -633,9 +651,9 @@ export class UserService {
         {
           data: users,
           total,
-          page: unlimited ? 1 : Number(page),
-          limit: unlimited ? total : Number(limit),
-          totalPages: unlimited ? 1 : Math.ceil(total / limit),
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(total / limit),
         },
         200,
         'All users with roles: REGISTRATOR, ADMIN',
@@ -1182,6 +1200,191 @@ export class UserService {
     try {
       res.clearCookie('refreshToken');
       return successRes({}, 200, 'Signed out!');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Search customers by phone number
+   * For market role: only shows customers who have ordered from this market
+   * For other roles: shows all matching customers
+   */
+  async suggestCustomerByPhone(
+    user: JwtPayload,
+    phone: string,
+    market_id?: string,
+  ): Promise<object> {
+    try {
+      if (!phone || phone.length < 3) {
+        return successRes([], 200, 'Enter at least 3 digits to search');
+      }
+
+      // Clean phone number - remove spaces and special characters
+      const cleanPhone = phone.replace(/\D/g, '');
+
+      // Determine which market_id to use
+      // For OPERATOR role, use their market_id from the user object
+      let effectiveMarketId = market_id;
+      if (user.role === Roles.MARKET) {
+        effectiveMarketId = user.id;
+      }
+
+      if (user.role === Roles.MARKET || effectiveMarketId) {
+        // For market role or when market_id is provided:
+        // Only show customers who have been linked to this market
+        const customers = await this.userRepo
+          .createQueryBuilder('customer')
+          .leftJoinAndSelect('customer.district', 'district')
+          .leftJoinAndSelect('district.region', 'region')
+          .innerJoin(
+            'customer_market',
+            'cm',
+            'cm.customer_id = customer.id AND cm.market_id = :marketId',
+            { marketId: effectiveMarketId },
+          )
+          .where('customer.role = :role', { role: Roles.CUSTOMER })
+          .andWhere('customer.phone_number ILIKE :phone', {
+            phone: `%${cleanPhone}%`,
+          })
+          .orderBy('customer.created_at', 'DESC')
+          .take(10)
+          .getMany();
+
+        return successRes(customers, 200, 'Customer suggestions');
+      } else {
+        // For admin/superadmin/registrator without market_id:
+        // Show all matching customers
+        const customers = await this.userRepo
+          .createQueryBuilder('customer')
+          .leftJoinAndSelect('customer.district', 'district')
+          .leftJoinAndSelect('district.region', 'region')
+          .where('customer.role = :role', { role: Roles.CUSTOMER })
+          .andWhere('customer.phone_number ILIKE :phone', {
+            phone: `%${cleanPhone}%`,
+          })
+          .orderBy('customer.created_at', 'DESC')
+          .take(10)
+          .getMany();
+
+        return successRes(customers, 200, 'Customer suggestions');
+      }
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Get customer order history
+   * For market role: only shows orders from this market
+   * For other roles: shows all orders or filtered by market_id
+   */
+  async getCustomerOrderHistory(
+    user: JwtPayload,
+    customerId: string,
+    market_id?: string,
+  ): Promise<object> {
+    try {
+      // Verify customer exists
+      const customer = await this.userRepo.findOne({
+        where: { id: customerId, role: Roles.CUSTOMER },
+      });
+      if (!customer) {
+        throw new NotFoundException('Customer not found');
+      }
+
+      // Determine which market_id to use
+      const effectiveMarketId =
+        user.role === Roles.MARKET ? user.id : market_id;
+
+      // Base query builder for orders
+      const baseQb = this.dataSource
+        .getRepository(OrderEntity)
+        .createQueryBuilder('order')
+        .where('order.customer_id = :customerId', { customerId })
+        .andWhere('order.deleted = :deleted', { deleted: false });
+
+      // If market role or market_id provided, filter by market
+      if (effectiveMarketId) {
+        baseQb.andWhere('order.user_id = :marketId', {
+          marketId: effectiveMarketId,
+        });
+      }
+
+      // Get statistics for ALL orders (not limited)
+      const statsQb = baseQb.clone();
+      const allOrders = await statsQb.select(['order.status', 'order.total_price']).getMany();
+
+      const stats = {
+        total: allOrders.length,
+        delivered: 0,
+        cancelled: 0,
+        pending: 0,
+        total_spent: 0,
+      };
+
+      for (const order of allOrders) {
+        if (order.status === Order_status.SOLD || order.status === Order_status.PAID) {
+          stats.delivered++;
+          stats.total_spent += Number(order.total_price) || 0;
+        } else if (order.status === Order_status.CANCELLED || order.status === Order_status.CANCELLED_SENT) {
+          stats.cancelled++;
+        } else {
+          stats.pending++;
+        }
+      }
+
+      // Get paginated orders with full details
+      const orders = await this.dataSource
+        .getRepository(OrderEntity)
+        .createQueryBuilder('order')
+        .leftJoinAndSelect('order.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('order.market', 'market')
+        .where('order.customer_id = :customerId', { customerId })
+        .andWhere('order.deleted = :deleted', { deleted: false })
+        .andWhere(effectiveMarketId ? 'order.user_id = :marketId' : '1=1', {
+          marketId: effectiveMarketId,
+        })
+        .orderBy('order.created_at', 'DESC')
+        .getMany();
+
+      // Format the response with order details
+      const formattedOrders = orders.map((order) => ({
+        id: order.id,
+        status: order.status,
+        total_price: order.total_price,
+        created_at: order.created_at,
+        where_deliver: order.where_deliver,
+        market_name: order.market?.name || 'Unknown',
+        items: order.items.map((item) => ({
+          product_name: item.product?.name || 'Unknown product',
+          quantity: item.quantity,
+        })),
+      }));
+
+      return successRes(
+        {
+          customer: {
+            id: customer.id,
+            name: customer.name,
+            phone_number: customer.phone_number,
+            extra_number: customer.extra_number,
+            address: customer.address,
+            district_id: customer.district_id,
+          },
+          orders: formattedOrders,
+          total_orders: stats.total,
+          stats: {
+            delivered: stats.delivered,
+            cancelled: stats.cancelled,
+            pending: stats.pending,
+            total_spent: stats.total_spent,
+          },
+        },
+        200,
+        'Customer order history',
+      );
     } catch (error) {
       return catchError(error);
     }

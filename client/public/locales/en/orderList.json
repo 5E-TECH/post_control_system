@@ -6,6 +6,7 @@
     "selectMarket": "Select market",
     "selectRegion": "Select region",
     "selectStatus": "Select status",
+    "selectStatuses": "Select statuses",
     "searchOrder": "Search order",
     "startDate": "Start date",
     "endDate": "End date"
@@ -57,7 +58,10 @@
     "address": "Address",
     "viloyat": "Region",
     "tuman": "District",
-    "manzil": "Address"
+    "manzil": "Address",
+    "courier": "Courier information",
+    "courierName": "Courier",
+    "courierPhone": "Phone"
   },
   "kutilayotganBuyurtmalar": "Pending Orders",
   "hammaBuyurtmalar": "All Orders",

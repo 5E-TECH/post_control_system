@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../..";
 
 export const region = "region";
 
 export const useRegion = () => {
+  const client = useQueryClient();
+
   const getRegions = (enabled = true) =>
     useQuery({
       queryKey: [region],
@@ -13,7 +15,7 @@ export const useRegion = () => {
       refetchOnWindowFocus: false,
     });
 
-  const getRegionsById = (id: string, bool?:boolean) =>
+  const getRegionsById = (id: string, bool?: boolean) =>
     useQuery({
       queryKey: [region, id],
       queryFn: () => api.get(`region/${id}`).then((res) => res.data),
@@ -21,5 +23,48 @@ export const useRegion = () => {
       staleTime: 1000 * 60 * 60 * 24,
       refetchOnWindowFocus: false,
     });
-  return { getRegions, getRegionsById };
+
+  // SATO code bilan ishlash
+  const getSatoMatchPreview = () =>
+    useQuery({
+      queryKey: [region, "sato-match"],
+      queryFn: () => api.get("region/sato-match/preview").then((res) => res.data),
+      staleTime: 0,
+      refetchOnWindowFocus: false,
+    });
+
+  const applySatoCodes = useMutation({
+    mutationFn: () => api.post("region/sato-match/apply").then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [region] });
+      client.invalidateQueries({ queryKey: [region, "sato-match"] });
+    },
+  });
+
+  const updateRegionSatoCode = useMutation({
+    mutationFn: ({ id, sato_code }: { id: string; sato_code: string }) =>
+      api.patch(`region/sato/${id}`, { sato_code }).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [region] });
+      client.invalidateQueries({ queryKey: [region, "sato-match"] });
+    },
+  });
+
+  const updateRegionName = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.patch(`region/name/${id}`, { name }).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [region] });
+      client.invalidateQueries({ queryKey: [region, "sato-match"] });
+    },
+  });
+
+  return {
+    getRegions,
+    getRegionsById,
+    getSatoMatchPreview,
+    applySatoCodes,
+    updateRegionSatoCode,
+    updateRegionName,
+  };
 };

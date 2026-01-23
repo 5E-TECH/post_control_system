@@ -80,4 +80,31 @@ export class DashboardController {
       endDate,
     });
   }
+
+  @Get('revenue')
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    description: 'Period type: daily, weekly, monthly, yearly',
+    enum: ['daily', 'weekly', 'monthly', 'yearly'],
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Start date timestamp (milliseconds)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'End date timestamp (milliseconds)',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  getRevenueStats(
+    @Query('period') period?: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.dashboardService.getRevenueStats(period, startDate, endDate);
+  }
 }

@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { HttpStatus, ValidationPipe } from '@nestjs/common';
+import { HttpStatus, ValidationPipe, HttpException } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.exception.filter';
@@ -35,6 +35,27 @@ export default class Application {
         whitelist: true,
         forbidNonWhitelisted: true,
         errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        transform: true, // DTO ga avtomatik transform qilish
+        exceptionFactory: (errors) => {
+          // Validation errorlarini tushunarli formatga o'tkazamiz
+          const messages = errors.map((error) => {
+            const constraints = error.constraints || {};
+            // Barcha constraint messagelarni olib, birinchisini qaytaramiz
+            const constraintMessages = Object.values(constraints);
+            return constraintMessages.length > 0
+              ? constraintMessages.join(', ')
+              : `${error.property} - noto'g'ri qiymat`;
+          });
+
+          return new HttpException(
+            {
+              statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+              message: messages,
+              error: 'Ma\'lumotlar validatsiyadan o\'tmadi',
+            },
+            HttpStatus.UNPROCESSABLE_ENTITY,
+          );
+        },
       }),
     );
 

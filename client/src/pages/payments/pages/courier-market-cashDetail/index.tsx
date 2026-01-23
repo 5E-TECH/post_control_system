@@ -9,6 +9,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useTranslation } from "react-i18next";
 import CustomCalendar from "../../../../shared/components/customDate";
+import { Wallet, Clock, X } from "lucide-react";
 
 const { RangePicker } = DatePicker;
 
@@ -63,43 +64,71 @@ const CashDetailMarketCourier = () => {
   const raw = Number(data?.data?.myCashbox?.balance || 0);
 
   return (
-    <div className="px-5 mt-5 flex gap-24 max-md:flex-col">
-      <div>
-        <h2 className="flex items-center mb-5 text-[25px] capitalize font-bold max-[640px]:mb-0">
-          {t("cashbox")}
-        </h2>
-        <CashboxCard
-          role={"market"}
-          name={data?.data?.cashbox?.user?.name}
-          raw={raw}
-          show={show}
-          setShow={setShow}
-        />
-      </div>
-      <div className="grid w-full max-[550px]:w-[100%]">
-        {form.from == "" && (
-          <h2 className="mb-5 text-[20px] font-medium">{t("today")}</h2>
-        )}
+    <div className="bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
+      <div className="max-w-screen-2xl mx-auto flex gap-8 lg:gap-16 max-lg:flex-col">
+        {/* Left Section - Card */}
+        <div className="lg:max-w-[520px] w-full">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+              <Wallet className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">
+                {t("cashbox")}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {role === "market" ? "Market kassasi" : "Kuryer kassasi"}
+              </p>
+            </div>
+          </div>
 
-        {form.from !== "" && form.from === form.to && (
-          <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} {t("day")}
-          </h2>
-        )}
+          <CashboxCard
+            role={role === "market" ? "market" : "courier"}
+            name={data?.data?.myCashbox?.user?.name}
+            raw={raw}
+            show={show}
+            setShow={setShow}
+          />
+        </div>
 
-        {form.from !== "" && form.from !== form.to && (
-          <h2 className="mb-5 text-[20px] font-medium">
-            {form.from} <span className="text-[15px]">{t("dan")}</span> {form.to}{" "}
-            <span className="text-[15px]">{t("gacha")}</span> {t("o'tkazmalar")}
-          </h2>
-        )}
-        <div className="flex flex-row items-center gap-7 max-[550px]:w-[100%] max-[640px]:flex-col max-[640px]:gap-0">
-          <h2 className="text-[20px] font-medium mb-2">{t("filters")}:</h2>
-          <div className="w-full flex justify-between">
-            <div className="flex gap-5 max-[640px]:gap-0  w-full">
-              {isMobile ? (
-                // Mobile uchun custom date inputs (faqat text input + popup)
-                <div className="flex flex-col gap-2 w-full">
+        {/* Right Section - Filters & History */}
+        <div className="w-full lg:flex-1">
+          {/* Modern Filter Card */}
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 p-5 mb-6">
+            {/* Header with date info */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <Clock size={18} className="text-white" />
+                </div>
+                <div>
+                  {form.from === "" ? (
+                    <>
+                      <h3 className="font-bold text-gray-800 dark:text-white">{t("today")}</h3>
+                      <p className="text-xs text-gray-400">Bugungi operatsiyalar</p>
+                    </>
+                  ) : form.from === form.to ? (
+                    <>
+                      <h3 className="font-bold text-gray-800 dark:text-white">{form.from}</h3>
+                      <p className="text-xs text-gray-400">{t("day")} operatsiyalari</p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="font-bold text-gray-800 dark:text-white">
+                        {form.from} - {form.to}
+                      </h3>
+                      <p className="text-xs text-gray-400">{t("o'tkazmalar")}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Date Range Filter */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                {isMobile ? (
                   <CustomCalendar
                     from={form.from ? dayjs(form.from) : null}
                     to={form.to ? dayjs(form.to) : null}
@@ -116,31 +145,38 @@ const CashDetailMarketCourier = () => {
                       }))
                     }
                   />
-                </div>
-              ) : (
-                // Desktop uchun Antd RangePicker
-                <RangePicker
-                  value={[
-                    form.from ? dayjs(form.from) : null,
-                    form.to ? dayjs(form.to) : null,
-                  ]}
-                  onChange={(dates) => {
-                    setForm((prev) => ({
-                      ...prev,
-                      from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
-                      to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
-                    }));
-                  }}
-                  placeholder={[`${t("start")}`, `${t("end")}`]}
-                  format="YYYY-MM-DD"
-                  size="large"
-                  className="w-[340px] max-md:w-[100%] border border-[#E5E7EB] rounded-lg px-3 py-[6px] outline-none"
-                />
+                ) : (
+                  <RangePicker
+                    value={[
+                      form.from ? dayjs(form.from) : null,
+                      form.to ? dayjs(form.to) : null,
+                    ]}
+                    onChange={(dates) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        from: dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                        to: dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                      }));
+                    }}
+                    placeholder={[`${t("start")}`, `${t("end")}`]}
+                    format="YYYY-MM-DD"
+                    size="large"
+                    className="w-full !rounded-xl !border-gray-200 dark:!border-gray-700 hover:!border-purple-400 focus:!border-purple-500"
+                  />
+                )}
+              </div>
+              {(form.from || form.to) && (
+                <button
+                  onClick={() => setForm((prev) => ({ ...prev, from: "", to: "" }))}
+                  className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
               )}
             </div>
           </div>
-        </div>
-        <div className="max-md:mb-5">
+
+          {/* History Section */}
           <CashboxHistory
             form={form}
             income={data?.data?.income}

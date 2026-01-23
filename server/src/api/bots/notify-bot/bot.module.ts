@@ -14,6 +14,9 @@ import config from 'src/config';
       useFactory: () => ({
         token: config.BOT_TOKEN,
         include: [BotModule],
+        launchOptions: {
+          dropPendingUpdates: true,
+        },
       }),
     }),
     TypeOrmModule.forFeature([UserEntity, TelegramEntity]),

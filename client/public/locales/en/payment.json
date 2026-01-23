@@ -85,5 +85,33 @@
     "address": "address"
   },
 
-  "sotuv": "selling"
+  "sotuv": "selling",
+
+  "button": {
+    "export": "Export to Excel",
+    "openShift": "Open Shift",
+    "closeShift": "Close Shift"
+  },
+  "messages": {
+    "exportSuccess": "Excel file downloaded successfully",
+    "exportError": "Failed to export Excel file",
+    "shiftOpened": "Shift opened successfully!",
+    "shiftClosed": "Shift closed and report downloaded!"
+  },
+  "shiftStatus": {
+    "open": "Shift is open",
+    "closed": "Shift is closed"
+  },
+  "shift": {
+    "closeTitle": "Close Shift",
+    "closeWarning": "When you close the shift, an Excel report will be automatically downloaded.",
+    "comment": "Comment (optional)",
+    "commentPlaceholder": "Comment about the shift...",
+    "closing": "Closing...",
+    "close": "Close Shift",
+    "notStartedTitle": "Shift not started!",
+    "notStartedWarning": "You need to start a shift before making any cashbox transactions. All operations will be recorded after the shift starts.",
+    "opening": "Opening...",
+    "startAndContinue": "Start Shift"
+  }
 }

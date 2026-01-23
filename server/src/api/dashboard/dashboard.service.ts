@@ -145,4 +145,16 @@ export class DashboardService {
       return catchError(error);
     }
   }
+
+  async getRevenueStats(
+    period?: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    startDate?: string,
+    endDate?: string,
+  ) {
+    return this.orderStats.getRevenueStats(
+      period || 'daily',
+      startDate,
+      endDate,
+    );
+  }
 }

@@ -6,6 +6,7 @@
     "selectMarket": "Выберите рынок",
     "selectRegion": "Выберите регион",
     "selectStatus": "Выберите статус",
+    "selectStatuses": "Выберите статусы",
     "searchOrder": "Поиск заказа",
     "startDate": "Дата начала",
     "endDate": "Дата окончания"
@@ -57,7 +58,10 @@
     "address": "Адрес",
     "viloyat": "Область",
     "tuman": "Район",
-    "manzil": "Адрес"
+    "manzil": "Адрес",
+    "courier": "Информация о курьере",
+    "courierName": "Курьер",
+    "courierPhone": "Телефон"
   },
   "kutilayotganBuyurtmalar": "Ожидающие заказы",
   "hammaBuyurtmalar": "Все заказы",

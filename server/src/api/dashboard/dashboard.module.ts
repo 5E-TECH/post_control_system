@@ -18,6 +18,7 @@ import { OrderBotModule } from '../bots/order_create-bot/order-bot.module';
 import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
+import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
 
 @Module({
   imports: [
@@ -32,7 +33,8 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
       TelegramEntity,
     ]),
     BotModule,
-    OrderBotModule
+    OrderBotModule,
+    ExternalIntegrationModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService, OrderService, OrderGateaway, MyLogger, OrderBotService, Token, BcryptEncryption],

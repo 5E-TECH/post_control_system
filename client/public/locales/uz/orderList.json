@@ -6,6 +6,7 @@
     "selectMarket": "Marketni tanlang",
     "selectRegion": "Hududni tanlang",
     "selectStatus": "Holatni tanlang",
+    "selectStatuses": "Holatlarni tanlang",
     "searchOrder": "Buyurtmani qidiring",
     "startDate": "Boshlanish sanasi",
     "endDate": "Tugash sanasi"
@@ -57,7 +58,10 @@
     "address": "Manzili",
     "viloyat": "Viloyat",
     "tuman": "Tuman",
-    "manzil": "Manzil"
+    "manzil": "Manzil",
+    "courier": "Kuryer ma'lumotlari",
+    "courierName": "Kuryer",
+    "courierPhone": "Telefon"
   },
   "kutilayotganBuyurtmalar": "Kutilayotgan Buyurtmalar",
   "hammaBuyurtmalar": "Hamma buyurtmalar",
