@@ -13,6 +13,8 @@ import { OrderItemEntity } from './order-item.entity';
 // 🟢 ProductEntity
 @Entity('product')
 @Index(['name', 'user_id'], { unique: true }) // endi name + user_id unique
+@Index('IDX_PRODUCT_USER_ID', ['user_id'])
+@Index('IDX_PRODUCT_DELETED', ['isDeleted'])
 export class ProductEntity extends BaseEntity {
   @Column({ type: 'varchar', name: 'name' })
   name: string;

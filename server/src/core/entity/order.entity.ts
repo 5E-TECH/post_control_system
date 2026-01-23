@@ -1,11 +1,25 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Order_status, Where_deliver } from 'src/common/enums';
-import { Column, Entity, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
 import { OrderItemEntity } from './order-item.entity';
 import { PostEntity } from './post.entity';
 import { UserEntity } from './users.entity';
+import { DistrictEntity } from './district.entity';
 
 @Entity('order')
+@Index('IDX_ORDER_STATUS', ['status'])
+@Index('IDX_ORDER_USER_ID', ['user_id'])
+@Index('IDX_ORDER_CUSTOMER_ID', ['customer_id'])
+@Index('IDX_ORDER_POST_ID', ['post_id'])
+@Index('IDX_ORDER_CREATED_AT', ['created_at'])
+@Index('IDX_ORDER_STATUS_USER', ['status', 'user_id'])
+@Index('IDX_ORDER_STATUS_CREATED', ['status', 'created_at'])
+// Dashboard statistika uchun indexlar
+@Index('IDX_ORDER_SOLD_AT', ['sold_at'])
+@Index('IDX_ORDER_STATUS_SOLD', ['status', 'sold_at'])
+@Index('IDX_ORDER_USER_CREATED', ['user_id', 'created_at'])
+@Index('IDX_ORDER_USER_SOLD', ['user_id', 'sold_at'])
+@Index('IDX_ORDER_DISTRICT_ID', ['district_id'])
 export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
@@ -49,14 +63,32 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   customer_id: string;
 
+  // Buyurtma uchun yetkazib berish manzili
+  @Column({ type: 'uuid', nullable: true })
+  district_id: string;
+
+  @Column({ type: 'text', nullable: true })
+  address: string;
+
   @Column({ type: 'bigint', nullable: true })
   sold_at: number | null;
+
+  // Sotilgan paytdagi tariflar (tarix uchun saqlanadi)
+  @Column({ type: 'int', nullable: true })
+  market_tariff: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  courier_tariff: number | null;
 
   @Column({ type: 'boolean', default: false })
   deleted: boolean;
 
   @Column({ type: 'jsonb', nullable: true })
   create_bot_messages: { chatId: number; messageId: number }[];
+
+  // Tashqi saytlardan kelgan buyurtma ID si (Adosh, etc.)
+  @Column({ type: 'varchar', nullable: true })
+  external_id: string;
 
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order)
@@ -77,8 +109,15 @@ export class OrderEntity extends BaseEntity {
   market: UserEntity; // Market egasi
 
   @ManyToOne(() => UserEntity, (user) => user.customerOrders, {
-    onDelete: 'CASCADE', // user o‘chsa order o‘chadi
+    onDelete: 'CASCADE', // user o'chsa order o'chadi
   })
   @JoinColumn({ name: 'customer_id' })
   customer: UserEntity; // Buyurtma beruvchi
+
+  // 🟢 Many Orders → One District (yetkazib berish manzili)
+  @ManyToOne(() => DistrictEntity, {
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'district_id' })
+  district: DistrictEntity;
 }

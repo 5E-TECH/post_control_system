@@ -1,13 +1,26 @@
-import { memo, useState } from "react";
-import { Image, Spin, Modal, Form, Input, Button, InputNumber, Switch } from "antd";
-import Avatar from "../../../../shared/assets/profile-image/Avatar.png";
-import Vector from "../../../../shared/assets/profile-image/Vector.svg";
-import Star from "../../../../shared/assets/profile-image/star.svg";
+import { memo, useState, useMemo } from "react";
+import { Spin, Modal, Form, Input, Button, InputNumber, Switch, Select } from "antd";
 import { useDispatch } from "react-redux";
+import { AvatarDisplay } from "../../../../shared/components/AvatarSelector";
 import { setEditing } from "../../../../shared/lib/features/profile/profileEditSlice";
 import { useParams } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
-import { Check, Copy } from "lucide-react";
+import {
+  Check,
+  Copy,
+  User,
+  Phone,
+  MapPin,
+  Shield,
+  Briefcase,
+  Home,
+  Edit3,
+  Key,
+  ToggleLeft,
+  Wallet,
+  Lock,
+  Truck,
+} from "lucide-react";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
 const UserProfile = () => {
@@ -23,9 +36,45 @@ const UserProfile = () => {
   // Local state to control formatted phone input display
   const [phoneDisplay, setPhoneDisplay] = useState<string>("+998 ");
 
+  // Maosh progress hisoblash
+  const salaryProgress = useMemo(() => {
+    if (!data?.data?.salary) return null;
+
+    const salary = data.data.salary;
+    const today = new Date();
+    const currentDay = today.getDate();
+    const paymentDay = salary.payment_day || 30;
+
+    const daysInMonth = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      0
+    ).getDate();
+
+    let progress: number;
+    let daysRemaining: number;
+
+    if (currentDay <= paymentDay) {
+      progress = (currentDay / paymentDay) * 100;
+      daysRemaining = paymentDay - currentDay;
+    } else {
+      const daysUntilEndOfMonth = daysInMonth - currentDay;
+      const totalDays = daysUntilEndOfMonth + paymentDay;
+      progress = 100;
+      daysRemaining = totalDays;
+    }
+
+    return {
+      progress: Math.min(progress, 100),
+      daysRemaining,
+      paymentDay,
+      currentDay,
+    };
+  }, [data?.data?.salary]);
+
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex justify-center items-center h-96">
         <Spin size="large" tip="Loading profile..." />
       </div>
     );
@@ -109,6 +158,11 @@ const UserProfile = () => {
             tariff_home: Number(user.tariff_home) || 0,
           }
         : {}),
+      ...(user.role === "market"
+        ? {
+            default_tariff: user.default_tariff || "center",
+          }
+        : {}),
     });
 
     // set phoneDisplay state too
@@ -154,6 +208,8 @@ const UserProfile = () => {
     if (payload.phone_number === userPhoneNormalized)
       delete payload.phone_number;
     if (!payload.password) delete payload.password;
+    if (payload.default_tariff === user.default_tariff)
+      delete payload.default_tariff;
 
     if (Object.keys(payload).length === 0) {
       setOpen(false);
@@ -195,186 +251,340 @@ const UserProfile = () => {
     );
   };
 
+  const getRoleColor = (role: string) => {
+    const colors: Record<string, string> = {
+      superadmin: "from-red-500 to-pink-500",
+      admin: "from-blue-500 to-cyan-500",
+      market: "from-green-500 to-emerald-500",
+      courier: "from-orange-500 to-amber-500",
+    };
+    return colors[role] || "from-purple-500 to-indigo-500";
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    const colors: Record<string, string> = {
+      superadmin: "bg-red-500/10 text-red-500 border-red-500/20",
+      admin: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+      market: "bg-green-500/10 text-green-500 border-green-500/20",
+      courier: "bg-orange-500/10 text-orange-500 border-orange-500/20",
+    };
+    return colors[role] || "bg-purple-500/10 text-purple-500 border-purple-500/20";
+  };
+
   return (
-    <div className="flex flex-col px-4 md:px-8 lg:px-16">
-      <div className="flex flex-col md:flex-row w-full mx-auto flex-grow gap-6 mt-8">
-        {/* Profile Card */}
-        <div className="w-full md:w-[380px] lg:w-[420px] p-4 flex flex-col items-center justify-between bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md">
-          <div className="flex flex-col items-center">
-            <Image
-              src={user?.avatar || Avatar}
-              alt="avatar"
-              className="rounded-full w-[100px] h-[100px] object-cover"
-              preview={false}
-            />
-            <h2 className="mt-3 text-lg md:text-xl font-semibold">
-              {user?.name}
-            </h2>
-            <h2
-              className={`mt-3 px-3 py-name1 text-sm md:text-[15px] rounded-2xl ${
-                user?.status === "active"
-                  ? "bg-green-500/20 text-green-600"
-                  : "bg-red-500/17 text-[#FF4C51]"
-              }`}
-            >
-              {user?.status}
-            </h2>
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="max-w-5xl mx-auto">
+        {/* Profile Header Card */}
+        <div className="relative bg-white dark:bg-[#1e1e2d] rounded-2xl shadow-xl overflow-hidden mb-6">
+          {/* Gradient Banner */}
+          <div
+            className={`h-32 md:h-40 bg-gradient-to-r ${getRoleColor(
+              user?.role
+            )} relative`}
+          >
+            <div className="absolute inset-0 bg-black/10"></div>
+            <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white dark:from-[#1e1e2d] to-transparent"></div>
           </div>
 
-          <div className="flex justify-between items-center w-full mt-6 gap-6">
-            <div className="flex justify-center items-center gap-3">
-              <div className="size-[40px] bg-[#f4f5fa] dark:bg-[#8C57FF29] flex justify-center items-center rounded-[6px]">
-                <img src={Vector} alt="" />
+          {/* Profile Content */}
+          <div className="relative px-6 pb-6">
+            {/* Avatar */}
+            <div className="flex flex-col md:flex-row md:items-end gap-4 -mt-16 md:-mt-20">
+              <div className="relative">
+                <AvatarDisplay
+                  avatarId={user?.avatar_id}
+                  role={user?.role}
+                  size="lg"
+                />
+                <div
+                  className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-3 border-white dark:border-[#1e1e2d] ${
+                    user?.status === "active" ? "bg-green-500" : "bg-red-500"
+                  }`}
+                ></div>
               </div>
-              <div>
-                <h2 className="text-base md:text-lg font-semibold">1.23k</h2>
-                <h2 className="text-[#686666] text-sm">Task Done</h2>
-              </div>
-            </div>
 
-            <div className="flex justify-center items-center gap-3">
-              <div className="size-[40px] bg-[#f4f5fa] dark:bg-[#8C57FF29] flex justify-center items-center rounded-[6px]">
-                <img src={Star} alt="" />
-              </div>
-              <div>
-                <h2 className="text-base md:text-lg font-semibold">587</h2>
-                <h2 className="text-[#686666] text-sm">Task Done</h2>
+              {/* Name & Status */}
+              <div className="flex-1 flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-2 md:mt-0 md:pb-2">
+                <div>
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">
+                    {user?.name}
+                  </h1>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span
+                      className={`px-3 py-1 text-xs font-semibold rounded-full border ${getRoleBadgeColor(
+                        user?.role
+                      )}`}
+                    >
+                      {user?.role?.toUpperCase()}
+                    </span>
+                    <span
+                      className={`px-3 py-1 text-xs font-medium rounded-full ${
+                        user?.status === "active"
+                          ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                          : "bg-red-500/10 text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {user?.status === "active" ? "Faol" : "Faol emas"}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleOpenModal}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#8C57FF] to-[#6366F1] hover:from-[#7C3AED] hover:to-[#4F46E5] text-white font-medium rounded-xl shadow-lg shadow-purple-500/25 transition-all duration-300 hover:scale-105"
+                >
+                  <Edit3 size={18} />
+                  Tahrirlash
+                </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Details */}
-        {user && (
-          <div className="flex-1 bg-white dark:bg-[#1e1e2d] rounded-xl shadow-md p-6 flex flex-col justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Details</h2>
-              <div className="w-full border border-[#2E263D1F] my-3"></div>
+        {/* Details Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {user?.name && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <User className="w-6 h-6 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    To'liq ism
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5">
+                    {user.name}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-              <div className="grid md:grid-cols-2 gap-4">
-                {user?.name && (
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Full Name
-                    </span>
-                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      {user?.name}
-                    </span>
-                  </div>
-                )}
+          {user?.phone_number && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500/10 to-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Phone className="w-6 h-6 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    Telefon raqam
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5">
+                    {user.phone_number}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-                {user.region_id && (
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Region
-                    </span>
-                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      {user?.region?.name}
-                    </span>
-                  </div>
-                )}
+          {user?.region_id && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/10 to-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <MapPin className="w-6 h-6 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    Hudud
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5">
+                    {user?.region?.name}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-                {user.tariff_center && (
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Tariff Center
-                    </span>
-                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      {user.tariff_center}
-                    </span>
-                  </div>
-                )}
+          {user?.role && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/10 to-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Shield className="w-6 h-6 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    Rol
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5 capitalize">
+                    {user.role}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-                {user.tariff_home && (
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Tariff Home
-                    </span>
-                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      {user.tariff_home}
-                    </span>
-                  </div>
-                )}
+          {user?.tariff_center && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Briefcase className="w-6 h-6 text-cyan-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    Tarif (Markaz)
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5">
+                    {user.tariff_center?.toLocaleString()} so'm
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-                {user.role && (
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Role
-                    </span>
-                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      {user.role}
-                    </span>
-                  </div>
-                )}
+          {user?.tariff_home && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/10 to-rose-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Home className="w-6 h-6 text-pink-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    Tarif (Uy)
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5">
+                    {user.tariff_home?.toLocaleString()} so'm
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-                {user.phone_number && (
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Contact
-                    </span>
-                    <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      {user.phone_number}
-                    </span>
-                  </div>
-                )}
+          {/* Default Delivery Type - Only for Market */}
+          {user?.role === "market" && user?.default_tariff && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500/10 to-cyan-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Truck className="w-6 h-6 text-teal-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    Yetkazib berish turi
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5">
+                    {user.default_tariff === "center" ? "Markazgacha" : "Manzilgacha"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-                {user.role === "market"  && (
-                  <div className="flex flex-row items-center mt-4 gap-5">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Add product
-                    </span>
-                    <span className="px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                      <Switch
-                        className={`${
-                          user?.add_order
-                            ? "bg-green-600!"
-                            : "bg-[#F76659]!"
-                        }`}
-                        checked={user?.add_order}
-                        onChange={(checked, event) => {
-                          event.stopPropagation();
-                          onChangeChecked(checked, user);
-                        }}
-                      />{" "}
-                    </span>
+          {/* TG Token Card */}
+          {user?.market_tg_token && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800 md:col-span-2 lg:col-span-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Key className="w-6 h-6 text-indigo-500" />
                   </div>
-                )}
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                      Telegram Token
+                    </p>
+                    <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5 font-mono">
+                      {user.market_tg_token}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.market_tg_token);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+                    copied
+                      ? "bg-green-500/10 text-green-600"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                  <span className="text-sm font-medium">
+                    {copied ? "Nusxalandi!" : "Nusxalash"}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Add Order Switch - Only for Market */}
+          {user?.role === "market" && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <ToggleLeft className="w-6 h-6 text-emerald-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                      Mahsulot qo'shish
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                      {user.add_order ? "Ruxsat berilgan" : "Ruxsat berilmagan"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  className={`${
+                    user?.add_order ? "bg-green-600!" : "bg-[#F76659]!"
+                  }`}
+                  checked={user?.add_order}
+                  onChange={(checked, event) => {
+                    event.stopPropagation();
+                    onChangeChecked(checked, user);
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Salary Card - faqat salary mavjud bo'lganda ko'rsatish */}
+        {user?.salary && salaryProgress && (
+          <div className="bg-white dark:bg-[#1e1e2d] rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-gradient-to-r from-[#8C57FF] to-[#6366F1] p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="inline-block px-3 py-1 bg-white/20 text-white text-xs font-medium rounded-full backdrop-blur-sm">
+                    Oylik maosh
+                  </span>
+                  <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
+                    {user.salary.salary_amount?.toLocaleString()}{" "}
+                    <span className="text-lg font-normal opacity-80">so'm</span>
+                  </h2>
+                  {user.salary.have_to_pay > 0 && (
+                    <p className="text-white/70 text-sm mt-1">
+                      To'lanishi kerak: {user.salary.have_to_pay?.toLocaleString()} so'm
+                    </p>
+                  )}
+                </div>
+                <div className="hidden md:block">
+                  <div className="w-20 h-20 bg-white/10 rounded-2xl backdrop-blur-sm flex items-center justify-center">
+                    <Wallet className="w-10 h-10 text-white" />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-between items-center mt-6">
-              {user.market_tg_token && (
-                <div className="flex flex-col">
-                  <span className="text-sm text-gray-500 dark:text-gray-400 flex gap-3 items-center">
-                    Tg Token
-                    <span
-                      className="cursor-pointer flex items-center gap-2 select-none"
-                      onClick={() => {
-                        navigator.clipboard.writeText(user.market_tg_token);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                      }}
-                    >
-                      <Copy width={18} />
-                      {copied && (
-                        <span className="text-green-500 text-[16px]">
-                          <Check />
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                  <span className="bg-gray-100 dark:bg-[#2A2A3C] px-3 py-1 rounded-md text-[#2E263DB2] dark:text-[#EAEAEA]">
-                    {user.market_tg_token}
+            <div className="p-6 space-y-5">
+              <div>
+                <div className="flex justify-between text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                  <span>To'lov kunigacha</span>
+                  <span className="text-purple-600 dark:text-purple-400">
+                    {salaryProgress.currentDay} / {salaryProgress.paymentDay} kun
                   </span>
                 </div>
-              )}
-
-              <button
-                onClick={handleOpenModal}
-                className="hover:bg-[#9b72f5] w-[100px] border-none bg-[#8C57FF] px-4 h-[38px] rounded-[6px] text-white"
-              >
-                Edit
-              </button>
+                <div className="w-full h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#8C57FF] to-[#6366F1] rounded-full transition-all duration-500"
+                    style={{ width: `${salaryProgress.progress}%` }}
+                  ></div>
+                </div>
+                <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">
+                  {salaryProgress.daysRemaining} kun qoldi
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -383,101 +593,170 @@ const UserProfile = () => {
       {/* Modal */}
       {user && (
         <Modal
-          title="Edit Profile"
           open={open}
           onCancel={() => setOpen(false)}
           footer={null}
+          centered
+          width={440}
+          title={
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#8C57FF] to-[#6366F1] flex items-center justify-center">
+                <Edit3 className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white m-0">
+                  Profilni tahrirlash
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 m-0">
+                  Foydalanuvchi ma'lumotlarini yangilang
+                </p>
+              </div>
+            </div>
+          }
         >
-          <Form form={form} layout="vertical" onFinish={handleUpdate}>
-            <Form.Item label="Name" name="name">
-              <Input />
+          <Form form={form} layout="vertical" onFinish={handleUpdate} className="mt-6">
+            <Form.Item
+              label={
+                <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                  <User className="w-4 h-4" />
+                  Ism
+                </span>
+              }
+              name="name"
+              className="mb-4"
+            >
+              <Input
+                placeholder="Ismini kiriting"
+                size="large"
+                className="rounded-lg"
+              />
             </Form.Item>
 
-            <Form.Item label="Phone Number" name="phone_number">
+            <Form.Item
+              label={
+                <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                  <Phone className="w-4 h-4" />
+                  Telefon raqam
+                </span>
+              }
+              name="phone_number"
+              className="mb-4"
+            >
               <Input
                 value={phoneDisplay}
                 onChange={handlePhoneInputChange}
                 maxLength={20}
                 placeholder="+998 99 000 00 00"
+                size="large"
+                className="rounded-lg"
               />
             </Form.Item>
 
             {(user.role === "market" || user.role === "courier") && (
               <>
-                <Form.Item label="Tariff Center" name="tariff_center">
-                  <InputNumber style={{ width: "100%" }} min={0} />
+                <Form.Item
+                  label={
+                    <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                      <Briefcase className="w-4 h-4" />
+                      Tarif (Markaz)
+                    </span>
+                  }
+                  name="tariff_center"
+                  className="mb-4"
+                >
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    min={0}
+                    size="large"
+                    className="rounded-lg"
+                    formatter={(value) =>
+                      `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                    }
+                  />
                 </Form.Item>
-                <Form.Item label="Tariff Home" name="tariff_home">
-                  <InputNumber style={{ width: "100%" }} min={0} />
+                <Form.Item
+                  label={
+                    <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                      <Home className="w-4 h-4" />
+                      Tarif (Uy)
+                    </span>
+                  }
+                  name="tariff_home"
+                  className="mb-4"
+                >
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    min={0}
+                    size="large"
+                    className="rounded-lg"
+                    formatter={(value) =>
+                      `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                    }
+                  />
                 </Form.Item>
               </>
             )}
 
-            <Form.Item label="Password" name="password">
-              <Input.Password />
+            {user.role === "market" && (
+              <Form.Item
+                label={
+                  <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                    <Truck className="w-4 h-4" />
+                    Yetkazib berish turi
+                  </span>
+                }
+                name="default_tariff"
+                className="mb-4"
+              >
+                <Select
+                  size="large"
+                  className="w-full"
+                  options={[
+                    { value: "center", label: "Markazgacha" },
+                    { value: "address", label: "Manzilgacha" },
+                  ]}
+                />
+              </Form.Item>
+            )}
+
+            <Form.Item
+              label={
+                <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                  <Lock className="w-4 h-4" />
+                  Yangi parol
+                </span>
+              }
+              name="password"
+              className="mb-6"
+            >
+              <Input.Password
+                placeholder="Yangi parol kiriting"
+                size="large"
+                className="rounded-lg"
+              />
             </Form.Item>
 
-            <div className="flex justify-end">
+            <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <Button
+                onClick={() => setOpen(false)}
+                size="large"
+                className="flex-1 rounded-lg font-medium"
+              >
+                Bekor qilish
+              </Button>
               <Button
                 type="primary"
                 htmlType="submit"
+                size="large"
                 loading={updateUser.isPending}
+                className="flex-1 rounded-lg font-medium bg-[#8C57FF] hover:bg-[#7C3AED]!"
               >
-                Save
+                Saqlash
               </Button>
             </div>
           </Form>
         </Modal>
       )}
-
-      {/* Salary (Maosh) */}
-      <div className="w-full mt-5 mx-auto bg-white dark:bg-[#312D4B] shadow-xl rounded-xl p-6 space-y-6 text-gray-900 dark:text-gray-200">
-        <div className="flex w-full justify-between items-center">
-          <div>
-            <h2 className="px-4 py-1 rounded-2xl bg-[#8C57FF29] text-[#9155FD] text-sm font-medium">
-              Maosh
-            </h2>
-          </div>
-          <div className="flex items-end gap-2">
-            <h2 className="text-[#9155FD] text-lg font-medium">so'm</h2>
-            <h2 className="text-[#9155FD] text-6xl font-bold leading-none">
-              3mln
-            </h2>
-          </div>
-        </div>
-
-        <ul className="space-y-2 text-gray-700 dark:text-gray-300 text-left">
-          <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
-            10 Users
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
-            Up to 10 GB storage
-          </li>
-          <li className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full"></span>
-            Basic Support
-          </li>
-        </ul>
-
-        <div>
-          <div className="flex justify-between text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-            <span>Days</span>
-            <span>26 of 30 Days</span>
-          </div>
-          <div className="w-full bg-purple-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-[#9155FD] h-1.5 rounded-full w-[86%]"></div>
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            4 days remaining
-          </p>
-        </div>
-
-        <button className="w-full bg-[#9155FD] text-white font-semibold py-3 rounded-lg hover:bg-purple-700 transition">
-          To’lash
-        </button>
-      </div>
     </div>
   );
 };

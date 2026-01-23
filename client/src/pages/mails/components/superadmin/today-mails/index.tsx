@@ -1,25 +1,11 @@
 import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
-import EmptyPage from "../../../../../shared/components/empty-page";
 import { useTranslation } from "react-i18next";
-import MailSkeleton from "../../choose-mail/MailSkeleton";
-
-const borderColorsByStatus = {
-  new: "border-gray-400",
-  received: "border-blue-500",
-  "on the road": "border-indigo-500",
-  waiting: "border-yellow-500",
-  sold: "border-green-600",
-  cancelled: "border-red-500",
-  paid: "border-emerald-600",
-  partly_paid: "border-teal-500",
-  "cancelled (sent)": "border-orange-500",
-  closed: "border-gray-600",
-};
+import { MapPin, Package, ChevronRight, Loader2, Sparkles } from "lucide-react";
 
 const TodayMails = () => {
-  const { t } = useTranslation("mails");
+  useTranslation("mails");
   const navigate = useNavigate();
   const { getAllPosts } = usePost();
   const { data, refetch, isLoading } = getAllPosts("new");
@@ -43,45 +29,92 @@ const TodayMails = () => {
   }, [refetch]);
 
   if (loading || isLoading) {
-    return <MailSkeleton />;
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
+      </div>
+    );
   }
 
+  if (!posts?.length) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <div className="text-center">
+          <Package className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+            Yangi pochtalar yo'q
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Hozircha jo'natilishi kerak bo'lgan pochtalar mavjud emas
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate totals
+  const totalOrders = posts.reduce((sum: number, p: any) => sum + (Number(p.order_quantity) || 0), 0);
+  const totalPrice = posts.reduce((sum: number, p: any) => sum + (Number(p.post_total_price) || 0), 0);
+
   return (
-    <div className="grid grid-cols-4 max-xl:grid-cols-3 max-lg:grid-cols-2 max-md:grid-cols-1 gap-10">
-      {posts?.length ? (
-        posts?.map((post: any) => (
+    <div className="h-full overflow-y-auto">
+      {/* Stats - simplified */}
+      <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-6 text-sm">
+        <span className="text-gray-600 dark:text-gray-300">
+          <span className="font-bold text-gray-800 dark:text-white">{posts.length}</span> viloyat
+        </span>
+        <span className="text-gray-600 dark:text-gray-300">
+          <span className="font-bold text-gray-800 dark:text-white">{totalOrders}</span> buyurtma
+        </span>
+        <span className="text-gray-600 dark:text-gray-300">
+          <span className="font-bold text-emerald-600 dark:text-emerald-400">{totalPrice.toLocaleString()}</span> so'm
+        </span>
+      </div>
+
+      {/* Posts Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {posts.map((post: any) => (
           <div
             key={post?.id}
-            className={`min-h-[250px] ${
-              borderColorsByStatus[
-                post?.status as keyof typeof borderColorsByStatus
-              ]
-            } shadow-2xl rounded-md flex flex-col items-center justify-center cursor-pointer bg-green-500 dark:bg-[#3f692e] text-white`}
             onClick={() =>
               navigate(`/mails/${post?.id}`, {
                 state: { regionName: post?.region?.name },
               })
             }
+            className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl p-5 cursor-pointer hover:shadow-xl hover:shadow-emerald-500/20 transition-all group"
           >
-            <h1 className="text-[30px] line-clamp-1 text-center">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                <MapPin className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-white/20 text-white">
+                  <Sparkles className="w-3 h-3" />
+                  Yangi
+                </span>
+                <ChevronRight className="w-5 h-5 text-white/70 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
+            <h3 className="text-xl font-bold text-white mb-3 line-clamp-1">
               {post?.region?.name}
-            </h1>
-            <p className="text-[22px]">
-              <span>{post?.order_quantity}</span> {t("tabuyurtmalar")}
-            </p>
-            <p className="text-[22px] font-bold">
-              <span>
-                {new Intl.NumberFormat("uz-UZ").format(post?.post_total_price)}{" "}
-                {t("so'm")}
-              </span>
-            </p>
+            </h3>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-white/80 text-sm">Buyurtmalar:</span>
+                <span className="text-white font-semibold text-base">{post?.order_quantity} ta</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/80 text-sm">Summa:</span>
+                <span className="text-white font-bold text-base">
+                  {new Intl.NumberFormat("uz-UZ").format(Number(post?.post_total_price) || 0)} so'm
+                </span>
+              </div>
+            </div>
           </div>
-        ))
-      ) : (
-        <div className="col-span-4 flex justify-center h-[65vh] items-center">
-          <EmptyPage />
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 };

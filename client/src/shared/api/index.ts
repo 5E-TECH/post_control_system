@@ -2,7 +2,10 @@ import axios from "axios";
 import { BASE_URL } from "../const";
 
 export const api = axios.create({
-    baseURL: BASE_URL
+    baseURL: BASE_URL,
+    paramsSerializer: {
+        indexes: null  // Creates ?status=paid&status=sold instead of status[0]=paid
+    }
 })
 
 

@@ -28,6 +28,7 @@ const Orders = lazy(() => import("../pages/orders"));
 const CourierOrder = lazy(() => import("../pages/orders/pages/courier"));
 const Regions = lazy(() => import("../pages/regions"));
 const Districts = lazy(() => import("../pages/regions/pages/districts"));
+const SatoManagement = lazy(() => import("../pages/regions/pages/sato-management"));
 const Users = lazy(() => import("../pages/users"));
 const Mails = lazy(() => import("../pages/mails"));
 const Products = lazy(() => import("../pages/products"));
@@ -80,6 +81,9 @@ const ChooseMarket = lazy(
 const OrderDetails = lazy(
   () => import("../pages/orders/pages/superadmin/order-details")
 );
+const CustomerDetailPage = lazy(
+  () => import("../pages/orders/pages/superadmin/customer-detail")
+);
 const TodayOrders = lazy(() => import("../pages/today-orders"));
 const TodayMails = lazy(
   () => import("../pages/mails/components/superadmin/today-mails")
@@ -108,6 +112,7 @@ const CourierOldMails = lazy(
 );
 const BalanceDashboard = lazy(() => import("../pages/history"));
 const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
+const Integrations = lazy(() => import("../pages/integrations"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -176,6 +181,10 @@ const AppRouters = () => {
                   path: "order-detail/:id",
                   element: <OrderDetails />,
                 },
+                {
+                  path: "customer/:id",
+                  element: <CustomerDetailPage />,
+                },
               ],
             },
             {
@@ -198,7 +207,6 @@ const AppRouters = () => {
                 },
               ],
             },
-            { path: "regions", element: <Regions /> },
             {
               path: "all-users",
               element: <Users />,
@@ -291,7 +299,15 @@ const AppRouters = () => {
                   path: "districts",
                   element: <Districts />,
                 },
+                {
+                  path: "sato-management",
+                  element: <SatoManagement />,
+                },
               ],
+            },
+            {
+              path: "integrations",
+              element: <Integrations />,
             },
           ],
         },

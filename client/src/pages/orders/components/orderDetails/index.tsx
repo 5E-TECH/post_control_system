@@ -9,6 +9,21 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 import type { RootState } from "../../../../app/store";
 import { useSelector } from "react-redux";
 import { useTranslation } from "react-i18next";
+import { DEFAULT_PRODUCT_IMAGE } from "../../../../shared/const";
+import {
+  Edit3,
+  Trash2,
+  Plus,
+  Save,
+  X,
+  ShoppingBag,
+  Wallet,
+  CreditCard,
+  Banknote,
+  MessageSquare,
+  Truck,
+  Home,
+} from "lucide-react";
 
 interface IProps {
   items: any[];
@@ -46,7 +61,9 @@ const Details: FC<IProps> = ({
   const { getProductsByMarket } = useProduct();
   const { data } = getProductsByMarket(marketId, isProductsOpen);
 
-  const selectedProduct = data?.data?.products?.find((p: any) => p.id === selectedId);
+  const selectedProduct = data?.data?.products?.find(
+    (p: any) => p.id === selectedId
+  );
 
   const [orderItems, setOrderItems] = useState(
     items.map((item) => ({
@@ -62,6 +79,7 @@ const Details: FC<IProps> = ({
 
   const { updateOrders } = useOrder();
   const { handleSuccess, handleApiError } = useApiNotification();
+
   const handlesubmit = () => {
     const payload: any = {};
 
@@ -111,267 +129,377 @@ const Details: FC<IProps> = ({
   ));
 
   return (
-    <div className="dark:bg-[#312D4B]">
-      <div className="flex justify-between m-5">
-        <h2 className="font-medium text-[18px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-          {t("detail.orderDetails")}
-        </h2>
-        {status == "new" && role != "market" && role != "courier" && (
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="text-[#8C57FF] cursor-pointer"
-          >
-            {t("detail.edit")}
-          </button>
-        )}
-      </div>
-
+    <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center gap-3 bg-[#F6F7FB] dark:bg-[#3d3759] px-3 py-2 max-md:flex-wrap">
-        <h2 className="flex-1 font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5] text-base max-sm:text-sm">
-          {t("detail.product")}
-        </h2>
-        {/* <div className="w-[2px] h-[14px] bg-[#2E263D1F]  dark:bg-[#524B6C]"></div> */}
-
-        <div className="hidden md:block h-[14px] border-l-2 border-[#2E263D1F] dark:border-[#E7E3FC1F]"></div>
-
-        <h2 className="font-medium text-[#2E263DE5] dark:text-[#E7E3FCE5] text-base max-sm:text-sm">
-          {t("detail.qty")}
-        </h2>
-      </div>
-
-      {/* Items */}
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="mx-3 flex flex-row gap-4 items-center my-2 border-b-2 border-[#F6F7FB] dark:border-[#474360] pb-2 max-md:flex-wrap max-md:justify-between"
-        >
-          <div className="flex flex-row gap-3 flex-1 items-center max-sm:w-full">
-            <div className="w-[34px] h-[34px] my-1 flex-shrink-0">
-              <img
-                src={`/uploads/${item.product.image_url}`}
-                alt={item.product.name}
-                className="object-contain w-full h-full"
-              />
+      <div className="p-5 border-b border-gray-100 dark:border-gray-700/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+              <ShoppingBag className="w-5 h-5 text-white" />
             </div>
-            <div className="flex items-center">
-              <h2 className="font-medium text-[16px] text-[#2E263DE5] dark:text-[#E7E3FCE5] truncate max-w-[140px] max-sm:text-[14px]">
-                {item.product.name.slice(0, 10)}
-              </h2>
+            <div>
+              <h3 className="font-semibold text-gray-800 dark:text-white">
+                {t("detail.orderDetails")}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {items.length} ta mahsulot
+              </p>
             </div>
           </div>
+          {status === "new" && role !== "market" && role !== "courier" && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-xl text-sm font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors cursor-pointer"
+            >
+              <Edit3 className="w-4 h-4" />
+              {t("detail.edit")}
+            </button>
+          )}
+        </div>
+      </div>
 
-          <div className="text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2] max-sm:text-[13px] max-md:mt-1">
-            <h2>{item.quantity}</h2>
+      {/* Items Table Header */}
+      <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-gray-50 dark:bg-gray-800/50 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <div className="col-span-8">{t("detail.product")}</div>
+        <div className="col-span-4 text-right">{t("detail.qty")}</div>
+      </div>
+
+      {/* Items List */}
+      <div className="divide-y divide-gray-100 dark:divide-gray-700/50">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="grid grid-cols-12 gap-4 px-5 py-4 items-center hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+          >
+            <div className="col-span-8 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                <img
+                  src={item.product.image_url ? `/uploads/${item.product.image_url}` : DEFAULT_PRODUCT_IMAGE}
+                  alt={item.product.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
+                  }}
+                />
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-medium text-gray-800 dark:text-white text-sm truncate">
+                  {item.product.name}
+                </h4>
+              </div>
+            </div>
+            <div className="col-span-4 text-right">
+              <span className="inline-flex items-center justify-center min-w-[40px] px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-lg text-sm font-medium">
+                {item.quantity}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Comment Section */}
+      {comment && (
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-700/50 bg-amber-50 dark:bg-amber-900/10">
+          <div className="flex items-start gap-3">
+            <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">
+                Izoh
+              </p>
+              <p className="text-sm text-amber-800 dark:text-amber-300">
+                {comment}
+              </p>
+            </div>
           </div>
         </div>
-      ))}
+      )}
+
+      {/* Delivery Status */}
+      <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-700/50">
+        <div className="flex items-center gap-2">
+          {deleveryStatus === "center" ? (
+            <Truck className="w-4 h-4 text-blue-500" />
+          ) : (
+            <Home className="w-4 h-4 text-green-500" />
+          )}
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Yetkazish:
+          </span>
+          <span
+            className={`text-sm font-medium px-2 py-0.5 rounded-lg ${
+              deleveryStatus === "center"
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+            }`}
+          >
+            {deleveryStatus === "center" ? "Markazga" : "Manzilga"}
+          </span>
+        </div>
+      </div>
 
       {/* Totals */}
-      <div className="flex justify-end mr-5 my-5">
-        <div className="flex flex-col items-end gap-2">
-          {/* Umumiy summa */}
-          <div className="flex gap-3">
-            <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-              {t("detail.total")}:
-            </h2>
-            <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
+      <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800/30">
+        <div className="space-y-3">
+          {/* Total Price */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {t("detail.total")}
+              </span>
+            </div>
+            <span className="text-lg font-bold text-gray-800 dark:text-white">
               {Number(total_price).toLocaleString("uz-UZ")} so'm
-            </h2>
+            </span>
           </div>
 
           {role !== "courier" && (
             <>
-              <div className="flex gap-3">
-                <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                  {t("detail.to_be_paid")}:
-                </h2>
-                <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
+              {/* To Be Paid */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-orange-500" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {t("detail.to_be_paid")}
+                  </span>
+                </div>
+                <span className="text-base font-semibold text-orange-600 dark:text-orange-400">
                   {Number(to_be_paid).toLocaleString("uz-UZ")} so'm
-                </h2>
+                </span>
               </div>
 
-              <div className="flex gap-3">
-                <h2 className="text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-                  {t("detail.paid_amount")}:
-                </h2>
-                <h2 className="text-[15px] text-[#2E263DE5] font-black dark:text-[#E7E3FCE5]">
+              {/* Paid Amount */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Banknote className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {t("detail.paid_amount")}
+                  </span>
+                </div>
+                <span className="text-base font-semibold text-green-600 dark:text-green-400">
                   {Number(paid_amount).toLocaleString("uz-UZ")} so'm
-                </h2>
+                </span>
               </div>
             </>
           )}
         </div>
       </div>
 
+      {/* Edit Modal */}
       <Popup isShow={isModalOpen} onClose={() => setIsModalOpen(false)}>
-        <div className="w-[720px] bg-white dark:bg-[#2f2a45] rounded-2xl shadow-lg p-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl">{t("detail.editOrder")}</h2>
+        <div className="w-[720px] max-w-[95vw] bg-white dark:bg-[#2A263D] rounded-2xl shadow-xl overflow-hidden">
+          {/* Modal Header */}
+          <div className="p-5 border-b border-gray-100 dark:border-gray-700/50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                <Edit3 className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
+                {t("detail.editOrder")}
+              </h2>
+            </div>
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
           </div>
-          <div>
-            {orderItems.map((item) => (
-              <div
-                key={item.id}
-                className="mx-5 flex flex-row gap-5 items-center my-1 border-b-2 border-[#F6F7FB] dark:border-[#474360]"
-              >
-                <div className="flex flex-row gap-5 flex-1">
-                  <div className="w-[34px] h-[34px] my-2">
+
+          {/* Modal Content */}
+          <div className="p-5 max-h-[60vh] overflow-y-auto">
+            {/* Order Items */}
+            <div className="space-y-3">
+              {orderItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-gray-200 dark:bg-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0">
                     <img
-                      src={`/uploads/${item.image_url}`}
+                      src={item.image_url ? `/uploads/${item.image_url}` : DEFAULT_PRODUCT_IMAGE}
                       alt={item.name}
-                      className="object-contain w-full"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
+                      }}
                     />
                   </div>
-                  <div className="flex items-center">
-                    <h2 className="font-medium text-[15px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-gray-800 dark:text-white text-sm truncate">
                       {item.name}
-                    </h2>
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {editItem === item.id ? (
+                      <div className="flex items-center gap-2">
+                        <InputNumber
+                          min={1}
+                          value={item.quantity}
+                          onChange={(value) => {
+                            setOrderItems((prev) =>
+                              prev.map((el) =>
+                                el.id === item.id
+                                  ? { ...el, quantity: value }
+                                  : el
+                              )
+                            );
+                          }}
+                          className="w-20"
+                        />
+                        <button
+                          className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors cursor-pointer"
+                          onClick={() => setEditItem("")}
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center justify-center min-w-[40px] px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-lg text-sm font-medium">
+                        {item.quantity}
+                      </span>
+                    )}
+                    <button
+                      className="p-2 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg transition-colors cursor-pointer"
+                      onClick={() => setEditItem(item.id)}
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg transition-colors cursor-pointer"
+                      onClick={() =>
+                        setOrderItems((prev) =>
+                          prev.filter((el) => el.id !== item.id)
+                        )
+                      }
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="mr-[93px] text-[#2E263DB2] text-[15px] dark:text-[#E7E3FCB2]">
-                  {editItem === item.id ? (
-                    <div className="flex items-center gap-2">
-                      <InputNumber
-                        min={1}
-                        value={item.quantity}
-                        onChange={(value) => {
-                          setOrderItems((prev) =>
-                            prev.map((el) =>
-                              el.id === item.id
-                                ? { ...el, quantity: value }
-                                : el
-                            )
-                          );
-                        }}
-                      />
-                      <button
-                        className="bg-green-500 text-white px-2 rounded"
-                        onClick={() => setEditItem("")} // 👈 Save bosilganda yopiladi
-                      >
-                        {t("detail.save")}
-                      </button>
-                    </div>
-                  ) : (
-                    <h2>{item.quantity}</h2>
-                  )}
-                </div>
-                <div className="flex gap-5 items-center">
-                  <button
-                    className="cursor-pointer"
-                    onClick={() => setEditItem(item.id)}
-                  >
-                    {t("detail.edit")}
-                  </button>
-                  <button
-                    className="cursor-pointer"
-                    onClick={() =>
-                      setOrderItems((prev) =>
-                        prev.filter((el) => el.id !== item.id)
-                      )
-                    }
-                  >
-                    {t("detail.delete")}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-5">
+              ))}
+            </div>
+
+            {/* Add New Item */}
             {addItem && (
-              <div className="flex justify-between gap-5 items-center">
-                <Select
-                  value={selectedId}
-                  onChange={(value) => setSelectedId(value)}
-                  placeholder="Selected Product"
-                  className="w-full"
-                >
-                  {marketOptions}
-                </Select>
-
-                <InputNumber
-                  min={1}
-                  value={newQty}
-                  onChange={(value) => setNewQty(value ?? 1)}
-                />
-
-                <button
-                  className="bg-[#854FFF] text-white px-3 py-1 rounded-md"
-                  onClick={() => {
-                    if (!selectedProduct) return;
-
-                    setOrderItems((prev) => [
-                      ...prev,
-                      {
-                        id: crypto.randomUUID(), // yoki backenddan keladigan vaqtincha id
-                        product_id: selectedProduct.id,
-                        quantity: newQty,
-                        image_url: selectedProduct.image_url,
-                        name: selectedProduct.name,
-                      },
-                    ]);
-
-                    // reset qilamiz
-                    setSelectedId("");
-                    setNewQty(1);
-                    setAddItem(false);
-                  }}
-                >
-                  {t("detail.add1")}
-                </button>
+              <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+                <h4 className="text-sm font-medium text-purple-700 dark:text-purple-400 mb-3">
+                  Yangi mahsulot qo'shish
+                </h4>
+                <div className="flex items-center gap-3">
+                  <Select
+                    value={selectedId}
+                    onChange={(value) => setSelectedId(value)}
+                    placeholder="Mahsulot tanlang"
+                    className="flex-1"
+                  >
+                    {marketOptions}
+                  </Select>
+                  <InputNumber
+                    min={1}
+                    value={newQty}
+                    onChange={(value) => setNewQty(value ?? 1)}
+                    className="w-20"
+                  />
+                  <button
+                    className="px-4 py-2 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 transition-colors cursor-pointer"
+                    onClick={() => {
+                      if (!selectedProduct) return;
+                      setOrderItems((prev) => [
+                        ...prev,
+                        {
+                          id: crypto.randomUUID(),
+                          product_id: selectedProduct.id,
+                          quantity: newQty,
+                          image_url: selectedProduct.image_url,
+                          name: selectedProduct.name,
+                        },
+                      ]);
+                      setSelectedId("");
+                      setNewQty(1);
+                      setAddItem(false);
+                    }}
+                  >
+                    {t("detail.add1")}
+                  </button>
+                </div>
               </div>
             )}
-          </div>
-          <div className="mt-5">
-            <div className="flex justify-between mb-5">
-              <div>
-                <Select
-                  value={delevery}
-                  onChange={(value) => setDelivery(value)}
-                  style={{ width: "150px" }}
-                >
-                  <Select.Option value="center">Center</Select.Option>
-                  <Select.Option value="address">Address</Select.Option>
-                </Select>
+
+            {/* Delivery & Price Settings */}
+            <div className="mt-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                    Yetkazish turi
+                  </label>
+                  <Select
+                    value={delevery}
+                    onChange={(value) => setDelivery(value)}
+                    className="w-full"
+                  >
+                    <Select.Option value="center">Markazga</Select.Option>
+                    <Select.Option value="address">Manzilga</Select.Option>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                    {t("detail.totalPrice")}
+                  </label>
+                  <InputNumber
+                    min={1}
+                    value={totalPrice}
+                    onChange={(value) => setTotalPrice(value)}
+                    className="w-full"
+                    formatter={(value) =>
+                      `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
+                    }
+                    parser={(value) => value!.replace(/\s/g, "")}
+                  />
+                </div>
               </div>
-              <div className="flex justify-end items-center gap-5">
-                <h2>{t("detail.totalPrice")}:</h2>
-                <InputNumber
-                  min={1}
-                  defaultValue={totalPrice}
-                  onChange={(value) => setTotalPrice(value)}
-                  className="w-full mb-3 dark:bg-[#312D4B]! dark:text-white! dark:placeholder-gray-400!"
-                  formatter={(value) =>
-                    `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
-                  }
-                  parser={(value) => value!.replace(/\s/g, "")}
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                  Izoh
+                </label>
+                <TextArea
+                  rows={3}
+                  value={updatedComment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Izoh kiriting..."
+                  className="w-full dark:bg-gray-800! dark:text-white! dark:placeholder-gray-500!"
                 />
               </div>
             </div>
-            <TextArea
-              rows={4}
-              value={updatedComment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Izoh kiriting..."
-              className="w-full mb-3 dark:bg-[#312D4B]! dark:outline-none! dark:text-white! dark:placeholder-gray-400!"
-            />{" "}
           </div>
-          <div className="flex justify-end mt-5 gap-5">
+
+          {/* Modal Footer */}
+          <div className="p-5 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between">
             <button
               onClick={() => {
                 setAddItem((p) => !p);
-                setIsProductsOpen(true); // ⭐ SO‘ROV KETADI
+                setIsProductsOpen(true);
               }}
-              className="text-[#854FFF] py-1 px-1 rounded-md border border-[#854FFF] cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 border-2 border-purple-500 text-purple-600 dark:text-purple-400 rounded-xl text-sm font-medium hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
             >
+              <Plus className="w-4 h-4" />
               {t("detail.add")}
             </button>
-            <button
-              onClick={() => handlesubmit()}
-              className="text-[18px] bg-[#854FFF] text-white py-1 px-3 rounded-md cursor-pointer"
-            >
-              {t("detail.save")}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+              >
+                Bekor qilish
+              </button>
+              <button
+                onClick={() => handlesubmit()}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all cursor-pointer"
+              >
+                {t("detail.save")}
+              </button>
+            </div>
           </div>
         </div>
       </Popup>

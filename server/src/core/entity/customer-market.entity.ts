@@ -1,9 +1,12 @@
 // customer-market.entity.ts
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { UserEntity } from './users.entity';
 
 @Entity('customer_market')
+@Index('IDX_CUSTOMER_MARKET_CUSTOMER_ID', ['customer_id'])
+@Index('IDX_CUSTOMER_MARKET_MARKET_ID', ['market_id'])
+@Index('IDX_CUSTOMER_MARKET_BIDIRECTIONAL', ['market_id', 'customer_id'])
 export class CustomerMarketEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   customer_id: string;

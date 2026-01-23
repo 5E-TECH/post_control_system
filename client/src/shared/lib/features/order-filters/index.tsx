@@ -3,7 +3,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 interface FilterState {
   marketId: string | null;
   regionId: string | null;
-  status: string | null;
+  status: string[] | null;
   startDate: string;
   endDate: string;
   search: string;
@@ -22,9 +22,20 @@ const orderFilterSlice = createSlice({
   name: "orderFilter",
   initialState,
   reducers: {
-    setFilter(state, action: PayloadAction<{ name: string; value: string }>) {
+    setFilter(state, action: PayloadAction<{ name: string; value: any }>) {
       const { name, value } = action.payload;
-      (state as any)[name] = value;
+      if (name === "status") {
+        // Convert to array or null
+        state.status = Array.isArray(value)
+          ? value.length > 0
+            ? value
+            : null
+          : value
+          ? [value]
+          : null;
+      } else {
+        (state as any)[name] = value;
+      }
     },
     resetFilter() {
       return initialState;

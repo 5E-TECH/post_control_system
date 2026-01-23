@@ -21,6 +21,9 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
       useFactory: () => ({
         token: config.ORDER_BOT_TOKEN,
         include: [OrderBotModule],
+        launchOptions: {
+          dropPendingUpdates: true,
+        },
         middlewares: [
           session({
             defaultSession: (): MySession => ({

@@ -26,24 +26,43 @@ export class AllExceptionsFilter implements ExceptionFilter {
         exception_response !== null
       ) {
         const message = (exception_response as any).message;
+
+        // Validation errorlari uchun (array formatda keladi)
         if (Array.isArray(message)) {
-          error_message = message.join(', ');
+          // Har bir validation errorni yangi qatorda ko'rsatamiz
+          error_message = message.join('. ');
+        } else if (typeof message === 'string') {
+          error_message = message;
         } else {
-          error_message = message || error_message;
+          error_message = 'Ma\'lumotlar noto\'g\'ri kiritildi';
         }
+
+        // Agar boshqa validation errors formati bo'lsa
         const validationErrors = (exception_response as any).errors;
-        if (validationErrors) {
-          error_message = validationErrors.join(', ');
+        if (validationErrors && Array.isArray(validationErrors)) {
+          error_message = validationErrors.join('. ');
         }
       }
     } else if (exception instanceof Error) {
-      error_message = exception.message;
+      const message = exception.message || '';
+
+      // Database errorlarni to'g'ri ko'rsatish
+      if (message.includes('duplicate key') || message.includes('unique constraint')) {
+        error_message = 'Bu ma\'lumot allaqachon mavjud';
+      } else if (message.includes('foreign key constraint')) {
+        error_message = 'Bog\'langan ma\'lumotlar mavjud, o\'chirish mumkin emas';
+      } else if (message.includes('violates not-null constraint')) {
+        error_message = 'Majburiy maydonlar to\'ldirilmagan';
+      } else if (message.includes('connection') || message.includes('timeout')) {
+        error_message = 'Ma\'lumotlar bazasiga ulanishda xatolik';
+      } else {
+        error_message = message || 'Noma\'lum xatolik yuz berdi';
+      }
     }
     const error_response = {
-      status_code: status,
-      error: {
-        message: error_message,
-      },
+      statusCode: status,
+      message: error_message,
+      error: error_message, // Compatibility uchun ham qoldiramiz
     };
     response.status(status).json(error_response);
   }

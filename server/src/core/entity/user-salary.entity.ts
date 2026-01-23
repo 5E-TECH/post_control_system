@@ -1,9 +1,11 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Column, Entity, OneToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, OneToOne, JoinColumn, Index } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { Max, Min } from 'class-validator';
 
 @Entity('user_salary')
+@Index('IDX_USER_SALARY_USER_ID', ['user_id'])
+@Index('IDX_USER_SALARY_PAYMENT_DAY', ['payment_day'])
 export class UserSalaryEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;

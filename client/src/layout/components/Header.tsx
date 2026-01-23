@@ -8,7 +8,6 @@ import {
   QrCode,
   Search,
   Sun,
-  User,
   X,
 } from "lucide-react";
 import logo from "../../shared/assets/logo.svg";
@@ -19,6 +18,8 @@ import { memo, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
 import { buildAdminPath } from "../../shared/const";
+import { useProfile } from "../../shared/api/hooks/useProfile";
+import { AvatarDisplay } from "../../shared/components/AvatarSelector";
 
 const Header = () => {
   const { t, i18n } = useTranslation(["header"]);
@@ -28,6 +29,9 @@ const Header = () => {
   });
 
   const { mutate: signOut } = useSignOut();
+  const { getUser } = useProfile();
+  const { data: userData } = getUser();
+  const user = userData?.data;
 
   // console.log(sidebarRedux.isOpen);
 
@@ -140,11 +144,12 @@ const Header = () => {
             <button
               type="button"
               onClick={() => navigate(buildAdminPath("profile"))}
-              className="p-2 cursor-pointer rounded-full border border-gray-400 dark:border-gray-600 
-               bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
-               hover:bg-gray-200 dark:hover:bg-gray-700 
-                shadow-sm hover:shadow-md transition-all duration-200">
-              <User size={20} />
+              className="cursor-pointer hover:scale-105 transition-transform">
+              <AvatarDisplay
+                avatarId={user?.avatar_id}
+                role={user?.role}
+                size="sm"
+              />
             </button>
           </div>
 
@@ -178,13 +183,23 @@ const Header = () => {
                 <div className="flex flex-col gap-4">
                   <button
                     type="button"
-                    onClick={() => navigate(buildAdminPath("profile"))}
-                    className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-400 dark:border-gray-600
+                    onClick={() => {
+                      navigate(buildAdminPath("profile"));
+                      setBurger(false);
+                    }}
+                    className="cursor-pointer flex items-center gap-3 px-4 py-2 rounded-lg border border-gray-400 dark:border-gray-600
        bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200
-       hover:bg-gray-200 dark:hover:bg-gray-700 
+       hover:bg-gray-200 dark:hover:bg-gray-700
         shadow-sm hover:shadow-md transition-all duration-200">
-                    <User className="w-5 h-5" />
-                    <span className="text-sm font-medium">Profile</span>
+                    <AvatarDisplay
+                      avatarId={user?.avatar_id}
+                      role={user?.role}
+                      size="sm"
+                    />
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm font-medium">{user?.name || "Profile"}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user?.role}</span>
+                    </div>
                   </button>
                   <button
                     onClick={() => setDark(!dark)}

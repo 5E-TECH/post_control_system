@@ -22,6 +22,7 @@ import { UserRepository } from 'src/core/repository/user.repository';
 import { BotService } from '../bots/notify-bot/bot.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
+import { getSafeLimit } from 'src/common/constants/pagination';
 
 @Injectable()
 export class ProductService {
@@ -124,15 +125,17 @@ export class ProductService {
     }
   }
 
-  async findAll(search?: string, marketId?: string, page = 1, limit = 10) {
+  async findAll(search?: string, marketId?: string, page = 1, limit?: number, fetchAll = false) {
     try {
+      const safeLimit = getSafeLimit(limit, fetchAll);
+
       const query = this.productRepo
         .createQueryBuilder('product')
         .where('product.isDeleted = :is_deleted', { is_deleted: false })
         .leftJoinAndSelect('product.user', 'user')
         .orderBy('product.created_at', 'ASC')
-        .skip((page - 1) * limit)
-        .take(limit);
+        .skip((page - 1) * safeLimit)
+        .take(safeLimit);
 
       // 🔍 search by product name
       if (search) {
@@ -160,8 +163,8 @@ export class ProductService {
           items: products,
           total,
           page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+          limit: safeLimit,
+          totalPages: Math.ceil(total / safeLimit),
         },
         200,
         'All products',
@@ -196,8 +199,10 @@ export class ProductService {
     }
   }
 
-  async getMyProducts(user: JwtPayload, search?: string, page = 1, limit = 10) {
+  async getMyProducts(user: JwtPayload, search?: string, page = 1, limit?: number, fetchAll = false) {
     try {
+      const safeLimit = getSafeLimit(limit, fetchAll);
+
       const currentUser = await this.userRepo.findOne({
         where: { id: user.id },
       });
@@ -220,8 +225,8 @@ export class ProductService {
       }
 
       qb.orderBy('product.created_at', 'DESC')
-        .skip((page - 1) * limit)
-        .take(limit);
+        .skip((page - 1) * safeLimit)
+        .take(safeLimit);
 
       const [products, total] = await qb.getManyAndCount();
 
@@ -236,8 +241,8 @@ export class ProductService {
           products,
           total,
           page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+          limit: safeLimit,
+          totalPages: Math.ceil(total / safeLimit),
         },
         200,
         'All my products',

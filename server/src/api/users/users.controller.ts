@@ -303,6 +303,62 @@ export class UsersController {
     return this.userService.allUsers({ search, status, role, page, limit });
   }
 
+  @ApiOperation({
+    summary: 'Search customer by phone number',
+    description:
+      'Search for customers by phone number. For market role, only shows customers who have ordered from this market. For other roles, shows all customers.',
+  })
+  @ApiQuery({
+    name: 'phone',
+    required: true,
+    description: 'Phone number to search (partial match supported)',
+  })
+  @ApiQuery({
+    name: 'market_id',
+    required: false,
+    description: 'Market ID to filter customers (required for market role)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Customer suggestions retrieved successfully',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @Get('customer/suggest')
+  suggestCustomer(
+    @CurrentUser() user: JwtPayload,
+    @Query('phone') phone: string,
+    @Query('market_id') market_id?: string,
+  ) {
+    return this.userService.suggestCustomerByPhone(user, phone, market_id);
+  }
+
+  @ApiOperation({
+    summary: 'Get customer order history',
+    description:
+      'Get order history for a customer. For market role, only shows orders from this market.',
+  })
+  @ApiParam({ name: 'id', description: 'Customer ID' })
+  @ApiQuery({
+    name: 'market_id',
+    required: false,
+    description: 'Market ID to filter orders (required for market role)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Customer order history retrieved successfully',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR, Roles.COURIER)
+  @Get('customer/:id/history')
+  getCustomerOrderHistory(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Query('market_id') market_id?: string,
+  ) {
+    return this.userService.getCustomerOrderHistory(user, id, market_id);
+  }
+
   @ApiOperation({ summary: 'List all markets' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
