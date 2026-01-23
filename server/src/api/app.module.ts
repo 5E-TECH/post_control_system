@@ -16,6 +16,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { PrinterModule } from './printer/printer.module';
 import { BotModule } from './bots/notify-bot/bot.module';
 import { OrderBotModule } from './bots/order_create-bot/order-bot.module';
+import { ExternalProxyModule } from './external-proxy/external-proxy.module';
+import { ExternalIntegrationModule } from './external-integration/external-integration.module';
 
 @Module({
   imports: [
@@ -56,6 +58,8 @@ import { OrderBotModule } from './bots/order_create-bot/order-bot.module';
     DashboardModule,
     LoggerModule,
     PrinterModule,
+    ExternalProxyModule,
+    ExternalIntegrationModule,
   ],
   providers: [OrderGateaway],
 })

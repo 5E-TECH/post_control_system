@@ -172,53 +172,53 @@ const OrderCard = ({
       onClick={onClick}
       className="bg-white dark:bg-[#2A2640] rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 active:scale-[0.98] transition-transform cursor-pointer"
     >
-      {/* Header: Customer name + Status */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
-            <User className="w-4 h-4 text-white" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-gray-800 dark:text-white truncate">
-              {item?.customer?.name || "Noma'lum"}
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              #{index + 1}
-            </p>
-          </div>
-        </div>
+      {/* Header: Status + Index */}
+      <div className="flex items-center justify-between mb-3">
         <StatusBadge status={item?.status} />
+        <span className="text-xs text-gray-400">#{index + 1}</span>
       </div>
 
-      {/* Info Grid */}
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        {/* Phone */}
-        <div className="flex items-center gap-2 text-sm">
-          <Phone className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-gray-600 dark:text-gray-300 truncate">
-            {formatPhone(item?.customer?.phone_number)}
-          </span>
+      {/* Customer info - full width */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+          <User className="w-5 h-5 text-white" />
         </div>
+        <div className="flex-1">
+          <h3 className="font-bold text-base text-gray-800 dark:text-white">
+            {item?.customer?.name || "Noma'lum"}
+          </h3>
+          <a
+            href={`tel:${item?.customer?.phone_number}`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400"
+          >
+            <Phone className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+            <span>{formatPhone(item?.customer?.phone_number)}</span>
+          </a>
+        </div>
+      </div>
 
-        {/* Location - Order district yoki customer district */}
-        <div className="flex items-center gap-2 text-sm">
-          <MapPin className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-gray-600 dark:text-gray-300 truncate">
+      {/* Info Row */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3 text-sm">
+        {/* Location */}
+        <div className="flex items-center gap-1.5">
+          <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-300">
             {item?.district?.name || item?.customer?.district?.name || "-"}
           </span>
         </div>
 
         {/* Market */}
-        <div className="flex items-center gap-2 text-sm">
-          <Store className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-gray-600 dark:text-gray-300 truncate">
+        <div className="flex items-center gap-1.5">
+          <Store className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <span className="text-gray-600 dark:text-gray-300">
             {item?.market?.name || "-"}
           </span>
         </div>
 
         {/* Date */}
-        <div className="flex items-center gap-2 text-sm">
-          <Calendar className="w-3.5 h-3.5 text-gray-400" />
+        <div className="flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
           <span className="text-gray-600 dark:text-gray-300">
             {formatDate(item?.created_at)}
           </span>
@@ -461,25 +461,25 @@ const OrderView = () => {
                 <th className="px-4 py-4 text-left text-sm font-semibold w-12">
                   #
                 </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold">
+                <th className="px-4 py-4 text-left text-sm font-semibold min-w-[180px] max-w-[250px]">
                   {t("customer")}
                 </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold">
+                <th className="px-4 py-4 text-left text-sm font-semibold whitespace-nowrap">
                   {t("phone")}
                 </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold">
+                <th className="px-4 py-4 text-left text-sm font-semibold min-w-[100px]">
                   {t("district")}
                 </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold">
+                <th className="px-4 py-4 text-left text-sm font-semibold min-w-[100px]">
                   {t("market")}
                 </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold">
+                <th className="px-4 py-4 text-left text-sm font-semibold whitespace-nowrap">
                   {t("status")}
                 </th>
-                <th className="px-4 py-4 text-right text-sm font-semibold">
+                <th className="px-4 py-4 text-right text-sm font-semibold whitespace-nowrap">
                   {t("price")}
                 </th>
-                <th className="px-4 py-4 text-left text-sm font-semibold">
+                <th className="px-4 py-4 text-left text-sm font-semibold whitespace-nowrap">
                   {t("createdAt")}
                 </th>
               </tr>
@@ -503,27 +503,27 @@ const OrderView = () => {
                     <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {(page - 1) * limit + index + 1}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 max-w-[250px]">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                           <User className="w-4 h-4 text-white" />
                         </div>
-                        <span className="font-medium text-gray-800 dark:text-white">
+                        <span className="font-medium text-gray-800 dark:text-white truncate" title={item?.customer?.name}>
                           {item?.customer?.name}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+                    <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
                       {formatPhone(item?.customer?.phone_number)}
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
                       <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                        {item?.district?.name || item?.customer?.district?.name || "-"}
+                        <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{item?.district?.name || item?.customer?.district?.name || "-"}</span>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
-                      {item?.market?.name}
+                      <span className="truncate block">{item?.market?.name}</span>
                     </td>
                     <td className="px-4 py-4">
                       <StatusBadge status={item?.status} />

@@ -1,5 +1,5 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { UserEntity } from './users.entity';
 
 export enum ShiftStatus {
@@ -8,6 +8,10 @@ export enum ShiftStatus {
 }
 
 @Entity('shifts')
+@Index('IDX_SHIFT_OPENED_BY', ['opened_by'])
+@Index('IDX_SHIFT_STATUS', ['status'])
+@Index('IDX_SHIFT_OPENED_AT', ['opened_at'])
+@Index('IDX_SHIFT_STATUS_OPENED', ['status', 'opened_at'])
 export class ShiftEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   opened_by: string;

@@ -95,6 +95,17 @@ export const useOrder = () => {
           .then((res) => res.data),
     });
 
+  // Marketning yangi (NEW) statusdagi buyurtmalarini olish
+  const getMarketNewOrders = (marketId: string | undefined, enabled = true) =>
+    useQuery({
+      queryKey: [order, "market-new-orders", marketId],
+      queryFn: () =>
+        api
+          .get(`order/market/${marketId}`, { params: { status: "new" } })
+          .then((res) => res.data),
+      enabled: Boolean(marketId) && enabled,
+    });
+
   const getCourierOrders = (params?: any) =>
     useQuery({
       queryKey: [order, params],
@@ -149,6 +160,16 @@ export const useOrder = () => {
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
+  // Tashqi buyurtmalarni qabul qilish (universal - integratsiya ID orqali)
+  const receiveExternalOrders = useMutation({
+    mutationFn: (data: {
+      integration_id: string;
+      orders: any[]; // Universal format - field mapping backend da qo'llaniladi
+    }) => api.post("order/receive/external", data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
   return {
     createOrder,
     updateOrders,
@@ -161,6 +182,7 @@ export const useOrder = () => {
     getOrderByMarket,
     getCourierOrders,
     getMarketsByMyNewOrders,
+    getMarketNewOrders,
     getOrdersByToken,
     deleteOrders,
     getOrderById,
@@ -170,6 +192,7 @@ export const useOrder = () => {
     joinPostRefusalProduct,
     receivePostByScan,
     createOrderBot,
-    updateOrderAddress
+    updateOrderAddress,
+    receiveExternalOrders
   };
 };

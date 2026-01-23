@@ -349,7 +349,7 @@ export class UsersController {
     description: 'Customer order history retrieved successfully',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR, Roles.COURIER)
   @Get('customer/:id/history')
   getCustomerOrderHistory(
     @CurrentUser() user: JwtPayload,

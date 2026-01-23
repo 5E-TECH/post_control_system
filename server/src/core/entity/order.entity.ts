@@ -73,11 +73,22 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'bigint', nullable: true })
   sold_at: number | null;
 
+  // Sotilgan paytdagi tariflar (tarix uchun saqlanadi)
+  @Column({ type: 'int', nullable: true })
+  market_tariff: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  courier_tariff: number | null;
+
   @Column({ type: 'boolean', default: false })
   deleted: boolean;
 
   @Column({ type: 'jsonb', nullable: true })
   create_bot_messages: { chatId: number; messageId: number }[];
+
+  // Tashqi saytlardan kelgan buyurtma ID si (Adosh, etc.)
+  @Column({ type: 'varchar', nullable: true })
+  external_id: string;
 
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order)

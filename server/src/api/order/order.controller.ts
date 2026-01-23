@@ -36,6 +36,7 @@ import { PartlySoldDto } from './dto/partly-sold.dto';
 import { OrderDto } from './dto/orderId.dto';
 import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
 import { UpdateOrderAddressDto } from './dto/update-order-address.dto';
+import { ReceiveExternalOrdersDto } from './dto/receive-external-orders.dto';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -220,6 +221,19 @@ export class OrderController {
     @Query('search') search?: string,
   ) {
     return this.orderService.receiveNewOrders(ordersArray, search);
+  }
+
+  @ApiOperation({ summary: 'Receive external orders (from Adosh, etc.)' })
+  @ApiBody({ type: ReceiveExternalOrdersDto })
+  @ApiResponse({ status: 201, description: 'External orders received and created' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('receive/external')
+  receiveExternalOrders(
+    @Body() dto: ReceiveExternalOrdersDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orderService.receiveExternalOrders(dto, user);
   }
 
   @ApiOperation({ summary: 'Receive new order by scaner' })

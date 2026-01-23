@@ -22,6 +22,8 @@ import {
   X,
   Save,
   User,
+  Plus,
+  AlertCircle,
 } from "lucide-react";
 import { useUser } from "../../../../../shared/api/hooks/useRegister";
 import { useDistrict } from "../../../../../shared/api/hooks/useDistrict";
@@ -39,6 +41,13 @@ const statusConfig: Record<
   string,
   { bg: string; text: string; darkBg: string; darkText: string; icon: any }
 > = {
+  created: {
+    bg: "bg-gray-100",
+    text: "text-gray-700",
+    darkBg: "dark:bg-gray-900/30",
+    darkText: "dark:text-gray-400",
+    icon: Clock,
+  },
   new: {
     bg: "bg-sky-100",
     text: "text-sky-700",
@@ -46,26 +55,47 @@ const statusConfig: Record<
     darkText: "dark:text-sky-400",
     icon: Clock,
   },
-  pending: {
+  received: {
     bg: "bg-amber-100",
     text: "text-amber-700",
     darkBg: "dark:bg-amber-900/30",
     darkText: "dark:text-amber-400",
     icon: Clock,
   },
-  on_way: {
+  "on the road": {
     bg: "bg-indigo-100",
     text: "text-indigo-700",
     darkBg: "dark:bg-indigo-900/30",
     darkText: "dark:text-indigo-400",
     icon: Truck,
   },
-  delivered: {
+  waiting: {
+    bg: "bg-orange-100",
+    text: "text-orange-700",
+    darkBg: "dark:bg-orange-900/30",
+    darkText: "dark:text-orange-400",
+    icon: Clock,
+  },
+  sold: {
     bg: "bg-emerald-100",
     text: "text-emerald-700",
     darkBg: "dark:bg-emerald-900/30",
     darkText: "dark:text-emerald-400",
     icon: CheckCircle2,
+  },
+  paid: {
+    bg: "bg-green-100",
+    text: "text-green-700",
+    darkBg: "dark:bg-green-900/30",
+    darkText: "dark:text-green-400",
+    icon: CheckCircle2,
+  },
+  partly_paid: {
+    bg: "bg-yellow-100",
+    text: "text-yellow-700",
+    darkBg: "dark:bg-yellow-900/30",
+    darkText: "dark:text-yellow-400",
+    icon: Clock,
   },
   cancelled: {
     bg: "bg-red-100",
@@ -74,14 +104,34 @@ const statusConfig: Record<
     darkText: "dark:text-red-400",
     icon: XCircle,
   },
+  "cancelled (sent)": {
+    bg: "bg-red-100",
+    text: "text-red-700",
+    darkBg: "dark:bg-red-900/30",
+    darkText: "dark:text-red-400",
+    icon: XCircle,
+  },
+  closed: {
+    bg: "bg-gray-100",
+    text: "text-gray-700",
+    darkBg: "dark:bg-gray-900/30",
+    darkText: "dark:text-gray-400",
+    icon: CheckCircle2,
+  },
 };
 
 const statusLabels: Record<string, string> = {
+  created: "Yaratildi",
   new: "Yangi",
-  pending: "Kutilmoqda",
-  on_way: "Yo'lda",
-  delivered: "Yetkazildi",
+  received: "Qabul qilindi",
+  "on the road": "Yo'lda",
+  waiting: "Kutilmoqda",
+  sold: "Sotildi",
+  paid: "To'landi",
+  partly_paid: "Qisman to'landi",
   cancelled: "Bekor qilindi",
+  "cancelled (sent)": "Bekor (jo'natildi)",
+  closed: "Yopildi",
 };
 
 interface OrderHistoryItem {
@@ -106,22 +156,43 @@ const CustomerDetail = () => {
   const page = Number(searchParams.get("page") || 1);
   const limit = Number(searchParams.get("limit") || 10);
 
-  const { getUserById, getCustomerOrderHistory } = useUser();
-  const { data: customerData, isLoading: customerLoading, refetch: refetchCustomer } = getUserById(id);
-  const customer = customerData?.data;
-
   // Get market_id from localStorage for market role
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const market_id = market?.id;
+  const isMarketRole = role === "market";
+  const isCourierRole = role === "courier";
+  const needsHistoryForCustomer = isMarketRole || isCourierRole;
+
+  const { getUserById, getCustomerOrderHistory } = useUser();
+
+  // For market/courier role, we skip getUserById (they don't have permission)
+  // and get customer data from history endpoint instead
+  const { data: customerData, isLoading: customerLoading, refetch: refetchCustomer } = getUserById(
+    needsHistoryForCustomer ? undefined : id
+  );
 
   const { data: historyData, isLoading: historyLoading } =
     getCustomerOrderHistory(id || "", market_id, !!id);
+
+  // For market/courier role, get customer from history response; for others, from getUserById
+  const customer = needsHistoryForCustomer
+    ? historyData?.data?.customer
+    : customerData?.data;
+
   const orderHistory: OrderHistoryItem[] = historyData?.data?.orders || [];
   const totalOrders = historyData?.data?.total_orders || 0;
-  // Calculate total spent from delivered orders
-  const totalSpent = orderHistory
-    .filter((o) => o.status === "delivered")
-    .reduce((sum, o) => sum + (o.total_price || 0), 0);
+
+  // Get statistics from server response
+  const serverStats = historyData?.data?.stats;
+  const totalSpent = serverStats?.total_spent || 0;
+  const deliveredOrders = serverStats?.delivered || 0;
+  const cancelledOrders = serverStats?.cancelled || 0;
+  const pendingOrders = serverStats?.pending || 0;
+
+  // Marketning yangi buyurtmalarini olish
+  const { getMarketNewOrders } = useOrder();
+  const { data: newOrdersData, isLoading: newOrdersLoading } = getMarketNewOrders(market_id, !!market_id);
+  const marketNewOrders = newOrdersData?.data?.data || [];
 
   // Get district info
   const { getDistrictById } = useDistrict();
@@ -171,12 +242,25 @@ const CustomerDetail = () => {
     // Agar raqamga aylanmasa, ISO string sifatida parse qilish
     if (isNaN(timestamp as number)) {
       const d = dayjs(date);
-      return d.isValid() ? d.format("DD.MM.YYYY") : "-";
+      return d.isValid() ? d.format("DD.MM.YYYY HH:mm") : "-";
     }
 
     // Timestamp millisekundlarda keladi
     const d = dayjs(timestamp);
-    return d.isValid() ? d.format("DD.MM.YYYY") : "-";
+    return d.isValid() ? d.format("DD.MM.YYYY HH:mm") : "-";
+  };
+
+  // Format phone number helper (998901234567 -> +998 90 123 45 67)
+  const formatPhone = (phone: string | undefined) => {
+    if (!phone) return "-";
+    const cleaned = phone.replace(/\D/g, "");
+    if (cleaned.length === 12 && cleaned.startsWith("998")) {
+      return `+${cleaned.slice(0, 3)} ${cleaned.slice(3, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8, 10)} ${cleaned.slice(10, 12)}`;
+    }
+    if (cleaned.length === 9) {
+      return `+998 ${cleaned.slice(0, 2)} ${cleaned.slice(2, 5)} ${cleaned.slice(5, 7)} ${cleaned.slice(7, 9)}`;
+    }
+    return phone;
   };
 
   // Pagination
@@ -205,18 +289,10 @@ const CustomerDetail = () => {
     navigate(buildAdminPath(`orders/order-detail/${orderId}`));
   };
 
-  // Calculate statistics
-  const deliveredOrders = orderHistory.filter(
-    (o) => o.status === "delivered"
-  ).length;
-  const cancelledOrders = orderHistory.filter(
-    (o) => o.status === "cancelled"
-  ).length;
-  const pendingOrders = orderHistory.filter(
-    (o) => !["delivered", "cancelled"].includes(o.status)
-  ).length;
+  // For market/courier role, use historyLoading; for others, use customerLoading
+  const isLoading = needsHistoryForCustomer ? historyLoading : customerLoading;
 
-  if (customerLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
@@ -234,7 +310,7 @@ const CustomerDetail = () => {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <button
@@ -472,7 +548,136 @@ const CustomerDetail = () => {
           </div>
 
           {/* Right Column - Order History */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
+            {/* Marketning yangi buyurtmalari (faqat market role uchun) */}
+            {market_id && (
+              <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden border-2 border-emerald-200 dark:border-emerald-800/50">
+                {/* Header */}
+                <div className="p-5 border-b border-emerald-100 dark:border-emerald-800/30 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                        <Plus className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
+                          Yangi qo'shilgan buyurtmalar
+                        </h2>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Hali jo'natilmagan buyurtmalar: {marketNewOrders.length} ta
+                        </p>
+                      </div>
+                    </div>
+                    {marketNewOrders.length > 0 && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                        <AlertCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                          {marketNewOrders.length} ta yangi
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* New Orders List */}
+                <div className="p-4">
+                  {newOrdersLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                    </div>
+                  ) : marketNewOrders.length === 0 ? (
+                    <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+                      <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Yangi buyurtmalar yo'q</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                      {marketNewOrders.map((newOrder: any) => (
+                        <div
+                          key={newOrder.id}
+                          className="p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition-all border border-emerald-100 dark:border-emerald-800/30"
+                        >
+                          {/* Top row: badges and date */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                                <Clock className="w-3 h-3" />
+                                Yangi
+                              </span>
+                              {newOrder.where_deliver === "address" ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                  <Home className="w-3 h-3" />
+                                  Uyga
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                  <Building2 className="w-3 h-3" />
+                                  Markazga
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatDate(newOrder.created_at)}
+                            </span>
+                          </div>
+
+                          {/* Main row: customer info (horizontal) + price */}
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 flex-1 min-w-0 flex-wrap">
+                              {/* Name */}
+                              <span className="text-sm font-semibold text-gray-800 dark:text-white whitespace-nowrap">
+                                {newOrder.customer?.name || "Noma'lum mijoz"}
+                              </span>
+                              {/* Phone */}
+                              <span className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1 whitespace-nowrap">
+                                <Phone className="w-3.5 h-3.5" />
+                                {formatPhone(newOrder.customer?.phone_number)}
+                              </span>
+                              {/* Location */}
+                              <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 whitespace-nowrap">
+                                <MapPin className="w-3.5 h-3.5" />
+                                {newOrder.customer?.district?.region?.name || newOrder.district?.region?.name || "-"},{" "}
+                                {newOrder.customer?.district?.name || newOrder.district?.name || "-"}
+                              </span>
+                            </div>
+                            {/* Price and view */}
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <p className="text-sm font-bold text-gray-800 dark:text-white whitespace-nowrap">
+                                {newOrder.total_price?.toLocaleString()} so'm
+                              </p>
+                              <button
+                                onClick={() => handleViewOrder(newOrder.id)}
+                                className="inline-flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer whitespace-nowrap"
+                              >
+                                <Eye className="w-4 h-4" />
+                                Ko'rish
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Products row */}
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {newOrder.items?.slice(0, 3).map((item: any, idx: number) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-gray-800 rounded text-xs text-gray-600 dark:text-gray-300"
+                              >
+                                {item.product?.name || item.product_name} x{item.quantity}
+                              </span>
+                            ))}
+                            {newOrder.items?.length > 3 && (
+                              <span className="text-xs text-gray-500">+{newOrder.items.length - 3}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Order History */}
             <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden">
               {/* Header */}
               <div className="p-5 border-b border-gray-100 dark:border-gray-700/50">

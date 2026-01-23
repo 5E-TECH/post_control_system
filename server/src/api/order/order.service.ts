@@ -57,6 +57,8 @@ import {
 } from 'src/common/constants/pagination';
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
+import { ExternalIntegrationService } from '../external-integration/external-integration.service';
+import { FieldMapping } from 'src/core/entity/external-integration.entity';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -95,8 +97,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     private readonly orderGateaway: OrderGateaway,
     private readonly botService: BotService,
     private readonly orderBotService: OrderBotService,
+    private readonly externalIntegrationService: ExternalIntegrationService,
   ) {
     super(orderRepo);
+  }
+
+  // Helper metod - nested field qiymatini olish (masalan: "customer.name")
+  private getFieldValue(obj: any, fieldPath: string): any {
+    if (!fieldPath || !obj) return undefined;
+    return fieldPath.split('.').reduce((o, k) => o?.[k], obj);
   }
 
   private formatPrice(value: number | string) {
@@ -1359,6 +1368,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         paid_amount: paidAfter,
         comment: finalComment,
         sold_at: Date.now(),
+        // Sotilgan paytdagi tariflarni saqlash (tarix uchun)
+        market_tariff: marketTarif,
+        courier_tariff: courierTarif,
       });
 
       await queryRunner.manager.save(order);
@@ -1792,6 +1804,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment: finalComment,
         product_quantity: totalNewQty,
         sold_at: order.sold_at ?? Date.now(),
+        // Sotilgan paytdagi tariflarni saqlash (tarix uchun)
+        market_tariff: order.market_tariff ?? marketTarif,
+        courier_tariff: order.courier_tariff ?? courierTarif,
       });
       await queryRunner.manager.save(order);
 
@@ -2291,12 +2306,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const soldAndPaid = Number(statsQuery?.soldAndPaid) || 0;
 
       // Profit hisoblash - bitta optimallashtirilgan query
-      // Market va Courier tarifflarini JOIN qilib olamiz
+      // Saqlangan tariflarni ishlatamiz, agar mavjud bo'lmasa eski usul
       const profitQuery = await this.orderRepo
         .createQueryBuilder('o')
         .select(
           `SUM(
             CASE
+              -- Agar saqlangan tariflar mavjud bo'lsa, ularni ishlatamiz
+              WHEN o.market_tariff IS NOT NULL AND o.courier_tariff IS NOT NULL THEN
+                COALESCE(o.market_tariff, 0) - COALESCE(o.courier_tariff, 0)
+              -- Aks holda eski usul (backward compatibility)
               WHEN o.where_deliver = :addressType THEN
                 COALESCE(market.tariff_home, 0) - COALESCE(courier.tariff_home, 0)
               ELSE
@@ -2353,7 +2372,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .groupBy('o.user_id')
         .getRawMany();
 
-      // 2) soldOrders: shu davrda yaratilgan AND shu davrda sotilgan AND status IN (...)
+      // 2) soldOrders: shu davrda SOTILGAN buyurtmalar (qachon yaratilganidan qat'iy nazar)
       const statuses = [
         Order_status.SOLD,
         Order_status.PAID,
@@ -2364,8 +2383,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .createQueryBuilder('o')
         .select('o.user_id', 'user_id')
         .addSelect('COUNT(*)', 'sold')
-        .where('o.created_at BETWEEN :start AND :end', { start, end }) // yaratilgan davr
-        .andWhere('o.sold_at BETWEEN :start AND :end', { start, end }) // sotilgan davr
+        .where('o.sold_at BETWEEN :start AND :end', { start, end }) // sotilgan davr
         .andWhere('o.status IN (:...statuses)', { statuses }) // kerakli statuslar
         .andWhere('o.user_id IS NOT NULL')
         .groupBy('o.user_id')
@@ -2667,10 +2685,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           TO_CHAR(TO_TIMESTAMP(MIN(o.sold_at) / 1000), '${labelFormat}') as label,
           COUNT(o.id) as orders_count,
           COALESCE(SUM(
-            CASE WHEN o.where_deliver = 'address' THEN
-              COALESCE(m.tariff_home, 0) - COALESCE(c.tariff_home, 0)
-            ELSE
-              COALESCE(m.tariff_center, 0) - COALESCE(c.tariff_center, 0)
+            CASE
+              -- Agar saqlangan tariflar mavjud bo'lsa, ularni ishlatamiz
+              WHEN o.market_tariff IS NOT NULL AND o.courier_tariff IS NOT NULL THEN
+                COALESCE(o.market_tariff, 0) - COALESCE(o.courier_tariff, 0)
+              -- Aks holda eski usul (backward compatibility)
+              WHEN o.where_deliver = 'address' THEN
+                COALESCE(m.tariff_home, 0) - COALESCE(c.tariff_home, 0)
+              ELSE
+                COALESCE(m.tariff_center, 0) - COALESCE(c.tariff_center, 0)
             END
           ), 0) as revenue
         FROM "order" o
@@ -2736,7 +2759,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         Order_status.PARTLY_PAID,
       ];
 
-      // Courier ma'lumotlarini olish (tarifflar uchun)
+      // Courier ma'lumotlarini olish (tarifflar uchun - fallback)
       const courier = await this.userRepo.findOne({ where: { id: user.id } });
       const tariffHome = Number(courier?.tariff_home ?? 0);
       const tariffCenter = Number(courier?.tariff_center ?? 0);
@@ -2756,13 +2779,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           `COUNT(CASE WHEN o.updated_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
           'canceledOrders',
         )
+        // Saqlangan tariflar bo'yicha profit (yangi buyurtmalar uchun)
         .addSelect(
-          `SUM(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) AND o.where_deliver = :addressType THEN 1 ELSE 0 END)`,
-          'addressCount',
+          `SUM(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) AND o.courier_tariff IS NOT NULL THEN o.courier_tariff ELSE 0 END)`,
+          'savedTariffProfit',
+        )
+        // Saqlangan tarifsiz buyurtmalar soni (eski buyurtmalar uchun fallback)
+        .addSelect(
+          `SUM(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) AND o.courier_tariff IS NULL AND o.where_deliver = :addressType THEN 1 ELSE 0 END)`,
+          'oldAddressCount',
         )
         .addSelect(
-          `SUM(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) AND o.where_deliver != :addressType THEN 1 ELSE 0 END)`,
-          'centerCount',
+          `SUM(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) AND o.courier_tariff IS NULL AND o.where_deliver != :addressType THEN 1 ELSE 0 END)`,
+          'oldCenterCount',
         )
         .innerJoin('o.post', 'post')
         .where('post.courier_id = :courierId', { courierId: user.id })
@@ -2778,11 +2807,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const totalOrders = Number(statsResult?.totalOrders) || 0;
       const soldOrders = Number(statsResult?.soldOrders) || 0;
       const canceledOrders = Number(statsResult?.canceledOrders) || 0;
-      const addressCount = Number(statsResult?.addressCount) || 0;
-      const centerCount = Number(statsResult?.centerCount) || 0;
 
-      // Profit ni JS da hisoblash (SQL type xatosidan qochish uchun)
-      const profit = addressCount * tariffHome + centerCount * tariffCenter;
+      // Profit hisoblash - yangi va eski buyurtmalar uchun
+      const savedTariffProfit = Number(statsResult?.savedTariffProfit) || 0;
+      const oldAddressCount = Number(statsResult?.oldAddressCount) || 0;
+      const oldCenterCount = Number(statsResult?.oldCenterCount) || 0;
+      const oldOrdersProfit = oldAddressCount * tariffHome + oldCenterCount * tariffCenter;
+      const profit = savedTariffProfit + oldOrdersProfit;
 
       const successRate =
         totalOrders > 0
@@ -3104,6 +3135,302 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.commitTransaction();
 
       return successRes(order, 200, 'Order address updated');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Tashqi saytlardan kelgan buyurtmalarni qabul qilish (Universal)
+   * Buyurtmalar to'g'ridan-to'g'ri RECEIVED holatida yaratiladi va pochtaga qo'shiladi
+   * Field mapping orqali har qanday tashqi API strukturasini qo'llab-quvvatlaydi
+   */
+  async receiveExternalOrders(
+    dto: {
+      integration_id: string;
+      orders: any[]; // Dynamic structure based on field_mapping
+    },
+    user: JwtPayload,
+  ): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const { integration_id, orders } = dto;
+
+      if (!orders || orders.length === 0) {
+        throw new BadRequestException("Buyurtmalar ro'yxati bo'sh");
+      }
+
+      // Integratsiya konfiguratsiyasini olish (entity to'g'ridan-to'g'ri)
+      const integration =
+        await this.externalIntegrationService.getIntegrationEntity(
+          integration_id,
+        );
+
+      if (!integration) {
+        throw new NotFoundException('Integratsiya topilmadi');
+      }
+
+      if (!integration.is_active) {
+        throw new BadRequestException('Bu integratsiya faol emas');
+      }
+
+      const { market_id, slug: source, field_mapping } = integration;
+
+      // Biriktirilgan marketni olish
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: market_id, role: Roles.MARKET },
+      });
+
+      if (!market) {
+        throw new NotFoundException('Biriktirilgan market topilmadi');
+      }
+
+      // Marketning default tariff ni olish (where_deliver uchun)
+      const defaultWhereDeliver =
+        market.default_tariff || Where_deliver.CENTER;
+
+      const createdOrders: OrderEntity[] = [];
+      // Region bo'yicha post cache
+      const postsByRegion: Map<string, PostEntity> = new Map();
+
+      for (const extOrder of orders) {
+        // Field mapping orqali qiymatlarni olish
+        const externalId = this.getFieldValue(extOrder, field_mapping.id_field);
+        const qrCode = this.getFieldValue(
+          extOrder,
+          field_mapping.qr_code_field,
+        );
+        const fullName = this.getFieldValue(
+          extOrder,
+          field_mapping.customer_name_field,
+        );
+        const phone = this.getFieldValue(extOrder, field_mapping.phone_field);
+        const additionalPhone = this.getFieldValue(
+          extOrder,
+          field_mapping.extra_phone_field,
+        );
+        const rawDistrict = this.getFieldValue(
+          extOrder,
+          field_mapping.district_code_field,
+        );
+        const address = this.getFieldValue(
+          extOrder,
+          field_mapping.address_field,
+        );
+        const comment = this.getFieldValue(
+          extOrder,
+          field_mapping.comment_field,
+        );
+        const totalPrice = this.getFieldValue(
+          extOrder,
+          field_mapping.total_price_field,
+        );
+        const deliveryPrice = this.getFieldValue(
+          extOrder,
+          field_mapping.delivery_price_field,
+        );
+        const totalCount = this.getFieldValue(
+          extOrder,
+          field_mapping.total_count_field,
+        );
+
+        // SATO kod orqali district topish
+        // undefined, null, "undefined", "null" ni tozalash
+        const districtCode =
+          rawDistrict !== undefined &&
+          rawDistrict !== null &&
+          rawDistrict !== 'undefined' &&
+          rawDistrict !== 'null' &&
+          rawDistrict !== ''
+            ? String(rawDistrict)
+            : '';
+
+        let targetDistrict: DistrictEntity | null = null;
+
+        if (districtCode) {
+          // Avval to'liq SATO kod bilan qidirish
+          targetDistrict = await queryRunner.manager.findOne(DistrictEntity, {
+            where: { sato_code: districtCode },
+          });
+
+          // Agar topilmasa, partial match qilish
+          if (!targetDistrict) {
+            const allDistricts = await queryRunner.manager.find(DistrictEntity);
+            targetDistrict =
+              allDistricts.find(
+                (d) =>
+                  d.sato_code?.endsWith(districtCode) ||
+                  d.sato_code?.includes(districtCode),
+              ) || null;
+          }
+        }
+
+        // Agar district topilmasa, default district ishlatish
+        if (!targetDistrict) {
+          const defaultDistricts = await queryRunner.manager.find(
+            DistrictEntity,
+            { take: 1 },
+          );
+          targetDistrict = defaultDistricts[0] || null;
+          if (!targetDistrict) {
+            throw new NotFoundException('Tizimda hech qanday tuman topilmadi');
+          }
+          if (districtCode) {
+            this.logger.warn(
+              `District topilmadi SATO kod: ${districtCode}, default ishlatilmoqda`,
+            );
+          }
+        }
+
+        const regionId =
+          targetDistrict.assigned_region || targetDistrict.region_id;
+
+        // Region uchun post topish yoki yaratish (cache dan)
+        let post: PostEntity | undefined = postsByRegion.get(regionId);
+
+        if (!post) {
+          const foundPost = await queryRunner.manager.findOne(PostEntity, {
+            where: { region_id: regionId, status: Post_status.NEW },
+          });
+          post = foundPost || undefined;
+
+          if (!post) {
+            post = queryRunner.manager.create(PostEntity, {
+              region_id: regionId,
+              qr_code_token: generateCustomToken(),
+              post_total_price: 0,
+              order_quantity: 0,
+              status: Post_status.NEW,
+            });
+            await queryRunner.manager.save(post);
+          }
+
+          postsByRegion.set(regionId, post);
+        }
+
+        // Telefon raqamni olish va formatlash
+        let phoneNumber =
+          phone ||
+          `unknown_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // +998 prefix qo'shish (agar yo'q bo'lsa)
+        if (phoneNumber && !phoneNumber.startsWith('unknown_')) {
+          // Faqat raqamlarni olish
+          const cleanPhone = phoneNumber.replace(/\D/g, '');
+          if (cleanPhone.length === 9) {
+            // 901234567 -> +998901234567
+            phoneNumber = `+998${cleanPhone}`;
+          } else if (cleanPhone.length === 12 && cleanPhone.startsWith('998')) {
+            // 998901234567 -> +998901234567
+            phoneNumber = `+${cleanPhone}`;
+          } else if (!phoneNumber.startsWith('+998')) {
+            // Boshqa formatlar uchun +998 qo'shish
+            phoneNumber = `+998${cleanPhone.slice(-9)}`;
+          }
+        }
+
+        const customerName = fullName || 'Tashqi mijoz';
+
+        // Mijozni topish yoki yaratish
+        let customer = await queryRunner.manager.findOne(UserEntity, {
+          where: {
+            phone_number: phoneNumber,
+            role: Roles.CUSTOMER,
+          },
+        });
+
+        if (!customer) {
+          customer = queryRunner.manager.create(UserEntity, {
+            name: customerName,
+            phone_number: phoneNumber,
+            role: Roles.CUSTOMER,
+            district_id: targetDistrict.id,
+            address: address || '',
+            extra_number: additionalPhone || undefined,
+          });
+          await queryRunner.manager.save(customer);
+        }
+
+        // Narxni hisoblash: total_price + delivery_price
+        const productPriceNum = Number(totalPrice) || 0;
+        const deliveryPriceNum = Number(deliveryPrice) || 0;
+        const finalTotalPrice = productPriceNum + deliveryPriceNum;
+
+        // QR kod token (tashqi QR koddan foydalanish)
+        const qrCodeToken = qrCode || generateCustomToken();
+
+        // Izoh yaratish
+        const orderComment = [
+          comment,
+          additionalPhone ? `Qo'shimcha tel: ${additionalPhone}` : null,
+        ]
+          .filter(Boolean)
+          .join(' | ');
+
+        // Buyurtma yaratish - to'g'ridan-to'g'ri RECEIVED holatida
+        const newOrder = queryRunner.manager.create(OrderEntity, {
+          user_id: market_id,
+          customer_id: customer.id,
+          district_id: targetDistrict.id,
+          post_id: post.id,
+          total_price: finalTotalPrice,
+          where_deliver: defaultWhereDeliver,
+          status: Order_status.RECEIVED,
+          qr_code_token: qrCodeToken,
+          comment: orderComment,
+          address: address || customer.address,
+          operator: `external_${source}`,
+          external_id: String(externalId),
+          product_quantity: Number(totalCount) || 1,
+        });
+
+        await queryRunner.manager.save(newOrder);
+
+        // Post statistikasini yangilash
+        post.post_total_price =
+          Number(post.post_total_price ?? 0) + finalTotalPrice;
+        post.order_quantity = Number(post.order_quantity ?? 0) + 1;
+
+        createdOrders.push(newOrder);
+      }
+
+      // Barcha postlarni saqlash
+      for (const post of postsByRegion.values()) {
+        await queryRunner.manager.save(post);
+      }
+
+      // Integratsiya last_sync_at ni yangilash
+      await this.externalIntegrationService.updateLastSync(
+        integration_id,
+        createdOrders.length,
+      );
+
+      await queryRunner.commitTransaction();
+
+      return successRes(
+        {
+          created_orders: createdOrders.length,
+          integration: {
+            id: integration.id,
+            name: integration.name,
+            slug: integration.slug,
+          },
+          orders: createdOrders.map((o) => ({
+            id: o.id,
+            external_id: o.external_id,
+            total_price: o.total_price,
+            status: o.status,
+          })),
+        },
+        201,
+        `${createdOrders.length} ta tashqi buyurtma qabul qilindi (${integration.name})`,
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

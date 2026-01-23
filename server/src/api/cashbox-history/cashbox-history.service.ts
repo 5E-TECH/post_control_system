@@ -42,6 +42,7 @@ export class CashboxHistoryService {
           'cashbox',
           'cashbox.user',
           'createdByUser',
+          'sourceUser', // Kuryer/Market user info
           'order',
           'order.market',
           'order.customer',

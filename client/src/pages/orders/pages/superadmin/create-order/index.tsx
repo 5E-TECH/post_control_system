@@ -108,7 +108,7 @@ const CreateOrder = () => {
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Page Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
@@ -121,8 +121,8 @@ const CreateOrder = () => {
 
         <div className="flex gap-6 max-[1100px]:flex-col">
           {/* Steps Sidebar */}
-          <div className="w-full max-w-xs max-[1100px]:max-w-full flex-shrink-0">
-            <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-5 sticky top-6">
+          <div className="w-full max-w-xs max-[1100px]:max-w-full flex-shrink-0 overflow-hidden">
+            <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-5 sticky top-6 overflow-hidden">
               {/* Step 1 - Completed */}
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
@@ -131,7 +131,7 @@ const CreateOrder = () => {
                   </div>
                   <div className="w-0.5 h-12 bg-green-500 mt-2"></div>
                 </div>
-                <div className="flex-1 pt-1">
+                <div className="flex-1 pt-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
                       1-qadam
@@ -141,16 +141,16 @@ const CreateOrder = () => {
                   <h3 className="font-semibold text-gray-800 dark:text-white text-sm">
                     Market tanlandi
                   </h3>
-                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl overflow-hidden">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
                         <Store className="w-4 h-4 text-green-600 dark:text-green-400" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-800 dark:text-white text-sm capitalize truncate">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="font-medium text-gray-800 dark:text-white text-sm capitalize truncate" title={marketName}>
                           {marketName}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           {marketPhone}
                         </p>
                       </div>
@@ -167,7 +167,7 @@ const CreateOrder = () => {
                   </div>
                   <div className="w-0.5 h-12 bg-gradient-to-b from-green-500 to-purple-500 mt-2"></div>
                 </div>
-                <div className="flex-1 pt-1">
+                <div className="flex-1 pt-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
                       2-qadam
@@ -177,18 +177,18 @@ const CreateOrder = () => {
                   <h3 className="font-semibold text-gray-800 dark:text-white text-sm">
                     Mijoz tanlandi
                   </h3>
-                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                  <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl overflow-hidden">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
                         <User className="w-4 h-4 text-green-600 dark:text-green-400" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-800 dark:text-white text-sm truncate capitalize">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="font-medium text-gray-800 dark:text-white text-sm truncate capitalize" title={customer?.name}>
                           {customer?.name}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {customer?.phone_number}
+                          <Phone className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{customer?.phone_number}</span>
                         </p>
                       </div>
                     </div>
@@ -203,7 +203,7 @@ const CreateOrder = () => {
                     <ShoppingCart className="w-5 h-5 text-white" />
                   </div>
                 </div>
-                <div className="flex-1 pt-1">
+                <div className="flex-1 pt-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 rounded-full">
                       3-qadam

@@ -1,12 +1,13 @@
 import React, { memo, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
 import { useTranslation } from "react-i18next";
+import { X } from "lucide-react";
 
 type CalendarProps = {
   from: Dayjs | null;
   to: Dayjs | null;
-  setFrom: (date: Dayjs) => void;
-  setTo: (date: Dayjs) => void;
+  setFrom: (date: Dayjs | null) => void;
+  setTo: (date: Dayjs | null) => void;
 };
 
 const CustomCalendar: React.FC<CalendarProps> = memo(
@@ -20,10 +21,23 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
     const [currentMonthTo, setCurrentMonthTo] = useState(dayjs());
 
     const toggleFrom = () => {
-      setIsFromOpen(!isFromOpen), setIsToOpen(false);
+      setIsFromOpen(!isFromOpen);
+      setIsToOpen(false);
     };
     const toggleTo = () => {
-      setIsToOpen(!isToOpen), setIsFromOpen(false);
+      setIsToOpen(!isToOpen);
+      setIsFromOpen(false);
+    };
+
+    const closeAll = () => {
+      setIsFromOpen(false);
+      setIsToOpen(false);
+    };
+
+    const handleClear = () => {
+      setFrom(null);
+      setTo(null);
+      closeAll();
     };
 
     const handlePrevMonth = (isFrom: boolean) => {
@@ -72,10 +86,17 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
     const weekDays = ["D", "S", "Ch", "P", "J", "Sh", "Y"];
 
     return (
-      <div className=" flex justify-center w-full">
+      <div className="flex justify-center w-full">
+        {/* Backdrop */}
+        {(isFromOpen || isToOpen) && (
+          <div
+            className="fixed inset-0 z-40"
+            onClick={closeAll}
+          />
+        )}
+
         <div className="w-[400px] max-sm:w-full">
-          {/* <h2 className="text-xl font-semibold mb-3">Sana oralig‘ini tanlang</h2> */}
-          <div className="flex flex-row sm:flex-row gap-3  w-full">
+          <div className="flex flex-row sm:flex-row gap-2 w-full">
             {/* From Input */}
             <div className="relative flex-1 w-full">
               <input
@@ -84,7 +105,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 onClick={toggleFrom}
                 value={from ? from.format("YYYY-MM-DD") : ""}
                 placeholder={`${t("start")}`}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] dark:text-white rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
               />
               {isFromOpen && (
                 <div className="absolute top-full left-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%] dark:bg-[#28243D]">
@@ -143,7 +164,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 onClick={toggleTo}
                 value={to ? to.format("YYYY-MM-DD") : ""}
                 placeholder={`${t("end")}`}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
+                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] dark:text-white rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
               />
               {isToOpen && (
                 <div className="absolute top-full right-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%] dark:bg-[#28243D]">
@@ -195,10 +216,20 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 </div>
               )}
             </div>
+
+            {/* Clear Button */}
+            {(from || to) && (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="flex-shrink-0 w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
-      // </div>
     );
   }
 );

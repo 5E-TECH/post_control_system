@@ -1,5 +1,5 @@
 import { memo, useState, useMemo } from "react";
-import { Spin, Modal, Form, Input, Button, InputNumber, Switch } from "antd";
+import { Spin, Modal, Form, Input, Button, InputNumber, Switch, Select } from "antd";
 import { useDispatch } from "react-redux";
 import { AvatarDisplay } from "../../../../shared/components/AvatarSelector";
 import { setEditing } from "../../../../shared/lib/features/profile/profileEditSlice";
@@ -19,6 +19,7 @@ import {
   ToggleLeft,
   Wallet,
   Lock,
+  Truck,
 } from "lucide-react";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 
@@ -157,6 +158,11 @@ const UserProfile = () => {
             tariff_home: Number(user.tariff_home) || 0,
           }
         : {}),
+      ...(user.role === "market"
+        ? {
+            default_tariff: user.default_tariff || "center",
+          }
+        : {}),
     });
 
     // set phoneDisplay state too
@@ -202,6 +208,8 @@ const UserProfile = () => {
     if (payload.phone_number === userPhoneNormalized)
       delete payload.phone_number;
     if (!payload.password) delete payload.password;
+    if (payload.default_tariff === user.default_tariff)
+      delete payload.default_tariff;
 
     if (Object.keys(payload).length === 0) {
       setOpen(false);
@@ -443,6 +451,25 @@ const UserProfile = () => {
             </div>
           )}
 
+          {/* Default Delivery Type - Only for Market */}
+          {user?.role === "market" && user?.default_tariff && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500/10 to-cyan-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Truck className="w-6 h-6 text-teal-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    Yetkazib berish turi
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5">
+                    {user.default_tariff === "center" ? "Markazgacha" : "Manzilgacha"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TG Token Card */}
           {user?.market_tg_token && (
             <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800 md:col-span-2 lg:col-span-3">
@@ -668,6 +695,28 @@ const UserProfile = () => {
                   />
                 </Form.Item>
               </>
+            )}
+
+            {user.role === "market" && (
+              <Form.Item
+                label={
+                  <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                    <Truck className="w-4 h-4" />
+                    Yetkazib berish turi
+                  </span>
+                }
+                name="default_tariff"
+                className="mb-4"
+              >
+                <Select
+                  size="large"
+                  className="w-full"
+                  options={[
+                    { value: "center", label: "Markazgacha" },
+                    { value: "address", label: "Manzilgacha" },
+                  ]}
+                />
+              </Form.Item>
             )}
 
             <Form.Item

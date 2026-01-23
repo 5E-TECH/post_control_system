@@ -1,51 +1,44 @@
-import { memo } from "react";
-import { Button, Form, Input, type FormProps } from "antd";
-import { ArrowRight } from "lucide-react";
+import { memo, useState } from "react";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { buildAdminPath } from "../../../../shared/const";
-
-type FieldType = {
-  first_name: string;
-  last_name: string;
-  phone_number: string;
-  password: string;
-  salary: string | number;
-  payment_day?: string | number;
-};
+import {
+  User,
+  Phone,
+  Lock,
+  DollarSign,
+  Calendar,
+  ArrowRight,
+  Loader2,
+  Shield,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 
 const CreateAdmin = () => {
   const { t } = useTranslation("users");
   const { createUser } = useUser("admin");
   const navigate = useNavigate();
+  const { handleApiError, handleSuccess } = useApiNotification();
 
-  const [form] = Form.useForm<FieldType>();
-  const { handleApiError } = useApiNotification();
-  const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
-    const newAdmin = {
-      ...values,
-      salary: Number(String(values.salary).replace(/,/g, "")),
-      payment_day: values.payment_day ? Number(values.payment_day) : undefined,
-      phone_number: values.phone_number.split(" ").join(""),
-    };
-    createUser.mutate(newAdmin, {
-      onSuccess: () => {
-        navigate(buildAdminPath("all-users"));
-      },
-      onError: (err: any) =>
-        handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),
-    });
-  };
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    phone_number: "+998 ",
+    password: "",
+    salary: "",
+    payment_day: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let input = e.target.value;
-
+  const handlePhoneChange = (value: string) => {
+    let input = value;
     if (!input.startsWith("+998 ")) input = "+998 ";
 
     let val = input.replace(/\D/g, "").slice(3);
-
     if (val.length > 9) val = val.slice(0, 9);
 
     let formatted = "+998 ";
@@ -57,117 +50,250 @@ const CreateAdmin = () => {
         .trim();
     }
 
-    form.setFieldsValue({ phone_number: formatted });
+    setFormData((prev) => ({ ...prev, phone_number: formatted }));
+  };
+
+  const handleSalaryChange = (value: string) => {
+    const onlyNums = value.replace(/\D/g, "");
+    const formatted = onlyNums.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    setFormData((prev) => ({ ...prev, salary: formatted }));
+  };
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = t("enterName");
+    }
+
+    if (!/^\+998 \d{2} \d{3} \d{2} \d{2}$/.test(formData.phone_number)) {
+      newErrors.phone_number = t("phoneNumberPattern");
+    }
+
+    if (!formData.password) {
+      newErrors.password = t("enterPassword");
+    }
+
+    if (!formData.salary) {
+      newErrors.salary = t("enterSalary");
+    }
+
+    if (formData.payment_day) {
+      const day = Number(formData.payment_day);
+      if (day < 1 || day > 31) {
+        newErrors.payment_day = t("paymentDayRange");
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validate()) return;
+
+    setIsLoading(true);
+
+    const newAdmin = {
+      name: formData.name,
+      phone_number: formData.phone_number.split(" ").join(""),
+      password: formData.password,
+      salary: Number(formData.salary.replace(/,/g, "")),
+      payment_day: formData.payment_day ? Number(formData.payment_day) : undefined,
+    };
+
+    createUser.mutate(newAdmin, {
+      onSuccess: () => {
+        handleSuccess("Admin muvaffaqiyatli yaratildi");
+        navigate(buildAdminPath("all-users"));
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi");
+        setIsLoading(false);
+      },
+    });
   };
 
   return (
-    <div className="min-[800px]:w-[420px]">
-      <h1 className="font-medium text-[24px] text-[#2E263DE5] dark:text-[#E7E3FCE5]">
-        {t("adminTitle")}
-      </h1>
-      <span className="font-normal text-[15px] text-[rgba(46,38,61,0.7)] dark:text-[#E7E3FCB2]">
-        {t("adminDescription")}
-      </span>
-      <Form
-        form={form}
-        onFinish={onFinish}
-        initialValues={{ phone_number: "+998 " }}
-        className="pt-5!"
-      >
-        <Form.Item
-          name="name"
-          rules={[{ required: true, message: t("enterName") }]}
-        >
-          <Input
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
-            placeholder={t("enterName")}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="phone_number"
-          rules={[
-            { required: true, message: t("enterPhoneNumber") },
-            {
-              pattern: /^\+998 \d{2} \d{3} \d{2} \d{2}$/,
-              message: t("phoneNumberPattern"),
-            },
-          ]}
-        >
-          <Input
-            placeholder={t("enterPhoneNumber")}
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
-            type="text"
-            onChange={handlePhoneChange}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="password"
-          rules={[{ required: true, message: t("enterPassword") }]}
-        >
-          <Input.Password
-            type="password"
-            className="custom-password h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:text-[#E7E3FC66]!"
-            placeholder={t("enterPassword")}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="salary"
-          rules={[{ required: true, message: t("enterSalary") }]}
-          getValueFromEvent={(e) => e.target.value.replace(/,/g, "")}
-          normalize={(value) => {
-            if (!value) return value;
-            const onlyNums = value.replace(/\D/g, "");
-            return onlyNums.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-          }}
-        >
-          <Input
-            placeholder={t("enterSalary")}
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="payment_day"
-          rules={[
-            {
-              type: "number",
-              min: 1,
-              max: 31,
-              message: t("paymentDayRange"),
-              transform: (value) => Number(value),
-            },
-          ]}
-          normalize={(value) => {
-            if (value > 31) {
-              return 31;
-            } else {
-              return value;
-            }
-          }}
-        >
-          <Input
-            type="number"
-            className="h-[48px] dark:bg-[#312D4B]! dark:border-[#E7E3FC38]! dark:placeholder:text-[#E7E3FCCC]! dark:text-[#E7E3FCCC]!"
-            placeholder={t("enterPaymentDay")}
-          />
-        </Form.Item>
-
-        <div className="flex items-center justify-center">
-          <Button
-            disabled={createUser.isPending}
-            loading={createUser.isPending}
-            type="primary"
-            htmlType="submit"
-            className="bg-[#8C57FF]! w-[115px]"
-          >
-            <span>{t("create")}</span>
-            <ArrowRight className="w-[12px] h-[12px]" />
-          </Button>
+    <div>
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-4 sm:mb-6">
+        <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+          <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
         </div>
-      </Form>
+        <div>
+          <h2 className="text-base sm:text-lg font-bold text-gray-800 dark:text-white">
+            {t("adminTitle")}
+          </h2>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            {t("adminDescription")}
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+        {/* Name */}
+        <div>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Ism <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
+              }
+              className={`w-full h-10 sm:h-11 pl-10 pr-4 text-sm sm:text-base rounded-lg sm:rounded-xl border ${
+                errors.name
+                  ? "border-red-300 dark:border-red-700 focus:ring-red-500/20 focus:border-red-500"
+                  : "border-gray-200 dark:border-gray-700 focus:ring-purple-500/20 focus:border-purple-500"
+              } bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all`}
+              placeholder={t("enterName")}
+            />
+          </div>
+          {errors.name && (
+            <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+          )}
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Telefon raqam <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={formData.phone_number}
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              className={`w-full h-10 sm:h-11 pl-10 pr-4 text-sm sm:text-base rounded-lg sm:rounded-xl border ${
+                errors.phone_number
+                  ? "border-red-300 dark:border-red-700 focus:ring-red-500/20 focus:border-red-500"
+                  : "border-gray-200 dark:border-gray-700 focus:ring-purple-500/20 focus:border-purple-500"
+              } bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all`}
+              placeholder={t("enterPhoneNumber")}
+            />
+          </div>
+          {errors.phone_number && (
+            <p className="text-red-500 text-xs mt-1">{errors.phone_number}</p>
+          )}
+        </div>
+
+        {/* Password */}
+        <div>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Parol <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type={showPassword ? "text" : "password"}
+              value={formData.password}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, password: e.target.value }))
+              }
+              className={`w-full h-10 sm:h-11 pl-10 pr-10 text-sm sm:text-base rounded-lg sm:rounded-xl border ${
+                errors.password
+                  ? "border-red-300 dark:border-red-700 focus:ring-red-500/20 focus:border-red-500"
+                  : "border-gray-200 dark:border-gray-700 focus:ring-purple-500/20 focus:border-purple-500"
+              } bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all`}
+              placeholder={t("enterPassword")}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              {showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+          {errors.password && (
+            <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+          )}
+        </div>
+
+        {/* Salary */}
+        <div>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            Maosh <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={formData.salary}
+              onChange={(e) => handleSalaryChange(e.target.value)}
+              className={`w-full h-10 sm:h-11 pl-10 pr-4 text-sm sm:text-base rounded-lg sm:rounded-xl border ${
+                errors.salary
+                  ? "border-red-300 dark:border-red-700 focus:ring-red-500/20 focus:border-red-500"
+                  : "border-gray-200 dark:border-gray-700 focus:ring-purple-500/20 focus:border-purple-500"
+              } bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all`}
+              placeholder={t("enterSalary")}
+            />
+          </div>
+          {errors.salary && (
+            <p className="text-red-500 text-xs mt-1">{errors.salary}</p>
+          )}
+        </div>
+
+        {/* Payment Day */}
+        <div>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            To'lov kuni (1-31)
+          </label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="number"
+              min="1"
+              max="31"
+              value={formData.payment_day}
+              onChange={(e) => {
+                let val = e.target.value;
+                if (Number(val) > 31) val = "31";
+                setFormData((prev) => ({ ...prev, payment_day: val }));
+              }}
+              className={`w-full h-10 sm:h-11 pl-10 pr-4 text-sm sm:text-base rounded-lg sm:rounded-xl border ${
+                errors.payment_day
+                  ? "border-red-300 dark:border-red-700 focus:ring-red-500/20 focus:border-red-500"
+                  : "border-gray-200 dark:border-gray-700 focus:ring-purple-500/20 focus:border-purple-500"
+              } bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all`}
+              placeholder={t("enterPaymentDay")}
+            />
+          </div>
+          {errors.payment_day && (
+            <p className="text-red-500 text-xs mt-1">{errors.payment_day}</p>
+          )}
+        </div>
+
+        {/* Submit Button */}
+        <button
+          type="submit"
+          disabled={isLoading || createUser.isPending}
+          className="w-full h-10 sm:h-11 rounded-lg sm:rounded-xl bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-sm sm:text-base font-medium flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer mt-4 sm:mt-6"
+        >
+          {isLoading || createUser.isPending ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Yaratilmoqda...
+            </>
+          ) : (
+            <>
+              {t("create")}
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
+      </form>
     </div>
   );
 };

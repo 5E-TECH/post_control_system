@@ -285,78 +285,153 @@ const OrderItems = () => {
             {formDataList.map((item, index) => (
               <div
                 key={`${item.product_id}-${index}`}
-                className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl group hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl group hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
-                {/* Product Image */}
-                <img
-                  src={item.product_image || DEFAULT_PRODUCT_IMAGE}
-                  alt={item.product_name}
-                  className="w-14 h-14 object-cover rounded-xl flex-shrink-0 bg-gray-200 dark:bg-gray-700"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
-                  }}
-                />
+                {/* Mobile Layout */}
+                <div className="flex flex-col sm:hidden gap-3">
+                  {/* Top row: Image + Name + Delete */}
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={item.product_image || DEFAULT_PRODUCT_IMAGE}
+                      alt={item.product_name}
+                      className="w-12 h-12 object-cover rounded-xl flex-shrink-0 bg-gray-200 dark:bg-gray-700"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-800 dark:text-white text-sm leading-tight" title={item.product_name}>
+                        {item.product_name || "Noma'lum mahsulot"}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {t("orderItems.item")} #{index + 1}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeItem(index)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 flex-shrink-0 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                {/* Product Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-800 dark:text-white truncate">
-                    {item.product_name || "Noma'lum mahsulot"}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {t("orderItems.item")} #{index + 1}
-                  </p>
+                  {/* Bottom row: Quantity Controls */}
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() =>
+                        handleQuantityChange(index, Number(item.quantity) - 1)
+                      }
+                      disabled={Number(item.quantity) <= 1}
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                        Number(item.quantity) <= 1
+                          ? "bg-gray-100 dark:bg-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer"
+                      }`}
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1;
+                        handleQuantityChange(index, val);
+                      }}
+                      className="w-14 h-9 text-center text-sm font-semibold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      min={1}
+                      max={99}
+                    />
+
+                    <button
+                      onClick={() =>
+                        handleQuantityChange(index, Number(item.quantity) + 1)
+                      }
+                      disabled={Number(item.quantity) >= 99}
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
+                        Number(item.quantity) >= 99
+                          ? "bg-gray-100 dark:bg-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                          : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 cursor-pointer"
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Quantity Controls */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() =>
-                      handleQuantityChange(index, Number(item.quantity) - 1)
-                    }
-                    disabled={Number(item.quantity) <= 1}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                      Number(item.quantity) <= 1
-                        ? "bg-gray-100 dark:bg-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer"
-                    }`}
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 1;
-                      handleQuantityChange(index, val);
+                {/* Desktop Layout */}
+                <div className="hidden sm:flex items-center gap-3">
+                  {/* Product Image */}
+                  <img
+                    src={item.product_image || DEFAULT_PRODUCT_IMAGE}
+                    alt={item.product_name}
+                    className="w-14 h-14 object-cover rounded-xl flex-shrink-0 bg-gray-200 dark:bg-gray-700"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = DEFAULT_PRODUCT_IMAGE;
                     }}
-                    className="w-12 h-8 text-center text-sm font-semibold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    min={1}
-                    max={99}
                   />
 
+                  {/* Product Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-white truncate">
+                      {item.product_name || "Noma'lum mahsulot"}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {t("orderItems.item")} #{index + 1}
+                    </p>
+                  </div>
+
+                  {/* Quantity Controls */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        handleQuantityChange(index, Number(item.quantity) - 1)
+                      }
+                      disabled={Number(item.quantity) <= 1}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                        Number(item.quantity) <= 1
+                          ? "bg-gray-100 dark:bg-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer"
+                      }`}
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1;
+                        handleQuantityChange(index, val);
+                      }}
+                      className="w-12 h-8 text-center text-sm font-semibold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      min={1}
+                      max={99}
+                    />
+
+                    <button
+                      onClick={() =>
+                        handleQuantityChange(index, Number(item.quantity) + 1)
+                      }
+                      disabled={Number(item.quantity) >= 99}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                        Number(item.quantity) >= 99
+                          ? "bg-gray-100 dark:bg-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                          : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 cursor-pointer"
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Delete Button */}
                   <button
-                    onClick={() =>
-                      handleQuantityChange(index, Number(item.quantity) + 1)
-                    }
-                    disabled={Number(item.quantity) >= 99}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                      Number(item.quantity) >= 99
-                        ? "bg-gray-100 dark:bg-gray-700 text-gray-300 dark:text-gray-600 cursor-not-allowed"
-                        : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 cursor-pointer"
-                    }`}
+                    onClick={() => removeItem(index)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-
-                {/* Delete Button */}
-                <button
-                  onClick={() => removeItem(index)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
               </div>
             ))}
           </div>

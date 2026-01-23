@@ -1297,25 +1297,56 @@ export class UserService {
       const effectiveMarketId =
         user.role === Roles.MARKET ? user.id : market_id;
 
-      const qb = this.dataSource
+      // Base query builder for orders
+      const baseQb = this.dataSource
+        .getRepository(OrderEntity)
+        .createQueryBuilder('order')
+        .where('order.customer_id = :customerId', { customerId })
+        .andWhere('order.deleted = :deleted', { deleted: false });
+
+      // If market role or market_id provided, filter by market
+      if (effectiveMarketId) {
+        baseQb.andWhere('order.user_id = :marketId', {
+          marketId: effectiveMarketId,
+        });
+      }
+
+      // Get statistics for ALL orders (not limited)
+      const statsQb = baseQb.clone();
+      const allOrders = await statsQb.select(['order.status', 'order.total_price']).getMany();
+
+      const stats = {
+        total: allOrders.length,
+        delivered: 0,
+        cancelled: 0,
+        pending: 0,
+        total_spent: 0,
+      };
+
+      for (const order of allOrders) {
+        if (order.status === Order_status.SOLD || order.status === Order_status.PAID) {
+          stats.delivered++;
+          stats.total_spent += Number(order.total_price) || 0;
+        } else if (order.status === Order_status.CANCELLED || order.status === Order_status.CANCELLED_SENT) {
+          stats.cancelled++;
+        } else {
+          stats.pending++;
+        }
+      }
+
+      // Get paginated orders with full details
+      const orders = await this.dataSource
         .getRepository(OrderEntity)
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.market', 'market')
         .where('order.customer_id = :customerId', { customerId })
-        .andWhere('order.deleted = :deleted', { deleted: false });
-
-      // If market role or market_id provided, filter by market
-      if (effectiveMarketId) {
-        qb.andWhere('order.user_id = :marketId', {
+        .andWhere('order.deleted = :deleted', { deleted: false })
+        .andWhere(effectiveMarketId ? 'order.user_id = :marketId' : '1=1', {
           marketId: effectiveMarketId,
-        });
-      }
-
-      const orders = await qb
+        })
         .orderBy('order.created_at', 'DESC')
-        .take(20)
         .getMany();
 
       // Format the response with order details
@@ -1338,10 +1369,18 @@ export class UserService {
             id: customer.id,
             name: customer.name,
             phone_number: customer.phone_number,
+            extra_number: customer.extra_number,
             address: customer.address,
+            district_id: customer.district_id,
           },
           orders: formattedOrders,
-          total_orders: formattedOrders.length,
+          total_orders: stats.total,
+          stats: {
+            delivered: stats.delivered,
+            cancelled: stats.cancelled,
+            pending: stats.pending,
+            total_spent: stats.total_spent,
+          },
         },
         200,
         'Customer order history',

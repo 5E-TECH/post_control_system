@@ -366,6 +366,7 @@ export class CashBoxService
           operation_type: Operation_type.INCOME,
           cashbox_id: mainCashbox.id,
           source_type: Source_type.COURIER_PAYMENT,
+          source_user_id: courier_id, // Store courier ID for tracking
           amount,
           balance_after: mainCashbox.balance,
           comment,
@@ -416,6 +417,7 @@ export class CashBoxService
             operation_type: Operation_type.EXPENSE,
             cashbox_id: mainCashbox.id,
             source_type: Source_type.MARKET_PAYMENT,
+            source_user_id: market_id, // Store market ID for tracking
             amount,
             balance_after: mainCashbox.balance,
             comment,
@@ -573,6 +575,7 @@ export class CashBoxService
           operation_type: Operation_type.EXPENSE,
           cashbox_id: mainCashbox.id,
           source_type: Source_type.MARKET_PAYMENT,
+          source_user_id: market_id, // Store market ID for tracking
           amount,
           balance_after: mainCashbox.balance,
           comment,
