@@ -952,7 +952,7 @@ const Payments = () => {
           {/* Mobile Cards */}
           <div className="lg:hidden divide-y divide-gray-100 dark:divide-gray-700/50">
             {cashBoxData?.data?.allCashboxHistories?.map(
-              (item: any, inx: number) => (
+              (item: any, _inx: number) => (
                 <div
                   key={item.id}
                   onClick={() => handleHistoryPopup(item.id)}
