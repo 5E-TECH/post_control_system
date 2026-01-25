@@ -117,6 +117,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     status?: string | string[];
     marketId?: string;
     regionId?: string;
+    courierId?: string;
     search?: string;
     startDate?: string;
     endDate?: string;
@@ -172,6 +173,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           '(orderRegion.id = :regionId OR (orderDistrict.id IS NULL AND customerRegion.id = :regionId))',
           { regionId: query.regionId },
         );
+      }
+
+      if (query.courierId) {
+        qb.andWhere('post.courier_id = :courierId', {
+          courierId: query.courierId,
+        });
       }
 
       if (query.search) {

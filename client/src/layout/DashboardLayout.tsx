@@ -1,6 +1,7 @@
-import { memo } from "react";
+import { memo, Suspense } from "react";
 import Sidebar from "./components/Sidebar";
 import { Outlet } from "react-router-dom";
+import Suspensee from "../shared/ui/Suspensee";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { useSelector } from "react-redux";
@@ -54,7 +55,9 @@ const DashboardLayout = () => {
       {/* Dashboard container */}
       <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pl-4 pb-8">
         <main className="w-full h-full bg-[#fff] dark:bg-[#312d48] rounded-4xl overflow-y-auto">
-          <Outlet />
+          <Suspense fallback={<Suspensee />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

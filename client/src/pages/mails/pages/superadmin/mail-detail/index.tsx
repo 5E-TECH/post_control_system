@@ -1,5 +1,71 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Check, Printer, Trash2, ArrowLeft, Search, Package, Home, MapPin, Phone, User, Store, Calendar, Send, Loader2 } from "lucide-react";
+
+// Skeleton Loading Component
+const SkeletonCard = () => (
+  <div className="bg-gray-50 dark:bg-[#3A3650] rounded-xl p-3 sm:p-4 animate-pulse">
+    <div className="flex items-center gap-4">
+      <div className="w-5 h-5 bg-gray-200 dark:bg-gray-600 rounded" />
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 lg:gap-4 flex-1">
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-28" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20" />
+        <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-24" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20" />
+      </div>
+    </div>
+  </div>
+);
+
+const MailDetailSkeleton = () => (
+  <div className="h-full flex flex-col overflow-hidden">
+    <div className="w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col flex-1 overflow-hidden">
+      {/* Header Skeleton */}
+      <div className="mb-4 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />
+            <div>
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mt-2 animate-pulse" />
+            </div>
+          </div>
+          <div className="w-full sm:w-72 h-11 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white dark:bg-[#2A263D] rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100 dark:border-gray-700/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                <div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse" />
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-12 mt-1 animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content Skeleton */}
+      <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 flex items-center gap-3 flex-shrink-0">
+          <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
+        </div>
+        <div className="p-3 sm:p-4 space-y-3 overflow-y-auto flex-1">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
 import {
   useLocation,
   useNavigate,
@@ -301,11 +367,7 @@ const MailDetail = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
-      </div>
-    );
+    return <MailDetailSkeleton />;
   }
 
   return (
@@ -514,11 +576,11 @@ const MailDetail = () => {
                     </div>
                     <div>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
-                        order?.where_deliver === "home"
+                        order?.where_deliver === "address"
                           ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                           : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                       }`}>
-                        {order?.where_deliver === "home" ? "Uygacha" : "Markazgacha"}
+                        {order?.where_deliver === "address" ? "Uygacha" : "Markazgacha"}
                       </span>
                     </div>
                   </div>
@@ -580,11 +642,11 @@ const MailDetail = () => {
                       {/* Delivery */}
                       <div>
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
-                          order?.where_deliver === "home"
+                          order?.where_deliver === "address"
                             ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                             : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                         }`}>
-                          {order?.where_deliver === "home" ? <Home className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                          {order?.where_deliver === "address" ? <Home className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
                           {t(`${order?.where_deliver}`)}
                         </span>
                       </div>

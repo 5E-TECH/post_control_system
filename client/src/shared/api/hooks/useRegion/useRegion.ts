@@ -59,6 +59,40 @@ export const useRegion = () => {
     },
   });
 
+  // Statistika
+  const getAllRegionsStats = (
+    startDate?: string,
+    endDate?: string,
+    enabled = true
+  ) =>
+    useQuery({
+      queryKey: [region, "stats", "all", startDate, endDate],
+      queryFn: () =>
+        api
+          .get("region/stats/all", { params: { startDate, endDate } })
+          .then((res) => res.data),
+      enabled,
+      staleTime: 1000 * 60 * 5, // 5 daqiqa
+      refetchOnWindowFocus: false,
+    });
+
+  const getRegionDetailedStats = (
+    id: string,
+    startDate?: string,
+    endDate?: string,
+    enabled = true
+  ) =>
+    useQuery({
+      queryKey: [region, "stats", id, startDate, endDate],
+      queryFn: () =>
+        api
+          .get(`region/stats/${id}`, { params: { startDate, endDate } })
+          .then((res) => res.data),
+      enabled: enabled && !!id,
+      staleTime: 1000 * 60 * 5, // 5 daqiqa
+      refetchOnWindowFocus: false,
+    });
+
   return {
     getRegions,
     getRegionsById,
@@ -66,5 +100,7 @@ export const useRegion = () => {
     applySatoCodes,
     updateRegionSatoCode,
     updateRegionName,
+    getAllRegionsStats,
+    getRegionDetailedStats,
   };
 };

@@ -3,6 +3,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 interface FilterState {
   marketId: string | null;
   regionId: string | null;
+  courierId: string | null;
   status: string[] | null;
   startDate: string;
   endDate: string;
@@ -12,6 +13,7 @@ interface FilterState {
 const initialState: FilterState = {
   marketId: null,
   regionId: null,
+  courierId: null,
   status: null,
   startDate: "",
   endDate: "",
