@@ -6,12 +6,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
+import { Cron } from '@nestjs/schedule';
 import { firstValueFrom } from 'rxjs';
 import { AxiosResponse, AxiosError } from 'axios';
 import {
   ExternalIntegrationEntity,
   DEFAULT_FIELD_MAPPING,
 } from 'src/core/entity/external-integration.entity';
+import { IntegrationSyncHistoryEntity } from 'src/core/entity/integration-sync-history.entity';
 import { CreateIntegrationDto, UpdateIntegrationDto } from './dto';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
 
@@ -29,6 +31,8 @@ export class ExternalIntegrationService {
   constructor(
     @InjectRepository(ExternalIntegrationEntity)
     private readonly repo: Repository<ExternalIntegrationEntity>,
+    @InjectRepository(IntegrationSyncHistoryEntity)
+    private readonly historyRepo: Repository<IntegrationSyncHistoryEntity>,
     private readonly httpService: HttpService,
   ) {}
 
@@ -351,5 +355,78 @@ export class ExternalIntegrationService {
       where: { id },
       relations: ['market'],
     });
+  }
+
+  /**
+   * Har kuni soat 04:00 da (O'zbekiston vaqti, UTC+5) sinxronlangan buyurtmalar sonini 0 ga tushirish
+   * 04:00 UZT = 23:00 UTC (oldingi kun)
+   * Cron format: sekund daqiqa soat kun oy hafta_kuni
+   */
+  @Cron('0 0 23 * * *')
+  async resetDailySyncedOrders() {
+    try {
+      // 1️⃣ Barcha integratsiyalarni olish
+      const integrations = await this.repo.find();
+
+      // 2️⃣ Hozirgi vaqtni millisekund formatda olish
+      const syncDate = Date.now();
+
+      // 3️⃣ Har bir integratsiya uchun tarixga yozish
+      const historyRecords: IntegrationSyncHistoryEntity[] = [];
+      for (const integration of integrations) {
+        if (integration.total_synced_orders > 0) {
+          const history = this.historyRepo.create({
+            integration_id: integration.id,
+            integration_name: integration.name,
+            synced_orders: integration.total_synced_orders,
+            sync_date: syncDate,
+          });
+          historyRecords.push(history);
+        }
+      }
+
+      // 4️⃣ Tarixni saqlash
+      if (historyRecords.length > 0) {
+        await this.historyRepo.save(historyRecords);
+        console.log(
+          `📊 [CRON] ${historyRecords.length} ta integratsiya tarixi saqlandi (${new Date(syncDate).toISOString()})`,
+        );
+      }
+
+      // 5️⃣ Barcha integratsiyalarni 0 ga tushirish
+      const result = await this.repo.update(
+        {}, // barcha integratsiyalar
+        { total_synced_orders: 0 },
+      );
+
+      console.log(
+        `🔄 [CRON] Kunlik sinxronlash hisobi yangilandi: ${result.affected} ta integratsiya 0 ga tushirildi (${new Date().toISOString()})`,
+      );
+    } catch (error) {
+      console.error('❌ [CRON] Kunlik reset xatoligi:', error);
+    }
+  }
+
+  /**
+   * Integratsiya sinxronlash tarixini olish
+   */
+  async getSyncHistory(integrationId?: string, limit: number = 30) {
+    try {
+      const queryBuilder = this.historyRepo
+        .createQueryBuilder('history')
+        .orderBy('history.sync_date', 'DESC')
+        .take(limit);
+
+      if (integrationId) {
+        queryBuilder.where('history.integration_id = :integrationId', {
+          integrationId,
+        });
+      }
+
+      const data = await queryBuilder.getMany();
+      return successRes(data);
+    } catch (error) {
+      return catchError(error);
+    }
   }
 }

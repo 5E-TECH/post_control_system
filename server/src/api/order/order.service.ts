@@ -246,6 +246,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       let { market_id } = createOrderDto;
 
+      // Agar market o'zi buyurtma yaratayotgan bo'lsa, market_id ni user.id ga o'rnatish
+      if (!market_id && user.role === Roles.MARKET) {
+        market_id = user.id;
+      }
+
+      // Agar market boshqa market uchun buyurtma yaratmoqchi bo'lsa, rad etish
+      if (user.role === Roles.MARKET && user.id !== market_id) {
+        throw new BadRequestException('Market Id is not match!');
+      }
+
       const market = await queryRunner.manager.findOne(UserEntity, {
         where: { id: market_id, role: Roles.MARKET },
       });
@@ -253,15 +263,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!market) {
         throw new NotFoundException('Market not found');
       }
-      if (!market_id && user.role === Roles.MARKET) {
-        market_id = user.id;
-      }
 
-      if (user.role === Roles.MARKET && user.id != market_id) {
-        throw new BadRequestException('Market Id is not match!');
-      }
-
-      if (user.role === Roles.MARKET && market.add_order) {
+      if (user.role === Roles.MARKET && !market.add_order) {
         throw new BadRequestException('You can not create order and product');
       }
 
@@ -1375,14 +1378,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.manager.save(order);
 
-      // === Extra cost (agar bo‘lsa) ===
-      if (sellDto.extraCost) {
-        const extra = Number(sellDto.extraCost);
+      // === Extra cost (agar bo'lsa) ===
+      // Telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun raqamga aylantirish
+      const extraCost = sellDto.extraCost
+        ? Number(String(sellDto.extraCost).replace(/[^\d.-]/g, ''))
+        : 0;
+
+      if (extraCost > 0) {
         await Promise.all([
           updateCashbox(
             marketCashbox,
             Operation_type.EXPENSE,
-            extra,
+            extraCost,
             order.id,
             Source_type.EXTRA_COST,
             finalComment,
@@ -1391,7 +1398,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           updateCashbox(
             courierCashbox,
             Operation_type.EXPENSE,
-            extra,
+            extraCost,
             order.id,
             Source_type.EXTRA_COST,
             finalComment,
@@ -1441,12 +1448,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         cancelOrderDto.comment,
         cancelOrderDto.extraCost,
       );
-      // console.log(cancelOrderDto.extraCost, 'BBBBBBBBBBBBBB');
+      // Extra cost ni raqamga aylantirish (telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun)
+      const extraCost = cancelOrderDto.extraCost
+        ? Number(String(cancelOrderDto.extraCost).replace(/[^\d.-]/g, ''))
+        : 0;
 
-      if (cancelOrderDto.extraCost) {
-      const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
-      });
+      if (extraCost > 0) {
+        const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
+          where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
+        });
         if (!marketCashbox) {
           throw new NotFoundException('Market cashbox not found');
         }
@@ -1459,9 +1469,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         if (!courierCashbox) {
           throw new NotFoundException();
         }
-        courierCashbox.balance -= cancelOrderDto.extraCost;
+        courierCashbox.balance -= extraCost;
         await queryRunner.manager.save(courierCashbox);
-        marketCashbox.balance -= cancelOrderDto.extraCost;
+        marketCashbox.balance -= extraCost;
         await queryRunner.manager.save(marketCashbox);
 
         const courierHistory = queryRunner.manager.create(
@@ -1471,7 +1481,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             cashbox_id: courierCashbox.id,
             source_type: Source_type.EXTRA_COST,
             source_id: order.id,
-            amount: cancelOrderDto.extraCost,
+            amount: extraCost,
             balance_after: courierCashbox.balance,
             comment: finalComment,
             created_by: currentUser.id,
@@ -1484,7 +1494,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           cashbox_id: marketCashbox.id,
           source_type: Source_type.EXTRA_COST,
           source_id: order.id,
-          amount: cancelOrderDto.extraCost,
+          amount: extraCost,
           balance_after: marketCashbox.balance,
           comment: finalComment,
           created_by: currentUser.id,
@@ -1506,16 +1516,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         where: { id: order?.post_id || '' },
         relations: ['courier'],
       });
-      const operator = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: currentUser.id },
-      });
 
       const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
         where: { market_id: marketId, group_type: Group_type.CANCEL || null },
       });
-      // created_at string yoki bigint bo'lishi mumkin
-
-      // console.log(telegramGroup);
 
       await this.botService.sendMessageToGroup(
         telegramGroup?.group_id || null,
@@ -1529,11 +1533,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
                 `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
             )
             .join('\n')}\n\n` +
-          `💰 *Narxi:* ${this.formatPrice(order.total_price)} so‘m\n` +
+          `💰 *Narxi:* ${this.formatPrice(order.total_price)} so'm\n` +
           `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
           `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
           `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n` +
-          `👨‍💼 *Operator:* ${operator?.name || '-'}\n\n` +
+          `👨‍💼 *Operator:* ${order.operator || '-'}\n\n` +
           `📝 *Izoh:* ${order.comment || '-'}\n`,
       );
 
@@ -1592,9 +1596,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
-      const operator = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: user.id },
-      });
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id: order.customer_id },
@@ -1811,13 +1812,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(order);
 
       // 9️⃣ Extra cost
-      if (extraCost) {
-        const cost = Number(extraCost);
+      // Telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun raqamga aylantirish
+      const parsedExtraCost = extraCost
+        ? Number(String(extraCost).replace(/[^\d.-]/g, ''))
+        : 0;
+
+      if (parsedExtraCost > 0) {
         await Promise.all([
           updateCashbox(
             marketCashbox,
             Operation_type.EXPENSE,
-            cost,
+            parsedExtraCost,
             order.id,
             Source_type.EXTRA_COST,
             finalComment,
@@ -1826,7 +1831,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           updateCashbox(
             courierCashbox,
             Operation_type.EXPENSE,
-            cost,
+            parsedExtraCost,
             order.id,
             Source_type.EXTRA_COST,
             finalComment,
@@ -1912,7 +1917,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               `🕒 *Yaratilgan vaqti:* ${new Date(Number(canceled?.created_at)).toLocaleString('uz-UZ')}\n\n` +
               `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
               `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n` +
-              `👨‍💼 *Operator:* ${operator?.name || '-'}\n\n` +
+              `👨‍💼 *Operator:* ${order.operator || '-'}\n\n` +
               `📝 *Izoh:* ${canceled?.comment || '-'}\n`,
           );
         }
@@ -1930,12 +1935,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
                 `   ${i + 1}. ${item.product.name} — ${item.quantity} dona`,
             )
             .join('\n')}\n\n` +
-          `💰 *Oldingi narxi:* ${oldTotalPrice} so‘m\n` +
-          `💰 *Sotilgan narxi:* ${order.total_price} so‘m\n` +
+          `💰 *Oldingi narxi:* ${oldTotalPrice} so'm\n` +
+          `💰 *Sotilgan narxi:* ${order.total_price} so'm\n` +
           `🕒 *Yaratilgan vaqti:* ${new Date(Number(order.created_at)).toLocaleString('uz-UZ')}\n\n` +
           `🚚 *Kurier:* ${post?.courier?.name || '-'}\n` +
           `📞 *Kurier bilan aloqa:* ${post?.courier?.phone_number || '-'}\n` +
-          `👨‍💼 *Operator:* ${operator?.name || '-'}\n\n` +
+          `👨‍💼 *Operator:* ${order.operator || '-'}\n\n` +
           `📝 *Izoh:* ${order.comment || '-'}\n`,
       );
 
@@ -2896,8 +2901,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   }
 
   async remove(id: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
     try {
-      const order = await this.orderRepo.findOne({
+      const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
       });
       if (!order) {
@@ -2907,10 +2916,65 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!acceptedStatuses.includes(order.status)) {
         throw new BadRequestException('You can not delete...!!!');
       }
-      await this.orderRepo.delete(id);
+
+      // Post ID ni olish (oddiy post yoki canceled post)
+      const postId = order.post_id || order.canceled_post_id;
+
+      // Orderni o'chirish
+      await queryRunner.manager.delete(OrderEntity, { id });
+
+      // Agar order postga tegishli bo'lsa, postni yangilash
+      if (postId) {
+        const post = await queryRunner.manager.findOne(PostEntity, {
+          where: { id: postId },
+        });
+
+        if (post) {
+          // Post ichidagi qolgan orderlar sonini hisoblash
+          const remainingOrdersCount = await queryRunner.manager.count(
+            OrderEntity,
+            {
+              where: [{ post_id: postId }, { canceled_post_id: postId }],
+            },
+          );
+
+          if (remainingOrdersCount === 0) {
+            // Agar orderlar qolmagan bo'lsa, postni ham o'chirish
+            await queryRunner.manager.delete(PostEntity, { id: postId });
+          } else {
+            // Qolgan orderlarning umumiy summasini hisoblash
+            const remainingOrders = await queryRunner.manager.find(
+              OrderEntity,
+              {
+                where: [{ post_id: postId }, { canceled_post_id: postId }],
+              },
+            );
+
+            const newTotalPrice = remainingOrders.reduce(
+              (sum, o) => sum + (Number(o.total_price) || 0),
+              0,
+            );
+
+            // Postni yangilash
+            await queryRunner.manager.update(
+              PostEntity,
+              { id: postId },
+              {
+                order_quantity: remainingOrdersCount,
+                post_total_price: newTotalPrice,
+              },
+            );
+          }
+        }
+      }
+
+      await queryRunner.commitTransaction();
       return successRes({}, 200, 'Order deleted');
     } catch (error) {
+      await queryRunner.rollbackTransaction();
       return catchError(error);
+    } finally {
+      await queryRunner.release();
     }
   }
 
@@ -3199,6 +3263,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // Region bo'yicha post cache
       const postsByRegion: Map<string, PostEntity> = new Map();
 
+      // OPTIMIZATION: Barcha districtlarni bir marta yuklash
+      const allDistricts = await queryRunner.manager.find(DistrictEntity);
+      const districtBySatoCode: Map<string, DistrictEntity> = new Map();
+      for (const d of allDistricts) {
+        if (d.sato_code) {
+          districtBySatoCode.set(d.sato_code, d);
+        }
+      }
+      const defaultDistrict = allDistricts[0] || null;
+      if (!defaultDistrict) {
+        throw new NotFoundException('Tizimda hech qanday tuman topilmadi');
+      }
+
+      // OPTIMIZATION: Customerlarni cache qilish
+      const customerCache: Map<string, UserEntity> = new Map();
+
       for (const extOrder of orders) {
         // Field mapping orqali qiymatlarni olish
         const externalId = this.getFieldValue(extOrder, field_mapping.id_field);
@@ -3240,8 +3320,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           field_mapping.total_count_field,
         );
 
-        // SATO kod orqali district topish
-        // undefined, null, "undefined", "null" ni tozalash
+        // SATO kod orqali district topish (OPTIMIZED - cache dan)
         const districtCode =
           rawDistrict !== undefined &&
           rawDistrict !== null &&
@@ -3254,14 +3333,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         let targetDistrict: DistrictEntity | null = null;
 
         if (districtCode) {
-          // Avval to'liq SATO kod bilan qidirish
-          targetDistrict = await queryRunner.manager.findOne(DistrictEntity, {
-            where: { sato_code: districtCode },
-          });
+          // Avval to'liq SATO kod bilan cache dan qidirish
+          targetDistrict = districtBySatoCode.get(districtCode) || null;
 
-          // Agar topilmasa, partial match qilish
+          // Agar topilmasa, partial match qilish (cache dan)
           if (!targetDistrict) {
-            const allDistricts = await queryRunner.manager.find(DistrictEntity);
             targetDistrict =
               allDistricts.find(
                 (d) =>
@@ -3273,14 +3349,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         // Agar district topilmasa, default district ishlatish
         if (!targetDistrict) {
-          const defaultDistricts = await queryRunner.manager.find(
-            DistrictEntity,
-            { take: 1 },
-          );
-          targetDistrict = defaultDistricts[0] || null;
-          if (!targetDistrict) {
-            throw new NotFoundException('Tizimda hech qanday tuman topilmadi');
-          }
+          targetDistrict = defaultDistrict;
           if (districtCode) {
             this.logger.warn(
               `District topilmadi SATO kod: ${districtCode}, default ishlatilmoqda`,
@@ -3337,24 +3406,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         const customerName = fullName || 'Tashqi mijoz';
 
-        // Mijozni topish yoki yaratish
-        let customer = await queryRunner.manager.findOne(UserEntity, {
-          where: {
-            phone_number: phoneNumber,
-            role: Roles.CUSTOMER,
-          },
-        });
+        // Mijozni topish yoki yaratish (OPTIMIZED - cache dan)
+        let customer = customerCache.get(phoneNumber);
 
         if (!customer) {
-          customer = queryRunner.manager.create(UserEntity, {
-            name: customerName,
-            phone_number: phoneNumber,
-            role: Roles.CUSTOMER,
-            district_id: targetDistrict.id,
-            address: address || '',
-            extra_number: additionalPhone || undefined,
+          const foundCustomer = await queryRunner.manager.findOne(UserEntity, {
+            where: {
+              phone_number: phoneNumber,
+              role: Roles.CUSTOMER,
+            },
           });
-          await queryRunner.manager.save(customer);
+
+          if (foundCustomer) {
+            customer = foundCustomer;
+          } else {
+            customer = queryRunner.manager.create(UserEntity, {
+              name: customerName,
+              phone_number: phoneNumber,
+              role: Roles.CUSTOMER,
+              district_id: targetDistrict.id,
+              address: address || '',
+              extra_number: additionalPhone || undefined,
+            });
+            await queryRunner.manager.save(customer);
+          }
+
+          customerCache.set(phoneNumber, customer);
         }
 
         // Narxni hisoblash: total_price + delivery_price

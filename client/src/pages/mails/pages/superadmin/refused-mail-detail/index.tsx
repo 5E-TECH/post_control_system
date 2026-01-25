@@ -17,6 +17,7 @@ import {
   CheckCircle,
   Loader2,
   Package,
+  Store,
 } from "lucide-react";
 
 const RefusedMailDetail = () => {
@@ -286,11 +287,15 @@ const RefusedMailDetail = () => {
                           <span className="truncate">{order?.customer?.district?.name || "-"}</span>
                         </div>
                         <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
-                          <Truck className="w-3 h-3 text-gray-400" />
-                          <span className="truncate">{t(`${order?.where_deliver}`) || "-"}</span>
+                          <Store className="w-3 h-3 text-gray-400" />
+                          <span className="truncate">{order?.market?.name || "-"}</span>
                         </div>
                         <div className="font-semibold text-red-600 dark:text-red-400">
                           {new Intl.NumberFormat("uz-UZ").format(Number(order?.total_price) || 0)} so'm
+                        </div>
+                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                          <Truck className="w-3 h-3 text-gray-400" />
+                          <span className="truncate">{t(`${order?.where_deliver}`) || "-"}</span>
                         </div>
                         <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
                           <Calendar className="w-3 h-3" />
@@ -310,7 +315,7 @@ const RefusedMailDetail = () => {
                           onChange={() => toggleSelect(order.id)}
                         />
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 lg:gap-4 flex-1">
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 lg:gap-4 flex-1">
                           {/* Customer Name */}
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -332,6 +337,14 @@ const RefusedMailDetail = () => {
                             <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
                             <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
                               {order?.customer?.district?.name || "-"}
+                            </span>
+                          </div>
+
+                          {/* Market Name */}
+                          <div className="flex items-center gap-2">
+                            <Store className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-sm font-medium text-gray-800 dark:text-white truncate">
+                              {order?.market?.name || "-"}
                             </span>
                           </div>
 
