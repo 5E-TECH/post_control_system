@@ -358,11 +358,11 @@ export class ExternalIntegrationService {
   }
 
   /**
-   * Har kuni soat 04:00 da (O'zbekiston vaqti, UTC+5) sinxronlangan buyurtmalar sonini 0 ga tushirish
-   * 04:00 UZT = 23:00 UTC (oldingi kun)
+   * Har kuni soat 04:00 da (O'zbekiston vaqti) sinxronlangan buyurtmalar sonini 0 ga tushirish
+   * Timezone aniq ko'rsatilgan - server qaysi timezone'da bo'lishidan qat'iy nazar ishlaydi
    * Cron format: sekund daqiqa soat kun oy hafta_kuni
    */
-  @Cron('0 0 23 * * *')
+  @Cron('0 0 4 * * *', { timeZone: 'Asia/Tashkent' })
   async resetDailySyncedOrders() {
     try {
       // 1️⃣ Barcha integratsiyalarni olish

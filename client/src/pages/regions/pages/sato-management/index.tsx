@@ -1,6 +1,8 @@
 import { memo, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
+import { Navigate } from "react-router-dom";
 import type { RootState } from "../../../../app/store";
+import { buildAdminPath } from "../../../../shared/const";
 import {
   Button,
   Card,
@@ -96,6 +98,11 @@ const SatoManagement = () => {
   // User role tekshirish
   const { role } = useSelector((state: RootState) => state.roleSlice);
   const isSuperadmin = role === "superadmin";
+
+  // Faqat superadmin kirishi mumkin
+  if (!isSuperadmin) {
+    return <Navigate to={buildAdminPath("regions")} replace />;
+  }
 
   const [activeTab, setActiveTab] = useState("districts");
   const [searchText, setSearchText] = useState("");

@@ -1,15 +1,27 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePost } from "../../../../../shared/api/hooks/usePost";
+import { usePost, post } from "../../../../../shared/api/hooks/usePost";
 import { useTranslation } from "react-i18next";
 import { MapPin, Package, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { api } from "../../../../../shared/api";
 
 const TodayMails = () => {
   useTranslation("mails");
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { getAllPosts } = usePost();
   const { data, refetch, isLoading } = getAllPosts("new");
   const posts = Array.isArray(data?.data) ? data?.data : [];
+
+  // Prefetch post data on hover
+  const prefetchPost = useCallback((postId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: [post, postId, "", undefined],
+      queryFn: () => api.get(`post/orders/${postId}`).then((res) => res.data),
+      staleTime: 1000 * 60 * 3,
+    });
+  }, [queryClient]);
 
   const [loading, setLoading] = useState(true);
 
@@ -76,6 +88,7 @@ const TodayMails = () => {
         {posts.map((post: any) => (
           <div
             key={post?.id}
+            onMouseEnter={() => prefetchPost(post?.id)}
             onClick={() =>
               navigate(`/mails/${post?.id}`, {
                 state: { regionName: post?.region?.name },

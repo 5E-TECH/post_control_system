@@ -1,10 +1,12 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePost } from "../../../../../shared/api/hooks/usePost";
+import { usePost, post } from "../../../../../shared/api/hooks/usePost";
 import { useTranslation } from "react-i18next";
 import { Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import { ChevronRight, Loader2, Clock, CheckCircle, XCircle, Calendar, Archive } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { api } from "../../../../../shared/api";
 
 const statusConfig: Record<string, { badge: string; icon: typeof CheckCircle; label: string }> = {
   sent: { badge: "bg-blue-500/80", icon: CheckCircle, label: "Jo'natilgan" },
@@ -17,8 +19,19 @@ const statusConfig: Record<string, { badge: string; icon: typeof CheckCircle; la
 const OldMails = () => {
   useTranslation("mails");
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { getAllPosts } = usePost();
   const { getParam, setParam, removeParam } = useParamsHook();
+
+  // Prefetch post data on hover
+  const prefetchPost = useCallback((postId: string, status: string) => {
+    const path = ["canceled", "canceled_received"].includes(status) ? "rejected/" : "";
+    queryClient.prefetchQuery({
+      queryKey: [post, postId, path, undefined],
+      queryFn: () => api.get(`post/orders/${path}${postId}`).then((res) => res.data),
+      staleTime: 1000 * 60 * 3,
+    });
+  }, [queryClient]);
 
   const page = Number(getParam("page") || 1);
   const limit = Number(getParam("limit") || 8);
@@ -98,6 +111,7 @@ const OldMails = () => {
             return (
               <div
                 key={post?.id}
+                onMouseEnter={() => prefetchPost(post?.id, post?.status)}
                 onClick={() =>
                   navigate(`/mails/${post?.id}?status=${post?.status}`, {
                     state: { regionName: post?.region?.name, hideSend: true },

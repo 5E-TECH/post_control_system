@@ -30,6 +30,8 @@ export const usePost = () => {
       queryFn: () =>
         api.get(`post/orders/${path}${id}`, params).then((res) => res.data),
       enabled: bool,
+      staleTime: 1000 * 60 * 3, // 3 daqiqa fresh
+      gcTime: 1000 * 60 * 15,   // 15 daqiqa cache
     });
 
   const getOldPostsCourier = (params: any) =>
@@ -46,9 +48,11 @@ export const usePost = () => {
 
   const getRejectedPostsByPostId = (id: string) =>
     useQuery({
-      queryKey: [post, id],
+      queryKey: [post, "rejected", id],
       queryFn: () =>
         api.get(`post/orders/rejected/${id}`).then((res) => res.data),
+      staleTime: 1000 * 60 * 3, // 3 daqiqa fresh
+      gcTime: 1000 * 60 * 15,   // 15 daqiqa cache
     });
 
   const sendAndGetCouriersByPostId = () =>
