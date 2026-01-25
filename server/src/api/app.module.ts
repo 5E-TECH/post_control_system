@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import config from 'src/config';
 import { UsersModule } from './users/users.module';
 import { ProductModule } from './product/product.module';
@@ -21,6 +22,7 @@ import { ExternalIntegrationModule } from './external-integration/external-integ
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: config.DB_URL,

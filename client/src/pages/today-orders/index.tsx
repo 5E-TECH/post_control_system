@@ -34,8 +34,8 @@ import {
 } from "lucide-react";
 import { message } from "antd";
 
-// API base URL
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+// API base URL - VITE_BASE_URL dan olinadi
+const API_BASE = import.meta.env.VITE_BASE_URL?.replace(/\/api\/v1\/?$/, "") || "";
 
 // Tashqi buyurtma interfeysi (universal - field mapping orqali)
 interface ExternalOrder {
@@ -73,6 +73,39 @@ interface Integration {
   total_synced_orders?: number;
 }
 
+// Sound utility functions
+const playSuccessSound = () => {
+  const audio = new Audio('/sound/beep.mp3');
+  audio.volume = 0.5;
+  audio.play().catch(() => {});
+};
+
+const playErrorSound = () => {
+  const audio = new Audio('/sound/error.mp3');
+  audio.volume = 0.7;
+  audio.play().catch(() => {});
+};
+
+// Confirmation modal interfeysi
+interface ConfirmationModal {
+  isOpen: boolean;
+  type: 'not_found' | 'duplicate' | null;
+  order: ExternalOrder | null;
+  qrCode: string;
+  message: string;
+}
+
+// Batch processing progress interfeysi
+interface BatchProgress {
+  isProcessing: boolean;
+  currentBatch: number;
+  totalBatches: number;
+  processedOrders: number;
+  totalOrders: number;
+  successCount: number;
+  failedCount: number;
+}
+
 // Tashqi buyurtmalar komponenti
 const ExternalOrdersTab = () => {
   const navigate = useNavigate();
@@ -86,6 +119,26 @@ const ExternalOrdersTab = () => {
   const [orders, setOrders] = useState<ExternalOrder[]>([]);
   const [scannerBuffer, setScannerBuffer] = useState("");
   const [integrationSearch, setIntegrationSearch] = useState("");
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<ConfirmationModal>({
+    isOpen: false,
+    type: null,
+    order: null,
+    qrCode: '',
+    message: ''
+  });
+
+  // Batch processing state
+  const [batchProgress, setBatchProgress] = useState<BatchProgress>({
+    isProcessing: false,
+    currentBatch: 0,
+    totalBatches: 0,
+    processedOrders: 0,
+    totalOrders: 0,
+    successCount: 0,
+    failedCount: 0
+  });
 
   // useOrder hookdan receiveExternalOrders mutationini olish
   const { receiveExternalOrders } = useOrder();
@@ -119,13 +172,50 @@ const ExternalOrdersTab = () => {
   const ordersRef = useRef<ExternalOrder[]>([]);
   ordersRef.current = orders;
 
+  // SCAN QUEUE SYSTEM - Tez skanerlashda xatoliklarni oldini olish
+  const scanQueueRef = useRef<string[]>([]); // Navbatdagi QR kodlar
+  const isProcessingRef = useRef<boolean>(false); // Hozir qayta ishlanmoqdami
+  const [queueLength, setQueueLength] = useState(0); // UI uchun navbat uzunligi
+
+  // OFFLINE/RETRY SYSTEM - Internet uzilganda saqlab qolish
+  const [failedScans, setFailedScans] = useState<{code: string; error: string; attempts: number}[]>([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const MAX_RETRY_ATTEMPTS = 3;
+  const RETRY_DELAY_MS = 2000; // 2 sekund
+
+  // Network status listener
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      message.success("Internet qayta ulandi!");
+      // Avtomatik retry failed scans
+      if (failedScans.length > 0) {
+        retryAllFailedScans();
+      }
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      message.warning("Internet uzildi! Skanlar saqlanadi...");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [failedScans]);
+
   // LocalStorage dan tokenni olish (o'z serverimizning tokeni)
   const getAuthToken = () => {
     return localStorage.getItem("x-auth-token") || "";
   };
 
-  // Tanlangan buyurtmalarni qabul qilish
-  const handleAcceptOrders = () => {
+  // Tanlangan buyurtmalarni qabul qilish (BATCH PROCESSING)
+  const BATCH_SIZE = 30; // Har bir batchda 30 ta buyurtma
+
+  const handleAcceptOrders = async () => {
     if (!selectedIntegration) {
       message.warning("Integratsiya tanlanmagan!");
       return;
@@ -137,25 +227,113 @@ const ExternalOrdersTab = () => {
       return;
     }
 
-    // Universal format - field mapping backend da qo'llaniladi
-    receiveExternalOrders.mutate(
-      {
-        integration_id: selectedIntegration.id,
-        orders: selectedOrders,
-      },
-      {
-        onSuccess: (data: any) => {
-          message.success(`${data?.message || 'Buyurtmalar qabul qilindi!'}`);
-          // Qabul qilingan buyurtmalarni ro'yxatdan olib tashlash
-          setOrders(prev => prev.filter(o => !o.selected));
-          // Integratsiyalarni yangilash (sync counter uchun)
-          refetchIntegrations();
-        },
-        onError: (err: any) => {
-          message.error(err?.response?.data?.message || "Buyurtmalarni qabul qilishda xatolik yuz berdi");
-        },
+    // Buyurtmalarni batchlarga bo'lish
+    const batches: ExternalOrder[][] = [];
+    for (let i = 0; i < selectedOrders.length; i += BATCH_SIZE) {
+      batches.push(selectedOrders.slice(i, i + BATCH_SIZE));
+    }
+
+    // Progress ni boshlash
+    setBatchProgress({
+      isProcessing: true,
+      currentBatch: 0,
+      totalBatches: batches.length,
+      processedOrders: 0,
+      totalOrders: selectedOrders.length,
+      successCount: 0,
+      failedCount: 0
+    });
+
+    let successCount = 0;
+    let failedCount = 0;
+    const processedOrderIds: (string | number)[] = [];
+
+    // Batchlarni ketma-ket yuborish
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+
+      setBatchProgress(prev => ({
+        ...prev,
+        currentBatch: i + 1,
+      }));
+
+      try {
+        // Promise wrapper for mutation
+        await new Promise<void>((resolve, reject) => {
+          receiveExternalOrders.mutate(
+            {
+              integration_id: selectedIntegration.id,
+              orders: batch,
+            },
+            {
+              onSuccess: (data: any) => {
+                const createdCount = data?.data?.created_orders || batch.length;
+                successCount += createdCount;
+                batch.forEach(o => processedOrderIds.push(o.id));
+
+                setBatchProgress(prev => ({
+                  ...prev,
+                  processedOrders: prev.processedOrders + batch.length,
+                  successCount: successCount,
+                }));
+
+                resolve();
+              },
+              onError: (err: any) => {
+                failedCount += batch.length;
+
+                setBatchProgress(prev => ({
+                  ...prev,
+                  processedOrders: prev.processedOrders + batch.length,
+                  failedCount: failedCount,
+                }));
+
+                console.error(`Batch ${i + 1} xatolik:`, err);
+                // Xatolik bo'lsa ham davom etamiz
+                resolve();
+              },
+            }
+          );
+        });
+
+        // Har bir batchdan keyin 500ms kutish (server yukini kamaytirish)
+        if (i < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (error) {
+        console.error(`Batch ${i + 1} exception:`, error);
+        failedCount += batch.length;
       }
-    );
+    }
+
+    // Yakunlash
+    setBatchProgress(prev => ({ ...prev, isProcessing: false }));
+
+    // Natijani ko'rsatish
+    if (successCount > 0) {
+      message.success(`${successCount} ta buyurtma muvaffaqiyatli qabul qilindi!`);
+      // Muvaffaqiyatli buyurtmalarni ro'yxatdan olib tashlash
+      setOrders(prev => prev.filter(o => !processedOrderIds.includes(o.id)));
+      // Integratsiyalarni yangilash
+      refetchIntegrations();
+    }
+
+    if (failedCount > 0) {
+      message.error(`${failedCount} ta buyurtma qabul qilinmadi!`);
+    }
+
+    // Progress ni tozalash
+    setTimeout(() => {
+      setBatchProgress({
+        isProcessing: false,
+        currentBatch: 0,
+        totalBatches: 0,
+        processedOrders: 0,
+        totalOrders: 0,
+        successCount: 0,
+        failedCount: 0
+      });
+    }, 2000);
   };
 
   // Scanner listener - klaviaturadan tez kiritilgan ma'lumotni ushlab oladi
@@ -263,26 +441,81 @@ const ExternalOrdersTab = () => {
     setOrders(prev => prev.filter(order => order.id !== orderId));
   };
 
-  // Scanner orqali avtomatik qidirish
-  const handleScannerSearch = async (scannedCode: string) => {
-    if (!selectedIntegration || !isReady || loading) return;
+  // Dublikat buyurtmani tekshirish (telefon raqami va mahsulotlar bo'yicha)
+  const checkDuplicateOrder = (newOrder: ExternalOrder): ExternalOrder | null => {
+    const newPhone = newOrder.phone?.replace(/\D/g, '') || '';
+    const newItems = typeof newOrder.items === 'string'
+      ? newOrder.items
+      : Array.isArray(newOrder.items)
+        ? newOrder.items.map((i: any) => `${i.name || i.product_name || i.title}`).sort().join(',')
+        : '';
 
-    // Allaqachon shu QR kod bilan buyurtma bormi tekshirish (ordersRef orqali hozirgi qiymatni olish)
+    for (const existingOrder of ordersRef.current) {
+      const existingPhone = existingOrder.phone?.replace(/\D/g, '') || '';
+      const existingItems = typeof existingOrder.items === 'string'
+        ? existingOrder.items
+        : Array.isArray(existingOrder.items)
+          ? existingOrder.items.map((i: any) => `${i.name || i.product_name || i.title}`).sort().join(',')
+          : '';
+
+      // Telefon raqami va mahsulotlar bir xil bo'lsa - dublikat
+      if (newPhone && existingPhone && newPhone === existingPhone && newItems === existingItems) {
+        return existingOrder;
+      }
+    }
+    return null;
+  };
+
+  // Confirmation modal dan tasdiqlash
+  const handleConfirmAccept = () => {
+    if (confirmModal.order) {
+      setOrders(prev => [{ ...confirmModal.order!, selected: true }, ...prev]);
+      message.success({ content: "Buyurtma qo'shildi!", key: "scanner" });
+    }
+    setConfirmModal({ isOpen: false, type: null, order: null, qrCode: '', message: '' });
+  };
+
+  // Confirmation modal dan bekor qilish
+  const handleConfirmReject = () => {
+    setConfirmModal({ isOpen: false, type: null, order: null, qrCode: '', message: '' });
+    message.info({ content: "Buyurtma bekor qilindi", key: "scanner" });
+  };
+
+  // Bitta QR kodni qayta ishlash (ichki funksiya) - RETRY LOGIC bilan
+  const processSingleScan = async (scannedCode: string, integrationSlug: string, attemptNumber: number = 1): Promise<boolean> => {
+    // Allaqachon shu QR kod bilan buyurtma bormi tekshirish
     const existingOrder = ordersRef.current.find(o => o.qrCode === scannedCode);
     if (existingOrder) {
-      message.warning({ content: `Bu buyurtma allaqachon ro'yxatda mavjud!`, key: "scanner" });
-      return;
+      playErrorSound();
+      message.warning({ content: `Bu buyurtma allaqachon ro'yxatda mavjud!`, key: scannedCode });
+      return true; // Skip, no need to retry
     }
 
-    console.log("🔍 Scanner orqali qidirish:", scannedCode);
-    message.loading({ content: `Qidirilmoqda: ${scannedCode}`, key: "scanner" });
+    // Navbatda ham bormi tekshirish
+    if (scanQueueRef.current.filter(q => q === scannedCode).length > 1) {
+      message.info({ content: `${scannedCode} allaqachon navbatda`, key: scannedCode });
+      return true; // Skip
+    }
 
-    setLoading(true);
-    setError(null);
+    console.log(`🔍 Qidirilmoqda: ${scannedCode} (urinish ${attemptNumber}/${MAX_RETRY_ATTEMPTS})`);
+
+    // Internet tekshirish
+    if (!navigator.onLine) {
+      // Offline - failed scans ga qo'shish
+      setFailedScans(prev => {
+        if (prev.some(f => f.code === scannedCode)) return prev;
+        return [...prev, { code: scannedCode, error: "Internet yo'q", attempts: attemptNumber }];
+      });
+      message.warning({ content: `⏸ ${scannedCode} - Internet yo'q, keyinroq uriniladi`, key: scannedCode });
+      return false;
+    }
 
     try {
       // Backend proxy orqali integratsiya API siga so'rov yuborish
-      const proxyEndpoint = `/api/v1/external-proxy/${selectedIntegration.slug}`;
+      const proxyEndpoint = `/api/v1/external-proxy/${integrationSlug}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
       const response = await fetch(`${API_BASE}${proxyEndpoint}/qrorder/find`, {
         method: "POST",
         headers: {
@@ -290,33 +523,188 @@ const ExternalOrdersTab = () => {
           "Authorization": `Bearer ${getAuthToken()}`,
         },
         body: JSON.stringify({ qr_code: scannedCode }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok && data.success !== false) {
-        // API javobidan data ni olish
+        // SUCCESS - API javobidan data ni olish
         const orderData = data.data || data;
 
-        // Yangi buyurtmani ro'yxatga qo'shish (default tanlangan)
+        // Yangi buyurtmani tayyorlash
         const newOrder: ExternalOrder = {
           ...orderData,
           qrCode: scannedCode,
           selected: true,
         };
 
-        setOrders(prev => [newOrder, ...prev]); // Yangi buyurtma eng yuqorida
-        message.success({ content: "Buyurtma topildi va qo'shildi!", key: "scanner" });
+        // Failed scans dan olib tashlash (agar bo'lsa)
+        setFailedScans(prev => prev.filter(f => f.code !== scannedCode));
+
+        // Dublikat tekshirish (telefon + mahsulot)
+        const duplicateOrder = checkDuplicateOrder(newOrder);
+        if (duplicateOrder) {
+          playErrorSound();
+          setConfirmModal({
+            isOpen: true,
+            type: 'duplicate',
+            order: newOrder,
+            qrCode: scannedCode,
+            message: `Bu mijoz (${newOrder.phone}) uchun bir xil mahsulotli buyurtma allaqachon mavjud! Baribir qo'shilsinmi?`
+          });
+          message.warning({ content: "Dublikat buyurtma topildi!", key: scannedCode });
+        } else {
+          playSuccessSound();
+          setOrders(prev => [newOrder, ...prev]);
+          message.success({ content: `✓ ${scannedCode} topildi!`, key: scannedCode, duration: 1 });
+        }
+        return true;
       } else {
-        message.error({ content: "Buyurtma topilmadi", key: "scanner" });
-        setError(`Xatolik (${response.status}): ${data.message || data.error || "Buyurtma topilmadi"}`);
+        // Buyurtma topilmadi - bu network error emas, retry kerak emas
+        playErrorSound();
+
+        const emptyOrder: ExternalOrder = {
+          id: `manual_${Date.now()}`,
+          qrCode: scannedCode,
+          full_name: '',
+          phone: '',
+          items: [],
+          total_price: 0,
+          selected: true,
+        };
+
+        setConfirmModal({
+          isOpen: true,
+          type: 'not_found',
+          order: emptyOrder,
+          qrCode: scannedCode,
+          message: `Tashqi saytda buyurtma topilmadi (QR: ${scannedCode}). Baribir ro'yxatga qo'shilsinmi?`
+        });
+
+        message.error({ content: `✗ ${scannedCode} topilmadi`, key: scannedCode });
+        return true; // No retry needed for "not found"
       }
     } catch (err: any) {
-      message.error({ content: "Xatolik yuz berdi", key: "scanner" });
-      setError("So'rov yuborishda xatolik: " + (err.message || "Noma'lum xatolik"));
-    } finally {
-      setLoading(false);
+      const isNetworkError = err.name === 'AbortError' || err.message?.includes('network') || err.message?.includes('Failed to fetch');
+
+      if (isNetworkError && attemptNumber < MAX_RETRY_ATTEMPTS) {
+        // Retry
+        message.loading({ content: `↻ ${scannedCode} - qayta urinish ${attemptNumber + 1}...`, key: scannedCode });
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attemptNumber));
+        return processSingleScan(scannedCode, integrationSlug, attemptNumber + 1);
+      }
+
+      // Max retry reached yoki boshqa xatolik
+      playErrorSound();
+      const errorMsg = err.name === 'AbortError' ? 'Timeout' : (err.message || "Noma'lum xatolik");
+
+      // Failed scans ga qo'shish
+      setFailedScans(prev => {
+        const existing = prev.find(f => f.code === scannedCode);
+        if (existing) {
+          return prev.map(f => f.code === scannedCode ? { ...f, attempts: attemptNumber, error: errorMsg } : f);
+        }
+        return [...prev, { code: scannedCode, error: errorMsg, attempts: attemptNumber }];
+      });
+
+      message.error({ content: `✗ ${scannedCode} - ${errorMsg}`, key: scannedCode });
+      console.error("Scan error:", err);
+      return false;
     }
+  };
+
+  // Bitta failed scan ni qayta urinish
+  const retrySingleFailedScan = async (code: string) => {
+    if (!selectedIntegration) return;
+
+    // Failed scans dan olib tashlash
+    setFailedScans(prev => prev.filter(f => f.code !== code));
+
+    // Navbatga qo'shish
+    scanQueueRef.current.push(code);
+    setQueueLength(scanQueueRef.current.length);
+    message.loading({ content: `↻ ${code} qayta urinilmoqda...`, key: code });
+
+    processQueue();
+  };
+
+  // Barcha failed scans ni qayta urinish
+  const retryAllFailedScans = async () => {
+    if (!selectedIntegration || failedScans.length === 0) return;
+
+    const codes = failedScans.map(f => f.code);
+    setFailedScans([]);
+
+    // Navbatga qo'shish
+    scanQueueRef.current.push(...codes);
+    setQueueLength(scanQueueRef.current.length);
+    message.loading({ content: `↻ ${codes.length} ta buyurtma qayta urinilmoqda...`, key: 'retry-all' });
+
+    processQueue();
+  };
+
+  // Failed scans ni tozalash
+  const clearFailedScans = () => {
+    setFailedScans([]);
+    message.info("Muvaffaqiyatsiz skanlar tozalandi");
+  };
+
+  // Navbatni qayta ishlash
+  const processQueue = async () => {
+    if (isProcessingRef.current) return; // Allaqachon ishlayapti
+    if (scanQueueRef.current.length === 0) return; // Navbat bo'sh
+    if (!selectedIntegration) return;
+
+    isProcessingRef.current = true;
+    setLoading(true);
+
+    while (scanQueueRef.current.length > 0) {
+      const currentCode = scanQueueRef.current[0];
+
+      // Navbatdan olib tashlash
+      scanQueueRef.current = scanQueueRef.current.slice(1);
+      setQueueLength(scanQueueRef.current.length);
+
+      // Buyurtmani topish
+      await processSingleScan(currentCode, selectedIntegration.slug);
+
+      // Keyingi so'rovdan oldin 200ms kutish (server yukini kamaytirish)
+      if (scanQueueRef.current.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
+    isProcessingRef.current = false;
+    setLoading(false);
+  };
+
+  // Scanner orqali avtomatik qidirish - navbatga qo'shish
+  const handleScannerSearch = (scannedCode: string) => {
+    if (!selectedIntegration || !isReady) return;
+
+    // QR kod allaqachon ro'yxatda bormi?
+    const existingOrder = ordersRef.current.find(o => o.qrCode === scannedCode);
+    if (existingOrder) {
+      playErrorSound();
+      message.warning({ content: `Bu buyurtma allaqachon ro'yxatda mavjud!`, key: scannedCode });
+      return;
+    }
+
+    // QR kod allaqachon navbatda bormi?
+    if (scanQueueRef.current.includes(scannedCode)) {
+      message.info({ content: `${scannedCode} allaqachon navbatda`, key: scannedCode });
+      return;
+    }
+
+    // Navbatga qo'shish
+    scanQueueRef.current.push(scannedCode);
+    setQueueLength(scanQueueRef.current.length);
+    message.loading({ content: `Navbatga qo'shildi: ${scannedCode}`, key: scannedCode, duration: 1 });
+
+    // Navbatni qayta ishlashni boshlash
+    processQueue();
   };
 
   // Integratsiyalar ro'yxati
@@ -510,6 +898,35 @@ const ExternalOrdersTab = () => {
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     QR kodni skanerlang - avtomatik qidiriladi
                   </p>
+
+                  {/* Network Status */}
+                  {!isOnline && (
+                    <div className="mt-3 px-3 py-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-lg inline-flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-sm font-medium text-amber-700 dark:text-amber-400">Offline rejim</span>
+                    </div>
+                  )}
+
+                  {/* Queue Status Indicator */}
+                  {queueLength > 0 && (
+                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 inline-flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                      <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                        Navbatda: {queueLength} ta buyurtma
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Failed Scans Count */}
+                  {failedScans.length > 0 && (
+                    <div className="mt-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 rounded-lg inline-flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                      <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                        {failedScans.length} ta muvaffaqiyatsiz
+                      </span>
+                    </div>
+                  )}
+
                   {scannerBuffer && (
                     <div className="mt-4 p-3 bg-white dark:bg-[#2A263D] rounded-lg border border-gray-200 dark:border-gray-700 inline-block">
                       <p className="text-xs text-gray-400 mb-1">Skanerlanmoqda:</p>
@@ -700,9 +1117,9 @@ const ExternalOrdersTab = () => {
           <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex-shrink-0">
             <button
               onClick={handleAcceptOrders}
-              disabled={orders.filter(o => o.selected).length === 0 || receiveExternalOrders.isPending}
+              disabled={orders.filter(o => o.selected).length === 0 || receiveExternalOrders.isPending || batchProgress.isProcessing}
               className={`w-full h-12 rounded-xl flex items-center justify-center gap-2 text-base font-medium transition-all ${
-                orders.filter(o => o.selected).length === 0 || receiveExternalOrders.isPending
+                orders.filter(o => o.selected).length === 0 || receiveExternalOrders.isPending || batchProgress.isProcessing
                   ? "opacity-50 cursor-not-allowed bg-gray-300 dark:bg-gray-700 text-gray-500"
                   : "bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:shadow-emerald-500/25 cursor-pointer"
               }`}
@@ -721,7 +1138,7 @@ const ExternalOrdersTab = () => {
       )}
 
       {/* Bo'sh holat */}
-      {orders.length === 0 && isReady && !loading && (
+      {orders.length === 0 && isReady && !loading && !queueLength && (
         <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-8 sm:p-12 text-center border border-gray-100 dark:border-gray-700/50">
           <Package className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
           <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-2">
@@ -730,6 +1147,227 @@ const ExternalOrdersTab = () => {
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
             QR kodni skanerlang - buyurtmalar avtomatik qo'shiladi
           </p>
+        </div>
+      )}
+
+      {/* Navbat qayta ishlanmoqda */}
+      {orders.length === 0 && isReady && queueLength > 0 && (
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-8 sm:p-12 text-center border border-blue-200 dark:border-blue-800">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          </div>
+          <h3 className="text-base sm:text-lg font-semibold text-blue-700 dark:text-blue-400 mb-2">
+            Navbat qayta ishlanmoqda...
+          </h3>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            {queueLength} ta buyurtma navbatda kutmoqda
+          </p>
+        </div>
+      )}
+
+      {/* Failed Scans - Internet uzilganda saqlanganlar */}
+      {failedScans.length > 0 && isReady && (
+        <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl shadow-sm border border-red-200 dark:border-red-800 overflow-hidden mb-4">
+          {/* Header */}
+          <div className="p-4 border-b border-red-200 dark:border-red-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-500" />
+              <h3 className="font-semibold text-red-700 dark:text-red-400">
+                Muvaffaqiyatsiz skanlar ({failedScans.length})
+              </h3>
+              {!isOnline && (
+                <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 text-xs rounded-full">
+                  Offline
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={retryAllFailedScans}
+                disabled={!isOnline}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-all ${
+                  isOnline
+                    ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                <RefreshCw className="w-4 h-4" />
+                Barchasini qayta urinish
+              </button>
+              <button
+                onClick={clearFailedScans}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-all cursor-pointer"
+              >
+                Tozalash
+              </button>
+            </div>
+          </div>
+
+          {/* Failed scans list */}
+          <div className="divide-y divide-red-200 dark:divide-red-800 max-h-40 overflow-y-auto">
+            {failedScans.map((scan) => (
+              <div key={scan.code} className="p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <QrCode className="w-4 h-4 text-red-400" />
+                  <div>
+                    <span className="font-mono font-medium text-gray-800 dark:text-white">{scan.code}</span>
+                    <p className="text-xs text-red-500">{scan.error} ({scan.attempts} urinish)</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => retrySingleFailedScan(scan.code)}
+                  disabled={!isOnline}
+                  className={`p-2 rounded-lg transition-all ${
+                    isOnline
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 hover:bg-blue-200 cursor-pointer'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Network Status Banner */}
+      {!isOnline && isReady && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 mb-4 border border-amber-200 dark:border-amber-800 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h4 className="font-semibold text-amber-800 dark:text-amber-400">Internet uzilgan</h4>
+            <p className="text-sm text-amber-600 dark:text-amber-500">
+              Skanerlashni davom ettiring - buyurtmalar saqlanadi va internet qaytganda avtomatik yuklanadi
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Progress Modal */}
+      {batchProgress.isProcessing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+          {/* Modal */}
+          <div className="relative bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+            {/* Icon */}
+            <div className="w-20 h-20 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
+              <Loader2 className="w-10 h-10 text-blue-600 dark:text-blue-400 animate-spin" />
+            </div>
+
+            {/* Title */}
+            <h3 className="text-lg font-bold text-center text-gray-800 dark:text-white mb-2">
+              Buyurtmalar qabul qilinmoqda...
+            </h3>
+
+            {/* Progress info */}
+            <div className="text-center mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Batch: <span className="font-semibold">{batchProgress.currentBatch}</span> / {batchProgress.totalBatches}
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Buyurtmalar: <span className="font-semibold">{batchProgress.processedOrders}</span> / {batchProgress.totalOrders}
+              </p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${(batchProgress.processedOrders / batchProgress.totalOrders) * 100}%` }}
+              />
+            </div>
+
+            {/* Stats */}
+            <div className="flex justify-center gap-6 text-sm">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                <span className="text-green-600 dark:text-green-400 font-medium">{batchProgress.successCount}</span>
+              </div>
+              {batchProgress.failedCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                  <span className="text-red-600 dark:text-red-400 font-medium">{batchProgress.failedCount}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Warning */}
+            <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-4">
+              Iltimos, sahifani yopmang va kuting...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleConfirmReject}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+            {/* Icon */}
+            <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
+              confirmModal.type === 'not_found'
+                ? 'bg-red-100 dark:bg-red-900/30'
+                : 'bg-amber-100 dark:bg-amber-900/30'
+            }`}>
+              <AlertCircle className={`w-8 h-8 ${
+                confirmModal.type === 'not_found'
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-amber-600 dark:text-amber-400'
+              }`} />
+            </div>
+
+            {/* Title */}
+            <h3 className="text-lg font-bold text-center text-gray-800 dark:text-white mb-2">
+              {confirmModal.type === 'not_found' ? 'Buyurtma topilmadi!' : 'Dublikat buyurtma!'}
+            </h3>
+
+            {/* Message */}
+            <p className="text-sm text-center text-gray-600 dark:text-gray-300 mb-6">
+              {confirmModal.message}
+            </p>
+
+            {/* QR Code */}
+            <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-3 mb-6">
+              <div className="flex items-center justify-center gap-2">
+                <QrCode className="w-5 h-5 text-gray-500" />
+                <span className="font-mono font-semibold text-gray-800 dark:text-white">
+                  {confirmModal.qrCode}
+                </span>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmReject}
+                className="flex-1 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all cursor-pointer"
+              >
+                Bekor qilish
+              </button>
+              <button
+                onClick={handleConfirmAccept}
+                className={`flex-1 h-12 rounded-xl text-white font-medium transition-all cursor-pointer ${
+                  confirmModal.type === 'not_found'
+                    ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:shadow-lg hover:shadow-red-500/25'
+                    : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:shadow-lg hover:shadow-amber-500/25'
+                }`}
+              >
+                Baribir qo'shish
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

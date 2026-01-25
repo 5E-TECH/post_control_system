@@ -94,6 +94,11 @@ const WaitingOrders = () => {
     const item = order.current;
     const type = urlType.current;
 
+    // extraCostValue dan raqam olish (formatlangan stringdan)
+    const parsedExtraCost = extraCostValue
+      ? Number(String(extraCostValue).replace(/[^\d]/g, ""))
+      : undefined;
+
     if (type === "sell") {
       if (partleSoldShow) {
         const order_item_info = orderItemInfo.map((item) => ({
@@ -107,7 +112,7 @@ const WaitingOrders = () => {
         const data = {
           order_item_info,
           totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
-          extraCost: Number(values?.extraCost),
+          extraCost: parsedExtraCost,
           comment: values?.comment,
         };
         partlySellOrder.mutate(
@@ -123,8 +128,13 @@ const WaitingOrders = () => {
           }
         );
       } else {
+        // extraCost ni qo'lda qo'shish (Form.Item ichida emas)
+        const data = {
+          comment: values?.comment,
+          extraCost: parsedExtraCost,
+        };
         sellOrder.mutate(
-          { id: item?.id as string, data: values },
+          { id: item?.id as string, data },
           {
             onSuccess: () => {
               handleSuccess("Buyurtma muvaffaqiyatli sotildi");
@@ -148,7 +158,7 @@ const WaitingOrders = () => {
         const data = {
           order_item_info,
           totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
-          extraCost: Number(values?.extraCost),
+          extraCost: parsedExtraCost,
           comment: values?.comment,
         };
         partlySellOrder.mutate(
@@ -163,8 +173,13 @@ const WaitingOrders = () => {
           }
         );
       } else {
+        // extraCost ni qo'lda qo'shish (Form.Item ichida emas)
+        const data = {
+          comment: values?.comment,
+          extraCost: parsedExtraCost,
+        };
         cancelOrder.mutate(
-          { id: item?.id as string, data: values },
+          { id: item?.id as string, data },
           {
             onSuccess: () => {
               handleSuccess("Buyurtma muvaffaqiyatli bekor qilindi");

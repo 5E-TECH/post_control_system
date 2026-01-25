@@ -27,7 +27,12 @@ export function getSafeLimit(limit?: number, fetchAll?: boolean): number {
     return PAGINATION.MAX_FETCH_ALL;
   }
 
-  if (!limit || limit <= 0) {
+  // limit: 0 bo'lsa barcha ma'lumotlarni olish (filter/select uchun)
+  if (limit === 0) {
+    return PAGINATION.MAX_FETCH_ALL;
+  }
+
+  if (!limit || limit < 0) {
     return PAGINATION.DEFAULT_LIMIT;
   }
 

@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -77,5 +78,22 @@ export class ExternalIntegrationController {
   @ApiOperation({ summary: 'Integratsiya ulanishini tekshirish' })
   testConnection(@Param('id') id: string) {
     return this.service.testConnection(id);
+  }
+
+  @Get('sync/history')
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @ApiOperation({ summary: 'Barcha integratsiyalar sinxronlash tarixini olish' })
+  getSyncHistory(@Query('limit') limit?: number) {
+    return this.service.getSyncHistory(undefined, limit || 30);
+  }
+
+  @Get(':id/sync/history')
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @ApiOperation({ summary: 'Bitta integratsiya sinxronlash tarixini olish' })
+  getIntegrationSyncHistory(
+    @Param('id') id: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.service.getSyncHistory(id, limit || 30);
   }
 }
