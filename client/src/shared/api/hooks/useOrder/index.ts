@@ -120,8 +120,10 @@ export const useOrder = () => {
   const deleteOrders = useMutation({
     mutationFn: (id: string) =>
       api.delete(`order/${id}`).then((res) => res.data),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" });
+      client.invalidateQueries({ queryKey: ["post"], refetchType: "active" });
+    },
   });
 
   const updateOrders = useMutation({

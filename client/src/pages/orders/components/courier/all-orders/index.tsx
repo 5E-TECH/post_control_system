@@ -217,6 +217,12 @@ const AllOrders = () => {
     const item = order.current;
     const type = urlType.current;
 
+    // Parse extraCost - handle formatted numbers like "300,000" or "300 000"
+    const extraCostValue = values?.extraCost;
+    const parsedExtraCost = extraCostValue
+      ? Number(String(extraCostValue).replace(/[^\d]/g, ""))
+      : undefined;
+
     if (type === "sell") {
       if (partleSoldShow) {
         const order_item_info = orderItemInfo.map((item) => ({
@@ -236,7 +242,7 @@ const AllOrders = () => {
         const data = {
           order_item_info,
           totalPrice: Number(String(totalPrice).split(",").join("")),
-          extraCost: Number(values?.extraCost),
+          extraCost: parsedExtraCost,
           comment: values?.comment,
         };
         partlySellOrder.mutate(
@@ -252,8 +258,12 @@ const AllOrders = () => {
           }
         );
       } else {
+        const data = {
+          comment: values?.comment,
+          extraCost: parsedExtraCost,
+        };
         sellOrder.mutate(
-          { id: item?.id as string, data: values },
+          { id: item?.id as string, data },
           {
             onSuccess: () => {
               closePopup();
@@ -283,7 +293,7 @@ const AllOrders = () => {
         const data = {
           order_item_info,
           totalPrice: Number(String(totalPrice).split(",").join("")),
-          extraCost: Number(values?.extraCost),
+          extraCost: parsedExtraCost,
           comment: values?.comment,
         };
         partlySellOrder.mutate(
@@ -299,8 +309,12 @@ const AllOrders = () => {
           }
         );
       } else {
+        const data = {
+          comment: values?.comment,
+          extraCost: parsedExtraCost,
+        };
         cancelOrder.mutate(
-          { id: item?.id as string, data: values },
+          { id: item?.id as string, data },
           {
             onSuccess: () => {
               closePopup();

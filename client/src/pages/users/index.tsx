@@ -56,6 +56,14 @@ const Users = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Sync search from URL params to Redux on mount
+  useEffect(() => {
+    const searchParam = getParam("search");
+    if (searchParam) {
+      dispatch(setUserFilter({ name: "search", value: searchParam }));
+    }
+  }, []);
+
   const isChecked = pathname.startsWith(
     buildAdminPath("all-users/create-user")
   );
@@ -78,6 +86,7 @@ const Users = () => {
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchValue(value);
+    dispatch(setUserFilter({ name: "search", value: value || null }));
     if (value) {
       setParam("search", value);
     } else {

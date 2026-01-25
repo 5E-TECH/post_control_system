@@ -141,7 +141,7 @@ const Payments = () => {
     ...searchParam,
     limit: 0,
   });
-  const { data: courierData } = getCourier(showCurier, { ...searchParam });
+  const { data: courierData } = getCourier(showCurier, { ...searchParam, limit: 0 });
   const total = cashBoxData?.data?.pagination?.total || 0;
   const onChange: PaginationProps["onChange"] = (newPage, limit) => {
     if (newPage === 1) {
@@ -409,7 +409,7 @@ const Payments = () => {
 
         {/* Market Popup */}
         <PaymentPopup isShow={showMarket} onClose={hendlerClose}>
-          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[95%] max-w-[700px] max-h-[90vh] px-4 sm:px-6 py-5 sm:py-6 relative flex flex-col">
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[95%] min-w-[700px] max-h-[90vh] px-4 sm:px-6 py-5 sm:py-6 relative flex flex-col">
             <button
               onClick={hendlerClose}
               className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
@@ -491,7 +491,7 @@ const Payments = () => {
 
         {/* Courier Popup */}
         <PaymentPopup isShow={showCurier} onClose={hendlerClose}>
-          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[95%] max-w-[800px] max-h-[90vh] px-4 sm:px-6 py-5 sm:py-6 relative flex flex-col">
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[95%] min-w-[700px] max-h-[90vh] px-4 sm:px-6 py-5 sm:py-6 relative flex flex-col">
             <button
               onClick={() => hendlerClose()}
               className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110 cursor-pointer"

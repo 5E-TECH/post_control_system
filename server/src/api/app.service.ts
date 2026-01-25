@@ -18,11 +18,15 @@ export default class Application {
     const myLogger = app.get(MyLogger);
     app.useLogger(myLogger);
 
+    // ✅ Body size limit (katta JSON payloadlar uchun - external orders)
+    app.use(express.json({ limit: '50mb' }));
+    app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
     // ✅ Static files (uploads)
     const uploadDir = 'home/ubuntu/uploads';
     app.use('/uploads', express.static(uploadDir));
 
-    // Public folder (agar bo‘lsa)
+    // Public folder (agar bo'lsa)
     app.use(express.static('public'));
 
     // Global filters, pipes, cors
