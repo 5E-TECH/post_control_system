@@ -259,7 +259,7 @@ const ExternalOrdersTab = () => {
 
       try {
         // Promise wrapper for mutation
-        await new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve) => {
           receiveExternalOrders.mutate(
             {
               integration_id: selectedIntegration.id,
