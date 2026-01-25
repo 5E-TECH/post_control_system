@@ -10,6 +10,9 @@ const client = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
+      staleTime: 1000 * 60 * 2, // 2 daqiqa - shu vaqt ichida qayta so'rov yuborilmaydi
+      gcTime: 1000 * 60 * 10,   // 10 daqiqa - cache da saqlanadi
+      refetchOnWindowFocus: false, // Tab ga qaytganda qayta yuklamaydi
     },
   },
 });

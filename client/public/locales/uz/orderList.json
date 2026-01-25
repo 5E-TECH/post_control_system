@@ -5,6 +5,7 @@
   "placeholder": {
     "selectMarket": "Marketni tanlang",
     "selectRegion": "Hududni tanlang",
+    "selectCourier": "Kuryerni tanlang",
     "selectStatus": "Holatni tanlang",
     "selectStatuses": "Holatlarni tanlang",
     "searchOrder": "Buyurtmani qidiring",
@@ -33,6 +34,7 @@
   "region": "VILOYAT",
   "district": "TUMAN",
   "market": "MARKET",
+  "courier": "KURYER",
   "status": "HOLAT",
   "price": "NARX",
   "createdAt": "YARATILGAN VAQTI",

@@ -7,8 +7,9 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiQuery } from '@nestjs/swagger';
 import { RegionService } from './region.service';
 import { CreateRegionDto } from './dto/create-region.dto';
 import { UpdateRegionDto } from './dto/update-region.dto';
@@ -40,7 +41,7 @@ export class RegionController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Patch('sato/:id')
   updateSatoCode(
     @Param('id') id: string,
@@ -54,7 +55,7 @@ export class RegionController {
    * Hech narsa o'zgarmaydi - faqat ko'rish uchun
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Get('sato-match/preview')
   matchSatoCodes() {
     return this.regionService.matchSatoCodes();
@@ -64,7 +65,7 @@ export class RegionController {
    * Mos kelgan viloyatlarga SATO kodlarini avtomatik qo'shish
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Post('sato-match/apply')
   applySatoCodes() {
     return this.regionService.applySatoCodes();
@@ -74,9 +75,40 @@ export class RegionController {
    * Viloyat nomini yangilash
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Patch('name/:id')
   updateName(@Param('id') id: string, @Body() dto: UpdateRegionNameDto) {
     return this.regionService.updateName(id, dto);
+  }
+
+  /**
+   * Barcha viloyatlar statistikasi (xarita uchun)
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @Get('stats/all')
+  getAllRegionsStats(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.regionService.getAllRegionsStats({ startDate, endDate });
+  }
+
+  /**
+   * Bitta viloyat batafsil statistikasi
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @Get('stats/:id')
+  getRegionDetailedStats(
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.regionService.getRegionDetailedStats(id, { startDate, endDate });
   }
 }

@@ -11,6 +11,8 @@ import { useDistrict } from "../../../../shared/api/hooks/useDistrict";
 import { Pencil, Plus, Merge, Trash2, Check, X } from "lucide-react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
+import { Navigate } from "react-router-dom";
+import { buildAdminPath } from "../../../../shared/const";
 
 interface DistrictType {
   id: string;
@@ -27,6 +29,11 @@ interface RegionType {
 const Districts = () => {
   const user = useSelector((state: RootState) => state.roleSlice);
   const isSuperAdmin = user.role === "superadmin";
+
+  // Faqat superadmin kirishi mumkin
+  if (!isSuperAdmin) {
+    return <Navigate to={buildAdminPath("regions")} replace />;
+  }
 
   const { getRegions, updateRegionName } = useRegion();
   const {

@@ -373,12 +373,12 @@ const WaitingOrders = () => {
               </div>
               <div
                 className={`flex items-center gap-1 px-2 py-0.5 rounded-md ${
-                  item?.where_deliver === "home"
+                  item?.where_deliver === "address"
                     ? "bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400"
                     : "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"
                 }`}
               >
-                {item?.where_deliver === "home" ? (
+                {item?.where_deliver === "address" ? (
                   <Home className="w-3 h-3" />
                 ) : (
                   <Truck className="w-3 h-3" />

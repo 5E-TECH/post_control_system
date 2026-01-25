@@ -40,7 +40,7 @@ export class DistrictController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Post()
   create(@Body() createDistrictDto: CreateDistrictDto) {
     return this.districtService.create(createDistrictDto);
@@ -70,7 +70,7 @@ export class DistrictController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Patch('name/:id')
   updateName(
     @Param('id') id: string,
@@ -85,7 +85,7 @@ export class DistrictController {
   }
 
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Patch('sato/:id')
   updateSatoCode(
     @Param('id') id: string,
@@ -99,7 +99,7 @@ export class DistrictController {
    * Hech narsa o'zgarmaydi - faqat ko'rish uchun
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Get('sato-match/preview')
   matchSatoCodes() {
     return this.districtService.matchSatoCodes();
@@ -109,7 +109,7 @@ export class DistrictController {
    * Mos kelgan tumanlarga SATO kodlarini avtomatik qo'shish
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Post('sato-match/apply')
   applySatoCodes() {
     return this.districtService.applySatoCodes();
@@ -121,7 +121,7 @@ export class DistrictController {
    * Source tumanlar o'chiriladi
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Post('merge')
   mergeDistricts(@Body() dto: MergeDistrictsDto) {
     return this.districtService.mergeDistricts(dto);
@@ -131,7 +131,7 @@ export class DistrictController {
    * Tumanni o'chirish (faqat buyurtmasi bo'lmagan tumanlarni)
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Delete(':id')
   deleteDistrict(@Param('id') id: string) {
     return this.districtService.deleteDistrict(id);
@@ -141,7 +141,7 @@ export class DistrictController {
    * DEBUG: Tumandagi buyurtmalar sonini tekshirish
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.SUPERADMIN)
   @Get('debug/orders/:id')
   debugDistrictOrders(@Param('id') id: string) {
     return this.districtService.debugDistrictOrders(id);

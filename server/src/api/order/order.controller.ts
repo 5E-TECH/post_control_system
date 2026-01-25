@@ -64,6 +64,7 @@ export class OrderController {
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'marketId', required: false })
   @ApiQuery({ name: 'regionId', required: false })
+  @ApiQuery({ name: 'courierId', required: false })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({
     name: 'startDate',
@@ -89,6 +90,7 @@ export class OrderController {
     @Query('status') status?: string | string[],
     @Query('marketId') marketId?: string,
     @Query('regionId') regionId?: string,
+    @Query('courierId') courierId?: string,
     @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -100,6 +102,7 @@ export class OrderController {
       status,
       marketId,
       regionId,
+      courierId,
       search,
       startDate,
       endDate,

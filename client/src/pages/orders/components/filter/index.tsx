@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Truck,
 } from "lucide-react";
 import { DatePicker, Select } from "antd";
 import { useDispatch, useSelector } from "react-redux";
@@ -27,6 +28,7 @@ import {
 } from "../../../../shared/lib/features/order-filters";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
+import { useCourier } from "../../../../shared/api/hooks/useCourier";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import { requestDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import CustomCalendar from "../../../../shared/components/customDate";
@@ -56,6 +58,8 @@ const Filter = () => {
   const { data } = getMarkets(role !== "market", { limit: 0 });
   const { getRegions } = useRegion();
   const { data: regionData } = getRegions();
+  const { getCourier } = useCourier();
+  const { data: courierData } = getCourier(role !== "courier", { limit: 0 });
 
   const form = useSelector((state: RootState) => state.setFilter);
 
@@ -119,6 +123,12 @@ const Filter = () => {
       label: item.name,
     })) || [];
 
+  const courierOptions =
+    courierData?.data?.map((item: any) => ({
+      value: item.id,
+      label: item.name,
+    })) || [];
+
   const statusOpts =
     statusOptions.map((item) => ({
       value: item.value,
@@ -137,6 +147,7 @@ const Filter = () => {
   const hasActiveFilters =
     form.marketId ||
     form.regionId ||
+    form.courierId ||
     (form.status && form.status.length > 0) ||
     form.startDate ||
     form.endDate ||
@@ -174,8 +185,25 @@ const Filter = () => {
             </button>
           </div>
 
-          {/* Search and Action Buttons */}
+          {/* Date, Search and Action Buttons */}
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* Date Range Picker */}
+            {!isMobile && (
+              <DatePicker.RangePicker
+                format="YYYY-MM-DD"
+                value={[
+                  form.startDate ? dayjs(form.startDate) : null,
+                  form.endDate ? dayjs(form.endDate) : null,
+                ]}
+                className="h-10 [&]:rounded-xl! [&]:border-gray-200! dark:[&]:border-gray-600! dark:[&]:bg-gray-800! dark:[&_.ant-picker-input>input]:text-gray-200! dark:[&_.ant-picker-input>input]:placeholder-gray-500! [&_.ant-picker-suffix]:text-gray-400!"
+                onChange={handleDateChange}
+                placeholder={[
+                  t("placeholder.startDate"),
+                  t("placeholder.endDate"),
+                ]}
+              />
+            )}
+
             {/* Search Input */}
             <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -261,6 +289,31 @@ const Filter = () => {
               />
             </div>
 
+            {/* Courier Select */}
+            {role !== "courier" && (
+              <div className="relative">
+                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                  <Truck className="w-3.5 h-3.5" />
+                  {t("courier")}
+                </label>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                    String(option?.label ?? "")
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                  value={form.courierId}
+                  onChange={handleSelectChange("courierId")}
+                  placeholder={t("placeholder.selectCourier")}
+                  className="w-full [&_.ant-select-selector]:h-10! [&_.ant-select-selector]:rounded-xl! [&_.ant-select-selector]:border-gray-200! dark:[&_.ant-select-selector]:border-gray-600! dark:[&_.ant-select-selector]:bg-gray-800! [&_.ant-select-selection-item]:leading-[38px]! dark:[&_.ant-select-selection-item]:text-gray-200! dark:[&_.ant-select-selection-placeholder]:text-gray-500!"
+                  options={courierOptions}
+                  allowClear
+                />
+              </div>
+            )}
+
             {/* Status Multi-Select */}
             <div className="relative">
               <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
@@ -286,27 +339,13 @@ const Filter = () => {
               />
             </div>
 
-            {/* Date Range Picker */}
-            <div className="relative">
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                {t("sana")}
-              </label>
-              {!isMobile ? (
-                <DatePicker.RangePicker
-                  format="YYYY-MM-DD"
-                  value={[
-                    form.startDate ? dayjs(form.startDate) : null,
-                    form.endDate ? dayjs(form.endDate) : null,
-                  ]}
-                  className="w-full h-10 [&]:rounded-xl! [&]:border-gray-200! dark:[&]:border-gray-600! dark:[&]:bg-gray-800! dark:[&_.ant-picker-input>input]:text-gray-200! dark:[&_.ant-picker-input>input]:placeholder-gray-500! [&_.ant-picker-suffix]:text-gray-400!"
-                  onChange={handleDateChange}
-                  placeholder={[
-                    t("placeholder.startDate"),
-                    t("placeholder.endDate"),
-                  ]}
-                />
-              ) : (
+            {/* Date Range Picker - Mobile only */}
+            {isMobile && (
+              <div className="relative">
+                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {t("sana")}
+                </label>
                 <CustomCalendar
                   from={form.startDate ? dayjs(form.startDate) : null}
                   to={form.endDate ? dayjs(form.endDate) : null}
@@ -327,8 +366,8 @@ const Filter = () => {
                     )
                   }
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons Row */}

@@ -241,7 +241,7 @@ const OrderCard = ({
 
           {/* Delivery type */}
           <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-800">
-            {item?.where_deliver === "home" ? (
+            {item?.where_deliver === "address" ? (
               <Home className="w-3.5 h-3.5 text-orange-500" />
             ) : (
               <Truck className="w-3.5 h-3.5 text-blue-500" />

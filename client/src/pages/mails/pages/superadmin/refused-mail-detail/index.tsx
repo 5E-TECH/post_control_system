@@ -20,6 +20,69 @@ import {
   Store,
 } from "lucide-react";
 
+// Skeleton Loading Component
+const SkeletonCard = () => (
+  <div className="bg-red-50/50 dark:bg-red-900/10 rounded-xl p-3 sm:p-4 animate-pulse border border-red-100 dark:border-red-900/20">
+    <div className="flex items-center gap-4">
+      <div className="w-5 h-5 bg-gray-200 dark:bg-gray-600 rounded" />
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 lg:gap-4 flex-1">
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-28" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20" />
+      </div>
+    </div>
+  </div>
+);
+
+const RefusedMailDetailSkeleton = () => (
+  <div className="h-full flex flex-col overflow-hidden">
+    <div className="w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col flex-1 overflow-hidden">
+      {/* Header Skeleton */}
+      <div className="mb-4 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />
+            <div>
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-56 animate-pulse" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mt-2 animate-pulse" />
+            </div>
+          </div>
+          <div className="w-full sm:w-72 h-11 bg-gray-200 dark:bg-gray-700 rounded-xl animate-pulse" />
+        </div>
+
+        {/* Stats Card Skeleton */}
+        <div className="mt-4">
+          <div className="bg-white dark:bg-[#2A263D] rounded-xl p-3 sm:p-4 shadow-sm border border-red-200 dark:border-red-900/30">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+              <div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16 animate-pulse" />
+                <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-12 mt-1 animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content Skeleton */}
+      <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1 border border-red-100 dark:border-red-900/20">
+        <div className="px-4 py-3 border-b border-red-100 dark:border-red-900/20 flex items-center gap-3 flex-shrink-0">
+          <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
+        </div>
+        <div className="p-3 sm:p-4 space-y-3 overflow-y-auto flex-1">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const RefusedMailDetail = () => {
   const { t } = useTranslation("mails");
 
@@ -127,11 +190,7 @@ const RefusedMailDetail = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-10 h-10 animate-spin text-red-500" />
-      </div>
-    );
+    return <RefusedMailDetailSkeleton />;
   }
 
   return (

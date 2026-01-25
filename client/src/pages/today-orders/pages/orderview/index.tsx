@@ -14,6 +14,9 @@ import {
   Building2,
   Loader2,
   CheckCircle,
+  AlertCircle,
+  RefreshCw,
+  WifiOff,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -30,7 +33,6 @@ import { buildAdminPath } from "../../../../shared/const";
 import dayjs from "dayjs";
 
 const OrderView = () => {
-  useGlobalScanner();
   const { t } = useTranslation("todayOrderList");
   const { t: st } = useTranslation("status");
 
@@ -58,6 +60,15 @@ const OrderView = () => {
     user.role === "market"
       ? getMarketsByMyNewOrders(params)
       : getOrderByMarket(id, params);
+
+  // Offline queue scanner
+  const {
+    queueStats,
+    isOnline,
+    isProcessing,
+    retryAllFailed,
+    clearAllFailed
+  } = useGlobalScanner(refetch);
 
   useEffect(() => {
     if (data?.data?.total === 0 && searchData == null) {
@@ -213,6 +224,59 @@ const OrderView = () => {
               )}
             </div>
           </div>
+
+          {/* Queue Status Indicator */}
+          {(queueStats.pending > 0 || queueStats.failed > 0 || !isOnline) && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {/* Online/Offline Status */}
+              {!isOnline && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                  <WifiOff className="w-4 h-4" />
+                  <span className="text-xs font-medium">Offline</span>
+                </div>
+              )}
+
+              {/* Pending Queue */}
+              {queueStats.pending > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                  {isProcessing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Clock className="w-4 h-4" />
+                  )}
+                  <span className="text-xs font-medium">
+                    {queueStats.pending} ta navbatda
+                  </span>
+                </div>
+              )}
+
+              {/* Failed Scans */}
+              {queueStats.failed > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-xs font-medium">
+                      {queueStats.failed} ta muvaffaqiyatsiz
+                    </span>
+                  </div>
+                  <button
+                    onClick={retryAllFailed}
+                    disabled={!isOnline}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Qayta urinish
+                  </button>
+                  <button
+                    onClick={clearAllFailed}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    Tozalash
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Content */}
