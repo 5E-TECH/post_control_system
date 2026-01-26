@@ -43,11 +43,35 @@ interface UseOfflineQueueReturn {
 // =============== SOUND UTILITIES ===============
 const BASE_URL = import.meta.env.BASE_URL || '/';
 
+// Preload audio for faster playback
+let successAudio: HTMLAudioElement | null = null;
+let errorAudio: HTMLAudioElement | null = null;
+
+// Initialize audio on first import
+if (typeof window !== 'undefined') {
+  try {
+    successAudio = new Audio(`${BASE_URL}sound/beep.mp3`);
+    successAudio.volume = 0.6;
+    successAudio.load();
+
+    errorAudio = new Audio(`${BASE_URL}sound/error.mp3`);
+    errorAudio.volume = 1.0; // Maksimal ovoz xatolik uchun
+    errorAudio.load();
+  } catch {
+    // Audio init error - ignore
+  }
+}
+
 const playSuccessSound = () => {
   try {
-    const audio = new Audio(`${BASE_URL}sound/beep.mp3`);
-    audio.volume = 0.5;
-    audio.play().catch(() => {});
+    if (successAudio) {
+      successAudio.currentTime = 0;
+      successAudio.play().catch(() => {});
+    } else {
+      const audio = new Audio(`${BASE_URL}sound/beep.mp3`);
+      audio.volume = 0.6;
+      audio.play().catch(() => {});
+    }
   } catch {
     // Sound error - ignore
   }
@@ -55,9 +79,14 @@ const playSuccessSound = () => {
 
 const playErrorSound = () => {
   try {
-    const audio = new Audio(`${BASE_URL}sound/error.mp3`);
-    audio.volume = 0.7;
-    audio.play().catch(() => {});
+    if (errorAudio) {
+      errorAudio.currentTime = 0;
+      errorAudio.play().catch(() => {});
+    } else {
+      const audio = new Audio(`${BASE_URL}sound/error.mp3`);
+      audio.volume = 1.0;
+      audio.play().catch(() => {});
+    }
   } catch {
     // Sound error - ignore
   }
@@ -167,9 +196,9 @@ export function useOfflineQueue(options: UseOfflineQueueOptions): UseOfflineQueu
 
       if (showMessages) {
         if (!isOnline) {
-          message.info({ content: `${token} - Offline, navbatga qo'shildi`, key: token, duration: 2 });
+          message.info({ content: `Offline - keyinroq tekshiriladi`, key: token, duration: 2 });
         } else {
-          message.loading({ content: `${token} tekshirilmoqda...`, key: token, duration: 0 });
+          message.loading({ content: `Tekshirilmoqda...`, key: token, duration: 0 });
         }
       }
 
@@ -262,20 +291,32 @@ export function useOfflineQueue(options: UseOfflineQueueOptions): UseOfflineQueu
           playSuccessSound();
           if (showMessages) {
             message.success({
-              content: `${operation.payload.token} - Muvaffaqiyatli!`,
+              content: `✓ Topildi!`,
               key: operation.payload.token,
-              duration: 2
+              duration: 1.5
             });
           }
         } else {
-          // Failed - faqat max urinishlardan keyin
+          // Failed operatsiyalar uchun darhol xabar
           if (operation.status === 'failed') {
             playErrorSound();
             if (showMessages) {
+              // Xatolik xabarini foydalanuvchiga tushunarli qilish
+              let errorText = 'Xatolik';
+              const errLower = (error || '').toLowerCase();
+
+              if (errLower.includes('not found') || errLower.includes('topilmadi')) {
+                errorText = 'Bu pochtada mavjud emas!';
+              } else if (errLower.includes('bad request') || errLower.includes('validation')) {
+                errorText = 'Noto\'g\'ri ma\'lumot';
+              } else if (error) {
+                errorText = error;
+              }
+
               message.error({
-                content: `${operation.payload.token} - Xatolik: ${error || 'Noma\'lum'}`,
+                content: `✗ ${errorText}`,
                 key: operation.payload.token,
-                duration: 3
+                duration: 2
               });
             }
           }
