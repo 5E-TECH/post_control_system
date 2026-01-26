@@ -15,8 +15,8 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  RefreshCw,
   WifiOff,
+  Check,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -63,11 +63,10 @@ const OrderView = () => {
 
   // Offline queue scanner
   const {
-    queueStats,
+    successCount,
+    errorCount,
     isOnline,
-    isProcessing,
-    retryAllFailed,
-    clearAllFailed
+    clearHistory
   } = useGlobalScanner(refetch);
 
   useEffect(() => {
@@ -225,8 +224,8 @@ const OrderView = () => {
             </div>
           </div>
 
-          {/* Queue Status Indicator */}
-          {(queueStats.pending > 0 || queueStats.failed > 0 || !isOnline) && (
+          {/* Scan Status Indicator */}
+          {(successCount > 0 || errorCount > 0 || !isOnline) && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {/* Online/Offline Status */}
               {!isOnline && (
@@ -236,44 +235,34 @@ const OrderView = () => {
                 </div>
               )}
 
-              {/* Pending Queue */}
-              {queueStats.pending > 0 && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
-                  {isProcessing ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Clock className="w-4 h-4" />
-                  )}
+              {/* Success Count */}
+              {successCount > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                  <Check className="w-4 h-4" />
                   <span className="text-xs font-medium">
-                    {queueStats.pending} ta navbatda
+                    {successCount} ta qabul qilindi
                   </span>
                 </div>
               )}
 
-              {/* Failed Scans */}
-              {queueStats.failed > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
-                    <AlertCircle className="w-4 h-4" />
-                    <span className="text-xs font-medium">
-                      {queueStats.failed} ta muvaffaqiyatsiz
-                    </span>
-                  </div>
-                  <button
-                    onClick={retryAllFailed}
-                    disabled={!isOnline}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Qayta urinish
-                  </button>
-                  <button
-                    onClick={clearAllFailed}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    Tozalash
-                  </button>
+              {/* Error Count */}
+              {errorCount > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                  <AlertCircle className="w-4 h-4" />
+                  <span className="text-xs font-medium">
+                    {errorCount} ta xato
+                  </span>
                 </div>
+              )}
+
+              {/* Clear History */}
+              {(successCount > 0 || errorCount > 0) && (
+                <button
+                  onClick={clearHistory}
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Tozalash
+                </button>
               )}
             </div>
           )}

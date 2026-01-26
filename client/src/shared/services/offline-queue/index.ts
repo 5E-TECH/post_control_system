@@ -51,6 +51,75 @@ const STORE_NAME = 'operations';
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_BASE = 2000; // 2 seconds
 
+// =============== ERROR DETECTION ===============
+/**
+ * Xatolik qayta urinishga arziydimi tekshirish
+ * NotFound, BadRequest kabi xatolar qayta urinmaslik kerak
+ */
+function isRetryableError(error: any): boolean {
+  // Axios xatosi strukturasi
+  const statusCode = error?.response?.status
+    || error?.status
+    || error?.statusCode;
+
+  // HTTP status kodlari bo'yicha tekshirish
+  // 4xx xatolar (client errors) - qayta urinmaslik kerak
+  // Faqat 408 (Request Timeout) va 429 (Too Many Requests) qayta urinish mumkin
+  if (statusCode >= 400 && statusCode < 500) {
+    if (statusCode === 408 || statusCode === 429) {
+      return true; // Timeout va rate limit qayta urinish mumkin
+    }
+    return false; // Boshqa 4xx xatolar qayta urinmaslik kerak
+  }
+
+  // Xabar matnini olish
+  const errorMessage = (
+    error?.response?.data?.message ||
+    error?.message ||
+    error?.toString() ||
+    ''
+  ).toLowerCase();
+
+  // Xabar matni bo'yicha tekshirish
+  const nonRetryablePatterns = [
+    'not found',
+    'topilmadi',
+    'mavjud emas',
+    'bad request',
+    'forbidden',
+    'unauthorized',
+    'validation',
+    'invalid',
+    'does not exist',
+    'yo\'q'
+  ];
+
+  for (const pattern of nonRetryablePatterns) {
+    if (errorMessage.includes(pattern)) {
+      return false;
+    }
+  }
+
+  // Network xatolarini tekshirish - bu qayta urinish mumkin
+  const retryablePatterns = [
+    'network',
+    'timeout',
+    'econnreset',
+    'econnrefused',
+    'socket',
+    'internet'
+  ];
+
+  for (const pattern of retryablePatterns) {
+    if (errorMessage.includes(pattern)) {
+      return true;
+    }
+  }
+
+  // Default: qayta urinish mumkin (network xatosi bo'lishi mumkin)
+  return true;
+}
+
 // =============== INDEXEDDB HELPERS ===============
 let dbInstance: IDBDatabase | null = null;
 let dbInitPromise: Promise<IDBDatabase> | null = null;
@@ -183,7 +252,7 @@ class OfflineQueueService {
     const db = await openDatabase();
 
     // Unique ID yaratish
-    const id = `${type}_${token}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `${type}_${token}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     const operation: QueuedOperation = {
       id,
@@ -520,17 +589,35 @@ class OfflineQueueService {
             console.log(`[OfflineQueue] Completed: ${operation.type} - ${operation.payload.token}`);
 
           } catch (error: any) {
-            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+            const errorMessage = error?.response?.data?.message
+              || error?.message
+              || error?.toString()
+              || 'Unknown error';
             operation.lastError = errorMessage;
 
-            // Max urinishlardan oshgan bo'lsa, failed ga o'tkazish
-            if (operation.attempts >= operation.maxAttempts) {
+            // Qayta urinishga arziydigan xato emasmi tekshirish
+            const shouldRetry = isRetryableError(error);
+
+            // Agar qayta urinishga arzimaydigan xato bo'lsa YOKI max urinishlardan oshgan bo'lsa
+            if (!shouldRetry || operation.attempts >= operation.maxAttempts) {
               operation.status = 'failed';
-              console.error(`[OfflineQueue] Failed after ${operation.attempts} attempts: ${operation.payload.token}`);
-            } else {
-              operation.status = 'pending';
-              console.warn(`[OfflineQueue] Retry later (${operation.attempts}/${operation.maxAttempts}): ${operation.payload.token}`);
+
+              if (!shouldRetry) {
+                console.log(`[OfflineQueue] Immediate fail (not retryable): ${operation.payload.token} - ${errorMessage}`);
+              } else {
+                console.error(`[OfflineQueue] Failed after ${operation.attempts} attempts: ${operation.payload.token}`);
+              }
+
+              await this.updateOperation(operation);
+              this.notifyOperationResult(operation, false, undefined, errorMessage);
+
+              // Qayta urinmaydigan xatolar uchun kutish yo'q - keyingi operatsiyaga o'tamiz
+              continue;
             }
+
+            // Qayta urinish mumkin bo'lgan xatolar uchun
+            operation.status = 'pending';
+            console.warn(`[OfflineQueue] Retry later (${operation.attempts}/${operation.maxAttempts}): ${operation.payload.token}`);
 
             await this.updateOperation(operation);
             this.notifyOperationResult(operation, false, undefined, errorMessage);

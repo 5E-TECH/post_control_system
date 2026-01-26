@@ -1,45 +1,85 @@
 /**
- * Global Scanner Hook
+ * Global Scanner Hook - Direct Mode
  *
  * Buyurtmalarni qabul qilish uchun QR kod skanerlash hook
- * Offline queue system bilan integratsiya qilingan
+ * TO'G'RIDAN-TO'G'RI API chaqirish - DARHOL javob
  *
  * Foydalanish:
  * - Market buyurtmalarini qabul qilish uchun
- * - Offline rejimda skanlarni saqlaydi
- * - Internet qaytganda avtomatik sync qiladi
+ * - Har bir skan uchun darhol success/error ovozi
  */
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { useOfflineQueue } from "../../hooks/useOfflineQueue";
-import { offlineQueueService } from "../../services/offline-queue";
+import { message } from "antd";
+import { api } from "../../api";
 
 const BASE_URL = import.meta.env.BASE_URL || '/';
 
+// ============ AUDIO PRELOAD ============
+let successAudio: HTMLAudioElement | null = null;
+let errorAudio: HTMLAudioElement | null = null;
+
+if (typeof window !== 'undefined') {
+  try {
+    successAudio = new Audio(`${BASE_URL}sound/beep.mp3`);
+    successAudio.volume = 0.7;
+    successAudio.load();
+
+    errorAudio = new Audio(`${BASE_URL}sound/error.mp3`);
+    errorAudio.volume = 1.0;
+    errorAudio.load();
+  } catch {
+    // Audio init error
+  }
+}
+
+const playSuccess = () => {
+  try {
+    if (successAudio) {
+      successAudio.currentTime = 0;
+      successAudio.play().catch(() => {});
+    }
+  } catch { /* ignore */ }
+};
+
+const playError = () => {
+  try {
+    if (errorAudio) {
+      errorAudio.currentTime = 0;
+      errorAudio.play().catch(() => {});
+    }
+  } catch { /* ignore */ }
+};
+
+// ============ TYPES ============
 interface UseGlobalScannerOptions {
   refetch?: () => void;
   onSuccess?: (token: string) => void;
   onError?: (error: any, token: string) => void;
 }
 
-interface UseGlobalScannerReturn {
-  // Queue stats
-  queueStats: {
-    pending: number;
-    processing: number;
-    failed: number;
-    total: number;
-  };
-  isOnline: boolean;
-  isProcessing: boolean;
-  failedOperations: any[];
-
-  // Actions
-  retryAllFailed: () => Promise<void>;
-  clearAllFailed: () => Promise<void>;
+interface ScanResult {
+  token: string;
+  success: boolean;
+  error?: string;
+  timestamp: number;
 }
 
+interface UseGlobalScannerReturn {
+  // Scan history
+  scanHistory: ScanResult[];
+  successCount: number;
+  errorCount: number;
+
+  // Status
+  isOnline: boolean;
+
+  // Actions
+  clearHistory: () => void;
+}
+
+// ============ HOOK ============
 export function useGlobalScanner(
   refetch?: () => void,
   options?: Omit<UseGlobalScannerOptions, 'refetch'>
@@ -50,44 +90,161 @@ export function useGlobalScanner(
   const pathParts = location.pathname.split("/");
   const marketId = pathParts[pathParts.length - 1];
 
-  // Refs for stable callbacks
+  // State
+  const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Refs
   const refetchRef = useRef(refetch);
   const onSuccessRef = useRef(options?.onSuccess);
   const onErrorRef = useRef(options?.onError);
+  const processingTokens = useRef<Set<string>>(new Set());
+
+  // Alohida: muvaffaqiyatli va xato tokenlar
+  const successTokens = useRef<Set<string>>(new Set());
+  const errorTokens = useRef<Set<string>>(new Set());
 
   // Update refs
   refetchRef.current = refetch;
   onSuccessRef.current = options?.onSuccess;
   onErrorRef.current = options?.onError;
 
-  // Offline queue hook
-  const {
-    stats: queueStats,
-    isOnline,
-    isProcessing,
-    failedOperations,
-    addToQueue,
-    retryAllFailed,
-    clearAllFailed,
-  } = useOfflineQueue({
-    operationType: 'receive_order',
-    contextId: marketId,
-    autoProcess: true,
-    showMessages: true
-  });
-
-  // Error sound
-  const errorSoundRef = useRef<HTMLAudioElement | null>(null);
-
+  // MarketId o'zgarganda tokenlarni tozalash
   useEffect(() => {
-    errorSoundRef.current = new Audio(`${BASE_URL}sound/error.mp3`);
+    successTokens.current.clear();
+    errorTokens.current.clear();
+    setScanHistory([]);
+  }, [marketId]);
+
+  // Network status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     return () => {
-      errorSoundRef.current = null;
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  // Scanner handler
-  const handleScan = useCallback(async (tokenValue: string) => {
+  // ============ DIRECT API CALL ============
+  const receiveOrderDirect = useCallback(async (token: string) => {
+    // 1. OLDIN QABUL QILINGAN BUYURTMA - success sound va xabar
+    if (successTokens.current.has(token)) {
+      playSuccess();
+      message.success({
+        content: '✓ Allaqachon qabul qilingan!',
+        key: token,
+        duration: 1
+      });
+      return;
+    }
+
+    // 2. OLDIN XATO BO'LGAN - qayta urinish uchun o'chiramiz
+    if (errorTokens.current.has(token)) {
+      errorTokens.current.delete(token);
+      // Davom etamiz - qayta serverga so'rov yuboramiz
+    }
+
+    // 3. Hozir tekshirilmoqda
+    if (processingTokens.current.has(token)) {
+      return;
+    }
+
+    // 4. Internet yo'q
+    if (!navigator.onLine) {
+      playError();
+      message.error({
+        content: 'Internet yo\'q!',
+        key: token,
+        duration: 2
+      });
+      return;
+    }
+
+    processingTokens.current.add(token);
+
+    try {
+      // TO'G'RIDAN-TO'G'RI API CHAQIRISH - NAVBAT YO'Q!
+      await api.post(`order/receive/${token}`, { marketId });
+
+      // MUVAFFAQIYAT!
+      playSuccess();
+      successTokens.current.add(token);
+      errorTokens.current.delete(token);
+
+      message.success({
+        content: '✓ Qabul qilindi!',
+        key: token,
+        duration: 1
+      });
+
+      // Scan history ga qo'shish
+      setScanHistory(prev => [{
+        token,
+        success: true,
+        timestamp: Date.now()
+      }, ...prev].slice(0, 100));
+
+      // Refetch
+      refetchRef.current?.();
+
+      // Callback
+      onSuccessRef.current?.(token);
+
+    } catch (error: any) {
+      // XATOLIK!
+      playError();
+      errorTokens.current.add(token);
+
+      const errorMsg = error?.response?.data?.message
+        || error?.message
+        || 'Xatolik';
+
+      // Foydalanuvchiga tushunarli xabar
+      let displayError = 'Xatolik!';
+      const errLower = errorMsg.toLowerCase();
+
+      if (errLower.includes('not found') || errLower.includes('topilmadi')) {
+        displayError = 'Buyurtma topilmadi!';
+      } else if (errLower.includes('already') || errLower.includes('allaqachon')) {
+        displayError = 'Allaqachon qabul qilingan!';
+        // Bu holda success tokenga qo'shamiz
+        successTokens.current.add(token);
+        errorTokens.current.delete(token);
+      } else if (error?.response?.status === 404) {
+        displayError = 'Buyurtma topilmadi!';
+      } else if (error?.response?.status === 400) {
+        displayError = errorMsg || 'Noto\'g\'ri so\'rov';
+      }
+
+      message.error({
+        content: `✗ ${displayError}`,
+        key: token,
+        duration: 1.5
+      });
+
+      // Scan history ga qo'shish
+      setScanHistory(prev => [{
+        token,
+        success: false,
+        error: displayError,
+        timestamp: Date.now()
+      }, ...prev].slice(0, 100));
+
+      // Callback
+      onErrorRef.current?.(errorMsg, token);
+
+    } finally {
+      processingTokens.current.delete(token);
+    }
+  }, [marketId]);
+
+  // ============ SCANNER HANDLER ============
+  const handleScan = useCallback((tokenValue: string) => {
     if (!tokenValue) return;
 
     // Agar URL bo'lsa faqat token qismini olamiz
@@ -95,25 +252,16 @@ export function useGlobalScanner(
       ? tokenValue.split("/").pop() || tokenValue
       : tokenValue;
 
-    // Navbatga qo'shish
-    const added = await addToQueue(token);
+    // Darhol tekshirish
+    receiveOrderDirect(token);
+  }, [receiveOrderDirect]);
 
-    if (!added) {
-      // Allaqachon navbatda - error sound
-      if (errorSoundRef.current) {
-        errorSoundRef.current.currentTime = 0;
-        errorSoundRef.current.play().catch(() => {});
-      }
-    }
-  }, [addToQueue]);
-
-  // Keyboard listener
+  // ============ KEYBOARD LISTENER ============
   useEffect(() => {
     let scanned = "";
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Agar input elementida bo'lsa, ishlamasin
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
         return;
@@ -143,40 +291,24 @@ export function useGlobalScanner(
     };
   }, [handleScan]);
 
-  // Operation result listener
-  useEffect(() => {
-    const unsubResult = offlineQueueService.onOperationResult(
-      (operation: any, success: boolean, _result: any, error?: string) => {
-        if (operation.type !== 'receive_order') return;
-        if (operation.payload.contextId !== marketId) return;
+  // ============ COMPUTED VALUES ============
+  const successCount = scanHistory.filter(s => s.success).length;
+  const errorCount = scanHistory.filter(s => !s.success).length;
 
-        if (success) {
-          // Refetch
-          refetchRef.current?.();
-
-          // Custom callback
-          onSuccessRef.current?.(operation.payload.token);
-        } else if (!success && operation.status === 'failed') {
-          // Custom error callback
-          onErrorRef.current?.(error, operation.payload.token);
-        }
-      }
-    );
-
-    return () => {
-      unsubResult();
-    };
-  }, [marketId]);
+  const clearHistory = useCallback(() => {
+    setScanHistory([]);
+    successTokens.current.clear();
+    errorTokens.current.clear();
+  }, []);
 
   return {
-    queueStats,
+    scanHistory,
+    successCount,
+    errorCount,
     isOnline,
-    isProcessing,
-    failedOperations,
-    retryAllFailed,
-    clearAllFailed
+    clearHistory
   };
 }
 
-// Default export for backwards compatibility
+// Default export
 export default useGlobalScanner;
