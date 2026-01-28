@@ -472,17 +472,17 @@ const UserProfile = () => {
 
           {/* TG Token Card */}
           {user?.market_tg_token && (
-            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800 md:col-span-2 lg:col-span-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Key className="w-6 h-6 text-indigo-500" />
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-4 sm:p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800 md:col-span-2 lg:col-span-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-indigo-500/10 to-violet-500/10 flex items-center justify-center group-hover:scale-110 transition-transform flex-shrink-0">
+                    <Key className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-500" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
                       Telegram Token
                     </p>
-                    <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5 font-mono">
+                    <p className="text-sm sm:text-base font-semibold text-gray-800 dark:text-white mt-0.5 font-mono truncate">
                       {user.market_tg_token}
                     </p>
                   </div>
@@ -493,14 +493,14 @@ const UserProfile = () => {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
                     copied
                       ? "bg-green-500/10 text-green-600"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
                   }`}
                 >
-                  {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                  <span className="text-sm font-medium">
+                  {copied ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <Copy className="w-4 h-4 sm:w-5 sm:h-5" />}
+                  <span className="text-xs sm:text-sm font-medium">
                     {copied ? "Nusxalandi!" : "Nusxalash"}
                   </span>
                 </button>

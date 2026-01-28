@@ -13,404 +13,218 @@ import {
 } from "lucide-react";
 import { buildAdminPath } from "../../const";
 
+// Umumiy nav container stili - barcha rollar uchun
+const navContainerClass = `
+  fixed bottom-0 left-0 right-0 w-full min-[650px]:hidden z-50
+  bg-[#1e1e2d]/95 backdrop-blur-md
+  border-t border-gray-800/50
+  pb-[env(safe-area-inset-bottom,0px)]
+`;
+
+// Nav item uchun umumiy stil
+const getNavItemClass = (isActive: boolean) => `
+  flex items-center justify-center w-12 h-11 rounded-xl transition-all duration-200
+  ${isActive
+    ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] text-white shadow-lg shadow-purple-500/30"
+    : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/50"
+  }
+`;
+
 const Navbar = ({ role }: { role: string }) => {
   const renderNav = () => {
     switch (role) {
       case "superadmin":
         return (
-          <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
+          <div className={navContainerClass}>
+            <div className="flex justify-between items-center px-4 py-2">
             <NavLink
               to={buildAdminPath()}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House />
+              <House className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("orders")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag />
+              <ShoppingBag className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("all-users")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <UserRound />
+              <UserRound className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("payments")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <CreditCard />
+              <CreditCard className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("m-balance")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Scale />{" "}
+              <Scale className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("logs")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <FileText />
+              <FileText className="w-5 h-5" />
             </NavLink>
+            </div>
           </div>
         );
       case "admin":
         return (
-          <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
+          <div className={navContainerClass}>
+            <div className="flex justify-between items-center px-4 py-2">
             <NavLink
               to={buildAdminPath()}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House />
+              <House className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("orders")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag />
+              <ShoppingBag className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("all-users")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <UserRound />
+              <UserRound className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("payments")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <CreditCard />
+              <CreditCard className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("m-balance")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Scale />
+              <Scale className="w-5 h-5" />
             </NavLink>
+            </div>
           </div>
         );
       case "registrator":
         return (
-          <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
+          <div className={navContainerClass}>
+            <div className="flex justify-between items-center px-4 py-2">
             <NavLink
               to={buildAdminPath()}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House />
+              <House className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("orders")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag />
+              <ShoppingBag className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("order/markets/new-orders")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Calendar1 />
+              <Calendar1 className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("mails")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <MailOpen />
+              <MailOpen className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("products")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Apple />
+              <Apple className="w-5 h-5" />
             </NavLink>
+            </div>
           </div>
         );
       case "courier":
         return (
-          <div className="flex justify-evenly px-3 fixed bottom-1.5 w-full min-[650px]:hidden ">
+          <div className={navContainerClass}>
+            <div className="flex justify-between items-center px-4 py-2 relative">
             <NavLink
               to={buildAdminPath()}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House />
+              <House className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("courier-orders/orders")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag />
+              <ShoppingBag className="w-5 h-5" />
             </NavLink>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
+
+            {/* QR Scanner - Markazda va yuqoriga chiqib turadi */}
             <NavLink
               to={buildAdminPath("scan")}
-              className={`flex items-center justify-center w-17 h-17 rounded-[50%] transition-all bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] absolute bottom-2`}
+              className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] text-white shadow-lg shadow-purple-500/40 -mt-8 border-4 border-[#1e1e2d]"
             >
-              <QrCode className="w-5 h-5" />
-            </NavLink>
-            <NavLink
-              to={buildAdminPath("courier-mails")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
-            >
-              <MailOpen />
+              <QrCode className="w-6 h-6" />
             </NavLink>
 
             <NavLink
-              to={buildAdminPath("cash-box")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              to={buildAdminPath("courier-mails")}
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <CreditCard />
+              <MailOpen className="w-5 h-5" />
             </NavLink>
+            <NavLink
+              to={buildAdminPath("cash-box")}
+              className={({ isActive }) => getNavItemClass(isActive)}
+            >
+              <CreditCard className="w-5 h-5" />
+            </NavLink>
+            </div>
           </div>
         );
       case "market":
         return (
-          <div className="flex justify-between px-3 fixed bottom-1.5 w-full min-[650px]:hidden">
+          <div className={navContainerClass}>
+            <div className="flex justify-between items-center px-4 py-2">
             <NavLink
               to={buildAdminPath()}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House />
+              <House className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("orders")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag />
+              <ShoppingBag className="w-5 h-5" />
             </NavLink>
-
-            {/* <NavLink
-              to={buildAdminPath("clients")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
-            >
-              <MailOpen />
-            </NavLink> */}
-
             <NavLink
               to={buildAdminPath("order/markets/new-orders")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Calendar1 />
+              <Calendar1 className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("products")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Apple />
+              <Apple className="w-5 h-5" />
             </NavLink>
-
             <NavLink
               to={buildAdminPath("cash-box")}
-              className={({ isActive }) =>
-                `flex items-center justify-center w-15 h-11 rounded-[3px] transition-all 
-       ${
-         isActive
-           ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff]"
-           : "text-gray-500"
-       }`
-              }
+              className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <CreditCard />
+              <CreditCard className="w-5 h-5" />
             </NavLink>
+            </div>
           </div>
         );
       default:
