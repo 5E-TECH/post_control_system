@@ -143,7 +143,7 @@ const CourierOrders = () => {
           </div>
 
           {/* Date Picker - Mobile */}
-          <div className="sm:hidden relative z-[100]">
+          <div className="sm:hidden relative z-10">
             <button
               onClick={() => setShowDatePicker(!showDatePicker)}
               className="w-full h-11 px-4 rounded-xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 flex items-center justify-between text-sm"
@@ -160,11 +160,11 @@ const CourierOrders = () => {
               <>
                 {/* Backdrop */}
                 <div
-                  className="fixed inset-0 z-[99]"
+                  className="fixed inset-0 z-30 bg-black/10"
                   onClick={() => setShowDatePicker(false)}
                 />
                 {/* Dropdown */}
-                <div className="absolute left-0 right-0 mt-2 p-4 bg-white dark:bg-[#2A263D] rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl z-[100]">
+                <div className="absolute left-0 right-0 mt-2 p-4 bg-white dark:bg-[#2A263D] rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl z-30">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 block">

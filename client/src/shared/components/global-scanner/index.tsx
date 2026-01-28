@@ -66,6 +66,13 @@ interface ScanResult {
   timestamp: number;
 }
 
+// Visual feedback type
+export interface VisualFeedback {
+  show: boolean;
+  type: 'success' | 'error' | 'warning';
+  message?: string;
+}
+
 interface UseGlobalScannerReturn {
   // Scan history
   scanHistory: ScanResult[];
@@ -74,6 +81,9 @@ interface UseGlobalScannerReturn {
 
   // Status
   isOnline: boolean;
+
+  // Visual feedback
+  visualFeedback: VisualFeedback;
 
   // Actions
   clearHistory: () => void;
@@ -93,6 +103,19 @@ export function useGlobalScanner(
   // State
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [visualFeedback, setVisualFeedback] = useState<VisualFeedback>({
+    show: false,
+    type: 'success',
+    message: ''
+  });
+
+  // Visual feedback ko'rsatish funksiyasi
+  const showVisualFeedback = useCallback((type: 'success' | 'error' | 'warning', msg?: string) => {
+    setVisualFeedback({ show: true, type, message: msg });
+    setTimeout(() => {
+      setVisualFeedback({ show: false, type: 'success', message: '' });
+    }, 800);
+  }, []);
 
   // Refs
   const refetchRef = useRef(refetch);
@@ -132,14 +155,10 @@ export function useGlobalScanner(
 
   // ============ DIRECT API CALL ============
   const receiveOrderDirect = useCallback(async (token: string) => {
-    // 1. OLDIN QABUL QILINGAN BUYURTMA - success sound va xabar
+    // 1. OLDIN QABUL QILINGAN BUYURTMA - success sound va sariq visual
     if (successTokens.current.has(token)) {
       playSuccess();
-      message.success({
-        content: '✓ Allaqachon qabul qilingan!',
-        key: token,
-        duration: 1
-      });
+      showVisualFeedback('warning', 'Allaqachon qabul qilingan!');
       return;
     }
 
@@ -157,11 +176,7 @@ export function useGlobalScanner(
     // 4. Internet yo'q
     if (!navigator.onLine) {
       playError();
-      message.error({
-        content: 'Internet yo\'q!',
-        key: token,
-        duration: 2
-      });
+      showVisualFeedback('error', 'Internet yo\'q!');
       return;
     }
 
@@ -173,14 +188,9 @@ export function useGlobalScanner(
 
       // MUVAFFAQIYAT!
       playSuccess();
+      showVisualFeedback('success', 'Qabul qilindi!');
       successTokens.current.add(token);
       errorTokens.current.delete(token);
-
-      message.success({
-        content: '✓ Qabul qilindi!',
-        key: token,
-        duration: 1
-      });
 
       // Scan history ga qo'shish
       setScanHistory(prev => [{
@@ -197,7 +207,6 @@ export function useGlobalScanner(
 
     } catch (error: any) {
       // XATOLIK!
-      playError();
       errorTokens.current.add(token);
 
       const errorMsg = error?.response?.data?.message
@@ -206,26 +215,31 @@ export function useGlobalScanner(
 
       // Foydalanuvchiga tushunarli xabar
       let displayError = 'Xatolik!';
+      let isAlreadyReceived = false;
       const errLower = errorMsg.toLowerCase();
 
       if (errLower.includes('not found') || errLower.includes('topilmadi')) {
-        displayError = 'Buyurtma topilmadi!';
+        displayError = 'Topilmadi!';
       } else if (errLower.includes('already') || errLower.includes('allaqachon')) {
         displayError = 'Allaqachon qabul qilingan!';
+        isAlreadyReceived = true;
         // Bu holda success tokenga qo'shamiz
         successTokens.current.add(token);
         errorTokens.current.delete(token);
       } else if (error?.response?.status === 404) {
-        displayError = 'Buyurtma topilmadi!';
+        displayError = 'Topilmadi!';
       } else if (error?.response?.status === 400) {
         displayError = errorMsg || 'Noto\'g\'ri so\'rov';
       }
 
-      message.error({
-        content: `✗ ${displayError}`,
-        key: token,
-        duration: 1.5
-      });
+      // Visual feedback va sound
+      if (isAlreadyReceived) {
+        playSuccess(); // Allaqachon qabul qilingan - success sound
+        showVisualFeedback('warning', displayError); // Sariq rang
+      } else {
+        playError();
+        showVisualFeedback('error', displayError);
+      }
 
       // Scan history ga qo'shish
       setScanHistory(prev => [{
@@ -306,6 +320,7 @@ export function useGlobalScanner(
     successCount,
     errorCount,
     isOnline,
+    visualFeedback,
     clearHistory
   };
 }

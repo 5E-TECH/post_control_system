@@ -19,6 +19,7 @@ import {
   QrCode,
   AlertCircle,
   CheckCircle,
+  XCircle,
   ArrowLeft,
   Globe,
   Trash2,
@@ -31,11 +32,49 @@ import {
   Settings,
   RefreshCw,
   Link2,
+  RotateCcw,
 } from "lucide-react";
-import { message } from "antd";
+import { message, Modal } from "antd";
 
 // API base URL - VITE_BASE_URL dan olinadi
 const API_BASE = import.meta.env.VITE_BASE_URL?.replace(/\/api\/v1\/?$/, "") || "";
+const BASE_URL = import.meta.env.BASE_URL || '/';
+
+// ============ AUDIO PRELOAD ============
+let successAudio: HTMLAudioElement | null = null;
+let errorAudio: HTMLAudioElement | null = null;
+
+if (typeof window !== 'undefined') {
+  try {
+    successAudio = new Audio(`${BASE_URL}sound/beep.mp3`);
+    successAudio.volume = 0.8;
+    successAudio.load();
+
+    errorAudio = new Audio(`${BASE_URL}sound/error.mp3`);
+    errorAudio.volume = 1.0;
+    errorAudio.load();
+  } catch {
+    // Audio init error
+  }
+}
+
+const playSuccessSound = () => {
+  try {
+    if (successAudio) {
+      successAudio.currentTime = 0;
+      successAudio.play().catch(() => {});
+    }
+  } catch { /* ignore */ }
+};
+
+const playErrorSound = () => {
+  try {
+    if (errorAudio) {
+      errorAudio.currentTime = 0;
+      errorAudio.play().catch(() => {});
+    }
+  } catch { /* ignore */ }
+};
 
 // Tashqi buyurtma interfeysi (universal - field mapping orqali)
 interface ExternalOrder {
@@ -73,18 +112,12 @@ interface Integration {
   total_synced_orders?: number;
 }
 
-// Sound utility functions
-const playSuccessSound = () => {
-  const audio = new Audio('/sound/beep.mp3');
-  audio.volume = 0.5;
-  audio.play().catch(() => {});
-};
-
-const playErrorSound = () => {
-  const audio = new Audio('/sound/error.mp3');
-  audio.volume = 0.7;
-  audio.play().catch(() => {});
-};
+// Visual Feedback interfeysi
+interface VisualFeedback {
+  show: boolean;
+  type: 'success' | 'error' | 'warning'; // warning = allaqachon mavjud
+  message?: string;
+}
 
 // Confirmation modal interfeysi
 interface ConfirmationModal {
@@ -140,11 +173,27 @@ const ExternalOrdersTab = () => {
     failedCount: 0
   });
 
+  // Visual feedback state - katta overlay uchun
+  const [visualFeedback, setVisualFeedback] = useState<VisualFeedback>({
+    show: false,
+    type: 'success',
+    message: ''
+  });
+
+  // Visual feedback ko'rsatish funksiyasi
+  const showVisualFeedback = (type: 'success' | 'error' | 'warning', msg?: string) => {
+    setVisualFeedback({ show: true, type, message: msg });
+    // 800ms dan keyin yo'qoladi
+    setTimeout(() => {
+      setVisualFeedback({ show: false, type: 'success', message: '' });
+    }, 800);
+  };
+
   // useOrder hookdan receiveExternalOrders mutationini olish
   const { receiveExternalOrders } = useOrder();
 
   // Integratsiyalarni olish (dinamik)
-  const { getActiveIntegrations, testConnection } = useExternalIntegration();
+  const { getActiveIntegrations, testConnection, resetSyncedOrders } = useExternalIntegration();
   const { data: integrationsData, isLoading: integrationsLoading, refetch: refetchIntegrations } = getActiveIntegrations();
 
   // Integratsiyalar ro'yxatini olish
@@ -423,6 +472,46 @@ const ExternalOrdersTab = () => {
     setOrders([]);
   };
 
+  // Sinxronlangan buyurtmalar sonini 0 ga tushirish
+  const handleResetSyncedOrders = (integration: Integration, e?: React.MouseEvent) => {
+    e?.stopPropagation(); // Card click ni to'xtatish
+
+    Modal.confirm({
+      title: "Sinxronlangan buyurtmalar sonini 0 ga tushirish",
+      content: (
+        <div className="py-2">
+          <p className="text-gray-600 dark:text-gray-300">
+            <strong>{integration.name}</strong> integratsiyasi uchun sinxronlangan buyurtmalar soni 0 ga tushiriladi.
+          </p>
+          <p className="text-amber-600 mt-2 text-sm">
+            ⚠️ Bu amal qaytarilmaydi!
+          </p>
+        </div>
+      ),
+      okText: "Ha, 0 ga tushirish",
+      cancelText: "Bekor qilish",
+      okButtonProps: {
+        danger: true,
+      },
+      onOk: () => {
+        return new Promise((resolve, reject) => {
+          resetSyncedOrders.mutate(integration.id, {
+            onSuccess: (data: any) => {
+              const prevCount = data?.data?.previous_count || 0;
+              message.success(`${integration.name}: ${prevCount} ta sinxronlangan buyurtma 0 ga tushirildi`);
+              refetchIntegrations();
+              resolve(true);
+            },
+            onError: (err: any) => {
+              message.error("Xatolik: " + (err?.response?.data?.message || err.message));
+              reject(err);
+            },
+          });
+        });
+      },
+    });
+  };
+
   // Buyurtmani tanlash/bekor qilish
   const toggleOrderSelection = (orderId: string | number) => {
     setOrders(prev => prev.map(order =>
@@ -486,8 +575,8 @@ const ExternalOrdersTab = () => {
     // Allaqachon shu QR kod bilan buyurtma bormi tekshirish
     const existingOrder = ordersRef.current.find(o => o.qrCode === scannedCode);
     if (existingOrder) {
-      playErrorSound();
-      message.warning({ content: `Bu buyurtma allaqachon ro'yxatda mavjud!`, key: scannedCode });
+      playSuccessSound(); // Allaqachon bor - success sound (qisqa)
+      showVisualFeedback('warning', 'Allaqachon mavjud!'); // Sariq rang bilan
       return true; // Skip, no need to retry
     }
 
@@ -546,7 +635,8 @@ const ExternalOrdersTab = () => {
         // Dublikat tekshirish (telefon + mahsulot)
         const duplicateOrder = checkDuplicateOrder(newOrder);
         if (duplicateOrder) {
-          playErrorSound();
+          playErrorSound(); // Dublikat - error sound
+          showVisualFeedback('warning', 'Dublikat!'); // Sariq rang - ogohlantirish
           setConfirmModal({
             isOpen: true,
             type: 'duplicate',
@@ -554,16 +644,16 @@ const ExternalOrdersTab = () => {
             qrCode: scannedCode,
             message: `Bu mijoz (${newOrder.phone}) uchun bir xil mahsulotli buyurtma allaqachon mavjud! Baribir qo'shilsinmi?`
           });
-          message.warning({ content: "Dublikat buyurtma topildi!", key: scannedCode });
         } else {
           playSuccessSound();
+          showVisualFeedback('success');
           setOrders(prev => [newOrder, ...prev]);
-          message.success({ content: `✓ ${scannedCode} topildi!`, key: scannedCode, duration: 1 });
         }
         return true;
       } else {
         // Buyurtma topilmadi - bu network error emas, retry kerak emas
         playErrorSound();
+        showVisualFeedback('error', 'Topilmadi!');
 
         const emptyOrder: ExternalOrder = {
           id: `manual_${Date.now()}`,
@@ -583,7 +673,6 @@ const ExternalOrdersTab = () => {
           message: `Tashqi saytda buyurtma topilmadi (QR: ${scannedCode}). Baribir ro'yxatga qo'shilsinmi?`
         });
 
-        message.error({ content: `✗ ${scannedCode} topilmadi`, key: scannedCode });
         return true; // No retry needed for "not found"
       }
     } catch (err: any) {
@@ -598,6 +687,7 @@ const ExternalOrdersTab = () => {
 
       // Max retry reached yoki boshqa xatolik
       playErrorSound();
+      showVisualFeedback('error', 'Xatolik!');
       const errorMsg = err.name === 'AbortError' ? 'Timeout' : (err.message || "Noma'lum xatolik");
 
       // Failed scans ga qo'shish
@@ -609,7 +699,6 @@ const ExternalOrdersTab = () => {
         return [...prev, { code: scannedCode, error: errorMsg, attempts: attemptNumber }];
       });
 
-      message.error({ content: `✗ ${scannedCode} - ${errorMsg}`, key: scannedCode });
       console.error("Scan error:", err);
       return false;
     }
@@ -687,8 +776,8 @@ const ExternalOrdersTab = () => {
     // QR kod allaqachon ro'yxatda bormi?
     const existingOrder = ordersRef.current.find(o => o.qrCode === scannedCode);
     if (existingOrder) {
-      playErrorSound();
-      message.warning({ content: `Bu buyurtma allaqachon ro'yxatda mavjud!`, key: scannedCode });
+      playSuccessSound(); // Allaqachon mavjud - success sound
+      showVisualFeedback('warning', 'Allaqachon mavjud!'); // Sariq rang
       return;
     }
 
@@ -795,9 +884,19 @@ const ExternalOrdersTab = () => {
                       Market: {integration.market?.name || 'Noma\'lum'}
                     </p>
                     {integration.total_synced_orders && integration.total_synced_orders > 0 && (
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                        ✓ {integration.total_synced_orders} ta sinxronlangan
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                          ✓ {integration.total_synced_orders} ta sinxronlangan
+                        </p>
+                        <button
+                          onClick={(e) => handleResetSyncedOrders(integration, e)}
+                          disabled={resetSyncedOrders.isPending}
+                          className="p-1 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 transition-all cursor-pointer disabled:opacity-50"
+                          title="0 ga tushirish"
+                        >
+                          <RotateCcw className={`w-3.5 h-3.5 ${resetSyncedOrders.isPending ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
                     )}
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
@@ -840,9 +939,17 @@ const ExternalOrdersTab = () => {
             </span>
           )}
           {selectedIntegration.total_synced_orders && selectedIntegration.total_synced_orders > 0 && (
-            <span className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-              {selectedIntegration.total_synced_orders} ta sinxronlangan
-            </span>
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+              <span>{selectedIntegration.total_synced_orders} ta sinxronlangan</span>
+              <button
+                onClick={(e) => handleResetSyncedOrders(selectedIntegration, e)}
+                disabled={resetSyncedOrders.isPending}
+                className="p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800/50 text-blue-600 hover:text-red-600 dark:text-blue-400 dark:hover:text-red-400 transition-all cursor-pointer disabled:opacity-50"
+                title="0 ga tushirish"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${resetSyncedOrders.isPending ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -1367,6 +1474,59 @@ const ExternalOrdersTab = () => {
                 Baribir qo'shish
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ VISUAL FEEDBACK OVERLAY ============ */}
+      {visualFeedback.show && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+          {/* Overlay background */}
+          <div
+            className={`absolute inset-0 transition-opacity duration-200 ${
+              visualFeedback.type === 'success'
+                ? 'bg-green-500/20'
+                : visualFeedback.type === 'warning'
+                ? 'bg-amber-500/20'
+                : 'bg-red-500/20'
+            }`}
+          />
+
+          {/* Big icon */}
+          <div className="relative flex flex-col items-center justify-center animate-in zoom-in duration-200">
+            {/* Circle background */}
+            <div
+              className={`w-40 h-40 sm:w-52 sm:h-52 rounded-full flex items-center justify-center shadow-2xl ${
+                visualFeedback.type === 'success'
+                  ? 'bg-green-500 shadow-green-500/50'
+                  : visualFeedback.type === 'warning'
+                  ? 'bg-amber-500 shadow-amber-500/50'
+                  : 'bg-red-500 shadow-red-500/50'
+              }`}
+            >
+              {visualFeedback.type === 'success' ? (
+                <CheckCircle className="w-24 h-24 sm:w-32 sm:h-32 text-white" strokeWidth={2.5} />
+              ) : visualFeedback.type === 'warning' ? (
+                <RefreshCw className="w-24 h-24 sm:w-32 sm:h-32 text-white" strokeWidth={2.5} />
+              ) : (
+                <XCircle className="w-24 h-24 sm:w-32 sm:h-32 text-white" strokeWidth={2.5} />
+              )}
+            </div>
+
+            {/* Message text */}
+            {visualFeedback.message && (
+              <p
+                className={`mt-6 text-2xl sm:text-3xl font-bold ${
+                  visualFeedback.type === 'success'
+                    ? 'text-green-600'
+                    : visualFeedback.type === 'warning'
+                    ? 'text-amber-600'
+                    : 'text-red-600'
+                }`}
+              >
+                {visualFeedback.message}
+              </p>
+            )}
           </div>
         </div>
       )}

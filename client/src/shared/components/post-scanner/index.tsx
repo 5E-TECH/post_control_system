@@ -68,6 +68,13 @@ interface ScanResult {
   timestamp: number;
 }
 
+// Visual feedback type
+export interface VisualFeedback {
+  show: boolean;
+  type: 'success' | 'error' | 'warning';
+  message?: string;
+}
+
 interface UsePostScannerReturn {
   // Scan history
   scanHistory: ScanResult[];
@@ -76,6 +83,9 @@ interface UsePostScannerReturn {
 
   // Status
   isOnline: boolean;
+
+  // Visual feedback
+  visualFeedback: VisualFeedback;
 
   // Actions
   clearHistory: () => void;
@@ -96,6 +106,19 @@ export function usePostScanner(
   // State
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [visualFeedback, setVisualFeedback] = useState<VisualFeedback>({
+    show: false,
+    type: 'success',
+    message: ''
+  });
+
+  // Visual feedback ko'rsatish funksiyasi
+  const showVisualFeedback = useCallback((type: 'success' | 'error' | 'warning', msg?: string) => {
+    setVisualFeedback({ show: true, type, message: msg });
+    setTimeout(() => {
+      setVisualFeedback({ show: false, type: 'success', message: '' });
+    }, 800);
+  }, []);
 
   // Refs
   const refetchRef = useRef(refetch);
@@ -137,14 +160,10 @@ export function usePostScanner(
 
   // ============ DIRECT API CALL ============
   const checkOrderDirect = useCallback(async (token: string) => {
-    // 1. OLDIN TOPILGAN BUYURTMA - success sound va xabar
+    // 1. OLDIN TOPILGAN BUYURTMA - success sound va sariq visual
     if (successTokens.current.has(token)) {
       playSuccess();
-      message.success({
-        content: '✓ Allaqachon topilgan!',
-        key: token,
-        duration: 1
-      });
+      showVisualFeedback('warning', 'Allaqachon topilgan!');
       return;
     }
 
@@ -162,11 +181,7 @@ export function usePostScanner(
     // 4. Internet yo'q
     if (!navigator.onLine) {
       playError();
-      message.error({
-        content: 'Internet yo\'q!',
-        key: token,
-        duration: 2
-      });
+      showVisualFeedback('error', 'Internet yo\'q!');
       return;
     }
 
@@ -178,16 +193,11 @@ export function usePostScanner(
 
       // MUVAFFAQIYAT!
       playSuccess();
+      showVisualFeedback('success', 'Topildi!');
       successTokens.current.add(token);
       errorTokens.current.delete(token); // Agar oldin xato bo'lgan bo'lsa
 
       const orderId = response.data?.data?.order?.id;
-
-      message.success({
-        content: '✓ Topildi!',
-        key: token,
-        duration: 1
-      });
 
       // Scan history ga qo'shish
       setScanHistory(prev => [{
@@ -229,11 +239,7 @@ export function usePostScanner(
         displayError = 'Bu pochtada yo\'q!';
       }
 
-      message.error({
-        content: `✗ ${displayError}`,
-        key: token,
-        duration: 1.5
-      });
+      showVisualFeedback('error', displayError);
 
       // Scan history ga qo'shish
       setScanHistory(prev => [{
@@ -314,6 +320,7 @@ export function usePostScanner(
     successCount,
     errorCount,
     isOnline,
+    visualFeedback,
     clearHistory
   };
 }

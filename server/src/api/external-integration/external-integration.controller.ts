@@ -80,6 +80,20 @@ export class ExternalIntegrationController {
     return this.service.testConnection(id);
   }
 
+  @Post(':id/reset-synced')
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @ApiOperation({ summary: 'Bitta integratsiya sinxronlangan buyurtmalar sonini 0 ga tushirish' })
+  resetSyncedOrders(@Param('id') id: string) {
+    return this.service.resetSyncedOrders(id);
+  }
+
+  @Post('reset-all-synced')
+  @AcceptRoles(Roles.SUPERADMIN)
+  @ApiOperation({ summary: 'Barcha integratsiyalarni 0 ga tushirish (faqat superadmin)' })
+  resetAllSyncedOrders() {
+    return this.service.resetAllSyncedOrders();
+  }
+
   @Get('sync/history')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @ApiOperation({ summary: 'Barcha integratsiyalar sinxronlash tarixini olish' })
