@@ -179,6 +179,7 @@ export const regions = [
       'Karshi',
       'Kasbi',
       'Kitob',
+      "Ko'kdala",
       'Koson',
       'Mirishkor',
       'Muborak',

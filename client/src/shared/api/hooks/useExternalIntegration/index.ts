@@ -154,6 +154,15 @@ export const useExternalIntegration = () => {
       api.post(`external-integration/${id}/test`).then((res) => res.data),
   });
 
+  // Sinxronlangan buyurtmalar sonini 0 ga tushirish
+  const resetSyncedOrders = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`external-integration/${id}/reset-synced`).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [INTEGRATION_KEY] });
+    },
+  });
+
   return {
     getIntegrations,
     getActiveIntegrations,
@@ -163,5 +172,6 @@ export const useExternalIntegration = () => {
     updateIntegration,
     deleteIntegration,
     testConnection,
+    resetSyncedOrders,
   };
 };

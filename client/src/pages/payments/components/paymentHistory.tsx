@@ -109,50 +109,50 @@ const CashboxHistoryComponent: React.FC<Props> = ({
   return (
     <div className="w-full">
       {/* Income va Outcome Summary Cards - Modern Glass Design */}
-      <div className="grid grid-cols-2 gap-4 mt-6">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 mt-6">
         {/* Income Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 p-5 shadow-2xl shadow-emerald-500/25">
+        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600 p-3 sm:p-5 shadow-2xl shadow-emerald-500/25">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
           <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
           <div className="relative">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <ArrowDownLeft size={20} className="text-white" />
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <ArrowDownLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <span className="text-sm text-white/80 font-medium">
-                  {t("income") || "Kirim"}
+                <span className="text-xs sm:text-sm text-white/80 font-medium">
+                  {t("income") || "kirim"}
                 </span>
               </div>
-              <TrendingUp size={20} className="text-white/60" />
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
             </div>
-            <p className="text-3xl font-bold text-white tracking-tight">
+            <p className="text-lg sm:text-2xl md:text-3xl font-bold text-white tracking-tight break-all">
               +{(income ?? 0).toLocaleString("uz-UZ")}
             </p>
-            <p className="text-sm text-white/60 mt-1">UZS</p>
+            <p className="text-xs sm:text-sm text-white/60 mt-0.5 sm:mt-1">UZS</p>
           </div>
         </div>
 
         {/* Outcome Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 p-5 shadow-2xl shadow-red-500/25">
+        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-500 via-rose-500 to-pink-600 p-3 sm:p-5 shadow-2xl shadow-red-500/25">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
           <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-xl" />
           <div className="relative">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <ArrowUpRight size={20} className="text-white" />
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <span className="text-sm text-white/80 font-medium">
-                  {t("expense") || "Chiqim"}
+                <span className="text-xs sm:text-sm text-white/80 font-medium">
+                  {t("expense") || "chiqim"}
                 </span>
               </div>
-              <TrendingDown size={20} className="text-white/60" />
+              <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
             </div>
-            <p className="text-3xl font-bold text-white tracking-tight">
+            <p className="text-lg sm:text-2xl md:text-3xl font-bold text-white tracking-tight break-all">
               -{(outcome ?? 0).toLocaleString("uz-UZ")}
             </p>
-            <p className="text-sm text-white/60 mt-1">UZS</p>
+            <p className="text-xs sm:text-sm text-white/60 mt-0.5 sm:mt-1">UZS</p>
           </div>
         </div>
       </div>

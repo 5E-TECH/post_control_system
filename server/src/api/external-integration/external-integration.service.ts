@@ -408,6 +408,91 @@ export class ExternalIntegrationService {
   }
 
   /**
+   * Barcha integratsiyalarni qo'lda 0 ga tushirish (CRON job bilan bir xil)
+   * Bu metod qo'lda chaqirilganda ham xuddi CRON job kabi ishlaydi
+   */
+  async resetAllSyncedOrders() {
+    try {
+      // CRON job bilan bir xil mantiq
+      const integrations = await this.repo.find();
+      const syncDate = Date.now();
+
+      // Tarixga yozish
+      const historyRecords: IntegrationSyncHistoryEntity[] = [];
+      for (const integration of integrations) {
+        if (integration.total_synced_orders > 0) {
+          const history = this.historyRepo.create({
+            integration_id: integration.id,
+            integration_name: integration.name,
+            synced_orders: integration.total_synced_orders,
+            sync_date: syncDate,
+          });
+          historyRecords.push(history);
+        }
+      }
+
+      if (historyRecords.length > 0) {
+        await this.historyRepo.save(historyRecords);
+      }
+
+      // Barcha integratsiyalarni 0 ga tushirish
+      const result = await this.repo.update({}, { total_synced_orders: 0 });
+
+      console.log(
+        `🔄 [MANUAL-ALL] Barcha integratsiyalar 0 ga tushirildi: ${result.affected} ta (${new Date().toISOString()})`,
+      );
+
+      return successRes(
+        {
+          affected: result.affected,
+          history_saved: historyRecords.length,
+        },
+        200,
+        `${result.affected} ta integratsiya 0 ga tushirildi`,
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Bitta integratsiya sinxronlangan buyurtmalar sonini qo'lda 0 ga tushirish
+   */
+  async resetSyncedOrders(id: string) {
+    try {
+      const integration = await this.repo.findOne({ where: { id } });
+
+      if (!integration) {
+        throw new NotFoundException('Integratsiya topilmadi');
+      }
+
+      // Agar 0 dan katta bo'lsa, tarixga yozish
+      if (integration.total_synced_orders > 0) {
+        const history = this.historyRepo.create({
+          integration_id: integration.id,
+          integration_name: integration.name,
+          synced_orders: integration.total_synced_orders,
+          sync_date: Date.now(),
+        });
+        await this.historyRepo.save(history);
+      }
+
+      // 0 ga tushirish
+      await this.repo.update(id, { total_synced_orders: 0 });
+
+      console.log(`🔄 [MANUAL] ${integration.name} sinxronlangan buyurtmalar soni 0 ga tushirildi`);
+
+      return successRes(
+        { previous_count: integration.total_synced_orders },
+        200,
+        'Sinxronlangan buyurtmalar soni 0 ga tushirildi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
    * Integratsiya sinxronlash tarixini olish
    */
   async getSyncHistory(integrationId?: string, limit: number = 30) {

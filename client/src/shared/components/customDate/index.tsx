@@ -86,49 +86,51 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
     const weekDays = ["D", "S", "Ch", "P", "J", "Sh", "Y"];
 
     return (
-      <div className="flex justify-center w-full">
+      <div className="w-full relative">
         {/* Backdrop */}
         {(isFromOpen || isToOpen) && (
           <div
-            className="fixed inset-0 z-40"
+            className="fixed inset-0 z-40 bg-black/10"
             onClick={closeAll}
           />
         )}
 
-        <div className="w-[400px] max-sm:w-full">
-          <div className="flex flex-row sm:flex-row gap-2 w-full">
+        <div className="w-full">
+          <div className="flex flex-row gap-2 w-full">
             {/* From Input */}
-            <div className="relative flex-1 w-full">
+            <div className="relative flex-1">
               <input
                 type="text"
                 readOnly
                 onClick={toggleFrom}
                 value={from ? from.format("YYYY-MM-DD") : ""}
                 placeholder={`${t("start")}`}
-                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] dark:text-white rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
+                className="w-full h-10 border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] dark:text-white rounded-xl px-3 py-2 text-sm outline-none hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition cursor-pointer"
               />
               {isFromOpen && (
-                <div className="absolute top-full left-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%] dark:bg-[#28243D]">
-                  <div className="flex justify-between items-center mb-2">
+                <div className="fixed left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 sm:absolute sm:left-0 sm:translate-x-0 sm:top-full sm:translate-y-0 bg-white border border-gray-200 mt-0 sm:mt-2 rounded-2xl shadow-2xl z-50 p-4 w-[calc(100vw-32px)] sm:w-[280px] max-w-[320px] dark:bg-[#28243D] dark:border-gray-700">
+                  <div className="flex justify-between items-center mb-3">
                     <button
+                      type="button"
                       onClick={() => handlePrevMonth(true)}
-                      className="px-2 py-1 hover:bg-gray-100 rounded"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                     >
                       {"<"}
                     </button>
-                    <span className="font-semibold">
+                    <span className="font-semibold text-gray-800 dark:text-white">
                       {currentMonth.format("MMMM YYYY")}
                     </span>
                     <button
+                      type="button"
                       onClick={() => handleNextMonth(true)}
-                      className="px-2 py-1 hover:bg-gray-100 rounded"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                     >
                       {">"}
                     </button>
                   </div>
-                  <div className="grid grid-cols-7 gap-1 text-center text-sm mb-1">
+                  <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
                     {weekDays.map((d) => (
-                      <div key={d} className="font-medium">
+                      <div key={d} className="font-medium text-gray-500 dark:text-gray-400 py-1">
                         {d}
                       </div>
                     ))}
@@ -138,13 +140,14 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                       const isSelected = day && from && day.isSame(from, "day");
                       return (
                         <button
+                          type="button"
                           key={idx}
                           disabled={!day}
                           onClick={() => day && handleDayClick(day, true)}
-                          className={`w-8 h-8 rounded-full ${
+                          className={`w-9 h-9 rounded-xl text-sm font-medium transition ${
                             isSelected
-                              ? "bg-blue-500 text-white"
-                              : "hover:bg-blue-100 dark:hover:bg-blue-500"
+                              ? "bg-blue-500 text-white shadow-md"
+                              : day ? "hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-700 dark:text-gray-300" : ""
                           }`}
                         >
                           {day ? day.date() : ""}
@@ -164,30 +167,32 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                 onClick={toggleTo}
                 value={to ? to.format("YYYY-MM-DD") : ""}
                 placeholder={`${t("end")}`}
-                className="w-full border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] dark:text-white rounded-lg px-3 py-2 outline-none hover:border-blue-500 focus:border-blue-500 transition cursor-pointer"
+                className="w-full h-10 border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] dark:text-white rounded-xl px-3 py-2 text-sm outline-none hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition cursor-pointer"
               />
               {isToOpen && (
-                <div className="absolute top-full right-0 bg-white border border-gray-300 mt-1 rounded-lg shadow-lg z-50 p-3 w-[200%] dark:bg-[#28243D]">
-                  <div className="flex justify-between items-center mb-2">
+                <div className="fixed left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 sm:absolute sm:right-0 sm:left-auto sm:translate-x-0 sm:top-full sm:translate-y-0 bg-white border border-gray-200 mt-0 sm:mt-2 rounded-2xl shadow-2xl z-50 p-4 w-[calc(100vw-32px)] sm:w-[280px] max-w-[320px] dark:bg-[#28243D] dark:border-gray-700">
+                  <div className="flex justify-between items-center mb-3">
                     <button
+                      type="button"
                       onClick={() => handlePrevMonth(false)}
-                      className="px-2 py-1 hover:bg-gray-100 rounded"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                     >
                       {"<"}
                     </button>
-                    <span className="font-semibold">
+                    <span className="font-semibold text-gray-800 dark:text-white">
                       {currentMonthTo.format("MMMM YYYY")}
                     </span>
                     <button
+                      type="button"
                       onClick={() => handleNextMonth(false)}
-                      className="px-2 py-1 hover:bg-gray-100 rounded"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                     >
                       {">"}
                     </button>
                   </div>
-                  <div className="grid grid-cols-7 gap-1 text-center text-sm mb-1">
+                  <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
                     {weekDays.map((d) => (
-                      <div key={d} className="font-medium">
+                      <div key={d} className="font-medium text-gray-500 dark:text-gray-400 py-1">
                         {d}
                       </div>
                     ))}
@@ -199,13 +204,14 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                         day && from ? day.isBefore(from, "day") : false;
                       return (
                         <button
+                          type="button"
                           key={idx}
                           disabled={!day || isBeforeFrom}
                           onClick={() => day && handleDayClick(day, false)}
-                          className={`w-8 h-8 rounded-full ${
+                          className={`w-9 h-9 rounded-xl text-sm font-medium transition ${
                             isSelected
-                              ? "bg-blue-500 text-white"
-                              : "hover:bg-blue-100 dark:hover:bg-blue-500"
+                              ? "bg-blue-500 text-white shadow-md"
+                              : day && !isBeforeFrom ? "hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-700 dark:text-gray-300" : "text-gray-300 dark:text-gray-600"
                           }`}
                         >
                           {day ? day.date() : ""}
@@ -222,7 +228,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
               <button
                 type="button"
                 onClick={handleClear}
-                className="flex-shrink-0 w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                className="flex-shrink-0 w-10 h-10 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>

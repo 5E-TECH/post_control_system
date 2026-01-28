@@ -161,6 +161,9 @@ const OrderItems = () => {
         };
       });
       setFormDataList(enrichedItems);
+    } else {
+      // Clear local state when redux orderItems is cleared
+      setFormDataList([]);
     }
   }, [orderItems, allProducts]);
 

@@ -53,7 +53,7 @@ const DashboardLayout = () => {
       </aside>
 
       {/* Dashboard container */}
-      <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pl-4 pb-8">
+      <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pl-4 pb-8 max-[650px]:pb-24">
         <main className="w-full h-full bg-[#fff] dark:bg-[#312d48] rounded-4xl overflow-y-auto">
           <Suspense fallback={<Suspensee />}>
             <Outlet />
@@ -62,8 +62,8 @@ const DashboardLayout = () => {
       </div>
 
       <RenderMediaSidebar role={role as string} />
-      {/* Footer */}
-      <div className="col-span-2 py-3">
+      {/* Footer - hidden on mobile since bottom nav is there */}
+      <div className="col-span-2 py-3 max-[650px]:hidden">
         <Footer />
       </div>
     </div>

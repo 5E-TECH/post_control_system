@@ -2641,51 +2641,68 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     endDate?: string,
   ) {
     try {
+      const UZB_OFFSET_MS = 5 * 60 * 60 * 1000; // UTC+5 (Toshkent vaqti)
       const now = Date.now();
       let start: number;
       let end: number;
       let groupFormat: string;
       let labelFormat: string;
 
-      // Default oraliqlar
+      // Default oraliqlar - Toshkent vaqti bo'yicha
       if (startDate && endDate) {
-        // String formatdagi sana keladi (YYYY-MM-DD), timestamp ga o'giramiz
-        start = new Date(startDate).setHours(0, 0, 0, 0);
-        end = new Date(endDate).setHours(23, 59, 59, 999);
+        // String formatdagi sana keladi (YYYY-MM-DD), Toshkent vaqtiga o'giramiz
+        const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+        const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+
+        // Toshkent vaqtida 00:00:00 va 23:59:59 ni UTC ga o'girish
+        start = Date.UTC(startYear, startMonth - 1, startDay, 0, 0, 0, 0) - UZB_OFFSET_MS;
+        end = Date.UTC(endYear, endMonth - 1, endDay, 23, 59, 59, 999) - UZB_OFFSET_MS;
       } else {
-        end = now;
+        // Toshkent vaqtida hozirgi kunning oxirini olish
+        const uzNowMs = now + UZB_OFFSET_MS;
+        const uzNow = new Date(uzNowMs);
+        const todayYear = uzNow.getUTCFullYear();
+        const todayMonth = uzNow.getUTCMonth();
+        const todayDay = uzNow.getUTCDate();
+
+        // Bugungi kunning oxiri (23:59:59) Toshkent vaqtida
+        end = Date.UTC(todayYear, todayMonth, todayDay, 23, 59, 59, 999) - UZB_OFFSET_MS;
+
         switch (period) {
           case 'daily':
-            start = now - 30 * 24 * 60 * 60 * 1000; // Oxirgi 30 kun
+            start = end - 30 * 24 * 60 * 60 * 1000; // Oxirgi 30 kun
             break;
           case 'weekly':
-            start = now - 12 * 7 * 24 * 60 * 60 * 1000; // Oxirgi 12 hafta
+            start = end - 12 * 7 * 24 * 60 * 60 * 1000; // Oxirgi 12 hafta
             break;
           case 'monthly':
-            start = now - 12 * 30 * 24 * 60 * 60 * 1000; // Oxirgi 12 oy
+            start = end - 12 * 30 * 24 * 60 * 60 * 1000; // Oxirgi 12 oy
             break;
           case 'yearly':
-            start = now - 5 * 365 * 24 * 60 * 60 * 1000; // Oxirgi 5 yil
+            start = end - 5 * 365 * 24 * 60 * 60 * 1000; // Oxirgi 5 yil
             break;
         }
       }
 
-      // SQL formatlar
+      // SQL formatlar - Toshkent vaqti zonasi bilan (UTC+5)
+      // PostgreSQL da timestamp ni Toshkent vaqtiga o'girish
+      const tzConvert = "TO_TIMESTAMP(o.sold_at / 1000) AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tashkent'";
+
       switch (period) {
         case 'daily':
-          groupFormat = "TO_CHAR(TO_TIMESTAMP(o.sold_at / 1000), 'YYYY-MM-DD')";
+          groupFormat = `TO_CHAR(${tzConvert}, 'YYYY-MM-DD')`;
           labelFormat = 'DD.MM';
           break;
         case 'weekly':
-          groupFormat = "TO_CHAR(TO_TIMESTAMP(o.sold_at / 1000), 'IYYY-IW')";
+          groupFormat = `TO_CHAR(${tzConvert}, 'IYYY-IW')`;
           labelFormat = 'WW';
           break;
         case 'monthly':
-          groupFormat = "TO_CHAR(TO_TIMESTAMP(o.sold_at / 1000), 'YYYY-MM')";
+          groupFormat = `TO_CHAR(${tzConvert}, 'YYYY-MM')`;
           labelFormat = 'MM.YYYY';
           break;
         case 'yearly':
-          groupFormat = "TO_CHAR(TO_TIMESTAMP(o.sold_at / 1000), 'YYYY')";
+          groupFormat = `TO_CHAR(${tzConvert}, 'YYYY')`;
           labelFormat = 'YYYY';
           break;
       }
@@ -2694,7 +2711,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         `
         SELECT
           ${groupFormat} as period,
-          TO_CHAR(TO_TIMESTAMP(MIN(o.sold_at) / 1000), '${labelFormat}') as label,
+          TO_CHAR(TO_TIMESTAMP(MIN(o.sold_at) / 1000) AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tashkent', '${labelFormat}') as label,
           COUNT(o.id) as orders_count,
           COALESCE(SUM(
             CASE
