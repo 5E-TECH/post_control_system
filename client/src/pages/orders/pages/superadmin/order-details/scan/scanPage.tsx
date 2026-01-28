@@ -152,7 +152,6 @@ export default function ScanPage() {
                 components={{
                   finder: false,
                   torch: false,
-                  tracker: false,
                   onOff: false,
                   zoom: false,
                 }}

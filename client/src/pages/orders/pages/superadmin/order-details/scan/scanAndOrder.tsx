@@ -33,11 +33,9 @@ import {
   MessageSquare,
 } from "lucide-react";
 import {
-  Button,
   Form,
   Input,
   message,
-  Select,
   type FormProps,
 } from "antd";
 import type { FieldType } from "../../../../components/courier/waiting-orders";
