@@ -345,12 +345,49 @@ const AdvancedStatsChart = memo(
     const thisWeekSummary = thisWeekData?.data?.summary || { totalRevenue: 0, totalOrders: 0 };
     const lastWeekSummary = lastWeekData?.data?.summary || { totalRevenue: 0, totalOrders: 0 };
 
+    // Hafta raqamini sana oralig'iga aylantirish
+    const getWeekDateRange = (weekNum: number, year: number) => {
+      const months = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avg", "sen", "okt", "noy", "dek"];
+      // Hafta boshini topish (ISO week)
+      const weekStart = dayjs().year(year).isoWeek(weekNum).startOf("isoWeek");
+      const weekEnd = weekStart.endOf("isoWeek");
+      return `${weekStart.date()}-${weekEnd.date()} ${months[weekStart.month()]}`;
+    };
+
     const enrichedChartData = useMemo(() => {
-      return chartData.map((item: any) => ({
-        ...item,
-        avgOrderValue: item.ordersCount > 0 ? Math.round(item.revenue / item.ordersCount) : 0,
-      }));
-    }, [chartData]);
+      // Hafta raqamlari uchun to'g'ri yilni aniqlash
+      const baseYear = startDate ? dayjs(startDate).year() : dayjs().year();
+      let prevWeekNum = 0;
+      let currentYear = baseYear;
+
+      return chartData.map((item: any, index: number) => {
+        let label = item.label;
+
+        // Haftalik formatni aniqlash va o'zgartirish
+        if (period === "weekly" && item.label) {
+          // Label "W01", "W47", "01", "47" ko'rinishida bo'lishi mumkin
+          const weekMatch = item.label.toString().match(/^W?(\d+)$/);
+          if (weekMatch) {
+            const weekNum = parseInt(weekMatch[1]);
+
+            // Agar hafta raqami oldingi haftadan kichik bo'lsa, yangi yilga o'tgan
+            // Masalan: 47 -> 48 -> 49 -> 50 -> 51 -> 52 -> 1 -> 2 -> 3
+            if (index > 0 && weekNum < prevWeekNum && prevWeekNum > 40 && weekNum < 10) {
+              currentYear++;
+            }
+            prevWeekNum = weekNum;
+
+            label = getWeekDateRange(weekNum, currentYear);
+          }
+        }
+
+        return {
+          ...item,
+          label,
+          avgOrderValue: item.ordersCount > 0 ? Math.round(item.revenue / item.ordersCount) : 0,
+        };
+      });
+    }, [chartData, period, startDate]);
 
     const periodLabels: Record<PeriodType, string> = {
       daily: t("daily"),

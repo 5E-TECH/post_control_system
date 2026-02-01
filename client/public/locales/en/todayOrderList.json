@@ -11,6 +11,7 @@
     "viloyat": "Region",
     "tuman": "District",
     "status": "Status",
+    "stock": "pcs",
     "price": "Price",
     "action": "Action",
     "qabulQilish": "Accept",

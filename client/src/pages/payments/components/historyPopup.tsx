@@ -64,16 +64,16 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-2 sm:p-4 pt-4 pb-16 sm:pb-4 sm:items-center overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#2A263D] w-full max-w-md max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-[#2A263D] w-full max-w-md max-h-[calc(100vh-80px)] sm:max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
-          className={`relative px-5 py-5 ${
+          className={`relative px-4 py-4 sm:px-5 sm:py-5 ${
             isIncome
               ? "bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600"
               : "bg-gradient-to-br from-red-500 via-rose-500 to-pink-600"
@@ -83,13 +83,13 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
 
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center ${
                 isIncome ? "bg-white/20" : "bg-white/20"
               } backdrop-blur-sm`}>
                 {isIncome ? (
-                  <TrendingUp className="w-6 h-6 text-white" />
+                  <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 ) : (
-                  <TrendingDown className="w-6 h-6 text-white" />
+                  <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 )}
               </div>
               <div>
@@ -115,7 +115,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
             <div className="flex items-end justify-between">
               <div>
                 <p className="text-sm text-white/70 mb-1">{t("amount")}</p>
-                <p className="text-3xl font-bold text-white tracking-tight">
+                <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
                   {isIncome ? "+" : "-"}
                   {info?.amount?.toLocaleString()}
                   <span className="text-lg font-normal text-white/80 ml-1">UZS</span>
@@ -132,7 +132,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-[calc(90vh-180px)]">
+        <div className="p-3 sm:p-4 overflow-y-auto max-h-[calc(100vh-250px)] sm:max-h-[calc(85vh-180px)]">
           {isLoading ? (
             <div className="space-y-3 animate-pulse">
               {[...Array(3)].map((_, i) => (

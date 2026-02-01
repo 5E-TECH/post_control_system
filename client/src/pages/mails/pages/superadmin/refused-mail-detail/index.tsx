@@ -18,6 +18,8 @@ import {
   Loader2,
   Package,
   Store,
+  XCircle,
+  RefreshCw,
 } from "lucide-react";
 
 // Skeleton Loading Component
@@ -92,7 +94,7 @@ const RefusedMailDetail = () => {
   const navigate = useNavigate();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  useRefusedPostScanner(undefined, setSelectedIds);
+  const { visualFeedback } = useRefusedPostScanner(undefined, setSelectedIds);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -486,6 +488,52 @@ const RefusedMailDetail = () => {
               </>
             )}
           </button>
+        </div>
+      )}
+      {/* ============ VISUAL FEEDBACK OVERLAY ============ */}
+      {visualFeedback.show && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+          <div
+            className={`absolute inset-0 transition-opacity duration-200 ${
+              visualFeedback.type === 'success'
+                ? 'bg-green-500/20'
+                : visualFeedback.type === 'warning'
+                ? 'bg-amber-500/20'
+                : 'bg-red-500/20'
+            }`}
+          />
+          <div className="relative flex flex-col items-center justify-center animate-in zoom-in duration-200">
+            <div
+              className={`w-40 h-40 sm:w-52 sm:h-52 rounded-full flex items-center justify-center shadow-2xl ${
+                visualFeedback.type === 'success'
+                  ? 'bg-green-500 shadow-green-500/50'
+                  : visualFeedback.type === 'warning'
+                  ? 'bg-amber-500 shadow-amber-500/50'
+                  : 'bg-red-500 shadow-red-500/50'
+              }`}
+            >
+              {visualFeedback.type === 'success' ? (
+                <CheckCircle className="w-24 h-24 sm:w-32 sm:h-32 text-white" strokeWidth={2.5} />
+              ) : visualFeedback.type === 'warning' ? (
+                <RefreshCw className="w-24 h-24 sm:w-32 sm:h-32 text-white" strokeWidth={2.5} />
+              ) : (
+                <XCircle className="w-24 h-24 sm:w-32 sm:h-32 text-white" strokeWidth={2.5} />
+              )}
+            </div>
+            {visualFeedback.message && (
+              <p
+                className={`mt-6 text-2xl sm:text-3xl font-bold ${
+                  visualFeedback.type === 'success'
+                    ? 'text-green-600'
+                    : visualFeedback.type === 'warning'
+                    ? 'text-amber-600'
+                    : 'text-red-600'
+                }`}
+              >
+                {visualFeedback.message}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
