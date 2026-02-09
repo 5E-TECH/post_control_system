@@ -20,7 +20,7 @@ import {
   Clock,
   CheckCheck,
 } from "lucide-react";
-import { Modal, Form, Input, Select, Switch, message, Popconfirm, Tabs, Badge, Tooltip, Table } from "antd";
+import { Modal, Form, Input, Select, Switch, message, Popconfirm, Tabs, Badge, Tooltip } from "antd";
 import {
   useExternalIntegration,
   type CreateIntegrationDto,
