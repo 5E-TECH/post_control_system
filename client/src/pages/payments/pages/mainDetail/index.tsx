@@ -594,26 +594,26 @@ const MainDetail = () => {
 
       {/* === POPUP MARKET === */}
       <PaymentPopup isShow={showMarket} onClose={() => handleClose()}>
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[600px] max-md:w-[95%] overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[600px] max-md:w-full overflow-hidden max-h-[85vh] sm:max-h-[90vh] flex flex-col">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 px-6 py-5 flex-shrink-0">
+          <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 px-4 py-4 sm:px-6 sm:py-5 flex-shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <BanknoteArrowUp size={24} className="text-white" />
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                  <BanknoteArrowUp size={20} className="text-white sm:w-6 sm:h-6" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-xl font-bold text-white truncate">
                     {t("berilishiKerak") || "Marketga to'lash"}
                   </h2>
-                  <p className="text-sm text-white/70">Marketni tanlang</p>
+                  <p className="text-xs sm:text-sm text-white/70">Marketni tanlang</p>
                 </div>
               </div>
               <button
                 onClick={() => handleClose()}
-                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer flex-shrink-0"
               >
-                <X size={20} className="text-white" />
+                <X size={18} className="text-white" />
               </button>
             </div>
           </div>
@@ -671,17 +671,17 @@ const MainDetail = () => {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end flex-shrink-0">
+          <div className="px-4 py-3 sm:px-6 sm:py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-2 sm:gap-3 justify-end flex-shrink-0">
             <button
               onClick={() => handleClose()}
-              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
+              className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer text-sm sm:text-base"
             >
               {t("bekorQilish") || "Bekor qilish"}
             </button>
             <button
               disabled={!select}
               onClick={() => handleNavigate()}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer text-sm sm:text-base"
             >
               {t("tanlash") || "Tanlash"}
             </button>
@@ -791,26 +791,26 @@ const MainDetail = () => {
 
       {/* === POPUP CURIER === */}
       <PaymentPopup isShow={showCurier} onClose={() => handleClose()}>
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[650px] max-md:w-[95%] overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[650px] max-md:w-full overflow-hidden max-h-[85vh] sm:max-h-[90vh] flex flex-col">
           {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 px-6 py-5 flex-shrink-0">
+          <div className="bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 px-4 py-4 sm:px-6 sm:py-5 flex-shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <BanknoteArrowDown size={24} className="text-white" />
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                  <BanknoteArrowDown size={20} className="text-white sm:w-6 sm:h-6" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-xl font-bold text-white truncate">
                     {t("olinishiKerak") || "Kuryerdan olish"}
                   </h2>
-                  <p className="text-sm text-white/70">Kuryerni tanlang</p>
+                  <p className="text-xs sm:text-sm text-white/70">Kuryerni tanlang</p>
                 </div>
               </div>
               <button
                 onClick={() => handleClose()}
-                className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer flex-shrink-0"
               >
-                <X size={20} className="text-white" />
+                <X size={18} className="text-white" />
               </button>
             </div>
           </div>
@@ -875,17 +875,17 @@ const MainDetail = () => {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end flex-shrink-0">
+          <div className="px-4 py-3 sm:px-6 sm:py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-2 sm:gap-3 justify-end flex-shrink-0">
             <button
               onClick={() => handleClose()}
-              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
+              className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer text-sm sm:text-base"
             >
               {t("bekorQilish") || "Bekor qilish"}
             </button>
             <button
               disabled={!select}
               onClick={() => handleNavigate()}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold shadow-lg shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold shadow-lg shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer text-sm sm:text-base"
             >
               {t("tanlash") || "Tanlash"}
             </button>

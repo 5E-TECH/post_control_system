@@ -79,17 +79,17 @@ export class PostService {
     await queryRunner.startTransaction();
 
     try {
-      // 1️⃣ RECEIVED statusida va post_id null bo‘lgan orderlarni olish
+      // 1️⃣ RECEIVED statusida va post_id null bo'lgan orderlarni olish
       const orphanOrders = await queryRunner.manager.find(OrderEntity, {
         where: { status: Order_status.RECEIVED, post_id: IsNull() },
-        relations: ['customer', 'customer.district'],
+        relations: ['district', 'customer', 'customer.district'],
       });
 
       const regionPostMap = new Map<string, PostEntity>();
 
-      // 2️⃣ Region bo‘yicha grouping (post obyektlarini yaratish)
+      // 2️⃣ Region bo'yicha grouping (post obyektlarini yaratish)
       for (const order of orphanOrders) {
-        const district = order.customer?.district;
+        const district = order.district || order.customer?.district;
         if (!district) {
           throw new NotFoundException(
             `District not found for order ${order.id}`,
@@ -126,7 +126,7 @@ export class PostService {
 
       // 5️⃣ Endi orderlarga post_id biriktiramiz
       for (const order of orphanOrders) {
-        const regionId = order.customer?.district?.assigned_region;
+        const regionId = (order.district || order.customer?.district)?.assigned_region;
         const postId = idMap.get(regionId);
         order.post_id = postId!;
       }
@@ -296,6 +296,8 @@ export class PostService {
         relations: [
           'customer',
           'market',
+          'district',
+          'district.region',
           'customer.district',
           'items',
           'items.product',
@@ -343,7 +345,7 @@ export class PostService {
     try {
       const allOrdersByPostId = await this.orderRepo.find({
         where: { canceled_post_id: id },
-        relations: ['customer', 'customer.district', 'items', 'items.product', 'market'],
+        relations: ['customer', 'district', 'district.region', 'customer.district', 'items', 'items.product', 'market'],
       });
       return successRes(allOrdersByPostId, 200, 'All orders by post id');
     } catch (error) {
@@ -435,7 +437,7 @@ export class PostService {
       });
       const newOrders = await queryRunner.manager.find(OrderEntity, {
         where: { id: In(orderIds) },
-        relations: ['market', 'customer', 'customer.district'],
+        relations: ['market', 'customer', 'district', 'district.region', 'customer.district'],
       });
 
       if (newOrders.length !== orderIds.length)
@@ -449,6 +451,7 @@ export class PostService {
       const removedOrders = oldOrders.filter((o) => !orderIds.includes(o.id));
       for (const order of removedOrders) {
         order.post_id = null;
+        order.status = Order_status.RECEIVED;
         await queryRunner.manager.save(order);
       }
 
@@ -660,10 +663,10 @@ export class PostService {
         throw new NotFoundException('There are not orders in this post');
       }
 
-      orders.forEach(async (order, _) => {
+      for (const order of orders) {
         order.status = Order_status.WAITING;
         await queryRunner.manager.save(order);
-      });
+      }
 
       post.status = Post_status.RECEIVED;
       await queryRunner.manager.save(post);

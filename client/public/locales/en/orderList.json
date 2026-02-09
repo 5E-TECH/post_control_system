@@ -5,6 +5,7 @@
   "placeholder": {
     "selectMarket": "Select market",
     "selectRegion": "Select region",
+    "selectCourier": "Select courier",
     "selectStatus": "Select status",
     "selectStatuses": "Select statuses",
     "searchOrder": "Search order",
@@ -33,6 +34,7 @@
   "region": "REGION",
   "district": "DISTRICT",
   "market": "MARKET",
+  "courier": "COURIER",
   "status": "STATUS",
   "price": "PRICE",
   "createdAt": "CREATED AT",

@@ -59,15 +59,22 @@ const Filter = () => {
   const { getRegions } = useRegion();
   const { data: regionData } = getRegions();
   const { getCourier } = useCourier();
-  const { data: courierData } = getCourier(role !== "courier", { limit: 0 });
 
   const form = useSelector((state: RootState) => state.setFilter);
+
+  // Courier query - barcha kuryerlarni olish (client-side filter qilamiz)
+  const { data: courierData } = getCourier(role !== "courier", { limit: 0 });
 
   const { refetch } = useProfile().getUser(role === "market");
 
   // umumiy Select uchun handler
   const handleSelectChange = (name: string) => (value: string) => {
     dispatch(setFilter({ name, value }));
+
+    // Viloyat o'zgarganda kuryerni tozalash
+    if (name === "regionId") {
+      dispatch(setFilter({ name: "courierId", value: undefined }));
+    }
   };
 
   // search uchun debounce qilingan handler
@@ -123,8 +130,18 @@ const Filter = () => {
       label: item.name,
     })) || [];
 
+  // Kurierlarni region bo'yicha filterlash (client-side)
+  const filteredCouriers = form.regionId
+    ? courierData?.data?.filter(
+        (item: any) =>
+          item.region?.id === form.regionId ||
+          item.region_id === form.regionId ||
+          item.regionId === form.regionId
+      )
+    : courierData?.data;
+
   const courierOptions =
-    courierData?.data?.map((item: any) => ({
+    (filteredCouriers || courierData?.data)?.map((item: any) => ({
       value: item.id,
       label: item.name,
     })) || [];
@@ -153,6 +170,15 @@ const Filter = () => {
     form.endDate ||
     form.search;
 
+  // Count active filters
+  const activeFilterCount = [
+    form.marketId,
+    form.regionId,
+    form.courierId,
+    form.status && form.status.length > 0,
+    form.startDate || form.endDate,
+  ].filter(Boolean).length;
+
   return (
     <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden mb-4">
       {/* Header Section */}
@@ -164,12 +190,19 @@ const Filter = () => {
               <SlidersHorizontal className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
-                {t("filters")}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
+                  {t("filters")}
+                </h2>
+                {activeFilterCount > 0 && (
+                  <span className="px-2 py-0.5 bg-purple-500 text-white text-xs font-bold rounded-full animate-pulse">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </div>
               {hasActiveFilters && (
                 <p className="text-xs text-purple-600 dark:text-purple-400">
-                  Filters active
+                  {activeFilterCount} ta filter faol
                 </p>
               )}
             </div>
@@ -240,26 +273,35 @@ const Filter = () => {
       >
         <div className="p-4 sm:p-5 space-y-4">
           {/* Filter Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             {/* Market Select */}
             {role !== "market" && (
-              <div className="relative">
-                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+              <div className={`relative p-3 rounded-xl transition-all ${
+                form.marketId
+                  ? "bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-500/50"
+                  : "bg-gray-50 dark:bg-gray-800/50"
+              }`}>
+                <label className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${
+                  form.marketId
+                    ? "text-purple-600 dark:text-purple-400"
+                    : "text-gray-500 dark:text-gray-400"
+                }`}>
                   <Store className="w-3.5 h-3.5" />
                   {t("market")}
+                  {form.marketId && (
+                    <span className="ml-auto w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                  )}
                 </label>
                 <Select
                   showSearch
                   optionFilterProp="label"
                   filterOption={(input, option) =>
-                    String(option?.label ?? "")
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
+                    (option?.label ?? "").toString().toLowerCase().includes(input.toLowerCase())
                   }
                   value={form.marketId}
                   onChange={handleSelectChange("marketId")}
                   placeholder={t("placeholder.selectMarket")}
-                  className="w-full [&_.ant-select-selector]:h-10! [&_.ant-select-selector]:rounded-xl! [&_.ant-select-selector]:border-gray-200! dark:[&_.ant-select-selector]:border-gray-600! dark:[&_.ant-select-selector]:bg-gray-800! [&_.ant-select-selection-item]:leading-[38px]! dark:[&_.ant-select-selection-item]:text-gray-200! dark:[&_.ant-select-selection-placeholder]:text-gray-500!"
+                  className="w-full filter-select"
                   options={marketOptions}
                   allowClear
                 />
@@ -267,23 +309,32 @@ const Filter = () => {
             )}
 
             {/* Region Select */}
-            <div className="relative">
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+            <div className={`relative p-3 rounded-xl transition-all ${
+              form.regionId
+                ? "bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-500/50"
+                : "bg-gray-50 dark:bg-gray-800/50"
+            }`}>
+              <label className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${
+                form.regionId
+                  ? "text-blue-600 dark:text-blue-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}>
                 <MapPin className="w-3.5 h-3.5" />
                 {t("region")}
+                {form.regionId && (
+                  <span className="ml-auto w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                )}
               </label>
               <Select
                 showSearch
                 optionFilterProp="label"
                 filterOption={(input, option) =>
-                  String(option?.label ?? "")
-                    .toLowerCase()
-                    .includes(input.toLowerCase())
+                  (option?.label ?? "").toString().toLowerCase().includes(input.toLowerCase())
                 }
                 value={form.regionId}
                 onChange={handleSelectChange("regionId")}
                 placeholder={t("placeholder.selectRegion")}
-                className="w-full [&_.ant-select-selector]:h-10! [&_.ant-select-selector]:rounded-xl! [&_.ant-select-selector]:border-gray-200! dark:[&_.ant-select-selector]:border-gray-600! dark:[&_.ant-select-selector]:bg-gray-800! [&_.ant-select-selection-item]:leading-[38px]! dark:[&_.ant-select-selection-item]:text-gray-200! dark:[&_.ant-select-selection-placeholder]:text-gray-500!"
+                className="w-full filter-select"
                 options={regionOptions}
                 allowClear
               />
@@ -291,23 +342,32 @@ const Filter = () => {
 
             {/* Courier Select */}
             {role !== "courier" && (
-              <div className="relative">
-                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+              <div className={`relative p-3 rounded-xl transition-all ${
+                form.courierId
+                  ? "bg-amber-50 dark:bg-amber-900/20 ring-2 ring-amber-500/50"
+                  : "bg-gray-50 dark:bg-gray-800/50"
+              }`}>
+                <label className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${
+                  form.courierId
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-gray-500 dark:text-gray-400"
+                }`}>
                   <Truck className="w-3.5 h-3.5" />
                   {t("courier")}
+                  {form.courierId && (
+                    <span className="ml-auto w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                  )}
                 </label>
                 <Select
                   showSearch
                   optionFilterProp="label"
                   filterOption={(input, option) =>
-                    String(option?.label ?? "")
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
+                    (option?.label ?? "").toString().toLowerCase().includes(input.toLowerCase())
                   }
                   value={form.courierId}
                   onChange={handleSelectChange("courierId")}
                   placeholder={t("placeholder.selectCourier")}
-                  className="w-full [&_.ant-select-selector]:h-10! [&_.ant-select-selector]:rounded-xl! [&_.ant-select-selector]:border-gray-200! dark:[&_.ant-select-selector]:border-gray-600! dark:[&_.ant-select-selector]:bg-gray-800! [&_.ant-select-selection-item]:leading-[38px]! dark:[&_.ant-select-selection-item]:text-gray-200! dark:[&_.ant-select-selection-placeholder]:text-gray-500!"
+                  className="w-full filter-select"
                   options={courierOptions}
                   allowClear
                 />
@@ -315,13 +375,31 @@ const Filter = () => {
             )}
 
             {/* Status Multi-Select */}
-            <div className="relative">
-              <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+            <div className={`relative p-3 rounded-xl transition-all ${
+              form.status && form.status.length > 0
+                ? "bg-emerald-50 dark:bg-emerald-900/20 ring-2 ring-emerald-500/50"
+                : "bg-gray-50 dark:bg-gray-800/50"
+            }`}>
+              <label className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${
+                form.status && form.status.length > 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}>
                 <Tag className="w-3.5 h-3.5" />
                 {t("status")}
+                {form.status && form.status.length > 0 && (
+                  <span className="ml-auto px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-bold rounded-full">
+                    {form.status.length}
+                  </span>
+                )}
               </label>
               <Select
                 mode="multiple"
+                showSearch
+                optionFilterProp="label"
+                filterOption={(input, option) =>
+                  (option?.label ?? "").toString().toLowerCase().includes(input.toLowerCase())
+                }
                 value={form.status || []}
                 onChange={(value: string[]) => {
                   dispatch(
@@ -332,7 +410,7 @@ const Filter = () => {
                   );
                 }}
                 placeholder={t("placeholder.selectStatuses")}
-                className="w-full [&_.ant-select-selector]:min-h-10! [&_.ant-select-selector]:rounded-xl! [&_.ant-select-selector]:border-gray-200! dark:[&_.ant-select-selector]:border-gray-600! dark:[&_.ant-select-selector]:bg-gray-800! [&_.ant-select-selection-item]:bg-purple-100! [&_.ant-select-selection-item]:text-purple-700! [&_.ant-select-selection-item]:border-purple-200! dark:[&_.ant-select-selection-item]:bg-purple-900/30! dark:[&_.ant-select-selection-item]:text-purple-300! dark:[&_.ant-select-selection-item]:border-purple-800! dark:[&_.ant-select-selection-placeholder]:text-gray-500!"
+                className="w-full filter-select"
                 options={statusOpts}
                 maxTagCount="responsive"
                 allowClear
@@ -341,10 +419,21 @@ const Filter = () => {
 
             {/* Date Range Picker - Mobile only */}
             {isMobile && (
-              <div className="relative">
-                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+              <div className={`relative p-3 rounded-xl transition-all ${
+                form.startDate || form.endDate
+                  ? "bg-indigo-50 dark:bg-indigo-900/20 ring-2 ring-indigo-500/50"
+                  : "bg-gray-50 dark:bg-gray-800/50"
+              }`}>
+                <label className={`flex items-center gap-1.5 text-xs font-medium mb-2 ${
+                  form.startDate || form.endDate
+                    ? "text-indigo-600 dark:text-indigo-400"
+                    : "text-gray-500 dark:text-gray-400"
+                }`}>
                   <Calendar className="w-3.5 h-3.5" />
                   {t("sana")}
+                  {(form.startDate || form.endDate) && (
+                    <span className="ml-auto w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+                  )}
                 </label>
                 <CustomCalendar
                   from={form.startDate ? dayjs(form.startDate) : null}
@@ -378,12 +467,17 @@ const Filter = () => {
               disabled={!hasActiveFilters}
               className={`h-10 px-4 rounded-xl flex items-center justify-center gap-2 text-sm font-medium transition-all ${
                 hasActiveFilters
-                  ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 cursor-pointer"
+                  ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 cursor-pointer ring-1 ring-red-200 dark:ring-red-800"
                   : "bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed"
               }`}
             >
               <X className="w-4 h-4" />
               {t("button.tozalash")}
+              {activeFilterCount > 0 && (
+                <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
 
             {/* Right: Export Button */}

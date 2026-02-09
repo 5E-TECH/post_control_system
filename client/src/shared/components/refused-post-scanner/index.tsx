@@ -1,36 +1,134 @@
-import { useEffect } from "react";
-import { useApiNotification } from "../../hooks/useApiNotification";
+/**
+ * Refused Post Scanner Hook - Direct Mode
+ *
+ * Bekor qilingan buyurtmalarni skanerlash uchun hook
+ * Visual va ovozli effectlar bilan
+ */
+
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { usePost } from "../../api/hooks/usePost";
 
+const BASE_URL = import.meta.env.BASE_URL || '/';
+
+// ============ AUDIO PRELOAD ============
+let successAudio: HTMLAudioElement | null = null;
+let errorAudio: HTMLAudioElement | null = null;
+
+if (typeof window !== 'undefined') {
+  try {
+    successAudio = new Audio(`${BASE_URL}sound/beep.mp3`);
+    successAudio.volume = 0.7;
+    successAudio.load();
+
+    errorAudio = new Audio(`${BASE_URL}sound/error.mp3`);
+    errorAudio.volume = 1.0;
+    errorAudio.load();
+  } catch {
+    // Audio init error
+  }
+}
+
+const playSuccess = () => {
+  try {
+    if (successAudio) {
+      successAudio.currentTime = 0;
+      successAudio.play().catch(() => {});
+    }
+  } catch { /* ignore */ }
+};
+
+const playError = () => {
+  try {
+    if (errorAudio) {
+      errorAudio.currentTime = 0;
+      errorAudio.play().catch(() => {});
+    }
+  } catch { /* ignore */ }
+};
+
+// ============ TYPES ============
+export interface VisualFeedback {
+  show: boolean;
+  type: 'success' | 'error' | 'warning';
+  message?: string;
+}
+
+interface UseRefusedPostScannerReturn {
+  visualFeedback: VisualFeedback;
+}
+
+// ============ HOOK ============
 export function useRefusedPostScanner(
   refetch?: () => void,
   setSelectedIds?: React.Dispatch<React.SetStateAction<string[]>>
-) {
-  const { handleApiError, handleSuccess } = useApiNotification();
-  const { checkRefusedPost } = usePost()
+): UseRefusedPostScannerReturn {
+  const { checkRefusedPost } = usePost();
   const location = useLocation();
 
-  // URL dan marketId ni ajratib olish
   const pathParts = location.pathname.split("/");
   const postId = pathParts[pathParts.length - 1];
+
+  const [visualFeedback, setVisualFeedback] = useState<VisualFeedback>({
+    show: false,
+    type: 'success',
+    message: ''
+  });
+
+  const showVisualFeedback = useCallback((type: 'success' | 'error' | 'warning', msg?: string) => {
+    setVisualFeedback({ show: true, type, message: msg });
+    setTimeout(() => {
+      setVisualFeedback({ show: false, type: 'success', message: '' });
+    }, 800);
+  }, []);
+
+  const refetchRef = useRef(refetch);
+  const setSelectedIdsRef = useRef(setSelectedIds);
+  const successTokens = useRef<Set<string>>(new Set());
+  const processingTokens = useRef<Set<string>>(new Set());
+
+  refetchRef.current = refetch;
+  setSelectedIdsRef.current = setSelectedIds;
+
+  useEffect(() => {
+    successTokens.current.clear();
+  }, [postId]);
 
   useEffect(() => {
     let scanned = "";
     let timer: any = null;
-    const errorSound = new Audio(`${import.meta.env.BASE_URL}sound/error.mp3`);
 
     const handleKeyPress = async (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+        return;
+      }
+
       if (e.key === "Enter") {
         const tokenValue = scanned.trim();
         scanned = "";
 
         if (!tokenValue) return;
 
-        // Agar URL bo‘lsa faqat token qismini olamiz
         const token = tokenValue.startsWith("http")
           ? tokenValue.split("/").pop()
           : tokenValue;
+
+        if (!token) return;
+
+        // Allaqachon topilgan
+        if (successTokens.current.has(token)) {
+          playSuccess();
+          showVisualFeedback('warning', 'Allaqachon topilgan!');
+          return;
+        }
+
+        // Hozir tekshirilmoqda
+        if (processingTokens.current.has(token)) {
+          return;
+        }
+
+        processingTokens.current.add(token);
 
         checkRefusedPost.mutate(
           {
@@ -41,19 +139,38 @@ export function useRefusedPostScanner(
             onSuccess: (res) => {
               const orderId = res.data.order?.id;
 
-              if (setSelectedIds) {
-                setSelectedIds((prev) =>
+              playSuccess();
+              showVisualFeedback('success', 'Buyurtma topildi!');
+              successTokens.current.add(token);
+
+              if (orderId && setSelectedIdsRef.current) {
+                setSelectedIdsRef.current((prev) =>
                   prev.includes(orderId) ? prev : [...prev, orderId]
                 );
               }
 
-              handleSuccess("Buyurtma topildi ✅");
-              refetch?.();
+              refetchRef.current?.();
             },
-            onError: (err) => {
-              handleApiError(err, "Buyurtma pochtada topolmadi!");
-              errorSound.currentTime = 0;
-              errorSound.play().catch(() => { });
+            onError: (err: any) => {
+              playError();
+
+              const errorMsg = err?.response?.data?.message
+                || err?.message
+                || 'Xatolik';
+
+              let displayError = 'Buyurtma topilmadi!';
+              const errLower = errorMsg.toLowerCase();
+
+              if (errLower.includes('not found') || errLower.includes('topilmadi')) {
+                displayError = 'Bu pochtada yo\'q!';
+              } else if (err?.response?.status === 404) {
+                displayError = 'Bu pochtada yo\'q!';
+              }
+
+              showVisualFeedback('error', displayError);
+            },
+            onSettled: () => {
+              processingTokens.current.delete(token);
             },
           }
         );
@@ -67,13 +184,15 @@ export function useRefusedPostScanner(
     };
 
     window.addEventListener("keypress", handleKeyPress);
-    return () => window.removeEventListener("keypress", handleKeyPress);
+    return () => {
+      window.removeEventListener("keypress", handleKeyPress);
+      if (timer) clearTimeout(timer);
+    };
   }, [
     checkRefusedPost,
-    handleApiError,
-    handleSuccess,
-    refetch,
+    showVisualFeedback,
     postId,
-    setSelectedIds
   ]);
+
+  return { visualFeedback };
 }

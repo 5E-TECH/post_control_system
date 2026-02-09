@@ -19,4 +19,9 @@ export class PrinterController {
   async printLabel(@Body() printOrderDto: CreatePrinterDto) {
     return await this.printerService.printMultiple(printOrderDto);
   }
+
+  @Post('receipt')
+  async getReceipt(@Body() printOrderDto: CreatePrinterDto) {
+    return await this.printerService.generateReceiptHtml(printOrderDto);
+  }
 }

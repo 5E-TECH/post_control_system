@@ -59,6 +59,7 @@ import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
 import { ExternalIntegrationService } from '../external-integration/external-integration.service';
 import { FieldMapping } from 'src/core/entity/external-integration.entity';
+import { IntegrationSyncService } from '../integration-sync/integration-sync.service';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -98,6 +99,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     private readonly botService: BotService,
     private readonly orderBotService: OrderBotService,
     private readonly externalIntegrationService: ExternalIntegrationService,
+    private readonly integrationSyncService: IntegrationSyncService,
   ) {
     super(orderRepo);
   }
@@ -562,6 +564,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('order.district', 'orderDistrict')
+        .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
         .leftJoinAndSelect('customer.district', 'district')
         .leftJoinAndSelect('district.region', 'region.name')
         .where('order.status = :status', { status: Order_status.NEW })
@@ -611,6 +615,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const query = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('order.district', 'orderDistrict')
+        .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
         .leftJoinAndSelect('customer.district', 'district')
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
@@ -667,7 +673,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const order = await this.orderRepo.findOne({
         where: { qr_code_token: token },
-        relations: ['customer', 'customer.district', 'items', 'items.product'],
+        relations: ['customer', 'district', 'district.region', 'customer.district', 'items', 'items.product'],
       });
       if (!order) {
         throw new NotFoundException('Order not found');
@@ -935,15 +941,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Customer not found');
       }
 
+      // Order ning o'z district_id sini ishlatish (fallback: customer.district)
+      const orderDistrict = order.district_id
+        ? await queryRunner.manager.findOne(DistrictEntity, { where: { id: order.district_id } })
+        : customer.district;
+
+      if (!orderDistrict) {
+        throw new NotFoundException('District not found for this order');
+      }
+
       let newPost = await queryRunner.manager.findOne(PostEntity, {
         where: {
-          region_id: customer.district.assigned_region,
+          region_id: orderDistrict.assigned_region,
           status: Post_status.NEW,
         },
       });
       if (!newPost) {
         newPost = queryRunner.manager.create(PostEntity, {
-          region_id: customer.district.assigned_region,
+          region_id: orderDistrict.assigned_region,
           qr_code_token: generateCustomToken(),
           post_total_price: 0,
           order_quantity: 0,
@@ -1000,6 +1015,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const qb = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
+        .leftJoinAndSelect('order.district', 'orderDistrict')
+        .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
         .leftJoinAndSelect('customer.district', 'district')
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
@@ -1110,6 +1127,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('o.market', 'market')
         .leftJoinAndSelect('o.customer', 'customer')
+        .leftJoinAndSelect('o.district', 'orderDistrict')
+        .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
         .leftJoinAndSelect('customer.district', 'district')
         .where('o.post_id IN (:...postIds)', { postIds: allPostIds })
         .orderBy('o.created_at', 'DESC')
@@ -1416,6 +1435,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
       await this.orderBotService.syncStatusButton(order.id);
+
+      // Tashqi integratsiya bilan sinxronlash (async, kurierga halaqit bermaydi)
+      // Agar order PAID yoki PARTLY_PAID bo'lsa 'paid' action, aks holda 'sold'
+      const syncAction = [Order_status.PAID, Order_status.PARTLY_PAID].includes(order.status)
+        ? 'paid'
+        : 'sold';
+      this.integrationSyncService.queueStatusSync(
+        order.id,
+        syncAction,
+        Order_status.WAITING,
+        order.status,
+      );
+
       return successRes({}, 200, 'Order sold');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1436,7 +1468,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
-        relations: ['items', 'items.product'],
+        relations: ['items', 'items.product', 'district', 'district.region'],
       });
       if (!order) {
         throw new NotFoundException('Order not found');
@@ -1533,7 +1565,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         `*❌ Buyurtma bekor qilindi!*\n\n` +
           `👤 *Mijoz:* ${customer?.name}\n` +
           `📞 *Telefon:* ${customer?.phone_number}\n` +
-          `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
+          `📍 *Manzil:* ${(order.district?.region?.name || customer?.district?.region?.name) || '-'}, ${(order.district?.name || customer?.district?.name) || '-'}\n\n` +
           `📦 *Buyurtmalar:*\n${order.items
             .map(
               (item, i) =>
@@ -1550,6 +1582,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
       await this.orderBotService.syncStatusButton(order.id);
+
+      // Tashqi integratsiya bilan sinxronlash (async, kurierga halaqit bermaydi)
+      this.integrationSyncService.queueStatusSync(
+        order.id,
+        'canceled',
+        Order_status.WAITING,
+        Order_status.CANCELLED,
+      );
+
       return successRes({ id: order.id }, 200, 'Order canceled');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1599,7 +1640,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // 1️⃣ Check order
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id, status: Order_status.WAITING },
-        relations: ['items', 'items.product'],
+        relations: ['items', 'items.product', 'district', 'district.region'],
       });
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
@@ -1913,7 +1954,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             `*⚠️❌ Qisman bekor qilindi!*\n\n` +
               `👤 *Mijoz:* ${customer?.name}\n` +
               `📞 *Telefon:* ${customer?.phone_number}\n` +
-              `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
+              `📍 *Manzil:* ${(order.district?.region?.name || customer?.district?.region?.name) || '-'}, ${(order.district?.name || customer?.district?.name) || '-'}\n\n` +
               `📦 *Buyurtmalar:*\n${canceled?.items
                 .map(
                   (item, i) =>
@@ -1935,7 +1976,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         `*⚠️ Buyurtma arzonroq sotildi!*\n\n` +
           `👤 *Mijoz:* ${customer?.name}\n` +
           `📞 *Telefon:* ${customer?.phone_number}\n` +
-          `📍 *Manzil:* ${customer?.district.region.name}, ${customer?.district.name}\n\n` +
+          `📍 *Manzil:* ${(order.district?.region?.name || customer?.district?.region?.name) || '-'}, ${(order.district?.name || customer?.district?.name) || '-'}\n\n` +
           `📦 *Buyurtmalar:*\n${order.items
             .map(
               (item, i) =>
@@ -2255,6 +2296,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // === Update order status ===
+      // Oldingi statusni saqlab qo'yamiz (sync uchun kerak)
+      const previousStatus = order.status;
+
       if (isSuperAdmin && [Order_status.PAID, Order_status.PARTLY_PAID].includes(order.status)) {
         Object.assign(order, {
           status: Order_status.WAITING,
@@ -2272,6 +2316,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
       await this.orderBotService.syncStatusButton(order.id);
+
+      // Tashqi integratsiya bilan sinxronlash (async, kurierga halaqit bermaydi)
+      this.integrationSyncService.queueStatusSync(
+        order.id,
+        'rollback',
+        previousStatus,
+        Order_status.WAITING,
+      );
+
       return successRes({}, 200, 'Order WAITING holatiga qaytarildi');
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -3074,6 +3127,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         const qb = this.orderRepo
           .createQueryBuilder('order')
           .leftJoinAndSelect('order.customer', 'customer')
+          .leftJoinAndSelect('order.district', 'orderDistrict')
+          .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
           .leftJoinAndSelect('customer.district', 'district')
           .leftJoinAndSelect('district.region', 'region')
           .leftJoinAndSelect('order.market', 'market')
@@ -3104,7 +3159,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
 
         if (filters.regionId) {
-          qb.andWhere('region.id = :regionId', { regionId: filters.regionId });
+          qb.andWhere(
+            '(orderRegion.id = :regionId OR (orderDistrict.id IS NULL AND region.id = :regionId))',
+            { regionId: filters.regionId },
+          );
         }
 
         if (filters.search) {
@@ -3140,8 +3198,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             market: order.market?.name || '-',
             customer_name: order.customer?.name || '-',
             phone: order.customer?.phone_number || '-',
-            region: order.customer?.district?.region?.name || '-',
-            district: order.customer?.district?.name || '-',
+            region: order.district?.region?.name || order.customer?.district?.region?.name || '-',
+            district: order.district?.name || order.customer?.district?.name || '-',
             address: order.customer?.address || '-',
             total_price: order.total_price || 0,
             paid_amount: order.paid_amount || 0,

@@ -159,6 +159,17 @@
   background-color: #4c4470 !important;
 }
 
+/* Search input in Select */
+.dark .ant-select-selection-search-input {
+  color: #fff !important;
+  caret-color: #fff !important;
+}
+
+.ant-select-selection-search-input {
+  color: #374151 !important;
+  caret-color: #374151 !important;
+}
+
 .dark .myTextArea.ant-input {
   background-color: #312d4b !important;
   color: #fff !important;
@@ -421,4 +432,39 @@
   cursor: pointer !important;
 }
 
+/* Filter Select Styling */
+.filter-select .ant-select-selector {
+  border-radius: 10px !important;
+  border: 1px solid #e5e7eb !important;
+  background: white !important;
+  min-height: 38px !important;
+}
+
+.filter-select .ant-select-selector:hover {
+  border-color: #a78bfa !important;
+}
+
+.filter-select.ant-select-focused .ant-select-selector {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2) !important;
+}
+
+.dark .filter-select .ant-select-selector {
+  background: #1f1b2e !important;
+  border-color: #374151 !important;
+}
+
+.dark .filter-select .ant-select-selector:hover {
+  border-color: #7c3aed !important;
+}
+
+.dark .filter-select.ant-select-focused .ant-select-selector {
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.3) !important;
+}
+
+/* Selected value styling */
+.filter-select .ant-select-selection-item {
+  font-weight: 500 !important;
+}
 

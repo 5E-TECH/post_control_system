@@ -19,6 +19,7 @@ import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
+import { IntegrationSyncModule } from '../integration-sync/integration-sync.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ExternalIntegrationModule } from '../external-integration/external-inte
     BotModule,
     OrderBotModule,
     ExternalIntegrationModule,
+    IntegrationSyncModule,
   ],
   controllers: [DashboardController],
   providers: [DashboardService, OrderService, OrderGateaway, MyLogger, OrderBotService, Token, BcryptEncryption],

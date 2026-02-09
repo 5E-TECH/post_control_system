@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { FieldMappingDto } from './field-mapping.dto';
+import { StatusMappingDto, StatusSyncConfigDto } from './status-mapping.dto';
 import { AuthType } from 'src/core/entity/external-integration.entity';
 
 export class CreateIntegrationDto {
@@ -91,4 +92,16 @@ export class CreateIntegrationDto {
   @ValidateNested()
   @Type(() => FieldMappingDto)
   field_mapping?: FieldMappingDto;
+
+  @ApiPropertyOptional({ description: 'Status mapping sozlamalari' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StatusMappingDto)
+  status_mapping?: StatusMappingDto;
+
+  @ApiPropertyOptional({ description: 'Status sync konfiguratsiyasi' })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => StatusSyncConfigDto)
+  status_sync_config?: StatusSyncConfigDto;
 }

@@ -5,6 +5,7 @@
   "placeholder": {
     "selectMarket": "Выберите рынок",
     "selectRegion": "Выберите регион",
+    "selectCourier": "Выберите курьера",
     "selectStatus": "Выберите статус",
     "selectStatuses": "Выберите статусы",
     "searchOrder": "Поиск заказа",
@@ -33,6 +34,7 @@
   "region": "РЕГИОН",
   "district": "РАЙОН",
   "market": "МАРКЕТ",
+  "courier": "КУРЬЕР",
   "status": "СТАТУС",
   "price": "ЦЕНА",
   "createdAt": "ДАТА СОЗДАНИЯ",
