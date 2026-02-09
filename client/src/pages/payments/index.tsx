@@ -409,25 +409,25 @@ const Payments = () => {
 
         {/* Market Popup */}
         <PaymentPopup isShow={showMarket} onClose={hendlerClose}>
-          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[95%] min-w-[700px] max-h-[90vh] px-4 sm:px-6 py-5 sm:py-6 relative flex flex-col">
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full sm:w-[95%] sm:min-w-[700px] max-h-[85vh] sm:max-h-[90vh] px-3 sm:px-6 py-4 sm:py-6 relative flex flex-col">
             <button
               onClick={hendlerClose}
-              className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110 cursor-pointer z-10"
             >
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+            <div className="flex items-center gap-3 mb-4 pr-10">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
                 <Store className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <h1 className="font-semibold text-lg text-gray-800 dark:text-white">
+              <h1 className="font-semibold text-base sm:text-lg text-gray-800 dark:text-white truncate">
                 {t("berilishiKerak")}
               </h1>
             </div>
 
             <div className="flex items-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 bg-white dark:bg-[#312D4B] focus-within:ring-2 focus-within:ring-purple-500/20 focus-within:border-purple-500 transition-all">
-              <Search className="w-4 h-4 text-gray-400" />
+              <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <input
                 defaultValue={search}
                 onChange={handleSearchChange}
@@ -438,11 +438,11 @@ const Payments = () => {
             </div>
 
             <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex-1 flex flex-col min-h-0">
-              <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-4 py-3">
-                <div className="grid grid-cols-12 gap-2 text-white text-sm font-medium">
-                  <div className="col-span-1">#</div>
-                  <div className="col-span-6">{t("marketName")}</div>
-                  <div className="col-span-5 text-right">
+              <div className="bg-gradient-to-r from-purple-500 to-indigo-600 px-3 sm:px-4 py-3">
+                <div className="flex items-center text-white text-xs sm:text-sm font-medium">
+                  <div className="w-8 sm:w-10">#</div>
+                  <div className="flex-1 min-w-0">{t("marketName")}</div>
+                  <div className="text-right flex-shrink-0">
                     {t("berilishiKerakSumma")}
                   </div>
                 </div>
@@ -453,19 +453,19 @@ const Payments = () => {
                   <div
                     key={item?.id}
                     onClick={() => setSelect(item?.id)}
-                    className={`grid grid-cols-12 gap-2 px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 transition-all ${
+                    className={`flex items-center px-3 sm:px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 transition-all ${
                       item.id === select
                         ? "bg-purple-100 dark:bg-purple-900/30"
                         : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
                     }`}
                   >
-                    <div className="col-span-1 text-purple-600 dark:text-purple-400 font-medium">
+                    <div className="w-8 sm:w-10 text-purple-600 dark:text-purple-400 font-medium text-sm">
                       {inx + 1}
                     </div>
-                    <div className="col-span-6 text-gray-800 dark:text-white font-medium truncate">
+                    <div className="flex-1 min-w-0 text-sm text-gray-800 dark:text-white font-medium truncate">
                       {item?.name}
                     </div>
-                    <div className="col-span-5 text-right text-gray-600 dark:text-gray-300">
+                    <div className="text-right text-sm text-gray-600 dark:text-gray-300 flex-shrink-0 ml-2">
                       {item?.cashbox?.balance?.toLocaleString()} UZS
                     </div>
                   </div>
@@ -477,7 +477,7 @@ const Payments = () => {
               <button
                 disabled={!select}
                 onClick={handleNavigate}
-                className={`px-6 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                className={`px-5 sm:px-6 py-2.5 text-sm font-medium rounded-xl transition-all ${
                   select
                     ? "bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/25"
                     : "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
@@ -491,25 +491,25 @@ const Payments = () => {
 
         {/* Courier Popup */}
         <PaymentPopup isShow={showCurier} onClose={hendlerClose}>
-          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[95%] min-w-[700px] max-h-[90vh] px-4 sm:px-6 py-5 sm:py-6 relative flex flex-col">
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full sm:w-[95%] sm:min-w-[700px] max-h-[85vh] sm:max-h-[90vh] px-3 sm:px-6 py-4 sm:py-6 relative flex flex-col">
             <button
               onClick={() => hendlerClose()}
-              className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110 cursor-pointer z-10"
             >
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+            <div className="flex items-center gap-3 mb-4 pr-10">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
                 <Truck className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               </div>
-              <h1 className="font-semibold text-lg text-gray-800 dark:text-white">
+              <h1 className="font-semibold text-base sm:text-lg text-gray-800 dark:text-white truncate">
                 {t("olinishiKerak")}
               </h1>
             </div>
 
             <div className="flex items-center gap-2 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 bg-white dark:bg-[#312D4B] focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500 transition-all">
-              <Search className="w-4 h-4 text-gray-400" />
+              <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <input
                 defaultValue={search}
                 onChange={handleSearchChange}
@@ -520,12 +520,12 @@ const Payments = () => {
             </div>
 
             <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden flex-1 flex flex-col min-h-0">
-              <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-3">
-                <div className="grid grid-cols-12 gap-2 text-white text-sm font-medium">
-                  <div className="col-span-1">#</div>
-                  <div className="col-span-4">{t("courierName")}</div>
-                  <div className="col-span-3">{t("region")}</div>
-                  <div className="col-span-4 text-right">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-3 sm:px-4 py-3">
+                <div className="flex items-center text-white text-xs sm:text-sm font-medium">
+                  <div className="w-8 sm:w-10">#</div>
+                  <div className="flex-1 min-w-0">{t("courierName")}</div>
+                  <div className="hidden sm:block w-[120px] text-center">{t("region")}</div>
+                  <div className="text-right flex-shrink-0">
                     {t("olinishiKerakSumma")}
                   </div>
                 </div>
@@ -536,22 +536,27 @@ const Payments = () => {
                   <div
                     key={item?.id}
                     onClick={() => setSelect(item?.id)}
-                    className={`grid grid-cols-12 gap-2 px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 transition-all ${
+                    className={`flex items-center px-3 sm:px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 transition-all ${
                       item.id === select
                         ? "bg-amber-100 dark:bg-amber-900/30"
                         : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
                     }`}
                   >
-                    <div className="col-span-1 text-amber-600 dark:text-amber-400 font-medium">
+                    <div className="w-8 sm:w-10 text-amber-600 dark:text-amber-400 font-medium text-sm">
                       {inx + 1}
                     </div>
-                    <div className="col-span-4 text-gray-800 dark:text-white font-medium truncate">
-                      {item?.name}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 dark:text-white font-medium truncate">
+                        {item?.name}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate sm:hidden">
+                        {item?.region?.name}
+                      </p>
                     </div>
-                    <div className="col-span-3 text-gray-500 dark:text-gray-400 truncate">
+                    <div className="hidden sm:block w-[120px] text-center text-sm text-gray-500 dark:text-gray-400 truncate">
                       {item?.region?.name}
                     </div>
-                    <div className="col-span-4 text-right text-gray-600 dark:text-gray-300">
+                    <div className="text-right text-sm text-gray-600 dark:text-gray-300 flex-shrink-0 ml-2">
                       {item?.cashbox?.balance?.toLocaleString()} UZS
                     </div>
                   </div>
@@ -563,7 +568,7 @@ const Payments = () => {
               <button
                 disabled={!select}
                 onClick={handleNavigate}
-                className={`px-6 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                className={`px-5 sm:px-6 py-2.5 text-sm font-medium rounded-xl transition-all ${
                   select
                     ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg shadow-amber-500/25"
                     : "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"

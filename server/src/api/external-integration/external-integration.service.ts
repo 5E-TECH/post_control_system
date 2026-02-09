@@ -12,6 +12,8 @@ import { AxiosResponse, AxiosError } from 'axios';
 import {
   ExternalIntegrationEntity,
   DEFAULT_FIELD_MAPPING,
+  DEFAULT_STATUS_MAPPING,
+  DEFAULT_STATUS_SYNC_CONFIG,
 } from 'src/core/entity/external-integration.entity';
 import { IntegrationSyncHistoryEntity } from 'src/core/entity/integration-sync-history.entity';
 import { CreateIntegrationDto, UpdateIntegrationDto } from './dto';
@@ -114,9 +116,23 @@ export class ExternalIntegrationService {
         ...(dto.field_mapping || {}),
       };
 
+      // Default status mapping bilan birlashtirish
+      const statusMapping = {
+        ...DEFAULT_STATUS_MAPPING,
+        ...(dto.status_mapping || {}),
+      };
+
+      // Default status sync config bilan birlashtirish
+      const statusSyncConfig = {
+        ...DEFAULT_STATUS_SYNC_CONFIG,
+        ...(dto.status_sync_config || {}),
+      };
+
       const integration = this.repo.create({
         ...dto,
         field_mapping: fieldMapping,
+        status_mapping: statusMapping,
+        status_sync_config: statusSyncConfig,
         is_active: dto.is_active ?? true,
       });
 
@@ -156,6 +172,22 @@ export class ExternalIntegrationService {
         dto.field_mapping = {
           ...integration.field_mapping,
           ...dto.field_mapping,
+        };
+      }
+
+      // Status mapping ni birlashtirish
+      if (dto.status_mapping) {
+        dto.status_mapping = {
+          ...integration.status_mapping,
+          ...dto.status_mapping,
+        };
+      }
+
+      // Status sync config ni birlashtirish
+      if (dto.status_sync_config) {
+        dto.status_sync_config = {
+          ...integration.status_sync_config,
+          ...dto.status_sync_config,
         };
       }
 

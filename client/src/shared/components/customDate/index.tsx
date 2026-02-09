@@ -1,7 +1,6 @@
 import React, { memo, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
 import { useTranslation } from "react-i18next";
-import { X } from "lucide-react";
 
 type CalendarProps = {
   from: Dayjs | null;
@@ -32,12 +31,6 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
     const closeAll = () => {
       setIsFromOpen(false);
       setIsToOpen(false);
-    };
-
-    const handleClear = () => {
-      setFrom(null);
-      setTo(null);
-      closeAll();
     };
 
     const handlePrevMonth = (isFrom: boolean) => {
@@ -109,6 +102,12 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
               />
               {isFromOpen && (
                 <div className="fixed left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 sm:absolute sm:left-0 sm:translate-x-0 sm:top-full sm:translate-y-0 bg-white border border-gray-200 mt-0 sm:mt-2 rounded-2xl shadow-2xl z-50 p-4 w-[calc(100vw-32px)] sm:w-[280px] max-w-[320px] dark:bg-[#28243D] dark:border-gray-700">
+                  {/* Label */}
+                  <div className="text-center mb-3 pb-2 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                      Qachondan
+                    </span>
+                  </div>
                   <div className="flex justify-between items-center mb-3">
                     <button
                       type="button"
@@ -138,15 +137,18 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                   <div className="grid grid-cols-7 gap-1 text-center">
                     {generateCalendarDays(currentMonth).map((day, idx) => {
                       const isSelected = day && from && day.isSame(from, "day");
+                      const isToday = day && day.isSame(dayjs(), "day");
                       return (
                         <button
                           type="button"
                           key={idx}
                           disabled={!day}
                           onClick={() => day && handleDayClick(day, true)}
-                          className={`w-9 h-9 rounded-xl text-sm font-medium transition ${
+                          className={`w-9 h-9 rounded-xl text-sm font-medium transition relative ${
                             isSelected
                               ? "bg-blue-500 text-white shadow-md"
+                              : isToday
+                              ? "bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 ring-2 ring-purple-400 dark:ring-purple-500"
                               : day ? "hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-700 dark:text-gray-300" : ""
                           }`}
                         >
@@ -171,6 +173,12 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
               />
               {isToOpen && (
                 <div className="fixed left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 sm:absolute sm:right-0 sm:left-auto sm:translate-x-0 sm:top-full sm:translate-y-0 bg-white border border-gray-200 mt-0 sm:mt-2 rounded-2xl shadow-2xl z-50 p-4 w-[calc(100vw-32px)] sm:w-[280px] max-w-[320px] dark:bg-[#28243D] dark:border-gray-700">
+                  {/* Label */}
+                  <div className="text-center mb-3 pb-2 border-b border-gray-100 dark:border-gray-700">
+                    <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                      Qachongacha
+                    </span>
+                  </div>
                   <div className="flex justify-between items-center mb-3">
                     <button
                       type="button"
@@ -200,6 +208,7 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                   <div className="grid grid-cols-7 gap-1 text-center">
                     {generateCalendarDays(currentMonthTo).map((day, idx) => {
                       const isSelected = day && to && day.isSame(to, "day");
+                      const isToday = day && day.isSame(dayjs(), "day");
                       const isBeforeFrom =
                         day && from ? day.isBefore(from, "day") : false;
                       return (
@@ -211,6 +220,8 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
                           className={`w-9 h-9 rounded-xl text-sm font-medium transition ${
                             isSelected
                               ? "bg-blue-500 text-white shadow-md"
+                              : isToday && !isBeforeFrom
+                              ? "bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 ring-2 ring-purple-400 dark:ring-purple-500"
                               : day && !isBeforeFrom ? "hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-700 dark:text-gray-300" : "text-gray-300 dark:text-gray-600"
                           }`}
                         >
@@ -223,16 +234,6 @@ const CustomCalendar: React.FC<CalendarProps> = memo(
               )}
             </div>
 
-            {/* Clear Button */}
-            {(from || to) && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="flex-shrink-0 w-10 h-10 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-[#28243D] flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
           </div>
         </div>
       </div>

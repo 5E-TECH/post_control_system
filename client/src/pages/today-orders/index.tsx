@@ -1823,8 +1823,8 @@ const TodayOrders = () => {
           </div>
         </div>
 
-        {/* Custom Tabs */}
-        <div className="grid grid-cols-2 gap-2 mb-6">
+        {/* Custom Tabs - Market uchun faqat Marketlar tabi ko'rinadi */}
+        <div className={`grid gap-2 mb-6 ${role.role === "market" ? "grid-cols-1" : "grid-cols-2"}`}>
           {/* Markets Tab */}
           <button
             onClick={() => setActiveTab("markets")}
@@ -1853,28 +1853,30 @@ const TodayOrders = () => {
             )}
           </button>
 
-          {/* External Orders Tab */}
-          <button
-            onClick={() => setActiveTab("external")}
-            className={`flex items-center justify-center gap-2 py-2.5 lg:py-3 rounded-xl font-medium transition-all cursor-pointer ${
-              activeTab === "external"
-                ? "bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/25"
-                : "bg-white dark:bg-[#2A263D] text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border border-gray-200 dark:border-gray-700"
-            }`}
-          >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-              activeTab === "external"
-                ? "bg-white/20"
-                : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-            }`}>
-              <QrCode className="w-4 h-4" />
-            </div>
-            <span className="text-sm hidden sm:inline">Tashqi buyurtmalar</span>
-          </button>
+          {/* External Orders Tab - faqat superadmin va admin uchun */}
+          {role.role !== "market" && (
+            <button
+              onClick={() => setActiveTab("external")}
+              className={`flex items-center justify-center gap-2 py-2.5 lg:py-3 rounded-xl font-medium transition-all cursor-pointer ${
+                activeTab === "external"
+                  ? "bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/25"
+                  : "bg-white dark:bg-[#2A263D] text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border border-gray-200 dark:border-gray-700"
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                activeTab === "external"
+                  ? "bg-white/20"
+                  : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+              }`}>
+                <QrCode className="w-4 h-4" />
+              </div>
+              <span className="text-sm hidden sm:inline">Tashqi buyurtmalar</span>
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
-        {activeTab === "markets" ? marketsContent : <ExternalOrdersTab />}
+        {activeTab === "markets" || role.role === "market" ? marketsContent : <ExternalOrdersTab />}
       </div>
     </div>
   );

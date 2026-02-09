@@ -10,17 +10,17 @@ const PaymentPopup: FC<Props> = ({ children, onClose, isShow = false }) => {
   if (!isShow) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-center items-center">
+    <div className="fixed inset-0 z-[100] flex justify-center items-center p-3 sm:p-4 overflow-y-auto">
       {/* Orqa fon - bosilganda popup yopiladi */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm cursor-pointer"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm cursor-pointer"
       />
 
       {/* Popup kontenti - bosilganda yopilmaydi */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative z-[101]"
+        className="relative z-[101] w-full flex justify-center my-auto"
       >
         {children}
       </div>

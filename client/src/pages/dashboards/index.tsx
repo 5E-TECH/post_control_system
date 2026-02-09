@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   XCircle,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCourierStatCard } from "../../shared/api/hooks/useCourierStatCard";
@@ -99,16 +100,26 @@ const Dashboards = () => {
   const soldOrders = dashboard?.soldAndPaid || 0;
   const successRate = totalOrders > 0 ? ((soldOrders / totalOrders) * 100).toFixed(1) : 0;
 
+  // O'zbek formatida sana
+  const formatDateUz = (dateStr: string) => {
+    const months = [
+      "yanvar", "fevral", "mart", "aprel", "may", "iyun",
+      "iyul", "avgust", "sentyabr", "oktyabr", "noyabr", "dekabr"
+    ];
+    const date = dayjs(dateStr);
+    return `${date.date()}-${months[date.month()]}`;
+  };
+
   let titleText = `${t("title")}`;
 
   if (fromDate && toDate && fromDate === toDate) {
-    titleText = `${fromDate} - ${t("title")}`;
+    titleText = `${formatDateUz(fromDate)} statistikasi`;
   } else if (fromDate && toDate && fromDate !== toDate) {
-    titleText = `${fromDate} - ${toDate}`;
+    titleText = `${formatDateUz(fromDate)} - ${formatDateUz(toDate)}`;
   } else if (fromDate && !toDate) {
-    titleText = `${fromDate} dan boshlab`;
+    titleText = `${formatDateUz(fromDate)} dan boshlab`;
   } else if (!fromDate && toDate) {
-    titleText = `${toDate} gacha`;
+    titleText = `${formatDateUz(toDate)} gacha`;
   }
 
   return (
@@ -136,38 +147,52 @@ const Dashboards = () => {
             <SkeletonBox className="w-full sm:w-64 h-10" />
           ) : (
             <>
-              {!isMobile ? (
-                <RangePicker
-                  value={[
-                    fromDate ? dayjs(fromDate) : null,
-                    toDate ? dayjs(toDate) : null,
-                  ]}
-                  onChange={(dates) => {
-                    setFromDate(
-                      dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
-                    );
-                    setToDate(
-                      dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
-                    );
-                  }}
-                  className="w-full sm:w-64
-                    dark:bg-[#342d4a]!
-                    dark:border-[#4b3b6a]!
-                    dark:[&_.ant-picker-input>input]:text-white!
-                    dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
-                />
-              ) : (
-                <CustomCalendar
-                  from={fromDate ? dayjs(fromDate) : null}
-                  to={toDate ? dayjs(toDate) : null}
-                  setFrom={(date: any) =>
-                    setFromDate(date ? date.format("YYYY-MM-DD") : undefined)
-                  }
-                  setTo={(date: any) =>
-                    setToDate(date ? date.format("YYYY-MM-DD") : undefined)
-                  }
-                />
-              )}
+              <div className="flex items-center gap-2">
+                {!isMobile ? (
+                  <RangePicker
+                    value={[
+                      fromDate ? dayjs(fromDate) : null,
+                      toDate ? dayjs(toDate) : null,
+                    ]}
+                    onChange={(dates) => {
+                      setFromDate(
+                        dates?.[0] ? dates[0].format("YYYY-MM-DD") : undefined
+                      );
+                      setToDate(
+                        dates?.[1] ? dates[1].format("YYYY-MM-DD") : undefined
+                      );
+                    }}
+                    className="w-full sm:w-64
+                      dark:bg-[#342d4a]!
+                      dark:border-[#4b3b6a]!
+                      dark:[&_.ant-picker-input>input]:text-white!
+                      dark:[&_.ant-picker-input>input]:placeholder-gray-300!"
+                  />
+                ) : (
+                  <CustomCalendar
+                    from={fromDate ? dayjs(fromDate) : null}
+                    to={toDate ? dayjs(toDate) : null}
+                    setFrom={(date: any) =>
+                      setFromDate(date ? date.format("YYYY-MM-DD") : undefined)
+                    }
+                    setTo={(date: any) =>
+                      setToDate(date ? date.format("YYYY-MM-DD") : undefined)
+                    }
+                  />
+                )}
+                {/* Clear Button */}
+                {(fromDate || toDate) && (
+                  <button
+                    onClick={() => {
+                      setFromDate(undefined);
+                      setToDate(undefined);
+                    }}
+                    className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
             </>
           )}
         </div>

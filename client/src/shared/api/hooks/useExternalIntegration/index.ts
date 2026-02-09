@@ -23,6 +23,26 @@ export interface FieldMapping {
 
 export type AuthType = 'api_key' | 'login';
 
+// Status mapping - bizning statuslarni tashqi tizim statuslariga moslashtirish
+export interface StatusMapping {
+  sold: string;
+  canceled: string;
+  paid: string;
+  rollback: string;
+  waiting: string;
+}
+
+// Status sync configuration
+export interface StatusSyncConfig {
+  enabled: boolean;
+  endpoint: string;
+  method: 'PUT' | 'PATCH' | 'POST';
+  status_field: string;
+  use_auth: boolean;
+  include_order_id_in_body: boolean;
+  order_id_field: string;
+}
+
 export interface ExternalIntegration {
   id: string;
   name: string;
@@ -37,6 +57,8 @@ export interface ExternalIntegration {
   market_id: string;
   is_active: boolean;
   field_mapping: FieldMapping;
+  status_mapping: StatusMapping;
+  status_sync_config: StatusSyncConfig;
   last_sync_at: number | null;
   total_synced_orders: number;
   created_at: number;
@@ -60,6 +82,8 @@ export interface CreateIntegrationDto {
   market_id: string;
   is_active?: boolean;
   field_mapping?: Partial<FieldMapping>;
+  status_mapping?: Partial<StatusMapping>;
+  status_sync_config?: Partial<StatusSyncConfig>;
 }
 
 export interface UpdateIntegrationDto {
@@ -75,6 +99,8 @@ export interface UpdateIntegrationDto {
   market_id?: string;
   is_active?: boolean;
   field_mapping?: Partial<FieldMapping>;
+  status_mapping?: Partial<StatusMapping>;
+  status_sync_config?: Partial<StatusSyncConfig>;
 }
 
 export const useExternalIntegration = () => {

@@ -19,8 +19,10 @@ import {
   Check,
   XCircle,
   RefreshCw,
+  ChevronDown,
+  Globe,
 } from "lucide-react";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { usePost } from "../../../../shared/api/hooks/usePost";
@@ -57,7 +59,9 @@ const OrderView = () => {
   );
 
   const params = searchData ? { search: searchData, limit: 0 } : { limit: 0 };
-  const { createPost, createPrint } = usePost();
+  const { createPost, createPrint, createBrowserPrint } = usePost();
+  const [printDropdownOpen, setPrintDropdownOpen] = useState(false);
+  const printDropdownRef = useRef<HTMLDivElement>(null);
   const { data, refetch, isLoading } =
     user.role === "market"
       ? getMarketsByMyNewOrders(params)
@@ -100,6 +104,7 @@ const OrderView = () => {
   const handlePrint = () => {
     if (isPrintDisabled) return;
     setIsPrintDisabled(true);
+    setPrintDropdownOpen(false);
     const orderids = { orderIds: selectedIds };
     createPrint.mutate(orderids, {
       onSuccess: () => {
@@ -113,6 +118,47 @@ const OrderView = () => {
       },
     });
   };
+
+  const handleBrowserPrint = () => {
+    if (isPrintDisabled || selectedIds.length === 0) return;
+    setIsPrintDisabled(true);
+    setPrintDropdownOpen(false);
+    const orderids = { orderIds: selectedIds };
+    createBrowserPrint.mutate(orderids, {
+      onSuccess: (res: any) => {
+        const html = res?.data?.html || res?.html;
+        if (html) {
+          const printWindow = window.open("", "_blank");
+          if (printWindow) {
+            printWindow.document.write(html);
+            printWindow.document.close();
+            handleSuccess("Chek tayyor");
+          } else {
+            handleApiError(null, "Brauzer yangi oyna ochishga ruxsat bermadi. Popup blockerni o'chiring.");
+          }
+        } else {
+          handleApiError(null, "Chek ma'lumotlari topilmadi");
+        }
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Chek yaratishda xatolik yuz berdi");
+      },
+      onSettled: () => {
+        setTimeout(() => setIsPrintDisabled(false), 3000);
+      },
+    });
+  };
+
+  // Close print dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (printDropdownRef.current && !printDropdownRef.current.contains(e.target as Node)) {
+        setPrintDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleAccapted = () => {
     const newOrder = { order_ids: selectedIds };
@@ -209,20 +255,52 @@ const OrderView = () => {
                 />
               </div>
 
-              {/* Print button */}
+              {/* Print button with dropdown */}
               {user.role !== "market" && (
-                <button
-                  onClick={handlePrint}
-                  disabled={isPrintDisabled || selectedIds.length === 0}
-                  className={`h-10 px-4 rounded-xl flex items-center gap-2 text-sm font-medium border transition-all ${
-                    isPrintDisabled || selectedIds.length === 0
-                      ? "opacity-50 cursor-not-allowed border-gray-300 text-gray-400 dark:border-gray-600 dark:text-gray-500"
-                      : "border-purple-500 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer"
-                  }`}
-                >
-                  <Printer className="w-4 h-4" />
-                  {isPrintDisabled ? "Kutayapti..." : "Chop etish"}
-                </button>
+                <div className="relative" ref={printDropdownRef}>
+                  <button
+                    onClick={() => {
+                      if (!isPrintDisabled && selectedIds.length > 0) {
+                        setPrintDropdownOpen((prev) => !prev);
+                      }
+                    }}
+                    disabled={isPrintDisabled || selectedIds.length === 0}
+                    className={`h-10 px-4 rounded-xl flex items-center gap-2 text-sm font-medium border transition-all ${
+                      isPrintDisabled || selectedIds.length === 0
+                        ? "opacity-50 cursor-not-allowed border-gray-300 text-gray-400 dark:border-gray-600 dark:text-gray-500"
+                        : "border-purple-500 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer"
+                    }`}
+                  >
+                    <Printer className="w-4 h-4" />
+                    {isPrintDisabled ? "Kutayapti..." : "Chop etish"}
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${printDropdownOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {printDropdownOpen && (
+                    <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#2A263D] rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden">
+                      <button
+                        onClick={handlePrint}
+                        className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                      >
+                        <Printer className="w-4 h-4 text-purple-500" />
+                        <div>
+                          <p className="font-medium text-gray-800 dark:text-white">Termal printer</p>
+                          <p className="text-xs text-gray-400">MQTT orqali</p>
+                        </div>
+                      </button>
+                      <div className="border-t border-gray-100 dark:border-gray-700" />
+                      <button
+                        onClick={handleBrowserPrint}
+                        className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                      >
+                        <Globe className="w-4 h-4 text-blue-500" />
+                        <div>
+                          <p className="font-medium text-gray-800 dark:text-white">Brauzer orqali</p>
+                          <p className="text-xs text-gray-400">Istalgan printer</p>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -325,8 +403,8 @@ const OrderView = () => {
                   }`}
                 >
                   {/* Top row: checkbox, index, badges and date */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {/* Checkbox */}
                       {user.role !== "market" && (
                         <div
@@ -346,74 +424,72 @@ const OrderView = () => {
                       <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">
                         #{inx + 1}
                       </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
-                        <Clock className="w-4 h-4" />
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                        <Clock className="w-3.5 h-3.5" />
                         {st(`${order.status}`)}
                       </span>
                       {order.where_deliver === "address" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                          <Home className="w-4 h-4" />
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                          <Home className="w-3.5 h-3.5" />
                           Uyga
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                          <Building2 className="w-4 h-4" />
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                          <Building2 className="w-3.5 h-3.5" />
                           Markaz
                         </span>
                       )}
                     </div>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0">
                       {formatDate(order.created_at)}
                     </span>
                   </div>
 
-                  {/* Main row: customer info (horizontal) + price + actions */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-5 flex-1 min-w-0 flex-wrap">
-                      {/* Name */}
-                      <span className="text-base font-semibold text-gray-800 dark:text-white whitespace-nowrap">
-                        {order.customer?.name || "Noma'lum"}
-                      </span>
-                      {/* Phone */}
-                      <span className="text-base text-gray-600 dark:text-gray-300 flex items-center gap-1.5 whitespace-nowrap">
-                        <Phone className="w-4 h-4 text-gray-400" />
-                        {formatPhone(order.customer?.phone_number)}
-                      </span>
-                      {/* Location */}
-                      <span className="text-base text-gray-500 dark:text-gray-400 flex items-center gap-1.5 whitespace-nowrap">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        {order.customer?.district?.region?.name || "-"}, {order.customer?.district?.name || "-"}
-                      </span>
+                  {/* Customer name + price */}
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="text-base font-semibold text-gray-800 dark:text-white truncate">
+                      {order.customer?.name || "Noma'lum"}
+                    </p>
+                    <p className="text-sm font-bold text-gray-800 dark:text-white whitespace-nowrap flex-shrink-0">
+                      {order.total_price?.toLocaleString()} so'm
+                    </p>
+                  </div>
+
+                  {/* Phone + Actions row */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1.5 whitespace-nowrap">
+                      <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      {formatPhone(order.customer?.phone_number)}
+                    </span>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(buildAdminPath(`orders/order-detail/${order.id}`));
+                        }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all cursor-pointer"
+                        title="Tahrirlash"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteId(order.id);
+                          setIsConfirmOpen(true);
+                        }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all cursor-pointer"
+                        title="O'chirish"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                    {/* Price and actions */}
-                    <div className="flex items-center gap-4 flex-shrink-0">
-                      <p className="text-base font-bold text-gray-800 dark:text-white whitespace-nowrap">
-                        {order.total_price?.toLocaleString()} so'm
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(buildAdminPath(`orders/order-detail/${order.id}`));
-                          }}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all cursor-pointer"
-                          title="Tahrirlash"
-                        >
-                          <Edit className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteId(order.id);
-                            setIsConfirmOpen(true);
-                          }}
-                          className="w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all cursor-pointer"
-                          title="O'chirish"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
+                  </div>
+
+                  {/* Location row */}
+                  <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                    <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    {order.customer?.district?.region?.name || "-"}, {order.customer?.district?.name || "-"}
                   </div>
 
                   {/* Products row */}

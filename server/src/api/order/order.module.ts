@@ -20,6 +20,7 @@ import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { OrderBotModule } from '../bots/order_create-bot/order-bot.module';
 import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
+import { IntegrationSyncModule } from '../integration-sync/integration-sync.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ExternalIntegrationModule } from '../external-integration/external-inte
     BotModule,
     OrderBotModule,
     ExternalIntegrationModule,
+    IntegrationSyncModule,
   ],
   controllers: [OrderController],
   providers: [
