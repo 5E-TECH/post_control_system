@@ -39,7 +39,7 @@ const Auth = () => {
               setUserData({
                 name: res?.data?.data?.name,
                 phone_number: res?.data?.data?.phone_number,
-              })
+              }),
             );
         }
         {
@@ -64,5 +64,6 @@ const Auth = () => {
 
   return valid ? <Outlet /> : <Navigate replace to={buildAdminPath("login")} />;
 };
+// test
 
 export default memo(Auth);
