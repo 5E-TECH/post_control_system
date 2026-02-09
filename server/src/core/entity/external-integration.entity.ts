@@ -23,6 +23,46 @@ export interface FieldMapping {
   created_at_field: string;
 }
 
+// Status mapping interfeysi - bizning statuslarni tashqi tizim statuslariga moslashtirish
+export interface StatusMapping {
+  sold: string;        // Sotildi → tashqi tizimdagi status
+  canceled: string;    // Bekor qilindi → tashqi tizimdagi status
+  paid: string;        // To'landi → tashqi tizimdagi status
+  rollback: string;    // Qaytarildi → tashqi tizimdagi status
+  waiting: string;     // Kutilmoqda → tashqi tizimdagi status
+}
+
+// Default status mapping
+export const DEFAULT_STATUS_MAPPING: StatusMapping = {
+  sold: 'completed',
+  canceled: 'cancelled',
+  paid: 'paid',
+  rollback: 'returned',
+  waiting: 'pending',
+};
+
+// Status sync configuration interfeysi
+export interface StatusSyncConfig {
+  enabled: boolean;              // Sync yoqilganmi
+  endpoint: string;              // API endpoint (e.g., '/orders/{id}/status' yoki '/orderstatus/update')
+  method: 'PUT' | 'PATCH' | 'POST';  // HTTP method
+  status_field: string;          // Request body dagi status field nomi
+  use_auth: boolean;             // Authorization header ishlatilsinmi
+  include_order_id_in_body: boolean;  // Order ID ni body ga qo'shish kerakmi
+  order_id_field: string;        // Body dagi order ID field nomi (masalan: 'order_id')
+}
+
+// Default status sync config
+export const DEFAULT_STATUS_SYNC_CONFIG: StatusSyncConfig = {
+  enabled: false,
+  endpoint: '/orders/{id}/status',
+  method: 'PUT',
+  status_field: 'status',
+  use_auth: true,
+  include_order_id_in_body: false,
+  order_id_field: 'order_id',
+};
+
 // Default field mapping (Adosh formatiga mos)
 export const DEFAULT_FIELD_MAPPING: FieldMapping = {
   id_field: 'id',
@@ -82,6 +122,14 @@ export class ExternalIntegrationEntity extends BaseEntity {
 
   @Column({ type: 'jsonb', default: DEFAULT_FIELD_MAPPING })
   field_mapping: FieldMapping;
+
+  // Status mapping - bizning statuslarni tashqi tizim statuslariga moslashtirish
+  @Column({ type: 'jsonb', default: DEFAULT_STATUS_MAPPING })
+  status_mapping: StatusMapping;
+
+  // Status sync configuration
+  @Column({ type: 'jsonb', default: DEFAULT_STATUS_SYNC_CONFIG })
+  status_sync_config: StatusSyncConfig;
 
   @Column({ type: 'bigint', nullable: true })
   last_sync_at: number | null;
