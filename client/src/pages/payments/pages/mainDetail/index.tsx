@@ -893,7 +893,7 @@ const MainDetail = () => {
         </div>
       </PaymentPopup>
 
-      {/* === SMENA BOSHLANMAGAN OGOHLANTIRISH POPUP === */>
+      {/* === SMENA BOSHLANMAGAN OGOHLANTIRISH POPUP === */}
       <PaymentPopup isShow={showShiftWarning} onClose={() => setShowShiftWarning(false)}>
         <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[480px] max-md:w-[95%] overflow-hidden">
           {/* Header */}

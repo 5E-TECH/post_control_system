@@ -22,7 +22,7 @@ import {
   ChevronDown,
   Globe,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useOrder } from "../../../../shared/api/hooks/useOrder";
 import { usePost } from "../../../../shared/api/hooks/usePost";
