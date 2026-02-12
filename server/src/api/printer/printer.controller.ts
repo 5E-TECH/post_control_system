@@ -1,15 +1,13 @@
 import {
   Controller,
-  Get,
   Post,
   Body,
-  Patch,
-  Param,
-  Delete,
+  Res,
+  Header,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { PrinterService } from './printer.service';
 import { CreatePrinterDto } from './dto/create-printer.dto';
-import { UpdatePrinterDto } from './dto/update-printer.dto';
 
 @Controller('printer')
 export class PrinterController {
@@ -23,5 +21,24 @@ export class PrinterController {
   @Post('receipt')
   async getReceipt(@Body() printOrderDto: CreatePrinterDto) {
     return await this.printerService.generateReceiptHtml(printOrderDto);
+  }
+
+  @Post('thermal-receipt')
+  async getThermalReceipt(@Body() printOrderDto: CreatePrinterDto) {
+    return await this.printerService.generateThermalReceiptHtml(printOrderDto);
+  }
+
+  @Post('thermal-pdf')
+  async getThermalPdf(
+    @Body() printOrderDto: CreatePrinterDto,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.printerService.generateThermalReceiptPdf(printOrderDto);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="beepost-chek-${Date.now()}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.end(pdfBuffer);
   }
 }

@@ -19,6 +19,7 @@ import {
   StatusMapping,
 } from 'src/core/entity/external-integration.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
+import { Order_status } from 'src/common/enums';
 import { ExternalIntegrationService } from '../external-integration/external-integration.service';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
 
@@ -229,6 +230,10 @@ export class IntegrationSyncService {
       }
 
       const url = integration.api_url.replace(/\/+$/, '') + endpoint;
+
+      this.logger.log(
+        `🌐 Sync request: ${config.method} ${url} | Order: #${job.external_order_id} | Payload: ${JSON.stringify(job.payload)}`,
+      );
 
       // Headers
       const headers: Record<string, string> = {
@@ -576,6 +581,130 @@ export class IntegrationSyncService {
       }
 
       return successRes(null, 200, 'Sync job o\'chirildi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Sync qilinmagan eski buyurtmalar sonini olish
+   */
+  async getUnsyncedOrdersCount(integrationId?: string) {
+    try {
+      const queryBuilder = this.orderRepo
+        .createQueryBuilder('order')
+        .where('order.external_id IS NOT NULL')
+        .andWhere('order.operator LIKE :prefix', { prefix: 'external_%' })
+        .andWhere('order.status IN (:...statuses)', {
+          statuses: [Order_status.SOLD, Order_status.CANCELLED],
+        });
+
+      // Allaqachon muvaffaqiyatli sync qilinganlarni chiqarib tashlash
+      queryBuilder.andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM integration_sync_queue sq
+          WHERE sq.order_id = order.id
+          AND sq.status = 'success'
+        )`,
+      );
+
+      if (integrationId) {
+        // Integration slugini olish
+        const integration = await this.integrationRepo.findOne({
+          where: { id: integrationId },
+        });
+        if (integration) {
+          queryBuilder.andWhere('order.operator = :operator', {
+            operator: `external_${integration.slug}`,
+          });
+        }
+      }
+
+      const count = await queryBuilder.getCount();
+      return successRes({ count });
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Eski buyurtmalarni sync queue ga qo'shish
+   */
+  async syncOldOrders(integrationId?: string) {
+    try {
+      const queryBuilder = this.orderRepo
+        .createQueryBuilder('order')
+        .where('order.external_id IS NOT NULL')
+        .andWhere('order.operator LIKE :prefix', { prefix: 'external_%' })
+        .andWhere('order.status IN (:...statuses)', {
+          statuses: [Order_status.SOLD, Order_status.CANCELLED],
+        });
+
+      // Allaqachon muvaffaqiyatli sync qilinganlarni chiqarib tashlash
+      queryBuilder.andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM integration_sync_queue sq
+          WHERE sq.order_id = order.id
+          AND sq.status = 'success'
+        )`,
+      );
+
+      // Allaqachon pending/processing holatda bo'lganlarni ham chiqarib tashlash
+      queryBuilder.andWhere(
+        `NOT EXISTS (
+          SELECT 1 FROM integration_sync_queue sq
+          WHERE sq.order_id = order.id
+          AND sq.status IN ('pending', 'processing')
+        )`,
+      );
+
+      if (integrationId) {
+        const integration = await this.integrationRepo.findOne({
+          where: { id: integrationId },
+        });
+        if (integration) {
+          queryBuilder.andWhere('order.operator = :operator', {
+            operator: `external_${integration.slug}`,
+          });
+        }
+      }
+
+      const orders = await queryBuilder
+        .orderBy('order.created_at', 'ASC')
+        .getMany();
+
+      let queuedCount = 0;
+
+      for (const order of orders) {
+        // Status ga qarab action ni aniqlash
+        let action: SyncAction;
+        if (order.status === Order_status.SOLD) {
+          action = 'sold';
+        } else {
+          action = 'canceled';
+        }
+
+        await this.queueStatusSync(
+          order.id,
+          action,
+          order.status, // old_status sifatida hozirgi status
+          order.status, // new_status ham hozirgi status
+        );
+        queuedCount++;
+      }
+
+      // Worker ni trigger qilish
+      if (queuedCount > 0) {
+        this.triggerWorker();
+      }
+
+      this.logger.log(`📦 ${queuedCount} ta eski buyurtma sync queue ga qo'shildi`);
+
+      return successRes(
+        { queued: queuedCount, total_found: orders.length },
+        200,
+        `${queuedCount} ta eski buyurtma sync queue ga qo'shildi`,
+      );
     } catch (error) {
       return catchError(error);
     }

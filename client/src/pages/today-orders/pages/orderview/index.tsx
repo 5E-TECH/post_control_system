@@ -21,6 +21,7 @@ import {
   RefreshCw,
   ChevronDown,
   Globe,
+  FileText,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -59,7 +60,7 @@ const OrderView = () => {
   );
 
   const params = searchData ? { search: searchData, limit: 0 } : { limit: 0 };
-  const { createPost, createPrint, createBrowserPrint } = usePost();
+  const { createPost, createPrint, createBrowserPrint, createThermalPrint, createThermalPdf } = usePost();
   const [printDropdownOpen, setPrintDropdownOpen] = useState(false);
   const printDropdownRef = useRef<HTMLDivElement>(null);
   const { data, refetch, isLoading } =
@@ -142,6 +143,57 @@ const OrderView = () => {
       },
       onError: (err: any) => {
         handleApiError(err, "Chek yaratishda xatolik yuz berdi");
+      },
+      onSettled: () => {
+        setTimeout(() => setIsPrintDisabled(false), 3000);
+      },
+    });
+  };
+
+  const handleThermalPrint = () => {
+    if (isPrintDisabled || selectedIds.length === 0) return;
+    setIsPrintDisabled(true);
+    setPrintDropdownOpen(false);
+    const orderids = { orderIds: selectedIds };
+    createThermalPrint.mutate(orderids, {
+      onSuccess: (res: any) => {
+        const html = res?.data?.html || res?.html;
+        if (html) {
+          const printWindow = window.open("", "_blank");
+          if (printWindow) {
+            printWindow.document.write(html);
+            printWindow.document.close();
+            handleSuccess("Termal chek tayyor — chop etish yoki PDF saqlash mumkin");
+          } else {
+            handleApiError(null, "Brauzer yangi oyna ochishga ruxsat bermadi. Popup blockerni o'chiring.");
+          }
+        } else {
+          handleApiError(null, "Chek ma'lumotlari topilmadi");
+        }
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Termal chek yaratishda xatolik yuz berdi");
+      },
+      onSettled: () => {
+        setTimeout(() => setIsPrintDisabled(false), 3000);
+      },
+    });
+  };
+
+  const handleThermalPdf = () => {
+    if (isPrintDisabled || selectedIds.length === 0) return;
+    setIsPrintDisabled(true);
+    setPrintDropdownOpen(false);
+    const orderids = { orderIds: selectedIds };
+    createThermalPdf.mutate(orderids, {
+      onSuccess: (res: any) => {
+        const blob = new Blob([res.data], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        handleSuccess("PDF tayyor — saqlang yoki chop eting");
+      },
+      onError: (err: any) => {
+        handleApiError(err, "PDF yaratishda xatolik yuz berdi");
       },
       onSettled: () => {
         setTimeout(() => setIsPrintDisabled(false), 3000);
@@ -296,6 +348,28 @@ const OrderView = () => {
                         <div>
                           <p className="font-medium text-gray-800 dark:text-white">Brauzer orqali</p>
                           <p className="text-xs text-gray-400">Istalgan printer</p>
+                        </div>
+                      </button>
+                      <div className="border-t border-gray-100 dark:border-gray-700" />
+                      <button
+                        onClick={handleThermalPrint}
+                        className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 text-emerald-500" />
+                        <div>
+                          <p className="font-medium text-gray-800 dark:text-white">Termal format</p>
+                          <p className="text-xs text-gray-400">HTML chop etish</p>
+                        </div>
+                      </button>
+                      <div className="border-t border-gray-100 dark:border-gray-700" />
+                      <button
+                        onClick={handleThermalPdf}
+                        className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 text-red-500" />
+                        <div>
+                          <p className="font-medium text-gray-800 dark:text-white">PDF (60x100mm)</p>
+                          <p className="text-xs text-gray-400">Gainscha printer uchun</p>
                         </div>
                       </button>
                     </div>

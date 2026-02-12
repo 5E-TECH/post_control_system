@@ -687,6 +687,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async updateOrder(
     id: string,
     updateOrderDto: UpdateOrderDto,
+    user?: JwtPayload,
   ): Promise<Object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -698,6 +699,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!editingOrder) {
         throw new NotFoundException('Order not found');
+      }
+
+      // Market uchun qo'shimcha tekshiruvlar
+      if (user?.role === Roles.MARKET) {
+        // Faqat o'z buyurtmasini tahrirlash
+        if (editingOrder.user_id !== user.id) {
+          throw new BadRequestException('Bu buyurtma sizga tegishli emas');
+        }
+        // Market faqat NEW statusdagi buyurtmalarni tahrirlashi mumkin
+        if (editingOrder.status !== Order_status.NEW) {
+          throw new BadRequestException('Faqat yangi buyurtmalarni tahrirlash mumkin');
+        }
+        // add_order ruxsatini tekshirish
+        const market = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: user.id },
+        });
+        if (!market?.add_order) {
+          throw new BadRequestException('Sizga buyurtma tahrirlash ruxsati berilmagan');
+        }
       }
 
       if (
@@ -2977,7 +2997,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, user?: JwtPayload) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -2989,6 +3009,26 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!order) {
         throw new NotFoundException('Order not found');
       }
+
+      // Market uchun qo'shimcha tekshiruvlar
+      if (user?.role === Roles.MARKET) {
+        // Faqat o'z buyurtmasini o'chirish
+        if (order.user_id !== user.id) {
+          throw new BadRequestException('Bu buyurtma sizga tegishli emas');
+        }
+        // Market faqat NEW statusdagi buyurtmalarni o'chirishi mumkin
+        if (order.status !== Order_status.NEW) {
+          throw new BadRequestException("Faqat yangi buyurtmalarni o'chirish mumkin");
+        }
+        // add_order ruxsatini tekshirish
+        const market = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: user.id },
+        });
+        if (!market?.add_order) {
+          throw new BadRequestException("Sizga buyurtma o'chirish ruxsati berilmagan");
+        }
+      }
+
       const acceptedStatuses = [Order_status.NEW, Order_status.RECEIVED];
       if (!acceptedStatuses.includes(order.status)) {
         throw new BadRequestException('You can not delete...!!!');
