@@ -19,6 +19,7 @@ import {
   Activity,
   Clock,
   CheckCheck,
+  Archive,
 } from "lucide-react";
 import { Modal, Form, Input, Select, Switch, message, Popconfirm, Tabs, Badge, Tooltip } from "antd";
 import {
@@ -40,6 +41,7 @@ const IntegrationsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSyncJobs, setSelectedSyncJobs] = useState<string[]>([]);
   const [syncPage, setSyncPage] = useState(1);
+  const [oldOrdersIntegrationFilter, setOldOrdersIntegrationFilter] = useState<string | undefined>(undefined);
   const [form] = Form.useForm();
 
   const {
@@ -56,9 +58,11 @@ const IntegrationsPage = () => {
     getAllSyncs,
     getSuccessfulSyncs,
     getPendingSyncs,
+    getUnsyncedCount,
     retrySync,
     bulkRetrySync,
     retryAllFailed,
+    syncOldOrders,
   } = useIntegrationSync();
 
   const { getMarkets } = useMarket();
@@ -99,8 +103,15 @@ const IntegrationsPage = () => {
   );
   const pendingSyncs: SyncJob[] = pendingSyncsData?.data || [];
 
+  // Sync qilinmagan eski buyurtmalar soni
+  const { data: unsyncedCountData, isLoading: isLoadingUnsyncedCount } = getUnsyncedCount(
+    oldOrdersIntegrationFilter,
+    isSyncMonitorOpen && syncMonitorTab === "old_orders"
+  );
+  const unsyncedCount = unsyncedCountData?.data?.count || 0;
+
   const { data: integrationsData, isLoading } = getIntegrations();
-  const { data: marketsData } = getMarkets(true);
+  const { data: marketsData } = getMarkets(true, { limit: 0 });
 
   const integrations: ExternalIntegration[] =
     integrationsData?.data || [];
@@ -320,6 +331,18 @@ const IntegrationsPage = () => {
     try {
       const result = await retryAllFailed.mutateAsync(undefined);
       message.success(result?.message || "Barcha failed joblar qayta queue ga qo'shildi");
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || "Xatolik yuz berdi");
+    }
+  };
+
+  // Eski buyurtmalarni sync qilish
+  const handleSyncOldOrders = async () => {
+    try {
+      const result = await syncOldOrders.mutateAsync(oldOrdersIntegrationFilter);
+      message.success(
+        result?.message || `${result?.data?.queued || 0} ta eski buyurtma sync queue ga qo'shildi`
+      );
     } catch (error: any) {
       message.error(error?.response?.data?.message || "Xatolik yuz berdi");
     }
@@ -1153,6 +1176,100 @@ const IntegrationsPage = () => {
                       <SyncJobItem key={job.id} job={job} onRetry={handleRetrySync} />
                     ))
                   )}
+                </div>
+              ),
+            },
+            {
+              key: "old_orders",
+              label: (
+                <span className="flex items-center gap-1.5">
+                  <Archive className="w-4 h-4 text-orange-500" />
+                  Eski buyurtmalar
+                  {unsyncedCount > 0 && (
+                    <Badge count={unsyncedCount} size="small" />
+                  )}
+                </span>
+              ),
+              children: (
+                <div className="space-y-4">
+                  <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <div className="flex items-start gap-3">
+                      <Archive className="w-5 h-5 text-orange-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-orange-800 dark:text-orange-300 mb-1">
+                          Eski buyurtmalarni sinxronlash
+                        </h4>
+                        <p className="text-sm text-orange-600 dark:text-orange-400">
+                          Allaqachon sotilgan yoki bekor qilingan, lekin tashqi saytga hali sync qilinmagan
+                          buyurtmalarni topib, ularning holatini tashqi saytga yuborish.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Integration filter */}
+                  <div className="flex items-center gap-3">
+                    <Select
+                      placeholder="Barcha integratsiyalar"
+                      allowClear
+                      size="large"
+                      className="flex-1"
+                      value={oldOrdersIntegrationFilter}
+                      onChange={(value) => setOldOrdersIntegrationFilter(value)}
+                      options={integrations.map((i) => ({
+                        value: i.id,
+                        label: i.name,
+                      }))}
+                    />
+                  </div>
+
+                  {/* Count va action */}
+                  <div className="p-4 bg-white dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Sync qilinmagan buyurtmalar
+                        </p>
+                        {isLoadingUnsyncedCount ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-blue-500 mt-1" />
+                        ) : (
+                          <p className="text-2xl font-bold text-gray-800 dark:text-white">
+                            {unsyncedCount} <span className="text-sm font-normal text-gray-500">ta</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <Popconfirm
+                        title="Eski buyurtmalarni sync qilish"
+                        description={`${unsyncedCount} ta buyurtma sync queue ga qo'shiladi. Davom etsinmi?`}
+                        onConfirm={handleSyncOldOrders}
+                        okText="Ha, boshlash"
+                        cancelText="Bekor qilish"
+                        okButtonProps={{
+                          loading: syncOldOrders.isPending,
+                        }}
+                      >
+                        <button
+                          disabled={unsyncedCount === 0 || syncOldOrders.isPending}
+                          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium shadow-lg shadow-orange-500/25 hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          {syncOldOrders.isPending ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-5 h-5" />
+                          )}
+                          Sync boshlash
+                        </button>
+                      </Popconfirm>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      Sync boshlangandan so'ng, buyurtmalar "Kutilmoqda" tabiga qo'shiladi va
+                      navbat bilan tashqi saytga yuboriladi. Jarayonni "Kutilmoqda" va "Barchasi" tablarida kuzatishingiz mumkin.
+                    </p>
+                  </div>
                 </div>
               ),
             },

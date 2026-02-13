@@ -146,7 +146,7 @@ const Details: FC<IProps> = ({
               </p>
             </div>
           </div>
-          {status === "new" && role !== "market" && role !== "courier" && (
+          {status === "new" && role !== "courier" && (
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-xl text-sm font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors cursor-pointer"

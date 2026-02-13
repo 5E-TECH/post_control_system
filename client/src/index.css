@@ -428,6 +428,123 @@
 }
 
 
+/* === Ant Design Modal dark mode === */
+.dark .ant-modal-content {
+  background-color: #1E1B2E !important;
+  color: #e5e7eb !important;
+}
+
+.dark .ant-modal-header {
+  background-color: #1E1B2E !important;
+  border-bottom-color: #374151 !important;
+}
+
+.dark .ant-modal-title {
+  color: #fff !important;
+}
+
+.dark .ant-modal-close {
+  color: #9ca3af !important;
+}
+
+.dark .ant-modal-close:hover {
+  color: #fff !important;
+}
+
+/* === Ant Design Form dark mode === */
+.dark .ant-form-item-label > label {
+  color: #d1d5db !important;
+}
+
+.dark .ant-input {
+  background-color: #312d4b !important;
+  border-color: #4b5563 !important;
+  color: #fff !important;
+}
+
+.dark .ant-input::placeholder {
+  color: #9ca3af !important;
+}
+
+.dark .ant-input:hover,
+.dark .ant-input:focus,
+.dark .ant-input-focused {
+  border-color: #7c3aed !important;
+}
+
+.dark .ant-input-password {
+  background-color: #312d4b !important;
+  border-color: #4b5563 !important;
+}
+
+.dark .ant-input-password .ant-input {
+  background-color: transparent !important;
+}
+
+.dark .ant-input-password .ant-input-suffix {
+  color: #9ca3af !important;
+}
+
+/* === Ant Design Tabs dark mode === */
+.dark .ant-tabs-tab {
+  color: #9ca3af !important;
+}
+
+.dark .ant-tabs-tab:hover {
+  color: #d1d5db !important;
+}
+
+.dark .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #8b5cf6 !important;
+}
+
+.dark .ant-tabs-ink-bar {
+  background-color: #8b5cf6 !important;
+}
+
+.dark .ant-tabs-nav::before {
+  border-bottom-color: #374151 !important;
+}
+
+/* === Ant Design Switch dark mode === */
+.dark .ant-switch {
+  background-color: #4b5563 !important;
+}
+
+.dark .ant-switch-checked {
+  background-color: #8b5cf6 !important;
+}
+
+/* === Ant Design Popconfirm/Popover dark mode === */
+.dark .ant-popover-inner {
+  background-color: #1E1B2E !important;
+  color: #e5e7eb !important;
+}
+
+.dark .ant-popover-arrow::before,
+.dark .ant-popover-arrow::after {
+  background-color: #1E1B2E !important;
+}
+
+.dark .ant-popconfirm-title {
+  color: #fff !important;
+}
+
+.dark .ant-popconfirm-description {
+  color: #9ca3af !important;
+}
+
+/* === Ant Design Tooltip dark mode === */
+.dark .ant-tooltip-inner {
+  background-color: #312d4b !important;
+  color: #e5e7eb !important;
+}
+
+.dark .ant-tooltip-arrow::before,
+.dark .ant-tooltip-arrow::after {
+  background-color: #312d4b !important;
+}
+
 .ant-pagination-options-size-changer {
   cursor: pointer !important;
 }

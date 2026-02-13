@@ -192,10 +192,14 @@ export class OrderController {
   @ApiBody({ type: UpdateOrderDto })
   @ApiResponse({ status: 200, description: 'Order updated' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
   @Patch(':id')
-  editOrder(@Param('id') id: string, @Body() updateOrderDto: UpdateOrderDto) {
-    return this.orderService.updateOrder(id, updateOrderDto);
+  editOrder(
+    @Param('id') id: string,
+    @Body() updateOrderDto: UpdateOrderDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orderService.updateOrder(id, updateOrderDto, user);
   }
 
   @ApiOperation({ summary: 'Update order delivery address' })
@@ -357,12 +361,12 @@ export class OrderController {
 
   @ApiOperation({ summary: 'Delete order' })
   @ApiParam({ name: 'id', description: 'Order ID' })
-  @ApiResponse({ status: 200, description: 'Order partly sold' })
+  @ApiResponse({ status: 200, description: 'Order deleted' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Delete(':id')
-  delete(@Param('id') id: string) {
-    return this.orderService.remove(id);
+  delete(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.orderService.remove(id, user);
   }
 
   @ApiOperation({ summary: 'Create order by telegram bot' })

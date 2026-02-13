@@ -121,4 +121,22 @@ export class IntegrationSyncController {
   async deleteSync(@Param('id') id: string) {
     return this.syncService.deleteSyncJob(id);
   }
+
+  /**
+   * Sync qilinmagan eski buyurtmalar sonini olish
+   */
+  @Get('unsynced-count')
+  @AcceptRoles(Roles.SUPERADMIN)
+  async getUnsyncedCount(@Query('integration_id') integrationId?: string) {
+    return this.syncService.getUnsyncedOrdersCount(integrationId);
+  }
+
+  /**
+   * Eski buyurtmalarni sync queue ga qo'shish
+   */
+  @Post('sync-old-orders')
+  @AcceptRoles(Roles.SUPERADMIN)
+  async syncOldOrders(@Query('integration_id') integrationId?: string) {
+    return this.syncService.syncOldOrders(integrationId);
+  }
 }

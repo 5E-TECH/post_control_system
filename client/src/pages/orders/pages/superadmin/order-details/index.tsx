@@ -18,6 +18,7 @@ import {
   Loader2,
   QrCode,
   Truck,
+  Trash2,
 } from "lucide-react";
 
 const statusConfig: Record<
@@ -103,7 +104,7 @@ const OrderDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { getOrderById, rollbackOrder } = useOrder();
+  const { getOrderById, rollbackOrder, deleteOrders } = useOrder();
   const { handleSuccess, handleApiError } = useApiNotification();
   const { data, isLoading } = getOrderById(id);
   const token = data?.data?.qr_code_token;
@@ -115,6 +116,7 @@ const OrderDetails = () => {
     localStorage.getItem("role");
   const canRollback =
     role === "superadmin" && (status === "paid" || status === "partly_paid");
+  const canDelete = role === "market" && status === "new";
 
   const confirmRollback = () => {
     rollbackOrder.mutate(id as string, {
@@ -123,6 +125,18 @@ const OrderDetails = () => {
       },
       onError: (err: any) => {
         handleApiError(err, "Rollback bajarilmadi");
+      },
+    });
+  };
+
+  const confirmDelete = () => {
+    deleteOrders.mutate(id as string, {
+      onSuccess: () => {
+        handleSuccess("Buyurtma o'chirildi");
+        navigate(-1);
+      },
+      onError: (err: any) => {
+        handleApiError(err, "Buyurtmani o'chirishda xatolik");
       },
     });
   };
@@ -189,6 +203,27 @@ const OrderDetails = () => {
                 >
                   <RotateCcw className="w-4 h-4" />
                   Rollback
+                </button>
+              )}
+
+              {/* Delete Button - Market uchun yangi buyurtmalarni o'chirish */}
+              {canDelete && (
+                <button
+                  onClick={() =>
+                    Modal.confirm({
+                      title: "Buyurtmani o'chirishni tasdiqlaysizmi?",
+                      content:
+                        "Bu buyurtma butunlay o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.",
+                      okText: "Ha, o'chirish",
+                      cancelText: "Yo'q",
+                      okButtonProps: { danger: true },
+                      onOk: confirmDelete,
+                    })
+                  }
+                  className="flex items-center gap-2 px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  O'chirish
                 </button>
               )}
             </div>

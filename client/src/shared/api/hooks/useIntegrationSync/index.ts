@@ -182,6 +182,29 @@ export const useIntegrationSync = () => {
     },
   });
 
+  // Sync qilinmagan eski buyurtmalar sonini olish
+  const getUnsyncedCount = (integrationId?: string, enabled: boolean = true) =>
+    useQuery({
+      queryKey: [SYNC_KEY, "unsynced-count", integrationId],
+      queryFn: () => {
+        const params = integrationId ? `?integration_id=${integrationId}` : "";
+        return api.get(`integration-sync/unsynced-count${params}`).then((res) => res.data);
+      },
+      enabled,
+      staleTime: 1000 * 60,
+    });
+
+  // Eski buyurtmalarni sync queue ga qo'shish
+  const syncOldOrders = useMutation({
+    mutationFn: (integrationId?: string) => {
+      const params = integrationId ? `?integration_id=${integrationId}` : "";
+      return api.post(`integration-sync/sync-old-orders${params}`).then((res) => res.data);
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [SYNC_KEY] });
+    },
+  });
+
   // Cache ni yangilash (manual refresh)
   const refreshSyncData = () => {
     client.invalidateQueries({ queryKey: [SYNC_KEY] });
@@ -194,9 +217,11 @@ export const useIntegrationSync = () => {
     getAllSyncs,
     getSuccessfulSyncs,
     getSyncsByOrder,
+    getUnsyncedCount,
     retrySync,
     bulkRetrySync,
     retryAllFailed,
+    syncOldOrders,
     deleteSync,
     refreshSyncData,
   };
