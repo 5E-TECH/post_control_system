@@ -9,3 +9,6 @@ server/home/ubuntu/uploads/
 *.jpg
 *.jpeg
 
+# server scripts
+server/scripts/
+
