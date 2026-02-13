@@ -22,10 +22,6 @@ export const usePost = () => {
     mutationFn: (data: any) => api.post("printer/receipt", data),
   });
 
-  const createThermalPrint = useMutation({
-    mutationFn: (data: any) => api.post("printer/thermal-receipt", data),
-  });
-
   const createThermalPdf = useMutation({
     mutationFn: (data: any) =>
       api.post("printer/thermal-pdf", data, { responseType: "blob" }),
@@ -121,7 +117,6 @@ export const usePost = () => {
     createPost,
     createPrint,
     createBrowserPrint,
-    createThermalPrint,
     createThermalPdf,
     getAllPosts,
     getPostById,

@@ -23,11 +23,6 @@ export class PrinterController {
     return await this.printerService.generateReceiptHtml(printOrderDto);
   }
 
-  @Post('thermal-receipt')
-  async getThermalReceipt(@Body() printOrderDto: CreatePrinterDto) {
-    return await this.printerService.generateThermalReceiptHtml(printOrderDto);
-  }
-
   @Post('thermal-pdf')
   async getThermalPdf(
     @Body() printOrderDto: CreatePrinterDto,
