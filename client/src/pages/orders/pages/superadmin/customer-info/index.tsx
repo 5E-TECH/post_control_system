@@ -376,8 +376,8 @@ const CustomerInfoOrder = () => {
                               {/* Location */}
                               <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 whitespace-nowrap">
                                 <MapPin className="w-3.5 h-3.5" />
-                                {order.customer?.district?.region?.name || order.district?.region?.name || "-"},{" "}
-                                {order.customer?.district?.name || order.district?.name || "-"}
+                                {order.district?.region?.name || order.customer?.district?.region?.name || "-"},{" "}
+                                {order.district?.name || order.customer?.district?.name || "-"}
                               </span>
                             </div>
                             {/* Price and view */}

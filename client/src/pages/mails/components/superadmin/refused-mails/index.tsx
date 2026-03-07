@@ -2,14 +2,18 @@ import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost, post } from "../../../../../shared/api/hooks/usePost";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, Loader2, AlertTriangle } from "lucide-react";
+import { ChevronRight, Loader2, AlertTriangle, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../../../shared/api";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const RefusedMails = () => {
   useTranslation("mails");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const role = useSelector((state: RootState) => state.roleSlice.role);
+  const canSeePrice = role === "superadmin" || role === "admin";
   const { getAllPosts } = usePost();
   const { data, refetch, isLoading } = getAllPosts("rejected");
   const posts = Array.isArray(data?.data) ? data?.data : [];
@@ -96,17 +100,26 @@ const RefusedMails = () => {
               {post?.region?.name}
             </h3>
 
+            {post?.courier?.name && (
+              <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg bg-white/10">
+                <User className="w-4 h-4 text-white/80" />
+                <span className="text-white/90 text-sm font-medium">{post.courier.name}</span>
+              </div>
+            )}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-white/80 text-sm">Buyurtmalar:</span>
                 <span className="text-white font-semibold text-base">{post?.order_quantity} ta</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white/80 text-sm">Summa:</span>
-                <span className="text-white font-bold text-base">
-                  {new Intl.NumberFormat("uz-UZ").format(Number(post?.post_total_price) || 0)} so'm
-                </span>
-              </div>
+              {canSeePrice && (
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80 text-sm">Summa:</span>
+                  <span className="text-white font-bold text-base">
+                    {new Intl.NumberFormat("uz-UZ").format(Number(post?.post_total_price) || 0)} so'm
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         ))}

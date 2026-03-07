@@ -129,7 +129,7 @@ const CustomerDetails = () => {
                   data-cell="TUMANI"
                 >
                   <span className="font-normal text-[15px] text-[#2E263DE5] dark:text-[#D5D1EB]">
-                    {order?.customer?.district?.name}
+                    {order?.district?.name || order?.customer?.district?.name}
                   </span>
                 </td>
 

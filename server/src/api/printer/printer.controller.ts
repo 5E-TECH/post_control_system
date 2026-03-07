@@ -3,7 +3,6 @@ import {
   Post,
   Body,
   Res,
-  Header,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { PrinterService } from './printer.service';
@@ -15,7 +14,7 @@ export class PrinterController {
 
   @Post('print')
   async printLabel(@Body() printOrderDto: CreatePrinterDto) {
-    return await this.printerService.printMultiple(printOrderDto);
+    return await this.printerService.generateReceiptHtml(printOrderDto);
   }
 
   @Post('receipt')

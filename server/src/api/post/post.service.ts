@@ -48,7 +48,7 @@ export class PostService {
       // 🔎 Umumiy ma’lumotlar
       const [data, total] = await this.postRepo.findAndCount({
         where: { status: Not(Post_status.NEW) },
-        relations: ['region'],
+        relations: ['region', 'courier'],
         order: { created_at: 'DESC' },
         skip,
         take,
@@ -156,7 +156,7 @@ export class PostService {
         where: {
           status: In([Post_status.CANCELED]),
         },
-        relations: ['region'],
+        relations: ['region', 'courier'],
         order: { created_at: 'DESC' },
       });
       return successRes(allPosts, 200, 'All new posts');

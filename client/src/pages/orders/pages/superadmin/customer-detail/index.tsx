@@ -636,8 +636,8 @@ const CustomerDetail = () => {
                               {/* Location */}
                               <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 whitespace-nowrap">
                                 <MapPin className="w-3.5 h-3.5" />
-                                {newOrder.customer?.district?.region?.name || newOrder.district?.region?.name || "-"},{" "}
-                                {newOrder.customer?.district?.name || newOrder.district?.name || "-"}
+                                {newOrder.district?.region?.name || newOrder.customer?.district?.region?.name || "-"},{" "}
+                                {newOrder.district?.name || newOrder.customer?.district?.name || "-"}
                               </span>
                             </div>
                             {/* Price and view */}

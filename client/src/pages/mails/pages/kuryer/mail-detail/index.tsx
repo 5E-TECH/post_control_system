@@ -109,7 +109,7 @@ const CourierMailDetail = () => {
     return (
       order?.customer?.name?.toLowerCase().includes(query) ||
       order?.customer?.phone_number?.includes(query) ||
-      order?.customer?.district?.name?.toLowerCase().includes(query)
+      (order?.district?.name || order?.customer?.district?.name)?.toLowerCase().includes(query)
     );
   });
 
@@ -326,7 +326,7 @@ const CourierMailDetail = () => {
                         {/* District */}
                         <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                           <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                          <span>{order?.customer?.district?.name || "-"}</span>
+                          <span>{order?.district?.name || order?.customer?.district?.name || "-"}</span>
                         </div>
 
                         {/* Delivery Type */}

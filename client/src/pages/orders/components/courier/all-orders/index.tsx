@@ -483,7 +483,7 @@ const AllOrders = () => {
               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                 <span className="truncate max-w-[100px]">
-                  {item?.customer?.district?.name || "-"}
+                  {item?.district?.name || item?.customer?.district?.name || "-"}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
@@ -616,7 +616,7 @@ const AllOrders = () => {
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">
                   <span className="truncate block">
-                    {item?.customer?.district?.name || "-"}
+                    {item?.district?.name || item?.customer?.district?.name || "-"}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">
@@ -739,7 +739,7 @@ const AllOrders = () => {
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-gray-400" />
               <span className="text-sm text-gray-600 dark:text-gray-300">
-                {order.current?.customer?.district?.name || "—"}
+                {order.current?.district?.name || order.current?.customer?.district?.name || "—"}
               </span>
             </div>
             <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
