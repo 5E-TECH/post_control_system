@@ -362,7 +362,7 @@ const WaitingOrders = () => {
               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                 <span className="truncate max-w-[100px]">
-                  {item?.customer?.district?.name || "-"}
+                  {item?.district?.name || item?.customer?.district?.name || "-"}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
@@ -485,7 +485,7 @@ const WaitingOrders = () => {
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">
                   <span className="truncate block">
-                    {item?.customer?.district?.name || "-"}
+                    {item?.district?.name || item?.customer?.district?.name || "-"}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">
@@ -589,7 +589,7 @@ const WaitingOrders = () => {
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20">
                 <div className="flex items-center gap-1 text-white/80 text-sm">
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>{order.current?.customer?.district?.name || "—"}</span>
+                  <span>{order.current?.district?.name || order.current?.customer?.district?.name || "—"}</span>
                 </div>
                 <div className="text-right">
                   <p className="text-white/70 text-xs">Jami summa</p>

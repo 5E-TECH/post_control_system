@@ -144,6 +144,7 @@ const ExternalOrdersTab = () => {
   const navigate = useNavigate();
   const role = useSelector((state: RootState) => state.roleSlice.role);
   const isSuperadmin = role === "superadmin";
+  const canSeePrice = role === "superadmin" || role === "admin";
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1080,10 +1081,14 @@ const ExternalOrdersTab = () => {
               <span className="text-sm text-gray-500 dark:text-gray-400">
                 {orders.filter(o => o.selected).length} ta tanlangan
               </span>
-              <span className="text-gray-300 dark:text-gray-600">•</span>
-              <span className="text-sm font-semibold text-gray-800 dark:text-white">
-                {orders.reduce((sum, o) => sum + (o.total_price || 0) + (o.delivery_price || 0), 0).toLocaleString()} so'm
-              </span>
+              {canSeePrice && (
+                <>
+                  <span className="text-gray-300 dark:text-gray-600">•</span>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-white">
+                    {orders.reduce((sum, o) => sum + (o.total_price || 0) + (o.delivery_price || 0), 0).toLocaleString()} so'm
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -1561,6 +1566,7 @@ const TodayOrders = () => {
 
   const { pathname } = useLocation();
   const role = useSelector((state: RootState) => state.roleSlice);
+  const canSeeTotal = role.role === "superadmin" || role.role === "admin";
 
   useEffect(() => {
     if (role.role === "market") {
@@ -1630,7 +1636,7 @@ const TodayOrders = () => {
 
       {/* Stats Cards */}
       {!isLoading && markets.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className={`grid grid-cols-1 ${canSeeTotal ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4 mb-6`}>
           <div className="bg-white dark:bg-[#2A263D] rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700/50">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
@@ -1653,17 +1659,19 @@ const TodayOrders = () => {
               </div>
             </div>
           </div>
-          <div className="bg-white dark:bg-[#2A263D] rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Umumiy summa</p>
-                <p className="text-lg font-bold text-gray-800 dark:text-white">{totalPrice.toLocaleString()} so'm</p>
+          {canSeeTotal && (
+            <div className="bg-white dark:bg-[#2A263D] rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Umumiy summa</p>
+                  <p className="text-lg font-bold text-gray-800 dark:text-white">{totalPrice.toLocaleString()} so'm</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -1706,7 +1714,7 @@ const TodayOrders = () => {
                   <th className="px-6 py-4 text-left text-sm font-medium text-white">#</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-white">{t("market")}</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-white">{t("phone")}</th>
-                  <th className="px-6 py-4 text-left text-sm font-medium text-white">{t("totalPrice")}</th>
+                  {canSeeTotal && <th className="px-6 py-4 text-left text-sm font-medium text-white">{t("totalPrice")}</th>}
                   <th className="px-6 py-4 text-left text-sm font-medium text-white">Buyurtmalar</th>
                   <th className="px-6 py-4 text-center text-sm font-medium text-white"></th>
                 </tr>
@@ -1739,11 +1747,13 @@ const TodayOrders = () => {
                         {formatPhone(item?.market?.phone_number)}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-semibold text-gray-800 dark:text-white">
-                        {item?.orderTotalPrice?.toLocaleString()} so'm
-                      </span>
-                    </td>
+                    {canSeeTotal && (
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-semibold text-gray-800 dark:text-white">
+                          {item?.orderTotalPrice?.toLocaleString()} so'm
+                        </span>
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                         <Package className="w-4 h-4" />
@@ -1791,9 +1801,11 @@ const TodayOrders = () => {
                       {item?.length} ta
                     </span>
                   </div>
-                  <span className="text-sm font-bold text-gray-800 dark:text-white">
-                    {item?.orderTotalPrice?.toLocaleString()} so'm
-                  </span>
+                  {canSeeTotal && (
+                    <span className="text-sm font-bold text-gray-800 dark:text-white">
+                      {item?.orderTotalPrice?.toLocaleString()} so'm
+                    </span>
+                  )}
                 </div>
               </div>
             ))}

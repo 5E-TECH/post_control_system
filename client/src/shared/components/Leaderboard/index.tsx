@@ -24,6 +24,7 @@ interface LeaderboardProps {
   data: LeaderboardItem[];
   type: "markets" | "couriers";
   showPodium?: boolean;
+  currentUserId?: string | null;
 }
 
 // Podium ranglari
@@ -78,9 +79,11 @@ const PodiumCard = memo(
   ({
     item,
     position,
+    isCurrentUser,
   }: {
     item: LeaderboardItem;
     position: 1 | 2 | 3;
+    isCurrentUser?: boolean;
   }) => {
     const { t } = useTranslation(["dashboard"]);
     const colorKey =
@@ -135,9 +138,16 @@ const PodiumCard = memo(
           </div>
         </div>
 
+        {/* "Bu siz" badge */}
+        {isCurrentUser && (
+          <div className="px-2 py-0.5 bg-blue-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full mb-1 animate-pulse">
+            Bu siz!
+          </div>
+        )}
+
         {/* Ism */}
         <p
-          className="font-semibold text-center text-xs sm:text-sm max-w-full truncate px-1"
+          className={`font-semibold text-center text-xs sm:text-sm max-w-full truncate px-1 ${isCurrentUser ? "text-blue-600 dark:text-blue-400" : ""}`}
           title={item.name}
         >
           {item.name}
@@ -187,10 +197,12 @@ const LeaderboardRow = memo(
     item,
     position,
     isExpanded,
+    isCurrentUser,
   }: {
     item: LeaderboardItem;
     position: number;
     isExpanded?: boolean;
+    isCurrentUser?: boolean;
   }) => {
     const { t } = useTranslation(["dashboard"]);
     const avatarColor = AVATAR_COLORS[position % AVATAR_COLORS.length];
@@ -202,11 +214,12 @@ const LeaderboardRow = memo(
       <div
         className={`
           flex items-center gap-2 sm:gap-4 p-2 sm:p-3
-          bg-white dark:bg-[#3B3656]
           rounded-xl
-          hover:bg-gray-50 dark:hover:bg-[#4B4666]
           transition-all duration-300
-          border border-gray-100 dark:border-gray-700
+          ${isCurrentUser
+            ? "bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-400 dark:border-blue-500 ring-1 ring-blue-300 dark:ring-blue-600"
+            : "bg-white dark:bg-[#3B3656] border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#4B4666]"
+          }
           ${isExpanded ? "animate-slideIn" : ""}
         `}
         style={{ animationDelay }}
@@ -239,7 +252,14 @@ const LeaderboardRow = memo(
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm sm:text-base truncate">{item.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className={`font-medium text-sm sm:text-base truncate ${isCurrentUser ? "text-blue-700 dark:text-blue-300 font-bold" : ""}`}>{item.name}</p>
+            {isCurrentUser && (
+              <span className="flex-shrink-0 px-1.5 py-0.5 bg-blue-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full animate-pulse">
+                Siz
+              </span>
+            )}
+          </div>
           <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
             {item.successfulOrders}/{item.totalOrders} {t("ordersShort")}
           </p>
@@ -290,7 +310,7 @@ const LeaderboardRow = memo(
 
 // Asosiy Leaderboard komponenti
 const Leaderboard = memo(
-  ({ title, data, type, showPodium = true }: LeaderboardProps) => {
+  ({ title, data, type, showPodium = true, currentUserId }: LeaderboardProps) => {
     const { t } = useTranslation(["dashboard"]);
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -341,11 +361,11 @@ const Leaderboard = memo(
         {showPodium && top3.length >= 3 && (
           <div className="flex items-end justify-center gap-1 sm:gap-2 mb-4 sm:mb-6 px-2">
             {/* 2nd place */}
-            <PodiumCard item={top3[1]} position={2} />
+            <PodiumCard item={top3[1]} position={2} isCurrentUser={currentUserId === top3[1].id} />
             {/* 1st place */}
-            <PodiumCard item={top3[0]} position={1} />
+            <PodiumCard item={top3[0]} position={1} isCurrentUser={currentUserId === top3[0].id} />
             {/* 3rd place */}
-            <PodiumCard item={top3[2]} position={3} />
+            <PodiumCard item={top3[2]} position={3} isCurrentUser={currentUserId === top3[2].id} />
           </div>
         )}
 
@@ -357,6 +377,7 @@ const Leaderboard = memo(
                 key={item.id || idx}
                 item={item}
                 position={idx + 1}
+                isCurrentUser={currentUserId === item.id}
               />
             ))}
           </div>
@@ -379,6 +400,7 @@ const Leaderboard = memo(
                 item={item}
                 position={idx + 4}
                 isExpanded={isExpanded && idx >= 4}
+                isCurrentUser={currentUserId === item.id}
               />
             ))}
 

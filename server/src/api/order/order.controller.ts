@@ -37,6 +37,7 @@ import { OrderDto } from './dto/orderId.dto';
 import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
 import { UpdateOrderAddressDto } from './dto/update-order-address.dto';
 import { ReceiveExternalOrdersDto } from './dto/receive-external-orders.dto';
+import { RollbackOrderDto } from './dto/rollback-order.dto';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -192,7 +193,7 @@ export class OrderController {
   @ApiBody({ type: UpdateOrderDto })
   @ApiResponse({ status: 200, description: 'Order updated' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Patch(':id')
   editOrder(
     @Param('id') id: string,
@@ -334,14 +335,19 @@ export class OrderController {
     return this.orderService.cancelOrder(currentUser, id, cancelDto);
   }
 
-  @ApiOperation({ summary: 'Rollback order to waiting' })
+  @ApiOperation({ summary: 'Rollback order' })
   @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiBody({ type: RollbackOrderDto })
   @ApiResponse({ status: 200, description: 'Order rolled back' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.COURIER, Roles.SUPERADMIN)
   @Post('rollback/:id')
-  rollbackOrder(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    return this.orderService.rollbackOrderToWaiting(user, id);
+  rollbackOrder(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: RollbackOrderDto,
+  ) {
+    return this.orderService.rollbackOrderToWaiting(user, id, dto);
   }
 
   @ApiOperation({ summary: 'Partly sell order' })

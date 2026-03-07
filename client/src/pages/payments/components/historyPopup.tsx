@@ -324,7 +324,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                         {t("tuman")}
                       </span>
                       <span className="text-xs font-medium text-gray-800 dark:text-white">
-                        {info?.order?.customer?.district?.name}
+                        {info?.order?.district?.name || info?.order?.customer?.district?.name}
                       </span>
                     </div>
 

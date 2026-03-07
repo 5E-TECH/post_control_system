@@ -25,7 +25,7 @@ export class DashboardController {
     description: 'End date (ISO string)',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   getOverview(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,

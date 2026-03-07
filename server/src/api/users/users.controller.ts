@@ -549,8 +549,9 @@ export class UsersController {
   updateRegistrator(
     @Param('id') id: string,
     @Body() updateRegisDto: UpdateAdminDto,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    return this.userService.updateRegistrator(id, updateRegisDto);
+    return this.userService.updateRegistrator(id, updateRegisDto, currentUser);
   }
 
   @ApiOperation({ summary: 'Update courier user' })

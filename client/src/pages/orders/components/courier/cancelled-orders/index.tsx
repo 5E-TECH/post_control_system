@@ -248,7 +248,7 @@ const CancelledOrders = () => {
                     {/* District */}
                     <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                       <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{item?.customer?.district?.name || "-"}</span>
+                      <span>{item?.district?.name || item?.customer?.district?.name || "-"}</span>
                     </div>
 
                     {/* Market */}
@@ -369,7 +369,7 @@ const CancelledOrders = () => {
                   </td>
                   <td className="py-3 px-3 text-sm text-gray-600 dark:text-gray-300">
                     <span className="truncate block">
-                      {item?.customer?.district?.name || "-"}
+                      {item?.district?.name || item?.customer?.district?.name || "-"}
                     </span>
                   </td>
                   <td className="py-3 px-3 text-sm text-gray-600 dark:text-gray-300">

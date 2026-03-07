@@ -4,9 +4,11 @@ import { usePost, post } from "../../../../../shared/api/hooks/usePost";
 import { useTranslation } from "react-i18next";
 import { Pagination, type PaginationProps } from "antd";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
-import { ChevronRight, Loader2, Clock, CheckCircle, XCircle, Calendar, Archive } from "lucide-react";
+import { ChevronRight, Loader2, Clock, CheckCircle, XCircle, Calendar, Archive, User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../../../shared/api";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const statusConfig: Record<string, { badge: string; icon: typeof CheckCircle; label: string }> = {
   sent: { badge: "bg-blue-500/80", icon: CheckCircle, label: "Jo'natilgan" },
@@ -20,6 +22,8 @@ const OldMails = () => {
   useTranslation("mails");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const role = useSelector((state: RootState) => state.roleSlice.role);
+  const canSeePrice = role === "superadmin" || role === "admin";
   const { getAllPosts } = usePost();
   const { getParam, setParam, removeParam } = useParamsHook();
 
@@ -136,17 +140,26 @@ const OldMails = () => {
                   {post?.region?.name}
                 </h3>
 
+                {post?.courier?.name && (
+                  <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg bg-white/10">
+                    <User className="w-4 h-4 text-white/60" />
+                    <span className="text-white/80 text-sm font-medium">{post.courier.name}</span>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-white/60 text-sm">Buyurtmalar:</span>
                     <span className="text-white/90 font-semibold text-base">{post?.order_quantity} ta</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/60 text-sm">Summa:</span>
-                    <span className="text-white/90 font-bold text-base">
-                      {new Intl.NumberFormat("uz-UZ").format(Number(post?.post_total_price) || 0)} so'm
-                    </span>
-                  </div>
+                  {canSeePrice && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/60 text-sm">Summa:</span>
+                      <span className="text-white/90 font-bold text-base">
+                        {new Intl.NumberFormat("uz-UZ").format(Number(post?.post_total_price) || 0)} so'm
+                      </span>
+                    </div>
+                  )}
                   {post?.created_at && (
                     <div className="flex items-center gap-1 text-white/50 text-xs pt-2 border-t border-white/10">
                       <Calendar className="w-3 h-3" />

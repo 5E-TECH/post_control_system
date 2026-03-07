@@ -1,5 +1,5 @@
-import { Status } from 'src/common/enums';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { Roles, Status } from 'src/common/enums';
+import { IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateAdminDto {
@@ -22,4 +22,12 @@ export class UpdateAdminDto {
   @IsOptional()
   @IsEnum(Status)
   status?: Status;
+
+  @ApiPropertyOptional({
+    enum: [Roles.ADMIN, Roles.REGISTRATOR],
+    description: 'Faqat superadmin admin<->registrator o\'zgartira oladi',
+  })
+  @IsOptional()
+  @IsIn([Roles.ADMIN, Roles.REGISTRATOR])
+  role?: Roles.ADMIN | Roles.REGISTRATOR;
 }

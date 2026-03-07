@@ -92,7 +92,6 @@ const RefusedMailDetail = () => {
   const { state } = useLocation();
   const regionName = state?.regionName;
   const navigate = useNavigate();
-
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { visualFeedback } = useRefusedPostScanner(undefined, setSelectedIds);
 
@@ -345,7 +344,7 @@ const RefusedMailDetail = () => {
                       <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 grid grid-cols-2 gap-2 text-xs">
                         <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                           <MapPin className="w-3 h-3 text-gray-400" />
-                          <span className="truncate">{order?.customer?.district?.name || "-"}</span>
+                          <span className="truncate">{order?.district?.name || order?.customer?.district?.name || "-"}</span>
                         </div>
                         <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                           <Store className="w-3 h-3 text-gray-400" />
@@ -397,7 +396,7 @@ const RefusedMailDetail = () => {
                           <div className="flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
                             <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
-                              {order?.customer?.district?.name || "-"}
+                              {order?.district?.name || order?.customer?.district?.name || "-"}
                             </span>
                           </div>
 

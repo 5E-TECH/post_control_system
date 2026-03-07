@@ -55,7 +55,7 @@ export class PostController {
   @ApiOperation({ summary: 'List rejected posts' })
   @ApiResponse({ status: 200, description: 'Rejected posts list' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Get('rejected')
   rejectedPosts() {
     return this.postService.rejectedPosts();
@@ -236,7 +236,7 @@ export class PostController {
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Canceled post received' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Post('cancel/receive/:id')
   receiveCanceledPost(
     @Param('id') id: string,

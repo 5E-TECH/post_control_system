@@ -31,8 +31,8 @@ export const useOrder = () => {
   });
 
   const rollbackOrder = useMutation({
-    mutationFn: (id: string) =>
-      api.post(`order/rollback/${id}`).then((res) => res.data),
+    mutationFn: ({ id, target_status }: { id: string; target_status: string }) =>
+      api.post(`order/rollback/${id}`, { target_status }).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 

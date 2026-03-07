@@ -6,7 +6,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { Status } from 'src/common/enums';
+import { Status, Where_deliver } from 'src/common/enums';
 
 export class UpdateMarketDto {
   @IsOptional()
@@ -38,4 +38,10 @@ export class UpdateMarketDto {
   @IsNumber()
   @Min(0)
   tariff_center?: number;
+
+  @IsOptional()
+  @IsEnum(Where_deliver, {
+    message: 'default_tariff must be either center or address',
+  })
+  default_tariff?: Where_deliver;
 }

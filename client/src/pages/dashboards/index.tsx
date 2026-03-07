@@ -46,13 +46,14 @@ const Dashboards = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Redux'dan role olish
+  // Redux'dan role va id olish
   const role = useSelector((state: RootState) => state.roleSlice.role);
+  const currentUserId = useSelector((state: RootState) => state.roleSlice.id);
 
   let data: any;
   let isLoading: boolean = false;
 
-  if (role === "superadmin" || role === "admin") {
+  if (role === "superadmin" || role === "admin" || role === "registrator") {
     ({ data, isLoading } = useChart().getChart({
       startDate: fromDate,
       endDate: toDate,
@@ -199,7 +200,7 @@ const Dashboards = () => {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+      <div className={`grid grid-cols-2 ${role === "registrator" ? "sm:grid-cols-3" : "sm:grid-cols-4"} gap-3 sm:gap-4 mb-6`}>
         {isLoading ? (
           [...Array(4)].map((_, i) => (
             <div key={i} className="bg-white dark:bg-[#2A263D] p-4 sm:p-6 rounded-2xl">
@@ -269,7 +270,7 @@ const Dashboards = () => {
               </>
             )}
 
-            {(role === "superadmin" || role === "admin") && (
+            {(role === "superadmin" || role === "admin" || role === "registrator") && (
               <>
                 <StatCard
                   icon={<ShoppingCart className="w-5 h-5" />}
@@ -290,13 +291,15 @@ const Dashboards = () => {
                   value={dashboard?.cancelled || 0}
                   gradient="from-red-500 to-rose-500"
                 />
-                <StatCard
-                  icon={<DollarSign className="w-5 h-5" />}
-                  label={t("profit")}
-                  value={`${Number(dashboard?.profit || 0).toLocaleString()}`}
-                  suffix="UZS"
-                  gradient="from-amber-500 to-yellow-500"
-                />
+                {(role === "superadmin" || role === "admin") && (
+                  <StatCard
+                    icon={<DollarSign className="w-5 h-5" />}
+                    label={t("profit")}
+                    value={`${Number(dashboard?.profit || 0).toLocaleString()}`}
+                    suffix="UZS"
+                    gradient="from-amber-500 to-yellow-500"
+                  />
+                )}
               </>
             )}
           </>
@@ -306,10 +309,12 @@ const Dashboards = () => {
       {/* Role-based Rendering */}
       {(role === "superadmin" || role === "admin" || role === "registrator") && (
         <>
-          {/* Advanced Stats Chart - Full Width */}
-          <div className="mb-6">
-            <AdvancedStatsChart startDate={fromDate} endDate={toDate} />
-          </div>
+          {/* Advanced Stats Chart - Full Width (faqat admin/superadmin) */}
+          {(role === "superadmin" || role === "admin") && (
+            <div className="mb-6">
+              <AdvancedStatsChart startDate={fromDate} endDate={toDate} />
+            </div>
+          )}
 
           {/* Charts Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
@@ -335,11 +340,13 @@ const Dashboards = () => {
               title={t("topMarkets")}
               data={markets}
               type="markets"
+              currentUserId={currentUserId}
             />
             <Leaderboard
               title={t("topCouriers")}
               data={couriers}
               type="couriers"
+              currentUserId={currentUserId}
             />
           </div>
         </>
@@ -352,6 +359,7 @@ const Dashboards = () => {
             title={t("topMarkets")}
             data={markets}
             type="markets"
+            currentUserId={currentUserId}
           />
         </div>
       )}
@@ -363,6 +371,7 @@ const Dashboards = () => {
             title={t("topCouriers")}
             data={couriers}
             type="couriers"
+            currentUserId={currentUserId}
           />
         </div>
       )}

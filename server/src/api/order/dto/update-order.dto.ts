@@ -57,4 +57,16 @@ export class UpdateOrderDto {
   @IsOptional()
   @IsArray()
   order_item_info?: OrderItems[];
+
+  @ApiPropertyOptional({ example: 25000, minimum: 1, description: 'Custom market delivery tariff' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  market_tariff?: number;
+
+  @ApiPropertyOptional({ example: 20000, minimum: 1, description: 'Custom courier delivery tariff' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  courier_tariff?: number;
 }
