@@ -426,10 +426,11 @@ export class ExternalIntegrationService {
       }
 
       // 5️⃣ Barcha integratsiyalarni 0 ga tushirish
-      const result = await this.repo.update(
-        {}, // barcha integratsiyalar
-        { total_synced_orders: 0 },
-      );
+      const result = await this.repo
+        .createQueryBuilder()
+        .update()
+        .set({ total_synced_orders: 0 })
+        .execute();
 
       console.log(
         `🔄 [CRON] Kunlik sinxronlash hisobi yangilandi: ${result.affected} ta integratsiya 0 ga tushirildi (${new Date().toISOString()})`,
@@ -468,7 +469,11 @@ export class ExternalIntegrationService {
       }
 
       // Barcha integratsiyalarni 0 ga tushirish
-      const result = await this.repo.update({}, { total_synced_orders: 0 });
+      const result = await this.repo
+        .createQueryBuilder()
+        .update()
+        .set({ total_synced_orders: 0 })
+        .execute();
 
       console.log(
         `🔄 [MANUAL-ALL] Barcha integratsiyalar 0 ga tushirildi: ${result.affected} ta (${new Date().toISOString()})`,

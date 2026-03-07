@@ -5,11 +5,15 @@ import { useTranslation } from "react-i18next";
 import { MapPin, Package, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../../../shared/api";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 
 const TodayMails = () => {
   useTranslation("mails");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const role = useSelector((state: RootState) => state.roleSlice.role);
+  const canSeePrice = role === "superadmin" || role === "admin";
   const { getAllPosts } = usePost();
   const { data, refetch, isLoading } = getAllPosts("new");
   const posts = Array.isArray(data?.data) ? data?.data : [];
@@ -78,9 +82,11 @@ const TodayMails = () => {
         <span className="text-gray-600 dark:text-gray-300">
           <span className="font-bold text-gray-800 dark:text-white">{totalOrders}</span> buyurtma
         </span>
-        <span className="text-gray-600 dark:text-gray-300">
-          <span className="font-bold text-emerald-600 dark:text-emerald-400">{totalPrice.toLocaleString()}</span> so'm
-        </span>
+        {canSeePrice && (
+          <span className="text-gray-600 dark:text-gray-300">
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">{totalPrice.toLocaleString()}</span> so'm
+          </span>
+        )}
       </div>
 
       {/* Posts Grid */}
@@ -118,12 +124,14 @@ const TodayMails = () => {
                 <span className="text-white/80 text-sm">Buyurtmalar:</span>
                 <span className="text-white font-semibold text-base">{post?.order_quantity} ta</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white/80 text-sm">Summa:</span>
-                <span className="text-white font-bold text-base">
-                  {new Intl.NumberFormat("uz-UZ").format(Number(post?.post_total_price) || 0)} so'm
-                </span>
-              </div>
+              {canSeePrice && (
+                <div className="flex items-center justify-between">
+                  <span className="text-white/80 text-sm">Summa:</span>
+                  <span className="text-white font-bold text-base">
+                    {new Intl.NumberFormat("uz-UZ").format(Number(post?.post_total_price) || 0)} so'm
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         ))}

@@ -43,6 +43,7 @@ const OrderView = () => {
 
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
+  const canSeeTotal = user.role === "superadmin" || user.role === "admin";
   const [deleteId, setDeleteId] = useState("");
   const [isPrintDisabled, setIsPrintDisabled] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -60,7 +61,7 @@ const OrderView = () => {
   );
 
   const params = searchData ? { search: searchData, limit: 0 } : { limit: 0 };
-  const { createPost, createPrint, createBrowserPrint, createThermalPdf } = usePost();
+  const { createPost, createBrowserPrint, createThermalPdf } = usePost();
   const [printDropdownOpen, setPrintDropdownOpen] = useState(false);
   const printDropdownRef = useRef<HTMLDivElement>(null);
   const { data, refetch, isLoading } =
@@ -98,24 +99,6 @@ const OrderView = () => {
       },
       onError: (err: any) => {
         handleApiError(err, "Orderni o'chirishda xatolik yuz berdi");
-      },
-    });
-  };
-
-  const handlePrint = () => {
-    if (isPrintDisabled) return;
-    setIsPrintDisabled(true);
-    setPrintDropdownOpen(false);
-    const orderids = { orderIds: selectedIds };
-    createPrint.mutate(orderids, {
-      onSuccess: () => {
-        handleSuccess("Chop etildi");
-      },
-      onError: (err: any) => {
-        handleApiError(err, "Chop etishda hatolik yuz berdi");
-      },
-      onSettled: () => {
-        setTimeout(() => setIsPrintDisabled(false), 10000);
       },
     });
   };
@@ -260,7 +243,7 @@ const OrderView = () => {
                   <span>{marketName}</span>
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {orders.length} ta buyurtma • {totalPrice.toLocaleString()} so'm
+                  {orders.length} ta buyurtma{canSeeTotal ? ` • ${totalPrice.toLocaleString()} so'm` : ""}
                 </p>
               </div>
             </div>
@@ -300,17 +283,6 @@ const OrderView = () => {
                   {printDropdownOpen && (
                     <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#2A263D] rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden">
                       <button
-                        onClick={handlePrint}
-                        className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
-                      >
-                        <Printer className="w-4 h-4 text-purple-500" />
-                        <div>
-                          <p className="font-medium text-gray-800 dark:text-white">Termal printer</p>
-                          <p className="text-xs text-gray-400">MQTT orqali</p>
-                        </div>
-                      </button>
-                      <div className="border-t border-gray-100 dark:border-gray-700" />
-                      <button
                         onClick={handleBrowserPrint}
                         className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
                       >
@@ -327,8 +299,8 @@ const OrderView = () => {
                       >
                         <FileText className="w-4 h-4 text-red-500" />
                         <div>
-                          <p className="font-medium text-gray-800 dark:text-white">PDF (60x100mm)</p>
-                          <p className="text-xs text-gray-400">Gainscha printer uchun</p>
+                          <p className="font-medium text-gray-800 dark:text-white">PDF (100x60mm)</p>
+                          <p className="text-xs text-gray-400">Termal printer uchun</p>
                         </div>
                       </button>
                     </div>
@@ -522,7 +494,7 @@ const OrderView = () => {
                   {/* Location row */}
                   <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
                     <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    {order.customer?.district?.region?.name || "-"}, {order.customer?.district?.name || "-"}
+                    {order.district?.region?.name || order.customer?.district?.region?.name || "-"}, {order.district?.name || order.customer?.district?.name || "-"}
                   </div>
 
                   {/* Products row */}

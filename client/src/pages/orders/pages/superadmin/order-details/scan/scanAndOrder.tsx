@@ -669,7 +669,7 @@ export default function ScanAndOrder() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-gray-500 dark:text-gray-400">Tuman</p>
                       <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
-                        {order.data?.customer?.district?.name || "—"}
+                        {order.data?.district?.name || order.data?.customer?.district?.name || "—"}
                       </p>
                     </div>
                   </div>

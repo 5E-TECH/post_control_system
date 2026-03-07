@@ -740,6 +740,19 @@ export class UserService {
       if (otherFields.status && currentUser.role !== Roles.SUPERADMIN) {
         throw new BadRequestException('Only SuperAdmin can change the status');
       }
+      // Rolni faqat superadmin o'zgartira oladi
+      if (otherFields.role) {
+        if (currentUser.role !== Roles.SUPERADMIN) {
+          throw new BadRequestException(
+            'Faqat SuperAdmin foydalanuvchi rolini o\'zgartira oladi',
+          );
+        }
+        if (![Roles.ADMIN, Roles.REGISTRATOR].includes(otherFields.role)) {
+          throw new BadRequestException(
+            'Faqat admin yoki registrator roliga o\'zgartirilishi mumkin',
+          );
+        }
+      }
       // Phone number oldin ro'yxatdan o'tganmi yoki yo'qligini tekshirish
       if (otherFields.phone_number) {
         const existPhone = await this.userRepo.findOne({
@@ -779,7 +792,11 @@ export class UserService {
     }
   }
 
-  async updateRegistrator(id: string, updateRegistratorDto: UpdateAdminDto) {
+  async updateRegistrator(
+    id: string,
+    updateRegistratorDto: UpdateAdminDto,
+    currentUser?: JwtPayload,
+  ) {
     try {
       const { password, ...otherFields } = updateRegistratorDto;
       const registrator = await this.userRepo.findOne({
@@ -788,9 +805,26 @@ export class UserService {
       if (!registrator) {
         throw new NotFoundException('Registrator not found');
       }
+      // Rolni faqat superadmin o'zgartira oladi
+      if (otherFields.role) {
+        if (!currentUser || currentUser.role !== Roles.SUPERADMIN) {
+          throw new BadRequestException(
+            'Faqat SuperAdmin foydalanuvchi rolini o\'zgartira oladi',
+          );
+        }
+        if (![Roles.ADMIN, Roles.REGISTRATOR].includes(otherFields.role)) {
+          throw new BadRequestException(
+            'Faqat admin yoki registrator roliga o\'zgartirilishi mumkin',
+          );
+        }
+      }
       if (otherFields.phone_number) {
         const isExistPhone = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
         });
         if (isExistPhone) {
           throw new BadRequestException(

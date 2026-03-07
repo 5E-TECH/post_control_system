@@ -1,0 +1,333 @@
+╔══════════════════════════════════════════════════════════════╗
+║    O'ZBEKISTON RESPUBLIKASI SOATO KODLARI                    ║
+║    (Viloyat, shahar va tumanlar bo'yicha)                    ║
+╚══════════════════════════════════════════════════════════════╝
+
+Manba: Davlat statistika qo'mitasi (2020-yil, 22-iyul, 59-son)
+Format: Viloyat — 4 raqamli kod | Tuman/shahar — 7 raqamli kod
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1. ANDIJON VILOYATI                    Kod: 1703
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Andijon shahri .................. 1703401
+   • Xonobod shahri .................. 1703408
+
+   Tumanlar:
+   • Oltinko'l tumani ................ 1703202
+   • Andijon tumani .................. 1703203
+   • Baliqchi tumani ................. 1703206
+   • Bo'ston tumani .................. 1703209
+   • Buloqboshi tumani ............... 1703210
+   • Jalaquduq tumani ................ 1703211
+   • Izboskan tumani ................. 1703214
+   • Ulug'nor tumani ................. 1703217
+   • Qo'rg'ontepa tumani ............ 1703220
+   • Asaka tumani .................... 1703224
+   • Marxamat tumani ................. 1703227
+   • Shaxrixon tumani ................ 1703230
+   • Paxtaobod tumani ................ 1703232
+   • Xo'jaobod tumani ................ 1703236
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 2. BUXORO VILOYATI                     Kod: 1706
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Buxoro shahri ................... 1706401
+   • Kogon shahri .................... 1706403
+
+   Tumanlar:
+   • Olot tumani ..................... 1706204
+   • Buxoro tumani ................... 1706207
+   • Vobkent tumani .................. 1706212
+   • G'ijduvon tumani ................ 1706215
+   • Kogon tumani .................... 1706219
+   • Qorako'l tumani ................. 1706230
+   • Qorovulbozor tumani ............. 1706232
+   • Peshku tumani ................... 1706240
+   • Romitan tumani .................. 1706242
+   • Jondor tumani ................... 1706246
+   • Shofirkon tumani ................ 1706258
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 3. JIZZAX VILOYATI                     Kod: 1708
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Jizzax shahri ................... 1708401
+
+   Tumanlar:
+   • Arnasoy tumani .................. 1708201
+   • Baxmal tumani ................... 1708204
+   • G'allaorol tumani ............... 1708209
+   • Sharof Rashidov tumani .......... 1708212
+   • Do'stlik tumani ................. 1708215
+   • Zomin tumani .................... 1708218
+   • Zarbdor tumani .................. 1708220
+   • Mirzacho'l tumani ............... 1708223
+   • Zafarobod tumani ................ 1708225
+   • Paxtakor tumani ................. 1708228
+   • Forish tumani ................... 1708235
+   • Yangiobod tumani ................ 1708237
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 4. QASHQADARYO VILOYATI                Kod: 1710
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Qarshi shahri ................... 1710401
+   • Shahrisabz shahri ............... 1710405
+
+   Tumanlar:
+   • G'uzor tumani ................... 1710207
+   • Dehqonobod tumani ............... 1710212
+   • Qamashi tumani .................. 1710220
+   • Qarshi tumani ................... 1710224
+   • Koson tumani .................... 1710229
+   • Kitob tumani .................... 1710232
+   • Mirishkor tumani ................ 1710233
+   • Muborak tumani .................. 1710234
+   • Nishon tumani ................... 1710235
+   • Kasbi tumani .................... 1710237
+   • Ko'kdala tumani ................. 1710240
+   • Chiroqchi tumani ................ 1710242
+   • Shahrisabz tumani ............... 1710245
+   • Yakkabog' tumani ................ 1710250
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 5. NAVOIY VILOYATI                     Kod: 1712
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Navoiy shahri ................... 1712401
+   • Zarafshon shahri ................ 1712408
+   • G'ozg'on shahri ................. 1712412
+
+   Tumanlar:
+   • Konimex tumani .................. 1712211
+   • Qiziltepa tumani ................ 1712216
+   • Navbahor tumani ................. 1712230
+   • Karmana tumani .................. 1712234
+   • Nurota tumani ................... 1712238
+   • Tomdi tumani .................... 1712244
+   • Uchquduq tumani ................. 1712248
+   • Xatirchi tumani ................. 1712251
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 6. NAMANGAN VILOYATI                   Kod: 1714
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Namangan shahri ................. 1714401
+
+   Tumanlar:
+   • Mingbuloq tumani ................ 1714204
+   • Kosonsoy tumani ................. 1714207
+   • Namangan tumani ................. 1714212
+   • Norin tumani .................... 1714216
+   • Pop tumani ...................... 1714219
+   • To'raqo'rg'on tumani ........... 1714224
+   • Uychi tumani .................... 1714229
+   • Uchqo'rg'on tumani ............. 1714234
+   • Chortoq tumani .................. 1714236
+   • Chust tumani .................... 1714237
+   • Yangiqo'rg'on tumani ........... 1714242
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 7. SAMARQAND VILOYATI                  Kod: 1718
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Samarqand shahri ................ 1718401
+   • Kattaqo'rg'on shahri ........... 1718406
+
+   Tumanlar:
+   • Oqdaryo tumani .................. 1718203
+   • Bulung'ur tumani ................ 1718206
+   • Jomboy tumani ................... 1718209
+   • Ishtixon tumani ................. 1718212
+   • Kattaqo'rg'on tumani ........... 1718215
+   • Qo'shrabot tumani ............... 1718216
+   • Narpay tumani ................... 1718218
+   • Payariq tumani .................. 1718224
+   • Pastdarg'om tumani .............. 1718227
+   • Paxtachi tumani ................. 1718230
+   • Samarqand tumani ................ 1718233
+   • Nurobod tumani .................. 1718235
+   • Urgut tumani .................... 1718236
+   • Tayloq tumani ................... 1718238
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 8. SURXONDARYO VILOYATI                Kod: 1722
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Termiz shahri ................... 1722401
+
+   Tumanlar:
+   • Oltinsoy tumani ................. 1722201
+   • Angor tumani .................... 1722202
+   • Bandixon tumani ................. 1722203
+   • Boysun tumani ................... 1722204
+   • Muzrabot tumani ................. 1722207
+   • Denov tumani .................... 1722210
+   • Jarqo'rg'on tumani ............. 1722212
+   • Qumqo'rg'on tumani ............. 1722214
+   • Qiziriq tumani .................. 1722215
+   • Sariosiyo tumani ................ 1722217
+   • Termiz tumani ................... 1722220
+   • Uzun tumani ..................... 1722221
+   • Sherobod tumani ................. 1722223
+   • Sho'rchi tumani ................. 1722226
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 9. SIRDARYO VILOYATI                   Kod: 1724
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Guliston shahri ................. 1724401
+   • Shirin shahri ................... 1724410
+   • Yangiyer shahri ................. 1724413
+
+   Tumanlar:
+   • Oqoltin tumani .................. 1724206
+   • Boyovut tumani .................. 1724212
+   • Sayxunobod tumani ............... 1724216
+   • Guliston tumani ................. 1724220
+   • Sardoba tumani .................. 1724226
+   • Mirzaobod tumani ................ 1724228
+   • Sirdaryo tumani ................. 1724231
+   • Xovos tumani .................... 1724235
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 10. TOSHKENT SHAHRI                    Kod: 1726
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Tumanlar:
+   • Uchtepa tumani .................. 1726262
+   • Bektemir tumani ................. 1726264
+   • Yunusobod tumani ................ 1726266
+   • Mirzo Ulug'bek tumani .......... 1726269
+   • Mirobod tumani .................. 1726273
+   • Shayxontoxur tumani ............. 1726277
+   • Olmazor tumani .................. 1726280
+   • Sirg'ali tumani ................. 1726283
+   • Yakkasaroy tumani ............... 1726287
+   • Yashnobod tumani ................ 1726290
+   • Yangihayot tumani ............... 1726292
+   • Chilonzor tumani ................ 1726294
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 11. TOSHKENT VILOYATI                  Kod: 1727
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Nurafshon shahri ................ 1727401
+   • Olmaliq shahri .................. 1727404
+   • Angren shahri ................... 1727407
+   • Bekobod shahri .................. 1727413
+   • Ohangaron shahri ................ 1727415
+   • Chirchiq shahri ................. 1727419
+   • Yangiyo'l shahri ................ 1727424
+
+   Tumanlar:
+   • Oqqo'rg'on tumani .............. 1727206
+   • Ohangaron tumani ................ 1727212
+   • Bekobod tumani .................. 1727220
+   • Bo'stonliq tumani ............... 1727224
+   • Bo'ka tumani .................... 1727228
+   • Quyichirchiq tumani ............. 1727233
+   • Zangiota tumani ................. 1727237
+   • Yuqorichirchiq tumani ........... 1727239
+   • Qibray tumani ................... 1727248
+   • Parkent tumani .................. 1727249
+   • Pskent tumani ................... 1727250
+   • O'rtachirchiq tumani ............ 1727253
+   • Chinoz tumani ................... 1727256
+   • Yangiyo'l tumani ................ 1727259
+   • Toshkent tumani ................. 1727265
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 12. FARG'ONA VILOYATI                  Kod: 1730
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Farg'ona shahri ................. 1730401
+   • Qo'qon shahri .................. 1730405
+   • Quvasoy shahri .................. 1730408
+   • Marg'ilon shahri ................ 1730412
+
+   Tumanlar:
+   • Oltiariq tumani ................. 1730203
+   • Qo'shtepa tumani ................ 1730206
+   • Bog'dod tumani .................. 1730209
+   • Buvayda tumani .................. 1730212
+   • Beshariq tumani ................. 1730215
+   • Quva tumani ..................... 1730218
+   • Uchko'prik tumani ............... 1730221
+   • Rishton tumani .................. 1730224
+   • So'x tumani ..................... 1730226
+   • Toshloq tumani .................. 1730227
+   • O'zbekiston tumani .............. 1730230
+   • Farg'ona tumani ................. 1730233
+   • Dang'ara tumani ................. 1730236
+   • Furqat tumani ................... 1730238
+   • Yozyovon tumani ................. 1730242
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 13. XORAZM VILOYATI                    Kod: 1733
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Urganch shahri .................. 1733401
+   • Xiva shahri ..................... 1733406
+
+   Tumanlar:
+   • Bog'ot tumani ................... 1733204
+   • Gurlan tumani ................... 1733208
+   • Qo'shko'pir tumani ............. 1733212
+   • Urganch tumani .................. 1733217
+   • Xazorasp tumani ................. 1733220
+   • Tuproqqal'a tumani .............. 1733221
+   • Xonqa tumani .................... 1733223
+   • Xiva tumani ..................... 1733226
+   • Shovot tumani ................... 1733230
+   • Yangiariq tumani ................ 1733233
+   • Yangibozor tumani ............... 1733236
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 14. QORAQALPOG'ISTON RESPUBLIKASI      Kod: 1735
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Shaharlar:
+   • Nukus shahri .................... 1735401
+
+   Tumanlar:
+   • Amudaryo tumani ................. 1735204
+   • Beruniy tumani .................. 1735207
+   • Bo'zatov tumani ................. 1735209
+   • Qorao'zak tumani ................ 1735211
+   • Kegeyli tumani .................. 1735212
+   • Qo'ng'irot tumani .............. 1735215
+   • Qanliko'l tumani ................ 1735218
+   • Mo'ynoq tumani .................. 1735222
+   • Nukus tumani .................... 1735225
+   • Taxiatosh tumani ................ 1735228
+   • Taxtako'pir tumani .............. 1735230
+   • To'rtko'l tumani ................ 1735233
+   • Xo'jayli tumani ................. 1735236
+   • Chimboy tumani .................. 1735240
+   • Shumanay tumani ................. 1735243
+   • Ellikkala tumani ................ 1735250
+
+
+══════════════════════════════════════════════════
+  UMUMIY STATISTIKA
+══════════════════════════════════════════════════
+  Viloyatlar soni:        14
+  Jami shaharlar:         28
+  Jami tumanlar:         176
+  Jami hududlar:         204
+══════════════════════════════════════════════════

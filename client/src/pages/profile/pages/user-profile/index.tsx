@@ -1,6 +1,7 @@
 import { memo, useState, useMemo } from "react";
 import { Spin, Modal, Form, Input, Button, InputNumber, Switch, Select } from "antd";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 import { AvatarDisplay } from "../../../../shared/components/AvatarSelector";
 import { setEditing } from "../../../../shared/lib/features/profile/profileEditSlice";
 import { useParams } from "react-router-dom";
@@ -26,6 +27,7 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 const UserProfile = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
+  const currentUserRole = useSelector((state: RootState) => state.roleSlice.role);
   const { getUserById, updateUser } = useUser();
   const { data, isLoading, refetch } = getUserById(id);
   const [open, setOpen] = useState(false);
@@ -163,6 +165,9 @@ const UserProfile = () => {
             default_tariff: user.default_tariff || "center",
           }
         : {}),
+      ...(currentUserRole === "superadmin" && (user.role === "admin" || user.role === "registrator")
+        ? { role: user.role }
+        : {}),
     });
 
     // set phoneDisplay state too
@@ -210,6 +215,9 @@ const UserProfile = () => {
     if (!payload.password) delete payload.password;
     if (payload.default_tariff === user.default_tariff)
       delete payload.default_tariff;
+
+    // Rol o'zgarganmi tekshirish
+    if (payload.role === user.role) delete payload.role;
 
     if (Object.keys(payload).length === 0) {
       setOpen(false);
@@ -714,6 +722,28 @@ const UserProfile = () => {
                   options={[
                     { value: "center", label: "Markazgacha" },
                     { value: "address", label: "Manzilgacha" },
+                  ]}
+                />
+              </Form.Item>
+            )}
+
+            {currentUserRole === "superadmin" && (user.role === "admin" || user.role === "registrator") && (
+              <Form.Item
+                label={
+                  <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                    <Shield className="w-4 h-4" />
+                    Rol
+                  </span>
+                }
+                name="role"
+                className="mb-4"
+              >
+                <Select
+                  size="large"
+                  className="w-full"
+                  options={[
+                    { value: "admin", label: "Admin" },
+                    { value: "registrator", label: "Registrator" },
                   ]}
                 />
               </Form.Item>

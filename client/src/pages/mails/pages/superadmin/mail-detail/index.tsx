@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo, useState } from "react";
-import { Check, Printer, Trash2, ArrowLeft, Search, Package, Home, MapPin, Phone, User, Store, Calendar, Send, Loader2, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Check, Printer, Trash2, ArrowLeft, Search, Package, Home, MapPin, Phone, User, Store, Calendar, Send, Loader2, CheckCircle, XCircle, RefreshCw, ChevronDown, Globe, FileText, AlertTriangle } from "lucide-react";
 
 // Skeleton Loading Component
 const SkeletonCard = () => (
@@ -81,6 +81,7 @@ import type { RootState } from "../../../../../app/store";
 import { resetDownload } from "../../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { usePostScanner } from "../../../../../shared/components/post-scanner";
 import { exportToExcel } from "../../../../../shared/helpers/export-download-excel-with-courier";
+import { generateCourierReceipt } from "../../../../../shared/helpers/generate-courier-receipt";
 import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import { buildAdminPath } from "../../../../../shared/const";
@@ -114,7 +115,7 @@ const MailDetail = () => {
 
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
-  const { getPostById, sendAndGetCouriersByPostId, sendPost, createPrint } =
+  const { getPostById, sendAndGetCouriersByPostId, sendPost, createBrowserPrint, createThermalPdf } =
     usePost();
   const { deleteOrders } = useOrder();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
@@ -123,23 +124,74 @@ const MailDetail = () => {
   const [initialized, setInitialized] = useState(false);
 
   const [isPrintDisabled, setIsPrintDisabled] = useState(false);
-  const [selected, setSelected] = useState("");
   const [confirmPopup, setConfirmPopup] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [printDropdownOpen, setPrintDropdownOpen] = useState<string | null>(null);
+  const [bulkPrintDropdownOpen, setBulkPrintDropdownOpen] = useState(false);
+  const printDropdownRef = useRef<HTMLDivElement>(null);
+  const bulkPrintDropdownRef = useRef<HTMLDivElement>(null);
 
-  const handlePrint = (id: string) => {
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (printDropdownRef.current && !printDropdownRef.current.contains(e.target as Node)) {
+        setPrintDropdownOpen(null);
+      }
+      if (bulkPrintDropdownRef.current && !bulkPrintDropdownRef.current.contains(e.target as Node)) {
+        setBulkPrintDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleBrowserPrint = (orderIds: string[]) => {
+    if (isPrintDisabled || orderIds.length === 0) return;
     setIsPrintDisabled(true);
-
-    const orderids = { orderIds: [id] };
-    createPrint.mutate(orderids, {
-      onSuccess: () => {
-        handleSuccess("Chop etildi");
+    setPrintDropdownOpen(null);
+    setBulkPrintDropdownOpen(false);
+    createBrowserPrint.mutate({ orderIds }, {
+      onSuccess: (res: any) => {
+        const html = res?.data?.html || res?.html;
+        if (html) {
+          const printWindow = window.open("", "_blank");
+          if (printWindow) {
+            printWindow.document.write(html);
+            printWindow.document.close();
+            handleSuccess("Chek tayyor");
+          } else {
+            handleApiError(null, "Brauzer yangi oyna ochishga ruxsat bermadi. Popup blockerni o'chiring.");
+          }
+        } else {
+          handleApiError(null, "Chek ma'lumotlari topilmadi");
+        }
       },
       onError: (err: any) => {
-        handleApiError(err, "Chop etishda hatolik yuz berdi");
+        handleApiError(err, "Chek yaratishda xatolik yuz berdi");
       },
       onSettled: () => {
-        setTimeout(() => setIsPrintDisabled(false), 10000);
+        setTimeout(() => setIsPrintDisabled(false), 3000);
+      },
+    });
+  };
+
+  const handleThermalPdf = (orderIds: string[]) => {
+    if (isPrintDisabled || orderIds.length === 0) return;
+    setIsPrintDisabled(true);
+    setPrintDropdownOpen(null);
+    setBulkPrintDropdownOpen(false);
+    createThermalPdf.mutate({ orderIds }, {
+      onSuccess: (res: any) => {
+        const blob = new Blob([res.data], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        handleSuccess("PDF tayyor — saqlang yoki chop eting");
+      },
+      onError: (err: any) => {
+        handleApiError(err, "PDF yaratishda xatolik yuz berdi");
+      },
+      onSettled: () => {
+        setTimeout(() => setIsPrintDisabled(false), 3000);
       },
     });
   };
@@ -190,6 +242,31 @@ const MailDetail = () => {
     });
   }, [postData, debouncedSearch]);
 
+  // Takroriy telefon raqamlarni aniqlash
+  const duplicateInfo = useMemo(() => {
+    if (!postData || !Array.isArray(postData)) return { groups: [] as { phone: string; orders: any[] }[], orderIds: new Set<string>() };
+
+    const phoneMap = new Map<string, any[]>();
+    for (const order of postData) {
+      const phone = (order?.customer?.phone_number || "").replace(/\D/g, "");
+      if (!phone) continue;
+      if (!phoneMap.has(phone)) phoneMap.set(phone, []);
+      phoneMap.get(phone)!.push(order);
+    }
+
+    const groups: { phone: string; orders: any[] }[] = [];
+    const orderIds = new Set<string>();
+
+    for (const [, orders] of phoneMap) {
+      if (orders.length > 1) {
+        groups.push({ phone: orders[0]?.customer?.phone_number || "", orders });
+        orders.forEach((o: any) => orderIds.add(o.id));
+      }
+    }
+
+    return { groups, orderIds };
+  }, [postData]);
+
   useEffect(() => {
     if (postData && !initialized) {
       setSelectedIds([]);
@@ -200,6 +277,9 @@ const MailDetail = () => {
   const [isShow, setIsShow] = useState(false);
   const [couriers, setCouriers] = useState<any[]>([]);
   const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
+
+
+
   const handleClick = (id: string) => {
     if (selectedIds.length === 0) {
       handleWarning(
@@ -242,7 +322,7 @@ const MailDetail = () => {
                       mail?.where_deliver == "center"
                         ? "Markazgacha"
                         : "Uygacha",
-                    Tuman: mail?.customer?.district?.name,
+                    Tuman: mail?.district?.name || mail?.customer?.district?.name,
                     Izoh: mail?.comment || "",
                   }));
 
@@ -251,6 +331,15 @@ const MailDetail = () => {
                     regionName: res?.data?.updatedPost?.region?.name,
                     courierName,
                     totalOrders: res?.data?.postTotalInfo?.total,
+                    date: res?.data?.updatedPost?.created_at,
+                  });
+
+                  generateCourierReceipt({
+                    qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+                    courierName: courierName || "",
+                    regionName: res?.data?.updatedPost?.region?.name || "",
+                    courierPhone: res?.data?.updatedPost?.courier?.phone_number || "",
+                    orderCount: res?.data?.postTotalInfo?.total,
                     date: res?.data?.updatedPost?.created_at,
                   });
 
@@ -314,7 +403,7 @@ const MailDetail = () => {
               Narxi: Number((mail?.total_price ?? 0) / 1000),
               Manzil:
                 mail?.where_deliver == "center" ? "Markazgacha" : "Uygacha",
-              Tuman: mail?.customer?.district?.name,
+              Tuman: mail?.district?.name || mail?.customer?.district?.name,
               Izoh: mail?.comment || "",
             }));
 
@@ -323,6 +412,15 @@ const MailDetail = () => {
               regionName: res?.data?.updatedPost?.region?.name,
               courierName,
               totalOrders: res?.data?.postTotalInfo?.total,
+              date: res?.data?.updatedPost?.created_at,
+            });
+
+            generateCourierReceipt({
+              qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+              courierName: courierName || "",
+              regionName: res?.data?.updatedPost?.region?.name || "",
+              courierPhone: res?.data?.updatedPost?.courier?.phone_number || "",
+              orderCount: res?.data?.postTotalInfo?.total,
               date: res?.data?.updatedPost?.created_at,
             });
 
@@ -396,16 +494,66 @@ const MailDetail = () => {
               </div>
             </div>
 
-            {/* Search */}
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                placeholder="Ism yoki telefon raqam..."
-                className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A263D] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-              />
+            <div className="flex items-center gap-3">
+              {/* Search */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  placeholder="Ism yoki telefon raqam..."
+                  className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A263D] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+              </div>
+
+              {/* Bulk Print Dropdown */}
+              {!hideSend && (
+                <div className="relative" ref={bulkPrintDropdownRef}>
+                  <button
+                    onClick={() => {
+                      if (!isPrintDisabled && selectedIds.length > 0) {
+                        setBulkPrintDropdownOpen((prev) => !prev);
+                      }
+                    }}
+                    disabled={isPrintDisabled || selectedIds.length === 0}
+                    className={`h-11 px-4 rounded-xl flex items-center gap-2 text-sm font-medium border transition-all whitespace-nowrap ${
+                      isPrintDisabled || selectedIds.length === 0
+                        ? "opacity-50 cursor-not-allowed border-gray-300 text-gray-400 dark:border-gray-600 dark:text-gray-500"
+                        : "border-purple-500 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer"
+                    }`}
+                  >
+                    <Printer className="w-4 h-4" />
+                    {isPrintDisabled ? "Kutayapti..." : `Chop etish (${selectedIds.length})`}
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${bulkPrintDropdownOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {bulkPrintDropdownOpen && (
+                    <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#2A263D] rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden">
+                      <button
+                        onClick={() => handleBrowserPrint(selectedIds)}
+                        className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                      >
+                        <Globe className="w-4 h-4 text-blue-500" />
+                        <div>
+                          <p className="font-medium text-gray-800 dark:text-white">Brauzer orqali</p>
+                          <p className="text-xs text-gray-400">Istalgan printer</p>
+                        </div>
+                      </button>
+                      <div className="border-t border-gray-100 dark:border-gray-700" />
+                      <button
+                        onClick={() => handleThermalPdf(selectedIds)}
+                        className="w-full px-4 py-3 text-left text-sm flex items-center gap-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 text-red-500" />
+                        <div>
+                          <p className="font-medium text-gray-800 dark:text-white">PDF (100x60mm)</p>
+                          <p className="text-xs text-gray-400">Termal printer uchun</p>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -479,6 +627,33 @@ const MailDetail = () => {
           </div>
         </div>
 
+        {/* Takroriy telefon raqamlar haqida ogohlantirish */}
+        {duplicateInfo.groups.length > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-3 sm:p-4 space-y-2">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-semibold">
+                Takroriy telefon raqamlar aniqlandi ({duplicateInfo.groups.length} ta raqam)
+              </span>
+            </div>
+            <div className="space-y-1.5 ml-7">
+              {duplicateInfo.groups.map((group, idx) => {
+                const uniqueNames = [...new Set(group.orders.map((o: any) => o?.customer?.name).filter(Boolean))];
+                return (
+                  <div key={idx} className="flex items-center gap-2 text-sm">
+                    <Phone className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                    <span className="font-medium text-amber-800 dark:text-amber-300">{group.phone}</span>
+                    <span className="text-amber-600 dark:text-amber-400">
+                      — {group.orders.length} ta buyurtma
+                      {uniqueNames.length > 0 && ` (${uniqueNames.join(", ")})`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1">
           {/* Select All Header */}
@@ -510,7 +685,7 @@ const MailDetail = () => {
                 onClick={() => !hideSend && toggleSelect(order.id)}
                 className={`bg-gray-50 dark:bg-[#3A3650] rounded-xl p-3 sm:p-4 transition-all ${
                   !hideSend ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-[#4A4660]" : ""
-                } ${selectedIds.includes(order.id) ? "ring-2 ring-indigo-500" : ""}`}
+                } ${selectedIds.includes(order.id) ? "ring-2 ring-indigo-500" : duplicateInfo.orderIds.has(order.id) ? "ring-2 ring-amber-400 dark:ring-amber-500" : ""}`}
               >
                 {/* Mobile Layout */}
                 <div className="block sm:hidden">
@@ -536,17 +711,37 @@ const MailDetail = () => {
                     </div>
                     {!hideSend && (
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          disabled={isPrintDisabled && order?.id === selected}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePrint(order?.id);
-                            setSelected(order?.id);
-                          }}
-                          className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50"
-                        >
-                          <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        </button>
+                        <div className="relative" ref={printDropdownOpen === order?.id ? printDropdownRef : undefined}>
+                          <button
+                            disabled={isPrintDisabled}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPrintDropdownOpen(printDropdownOpen === order?.id ? null : order?.id);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50"
+                          >
+                            <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          </button>
+                          {printDropdownOpen === order?.id && (
+                            <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#2A263D] rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleBrowserPrint([order.id]); }}
+                                className="w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                              >
+                                <Globe className="w-4 h-4 text-blue-500" />
+                                <span className="text-gray-800 dark:text-white">Brauzer orqali</span>
+                              </button>
+                              <div className="border-t border-gray-100 dark:border-gray-700" />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleThermalPdf([order.id]); }}
+                                className="w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                              >
+                                <FileText className="w-4 h-4 text-red-500" />
+                                <span className="text-gray-800 dark:text-white">PDF (100x60mm)</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
                         {role === "superadmin" && (
                           <button
                             onClick={(e) => {
@@ -565,7 +760,7 @@ const MailDetail = () => {
                   <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                       <MapPin className="w-3 h-3 text-gray-400" />
-                      <span className="truncate">{order?.customer?.district?.name}</span>
+                      <span className="truncate">{order?.district?.name || order?.customer?.district?.name}</span>
                     </div>
                     <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                       <Store className="w-3 h-3 text-gray-400" />
@@ -620,7 +815,7 @@ const MailDetail = () => {
                       <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
                         <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
-                          {order?.customer?.district?.name}
+                          {order?.district?.name || order?.customer?.district?.name}
                         </span>
                       </div>
 
@@ -664,17 +859,37 @@ const MailDetail = () => {
                   {/* Actions */}
                   {!hideSend && (
                     <div className="flex items-center gap-2 ml-4">
-                      <button
-                        disabled={isPrintDisabled && order?.id === selected}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePrint(order?.id);
-                          setSelected(order?.id);
-                        }}
-                        className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50"
-                      >
-                        <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      </button>
+                      <div className="relative" ref={printDropdownOpen === order?.id ? printDropdownRef : undefined}>
+                        <button
+                          disabled={isPrintDisabled}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPrintDropdownOpen(printDropdownOpen === order?.id ? null : order?.id);
+                          }}
+                          className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50"
+                        >
+                          <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </button>
+                        {printDropdownOpen === order?.id && (
+                          <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#2A263D] rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl z-50 overflow-hidden">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleBrowserPrint([order.id]); }}
+                              className="w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                            >
+                              <Globe className="w-4 h-4 text-blue-500" />
+                              <span className="text-gray-800 dark:text-white">Brauzer orqali</span>
+                            </button>
+                            <div className="border-t border-gray-100 dark:border-gray-700" />
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleThermalPdf([order.id]); }}
+                              className="w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                            >
+                              <FileText className="w-4 h-4 text-red-500" />
+                              <span className="text-gray-800 dark:text-white">PDF (100x60mm)</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       {role === "superadmin" && (
                         <button
                           onClick={(e) => {
