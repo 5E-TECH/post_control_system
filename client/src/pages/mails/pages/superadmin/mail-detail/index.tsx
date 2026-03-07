@@ -114,18 +114,16 @@ const MailDetail = () => {
   };
 
   const role = useSelector((state: RootState) => state.roleSlice.role);
-  const canSeePrice = role === "superadmin" || role === "admin";
 
   const { getPostById, sendAndGetCouriersByPostId, sendPost, createBrowserPrint, createThermalPdf } =
     usePost();
-  const { deleteOrders, updateOrders } = useOrder();
+  const { deleteOrders } = useOrder();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
   const { mutate: sendCouriersToPost, isPending } = sendPost();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
 
   const [isPrintDisabled, setIsPrintDisabled] = useState(false);
-  const [selected, setSelected] = useState("");
   const [confirmPopup, setConfirmPopup] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [printDropdownOpen, setPrintDropdownOpen] = useState<string | null>(null);
@@ -228,7 +226,7 @@ const MailDetail = () => {
     condition = true;
   }
 
-  const { data, isLoading, refetch } = getPostById(id as string, endpoint, condition);
+  const { data, isLoading } = getPostById(id as string, endpoint, condition);
   const postData = data?.data?.allOrdersByPostId || data?.data;
 
   // Filter locally by name or phone

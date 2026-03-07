@@ -188,7 +188,7 @@ const AllOrders = () => {
 
   const handleConfirm = () => {
     const id = orderId.current;
-    rollbackOrder.mutate(id as string, {
+    rollbackOrder.mutate({ id: id as string, target_status: "waiting" }, {
       onSuccess: () => {
         handleSuccess("Buyurtma muvaffaqiyatli ortga qaytarildi");
         setIsShowModal(false);

@@ -5,8 +5,6 @@ import { useApiNotification } from "../../../../../shared/hooks/useApiNotificati
 import { useTranslation } from "react-i18next";
 import { useRefusedPostScanner } from "../../../../../shared/components/refused-post-scanner";
 import debounce from "lodash/debounce";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../../../../app/store";
 import {
   ArrowLeft,
   Search,
@@ -94,9 +92,6 @@ const RefusedMailDetail = () => {
   const { state } = useLocation();
   const regionName = state?.regionName;
   const navigate = useNavigate();
-  const role = useSelector((state: RootState) => state.roleSlice.role);
-  const canSeePrice = role === "superadmin" || role === "admin";
-
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { visualFeedback } = useRefusedPostScanner(undefined, setSelectedIds);
 
