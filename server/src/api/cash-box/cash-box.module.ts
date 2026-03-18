@@ -19,6 +19,6 @@ import { MyLogger } from 'src/logger/logger.service';
   ],
   controllers: [CasheBoxController],
   providers: [CashBoxService],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, CashBoxService],
 })
 export class CashBoxModule {}

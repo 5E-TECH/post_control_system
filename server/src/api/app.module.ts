@@ -17,6 +17,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { TelegrafModule } from 'nestjs-telegraf';
 import { BotUpdate } from './bot/bot.update';
 import { PrinterModule } from './printer/printer.module';
+import { FinanceModule } from './finance/finance.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { PrinterModule } from './printer/printer.module';
     LoggerModule,
 
     PrinterModule,
+    FinanceModule,
   ],
   providers: [OrderGateaway],
 })

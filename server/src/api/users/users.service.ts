@@ -690,7 +690,7 @@ export class UserService {
       return catchError(error);
     }
   }
-
+///////////////////////////
   async profile(user: JwtPayload): Promise<object> {
     try {
       const { id } = user;

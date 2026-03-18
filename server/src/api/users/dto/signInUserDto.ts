@@ -14,7 +14,7 @@ export class SignInUserDto {
     type: String,
     example: '0990',
   })
-  @IsNotEmpty()
+  @IsNotEmpty()w
   @IsString()
   password: string;
 }
