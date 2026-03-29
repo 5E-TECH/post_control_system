@@ -9,6 +9,7 @@ import {
   Calendar1,
   CreditCard,
   Scale,
+  Landmark,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -32,6 +33,7 @@ const AdminSidebar = () => {
     { to: "/payments", icon: <CreditCard />, label: t("payments") },
     { to: "/m-balance", icon: <Scale />, label: t("balance") },
     { to: "/regions", icon: <MapPinned />, label: t("region") },
+    // { to: "/investors", icon: <Landmark />, label: "Investorlar" },
   ];
   const sidebarRedux = useSelector((state: RootState) => state.sidebar);
   // Test deploy

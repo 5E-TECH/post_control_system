@@ -16,9 +16,15 @@ import {
   Clock,
   Play,
   Square,
+  Landmark,
+  PiggyBank,
+  ArrowDownLeft,
+  Check,
+  Magnet,
+  ChevronLeft,
 } from "lucide-react";
 import { BASE_URL } from "../../../../shared/const";
-import { message } from "antd";
+import { message, Modal } from "antd";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useCourier } from "../../../../shared/api/hooks/useCourier";
 import TextArea from "antd/es/input/TextArea";
@@ -71,6 +77,20 @@ const MainDetail = () => {
   const [shiftComment, setShiftComment] = useState("");
   const [showShiftWarning, setShowShiftWarning] = useState(false);
   const [pendingAction, setPendingAction] = useState<"spend" | "fill" | null>(null);
+  // Salary payment states
+  const [salaryUser, setSalaryUser] = useState<any>(null);
+  const [salaryAmount, setSalaryAmount] = useState("");
+  const [salaryPayMethod, setSalaryPayMethod] = useState<"cash" | "click">("cash");
+  const [salaryComment, setSalaryComment] = useState("");
+  // Investor popup states
+  const [showInvestorPopup, setShowInvestorPopup] = useState(false);
+  const [selectedInvestor, setSelectedInvestor] = useState<any>(null);
+  const [investorAction, setInvestorAction] = useState<"piggy" | "pay">("piggy");
+  const [investorAmount, setInvestorAmount] = useState("");
+  const [investorNote, setInvestorNote] = useState("");
+  const [investorPayMethod, setInvestorPayMethod] = useState<"cash" | "click">("cash");
+  const [investorSearch, setInvestorSearch] = useState("");
+  const [showInvestorActionModal, setShowInvestorActionModal] = useState(false);
   const { handleApiError } = useApiNotification();
 
   const navigate = useNavigate();
@@ -99,11 +119,18 @@ const MainDetail = () => {
   const [show, setShow] = useState(true);
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
-  const { getCashBoxMain, cashboxSpand, cashboxFill, getCurrentShift, openShift, closeShift } = useCashBox();
-  const { getAdminAndRegister } = useUser();
+  const { getCashBoxMain, cashboxSpand, cashboxFill, paySalary, getCurrentShift, openShift, closeShift } = useCashBox();
+  const { getAdminAndRegister, getInvestors, payInvestor, addManualEarning } = useUser();
 
   // Get current shift status
   const { data: shiftData, refetch: refetchShift } = getCurrentShift();
+
+  // Investors
+  const { data: investorsData } = getInvestors(showInvestorPopup);
+  const allInvestors = investorsData?.data || [];
+  const filteredInvestors = investorSearch
+    ? allInvestors.filter((i: any) => i.name?.toLowerCase().includes(investorSearch.toLowerCase()))
+    : allInvestors;
 
   const searchParam = form.search
     ? { search: form.search } // ✅ faqat search bo‘lsa qo‘shiladi
@@ -345,7 +372,7 @@ const MainDetail = () => {
 
           {/* === ACTION BUTTONS - Modern Circular Design === */}
           <div className="mt-8">
-            <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap">
+            <div className="flex items-start justify-center gap-4 sm:gap-6 flex-wrap">
               {/* Kuryerdan olish */}
               <button
                 onClick={() => setShowCurier(true)}
@@ -436,6 +463,21 @@ const MainDetail = () => {
                   {t("maoshTo'lash") || "Maosh"}
                 </span>
               </button>
+
+              {/* Investor ulushi (vaqtinchalik o'chirilgan) */}
+              {/* <button
+                onClick={() => setShowInvestorPopup(true)}
+                className="group flex flex-col items-center gap-2 cursor-pointer"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-fuchsia-500 flex items-center justify-center shadow-xl shadow-purple-500/40 group-hover:shadow-purple-500/60 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
+                    <Landmark size={24} className="text-white" />
+                  </div>
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
+                  Investor
+                </span>
+              </button> */}
             </div>
 
             {/* Secondary Actions - Pills */}
@@ -690,24 +732,34 @@ const MainDetail = () => {
       </PaymentPopup>
 
       {/* === ADMIN/REGISTRATOR POPUP === */}
-      <PaymentPopup isShow={showAdminAndRegistrator} onClose={() => handleClose()}>
+      <PaymentPopup isShow={showAdminAndRegistrator} onClose={() => { handleClose(); setSalaryUser(null); setSalaryAmount(""); setSalaryComment(""); setSalaryPayMethod("cash"); }}>
         <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[600px] max-md:w-[95%] overflow-hidden max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 px-6 py-5 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
+                {salaryUser && (
+                  <button
+                    onClick={() => setSalaryUser(null)}
+                    className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer mr-1"
+                  >
+                    <ChevronLeft size={20} className="text-white" />
+                  </button>
+                )}
                 <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
                   <Wallet size={24} className="text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">
-                    {t("hodimniTanlang") || "Hodimni tanlang"}
+                  <h2 className="text-lg font-bold text-white">
+                    {salaryUser ? salaryUser.name : (t("hodimniTanlang") || "Hodimni tanlang")}
                   </h2>
-                  <p className="text-sm text-white/70">Maosh to'lash uchun</p>
+                  <p className="text-sm text-white/70">
+                    {salaryUser ? "Maosh to'lash" : "Maosh to'lash uchun"}
+                  </p>
                 </div>
               </div>
               <button
-                onClick={() => handleClose()}
+                onClick={() => { handleClose(); setSalaryUser(null); setSalaryAmount(""); setSalaryComment(""); }}
                 className="w-10 h-10 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all cursor-pointer"
               >
                 <X size={20} className="text-white" />
@@ -715,77 +767,237 @@ const MainDetail = () => {
             </div>
           </div>
 
-          {/* Search */}
-          <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-            <div className="relative">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                defaultValue={form.search}
-                onChange={handleSearchChange}
-                type="text"
-                placeholder={`${t("search") || "Qidirish"}...`}
-                className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] focus:border-amber-400 focus:ring-4 focus:ring-amber-100 dark:focus:ring-amber-900/30 outline-none transition-all"
-              />
-            </div>
-          </div>
+          {!salaryUser ? (
+            <>
+              {/* Search */}
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+                <div className="relative">
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    defaultValue={form.search}
+                    onChange={handleSearchChange}
+                    type="text"
+                    placeholder={`${t("search") || "Qidirish"}...`}
+                    className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] focus:border-amber-400 focus:ring-4 focus:ring-amber-100 dark:focus:ring-amber-900/30 outline-none transition-all"
+                  />
+                </div>
+              </div>
 
-          {/* List */}
-          <div className="flex-1 overflow-y-auto px-3 py-3">
-            <div className="space-y-2">
-              {adminAndRegisterData?.data?.data?.map((item: any, inx: number) => {
-                const roleColors: Record<string, { bg: string; text: string }> = {
-                  admin: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-600 dark:text-purple-400" },
-                  registrator: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-600 dark:text-blue-400" },
-                };
-                const colors = roleColors[item?.role] || { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400" };
+              {/* User List */}
+              <div className="flex-1 overflow-y-auto px-3 py-3">
+                <div className="space-y-2">
+                  {adminAndRegisterData?.data?.data?.map((item: any, inx: number) => {
+                    const roleColors: Record<string, { bg: string; text: string }> = {
+                      admin: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-600 dark:text-purple-400" },
+                      registrator: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-600 dark:text-blue-400" },
+                      logist: { bg: "bg-teal-100 dark:bg-teal-900/30", text: "text-teal-600 dark:text-teal-400" },
+                    };
+                    const colors = roleColors[item?.role] || { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400" };
+                    const haveToPay = item?.salary?.have_to_pay || 0;
 
-                return (
-                  <div
-                    key={item?.id}
-                    onClick={() => setSelect(item?.id)}
-                    className={`p-4 rounded-xl cursor-pointer transition-all duration-200 ${
-                      item.id === select
-                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30"
-                        : "bg-gray-50 dark:bg-[#312D4B] hover:bg-gray-100 dark:hover:bg-[#3d3759]"
+                    return (
+                      <div
+                        key={item?.id}
+                        onClick={() => {
+                          setSalaryUser(item);
+                          setSalaryAmount("");
+                          setSalaryComment("");
+                          setSalaryPayMethod("cash");
+                        }}
+                        className="p-4 rounded-xl cursor-pointer transition-all duration-200 bg-gray-50 dark:bg-[#312D4B] hover:bg-gray-100 dark:hover:bg-[#3d3759]"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                            {inx + 1}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-800 dark:text-white">{item?.name}</p>
+                            <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-xs font-medium ${colors.bg} ${colors.text}`}>
+                              {item?.role}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            {haveToPay > 0 ? (
+                              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                                {haveToPay.toLocaleString("uz-UZ")} so'm
+                              </p>
+                            ) : (
+                              <p className="text-xs text-gray-400">0</p>
+                            )}
+                            <p className="text-[10px] text-gray-400">to'lanmagan</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* === SALARY PAYMENT FORM === */
+            <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+              {/* Salary info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">To'lanmagan qoldiq</p>
+                  <p className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                    {(salaryUser?.salary?.have_to_pay || 0).toLocaleString("uz-UZ")} so'm
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Oylik maosh</p>
+                  <p className="text-lg font-bold text-gray-700 dark:text-gray-200">
+                    {(salaryUser?.salary?.salary_amount || 0).toLocaleString("uz-UZ")} so'm
+                  </p>
+                </div>
+              </div>
+
+              {/* Summa */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Summa</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={salaryAmount}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "");
+                      setSalaryAmount(v ? Number(v).toLocaleString("uz-UZ") : "");
+                    }}
+                    placeholder="0"
+                    className="w-full h-12 px-4 pr-12 text-lg font-bold rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                  />
+                  {(salaryUser?.salary?.have_to_pay || 0) > 0 && (
+                    <button
+                      onClick={() => setSalaryAmount(Number(salaryUser.salary.have_to_pay).toLocaleString("uz-UZ"))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-all cursor-pointer"
+                      title="To'liq summani to'ldirish"
+                    >
+                      <Magnet className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* To'lov usuli */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">To'lov usuli</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSalaryPayMethod("cash")}
+                    className={`flex-1 h-10 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                      salaryPayMethod === "cash"
+                        ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-2 border-green-400 dark:border-green-600"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
                     }`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                        item.id === select ? "bg-white/20" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                      }`}>
-                        {inx + 1}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold">{item?.name}</p>
-                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-xs font-medium ${
-                          item.id === select ? "bg-white/20 text-white" : colors.bg + " " + colors.text
-                        }`}>
-                          {item?.role}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                    Naqd
+                  </button>
+                  <button
+                    onClick={() => setSalaryPayMethod("click")}
+                    className={`flex-1 h-10 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                      salaryPayMethod === "click"
+                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-2 border-blue-400 dark:border-blue-600"
+                        : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
+                    }`}
+                  >
+                    Karta
+                  </button>
+                </div>
+              </div>
 
-          {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end flex-shrink-0">
-            <button
-              onClick={() => handleClose()}
-              className="px-5 py-2.5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer"
-            >
-              {t("bekorQilish") || "Bekor qilish"}
-            </button>
-            <button
-              disabled={!select}
-              onClick={() => handleNavigateProfile()}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold shadow-lg shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
-            >
-              {t("tanlash") || "Tanlash"}
-            </button>
-          </div>
+              {/* Izoh */}
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Izoh</label>
+                <input
+                  type="text"
+                  value={salaryComment}
+                  onChange={(e) => setSalaryComment(e.target.value)}
+                  placeholder="Ixtiyoriy"
+                  className="w-full h-10 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-sm"
+                />
+              </div>
+
+              {/* Qarz ogohlantiruvi */}
+              {(() => {
+                const amount = Number(salaryAmount.replace(/\D/g, "") || 0);
+                const currentBalance = salaryUser?.salary?.have_to_pay || 0;
+                const afterBalance = currentBalance - amount;
+                if (amount > 0 && afterBalance < 0 && currentBalance >= 0) {
+                  return (
+                    <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
+                      <p className="text-xs font-semibold text-red-600 dark:text-red-400">Diqqat! Bu to'lovdan keyin ishchi qarzga tushadi</p>
+                      <p className="text-sm font-bold text-red-700 dark:text-red-300 mt-0.5">Qoldiq: {afterBalance.toLocaleString()} so'm</p>
+                    </div>
+                  );
+                }
+                if (amount > 0 && currentBalance < 0) {
+                  return (
+                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
+                      <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">Ishchi hozir qarzda: {currentBalance.toLocaleString()} so'm</p>
+                      <p className="text-sm font-bold text-amber-700 dark:text-amber-300 mt-0.5">To'lovdan keyin: {afterBalance.toLocaleString()} so'm</p>
+                    </div>
+                  );
+                }
+                if (amount > 0 && afterBalance >= 0) {
+                  return (
+                    <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30">
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">To'lovdan keyin qoldiq: <span className="font-bold">{afterBalance.toLocaleString()} so'm</span></p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Submit */}
+              <button
+                onClick={() => {
+                  const amount = Number(salaryAmount.replace(/\D/g, ""));
+                  if (!amount || !salaryUser?.id) return;
+
+                  const doPayment = () => {
+                    paySalary.mutate(
+                      { user_id: salaryUser.id, amount, type: salaryPayMethod, comment: salaryComment || "Oylik maosh" },
+                      {
+                        onSuccess: () => {
+                          message.success(`${salaryUser.name} ga ${amount.toLocaleString()} so'm maosh to'landi`);
+                          setSalaryUser(null);
+                          setSalaryAmount("");
+                          setSalaryComment("");
+                          setshowAdminAndRegistrator(false);
+                          refetch();
+                        },
+                        onError: (err: any) => handleApiError(err, "Maosh to'lashda xatolik"),
+                      },
+                    );
+                  };
+
+                  const currentBalance = salaryUser?.salary?.have_to_pay || 0;
+                  const afterBalance = currentBalance - amount;
+                  if (afterBalance < 0) {
+                    Modal.confirm({
+                      title: <span className="text-gray-800 dark:text-white">Diqqat!</span>,
+                      content: <span className="text-gray-600 dark:text-gray-300">{`Bu to'lovdan keyin ${salaryUser.name} ${afterBalance.toLocaleString()} so'm qarzga tushadi. Davom etasizmi?`}</span>,
+                      okText: "Ha, to'lash",
+                      cancelText: "Bekor qilish",
+                      okButtonProps: { danger: true },
+                      onOk: doPayment,
+                      className: "dark:[&_.ant-modal-content]:bg-[#2A263D] dark:[&_.ant-modal-confirm-title]:text-white dark:[&_.ant-modal-confirm-content]:text-gray-300 dark:[&_.ant-btn-default]:bg-gray-700 dark:[&_.ant-btn-default]:text-white dark:[&_.ant-btn-default]:border-gray-600",
+                    });
+                  } else {
+                    doPayment();
+                  }
+                }}
+                disabled={!salaryAmount || paySalary.isPending}
+                className="w-full h-12 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium shadow-lg hover:shadow-amber-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+              >
+                {paySalary.isPending ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <><Wallet className="w-5 h-5" /> Maosh to'lash</>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </PaymentPopup>
 
@@ -1303,6 +1515,254 @@ const MainDetail = () => {
           </div>
         </div>
       </PaymentPopup>
+
+      {/* ===== INVESTOR SELECTION POPUP ===== */}
+      <PaymentPopup isShow={showInvestorPopup} onClose={() => { setShowInvestorPopup(false); setInvestorSearch(""); }}>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl overflow-hidden shadow-2xl w-[95vw] sm:w-[90vw] max-w-lg max-h-[85vh] flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-violet-600 to-purple-700 p-5 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <Landmark size={24} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Investorni tanlang</h2>
+                <p className="text-sm text-white/70">Ulush ajratish yoki to'lov</p>
+              </div>
+            </div>
+            <button onClick={() => { setShowInvestorPopup(false); setInvestorSearch(""); }}
+              className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={investorSearch}
+                onChange={(e) => setInvestorSearch(e.target.value)}
+                placeholder="Investor qidirish..."
+                className="w-full h-10 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto p-2">
+            {filteredInvestors.length === 0 ? (
+              <div className="py-12 text-center text-gray-400">
+                <Landmark className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Investor topilmadi</p>
+              </div>
+            ) : filteredInvestors.map((inv: any) => (
+              <div
+                key={inv.id}
+                onClick={() => {
+                  setSelectedInvestor(inv);
+                  setShowInvestorPopup(false);
+                  setInvestorSearch("");
+                  setInvestorAction("piggy");
+                  setInvestorAmount("");
+                  setInvestorNote("");
+                  setShowInvestorActionModal(true);
+                }}
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer transition-all"
+              >
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                  {inv.name?.charAt(0)?.toUpperCase() || "I"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 dark:text-white truncate">{inv.name}</p>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${inv.is_partner ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" : "bg-green-100 dark:bg-green-900/30 text-green-600"}`}>
+                    {inv.is_partner ? "Sherik" : "Investor"}
+                  </span>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  {(inv.balance ?? 0) < 0 ? (
+                    <p className="text-[10px] font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded mb-0.5">
+                      Qarz: {Number(inv.balance).toLocaleString("uz-UZ")}
+                    </p>
+                  ) : inv.pending_amount > 0 ? (
+                    <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded mb-0.5">
+                      {Number(inv.pending_amount).toLocaleString("uz-UZ")} kutmoqda
+                    </p>
+                  ) : null}
+                  <p className={`text-sm font-bold ${inv.today_earned > 0 ? "text-emerald-600" : "text-gray-400"}`}>
+                    {inv.today_earned > 0 ? `+${Number(inv.today_earned).toLocaleString("uz-UZ")}` : "0"} <span className="text-[10px] font-normal text-gray-400">bugun</span>
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PaymentPopup>
+
+      {/* ===== INVESTOR ACTION MODAL ===== */}
+      <PaymentPopup isShow={showInvestorActionModal} onClose={() => setShowInvestorActionModal(false)}>
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl overflow-hidden shadow-2xl w-[95vw] sm:w-[90vw] max-w-md">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-violet-600 to-purple-700 p-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <Landmark size={24} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">{selectedInvestor?.name}</h2>
+                <p className="text-sm text-white/70">
+                  {selectedInvestor?.is_partner ? "Sherik" : "Investor"}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setShowInvestorActionModal(false)}
+              className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer">
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {/* Qarz yoki pending ko'rsatish */}
+            {(selectedInvestor?.balance ?? 0) < 0 ? (
+              <div className="flex items-center justify-between p-3 rounded-xl border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/30">
+                <div>
+                  <p className="text-xs text-red-700 dark:text-red-400">Investor qarzda</p>
+                  <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                    {Number(selectedInvestor?.balance || 0).toLocaleString("uz-UZ")} so'm
+                  </p>
+                </div>
+                <p className="text-[10px] text-red-500 dark:text-red-400 max-w-[140px] text-right">
+                  Qarz yopilmaguncha ajratish mumkin emas
+                </p>
+              </div>
+            ) : (
+              <div className={`flex items-center justify-between p-3 rounded-xl border ${
+                (selectedInvestor?.pending_amount || 0) > 0
+                  ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/30"
+                  : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
+              }`}>
+                <div>
+                  <p className={`text-xs ${(selectedInvestor?.pending_amount || 0) > 0 ? "text-amber-700 dark:text-amber-400" : "text-gray-500 dark:text-gray-400"}`}>
+                    Ajratib olinmagan summa
+                  </p>
+                  <p className={`text-lg font-bold ${(selectedInvestor?.pending_amount || 0) > 0 ? "text-amber-800 dark:text-amber-300" : "text-gray-400"}`}>
+                    {Number(selectedInvestor?.pending_amount || 0).toLocaleString("uz-UZ")} so'm
+                  </p>
+                </div>
+                {(selectedInvestor?.pending_amount || 0) > 0 && (
+                  <button
+                    onClick={() => setInvestorAmount(Number(selectedInvestor.pending_amount).toLocaleString("uz-UZ"))}
+                    className="w-10 h-10 rounded-xl bg-amber-200 dark:bg-amber-800/50 flex items-center justify-center text-amber-700 dark:text-amber-300 hover:bg-amber-300 dark:hover:bg-amber-700/50 transition-all cursor-pointer"
+                    title="Summani avtomatik to'ldirish"
+                  >
+                    <Magnet className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Summa */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Summa</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={investorAmount}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, "");
+                    setInvestorAmount(v ? Number(v).toLocaleString("uz-UZ") : "");
+                  }}
+                  placeholder="0"
+                  className="w-full h-12 px-4 pr-12 text-lg font-bold rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
+                />
+                {(selectedInvestor?.pending_amount || 0) > 0 && (selectedInvestor?.balance ?? 0) > 0 && (
+                  <button
+                    onClick={() => setInvestorAmount(Number(selectedInvestor.pending_amount).toLocaleString("uz-UZ"))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-all cursor-pointer"
+                    title="Tavsiya etilgan summani to'ldirish"
+                  >
+                    <Magnet className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Izoh */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Izoh</label>
+              <input
+                type="text"
+                value={investorNote}
+                onChange={(e) => setInvestorNote(e.target.value)}
+                placeholder="Ixtiyoriy"
+                className="w-full h-10 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
+              />
+            </div>
+
+            {/* Naqd / Karta tanlash */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">To'lov usuli</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setInvestorPayMethod("cash")}
+                  className={`flex-1 h-10 rounded-xl text-sm font-medium transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    investorPayMethod === "cash"
+                      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-2 border-green-400 dark:border-green-600"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
+                  }`}
+                >
+                  Naqd
+                </button>
+                <button
+                  onClick={() => setInvestorPayMethod("click")}
+                  className={`flex-1 h-10 rounded-xl text-sm font-medium transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    investorPayMethod === "click"
+                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-2 border-blue-400 dark:border-blue-600"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
+                  }`}
+                >
+                  Karta
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs text-purple-500 dark:text-purple-400">
+              Asosiy kassaning {investorPayMethod === "cash" ? "naqd" : "karta"} balansidan yechiladi va investor kassasiga qo'shiladi
+            </p>
+
+            {/* Submit */}
+            <button
+              onClick={() => {
+                const amount = Number(investorAmount.replace(/\D/g, ""));
+                if (!amount || !selectedInvestor?.id) return;
+                addManualEarning.mutate(
+                  { id: selectedInvestor.id, data: { amount, note: investorNote || "Kassadan ajratildi", payment_method: investorPayMethod } },
+                  {
+                    onSuccess: () => {
+                      message.success("Investor kassasiga ajratildi");
+                      setShowInvestorActionModal(false);
+                      refetch();
+                    },
+                    onError: (err: any) => handleApiError(err, "Xatolik"),
+                  },
+                );
+              }}
+              disabled={!investorAmount || addManualEarning.isPending || (selectedInvestor?.balance ?? 0) <= 0}
+              className="w-full h-12 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-medium shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+            >
+              {addManualEarning.isPending ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (selectedInvestor?.balance ?? 0) <= 0 ? (
+                <><PiggyBank className="w-5 h-5" /> Qarzda — ajratish mumkin emas</>
+              ) : (
+                <><PiggyBank className="w-5 h-5" /> Ajratib olish</>
+              )}
+            </button>
+          </div>
+        </div>
+      </PaymentPopup>
+
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   Scale,
   CreditCard,
   Calendar1,
+  Landmark,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -34,6 +35,7 @@ const Sidebar = () => {
     { to: "/m-balance", icon: <Scale />, label: t("balance") },
     { to: "/regions", icon: <MapPinned />, label: t("region") },
     { to: "/logs", icon: <FileText />, label: t("logs") },
+    // { to: "/investors", icon: <Landmark />, label: "Investorlar" },
   ];
 
   const sidebarRedux = useSelector((state: RootState) => state.sidebar);

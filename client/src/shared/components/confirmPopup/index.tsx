@@ -7,6 +7,7 @@ interface IConfirmPopupProps {
   description?: string;
   confirmText?: string;
   cancelText?: string;
+  confirmClassName?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -17,6 +18,7 @@ const ConfirmPopup: FC<IConfirmPopupProps> = ({
   description = "Bu amalni ortga qaytarib bo‘lmaydi.",
   confirmText = "Ha",
   cancelText = "Bekor qilish",
+  confirmClassName,
   onConfirm,
   onCancel,
 }) => {
@@ -32,7 +34,7 @@ const ConfirmPopup: FC<IConfirmPopupProps> = ({
           <button
             onClick={onConfirm}
             type="button"
-            className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
+            className={confirmClassName || "bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"}
           >
             {confirmText}
           </button>

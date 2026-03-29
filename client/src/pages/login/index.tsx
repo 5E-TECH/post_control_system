@@ -72,22 +72,29 @@ const Login: FC = () => {
     signinUser.mutate(values, {
       onSuccess: (res) => {
         dispatch(setToken(res?.data?.data));
+        if (res?.data?.data?.refresh_token_expires_at) {
+          localStorage.setItem("refresh_token_expires_at", String(res.data.data.refresh_token_expires_at));
+        }
         navigate(buildAdminPath());
         setSubmitting(false);
       },
       onError: (err: any) => {
-        const errorMsg = err?.response?.data?.error?.message;
-        let errorDesc: any;
+        const errorMsg =
+          err?.response?.data?.error?.message ||
+          err?.response?.data?.message;
+        let errorDesc: string;
 
-        switch (true) {
-          case errorMsg === "Phone number or password incorrect":
+        switch (errorMsg) {
+          case "Phone number or password incorrect":
             errorDesc = "Telefon raqam yoki parol noto'g'ri";
             break;
-          case errorMsg === "You have been blocked by superadmin":
+          case "You have been blocked by superadmin":
             errorDesc = "Siz superadmin tomonidan bloklangansiz";
             break;
           default:
-            errorDesc = "Server nosozlik";
+            errorDesc = err?.message === "Network Error"
+              ? "Serverga ulanib bo'lmadi. Internet aloqangizni tekshiring"
+              : `Server xatosi: ${errorMsg || err?.message || "Noma'lum xato"}`;
             break;
         }
 

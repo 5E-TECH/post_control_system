@@ -52,6 +52,7 @@ export class PrinterService {
       .leftJoinAndSelect('order.customer', 'customer')
       .leftJoinAndSelect('customer.district', 'district')
       .leftJoinAndSelect('district.assignedToRegion', 'assignedToRegion')
+      .leftJoinAndSelect('assignedToRegion.logist', 'logist')
       .leftJoinAndSelect('order.market', 'market')
       .leftJoinAndSelect('order.items', 'items')
       .leftJoinAndSelect('items.product', 'product')
@@ -86,9 +87,15 @@ export class PrinterService {
         const comment = order.comment ?? '-';
         const market = order.market?.name ?? 'N/A';
         const operator = order.operator ?? '-';
+        const operatorPhone = order.operator_phone ? this.formatPhoneNumber(order.operator_phone) : '';
         const createdTime = this.formatDateStr(order.created_at);
         const whereDeliver = order.where_deliver === Where_deliver.ADDRESS ? 'UYGACHA' : 'MARKAZGA';
         const qrCode = order.qr_code_token ?? '';
+
+        // Logist ma'lumoti (region orqali)
+        const logist = (order.customer?.district?.assignedToRegion as any)?.logist;
+        const logistPhone = logist ? this.formatPhoneNumber(logist.phone_number) : '';
+        const logistName = logist?.name ?? '';
 
         const productStr = (order.items || [])
           .map((i) => `${i.product?.name ?? 'N/A'}-${i.quantity ?? 1}`)
@@ -127,13 +134,14 @@ export class PrinterService {
                   <div class="a-row a-row-phone"><span class="lbl">Telefon:</span><span class="val val-phone">${phoneDisplay}</span></div>
                   <div class="a-row a-row-manzil"><span class="lbl">Manzil:</span><span class="val val-manzil">${region} ${district}</span></div>
                   <div class="a-row"><span class="lbl">Jami:</span><span class="val val-price"><b>${orderPrice}</b> <span class="deliver-badge">${whereDeliver}</span></span></div>
-                  <div class="a-row a-row-last"><span class="lbl">Jo'natuvchi:</span><span class="val val-sender"><b>${market}</b> <span style="font-size:7px;color:#555">/ ${operator}</span></span></div>
+                  <div class="a-row a-row-last"><span class="lbl">Jo'natuvchi:</span><span class="val val-sender"><b>${market}</b> <span style="font-size:7px;color:#555">/ ${operator}${operatorPhone ? ` (${operatorPhone})` : ''}</span></span></div>
                 </div>
               </div>
               <div class="zone-b">
                 <div class="b-row b-row-compact"><span class="lbl-b">Mahsulot:</span><span class="val-b">${productStr || '-'}</span></div>
-                <div class="b-row"><span class="lbl-b">Mo'ljal:</span><span class="val-b val-b-wrap">${address || '-'}</span></div>
-                <div class="b-row b-row-last"><span class="lbl-b">Izoh:</span><span class="val-b val-b-wrap">${comment || '-'}</span></div>
+                <div class="b-row b-row-compact"><span class="lbl-b">Mo'ljal:</span><span class="val-b">${address || '-'}</span></div>
+                <div class="b-row b-row-compact b-row-izoh"><span class="lbl-b">Izoh:</span><span class="val-b">${comment || '-'}</span></div>
+                <div class="b-row b-row-last b-row-logist"><span class="lbl-b">Logist:</span><span class="val-b val-b-logist">${logistName ? `<b>${logistName}</b> <span class="logist-phone">${logistPhone}</span>` : '-'}</span></div>
               </div>
             </div>
           </div>
@@ -319,6 +327,14 @@ export class PrinterService {
     white-space:normal;line-height:1.2;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   }
+  .b-row-izoh .val-b{
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .b-row-logist{
+    background:#f8f8f8;
+  }
+  .val-b-logist{font-size:8px}
+  .logist-phone{font-size:7.5px;color:#333;font-weight:bold;margin-left:3px}
 
   @media print{
     html,body{background:#fff!important;margin:0!important;padding:0!important}
@@ -399,9 +415,16 @@ ${pages.join('\n')}
       const comment = order.comment ?? '-';
       const market = order.market?.name ?? 'N/A';
       const operator = order.operator ?? '-';
+      const operatorPhone = order.operator_phone ? this.formatPhoneNumber(order.operator_phone) : '';
       const createdTime = this.formatDateStr(order.created_at);
       const whereDeliver = order.where_deliver === Where_deliver.ADDRESS ? 'UYGACHA' : 'MARKAZGA';
       const qrCode = order.qr_code_token ?? '';
+
+      // Logist ma'lumoti (region orqali)
+      const logistPdf = (order.customer?.district?.assignedToRegion as any)?.logist;
+      const logistPhonePdf = logistPdf ? this.formatPhoneNumber(logistPdf.phone_number) : '';
+      const logistNamePdf = logistPdf?.name ?? '';
+      const logistDisplay = logistNamePdf ? `${logistNamePdf}  ${logistPhonePdf}` : '-';
 
       const productStr = (order.items || [])
         .map((item) => `${item.product?.name ?? 'N/A'}-${item.quantity ?? 1}`)
@@ -419,11 +442,12 @@ ${pages.join('\n')}
       const TABLE_BOT = PAGE_H - M;
       const TABLE_H = TABLE_BOT - TABLE_TOP;
 
-      // ZONE B: Mahsulot va Mo'ljal 1 qator, Izoh 2 qator
+      // ZONE B: Mahsulot, Mo'ljal, Izoh (1 qator), Logist
       const MAHSULOT_H = 16;
       const MOLJAL_H = 16;
-      const ZONE_B_H = 58;
-      const IZOH_H = ZONE_B_H - MAHSULOT_H - MOLJAL_H; // 26
+      const IZOH_H = 13;
+      const LOGIST_H = 13;
+      const ZONE_B_H = MAHSULOT_H + MOLJAL_H + IZOH_H + LOGIST_H;
       const B_LABEL_COL = 17 * MM;
       const B_VALUE_X = M + B_LABEL_COL;
       const B_VALUE_W = FULL_W - B_LABEL_COL;
@@ -433,12 +457,14 @@ ${pages.join('\n')}
         productStr || '-',
         address || '-',
         comment || '-',
+        logistDisplay,
       ];
 
       const zoneBRows = [
         { label: 'Mahsulot:', h: MAHSULOT_H },
         { label: "Mo'ljal:", h: MOLJAL_H },
         { label: 'Izoh:',    h: IZOH_H },
+        { label: 'Logist:',  h: LOGIST_H },
       ];
 
       // ZONE A: Qolgan barcha joy (chap=logo+QR+sana | o'ng=jadval)
@@ -459,12 +485,13 @@ ${pages.join('\n')}
       const phoneValue = extraNumber
         ? `${customerPhone}\n${extraNumber}`
         : customerPhone;
+      const operatorDisplay = operatorPhone ? `${operator} (${operatorPhone})` : operator;
       const zoneAValues = [
         customerName,
         phoneValue,
         `${region} ${district}`,
         `${orderPrice}   ${whereDeliver}`,
-        `${market} / ${operator}`,
+        `${market} / ${operatorDisplay}`,
       ];
 
       // ====== CHAP PANEL (logo + brend + QR + sana) ======
@@ -570,7 +597,7 @@ ${pages.join('\n')}
           const mktW = doc.widthOfString(market);
           doc.text(market, A_VALUE_X + PAD, senderValY, { lineBreak: false });
           doc.font('Sans').fontSize(7);
-          doc.text(' | ' + operator, A_VALUE_X + PAD + mktW, senderValY + 1.5, { lineBreak: false });
+          doc.text(' | ' + operatorDisplay, A_VALUE_X + PAD + mktW, senderValY + 1.5, { lineBreak: false });
           doc.restore();
         } else {
           if (isPhone) {

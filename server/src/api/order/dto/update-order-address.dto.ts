@@ -17,4 +17,20 @@ export class UpdateOrderAddressDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @ApiPropertyOptional({
+    description: 'Client name',
+    example: 'Ali Valiyev',
+  })
+  @IsOptional()
+  @IsString()
+  client_name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Client phone number',
+    example: '+998901234567',
+  })
+  @IsOptional()
+  @IsString()
+  client_phone_number?: string;
 }

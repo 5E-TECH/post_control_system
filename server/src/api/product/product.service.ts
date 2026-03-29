@@ -61,6 +61,14 @@ export class ProductService {
 
       if (currentUser?.role === Roles.MARKET) {
         createProductDto.market_id = currentUser?.id;
+      } else if (currentUser?.role === Roles.OPERATOR) {
+        const operatorUser = await this.userRepo.findOne({
+          where: { id: currentUser.id, role: Roles.OPERATOR },
+        });
+        if (!operatorUser || !operatorUser.market_id) {
+          throw new BadRequestException('Operator marketga biriktirilmagan');
+        }
+        createProductDto.market_id = operatorUser.market_id;
       }
       const { name, market_id } = createProductDto;
       if (!market_id) {
@@ -339,8 +347,20 @@ export class ProductService {
     file?: Express.Multer.File,
   ) {
     try {
+      // Operator uchun market_id ni aniqlash
+      let marketId = currentUser.id;
+      if (currentUser.role === Roles.OPERATOR) {
+        const operatorUser = await this.userRepo.findOne({
+          where: { id: currentUser.id, role: Roles.OPERATOR },
+        });
+        if (!operatorUser || !operatorUser.market_id) {
+          throw new BadRequestException('Operator marketga biriktirilmagan');
+        }
+        marketId = operatorUser.market_id;
+      }
+
       const product = await this.productRepo.findOne({
-        where: { id, user_id: currentUser.id },
+        where: { id, user_id: marketId },
       });
       if (!product) throw new NotFoundException('Product not found');
 
@@ -354,7 +374,7 @@ export class ProductService {
 
       // ✅ Boshqa mahsulotda bu name + market_id mavjudmi?
       const exists = await this.productRepo.findOne({
-        where: { name, user_id: currentUser.id },
+        where: { name, user_id: marketId },
       });
 
       if (exists) {

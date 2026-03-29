@@ -49,20 +49,23 @@ const Products = () => {
   const permission = useSelector(
     (state: RootState) => state.togglePermission.value
   );
+  const isMarketOrOperator = role === "market" || role === "operator";
   const { refetch } = useProfile().getUser(role === "market");
 
   const handleCheck = async () => {
-    const res = await refetch();
-    const addOrder = res.data.data.add_order;
-    if (!addOrder && res.data.data.role === "market") {
-      dispatch(togglePermission(true));
-      return;
+    if (role === "market") {
+      const res = await refetch();
+      const addOrder = res.data.data.add_order;
+      if (!addOrder) {
+        dispatch(togglePermission(true));
+        return;
+      }
     }
     navigate(`create/${select}`);
   };
 
   useEffect(() => {
-    if (role === "market") {
+    if (isMarketOrOperator) {
       setSelect(id);
     }
   }, [role, id]);
@@ -105,7 +108,7 @@ const Products = () => {
 
   const { getProducts, getMyProducts } = useProduct();
   const { data: productData, isLoading } =
-    role === "market"
+    isMarketOrOperator
       ? getMyProducts({ search: searchProduct, page, limit })
       : getProducts({
           search: searchProduct,
@@ -117,7 +120,7 @@ const Products = () => {
   const { getMarkets } = useMarket();
 
   const { data: marketsData, isLoading: marketsLoading } = getMarkets(
-    role !== "market",
+    !isMarketOrOperator,
     {
       search: searchPopup,
       limit: 0,
@@ -156,7 +159,7 @@ const Products = () => {
 
             <button
               onClick={() => {
-                if (role === "market") {
+                if (isMarketOrOperator) {
                   handleCheck();
                 } else {
                   setShowMarket(true);
@@ -192,7 +195,7 @@ const Products = () => {
         <div className="bg-white dark:bg-[#2A263D] rounded-xl sm:rounded-2xl shadow-sm p-3 sm:p-4 mb-4 sm:mb-6 border border-gray-100 dark:border-gray-700/50">
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
             {/* Market Filter */}
-            {role !== "market" && (
+            {!isMarketOrOperator && (
               <div className="relative flex-1 sm:flex-initial sm:w-48 md:w-56 lg:w-64">
                 <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <select

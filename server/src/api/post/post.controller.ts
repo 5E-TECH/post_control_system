@@ -37,7 +37,7 @@ export class PostController {
   @ApiOperation({ summary: 'List all posts (with pagination)' })
   @ApiResponse({ status: 200, description: 'Paginated posts list' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
   @Get()
   findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 8) {
     return this.postService.findAll(Number(page), Number(limit));
@@ -46,7 +46,7 @@ export class PostController {
   @ApiOperation({ summary: 'List new posts' })
   @ApiResponse({ status: 200, description: 'New posts list' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST)
   @Get('new')
   newPosts() {
     return this.postService.newPosts();
@@ -55,7 +55,7 @@ export class PostController {
   @ApiOperation({ summary: 'List rejected posts' })
   @ApiResponse({ status: 200, description: 'Rejected posts list' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST)
   @Get('rejected')
   rejectedPosts() {
     return this.postService.rejectedPosts();
@@ -100,7 +100,7 @@ export class PostController {
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Post data' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.postService.findOne(id);
@@ -130,7 +130,7 @@ export class PostController {
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Orders for post' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
   @Get('orders/:id')
   getAllOrdersByPostId(
     @Param('id') id: string,
@@ -143,7 +143,7 @@ export class PostController {
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Rejected orders for post' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
   @Get('orders/rejected/:id')
   getAllRejectedOrdersByPostId(@Param('id') id: string) {
     return this.postService.getRejectedPostsOrders(id);

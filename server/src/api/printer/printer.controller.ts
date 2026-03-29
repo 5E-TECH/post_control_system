@@ -3,11 +3,21 @@ import {
   Post,
   Body,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PrinterService } from './printer.service';
 import { CreatePrinterDto } from './dto/create-printer.dto';
+import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { AcceptRoles } from 'src/common/decorator/roles.decorator';
+import { Roles } from 'src/common/enums';
 
+@ApiTags('Printer')
+@ApiBearerAuth()
+@UseGuards(JwtGuard, RolesGuard)
+@AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
 @Controller('printer')
 export class PrinterController {
   constructor(private readonly printerService: PrinterService) {}

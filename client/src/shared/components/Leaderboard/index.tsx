@@ -22,7 +22,7 @@ interface LeaderboardItem {
 interface LeaderboardProps {
   title: string;
   data: LeaderboardItem[];
-  type: "markets" | "couriers";
+  type: "markets" | "couriers" | "operators";
   showPodium?: boolean;
   currentUserId?: string | null;
 }
@@ -316,8 +316,8 @@ const Leaderboard = memo(
 
     // Data formatlash - turli formatlarni qo'llab-quvvatlash
     const formattedData: LeaderboardItem[] = (data || []).map((item: any) => ({
-      id: item.market_id || item.courier_id || item.id,
-      name: item.market_name || item.courier_name || item.name || "Unknown",
+      id: item.market_id || item.courier_id || item.operator_id || item.id,
+      name: item.market_name || item.courier_name || item.operator_name || item.name || "Unknown",
       totalOrders: Number(item.total_orders || item.totalOrders) || 0,
       successfulOrders: Number(item.successful_orders || item.successfulOrders) || 0,
       successRate: Number(item.success_rate || item.successRate) || 0,
@@ -440,6 +440,11 @@ const Leaderboard = memo(
               <>
                 <Star className="w-4 h-4 inline-block text-yellow-500 mr-1" />
                 {t("courierMotivation")}
+              </>
+            ) : type === "operators" ? (
+              <>
+                <Flame className="w-4 h-4 inline-block text-orange-500 mr-1" />
+                {t("operatorMotivation", "Eng yaxshi operatorlar reytingi!")}
               </>
             ) : (
               <>

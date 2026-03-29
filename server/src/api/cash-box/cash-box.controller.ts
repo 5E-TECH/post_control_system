@@ -22,9 +22,11 @@ import {
 } from '@nestjs/swagger';
 import { CashBoxService } from './cash-box.service';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
+import { SalaryDto } from './dto/salary.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import {
   Cashbox_type,
+  FinancialSource_type,
   Operation_type,
   Roles,
   Source_type,
@@ -238,6 +240,46 @@ export class CasheBoxController {
     return this.cashBoxService.financialBalance();
   }
 
+  @ApiOperation({ summary: 'Get financial balance history (only balance-affecting events)' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Start date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'End date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'sourceType', required: false, enum: FinancialSource_type, description: 'Filter by source type' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  @ApiResponse({ status: 200, description: 'Financial balance history' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('financial-balanse/history')
+  financialBalanceHistory(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('sourceType') sourceType?: FinancialSource_type,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.financialBalanceHistory({
+      fromDate,
+      toDate,
+      sourceType,
+      page,
+      limit,
+    });
+  }
+
+  @ApiOperation({ summary: 'Get financial balance analytics and impact analysis' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Start date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'End date (YYYY-MM-DD)' })
+  @ApiResponse({ status: 200, description: 'Analytics: top sources, users, transactions affecting balance' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('financial-balanse/analytics')
+  financialBalanceAnalytics(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.cashBoxService.financialBalanceAnalytics({ fromDate, toDate });
+  }
+
   @ApiOperation({ summary: 'Spend money' })
   @ApiResponse({ status: 200, description: 'Spend money' })
   @UseGuards(JwtGuard, RolesGuard)
@@ -260,6 +302,22 @@ export class CasheBoxController {
     @Body() updateCashboxDto: UpdateCashBoxDto,
   ) {
     return this.cashBoxService.fillTheCashbox(user, updateCashboxDto);
+  }
+
+  // ==================== SALARY ENDPOINT ====================
+
+  @ApiOperation({ summary: 'Pay salary to staff' })
+  @ApiBody({ type: SalaryDto })
+  @ApiResponse({ status: 200, description: 'Salary paid successfully' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('salary')
+  paySalary(
+    @CurrentUser() user: JwtPayload,
+    @Body() salaryDto: SalaryDto,
+  ) {
+    return this.cashBoxService.paySalary(user, salaryDto);
   }
 
   // ==================== SHIFT (SMENA) ENDPOINTS ====================

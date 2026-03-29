@@ -10,6 +10,9 @@ import {
   Scale,
   ShoppingBag,
   UserRound,
+  MapPin,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { buildAdminPath } from "../../const";
 
@@ -227,6 +230,50 @@ const Navbar = ({ role }: { role: string }) => {
             </div>
           </div>
         );
+      case "logist":
+        return (
+          <div className={navContainerClass}>
+            <div className="flex justify-between items-center px-4 py-2">
+            <NavLink
+              to={buildAdminPath()}
+              className={({ isActive }) => getNavItemClass(isActive)}
+            >
+              <House className="w-5 h-5" />
+            </NavLink>
+            <NavLink
+              to={buildAdminPath("orders")}
+              className={({ isActive }) => getNavItemClass(isActive)}
+            >
+              <ShoppingBag className="w-5 h-5" />
+            </NavLink>
+            <NavLink
+              to={buildAdminPath("mails")}
+              className={({ isActive }) => getNavItemClass(isActive)}
+            >
+              <MailOpen className="w-5 h-5" />
+            </NavLink>
+            <NavLink
+              to={buildAdminPath("regions")}
+              className={({ isActive }) => getNavItemClass(isActive)}
+            >
+              <MapPin className="w-5 h-5" />
+            </NavLink>
+            </div>
+          </div>
+        );
+      // case "investor":
+      //   return (
+      //     <div className={navContainerClass}>
+      //       <div className="flex justify-between items-center px-4 py-2">
+      //       <NavLink to={buildAdminPath()} className={({ isActive }) => getNavItemClass(isActive)}>
+      //         <House className="w-5 h-5" />
+      //       </NavLink>
+      //       <NavLink to={buildAdminPath("my-investments")} className={({ isActive }) => getNavItemClass(isActive)}>
+      //         <TrendingUp className="w-5 h-5" />
+      //       </NavLink>
+      //       </div>
+      //     </div>
+      //   );
       default:
         return null;
     }

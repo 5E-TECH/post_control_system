@@ -16,9 +16,10 @@ interface IProps {
     phone_number: string;
     id: string;
   } | null;
+  canEdit?: boolean;
 }
 
-const CustomerDetail: FC<IProps> = ({ customer }) => {
+const CustomerDetail: FC<IProps> = ({ customer, canEdit: canEditProp }) => {
   const { t } = useTranslation("orderList");
   const navigate = useNavigate();
   if (!customer) return null;
@@ -66,7 +67,8 @@ const CustomerDetail: FC<IProps> = ({ customer }) => {
     navigate(buildAdminPath(`orders/customer/${customer.id}`));
   };
 
-  const canEdit = role !== "market" && role !== "courier";
+  // Prop berilgan bo'lsa uni ishlatamiz, aks holda eski logika
+  const canEdit = canEditProp !== undefined ? canEditProp : (role !== "market" && role !== "courier");
 
   return (
     <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden">

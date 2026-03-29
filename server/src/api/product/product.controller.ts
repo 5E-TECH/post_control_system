@@ -77,7 +77,7 @@ export class ProductController {
   })
   @ApiResponse({ status: 201, description: 'Product created' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
   @Post()
   @UseInterceptors(FileInterceptor('image', { storage }))
   @HttpCode(HttpStatus.CREATED)
@@ -150,7 +150,7 @@ export class ProductController {
   @ApiOperation({ summary: 'Get product by id' })
   @ApiParam({ name: 'id', description: 'Product ID' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.MARKET, Roles.REGISTRATOR, Roles.OPERATOR)
   @Get(':id')
   async findOne(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.productService.findOne(user, id);
@@ -190,7 +190,7 @@ export class ProductController {
   @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'id', description: 'Product ID' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.MARKET)
+  @AcceptRoles(Roles.MARKET, Roles.OPERATOR)
   @Patch('my/:id') // ✅ DIFFERENT ROUTE
   @UseInterceptors(FileInterceptor('image', { storage }))
   async updateOwnProduct(

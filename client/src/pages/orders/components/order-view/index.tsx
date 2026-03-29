@@ -338,13 +338,15 @@ const OrderView = () => {
   // query
   const queryParams = { page, limit, ...cleanedFilters };
 
+  const isMarketOrOperator = role === "market" || role === "operator";
+
   const { data, refetch, isLoading } =
-    role === "market"
+    isMarketOrOperator
       ? getMarketsAllNewOrder(queryParams)
       : getOrders(queryParams);
 
   useEffect(() => {
-    if (role === "market") refetch();
+    if (isMarketOrOperator) refetch();
   }, [role]);
 
   const myNewOrders = Array.isArray(data?.data?.data) ? data?.data?.data : [];
@@ -363,7 +365,7 @@ const OrderView = () => {
         const isFiltered = Object.keys(cleanedFilters).length > 0;
 
         let url = `${BASE_URL}order`;
-        if (user?.role === "market") {
+        if (user?.role === "market" || user?.role === "operator") {
           url = `${BASE_URL}order/market/all/my-orders`;
         } else if (user?.role === "courier") {
           url = `${BASE_URL}order/courier/orders`;

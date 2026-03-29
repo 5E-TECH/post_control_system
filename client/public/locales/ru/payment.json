@@ -73,7 +73,11 @@
     "sell": "Продажа",
     "cancel": "Отмена",
     "extra_cost": "Дополнительные расходы",
-    "bills": "Счета"
+    "bills": "Счета",
+    "investor_earning": "Доход инвестора",
+    "investor_allocate": "Доля инвестора",
+    "investor_payout": "Выплата инвестору",
+    "investor_refund": "Возврат инвестиции"
   },
 
   "tuman": "Район",
@@ -100,6 +104,32 @@
   "shiftStatus": {
     "open": "Смена открыта",
     "closed": "Смена закрыта"
+  },
+  "financialHistory": {
+    "title": "Финансовая история",
+    "analytics": "Аналитика",
+    "history": "История",
+    "currentBalance": "Текущий баланс",
+    "cashBalance": "Наличный баланс",
+    "cardBalance": "Карточный баланс",
+    "balanceBefore": "Баланс до",
+    "balanceAfter": "Баланс после",
+    "change": "Изменение",
+    "source": "Источник",
+    "sourceUser": "Пользователь источника",
+    "totalIncome": "Общий доход",
+    "totalExpense": "Общий расход",
+    "netChange": "Чистое изменение",
+    "transactionCount": "Кол-во транзакций",
+    "incomeBySource": "Источники дохода",
+    "expenseBySource": "Источники расхода",
+    "paymentMethodBreakdown": "Методы оплаты",
+    "topTransactions": "Крупнейшие транзакции",
+    "topUsers": "Самые активные пользователи",
+    "percentage": "Процент",
+    "noData": "Данные не найдены",
+    "allSources": "Все источники",
+    "allOperations": "Все операции"
   },
   "shift": {
     "closeTitle": "Закрытие смены",

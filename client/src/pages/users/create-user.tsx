@@ -8,6 +8,8 @@ import {
   ClipboardList,
   Truck,
   Store,
+  HeadphonesIcon,
+  Landmark,
 } from "lucide-react";
 
 const roleIcons: Record<string, React.ElementType> = {
@@ -15,6 +17,8 @@ const roleIcons: Record<string, React.ElementType> = {
   registrator: ClipboardList,
   courier: Truck,
   market: Store,
+  logist: HeadphonesIcon,
+  investor: Landmark,
 };
 
 const roleColors: Record<
@@ -41,6 +45,16 @@ const roleColors: Record<
     bg: "bg-emerald-100 dark:bg-emerald-900/30",
     icon: "text-emerald-600 dark:text-emerald-400",
   },
+  logist: {
+    gradient: "from-teal-500 to-cyan-600",
+    bg: "bg-teal-100 dark:bg-teal-900/30",
+    icon: "text-teal-600 dark:text-teal-400",
+  },
+  investor: {
+    gradient: "from-rose-500 to-pink-600",
+    bg: "bg-rose-100 dark:bg-rose-900/30",
+    icon: "text-rose-600 dark:text-rose-400",
+  },
 };
 
 const CreateUser = () => {
@@ -52,6 +66,8 @@ const CreateUser = () => {
     { key: "registrator", path: "registrator", label: t("registrator") },
     { key: "courier", path: "courier", label: t("courier") },
     { key: "market", path: "market", label: t("market") },
+    { key: "logist", path: "logist", label: "Logist" },
+    // { key: "investor", path: "investor", label: "Investor" },
   ];
 
   return (

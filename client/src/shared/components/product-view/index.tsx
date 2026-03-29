@@ -61,6 +61,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
   };
 
   const user = useSelector((state: RootState) => state.roleSlice);
+  const canDelete = user.role !== "operator";
 
   const { deleteProduct, updateProduct } = useProduct();
   const { handleSuccess, handleApiError } = useApiNotification();
@@ -119,7 +120,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
       {
         id: editItem.id,
         data: formData,
-        isMarket: user.role === "market",
+        isMarket: user.role === "market" || user.role === "operator",
       },
       {
         onSuccess: () => {
@@ -174,7 +175,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
               <th className="px-4 py-3 text-left text-sm font-medium text-white whitespace-nowrap">
                 {t("productName")}
               </th>
-              {user.role !== "market" && (
+              {user.role !== "market" && user.role !== "operator" && (
                 <th className="px-4 py-3 text-left text-sm font-medium text-white whitespace-nowrap">
                   {t("popup.market")}
                 </th>
@@ -213,7 +214,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                     </span>
                   </div>
                 </td>
-                {user.role !== "market" && (
+                {user.role !== "market" && user.role !== "operator" && (
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-md bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
@@ -234,6 +235,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                     >
                       <Edit className="w-4 h-4" />
                     </button>
+                    {canDelete && (
                     <button
                       onClick={() => handlePopup(item.id, item.name)}
                       disabled={deleteProduct.isPending}
@@ -246,6 +248,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                         <Trash2 className="w-4 h-4" />
                       )}
                     </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -291,6 +294,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                 >
                   <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
+                {canDelete && (
                 <button
                   onClick={() => handlePopup(item.id, item.name)}
                   disabled={deleteProduct.isPending}
@@ -302,6 +306,7 @@ const ProductView: FC<IProps> = ({ data, total }) => {
                     <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                   )}
                 </button>
+                )}
               </div>
             </div>
           </div>

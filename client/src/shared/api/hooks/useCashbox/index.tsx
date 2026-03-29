@@ -65,6 +65,35 @@ export const useCashBox = () => {
     },
   });
 
+  // ==================== FINANCIAL BALANCE HOOKS ====================
+
+  const getFinancialBalanceHistory = (params?: {
+    fromDate?: string;
+    toDate?: string;
+    sourceType?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    useQuery({
+      queryKey: [cashbox, "financial-history", params],
+      queryFn: () =>
+        api
+          .get("cashbox/financial-balanse/history", { params })
+          .then((res) => res.data),
+    });
+
+  const getFinancialBalanceAnalytics = (params?: {
+    fromDate?: string;
+    toDate?: string;
+  }) =>
+    useQuery({
+      queryKey: [cashbox, "financial-analytics", params],
+      queryFn: () =>
+        api
+          .get("cashbox/financial-balanse/analytics", { params })
+          .then((res) => res.data),
+    });
+
   // ==================== SHIFT (SMENA) HOOKS ====================
 
   const getCurrentShift = () =>
@@ -96,6 +125,15 @@ export const useCashBox = () => {
         api.get("cashbox/shift/history", { params }).then((res) => res.data),
     });
 
+  const paySalary = useMutation({
+    mutationFn: (data: { user_id: string; amount: number; type?: string; comment?: string }) =>
+      api.post("cashbox/salary", data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [cashbox] });
+      client.invalidateQueries({ queryKey: ["user"] });
+    },
+  });
+
   return {
     getCashBoxById,
     getCashBoxInfo,
@@ -106,6 +144,10 @@ export const useCashBox = () => {
     createPaymentMarket,
     cashboxSpand,
     cashboxFill,
+    paySalary,
+    // Financial balance hooks
+    getFinancialBalanceHistory,
+    getFinancialBalanceAnalytics,
     // Shift hooks
     getCurrentShift,
     openShift,

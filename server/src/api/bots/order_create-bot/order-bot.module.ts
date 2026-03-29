@@ -24,6 +24,14 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
         launchOptions: {
           dropPendingUpdates: true,
         },
+        options: {
+          handlerTimeout: 90_000,
+          telegram: {
+            apiRoot: 'https://api.telegram.org',
+            agent: undefined,
+            timeoutMs: 30_000,
+          },
+        },
         middlewares: [
           session({
             defaultSession: (): MySession => ({

@@ -181,6 +181,9 @@ const ExternalOrdersTab = () => {
     message: ''
   });
 
+  // Accept confirmation modal state
+  const [isAcceptConfirmOpen, setIsAcceptConfirmOpen] = useState(false);
+
   // Visual feedback ko'rsatish funksiyasi
   const showVisualFeedback = (type: 'success' | 'error' | 'warning', msg?: string) => {
     setVisualFeedback({ show: true, type, message: msg });
@@ -318,7 +321,11 @@ const ExternalOrdersTab = () => {
             {
               onSuccess: (data: any) => {
                 const createdCount = data?.data?.created_orders || batch.length;
+                const skippedCount = data?.data?.skipped_orders || 0;
                 successCount += createdCount;
+                if (skippedCount > 0) {
+                  message.warning(`${skippedCount} ta buyurtma dublikat sababli o'tkazib yuborildi`);
+                }
                 batch.forEach(o => processedOrderIds.push(o.id));
 
                 setBatchProgress(prev => ({
@@ -559,7 +566,11 @@ const ExternalOrdersTab = () => {
   // Confirmation modal dan tasdiqlash
   const handleConfirmAccept = () => {
     if (confirmModal.order) {
-      setOrders(prev => [{ ...confirmModal.order!, selected: true }, ...prev]);
+      // Agar buyurtma allaqachon ro'yxatda bo'lsa (backend dublikat), qayta qo'shmaslik
+      const alreadyInList = ordersRef.current.some(o => o.qrCode === confirmModal.qrCode);
+      if (!alreadyInList) {
+        setOrders(prev => [{ ...confirmModal.order!, selected: true }, ...prev]);
+      }
       message.success({ content: "Buyurtma qo'shildi!", key: "scanner" });
     }
     setConfirmModal({ isOpen: false, type: null, order: null, qrCode: '', message: '' });
@@ -567,6 +578,10 @@ const ExternalOrdersTab = () => {
 
   // Confirmation modal dan bekor qilish
   const handleConfirmReject = () => {
+    // Agar buyurtma allaqachon ro'yxatda bo'lsa (backend dublikat), uni olib tashlash
+    if (confirmModal.order && confirmModal.qrCode) {
+      setOrders(prev => prev.filter(o => o.qrCode !== confirmModal.qrCode));
+    }
     setConfirmModal({ isOpen: false, type: null, order: null, qrCode: '', message: '' });
     message.info({ content: "Buyurtma bekor qilindi", key: "scanner" });
   };
@@ -633,22 +648,60 @@ const ExternalOrdersTab = () => {
         // Failed scans dan olib tashlash (agar bo'lsa)
         setFailedScans(prev => prev.filter(f => f.code !== scannedCode));
 
-        // Dublikat tekshirish (telefon + mahsulot)
+        // 1. Lokal dublikat tekshirish (hozirgi sessiyada — sinxron, tez)
         const duplicateOrder = checkDuplicateOrder(newOrder);
         if (duplicateOrder) {
-          playErrorSound(); // Dublikat - error sound
-          showVisualFeedback('warning', 'Dublikat!'); // Sariq rang - ogohlantirish
+          playErrorSound();
+          showVisualFeedback('warning', 'Dublikat!');
           setConfirmModal({
             isOpen: true,
             type: 'duplicate',
             order: newOrder,
             qrCode: scannedCode,
-            message: `Bu mijoz (${newOrder.phone}) uchun bir xil mahsulotli buyurtma allaqachon mavjud! Baribir qo'shilsinmi?`
+            message: `Bu mijoz (${newOrder.phone}) uchun bir xil mahsulotli buyurtma allaqachon ro'yxatda mavjud! Baribir qo'shilsinmi?`
           });
         } else {
+          // Buyurtmani darhol ro'yxatga qo'shish (skanerlatni sekinlashtirmaslik uchun)
           playSuccessSound();
           showVisualFeedback('success');
           setOrders(prev => [newOrder, ...prev]);
+
+          // 2. Backend dublikat tekshirish — NON-BLOCKING (parallel, fon rejimda)
+          // Natija keyinroq keladi, dublikat topilsa ogohlantirish ko'rsatiladi
+          if (selectedIntegration && (newOrder.phone || scannedCode)) {
+            fetch(`${API_BASE}/api/v1/order/check-duplicate`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getAuthToken()}`,
+              },
+              body: JSON.stringify({
+                phone: newOrder.phone || '',
+                qr_code: scannedCode,
+                integration_id: selectedIntegration.id,
+              }),
+            })
+              .then(res => res.json())
+              .then(checkData => {
+                if (checkData?.data?.isDuplicate && checkData?.data?.duplicates?.length > 0) {
+                  const dups = checkData.data.duplicates;
+                  const dupInfo = dups.map((d: any) => {
+                    const itemsStr = d.items?.map((i: any) => `${i.product_name} x${i.quantity}`).join(', ') || '';
+                    return `${d.customer_name || ''} - ${d.status} - ${d.total_price?.toLocaleString()} so'm${itemsStr ? ` (${itemsStr})` : ''}`;
+                  }).join('\n');
+
+                  playErrorSound();
+                  setConfirmModal({
+                    isOpen: true,
+                    type: 'duplicate',
+                    order: newOrder,
+                    qrCode: scannedCode,
+                    message: `Diqqat! Bu buyurtma bazada allaqachon mavjud!\n\n${dupInfo}\n\nRo'yxatdan olib tashlansinmi?`,
+                  });
+                }
+              })
+              .catch(() => { /* Backend tekshirish xatoligi - e'tiborsiz */ });
+          }
         }
         return true;
       } else {
@@ -1059,7 +1112,7 @@ const ExternalOrdersTab = () => {
 
       {/* Buyurtmalar ro'yxati */}
       {orders.length > 0 && (
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col border border-gray-100 dark:border-gray-700/50">
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col border border-gray-100 dark:border-gray-700/50 max-h-[80vh]">
           {/* Select all header */}
           <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex items-center justify-between flex-shrink-0 flex-wrap gap-2">
             <button
@@ -1228,7 +1281,7 @@ const ExternalOrdersTab = () => {
           {/* Accept button - fixed at bottom */}
           <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex-shrink-0">
             <button
-              onClick={handleAcceptOrders}
+              onClick={() => setIsAcceptConfirmOpen(true)}
               disabled={orders.filter(o => o.selected).length === 0 || receiveExternalOrders.isPending || batchProgress.isProcessing}
               className={`w-full h-12 rounded-xl flex items-center justify-center gap-2 text-base font-medium transition-all ${
                 orders.filter(o => o.selected).length === 0 || receiveExternalOrders.isPending || batchProgress.isProcessing
@@ -1248,6 +1301,45 @@ const ExternalOrdersTab = () => {
           </div>
         </div>
       )}
+
+      {/* Accept confirmation modal */}
+      <Modal
+        open={isAcceptConfirmOpen}
+        onCancel={() => setIsAcceptConfirmOpen(false)}
+        footer={null}
+        centered
+        closable={false}
+        width={400}
+      >
+        <div className="text-center py-4">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+            <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+            Buyurtmalarni qabul qilishni tasdiqlaysizmi?
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            {orders.filter(o => o.selected).length} ta tanlangan buyurtma qabul qilinadi.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setIsAcceptConfirmOpen(false)}
+              className="flex-1 h-11 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all cursor-pointer"
+            >
+              Bekor qilish
+            </button>
+            <button
+              onClick={() => {
+                setIsAcceptConfirmOpen(false);
+                handleAcceptOrders();
+              }}
+              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all cursor-pointer"
+            >
+              Ha, qabul qilish
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Bo'sh holat */}
       {orders.length === 0 && isReady && !loading && !queueLength && (
@@ -1462,22 +1554,29 @@ const ExternalOrdersTab = () => {
 
             {/* Buttons */}
             <div className="flex gap-3">
-              <button
-                onClick={handleConfirmReject}
-                className="flex-1 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all cursor-pointer"
-              >
-                Bekor qilish
-              </button>
-              <button
-                onClick={handleConfirmAccept}
-                className={`flex-1 h-12 rounded-xl text-white font-medium transition-all cursor-pointer ${
-                  confirmModal.type === 'not_found'
-                    ? 'bg-gradient-to-r from-red-500 to-rose-600 hover:shadow-lg hover:shadow-red-500/25'
-                    : 'bg-gradient-to-r from-amber-500 to-orange-600 hover:shadow-lg hover:shadow-amber-500/25'
-                }`}
-              >
-                Baribir qo'shish
-              </button>
+              {confirmModal.type === 'not_found' ? (
+                <button
+                  onClick={handleConfirmReject}
+                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium hover:shadow-lg transition-all cursor-pointer"
+                >
+                  Tushunarli
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleConfirmReject}
+                    className="flex-1 h-12 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all cursor-pointer"
+                  >
+                    Bekor qilish
+                  </button>
+                  <button
+                    onClick={handleConfirmAccept}
+                    className="flex-1 h-12 rounded-xl text-white font-medium transition-all cursor-pointer bg-gradient-to-r from-amber-500 to-orange-600 hover:shadow-lg hover:shadow-amber-500/25"
+                  >
+                    Baribir qo'shish
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1572,13 +1671,18 @@ const TodayOrders = () => {
     if (role.role === "market") {
       navigate(`${role.id}`);
     }
+    // Operator uchun market_id ga redirect
+    if (role.role === "operator" && role.market_id) {
+      navigate(`${role.market_id}`);
+    }
   }, [pathname]);
 
   const handleProps = (id: string) => {
     navigate(`${id}`);
   };
 
-  const enabled = role.role !== "market";
+  const isMarketOrOperator = role.role === "market" || role.role === "operator";
+  const enabled = !isMarketOrOperator;
 
   const { getMarketsNewOrder } = useMarket();
   const { data, isLoading, refetch } = getMarketsNewOrder(
@@ -1835,38 +1939,38 @@ const TodayOrders = () => {
           </div>
         </div>
 
-        {/* Custom Tabs - Market uchun faqat Marketlar tabi ko'rinadi */}
-        <div className={`grid gap-2 mb-6 ${role.role === "market" ? "grid-cols-1" : "grid-cols-2"}`}>
-          {/* Markets Tab */}
-          <button
-            onClick={() => setActiveTab("markets")}
-            className={`flex items-center justify-center gap-2 py-2.5 lg:py-3 rounded-xl font-medium transition-all cursor-pointer ${
-              activeTab === "markets"
-                ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25"
-                : "bg-white dark:bg-[#2A263D] text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-gray-700"
-            }`}
-          >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-              activeTab === "markets"
-                ? "bg-white/20"
-                : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
-            }`}>
-              <Store className="w-4 h-4" />
-            </div>
-            <span className="text-sm hidden sm:inline">Marketlar</span>
-            {markets.length > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+        {/* Custom Tabs - faqat superadmin, admin, registrator uchun */}
+        {(role.role === "superadmin" || role.role === "admin" || role.role === "registrator") && (
+          <div className="grid grid-cols-2 gap-2 mb-6">
+            {/* Markets Tab */}
+            <button
+              onClick={() => setActiveTab("markets")}
+              className={`flex items-center justify-center gap-2 py-2.5 lg:py-3 rounded-xl font-medium transition-all cursor-pointer ${
                 activeTab === "markets"
-                  ? "bg-white/20 text-white"
-                  : "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
+                  ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25"
+                  : "bg-white dark:bg-[#2A263D] text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-gray-200 dark:border-gray-700"
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                activeTab === "markets"
+                  ? "bg-white/20"
+                  : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400"
               }`}>
-                {markets.length}
-              </span>
-            )}
-          </button>
+                <Store className="w-4 h-4" />
+              </div>
+              <span className="text-sm hidden sm:inline">Marketlar</span>
+              {markets.length > 0 && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  activeTab === "markets"
+                    ? "bg-white/20 text-white"
+                    : "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
+                }`}>
+                  {markets.length}
+                </span>
+              )}
+            </button>
 
-          {/* External Orders Tab - faqat superadmin va admin uchun */}
-          {role.role !== "market" && (
+            {/* External Orders Tab */}
             <button
               onClick={() => setActiveTab("external")}
               className={`flex items-center justify-center gap-2 py-2.5 lg:py-3 rounded-xl font-medium transition-all cursor-pointer ${
@@ -1884,11 +1988,13 @@ const TodayOrders = () => {
               </div>
               <span className="text-sm hidden sm:inline">Tashqi buyurtmalar</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Tab Content */}
-        {activeTab === "markets" || role.role === "market" ? marketsContent : <ExternalOrdersTab />}
+        {activeTab === "external" && (role.role === "superadmin" || role.role === "admin" || role.role === "registrator")
+          ? <ExternalOrdersTab />
+          : marketsContent}
       </div>
     </div>
   );

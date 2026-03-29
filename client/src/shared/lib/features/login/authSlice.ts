@@ -32,6 +32,7 @@ export const authSlice = createSlice({
     removeToken: (state) => {
       state.token = null;
       localStorage.removeItem("x-auth-token");
+      localStorage.removeItem("refresh_token_expires_at");
     },
     setUser: (state, action: PayloadAction<any>) => {
       state.user = action.payload;

@@ -20,6 +20,7 @@ import { DistrictEntity } from './district.entity';
 @Index('IDX_ORDER_USER_CREATED', ['user_id', 'created_at'])
 @Index('IDX_ORDER_USER_SOLD', ['user_id', 'sold_at'])
 @Index('IDX_ORDER_DISTRICT_ID', ['district_id'])
+@Index('IDX_ORDER_OPERATOR_ID', ['operator_id'])
 export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
@@ -47,6 +48,13 @@ export class OrderEntity extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   operator: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  operator_phone: string | null;
+
+  // Buyurtmani yaratgan operatorning user ID si
+  @Column({ type: 'uuid', nullable: true })
+  operator_id: string | null;
 
   @Column({ type: 'uuid', nullable: true })
   post_id: string | null;

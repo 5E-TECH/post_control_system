@@ -73,7 +73,11 @@
     "sell": "Sale",
     "cancel": "Cancel",
     "extra_cost": "Extra cost",
-    "bills": "Bills"
+    "bills": "Bills",
+    "investor_earning": "Investor earning",
+    "investor_allocate": "Investor allocation",
+    "investor_payout": "Investor payout",
+    "investor_refund": "Investment refund"
   },
 
   "tuman": "District",
@@ -101,6 +105,32 @@
   "shiftStatus": {
     "open": "Shift is open",
     "closed": "Shift is closed"
+  },
+  "financialHistory": {
+    "title": "Financial History",
+    "analytics": "Analytics",
+    "history": "History",
+    "currentBalance": "Current Balance",
+    "cashBalance": "Cash Balance",
+    "cardBalance": "Card Balance",
+    "balanceBefore": "Balance Before",
+    "balanceAfter": "Balance After",
+    "change": "Change",
+    "source": "Source",
+    "sourceUser": "Source User",
+    "totalIncome": "Total Income",
+    "totalExpense": "Total Expense",
+    "netChange": "Net Change",
+    "transactionCount": "Transaction Count",
+    "incomeBySource": "Income Sources",
+    "expenseBySource": "Expense Sources",
+    "paymentMethodBreakdown": "Payment Methods",
+    "topTransactions": "Top Transactions",
+    "topUsers": "Most Active Users",
+    "percentage": "Percentage",
+    "noData": "No data found",
+    "allSources": "All sources",
+    "allOperations": "All operations"
   },
   "shift": {
     "closeTitle": "Close Shift",

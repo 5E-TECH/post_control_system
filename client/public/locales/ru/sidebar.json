@@ -8,5 +8,6 @@
     "payments": "Платежи",
     "balance": "Финансовый баланс",
     "logs": "Логи",
-    "region": "Область"
+    "region": "Область",
+    "financialHistory": "Финансовая история"
 }

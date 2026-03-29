@@ -1,5 +1,6 @@
 import { memo, useState, useMemo } from "react";
-import { Spin, Modal, Form, Input, Button, InputNumber, Switch, Select } from "antd";
+import { Spin, Modal, Form, Input, Button, InputNumber, Switch, Select, DatePicker } from "antd";
+import dayjs from "dayjs";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { AvatarDisplay } from "../../../../shared/components/AvatarSelector";
@@ -168,6 +169,13 @@ const UserProfile = () => {
       ...(currentUserRole === "superadmin" && (user.role === "admin" || user.role === "registrator")
         ? { role: user.role }
         : {}),
+      ...(currentUserRole === "superadmin" && ["admin", "registrator", "logist"].includes(user.role)
+        ? {
+            salary: user.salary?.salary_amount || 0,
+            payment_day: user.salary?.payment_day || undefined,
+            have_to_pay: user.salary?.have_to_pay || 0,
+          }
+        : {}),
     });
 
     // set phoneDisplay state too
@@ -219,6 +227,11 @@ const UserProfile = () => {
     // Rol o'zgarganmi tekshirish
     if (payload.role === user.role) delete payload.role;
 
+    // Salary fieldlarni tekshirish
+    if (payload.salary === (user?.salary?.salary_amount || 0)) delete payload.salary;
+    if (payload.payment_day === (user?.salary?.payment_day || undefined)) delete payload.payment_day;
+    if (payload.have_to_pay === (user?.salary?.have_to_pay || 0)) delete payload.have_to_pay;
+
     if (Object.keys(payload).length === 0) {
       setOpen(false);
       return;
@@ -255,6 +268,25 @@ const UserProfile = () => {
           handleSuccess(`Foydalanuvchini holati muvaffaqiyatli yangilandi`),
         onError: (err) =>
           handleApiError(err, `Foydalanuvchini holatini yangilashda xatolik`),
+      }
+    );
+  };
+
+  const onChangeRequireOperatorPhone = (checked: boolean, user: any) => {
+    const id = user?.id;
+    const role = user?.role;
+
+    updateUser.mutate(
+      { role, id, data: { require_operator_phone: checked } },
+      {
+        onSuccess: () =>
+          handleSuccess(
+            checked
+              ? "Operator telefon raqami majburiy qilindi"
+              : "Operator telefon raqami ixtiyoriy qilindi"
+          ),
+        onError: (err) =>
+          handleApiError(err, "Sozlamani yangilashda xatolik"),
       }
     );
   };
@@ -546,56 +578,127 @@ const UserProfile = () => {
               </div>
             </div>
           )}
+
+          {/* Require Operator Phone Switch - Only for Market */}
+          {user?.role === "market" && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/10 to-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Phone className="w-6 h-6 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                      Operator telefon raqami
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                      {user.require_operator_phone ? "Majburiy" : "Ixtiyoriy"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  className={`${
+                    user?.require_operator_phone ? "bg-green-600!" : "bg-[#F76659]!"
+                  }`}
+                  checked={user?.require_operator_phone}
+                  onChange={(checked, event) => {
+                    event.stopPropagation();
+                    onChangeRequireOperatorPhone(checked, user);
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Salary Card - faqat salary mavjud bo'lganda ko'rsatish */}
-        {user?.salary && salaryProgress && (
-          <div className="bg-white dark:bg-[#1e1e2d] rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-[#8C57FF] to-[#6366F1] p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="inline-block px-3 py-1 bg-white/20 text-white text-xs font-medium rounded-full backdrop-blur-sm">
-                    Oylik maosh
-                  </span>
-                  <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
-                    {user.salary.salary_amount?.toLocaleString()}{" "}
-                    <span className="text-lg font-normal opacity-80">so'm</span>
-                  </h2>
-                  {user.salary.have_to_pay > 0 && (
+        {user?.salary && salaryProgress && (() => {
+          const sal = user.salary;
+          const haveToPay = sal.have_to_pay || 0;
+          const isDebt = haveToPay < 0;
+          const isPositive = haveToPay > 0;
+
+          return (
+            <div className="bg-white dark:bg-[#1e1e2d] rounded-2xl shadow-xl overflow-hidden">
+              {/* Header */}
+              <div className={`p-6 ${isDebt ? "bg-gradient-to-r from-red-500 to-rose-600" : "bg-gradient-to-r from-[#8C57FF] to-[#6366F1]"}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="inline-block px-3 py-1 bg-white/20 text-white text-xs font-medium rounded-full backdrop-blur-sm">
+                      Oylik maosh
+                    </span>
+                    <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
+                      {sal.salary_amount?.toLocaleString()}{" "}
+                      <span className="text-lg font-normal opacity-80">so'm</span>
+                    </h2>
                     <p className="text-white/70 text-sm mt-1">
-                      To'lanishi kerak: {user.salary.have_to_pay?.toLocaleString()} so'm
+                      Har oyning {sal.payment_day}-sanasida hisoblanadi
                     </p>
-                  )}
-                </div>
-                <div className="hidden md:block">
-                  <div className="w-20 h-20 bg-white/10 rounded-2xl backdrop-blur-sm flex items-center justify-center">
-                    <Wallet className="w-10 h-10 text-white" />
+                  </div>
+                  <div className="hidden md:block">
+                    <div className="w-20 h-20 bg-white/10 rounded-2xl backdrop-blur-sm flex items-center justify-center">
+                      <Wallet className="w-10 h-10 text-white" />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="p-6 space-y-5">
-              <div>
-                <div className="flex justify-between text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-                  <span>To'lov kunigacha</span>
-                  <span className="text-purple-600 dark:text-purple-400">
-                    {salaryProgress.currentDay} / {salaryProgress.paymentDay} kun
-                  </span>
+              <div className="p-6 space-y-4">
+                {/* Qoldiq / Qarz */}
+                <div className={`p-4 rounded-xl border ${
+                  isDebt
+                    ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/30"
+                    : isPositive
+                    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/30"
+                    : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-xs font-medium ${
+                        isDebt ? "text-red-600 dark:text-red-400" : isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-gray-500"
+                      }`}>
+                        {isDebt ? "Qarz (avans olgan)" : isPositive ? "To'lanishi kerak" : "Hisob"}
+                      </p>
+                      <p className={`text-2xl font-bold ${
+                        isDebt ? "text-red-700 dark:text-red-300" : isPositive ? "text-emerald-700 dark:text-emerald-300" : "text-gray-600 dark:text-gray-300"
+                      }`}>
+                        {isDebt ? "" : "+"}{haveToPay.toLocaleString()} so'm
+                      </p>
+                    </div>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                      isDebt ? "bg-red-100 dark:bg-red-900/30" : isPositive ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-gray-100 dark:bg-gray-800"
+                    }`}>
+                      <Wallet className={`w-6 h-6 ${
+                        isDebt ? "text-red-500" : isPositive ? "text-emerald-500" : "text-gray-400"
+                      }`} />
+                    </div>
+                  </div>
                 </div>
-                <div className="w-full h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#8C57FF] to-[#6366F1] rounded-full transition-all duration-500"
-                    style={{ width: `${salaryProgress.progress}%` }}
-                  ></div>
+
+                {/* Progress bar */}
+                <div>
+                  <div className="flex justify-between text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                    <span>To'lov kunigacha</span>
+                    <span className="text-purple-600 dark:text-purple-400">
+                      {salaryProgress.daysRemaining} kun qoldi
+                    </span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isDebt ? "bg-gradient-to-r from-red-500 to-rose-500" : "bg-gradient-to-r from-[#8C57FF] to-[#6366F1]"
+                      }`}
+                      style={{ width: `${salaryProgress.progress}%` }}
+                    />
+                  </div>
+                  <p className="text-gray-400 text-xs mt-1.5">
+                    Oyning {salaryProgress.currentDay}-kuni / To'lov: {salaryProgress.paymentDay}-kun
+                  </p>
                 </div>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">
-                  {salaryProgress.daysRemaining} kun qoldi
-                </p>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Modal */}
@@ -765,6 +868,72 @@ const UserProfile = () => {
                 className="rounded-lg"
               />
             </Form.Item>
+
+            {/* Salary fields — faqat superadmin uchun, maosh oladigan rollar */}
+            {currentUserRole === "superadmin" && ["admin", "registrator", "logist"].includes(user?.role) && (
+              <div className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/15 dark:to-orange-900/15 border border-amber-200/60 dark:border-amber-800/30">
+                <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-amber-200/40 dark:border-amber-700/30">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
+                    <Wallet className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Maosh sozlamalari</p>
+                    <p className="text-[10px] text-amber-600/70 dark:text-amber-400/60">Faqat superadmin o'zgartira oladi</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <Form.Item
+                    label={<span className="text-xs font-medium text-amber-700 dark:text-amber-400">Oylik maosh</span>}
+                    name="salary"
+                    className="mb-0"
+                  >
+                    <InputNumber
+                      placeholder="3,000,000"
+                      size="large"
+                      className="w-full! rounded-xl! border-transparent! bg-white/60! dark:bg-white/5! dark:text-white! [&_.ant-input-number-handler-wrap]:hidden!"
+                      min={0}
+                      suffix={<span className="text-amber-500 text-xs">so'm</span>}
+                      formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                      parser={(value) => Number(value?.replace(/,/g, "") || 0)}
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    label={<span className="text-xs font-medium text-amber-700 dark:text-amber-400">To'lov sanasi</span>}
+                    name="payment_day"
+                    className="mb-0"
+                    getValueProps={(value) => ({
+                      value: value ? dayjs().date(value) : null,
+                    })}
+                    getValueFromEvent={(date: any) => date ? date.date() : undefined}
+                  >
+                    <DatePicker
+                      format="DD-MMMM"
+                      placeholder="Sanani tanlang"
+                      size="large"
+                      className="w-full! rounded-xl! border-transparent! bg-white/60! dark:bg-white/5! dark:[&_.ant-picker-input>input]:text-white! dark:[&_.ant-picker-input>input]:placeholder-gray-400! dark:[&_.ant-picker-suffix]:text-amber-500!"
+                    />
+                  </Form.Item>
+                </div>
+
+                <Form.Item
+                  label={<span className="text-xs font-medium text-amber-700 dark:text-amber-400">Hozirgi qoldiq</span>}
+                  name="have_to_pay"
+                  className="mb-0"
+                  extra={<span className="text-[10px] text-amber-600/60 dark:text-amber-400/50">Manfiy = qarz (avans olgan), Musbat = yig'ilgan maosh</span>}
+                >
+                  <InputNumber
+                    placeholder="0"
+                    size="large"
+                    className="w-full! rounded-xl! border-transparent! bg-white/60! dark:bg-white/5! dark:text-white! [&_.ant-input-number-handler-wrap]:hidden!"
+                    suffix={<span className="text-amber-500 text-xs">so'm</span>}
+                    formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                    parser={(value) => Number(value?.replace(/,/g, "") || 0)}
+                  />
+                </Form.Item>
+              </div>
+            )}
 
             <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
               <Button

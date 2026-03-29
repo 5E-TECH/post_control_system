@@ -102,6 +102,10 @@ const CashboxHistoryComponent: React.FC<Props> = ({
       cancel: "Bekor qilish",
       extra_cost: "Qo'shimcha xarajat",
       bills: "To'lovlar",
+      investor_earning: "Investor daromadi",
+      investor_allocate: "Investor ulushi ajratish",
+      investor_payout: "Investorga to'lov",
+      investor_refund: "Investitsiya qaytarish",
     };
     return labels[sourceType] || sourceType;
   };

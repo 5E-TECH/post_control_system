@@ -20,7 +20,7 @@ const Orders = () => {
 
   const isOrdersChild = normalizedPathname.startsWith("/orders/");
 
-  if (role === "superadmin" || role === "admin" || role === "market" || role === "registrator") {
+  if (role === "superadmin" || role === "admin" || role === "market" || role === "registrator" || role === "logist" || role === "operator") {
     if (isOrdersChild) {
       return <Outlet />;
     }

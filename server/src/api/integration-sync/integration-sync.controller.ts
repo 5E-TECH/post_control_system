@@ -14,6 +14,10 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
+@ApiTags('Integration Sync')
+@ApiBearerAuth()
 @Controller('integration-sync')
 @UseGuards(JwtGuard, RolesGuard)
 export class IntegrationSyncController {
