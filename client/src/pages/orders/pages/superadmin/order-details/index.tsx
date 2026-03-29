@@ -114,15 +114,26 @@ const OrderDetails = () => {
   const status = data?.data?.status;
   const statusStyle = statusConfig[status] || statusConfig.new;
 
-  const role =
-    useSelector((state: RootState) => state.roleSlice.role) ||
-    localStorage.getItem("role");
+  const { role, id: userId } = useSelector((state: RootState) => state.roleSlice);
+  const currentRole = role || localStorage.getItem("role");
   const canRollback =
-    role === "superadmin" && (status === "paid" || status === "partly_paid");
-  const canDelete = role === "market" && status === "new";
+    currentRole === "superadmin" && (status === "paid" || status === "partly_paid");
+  const canDelete = currentRole === "market" && status === "new";
   const canEditTariff =
-    (role === "admin" || role === "superadmin") &&
+    (currentRole === "admin" || currentRole === "superadmin") &&
     (status === "new" || status === "received" || status === "on the road");
+
+  // Operator faqat o'z buyurtmalarini va faqat new/created statusda tahrirlashi mumkin
+  const isOperatorOwnEditableOrder =
+    currentRole === "operator" &&
+    (status === "new" || status === "created") &&
+    data?.data?.operator_id === userId;
+
+  // Umumiy edit ruxsati: operator uchun maxsus, boshqalar uchun eski logika
+  const canEditDetails =
+    currentRole === "operator"
+      ? isOperatorOwnEditableOrder
+      : currentRole !== "market" && currentRole !== "courier";
 
   // Rollback state
   const [rollbackModalOpen, setRollbackModalOpen] = useState(false);
@@ -392,7 +403,7 @@ const OrderDetails = () => {
           {/* Right Column - Customer & Shipping Info */}
           <div className="space-y-6">
             {/* Customer Details */}
-            <CustomerDetail customer={data?.data?.customer} />
+            <CustomerDetail customer={data?.data?.customer} canEdit={canEditDetails} />
 
             {/* Shipping Address - Order dan manzil olish */}
             <ShippingAddress
@@ -400,6 +411,7 @@ const OrderDetails = () => {
               districtId={data?.data?.district_id || data?.data?.customer?.district_id}
               id={data?.data?.id}
               isOrderAddress={true}
+              canEdit={canEditDetails}
             />
 
             {/* Courier Info */}

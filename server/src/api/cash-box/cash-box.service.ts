@@ -15,15 +15,19 @@ import {
   DataSource,
   DeepPartial,
   IsNull,
+  Repository,
 } from 'typeorm';
 import {
   Cashbox_type,
+  FinancialSource_type,
   Operation_type,
   Order_status,
   PaymentMethod,
   Roles,
   Source_type,
 } from 'src/common/enums';
+import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
+import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
 import { successRes } from 'src/infrastructure/lib/response';
 import { CreatePaymentsFromCourierDto } from './dto/payments-from-courier.dto';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
@@ -66,6 +70,9 @@ export class CashBoxService
 
     @InjectRepository(ShiftEntity)
     private readonly shiftRepo: ShiftRepository,
+
+    @InjectRepository(FinancialBalanceHistoryEntity)
+    private readonly financialHistoryRepo: Repository<FinancialBalanceHistoryEntity>,
 
     private readonly dataSource: DataSource,
   ) {
@@ -693,6 +700,232 @@ export class CashBoxService
     }
   }
 
+  // ==================== FINANCIAL BALANCE HISTORY ====================
+
+  async financialBalanceHistory(filters?: {
+    fromDate?: string;
+    toDate?: string;
+    sourceType?: FinancialSource_type;
+    page?: number;
+    limit?: number;
+  }) {
+    try {
+      const currentBalance = await calculateFinancialBalance(this.dataSource.manager);
+
+      const page = filters?.page && filters.page > 0 ? filters.page : 1;
+      const limit = getSafeLimit(filters?.limit);
+      const skip = (page - 1) * limit;
+
+      let fromTs: number | null = null;
+      let toTs: number | null = null;
+
+      if (filters?.fromDate) {
+        fromTs = toUzbekistanTimestamp(filters.fromDate, false);
+      }
+      if (filters?.toDate) {
+        toTs = toUzbekistanTimestamp(filters.toDate, true);
+      }
+
+      const qb = this.financialHistoryRepo
+        .createQueryBuilder('h')
+        .leftJoinAndSelect('h.createdByUser', 'createdByUser')
+        .leftJoinAndSelect('h.relatedUser', 'relatedUser')
+        .leftJoinAndSelect('h.order', 'order')
+        .orderBy('h.created_at', 'DESC')
+        .skip(skip)
+        .take(limit);
+
+      if (fromTs !== null) {
+        qb.andWhere('h.created_at >= :fromTs', { fromTs });
+      }
+      if (toTs !== null) {
+        qb.andWhere('h.created_at <= :toTs', { toTs });
+      }
+      if (filters?.sourceType) {
+        qb.andWhere('h.source_type = :sourceType', {
+          sourceType: filters.sourceType,
+        });
+      }
+
+      const [histories, total] = await qb.getManyAndCount();
+
+      const historyData = histories.map((h) => ({
+        id: h.id,
+        created_at: h.created_at,
+        source_type: h.source_type,
+        amount: h.amount,
+        balance_before: h.balance_before,
+        balance_after: h.balance_after,
+        comment: h.comment,
+        created_by: h.createdByUser
+          ? { id: h.createdByUser.id, name: h.createdByUser.name }
+          : null,
+        related_user: h.relatedUser
+          ? { id: h.relatedUser.id, name: h.relatedUser.name, role: h.relatedUser.role }
+          : null,
+        order: h.order
+          ? { id: h.order.id, total_price: h.order.total_price }
+          : null,
+      }));
+
+      return successRes(
+        {
+          currentBalance,
+          history: historyData,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+        200,
+        'Financial balance history',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== FINANCIAL BALANCE ANALYTICS ====================
+
+  async financialBalanceAnalytics(filters?: {
+    fromDate?: string;
+    toDate?: string;
+  }) {
+    try {
+      const currentBalance = await calculateFinancialBalance(this.dataSource.manager);
+
+      let fromTs: number | null = null;
+      let toTs: number | null = null;
+
+      if (filters?.fromDate) {
+        fromTs = toUzbekistanTimestamp(filters.fromDate, false);
+      }
+      if (filters?.toDate) {
+        toTs = toUzbekistanTimestamp(filters.toDate, true);
+      }
+
+      // === 1. Source type bo'yicha guruhlash ===
+      const sourceQb = this.financialHistoryRepo
+        .createQueryBuilder('h')
+        .select('h.source_type', 'source_type')
+        .addSelect('SUM(CASE WHEN h.amount > 0 THEN h.amount ELSE 0 END)', 'positive_total')
+        .addSelect('SUM(CASE WHEN h.amount < 0 THEN (-1 * h.amount) ELSE 0 END)', 'negative_total')
+        .addSelect('SUM(h.amount)', 'net_total')
+        .addSelect('COUNT(h.id)', 'transaction_count')
+        .groupBy('h.source_type')
+        .orderBy('net_total', 'DESC');
+
+      if (fromTs !== null) {
+        sourceQb.andWhere('h.created_at >= :fromTs', { fromTs });
+      }
+      if (toTs !== null) {
+        sourceQb.andWhere('h.created_at <= :toTs', { toTs });
+      }
+
+      const sourceBreakdown = await sourceQb.getRawMany();
+
+      // === 2. Umumiy statistika ===
+      const totalsQb = this.financialHistoryRepo
+        .createQueryBuilder('h')
+        .select('SUM(CASE WHEN h.amount > 0 THEN h.amount ELSE 0 END)', 'total_positive')
+        .addSelect('SUM(CASE WHEN h.amount < 0 THEN (-1 * h.amount) ELSE 0 END)', 'total_negative')
+        .addSelect('SUM(h.amount)', 'net_change')
+        .addSelect('COUNT(h.id)', 'total_count');
+
+      if (fromTs !== null) {
+        totalsQb.andWhere('h.created_at >= :fromTs', { fromTs });
+      }
+      if (toTs !== null) {
+        totalsQb.andWhere('h.created_at <= :toTs', { toTs });
+      }
+
+      const totalsRaw = await totalsQb.getRawOne();
+      const totalPositive = Number(totalsRaw?.total_positive ?? 0);
+      const totalNegative = Number(totalsRaw?.total_negative ?? 0);
+      const netChange = Number(totalsRaw?.net_change ?? 0);
+      const totalCount = Number(totalsRaw?.total_count ?? 0);
+
+      // === 3. Musbat ta'sir (+ tomonlama) ===
+      const positiveImpact = sourceBreakdown
+        .filter((s) => Number(s.positive_total) > 0)
+        .map((s) => ({
+          source_type: s.source_type,
+          total_amount: Number(s.positive_total),
+          transaction_count: Number(s.transaction_count),
+          percentage: totalPositive > 0
+            ? Math.round((Number(s.positive_total) / totalPositive) * 10000) / 100
+            : 0,
+        }))
+        .sort((a, b) => b.total_amount - a.total_amount);
+
+      // === 4. Manfiy ta'sir (- tomonlama) ===
+      const negativeImpact = sourceBreakdown
+        .filter((s) => Number(s.negative_total) > 0)
+        .map((s) => ({
+          source_type: s.source_type,
+          total_amount: Number(s.negative_total),
+          transaction_count: Number(s.transaction_count),
+          percentage: totalNegative > 0
+            ? Math.round((Number(s.negative_total) / totalNegative) * 10000) / 100
+            : 0,
+        }))
+        .sort((a, b) => b.total_amount - a.total_amount);
+
+      // === 5. Top 10 eng katta ta'sir ===
+      const topQb = this.financialHistoryRepo
+        .createQueryBuilder('h')
+        .leftJoinAndSelect('h.createdByUser', 'createdByUser')
+        .leftJoinAndSelect('h.relatedUser', 'relatedUser')
+        .addSelect('CASE WHEN h.amount >= 0 THEN h.amount ELSE (-1 * h.amount) END', 'abs_amount')
+        .orderBy('abs_amount', 'DESC')
+        .take(10);
+
+      if (fromTs !== null) {
+        topQb.andWhere('h.created_at >= :fromTs', { fromTs });
+      }
+      if (toTs !== null) {
+        topQb.andWhere('h.created_at <= :toTs', { toTs });
+      }
+
+      const topTransactions = await topQb.getMany();
+
+      return successRes(
+        {
+          currentBalance,
+          summary: {
+            totalPositive,
+            totalNegative,
+            netChange,
+            totalCount,
+          },
+          positiveImpact,
+          negativeImpact,
+          topTransactions: topTransactions.map((h) => ({
+            id: h.id,
+            created_at: h.created_at,
+            source_type: h.source_type,
+            amount: h.amount,
+            balance_before: h.balance_before,
+            balance_after: h.balance_after,
+            comment: h.comment,
+            created_by: h.createdByUser
+              ? { id: h.createdByUser.id, name: h.createdByUser.name }
+              : null,
+            related_user: h.relatedUser
+              ? { id: h.relatedUser.id, name: h.relatedUser.name, role: h.relatedUser.role }
+              : null,
+          })),
+        },
+        200,
+        'Financial balance analytics',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async allCashboxesTotal(filters?: {
     operationType?: Operation_type;
     sourceType?: Source_type;
@@ -856,6 +1089,19 @@ export class CashBoxService
       });
       await queryRunner.manager.save(cashboxHistory);
 
+      // === MOLIYAVIY TAROZI: qo'lda chiqim ===
+      const expBalanceAfter = await calculateFinancialBalance(queryRunner.manager);
+      await queryRunner.manager.save(
+        queryRunner.manager.create(FinancialBalanceHistoryEntity, {
+          amount: -updateCashboxDto.amount,
+          balance_before: expBalanceAfter + updateCashboxDto.amount,
+          balance_after: expBalanceAfter,
+          source_type: FinancialSource_type.MANUAL_EXPENSE,
+          comment: updateCashboxDto.comment,
+          created_by: user.id,
+        }),
+      );
+
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Manual expense created');
     } catch (error) {
@@ -897,6 +1143,19 @@ export class CashBoxService
         source_type: Source_type.MANUAL_INCOME,
       });
       await queryRunner.manager.save(cashboxHistory);
+
+      // === MOLIYAVIY TAROZI: qo'lda kirim ===
+      const fillBalanceAfter = await calculateFinancialBalance(queryRunner.manager);
+      await queryRunner.manager.save(
+        queryRunner.manager.create(FinancialBalanceHistoryEntity, {
+          amount: updateCashboxDto.amount,
+          balance_before: fillBalanceAfter - updateCashboxDto.amount,
+          balance_after: fillBalanceAfter,
+          source_type: FinancialSource_type.MANUAL_INCOME,
+          comment: updateCashboxDto.comment,
+          created_by: user.id,
+        }),
+      );
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Cashbox filled');
@@ -964,14 +1223,28 @@ export class CashBoxService
         amount,
         balance_after: mainCashbox.balance,
         cashbox_id: mainCashbox.id,
-        comment: salaryDto?.comment,
+        comment: salaryDto?.comment || `${staff?.name || 'Hodim'} ga maosh to'landi`,
         created_by: user.id,
         payment_method: salaryDto.type,
         operation_type: Operation_type.EXPENSE,
         source_type: Source_type.SALARY,
-        source_id: user_id,
+        source_user_id: user_id,
       });
       await queryRunner.manager.save(cashboxHistory);
+
+      // === MOLIYAVIY TAROZI: maosh to'lovi ===
+      const salaryBalanceAfter = await calculateFinancialBalance(queryRunner.manager);
+      await queryRunner.manager.save(
+        queryRunner.manager.create(FinancialBalanceHistoryEntity, {
+          amount: -amount,
+          balance_before: salaryBalanceAfter + amount,
+          balance_after: salaryBalanceAfter,
+          source_type: FinancialSource_type.SALARY,
+          related_user_id: user_id,
+          comment: salaryDto?.comment || `${staff?.name || 'Hodim'} ga maosh to'landi`,
+          created_by: user.id,
+        }),
+      );
 
       await queryRunner.commitTransaction();
       return successRes({}, 200, 'Staff salary paid');

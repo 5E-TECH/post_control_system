@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { RegionEntity } from './region.entity';
 import { UserEntity } from './users.entity';
+import { DistrictCourierEntity } from './district-courier.entity';
 
 @Entity('district')
 @Index('IDX_DISTRICT_REGION_ID', ['region_id'])
@@ -48,4 +49,10 @@ export class DistrictEntity extends BaseEntity {
 
   @OneToMany(() => UserEntity, (user) => user.district)
   users: UserEntity[];
+
+  // 1-N District → Couriers (tuman kuriyerlari — faqat ism va telefon)
+  @OneToMany(() => DistrictCourierEntity, (c) => c.district, {
+    cascade: true,
+  })
+  couriers: DistrictCourierEntity[];
 }

@@ -18,6 +18,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { DistrictEntity } from 'src/core/entity/district.entity';
+import { DistrictCourierEntity } from 'src/core/entity/district-courier.entity';
 import { Order_status, Roles, Status } from 'src/common/enums';
 import {
   getUzbekistanDayRange,
@@ -32,6 +33,7 @@ export class RegionService implements OnModuleInit {
     @InjectRepository(OrderEntity) private orderRepository: Repository<OrderEntity>,
     @InjectRepository(UserEntity) private userRepository: Repository<UserEntity>,
     @InjectRepository(DistrictEntity) private districtRepository: Repository<DistrictEntity>,
+    @InjectRepository(DistrictCourierEntity) private districtCourierRepository: Repository<DistrictCourierEntity>,
   ) {}
 
   async onModuleInit() {
@@ -375,11 +377,29 @@ export class RegionService implements OnModuleInit {
 
       const region = await this.regionRepository.findOne({
         where: { id: regionId },
-        relations: ['assignedDistricts'],
+        relations: ['assignedDistricts', 'mainCourier'],
       });
 
       if (!region) {
         throw new NotFoundException('Viloyat topilmadi');
+      }
+
+      // Tumanlar va ularning kuriyerlari (district_courier jadvalidan)
+      const districtIds = region.assignedDistricts.map((d) => d.id);
+      const districtCourierMap = new Map<string, any[]>();
+      if (districtIds.length > 0) {
+        const allDistrictCouriers = await this.districtCourierRepository.find({
+          where: { district_id: In(districtIds) },
+          select: ['id', 'name', 'phone_number', 'district_id'],
+        });
+        for (const districtId of districtIds) {
+          districtCourierMap.set(
+            districtId,
+            allDistrictCouriers
+              .filter((c) => c.district_id === districtId)
+              .map((c) => ({ id: c.id, name: c.name, phone_number: c.phone_number })),
+          );
+        }
       }
 
       // Viloyat kuryerlari va ularning statistikasi
@@ -561,6 +581,7 @@ export class RegionService implements OnModuleInit {
             id: district.id,
             name: district.name,
             satoCode: district.sato_code,
+            couriers: districtCourierMap.get(district.id) || [],
             totalOrders,
             deliveredOrders,
             cancelledOrders,
@@ -649,6 +670,13 @@ export class RegionService implements OnModuleInit {
             id: region.id,
             name: region.name,
             satoCode: region.sato_code,
+            mainCourier: region.mainCourier
+              ? {
+                  id: region.mainCourier.id,
+                  name: region.mainCourier.name,
+                  phone_number: region.mainCourier.phone_number,
+                }
+              : null,
           },
           summary: {
             totalOrders,
@@ -670,6 +698,133 @@ export class RegionService implements OnModuleInit {
         200,
         'Viloyat batafsil statistikasi',
       );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== MAIN COURIER ASSIGNMENT ====================
+
+  /**
+   * Viloyatga asosiy kuryer biriktirish (yoki olib tashlash)
+   */
+  async assignMainCourier(regionId: string, courierId: string | null) {
+    try {
+      const region = await this.regionRepository.findOne({ where: { id: regionId } });
+      if (!region) {
+        throw new NotFoundException('Viloyat topilmadi');
+      }
+
+      if (courierId) {
+        const courier = await this.userRepository.findOne({
+          where: { id: courierId, role: Roles.COURIER, is_deleted: false },
+        });
+        if (!courier) {
+          throw new NotFoundException('Kuryer topilmadi');
+        }
+      }
+
+      region.main_courier_id = courierId as any;
+      await this.regionRepository.save(region);
+
+      return successRes(region, 200, courierId ? 'Asosiy kuryer biriktirildi' : 'Asosiy kuryer olib tashlandi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== LOGIST ASSIGNMENT ====================
+
+  /**
+   * Regionga logist biriktirish
+   */
+  async assignLogist(regionId: string, logistId: string | null) {
+    try {
+      const region = await this.regionRepository.findOne({
+        where: { id: regionId },
+      });
+      if (!region) {
+        throw new NotFoundException('Viloyat topilmadi');
+      }
+
+      if (logistId) {
+        const logist = await this.userRepository.findOne({
+          where: { id: logistId, role: Roles.LOGIST, is_deleted: false },
+        });
+        if (!logist) {
+          throw new NotFoundException('Logist topilmadi');
+        }
+      }
+
+      region.logist_id = logistId as any;
+      await this.regionRepository.save(region);
+
+      return successRes(region, 200, logistId ? 'Logist biriktirildi' : 'Logist olib tashlandi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Bir nechta regionga bitta logistni biriktirish (bulk)
+   */
+  async bulkAssignLogist(logistId: string, regionIds: string[]) {
+    try {
+      const logist = await this.userRepository.findOne({
+        where: { id: logistId, role: Roles.LOGIST, is_deleted: false },
+      });
+      if (!logist) {
+        throw new NotFoundException('Logist topilmadi');
+      }
+
+      // Avval bu logistning barcha eski biriktirishlarini olib tashlash
+      await this.regionRepository.update(
+        { logist_id: logistId },
+        { logist_id: null as any },
+      );
+
+      // Yangi regionlarga biriktirish
+      if (regionIds.length > 0) {
+        await this.regionRepository
+          .createQueryBuilder()
+          .update(RegionEntity)
+          .set({ logist_id: logistId })
+          .where('id IN (:...regionIds)', { regionIds })
+          .execute();
+      }
+
+      return successRes({}, 200, `Logist ${regionIds.length} ta viloyatga biriktirildi`);
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Regionlar ro'yxatini logist ma'lumoti bilan olish
+   */
+  async findAllWithLogist() {
+    try {
+      const regions = await this.regionRepository.find({
+        relations: ['assignedDistricts', 'logist'],
+        order: { created_at: 'ASC' },
+      });
+
+      const result = regions.map((r) => ({
+        id: r.id,
+        name: r.name,
+        sato_code: r.sato_code,
+        logist_id: r.logist_id,
+        logist: r.logist
+          ? {
+              id: r.logist.id,
+              name: r.logist.name,
+              phone_number: r.logist.phone_number,
+            }
+          : null,
+        assignedDistricts: r.assignedDistricts,
+      }));
+
+      return successRes(result, 200, 'Regions with logist info');
     } catch (error) {
       return catchError(error);
     }

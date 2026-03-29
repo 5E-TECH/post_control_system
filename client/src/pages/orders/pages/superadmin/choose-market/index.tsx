@@ -69,6 +69,11 @@ const ChooseMarket = () => {
       localStorage.setItem("marketId", user.id);
       navigate(buildAdminPath("orders/customer-info"));
     }
+    // Operator uchun market avtomatik tanlanadi
+    if (role === "operator" && user.market_id) {
+      localStorage.setItem("marketId", user.market_id);
+      navigate(buildAdminPath("orders/customer-info"));
+    }
   }, [role, user, navigate]);
 
   const onClick = () => {

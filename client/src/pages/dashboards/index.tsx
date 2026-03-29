@@ -30,6 +30,9 @@ const SkeletonBox = ({ className }: { className?: string }) => (
   />
 );
 
+// Investor roli uchun lazy import (vaqtinchalik o'chirilgan)
+// const InvestorDashboardLazy = lazy(() => import("../investor-dashboard"));
+
 const Dashboards = () => {
   const { t } = useTranslation(["dashboard"]);
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
@@ -50,10 +53,15 @@ const Dashboards = () => {
   const role = useSelector((state: RootState) => state.roleSlice.role);
   const currentUserId = useSelector((state: RootState) => state.roleSlice.id);
 
+  // Investor roli uchun alohida dashboard (vaqtinchalik o'chirilgan)
+  // if (role === "investor") {
+  //   return <InvestorDashboardLazy />;
+  // }
+
   let data: any;
   let isLoading: boolean = false;
 
-  if (role === "superadmin" || role === "admin" || role === "registrator") {
+  if (role === "superadmin" || role === "admin" || role === "registrator" || role === "logist") {
     ({ data, isLoading } = useChart().getChart({
       startDate: fromDate,
       endDate: toDate,
@@ -63,7 +71,7 @@ const Dashboards = () => {
       startDate: fromDate,
       endDate: toDate,
     }));
-  } else if (role === "market") {
+  } else if (role === "market" || role === "operator") {
     ({ data, isLoading } = useMarketStatCard().getChart({
       startDate: fromDate,
       endDate: toDate,
@@ -90,6 +98,7 @@ const Dashboards = () => {
 
   const couriers = data?.data?.topCouriers?.data ?? [];
   const markets = data?.data?.topMarkets?.data ?? [];
+  const operators = data?.data?.topOperators?.data ?? [];
 
   const visibleMarkets = showAllMarkets ? ordersData : ordersData.slice(0, 10);
   const visibleCouriers = showAllCouriers
@@ -200,7 +209,7 @@ const Dashboards = () => {
       </div>
 
       {/* Stat Cards */}
-      <div className={`grid grid-cols-2 ${role === "registrator" ? "sm:grid-cols-3" : "sm:grid-cols-4"} gap-3 sm:gap-4 mb-6`}>
+      <div className={`grid grid-cols-2 ${role === "registrator" || role === "logist" || role === "operator" ? "sm:grid-cols-3" : "sm:grid-cols-4"} gap-3 sm:gap-4 mb-6`}>
         {isLoading ? (
           [...Array(4)].map((_, i) => (
             <div key={i} className="bg-white dark:bg-[#2A263D] p-4 sm:p-6 rounded-2xl">
@@ -240,7 +249,7 @@ const Dashboards = () => {
               </>
             )}
 
-            {role === "market" && (
+            {(role === "market" || role === "operator") && (
               <>
                 <StatCard
                   icon={<ShoppingCart className="w-5 h-5" />}
@@ -260,17 +269,19 @@ const Dashboards = () => {
                   value={aboutMarket?.canceledOrders || 0}
                   gradient="from-red-500 to-rose-500"
                 />
-                <StatCard
-                  icon={<DollarSign className="w-5 h-5" />}
-                  label={t("profit")}
-                  value={`${Number(aboutMarket?.profit || 0).toLocaleString()}`}
-                  suffix="UZS"
-                  gradient="from-amber-500 to-yellow-500"
-                />
+                {role === "market" && (
+                  <StatCard
+                    icon={<DollarSign className="w-5 h-5" />}
+                    label={t("profit")}
+                    value={`${Number(aboutMarket?.profit || 0).toLocaleString()}`}
+                    suffix="UZS"
+                    gradient="from-amber-500 to-yellow-500"
+                  />
+                )}
               </>
             )}
 
-            {(role === "superadmin" || role === "admin" || role === "registrator") && (
+            {(role === "superadmin" || role === "admin" || role === "registrator" || role === "logist") && (
               <>
                 <StatCard
                   icon={<ShoppingCart className="w-5 h-5" />}
@@ -352,6 +363,36 @@ const Dashboards = () => {
         </>
       )}
 
+      {/* Logist - kurierlar statistikasi va top 10 */}
+      {role === "logist" && (
+        <>
+          <div className="mb-6">
+            <SalesChart
+              title={t("courierStatistics")}
+              data={visibleCouriers}
+              type="couriers"
+              showAll={showAllCouriers}
+              setShowAll={setShowAllCouriers}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <Leaderboard
+              title={t("topCouriers")}
+              data={couriers}
+              type="couriers"
+              currentUserId={currentUserId}
+            />
+            <Leaderboard
+              title={t("topMarkets")}
+              data={markets}
+              type="markets"
+              currentUserId={currentUserId}
+            />
+          </div>
+        </>
+      )}
+
       {/* Market faqat marketlar reytingi va o'z statistikasini ko'radi */}
       {role === "market" && (
         <div className="space-y-4 sm:space-y-6">
@@ -359,6 +400,32 @@ const Dashboards = () => {
             title={t("topMarkets")}
             data={markets}
             type="markets"
+            currentUserId={currentUserId}
+          />
+          {operators.length > 0 && (
+            <Leaderboard
+              title={t("topOperators", "Top operatorlar")}
+              data={operators}
+              type="operators"
+              currentUserId={currentUserId}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Operator - top marketlar va shu marketning top operatorlarini ko'radi */}
+      {role === "operator" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <Leaderboard
+            title={t("topMarkets")}
+            data={markets}
+            type="markets"
+            currentUserId={currentUserId}
+          />
+          <Leaderboard
+            title={t("topOperators", "Top operatorlar")}
+            data={operators}
+            type="operators"
             currentUserId={currentUserId}
           />
         </div>

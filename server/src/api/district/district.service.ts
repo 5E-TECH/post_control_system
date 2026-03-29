@@ -9,6 +9,7 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { DistrictCourierEntity } from 'src/core/entity/district-courier.entity';
 import { DistrictRepository } from 'src/core/repository/district.repository';
 import { RegionRepository } from 'src/core/repository/region.repository';
 import { OrderRepository } from 'src/core/repository/order.repository';
@@ -19,8 +20,9 @@ import { CreateDistrictDto } from './dto/create-district.dto';
 import { UpdateDistrictNameDto } from './dto/update-name.dto';
 import { UpdateDistrictSatoCodeDto } from './dto/update-sato-code.dto';
 import { MergeDistrictsDto } from './dto/merge-districts.dto';
-import { Not, In, DataSource } from 'typeorm';
+import { Not, In, DataSource, Repository } from 'typeorm';
 import { matchDistricts } from 'src/infrastructure/lib/utils/sato-matcher';
+import { Roles } from 'src/common/enums';
 
 @Injectable()
 export class DistrictService implements OnModuleInit {
@@ -33,6 +35,9 @@ export class DistrictService implements OnModuleInit {
 
     @InjectRepository(OrderEntity)
     private readonly orderRepository: OrderRepository,
+
+    @InjectRepository(DistrictCourierEntity)
+    private readonly districtCourierRepository: Repository<DistrictCourierEntity>,
 
     private readonly dataSource: DataSource,
   ) {}
@@ -464,6 +469,47 @@ export class DistrictService implements OnModuleInit {
     } finally {
       // QueryRunner ni yopish
       await queryRunner.release();
+    }
+  }
+
+  /**
+   * Tumanga kuryer qo'shish (faqat ism va telefon)
+   */
+  async addDistrictCourier(districtId: string, dto: { name: string; phone_number: string }) {
+    try {
+      const district = await this.districtRepository.findOne({ where: { id: districtId } });
+      if (!district) {
+        throw new NotFoundException('Tuman topilmadi');
+      }
+
+      const courier = this.districtCourierRepository.create({
+        name: dto.name,
+        phone_number: dto.phone_number,
+        district_id: districtId,
+      });
+      await this.districtCourierRepository.save(courier);
+
+      return successRes(courier, 201, 'Kuryer qo\'shildi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Tuman kuryerini o'chirish
+   */
+  async removeDistrictCourier(courierId: string) {
+    try {
+      const courier = await this.districtCourierRepository.findOne({ where: { id: courierId } });
+      if (!courier) {
+        throw new NotFoundException('Kuryer topilmadi');
+      }
+
+      await this.districtCourierRepository.delete({ id: courierId });
+
+      return successRes({}, 200, 'Kuryer o\'chirildi');
+    } catch (error) {
+      return catchError(error);
     }
   }
 

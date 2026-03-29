@@ -11,11 +11,13 @@ export const useSignOut = () => {
       client.invalidateQueries({ queryKey: ["user"], refetchType: "active" });
 
       localStorage.removeItem("x-auth-token");
+      localStorage.removeItem("refresh_token_expires_at");
 
       window.location.href = buildAdminPath("login", { absolute: true });
     },
     onError: () => {
       localStorage.removeItem("x-auth-token");
+      localStorage.removeItem("refresh_token_expires_at");
       window.location.href = buildAdminPath("login", { absolute: true });
     },
   });

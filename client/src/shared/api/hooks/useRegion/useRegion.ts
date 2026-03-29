@@ -93,6 +93,43 @@ export const useRegion = () => {
       refetchOnWindowFocus: false,
     });
 
+  // Logist bilan ishlash
+  const getRegionsWithLogist = (enabled = true) =>
+    useQuery({
+      queryKey: [region, "with-logist"],
+      queryFn: () => api.get("region/with-logist").then((res) => res.data),
+      enabled,
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+    });
+
+  const assignMainCourier = useMutation({
+    mutationFn: ({ regionId, courier_id }: { regionId: string; courier_id: string | null }) =>
+      api.patch(`region/main-courier/${regionId}`, { courier_id }).then((res) => res.data),
+    onSuccess: (_, { regionId }) => {
+      client.invalidateQueries({ queryKey: [region, "stats", regionId] });
+      client.invalidateQueries({ queryKey: [region, "stats"] });
+    },
+  });
+
+  const assignLogist = useMutation({
+    mutationFn: ({ regionId, logist_id }: { regionId: string; logist_id: string | null }) =>
+      api.patch(`region/logist/${regionId}`, { logist_id }).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [region] });
+      client.invalidateQueries({ queryKey: [region, "with-logist"] });
+    },
+  });
+
+  const bulkAssignLogist = useMutation({
+    mutationFn: ({ logist_id, region_ids }: { logist_id: string; region_ids: string[] }) =>
+      api.post("region/logist/bulk-assign", { logist_id, region_ids }).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [region] });
+      client.invalidateQueries({ queryKey: [region, "with-logist"] });
+    },
+  });
+
   return {
     getRegions,
     getRegionsById,
@@ -102,5 +139,9 @@ export const useRegion = () => {
     updateRegionName,
     getAllRegionsStats,
     getRegionDetailedStats,
+    getRegionsWithLogist,
+    assignMainCourier,
+    assignLogist,
+    bulkAssignLogist,
   };
 };

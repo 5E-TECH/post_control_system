@@ -28,7 +28,6 @@ const CreateOrder = () => {
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
   const customer = JSON.parse(localStorage.getItem("customer") ?? "null");
 
-  const market_id = market?.id;
   const customer_id = customer?.id;
 
   const orderItems = useSelector(
@@ -43,6 +42,9 @@ const CreateOrder = () => {
   const dispatch = useDispatch();
 
   const user = useSelector((state: RootState) => state.roleSlice);
+
+  // Operator va market uchun market_id reduxdan yoki localStorage dan olinadi
+  const market_id = market?.id || user.market_id || (user.role === "market" ? user.id : null) || localStorage.getItem("marketId");
 
   const marketdata = useSelector(
     (state: RootState) => state.authSlice.marketData
@@ -82,6 +84,7 @@ const CreateOrder = () => {
       where_deliver: productInfo?.where_deliver,
       comment: productInfo?.comment,
       operator: productInfo?.operator,
+      operator_phone: productInfo?.operator_phone || undefined,
       // Buyurtma uchun yetkazib berish manzili
       district_id: customer?.district_id,
       address: customer?.address,
@@ -102,9 +105,10 @@ const CreateOrder = () => {
     navigate(buildAdminPath("orders/customer-info"));
   };
 
-  const marketName = user.role === "market" ? marketdata?.name : market?.name;
+  const isMarketOrOperator = user.role === "market" || user.role === "operator";
+  const marketName = isMarketOrOperator ? (marketdata?.name || user.name) : market?.name;
   const marketPhone =
-    user.role === "market" ? marketdata?.phone_number : market?.phone_number;
+    isMarketOrOperator ? (marketdata?.phone_number || "") : market?.phone_number;
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E]">
@@ -123,7 +127,8 @@ const CreateOrder = () => {
           {/* Steps Sidebar */}
           <div className="w-full max-w-xs max-[1100px]:max-w-full flex-shrink-0 overflow-hidden">
             <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-5 sticky top-6 overflow-hidden">
-              {/* Step 1 - Completed */}
+              {/* Step 1 - Completed (faqat admin/registrator/superadmin uchun) */}
+              {!isMarketOrOperator && (
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
@@ -158,8 +163,9 @@ const CreateOrder = () => {
                   </div>
                 </div>
               </div>
+              )}
 
-              {/* Step 2 - Completed */}
+              {/* Step 2 - Completed (operator/market uchun 1-qadam) */}
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
@@ -170,7 +176,7 @@ const CreateOrder = () => {
                 <div className="flex-1 pt-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
-                      2-qadam
+                      {isMarketOrOperator ? "1-qadam" : "2-qadam"}
                     </span>
                     <Check className="w-4 h-4 text-green-500" />
                   </div>
@@ -206,7 +212,7 @@ const CreateOrder = () => {
                 <div className="flex-1 pt-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 rounded-full">
-                      3-qadam
+                      {isMarketOrOperator ? "2-qadam" : "3-qadam"}
                     </span>
                     <span className="text-xs text-purple-500 dark:text-purple-400">
                       Hozirgi

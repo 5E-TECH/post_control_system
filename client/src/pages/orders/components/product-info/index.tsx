@@ -10,6 +10,7 @@ import {
   MessageSquare,
   User,
   FileText,
+  Phone,
 } from "lucide-react";
 
 const parsePriceToNumber = (value: string | number): number => {
@@ -23,6 +24,7 @@ export interface IProductInfo {
   where_deliver: string;
   comment?: string;
   operator?: string;
+  operator_phone?: string;
 }
 
 const ProductInfo = () => {
@@ -31,11 +33,17 @@ const ProductInfo = () => {
     (state: RootState) => state.authSlice.default_tariff
   );
   const OperatorName = useSelector((state: RootState) => state.roleSlice.name);
+  const marketData = useSelector(
+    (state: RootState) => state.authSlice.marketData
+  );
+  // Market yoki localStorage dan require_operator_phone ni olish
+  const requireOperatorPhone = market?.require_operator_phone || marketData?.require_operator_phone || false;
   const initialState: IProductInfo = {
     total_price: "",
     where_deliver: market?.default_tariff || default_tariff || "center",
     comment: "",
     operator: OperatorName || "",
+    operator_phone: "",
   };
 
   const { t } = useTranslation("createOrder");
@@ -171,18 +179,36 @@ const ProductInfo = () => {
         </div>
 
         {/* Operator */}
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-            <User className="w-4 h-4 text-purple-500" />
-            {t("Operator")}
-          </label>
-          <input
-            name="operator"
-            value={formData.operator}
-            onChange={handleChange}
-            placeholder={t("Operator...")}
-            className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-          />
+        <div className={`grid grid-cols-1 ${requireOperatorPhone ? 'sm:grid-cols-2' : ''} gap-4`}>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <User className="w-4 h-4 text-purple-500" />
+              {t("Operator")}
+            </label>
+            <input
+              name="operator"
+              value={formData.operator}
+              onChange={handleChange}
+              placeholder={t("Operator...")}
+              className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            />
+          </div>
+          {requireOperatorPhone && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <Phone className="w-4 h-4 text-purple-500" />
+                Operator telefon raqami
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="operator_phone"
+                value={formData.operator_phone || ""}
+                onChange={handleChange}
+                placeholder="+998 90 123 45 67"
+                className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              />
+            </div>
+          )}
         </div>
 
         {/* Comment */}

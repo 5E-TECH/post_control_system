@@ -3,4 +3,7 @@ export type UserRole =
   | "admin"
   | "courier"
   | "market"
-  | "registrator";
+  | "registrator"
+  | "logist"
+  | "operator"
+  | "investor";

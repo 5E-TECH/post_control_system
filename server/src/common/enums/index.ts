@@ -6,6 +6,8 @@ export enum Roles {
   MARKET = 'market',
   CUSTOMER = 'customer',
   OPERATOR = 'operator',
+  LOGIST = 'logist',
+  INVESTOR = 'investor',
 }
 
 export enum Status {
@@ -40,6 +42,10 @@ export enum Source_type {
   CANCEL = 'cancel',
   EXTRA_COST = 'extra_cost',
   BILLS = 'bills',
+  INVESTOR_EARNING = 'investor_earning',
+  INVESTOR_ALLOCATE = 'investor_allocate',
+  INVESTOR_PAYOUT = 'investor_payout',
+  INVESTOR_REFUND = 'investor_refund',
 }
 
 export enum Order_status {
@@ -60,6 +66,7 @@ export enum Cashbox_type {
   MAIN = 'main',
   FOR_COURIER = 'couriers',
   FOR_MARKET = 'markets',
+  FOR_INVESTOR = 'investors',
 }
 
 export enum Where_deliver {
@@ -83,4 +90,19 @@ export enum Manual_payment_methods {
 export enum Group_type {
   CANCEL = 'cancel',
   CREATE = 'create',
+}
+
+export enum Commission_type {
+  PERCENT = 'percent',
+  FIXED = 'fixed',
+}
+
+// Moliyaviy taroziga ta'sir qiluvchi manba turlari
+export enum FinancialSource_type {
+  SELL_PROFIT = 'sell_profit',           // Sotuvdan pochta foydasi
+  MANUAL_EXPENSE = 'manual_expense',     // Qo'lda chiqim
+  MANUAL_INCOME = 'manual_income',       // Qo'lda kirim
+  SALARY = 'salary',                     // Maosh to'lovi
+  CORRECTION = 'correction',             // Tuzatish (rollback)
+  BILLS = 'bills',                       // Hisob-fakturalar
 }

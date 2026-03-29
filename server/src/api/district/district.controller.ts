@@ -8,7 +8,7 @@ import {
   Post,
   Delete,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { DistrictService } from './district.service';
 import { UpdateDistrictDto } from './dto/update-district.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
@@ -21,6 +21,7 @@ import { UpdateDistrictSatoCodeDto } from './dto/update-sato-code.dto';
 import { MergeDistrictsDto } from './dto/merge-districts.dto';
 
 @ApiTags('Districts')
+@ApiBearerAuth()
 @Controller('district')
 export class DistrictController {
   constructor(private readonly districtService: DistrictService) {}
@@ -135,6 +136,29 @@ export class DistrictController {
   @Delete(':id')
   deleteDistrict(@Param('id') id: string) {
     return this.districtService.deleteDistrict(id);
+  }
+
+  /**
+   * Tumanga kuryer qo'shish (faqat ism va telefon)
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.LOGIST)
+  @Post('courier/:districtId')
+  addDistrictCourier(
+    @Param('districtId') districtId: string,
+    @Body() dto: { name: string; phone_number: string },
+  ) {
+    return this.districtService.addDistrictCourier(districtId, dto);
+  }
+
+  /**
+   * Tuman kuryerini o'chirish
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.LOGIST)
+  @Delete('courier/:courierId')
+  removeDistrictCourier(@Param('courierId') courierId: string) {
+    return this.districtService.removeDistrictCourier(courierId);
   }
 
   /**

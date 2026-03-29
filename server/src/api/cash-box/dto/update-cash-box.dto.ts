@@ -31,7 +31,7 @@ export class UpdateCashBoxDto {
     type: String,
     example: 'Xodimlar kechki ovqati uchun',
   })
-  @IsOptional()
+  @IsNotEmpty({ message: 'Izoh kiritish majburiy' })
   @IsString()
   comment: string;
 }

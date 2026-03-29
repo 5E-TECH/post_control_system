@@ -10,6 +10,9 @@ import AdminSidebar from "./components/AdminSidebar";
 import Courier from "./components/Courier";
 import MarketSidebar from "./components/MarketSidebar";
 import RegistratorSidebar from "./components/RegistratorSidebar";
+import LogistSidebar from "./components/LogistSidebar";
+import OperatorSidebar from "./components/OperatorSidebar";
+// import InvestorSidebar from "./components/InvestorSidebar";
 import type { UserRole } from "../shared/enums/Roles";
 import RenderMediaSidebar from "../shared/components/render-media-sidebar/RenderMediaSidebar";
 
@@ -34,6 +37,15 @@ const DashboardLayout = () => {
     case "registrator":
       sidebar = <RegistratorSidebar />;
       break;
+    case "logist":
+      sidebar = <LogistSidebar />;
+      break;
+    case "operator":
+      sidebar = <OperatorSidebar />;
+      break;
+    // case "investor":
+    //   sidebar = <InvestorSidebar />;
+    //   break;
     default:
       sidebar = null;
   }

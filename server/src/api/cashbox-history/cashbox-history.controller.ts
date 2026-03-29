@@ -8,7 +8,7 @@ import {
   Delete,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CashboxHistoryService } from './cashbox-history.service';
 import { CreateCashboxHistoryDto } from './dto/create-cashbox-history.dto';
 import { UpdateCashboxHistoryDto } from './dto/update-cashbox-history.dto';
@@ -18,6 +18,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 
 @ApiTags('Cashbox History')
+@ApiBearerAuth()
 @Controller('cashbox-history')
 export class CashboxHistoryController {
   constructor(private readonly cashboxHistoryService: CashboxHistoryService) {}

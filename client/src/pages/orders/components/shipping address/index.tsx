@@ -15,9 +15,10 @@ interface IProps {
   districtId: string;
   id: string;
   isOrderAddress?: boolean; // true bo'lsa order manzilini, false bo'lsa mijoz manzilini yangilaydi
+  canEdit?: boolean;
 }
 
-const ShippingAddress: FC<IProps> = ({ address, districtId, id, isOrderAddress = false }) => {
+const ShippingAddress: FC<IProps> = ({ address, districtId, id, isOrderAddress = false, canEdit: canEditProp }) => {
   const { t } = useTranslation("orderList");
   const { role } = useSelector((state: RootState) => state.roleSlice);
   const [district, setDistrict] = useState(districtId);
@@ -97,7 +98,8 @@ const ShippingAddress: FC<IProps> = ({ address, districtId, id, isOrderAddress =
   // Aktiv mutationni aniqlash
   const activeMutation = isOrderAddress ? updateOrderAddress : updateOrdersUserAddress;
 
-  const canEdit = role !== "market" && role !== "courier";
+  // Prop berilgan bo'lsa uni ishlatamiz, aks holda eski logika
+  const canEdit = canEditProp !== undefined ? canEditProp : (role !== "market" && role !== "courier");
 
   return (
     <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden">

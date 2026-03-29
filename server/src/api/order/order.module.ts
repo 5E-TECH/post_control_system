@@ -17,6 +17,9 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { MyLogger } from 'src/logger/logger.service';
 import { BotModule } from '../bots/notify-bot/bot.module';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { OperatorEarningEntity } from 'src/core/entity/operator-earning.entity';
+import { InvestorEarningEntity } from 'src/core/entity/investor-earning.entity';
+import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { OrderBotModule } from '../bots/order_create-bot/order-bot.module';
 import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
@@ -33,6 +36,9 @@ import { IntegrationSyncModule } from '../integration-sync/integration-sync.modu
       UserEntity,
       PostEntity,
       TelegramEntity,
+      OperatorEarningEntity,
+      InvestorEarningEntity,
+      FinancialBalanceHistoryEntity,
     ]),
     CashBoxModule,
     BotModule,

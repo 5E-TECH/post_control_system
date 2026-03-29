@@ -22,6 +22,8 @@ import {
   ChevronDown,
   Globe,
   FileText,
+  AlertTriangle,
+  Copy,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -44,9 +46,11 @@ const OrderView = () => {
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
   const canSeeTotal = user.role === "superadmin" || user.role === "admin";
+  const canManageOrders = canSeeTotal && user.role !== "operator";
   const [deleteId, setDeleteId] = useState("");
   const [isPrintDisabled, setIsPrintDisabled] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isAcceptConfirmOpen, setIsAcceptConfirmOpen] = useState(false);
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchData, setSearch] = useState<any>(null);
@@ -223,6 +227,29 @@ const OrderView = () => {
   const marketName = data?.message?.split("'s")[0] || "";
   const totalPrice = orders.reduce((sum: number, o: any) => sum + (o.total_price || 0), 0);
 
+  // Dublikat telefon raqamlarni aniqlash (faqat "new" holatdagilar)
+  const duplicateInfo = useMemo(() => {
+    const phoneMap = new Map<string, any[]>();
+    for (const order of orders) {
+      if (order.status !== "new") continue;
+      const phone = (order?.customer?.phone_number || "").replace(/\D/g, "");
+      if (!phone) continue;
+      if (!phoneMap.has(phone)) phoneMap.set(phone, []);
+      phoneMap.get(phone)!.push(order);
+    }
+
+    const groups: { phone: string; orders: any[] }[] = [];
+    const orderIds = new Set<string>();
+
+    for (const [, phoneOrders] of phoneMap) {
+      if (phoneOrders.length > 1) {
+        groups.push({ phone: phoneOrders[0]?.customer?.phone_number || "", orders: phoneOrders });
+        phoneOrders.forEach((o: any) => orderIds.add(o.id));
+      }
+    }
+    return { groups, orderIds };
+  }, [orders]);
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col flex-1 overflow-hidden">
@@ -261,7 +288,7 @@ const OrderView = () => {
               </div>
 
               {/* Print button with dropdown */}
-              {user.role !== "market" && (
+              {canManageOrders && (
                 <div className="relative" ref={printDropdownRef}>
                   <button
                     onClick={() => {
@@ -354,6 +381,42 @@ const OrderView = () => {
           )}
         </div>
 
+        {/* Dublikat telefon raqamlar ogohlantirilishi */}
+        {duplicateInfo.groups.length > 0 && (
+          <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl flex-shrink-0">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-amber-800 dark:text-amber-300 text-sm">
+                  Takroriy telefon raqamlar aniqlandi!
+                </h4>
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                  {duplicateInfo.groups.length} ta telefon raqam bir nechta "yangi" buyurtmalarda takrorlanmoqda.
+                  Buyurtmalar dublikat bo'lishi mumkin.
+                </p>
+                <div className="mt-3 space-y-2">
+                  {duplicateInfo.groups.map((group, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 p-2.5 bg-white dark:bg-gray-800/50 rounded-lg border border-amber-100 dark:border-amber-800/50"
+                    >
+                      <Copy className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      <span className="text-sm font-medium text-gray-800 dark:text-white">
+                        {group.phone}
+                      </span>
+                      <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded-full">
+                        {group.orders.length} ta buyurtma
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         {isLoading ? (
           <div className="flex items-center justify-center py-20 flex-1">
@@ -372,7 +435,7 @@ const OrderView = () => {
         ) : (
           <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1">
             {/* Select all header - fixed */}
-            {user.role !== "market" && (
+            {canManageOrders && (
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex items-center justify-between flex-shrink-0">
                 <button
                   onClick={toggleSelectAll}
@@ -398,20 +461,29 @@ const OrderView = () => {
               {orders.map((order: any, inx: number) => (
                 <div
                   key={order.id}
-                  onClick={() => user.role !== "market" && toggleSelect(order.id)}
+                  onClick={() => canManageOrders && toggleSelect(order.id)}
                   className={`p-4 rounded-xl transition-all border ${
-                    user.role !== "market" ? "cursor-pointer" : ""
+                    canManageOrders ? "cursor-pointer" : ""
                   } ${
-                    selectedIds.includes(order.id)
-                      ? "bg-purple-50 dark:bg-purple-900/10 border-purple-200 dark:border-purple-800/50"
-                      : "bg-gray-50 dark:bg-gray-800/30 border-gray-100 dark:border-gray-700/30 hover:bg-purple-50 dark:hover:bg-purple-900/10"
+                    duplicateInfo.orderIds.has(order.id)
+                      ? "ring-2 ring-amber-400 dark:ring-amber-500 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50"
+                      : selectedIds.includes(order.id)
+                        ? "bg-purple-50 dark:bg-purple-900/10 border-purple-200 dark:border-purple-800/50"
+                        : "bg-gray-50 dark:bg-gray-800/30 border-gray-100 dark:border-gray-700/30 hover:bg-purple-50 dark:hover:bg-purple-900/10"
                   }`}
                 >
                   {/* Top row: checkbox, index, badges and date */}
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2 flex-wrap">
+                      {/* Dublikat badge */}
+                      {duplicateInfo.orderIds.has(order.id) && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          <Copy className="w-3 h-3" />
+                          Dublikat
+                        </span>
+                      )}
                       {/* Checkbox */}
-                      {user.role !== "market" && (
+                      {canManageOrders && (
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
@@ -466,6 +538,7 @@ const OrderView = () => {
                       <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       {formatPhone(order.customer?.phone_number)}
                     </span>
+                    {canManageOrders && (
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         onClick={(e) => {
@@ -489,6 +562,7 @@ const OrderView = () => {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
+                    )}
                   </div>
 
                   {/* Location row */}
@@ -518,10 +592,10 @@ const OrderView = () => {
             </div>
 
             {/* Accept button - fixed at bottom */}
-            {user.role !== "market" && (
+            {canManageOrders && (
               <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex-shrink-0">
                 <button
-                  onClick={handleAccapted}
+                  onClick={() => setIsAcceptConfirmOpen(true)}
                   disabled={selectedIds.length === 0 || createPost.isPending}
                   className={`w-full h-12 rounded-xl flex items-center justify-center gap-2 text-base font-medium transition-all ${
                     selectedIds.length === 0 || createPost.isPending
@@ -558,6 +632,22 @@ const OrderView = () => {
         onCancel={() => {
           setIsConfirmOpen(false);
           setDeleteId("");
+        }}
+      />
+
+      <ConfirmPopup
+        isShow={isAcceptConfirmOpen}
+        title={`${selectedIds.length} ta buyurtmani qabul qilishni tasdiqlaysizmi?`}
+        description="Tanlangan buyurtmalar uchun pochta yaratiladi."
+        confirmText="Ha, qabul qilish"
+        cancelText="Bekor qilish"
+        confirmClassName="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600"
+        onConfirm={() => {
+          setIsAcceptConfirmOpen(false);
+          handleAccapted();
+        }}
+        onCancel={() => {
+          setIsAcceptConfirmOpen(false);
         }}
       />
 

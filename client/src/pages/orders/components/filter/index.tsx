@@ -54,8 +54,10 @@ const Filter = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const isMarketOrOperator = role === "market" || role === "operator";
+
   const { getMarkets } = useMarket();
-  const { data } = getMarkets(role !== "market", { limit: 0 });
+  const { data } = getMarkets(!isMarketOrOperator, { limit: 0 });
   const { getRegions } = useRegion();
   const { data: regionData } = getRegions();
   const { getCourier } = useCourier();
@@ -63,7 +65,7 @@ const Filter = () => {
   const form = useSelector((state: RootState) => state.setFilter);
 
   // Courier query - barcha kuryerlarni olish (client-side filter qilamiz)
-  const { data: courierData } = getCourier(role !== "courier", { limit: 0 });
+  const { data: courierData } = getCourier(role !== "courier" && !isMarketOrOperator, { limit: 0 });
 
   const { refetch } = useProfile().getUser(role === "market");
 
@@ -275,7 +277,7 @@ const Filter = () => {
           {/* Filter Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             {/* Market Select */}
-            {role !== "market" && (
+            {!isMarketOrOperator && (
               <div className={`relative p-3 rounded-xl transition-all ${
                 form.marketId
                   ? "bg-purple-50 dark:bg-purple-900/20 ring-2 ring-purple-500/50"
@@ -341,7 +343,7 @@ const Filter = () => {
             </div>
 
             {/* Courier Select */}
-            {role !== "courier" && (
+            {role !== "courier" && !isMarketOrOperator && (
               <div className={`relative p-3 rounded-xl transition-all ${
                 form.courierId
                   ? "bg-amber-50 dark:bg-amber-900/20 ring-2 ring-amber-500/50"

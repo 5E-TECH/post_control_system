@@ -73,7 +73,11 @@
     "sell": "Sotuv",
     "cancel": "Bekor qilish",
     "extra_cost": "Qo'shimcha xarajat",
-    "bills": "Hisob-fakturalar"
+    "bills": "Hisob-fakturalar",
+    "investor_earning": "Investor daromadi",
+    "investor_allocate": "Investor ulushi ajratish",
+    "investor_payout": "Investorga to'lov",
+    "investor_refund": "Investitsiya qaytarish"
   },
   "tuman": "tuman",
   "telefon_nomer": "Telefon nomer",
@@ -96,6 +100,32 @@
   "shiftStatus": {
     "open": "Smena ochiq",
     "closed": "Smena yopiq"
+  },
+  "financialHistory": {
+    "title": "Moliyaviy tarix",
+    "analytics": "Tahlil",
+    "history": "Tarix",
+    "currentBalance": "Joriy balans",
+    "cashBalance": "Naqd balans",
+    "cardBalance": "Karta balans",
+    "balanceBefore": "Oldingi balans",
+    "balanceAfter": "Keyingi balans",
+    "change": "O'zgarish",
+    "source": "Manba",
+    "sourceUser": "Manba foydalanuvchi",
+    "totalIncome": "Umumiy kirim",
+    "totalExpense": "Umumiy chiqim",
+    "netChange": "Sof o'zgarish",
+    "transactionCount": "Tranzaksiya soni",
+    "incomeBySource": "Kirim manbalari",
+    "expenseBySource": "Chiqim manbalari",
+    "paymentMethodBreakdown": "To'lov usullari",
+    "topTransactions": "Eng katta tranzaksiyalar",
+    "topUsers": "Eng faol foydalanuvchilar",
+    "percentage": "Foiz",
+    "noData": "Ma'lumot topilmadi",
+    "allSources": "Barcha manbalar",
+    "allOperations": "Barcha amallar"
   },
   "shift": {
     "closeTitle": "Smenani yopish",

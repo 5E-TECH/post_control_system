@@ -47,7 +47,8 @@ const CustomerInfoOrder = () => {
   );
 
   const market = JSON.parse(localStorage.getItem("market") ?? "null");
-  const market_id = market?.id;
+  // Operator va market uchun market_id reduxdan yoki marketId localStorage dan olinadi
+  const market_id = market?.id || user.market_id || (user.role === "market" ? user.id : null) || localStorage.getItem("marketId");
   const { createUser } = useUser("customer");
   const navigate = useNavigate();
 
@@ -119,12 +120,17 @@ const CustomerInfoOrder = () => {
   };
 
   const handleBack = () => {
-    navigate(buildAdminPath("orders/choose-market"));
+    // Operator va market uchun buyurtmalar ro'yxatiga qaytish (market tanlash bosqichi yo'q)
+    if (user.role === "operator" || user.role === "market") {
+      navigate(buildAdminPath("orders"));
+    } else {
+      navigate(buildAdminPath("orders/choose-market"));
+    }
   };
 
-  const marketName = user.role === "market" ? marketdata?.name : market?.name;
+  const marketName = (user.role === "market" || user.role === "operator") ? (marketdata?.name || user.name) : market?.name;
   const marketPhone =
-    user.role === "market" ? marketdata?.phone_number : market?.phone_number;
+    (user.role === "market" || user.role === "operator") ? (marketdata?.phone_number || "") : market?.phone_number;
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E]">
@@ -143,7 +149,8 @@ const CustomerInfoOrder = () => {
           {/* Steps Sidebar */}
           <div className="w-full max-w-xs max-[1100px]:max-w-full flex-shrink-0">
             <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-5 sticky top-6">
-              {/* Step 1 - Completed */}
+              {/* Step 1 - Completed (faqat admin/registrator/superadmin uchun) */}
+              {user.role !== "market" && user.role !== "operator" && (
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
@@ -178,8 +185,9 @@ const CustomerInfoOrder = () => {
                   </div>
                 </div>
               </div>
+              )}
 
-              {/* Step 2 - Current */}
+              {/* Step 2 - Current (operator/market uchun 1-qadam) */}
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg ring-4 ring-purple-100 dark:ring-purple-900/30">
@@ -190,7 +198,7 @@ const CustomerInfoOrder = () => {
                 <div className="flex-1 pt-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 rounded-full">
-                      2-qadam
+                      {(user.role === "market" || user.role === "operator") ? "1-qadam" : "2-qadam"}
                     </span>
                     <span className="text-xs text-purple-500 dark:text-purple-400">
                       Hozirgi
@@ -235,7 +243,7 @@ const CustomerInfoOrder = () => {
                 <div className="flex-1 pt-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
-                      3-qadam
+                      {(user.role === "market" || user.role === "operator") ? "2-qadam" : "3-qadam"}
                     </span>
                   </div>
                   <h3 className="font-medium text-gray-400 dark:text-gray-500 text-sm">
@@ -256,7 +264,7 @@ const CustomerInfoOrder = () => {
 
             {/* Navigation Buttons */}
             <div className="flex justify-between">
-              {user.role !== "market" && (
+              {user.role !== "market" && user.role !== "operator" && (
                 <button
                   onClick={handleBack}
                   className="h-11 px-5 rounded-xl flex items-center gap-2 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"

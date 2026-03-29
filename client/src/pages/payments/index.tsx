@@ -205,6 +205,10 @@ const Payments = () => {
     "cancel",
     "extra_cost",
     "bills",
+    "investor_earning",
+    "investor_allocate",
+    "investor_payout",
+    "investor_refund",
   ];
   const sourceOptions = sourceType.map((status: string) => ({
     value: status,
@@ -250,6 +254,23 @@ const Payments = () => {
     return new Date(Number(timestamp)).toLocaleString("uz-UZ");
   };
 
+  const sourceTypeLabels: Record<string, string> = {
+    courier_payment: "Kuryer to'lovi",
+    market_payment: "Market to'lovi",
+    manual_expense: "Qo'lda chiqim",
+    manual_income: "Qo'lda kirim",
+    correction: "Tuzatish",
+    salary: "Maosh",
+    sell: "Sotuv",
+    cancel: "Bekor qilish",
+    extra_cost: "Qo'shimcha xarajat",
+    bills: "To'lovlar",
+    investor_earning: "Investor daromadi",
+    investor_allocate: "Investor ulushi",
+    investor_payout: "Investorga to'lov",
+    investor_refund: "Investitsiya qaytarish",
+  };
+
   const getPaymentMethodBadge = (method: string) => {
     if (method === "click_to_market") {
       return (
@@ -277,7 +298,7 @@ const Payments = () => {
     }
     return (
       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300">
-        {t("sotuv")}
+        —
       </span>
     );
   };
@@ -916,7 +937,14 @@ const Payments = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {getPaymentMethodBadge(item?.payment_method)}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {sourceTypeLabels[item?.source_type] || item?.source_type}
+                          </span>
+                          {item?.payment_method && (
+                            getPaymentMethodBadge(item?.payment_method)
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span

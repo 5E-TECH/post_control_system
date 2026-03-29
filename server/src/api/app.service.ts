@@ -10,6 +10,16 @@ import { AppModule } from './app.module';
 
 export default class Application {
   public static async main(): Promise<void> {
+    // Telegram bot timeout xatoliklari serverni crash qilmasligi uchun
+    process.on('unhandledRejection', (reason: any) => {
+      const message = reason?.message || String(reason);
+      if (message.includes('ETIMEDOUT') || message.includes('ECONNREFUSED') || message.includes('getMe')) {
+        console.warn(`⚠️  Telegram bot ulanish xatosi (server davom etmoqda): ${message}`);
+      } else {
+        console.error('Unhandled Rejection:', reason);
+      }
+    });
+
     const app = await NestFactory.create(AppModule, {
       bufferLogs: true,
     });
@@ -32,7 +42,10 @@ export default class Application {
     // Global filters, pipes, cors
     app.useGlobalFilters(new AllExceptionsFilter());
     app.use(cookieParser());
-    app.enableCors({ origin: '*' });
+    app.enableCors({
+      origin: true,
+      credentials: true,
+    });
 
     app.useGlobalPipes(
       new ValidationPipe({

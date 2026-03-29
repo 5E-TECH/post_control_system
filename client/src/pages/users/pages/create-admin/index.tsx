@@ -16,6 +16,8 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
 
 const CreateAdmin = () => {
   const { t } = useTranslation("users");
@@ -245,31 +247,35 @@ const CreateAdmin = () => {
           )}
         </div>
 
-        {/* Payment Day */}
+        {/* Payment Day - Ishga kirgan sanasi */}
         <div>
           <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            To'lov kuni (1-31)
+            Ishga kirgan sanasi
           </label>
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="number"
-              min="1"
-              max="31"
-              value={formData.payment_day}
-              onChange={(e) => {
-                let val = e.target.value;
-                if (Number(val) > 31) val = "31";
-                setFormData((prev) => ({ ...prev, payment_day: val }));
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10 pointer-events-none" />
+            <DatePicker
+              value={formData.payment_day ? dayjs().date(Number(formData.payment_day)) : null}
+              onChange={(date) => {
+                setFormData((prev) => ({
+                  ...prev,
+                  payment_day: date ? String(date.date()) : "",
+                }));
               }}
-              className={`w-full h-10 sm:h-11 pl-10 pr-4 text-sm sm:text-base rounded-lg sm:rounded-xl border ${
+              format="DD-MMMM"
+              placeholder="Sanani tanlang"
+              className={`w-full h-10 sm:h-11 pl-10! text-sm sm:text-base rounded-lg sm:rounded-xl border ${
                 errors.payment_day
-                  ? "border-red-300 dark:border-red-700 focus:ring-red-500/20 focus:border-red-500"
-                  : "border-gray-200 dark:border-gray-700 focus:ring-purple-500/20 focus:border-purple-500"
-              } bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all`}
-              placeholder={t("enterPaymentDay")}
+                  ? "border-red-300! dark:border-red-700!"
+                  : "border-gray-200! dark:border-gray-700!"
+              } bg-white! dark:bg-[#312D4B]! dark:[&_.ant-picker-input>input]:text-white! dark:[&_.ant-picker-input>input]:placeholder-gray-400!`}
             />
           </div>
+          {formData.payment_day && (
+            <p className="text-xs text-gray-400 mt-1">
+              Har oyning {formData.payment_day}-sanasida oylik hisoblanadi
+            </p>
+          )}
           {errors.payment_day && (
             <p className="text-red-500 text-xs mt-1">{errors.payment_day}</p>
           )}

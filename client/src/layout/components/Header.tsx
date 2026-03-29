@@ -19,6 +19,7 @@ import { FaInstagram, FaLinkedin, FaTelegram } from "react-icons/fa";
 import { buildAdminPath } from "../../shared/const";
 import { useProfile } from "../../shared/api/hooks/useProfile";
 import { AvatarDisplay } from "../../shared/components/AvatarSelector";
+import SessionTimer from "../../shared/components/session-timer/SessionTimer";
 
 const Header = () => {
   const { t, i18n } = useTranslation(["header"]);
@@ -131,6 +132,8 @@ const Header = () => {
 
       {/* Actions */}
       <div className="flex gap-3 sm:gap-6 items-center">
+        {/* Session Timer - desktop va mobile'da ham ko'rinadi */}
+        <SessionTimer />
         <div
           onClick={() => navigate(buildAdminPath("scan"))}
           className="cursor-pointer max-[650px]:hidden">
