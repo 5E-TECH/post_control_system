@@ -9,7 +9,6 @@ import {
   ChevronDown,
   Scale,
   Zap,
-  Wallet,
   Building2,
   Store,
   Truck,
@@ -206,7 +205,6 @@ const DetailPopup = ({ item, onClose }: { item: any; onClose: () => void }) => {
 
 // ==================== MAIN COMPONENT ====================
 const FinancialHistory: React.FC = () => {
-  const { t } = useTranslation("payment");
   const { t: th } = useTranslation("history");
   const { getFinancialBalanceHistory, getFinancialBalanceAnalytics } = useCashBox();
   const { data: balanceData, isLoading: balanceLoading } = useHistory().getHistory();

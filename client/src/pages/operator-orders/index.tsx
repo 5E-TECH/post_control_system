@@ -8,7 +8,6 @@ import { Pagination, type PaginationProps, Empty } from "antd";
 import { useParamsHook } from "../../shared/hooks/useParams";
 import { buildAdminPath } from "../../shared/const";
 import {
-  Loader2,
   ShoppingBag,
   CheckCircle2,
   XCircle,

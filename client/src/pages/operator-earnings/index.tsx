@@ -20,7 +20,6 @@ import {
   X,
   ArrowDownLeft,
   ArrowUpRight,
-  TrendingDown,
 } from "lucide-react";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";

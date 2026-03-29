@@ -4,7 +4,6 @@ import {
   Landmark,
   Loader2,
   ChevronRight,
-  TrendingUp,
 } from "lucide-react";
 import { Empty } from "antd";
 import { useNavigate } from "react-router-dom";

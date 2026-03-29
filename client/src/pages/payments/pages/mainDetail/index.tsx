@@ -18,8 +18,6 @@ import {
   Square,
   Landmark,
   PiggyBank,
-  ArrowDownLeft,
-  Check,
   Magnet,
   ChevronLeft,
 } from "lucide-react";
@@ -85,7 +83,7 @@ const MainDetail = () => {
   // Investor popup states
   const [showInvestorPopup, setShowInvestorPopup] = useState(false);
   const [selectedInvestor, setSelectedInvestor] = useState<any>(null);
-  const [investorAction, setInvestorAction] = useState<"piggy" | "pay">("piggy");
+  const [, setInvestorAction] = useState<"piggy" | "pay">("piggy");
   const [investorAmount, setInvestorAmount] = useState("");
   const [investorNote, setInvestorNote] = useState("");
   const [investorPayMethod, setInvestorPayMethod] = useState<"cash" | "click">("cash");
@@ -120,7 +118,7 @@ const MainDetail = () => {
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
   const { getCashBoxMain, cashboxSpand, cashboxFill, paySalary, getCurrentShift, openShift, closeShift } = useCashBox();
-  const { getAdminAndRegister, getInvestors, payInvestor, addManualEarning } = useUser();
+  const { getAdminAndRegister, getInvestors, addManualEarning } = useUser();
 
   // Get current shift status
   const { data: shiftData, refetch: refetchShift } = getCurrentShift();
@@ -162,12 +160,6 @@ const MainDetail = () => {
   useEffect(() => {
     refetch();
   }, []);
-
-  const handleNavigateProfile = () => {
-    navigate(`/user-profile/${select}`);
-    setSelect(null);
-    setshowAdminAndRegistrator(false);
-  };
 
   const handleNavigate = () => {
     navigate(`/payments/cash-detail/${select}`, {

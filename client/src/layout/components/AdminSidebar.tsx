@@ -9,7 +9,6 @@ import {
   Calendar1,
   CreditCard,
   Scale,
-  Landmark,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";

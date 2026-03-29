@@ -117,7 +117,6 @@ const CourierRefusedMails = lazy(
 const CourierOldMails = lazy(
   () => import("../pages/mails/components/courier/old-mails")
 );
-const BalanceDashboard = lazy(() => import("../pages/history"));
 const FinancialHistory = lazy(() => import("../pages/payments/pages/financial-history"));
 const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
 const Integrations = lazy(() => import("../pages/integrations"));

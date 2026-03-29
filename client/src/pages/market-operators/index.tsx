@@ -15,10 +15,7 @@ import {
   ArrowRight,
   BarChart2,
   Settings2,
-  ChevronDown,
-  ChevronUp,
   Check,
-  EyeOff as EyeOffIcon,
 } from "lucide-react";
 import { Modal } from "antd";
 

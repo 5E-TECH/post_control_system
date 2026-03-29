@@ -11,8 +11,6 @@ import {
   ShoppingBag,
   UserRound,
   MapPin,
-  TrendingUp,
-  Wallet,
 } from "lucide-react";
 import { buildAdminPath } from "../../const";
 

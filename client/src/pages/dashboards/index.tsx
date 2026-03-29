@@ -1,4 +1,4 @@
-import { lazy, memo, useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useChart } from "../../shared/api/hooks/useChart";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";

@@ -895,7 +895,7 @@ const UserProfile = () => {
                       min={0}
                       suffix={<span className="text-amber-500 text-xs">so'm</span>}
                       formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                      parser={(value) => Number(value?.replace(/,/g, "") || 0)}
+                      parser={(value) => Number(value?.replace(/,/g, "") || 0) as 0}
                     />
                   </Form.Item>
 

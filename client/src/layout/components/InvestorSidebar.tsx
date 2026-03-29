@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { House, TrendingUp, Wallet } from "lucide-react";
+import { House, Wallet } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
