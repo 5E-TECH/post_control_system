@@ -1,5 +1,5 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Roles, Status, Where_deliver } from 'src/common/enums';
+import { Commission_type, Roles, Status, Where_deliver } from 'src/common/enums';
 import {
   Column,
   Entity,
@@ -77,6 +77,31 @@ export class UserEntity extends BaseEntity {
 
   @Column({ type: 'boolean', default: false })
   is_deleted: boolean;
+
+  // Market uchun: operator telefon raqamini majburiy kiritish
+  @Column({ type: 'boolean', default: false })
+  require_operator_phone: boolean;
+
+  // Operator uchun komissiya sozlamalari
+  @Column({ type: 'enum', enum: Commission_type, nullable: true })
+  commission_type: Commission_type | null;
+
+  @Column({ type: 'float', nullable: true })
+  commission_value: number | null;
+
+  // Operatorga uning daromadlarini ko'rsatish/yashirish
+  @Column({ type: 'boolean', default: false })
+  show_earnings: boolean;
+
+  // Investor uchun
+  @Column({ type: 'float', nullable: true, default: 0 })
+  committed_amount: number | null;
+
+  @Column({ type: 'float', nullable: true, default: 0 })
+  share_percent: number | null;
+
+  @Column({ type: 'float', nullable: true, default: 0 })
+  deposited_amount: number | null;
 
   @Column({
     type: 'enum',

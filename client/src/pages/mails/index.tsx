@@ -11,7 +11,7 @@ const Mails = () => {
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
   const isCourier = role === "courier";
-  const isSuperadmin = role === "superadmin" || role === "admin" || role === "registrator";
+  const isSuperadmin = role === "superadmin" || role === "admin" || role === "registrator" || role === "logist";
 
   if (!isCourier && !isSuperadmin) return null;
 

@@ -77,12 +77,20 @@ export class CreateOrderDto {
   comment?: string;
 
   @ApiPropertyOptional({
-    description: 'Additional comment for the order',
-    example: 'Please deliver after 6 PM',
+    description: 'Operator name',
+    example: 'Ali Valiyev',
   })
   @IsOptional()
   @IsString()
   operator?: string;
+
+  @ApiPropertyOptional({
+    description: 'Operator phone number',
+    example: '+998901234567',
+  })
+  @IsOptional()
+  @IsString()
+  operator_phone?: string;
 
   @ApiPropertyOptional({
     description: 'District ID for delivery address',

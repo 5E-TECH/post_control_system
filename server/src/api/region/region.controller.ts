@@ -9,7 +9,7 @@ import {
   UseGuards,
   Query,
 } from '@nestjs/common';
-import { ApiTags, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { RegionService } from './region.service';
 import { CreateRegionDto } from './dto/create-region.dto';
 import { UpdateRegionDto } from './dto/update-region.dto';
@@ -21,6 +21,7 @@ import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 
 @ApiTags('Regions')
+@ApiBearerAuth()
 @Controller('region')
 export class RegionController {
   constructor(private readonly regionService: RegionService) {}
@@ -33,6 +34,16 @@ export class RegionController {
   @Get('sato/:satoCode')
   getBySatoCode(@Param('satoCode') satoCode: string) {
     return this.regionService.findBySatoCode(satoCode);
+  }
+
+  /**
+   * Regionlar ro'yxati logist ma'lumoti bilan
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @Get('with-logist')
+  getAllWithLogist() {
+    return this.regionService.findAllWithLogist();
   }
 
   @Get(':id')
@@ -85,7 +96,7 @@ export class RegionController {
    * Barcha viloyatlar statistikasi (xarita uchun)
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.LOGIST)
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   @Get('stats/all')
@@ -100,7 +111,7 @@ export class RegionController {
    * Bitta viloyat batafsil statistikasi
    */
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.LOGIST)
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   @Get('stats/:id')
@@ -110,5 +121,45 @@ export class RegionController {
     @Query('endDate') endDate?: string,
   ) {
     return this.regionService.getRegionDetailedStats(id, { startDate, endDate });
+  }
+
+  // ==================== MAIN COURIER ASSIGNMENT ====================
+
+  /**
+   * Viloyatga asosiy kuryer biriktirish (yoki olib tashlash — courier_id: null)
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.LOGIST)
+  @Patch('main-courier/:id')
+  assignMainCourier(
+    @Param('id') id: string,
+    @Body() dto: { courier_id: string | null },
+  ) {
+    return this.regionService.assignMainCourier(id, dto.courier_id);
+  }
+
+  // ==================== LOGIST ASSIGNMENT ====================
+
+  /**
+   * Regionga logist biriktirish (yoki olib tashlash — logist_id: null)
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @Patch('logist/:id')
+  assignLogist(
+    @Param('id') id: string,
+    @Body() dto: { logist_id: string | null },
+  ) {
+    return this.regionService.assignLogist(id, dto.logist_id);
+  }
+
+  /**
+   * Bir nechta regionga bitta logistni biriktirish (bulk)
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
+  @Post('logist/bulk-assign')
+  bulkAssignLogist(@Body() dto: { logist_id: string; region_ids: string[] }) {
+    return this.regionService.bulkAssignLogist(dto.logist_id, dto.region_ids);
   }
 }

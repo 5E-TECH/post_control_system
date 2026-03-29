@@ -41,11 +41,11 @@ export class PostService {
 
   async findAll(page: number, limit: number): Promise<object> {
     try {
-      // Sahifani to‘g‘rilab olamiz
+      // Sahifani to'g'rilab olamiz
       const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
       const skip = (page - 1) * take;
 
-      // 🔎 Umumiy ma’lumotlar
+      // 🔎 Umumiy ma'lumotlar
       const [data, total] = await this.postRepo.findAndCount({
         where: { status: Not(Post_status.NEW) },
         relations: ['region', 'courier'],
@@ -80,10 +80,20 @@ export class PostService {
 
     try {
       // 1️⃣ RECEIVED statusida va post_id null bo'lgan orderlarni olish
-      const orphanOrders = await queryRunner.manager.find(OrderEntity, {
+      // (pessimistic lock — bir vaqtda 2 qurilma bir xil orderlarni 2 ta postga qo'shib qo'ymasin)
+      // Avval lock bilan faqat IDlarni olish (LEFT JOIN + FOR UPDATE ishlamaydi)
+      const lockedOrders = await queryRunner.manager.find(OrderEntity, {
         where: { status: Order_status.RECEIVED, post_id: IsNull() },
-        relations: ['district', 'customer', 'customer.district'],
+        select: ['id'],
+        lock: { mode: 'pessimistic_write' },
       });
+      // Keyin relationsni alohida yuklash
+      const orphanOrders = lockedOrders.length > 0
+        ? await queryRunner.manager.find(OrderEntity, {
+            where: { id: In(lockedOrders.map(o => o.id)) },
+            relations: ['district', 'customer', 'customer.district'],
+          })
+        : [];
 
       const regionPostMap = new Map<string, PostEntity>();
 
@@ -115,7 +125,7 @@ export class PostService {
         post.order_quantity = (Number(post.order_quantity) || 0) + 1;
       }
 
-      // 3️⃣ Avval yangi postlarni saqlaymiz (IDlar hosil bo‘lishi uchun)
+      // 3️⃣ Avval yangi postlarni saqlaymiz (IDlar hosil bo'lishi uchun)
       const savedPosts = await queryRunner.manager.save(
         Array.from(regionPostMap.values()),
       );
@@ -408,12 +418,21 @@ export class PostService {
       const { orderIds, courierId } = dto;
 
       /**
-       * 1️⃣ Postni topish
+       * 1️⃣ Original postni pessimistic lock bilan topish
+       * Bu lock faqat shu postni o'qib yozayotgan parallel so'rovlarni navbatga qo'yadi.
+       * Har bir device o'z batch'ini alohida yangi post yaratib jo'natadi —
+       * shuning uchun bir xil postga 2 device parallel ishlay oladi, lekin
+       * o'sha original NEW postni lock qilib, uning statusi va order_quantity ni
+       * xavfsiz yangilashni ta'minlaymiz.
        */
-      const post = await queryRunner.manager.findOne(PostEntity, {
+      const originalPost = await queryRunner.manager.findOne(PostEntity, {
         where: { id },
+        lock: { mode: 'pessimistic_write' },
       });
-      if (!post) throw new NotFoundException('Post not found');
+      if (!originalPost) throw new NotFoundException('Post not found');
+      if (originalPost.status !== Post_status.NEW) {
+        throw new BadRequestException('Post topilmadi yoki artiq jo\'natib bo\'lmaydi');
+      }
 
       /**
        * 2️⃣ Kuryerni tekshirish
@@ -430,81 +449,77 @@ export class PostService {
         throw new BadRequestException('You can not send an empty post');
 
       /**
-       * 4️⃣ Eski va yangi orderlarni olish
+       * 4️⃣ Tanlangan orderlarni olish.
+       * MUHIM: faqat shu postga tegishli (post_id = id) va RECEIVED statusidagi
+       * orderlar jo'natilishi mumkin. Bu boshqa device allaqachon jo'natib
+       * yuborgan orderlarni ikki marta jo'natishni oldini oladi.
        */
-      const oldOrders = await queryRunner.manager.find(OrderEntity, {
-        where: { post_id: id },
-      });
       const newOrders = await queryRunner.manager.find(OrderEntity, {
-        where: { id: In(orderIds) },
+        where: { id: In(orderIds), post_id: id },
         relations: ['market', 'customer', 'district', 'district.region', 'customer.district'],
       });
 
-      if (newOrders.length !== orderIds.length)
-        throw new BadRequestException('Some orders not found');
+      if (newOrders.length === 0)
+        throw new BadRequestException('Tanlangan buyurtmalar bu pochtada topilmadi');
 
-      /**
-       * 5️⃣ Postdan chiqarilgan orderlarni topish (removedOrders)
-       * - status o‘zgartirilmaydi
-       * - faqat post_id null qilinadi
-       */
-      const removedOrders = oldOrders.filter((o) => !orderIds.includes(o.id));
-      for (const order of removedOrders) {
-        order.post_id = null;
-        order.status = Order_status.RECEIVED;
-        await queryRunner.manager.save(order);
-      }
+      // Agar ba'zi orderlar allaqachon boshqa device tomonidan jo'natilgan bo'lsa,
+      // faqat mavjud orderlar bilan davom etamiz (xato otmaymiz).
 
       const postTotalInfo = {
         total: newOrders.length,
-        sum: 0,
+        sum: newOrders.reduce((s, o) => s + (Number(o.total_price) || 0), 0),
       };
+
       /**
-       * 6️⃣ Yangi orderlarni ON_THE_ROAD holatiga o'tkazish
+       * 5️⃣ Ushbu batch uchun YANGI alohida sent post yaratish.
+       * Har bir "jo'natish" amali o'z postini yaratadi — original NEW post
+       * qolgan orderlar uchun ochiq qoladi. Bu parallel jo'natishga imkon beradi.
+       */
+      let sentPost = queryRunner.manager.create(PostEntity, {
+        region_id: originalPost.region_id,
+        status: Post_status.SENT,
+        courier_id: courierId,
+        qr_code_token: generateCustomToken(),
+        order_quantity: postTotalInfo.total,
+        post_total_price: postTotalInfo.sum,
+      });
+      sentPost = await queryRunner.manager.save(sentPost);
+
+      /**
+       * 6️⃣ Tanlangan orderlarni yangi sentPost ga ko'chirish va ON_THE_ROAD qilish
        */
       for (const order of newOrders) {
-        postTotalInfo.sum += Number(order.total_price) || 0;
-        order.post_id = post.id;
+        order.post_id = sentPost.id;
         order.status = Order_status.ON_THE_ROAD;
         await queryRunner.manager.save(order);
       }
 
       /**
-       * 7️⃣ Postning yangilangan ichki buyurtmalarini olish
+       * 7️⃣ Original postni yangilash.
+       * Yuborilgan orderlar chiqib ketdi — qolganlarni qayta hisoblaymiz.
+       * Agar hech narsa qolmagan bo'lsa, original postni o'chiramiz.
        */
-      const activeOrders = await queryRunner.manager.find(OrderEntity, {
+      const remainingOrders = await queryRunner.manager.find(OrderEntity, {
         where: { post_id: id },
       });
 
-      const total_price = activeOrders.reduce(
-        (sum, o) => sum + Number(o.total_price),
-        0,
-      );
-      const quantity = activeOrders.length;
-
-      /**
-       * 8️⃣ Bo‘sh post jo‘natilmasin!
-       */
-      if (quantity === 0) {
-        throw new BadRequestException(
-          'Post cannot be empty. At least one order is required.',
+      if (remainingOrders.length === 0) {
+        await queryRunner.manager.delete(PostEntity, { id });
+      } else {
+        const remainingTotal = remainingOrders.reduce(
+          (s, o) => s + (Number(o.total_price) || 0),
+          0,
         );
+        originalPost.order_quantity = remainingOrders.length;
+        originalPost.post_total_price = remainingTotal;
+        await queryRunner.manager.save(originalPost);
       }
 
       /**
-       * 9️⃣ Postni yangilash
-       */
-      post.courier_id = courierId;
-      post.post_total_price = total_price;
-      post.order_quantity = quantity;
-      post.status = Post_status.SENT;
-      await queryRunner.manager.save(post);
-
-      /**
-       * 🔟 Natijani qaytarish
+       * 8️⃣ Natijani qaytarish (frontend uchun sentPost ma'lumotlari)
        */
       const updatedPost = await queryRunner.manager.findOne(PostEntity, {
-        where: { id },
+        where: { id: sentPost.id },
         relations: ['courier', 'region'],
       });
 
@@ -532,19 +547,25 @@ export class PostService {
     await queryRunner.startTransaction();
 
     try {
-      // 1️⃣ Postni topamiz (courier_id va orders bilan)
-      const post = await queryRunner.manager.findOne(PostEntity, {
+      // 1️⃣ Postni topamiz (pessimistic lock — bir vaqtda 2 qurilmadan qabul qilinmasin)
+      // Avval lock bilan postni olish (relations'siz)
+      const lockedPost = await queryRunner.manager.findOne(PostEntity, {
         where: { id, courier_id: user.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lockedPost) throw new NotFoundException('Post not found');
+      // Keyin relations yuklash
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id },
         relations: ['orders'],
       });
-
       if (!post) throw new NotFoundException('Post not found');
       if (post.status !== Post_status.SENT)
         throw new BadRequestException('Cannot receive post with this status!');
 
       const waitingOrderIds: string[] = ordersArrayDto.order_ids ?? [];
 
-      // 2️⃣ DTOdagi orderlarni WAITING holatiga qaytaramiz (agar ON_THE_ROAD bo‘lsa)
+      // 2️⃣ DTOdagi orderlarni WAITING holatiga qaytaramiz (agar ON_THE_ROAD bo'lsa)
       if (waitingOrderIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
@@ -699,7 +720,7 @@ export class PostService {
         throw new NotFoundException('Order has no post');
       }
 
-      // 2) Shu order tegishli bo'lgan postni faqat shu courierga bog‘langanini tekshiramiz
+      // 2) Shu order tegishli bo'lgan postni faqat shu courierga bog'langanini tekshiramiz
       const post = await queryRunner.manager.findOne(PostEntity, {
         where: { id: order.post_id, courier_id: user.id },
       });
@@ -709,11 +730,11 @@ export class PostService {
         );
       }
 
-      // 3) Order statusini o‘zgartiramiz
+      // 3) Order statusini o'zgartiramiz
       order.status = Order_status.WAITING;
       await queryRunner.manager.save(order);
 
-      // 4) Post ichida hali "ON_THE_ROAD" order bor yoki yo‘qligini tekshiramiz
+      // 4) Post ichida hali "ON_THE_ROAD" order bor yoki yo'qligini tekshiramiz
       const activeOrdersCount = await queryRunner.manager.count(OrderEntity, {
         where: { post_id: post.id, status: Order_status.ON_THE_ROAD },
       });
@@ -767,18 +788,18 @@ export class PostService {
         throw new NotFoundException('Courier not found');
       }
 
-      // 4️⃣ Mavjud canceled postni topish (faqat courier bo‘yicha)
+      // 4️⃣ Mavjud canceled postni topish (faqat courier bo'yicha)
       let canceledPost = await queryRunner.manager.findOne(PostEntity, {
         where: { courier_id: courier.id, status: Post_status.CANCELED },
       });
 
-      // 5️⃣ Agar yo‘q bo‘lsa, yangi canceled post yaratamiz
+      // 5️⃣ Agar yo'q bo'lsa, yangi canceled post yaratamiz
       if (!canceledPost) {
         const customToken = generateCustomToken();
 
         canceledPost = queryRunner.manager.create(PostEntity, {
           courier_id: courier.id,
-          region_id: courier.region_id, // optional, faqat qo‘shimcha info sifatida
+          region_id: courier.region_id, // optional, faqat qo'shimcha info sifatida
           post_total_price: 0,
           order_quantity: 0,
           qr_code_token: customToken,
@@ -890,7 +911,7 @@ export class PostService {
         );
       }
 
-      // Pochtaning statusi har doim Canceled_RECEIVED bo‘lib qoladi
+      // Pochtaning statusi har doim Canceled_RECEIVED bo'lib qoladi
       await queryRunner.manager.update(
         PostEntity,
         { id },

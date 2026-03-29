@@ -7,6 +7,7 @@ import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { ShiftEntity } from 'src/core/entity/shift.entity';
+import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ShiftEntity } from 'src/core/entity/shift.entity';
       OrderEntity,
       UserEntity,
       ShiftEntity,
+      FinancialBalanceHistoryEntity,
     ]),
   ],
   controllers: [CasheBoxController],

@@ -32,6 +32,7 @@ import { useApiNotification } from "../../../../../shared/hooks/useApiNotificati
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import { useProfile } from "../../../../../shared/api/hooks/useProfile";
 
 export type FieldType = {
   comment?: string;
@@ -68,6 +69,8 @@ const WaitingOrders = () => {
 
   const [form] = Form.useForm<FieldType>();
   const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
+  const { getUser: getProfile } = useProfile();
+  const { data: profileData } = getProfile();
 
   const [isShow, setIsShow] = useState<boolean>(false);
   const [partleSoldShow, setPartlySoldShow] = useState<boolean>(false);
@@ -733,33 +736,82 @@ const WaitingOrders = () => {
 
             {/* Form */}
             <Form form={form} onFinish={onFinish} layout="vertical">
-              {/* Qo'shimcha to'lov */}
-              <div className="mb-4">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              {/* Qo'shimcha to'lov — faqat markazga yetkazishda yoki bekor qilishda ko'rsatiladi */}
+              {(() => {
+                const profile = profileData?.data;
+                const currentOrder = order.current;
+                const isCenter = currentOrder?.where_deliver === "center";
+                const isSell = urlType.current === "sell";
+
+                // Uyga yetkazish + sotish = ortiqcha xarajat yozish mumkin emas
+                if (!isCenter && isSell) return null;
+
+                const courierCenterTariff = currentOrder?.courier_tariff != null && isCenter
+                  ? currentOrder.courier_tariff
+                  : (profile?.tariff_center ?? 0);
+                const courierHomeTariff = profile?.tariff_home ?? 0;
+                const courierTariff = isCenter ? courierCenterTariff : courierHomeTariff;
+
+                // Sotishda (faqat markaz): max = uyTarif - markazTarif
+                // Bekor qilishda: max = o'z xizmat haqqi (courierTariff)
+                const maxExtraCost = isSell
+                  ? Math.max(0, courierHomeTariff - courierTariff)
+                  : courierTariff;
+
+                const parsedExtra = extraCostValue
+                  ? Number(extraCostValue.replace(/[^\d]/g, ""))
+                  : 0;
+                const isOverLimit = parsedExtra > maxExtraCost && maxExtraCost > 0;
+
+                return (
+                  <div className="mb-4">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      Qo'shimcha to'lov
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={extraCostValue}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          const formatted = raw ? new Intl.NumberFormat("uz-UZ").format(Number(raw)) : "";
+                          setExtraCostValue(formatted);
+                          form.setFieldValue("extraCost", raw ? Number(raw) : undefined);
+                        }}
+                        className={`w-full h-14 px-4 pr-16 rounded-xl text-lg font-semibold bg-white dark:bg-[#312D4B] border text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent ${
+                          isOverLimit
+                            ? "border-red-400 focus:ring-red-400"
+                            : "border-gray-200 dark:border-gray-600 focus:ring-blue-500"
+                        }`}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-base">
+                        so'm
+                      </span>
+                    </div>
+                    {maxExtraCost > 0 && (
+                      <div className={`mt-2 flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${
+                        isOverLimit
+                          ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                          : "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
+                      }`}>
+                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <span>
+                          {isOverLimit
+                            ? isSell
+                              ? `Limit oshib ketdi! Ortiqcha xarajat + yetkazish (${courierTariff.toLocaleString("uz-UZ")}) uy tarifidan (${courierHomeTariff.toLocaleString("uz-UZ")}) oshmasligi kerak. Maks: ${maxExtraCost.toLocaleString("uz-UZ")} so'm`
+                              : `Limit oshib ketdi! Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm (xizmat haqqingiz)`
+                            : `Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm (xizmat haqqingiz)`}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  Qo'shimcha to'lov
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={extraCostValue}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/\D/g, "");
-                      const formatted = raw ? new Intl.NumberFormat("uz-UZ").format(Number(raw)) : "";
-                      setExtraCostValue(formatted);
-                      form.setFieldValue("extraCost", raw ? Number(raw) : undefined);
-                    }}
-                    className="w-full h-14 px-4 pr-16 rounded-xl text-lg font-semibold bg-white dark:bg-[#312D4B] border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-base">
-                    so'm
-                  </span>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Izoh */}
               <div className="mb-2">

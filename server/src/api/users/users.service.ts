@@ -6,11 +6,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { JwtService } from '@nestjs/jwt';
 import {
   Cashbox_type,
+  Operation_type,
   Order_status,
+  PaymentMethod,
   Post_status,
   Roles,
+  Source_type,
   Status,
 } from 'src/common/enums';
 import config from 'src/config';
@@ -22,14 +26,19 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
-import { Response } from 'express';
+import { parseDurationToMs } from 'src/common/utils/parse-duration.util';
+import { Request, Response } from 'express';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { DataSource, DeepPartial, ILike, In, Not } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
+import { CreateLogistDto } from './dto/create-logist.dto';
+import { UpdateLogistDto } from './dto/update-logist.dto';
+import { CreateOperatorDto } from './dto/create-operator.dto';
 import { UpdateSelfDto } from './dto/self-update.dto';
 import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
 import { UserSalaryRepository } from 'src/core/repository/user-salary.repository';
@@ -46,11 +55,27 @@ import { UpdateMarketDto } from './dto/update-market.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
+import { OperatorEarningEntity } from 'src/core/entity/operator-earning.entity';
+import { OperatorPaymentEntity } from 'src/core/entity/operator-payment.entity';
+import { Commission_type } from 'src/common/enums';
+import { UpdateOperatorCommissionDto } from './dto/update-operator-commission.dto';
+import { PayOperatorDto } from './dto/pay-operator.dto';
 import { getSafeLimit } from 'src/common/constants/pagination';
 import { TelegramInitData } from './dto/initData.dto';
+import { InvestorDepositEntity } from 'src/core/entity/investor-deposit.entity';
+import { InvestorEarningEntity } from 'src/core/entity/investor-earning.entity';
+import { InvestorPayoutEntity } from 'src/core/entity/investor-payout.entity';
+import { CreateInvestorDto } from './dto/create-investor.dto';
+import { RecordInvestorDepositDto } from './dto/record-investor-deposit.dto';
+import { PayInvestorDto } from './dto/pay-investor.dto';
+import { UpdateInvestorDto } from './dto/update-investor.dto';
+import { Cron } from '@nestjs/schedule';
+import { Logger, OnModuleInit } from '@nestjs/common';
 
 @Injectable()
-export class UserService {
+export class UserService implements OnModuleInit {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: UserRepository,
@@ -72,12 +97,14 @@ export class UserService {
 
     private readonly bcrypt: BcryptEncryption,
     private readonly token: Token,
+    private readonly jwtService: JwtService,
     private readonly dataSource: DataSource,
   ) {}
 
   // Test for CI/CD
 
   async onModuleInit() {
+    console.log('🟢 [SALARY CRON] Oylik maosh cron job ro\'yxatga olindi');
     try {
       const isSuperAdmin = await this.userRepo.findOne({
         where: { role: Roles.SUPERADMIN },
@@ -308,10 +335,20 @@ export class UserService {
       const { name, phone_number, district_id, address, extra_number } =
         createCustomerDto;
       if (!createCustomerDto.market_id) {
-        if (user.role !== Roles.MARKET) {
-          throw new BadRequestException('Market not choosen');
-        } else {
+        if (user.role === Roles.MARKET) {
           createCustomerDto.market_id = user.id;
+        } else if (user.role === Roles.OPERATOR) {
+          // Operator o'z marketining ID sini olish
+          const operatorUser = await queryRunner.manager.findOne(UserEntity, {
+            where: { id: user.id, role: Roles.OPERATOR },
+            select: ['id', 'market_id'],
+          });
+          if (!operatorUser?.market_id) {
+            throw new BadRequestException('Operator marketga biriktirilmagan');
+          }
+          createCustomerDto.market_id = operatorUser.market_id;
+        } else {
+          throw new BadRequestException('Market not choosen');
         }
       }
       const market = await queryRunner.manager.findOne(UserEntity, {
@@ -615,11 +652,12 @@ export class UserService {
       const { search, status, role, page = 1, fetchAll = false } = filters;
       const limit = getSafeLimit(filters.limit, fetchAll);
 
-      const allowedRoles = [Roles.REGISTRATOR, Roles.ADMIN];
+      const allowedRoles = [Roles.REGISTRATOR, Roles.ADMIN, Roles.LOGIST];
 
       const qb = this.userRepo
         .createQueryBuilder('user')
         .leftJoinAndSelect('user.region', 'region')
+        .leftJoinAndSelect('user.salary', 'salary')
         .where('user.role IN (:...allowedRoles)', { allowedRoles });
 
       // 🔍 Search filter
@@ -714,7 +752,7 @@ export class UserService {
       const { id } = user;
       const myProfile = await this.userRepo.findOne({
         where: { id },
-        relations: ['region'],
+        relations: ['region', 'market'],
       });
       return successRes(myProfile, 200, 'Profile info');
     } catch (error) {
@@ -774,11 +812,35 @@ export class UserService {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
 
+      // salary va payment_day ni alohida olamiz
+      const { salary: newSalary, payment_day: newPaymentDay, have_to_pay: newHaveToPay, ...fieldsToUpdate } = otherFields;
+
       Object.assign(user, {
-        ...otherFields,
+        ...fieldsToUpdate,
         ...(hashedPassword && { password: hashedPassword }),
       });
       await this.userRepo.save(user);
+
+      // Salary yangilash (faqat superadmin)
+      if (newSalary !== undefined || newPaymentDay !== undefined || newHaveToPay !== undefined) {
+        const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
+        let salary = await salaryRepo.findOne({ where: { user_id: id } });
+        if (salary) {
+          if (newSalary !== undefined) salary.salary_amount = newSalary;
+          if (newPaymentDay !== undefined) salary.payment_day = newPaymentDay;
+          if (newHaveToPay !== undefined) salary.have_to_pay = newHaveToPay;
+          await salaryRepo.save(salary);
+        } else if (newSalary !== undefined) {
+          // Salary yo'q bo'lsa yaratamiz
+          salary = salaryRepo.create({
+            user_id: id,
+            salary_amount: newSalary,
+            have_to_pay: newSalary,
+            payment_day: newPaymentDay || new Date().getDate(),
+          });
+          await salaryRepo.save(salary);
+        }
+      }
 
       const updatedUser = await this.userRepo.findOneOrFail({
         where: { id },
@@ -836,11 +898,34 @@ export class UserService {
       if (password) {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
+      // salary va payment_day ni alohida olamiz
+      const { salary: newSalary, payment_day: newPaymentDay, have_to_pay: newHaveToPay, ...fieldsToUpdate } = otherFields;
+
       Object.assign(registrator, {
-        ...otherFields,
+        ...fieldsToUpdate,
         ...(hashedPassword && { password: hashedPassword }),
       });
       await this.userRepo.save(registrator);
+
+      // Salary yangilash
+      if (newSalary !== undefined || newPaymentDay !== undefined || newHaveToPay !== undefined) {
+        const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
+        let salary = await salaryRepo.findOne({ where: { user_id: id } });
+        if (salary) {
+          if (newSalary !== undefined) salary.salary_amount = newSalary;
+          if (newPaymentDay !== undefined) salary.payment_day = newPaymentDay;
+          if (newHaveToPay !== undefined) salary.have_to_pay = newHaveToPay;
+          await salaryRepo.save(salary);
+        } else if (newSalary !== undefined) {
+          salary = salaryRepo.create({
+            user_id: id,
+            salary_amount: newSalary,
+            have_to_pay: newSalary,
+            payment_day: newPaymentDay || new Date().getDate(),
+          });
+          await salaryRepo.save(salary);
+        }
+      }
 
       return successRes({}, 200, 'Registrator updated');
     } catch (error) {
@@ -1186,8 +1271,9 @@ export class UserService {
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
+      const refreshTokenExpiresAt = Date.now() + parseDurationToMs(config.REFRESH_TOKEN_TIME);
       return successRes(
-        { access_token: accessToken },
+        { access_token: accessToken, refresh_token_expires_at: refreshTokenExpiresAt },
         200,
         'Logged in successfully',
       );
@@ -1224,6 +1310,43 @@ export class UserService {
         { access_token: accessToken },
         200,
         'Logged in successfully',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async refreshToken(req: Request, res: Response): Promise<object> {
+    try {
+      const token = req.cookies?.refreshToken;
+      if (!token) {
+        throw new UnauthorizedException('Refresh token not found');
+      }
+
+      let payload: JwtPayload;
+      try {
+        const decoded = this.jwtService.verify(token, {
+          secret: config.REFRESH_TOKEN_KEY,
+        });
+        payload = { id: decoded.id, role: decoded.role, status: decoded.status };
+      } catch {
+        res.clearCookie('refreshToken');
+        throw new UnauthorizedException('Refresh token expired or invalid');
+      }
+
+      const user = await this.userRepo.findOne({ where: { id: payload.id } });
+      if (!user || user.status === Status.INACTIVE) {
+        res.clearCookie('refreshToken');
+        throw new UnauthorizedException('User not found or inactive');
+      }
+
+      const newPayload: JwtPayload = { id: user.id, role: user.role, status: user.status };
+      const accessToken = await this.token.generateAccessToken(newPayload);
+
+      return successRes(
+        { access_token: accessToken },
+        200,
+        'Token refreshed successfully',
       );
     } catch (error) {
       return catchError(error);
@@ -1421,6 +1544,1502 @@ export class UserService {
       );
     } catch (error) {
       return catchError(error);
+    }
+  }
+
+  // ==================== LOGIST CRUD ====================
+
+  async createLogist(dto: CreateLogistDto): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { password, phone_number, name, salary } = dto;
+      let { payment_day } = dto;
+
+      const existUser = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number, role: Not(Roles.CUSTOMER) },
+      });
+      if (existUser) {
+        throw new ConflictException(
+          `${phone_number} raqamli foydalanuvchi allaqachon mavjud`,
+        );
+      }
+
+      if (!payment_day) {
+        const dayToPay = Number(
+          new Date(Date.now()).toLocaleDateString('uz-UZ').split('.')[0],
+        );
+        payment_day = dayToPay;
+      }
+
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const user = queryRunner.manager.create(UserEntity, {
+        name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.LOGIST,
+      });
+      await queryRunner.manager.save(user);
+
+      const userSalary = queryRunner.manager.create(UserSalaryEntity, {
+        user_id: user.id,
+        salary_amount: salary,
+        have_to_pay: salary,
+        payment_day,
+      });
+      await queryRunner.manager.save(userSalary);
+
+      await queryRunner.commitTransaction();
+      return successRes(user, 201, 'Yangi logist yaratildi');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async allLogists(search?: string): Promise<object> {
+    try {
+      const where: any = {
+        role: Roles.LOGIST,
+        is_deleted: false,
+      };
+      if (search) {
+        where.name = ILike(`%${search}%`);
+      }
+
+      const logists = await this.userRepo.find({
+        where,
+        relations: ['salary'],
+        order: { created_at: 'DESC' },
+      });
+
+      // Har bir logist uchun biriktirilgan regionlarni olish
+      const logistsWithRegions = await Promise.all(
+        logists.map(async (logist) => {
+          const regions = await this.dataSource
+            .getRepository(RegionEntity)
+            .find({
+              where: { logist_id: logist.id },
+              select: ['id', 'name', 'sato_code'],
+            });
+          return { ...logist, regions };
+        }),
+      );
+
+      return successRes(logistsWithRegions, 200, 'All logists');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async updateLogist(id: string, dto: UpdateLogistDto): Promise<object> {
+    try {
+      const { password, ...otherFields } = dto;
+      const logist = await this.userRepo.findOne({
+        where: { id, role: Roles.LOGIST },
+      });
+      if (!logist) {
+        throw new NotFoundException('Logist topilmadi');
+      }
+
+      if (otherFields.phone_number) {
+        const isExistPhone = await this.userRepo.findOne({
+          where: {
+            phone_number: otherFields.phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
+        });
+        if (isExistPhone) {
+          throw new BadRequestException(
+            `${otherFields.phone_number} raqamli foydalanuvchi allaqachon mavjud`,
+          );
+        }
+      }
+
+      let hashedPassword: string | undefined;
+      if (password) {
+        hashedPassword = await this.bcrypt.encrypt(password);
+      }
+
+      Object.assign(logist, {
+        ...otherFields,
+        ...(hashedPassword && { password: hashedPassword }),
+      });
+      await this.userRepo.save(logist);
+
+      // Salary yangilash
+      if (dto.salary !== undefined || dto.payment_day !== undefined || dto.have_to_pay !== undefined) {
+        const salary = await this.dataSource
+          .getRepository(UserSalaryEntity)
+          .findOne({ where: { user_id: id } });
+        if (salary) {
+          if (dto.salary !== undefined) salary.salary_amount = dto.salary;
+          if (dto.payment_day !== undefined) salary.payment_day = dto.payment_day;
+          if (dto.have_to_pay !== undefined) salary.have_to_pay = dto.have_to_pay;
+          await this.dataSource.getRepository(UserSalaryEntity).save(salary);
+        }
+      }
+
+      return successRes({}, 200, 'Logist yangilandi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async deleteLogist(id: string): Promise<object> {
+    try {
+      const logist = await this.userRepo.findOne({
+        where: { id, role: Roles.LOGIST },
+      });
+      if (!logist) {
+        throw new NotFoundException('Logist topilmadi');
+      }
+
+      // Logistga biriktirilgan regionlardan logist_id ni olib tashlash
+      await this.dataSource
+        .getRepository(RegionEntity)
+        .update({ logist_id: id }, { logist_id: null as any });
+
+      logist.is_deleted = true;
+      await this.userRepo.save(logist);
+
+      return successRes({}, 200, 'Logist o\'chirildi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== OPERATOR CRUD ====================
+
+  async createOperator(dto: CreateOperatorDto, market: JwtPayload): Promise<object> {
+    try {
+      const { password, phone_number, name } = dto;
+
+      const existUser = await this.userRepo.findOne({
+        where: { phone_number, is_deleted: false },
+      });
+      if (existUser) {
+        throw new ConflictException(
+          `${phone_number} raqamli foydalanuvchi allaqachon mavjud`,
+        );
+      }
+
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const operator = this.userRepo.create({
+        name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.OPERATOR,
+        market_id: market.id,
+      });
+      await this.userRepo.save(operator);
+
+      return successRes(operator, 201, 'Yangi operator yaratildi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getMyOperators(market: JwtPayload): Promise<object> {
+    try {
+      const operators = await this.userRepo.find({
+        where: { market_id: market.id, role: Roles.OPERATOR, is_deleted: false },
+        order: { created_at: 'DESC' },
+        select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+      });
+      return successRes(operators, 200, 'Market operatorlari');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async deleteOperator(id: string, market: JwtPayload): Promise<object> {
+    try {
+      const operator = await this.userRepo.findOne({
+        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+      });
+      if (!operator) {
+        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+      }
+      operator.is_deleted = true;
+      await this.userRepo.save(operator);
+      return successRes({}, 200, 'Operator o\'chirildi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getOperatorStats(id: string, market: JwtPayload): Promise<object> {
+    try {
+      const operator = await this.userRepo.findOne({
+        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+      });
+      if (!operator) {
+        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+      }
+
+      const orderRepo = this.dataSource.getRepository(OrderEntity);
+
+      const orders = await orderRepo.find({
+        where: { operator_id: id },
+        select: ['id', 'status', 'total_price', 'created_at', 'sold_at'],
+        order: { created_at: 'DESC' },
+      });
+
+      const total = orders.length;
+      const sold = orders.filter((o) =>
+        ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status),
+      ).length;
+      const cancelled = orders.filter((o) =>
+        ['cancelled', 'cancelled (sent)'].includes(o.status),
+      ).length;
+      const pending = total - sold - cancelled;
+      const success_rate = total > 0 ? Math.round((sold / total) * 100) : 0;
+
+      const total_revenue = orders
+        .filter((o) => ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status))
+        .reduce((sum, o) => sum + Number(o.total_price || 0), 0);
+
+      return successRes(
+        {
+          operator: {
+            id: operator.id,
+            name: operator.name,
+            phone_number: operator.phone_number,
+            status: operator.status,
+            created_at: operator.created_at,
+          },
+          stats: {
+            total,
+            sold,
+            cancelled,
+            pending,
+            success_rate,
+            total_revenue,
+          },
+          recent_orders: orders.slice(0, 20),
+        },
+        200,
+        'Operator statistikasi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== OPERATOR COMMISSION ====================
+
+  async updateOperatorCommission(
+    id: string,
+    dto: UpdateOperatorCommissionDto,
+    market: JwtPayload,
+  ): Promise<object> {
+    try {
+      const operator = await this.userRepo.findOne({
+        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+      });
+      if (!operator) {
+        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+      }
+
+      if (dto.commission_type !== undefined) operator.commission_type = dto.commission_type;
+      if (dto.commission_value !== undefined) operator.commission_value = dto.commission_value;
+      if (dto.show_earnings !== undefined) operator.show_earnings = dto.show_earnings;
+
+      await this.userRepo.save(operator);
+      return successRes(
+        {
+          id: operator.id,
+          commission_type: operator.commission_type,
+          commission_value: operator.commission_value,
+          show_earnings: operator.show_earnings,
+        },
+        200,
+        'Operator komissiyasi yangilandi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getOperatorBalance(id: string, market: JwtPayload): Promise<object> {
+    try {
+      const operator = await this.userRepo.findOne({
+        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        select: ['id', 'name', 'phone_number', 'status', 'commission_type', 'commission_value', 'show_earnings'],
+      });
+      if (!operator) {
+        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+      }
+
+      const earningRepo = this.dataSource.getRepository(OperatorEarningEntity);
+      const paymentRepo = this.dataSource.getRepository(OperatorPaymentEntity);
+
+      const earnings = await earningRepo.find({
+        where: { operator_id: id },
+        order: { created_at: 'DESC' },
+      });
+
+      const payments = await paymentRepo.find({
+        where: { operator_id: id },
+        order: { created_at: 'DESC' },
+      });
+
+      const total_earned = earnings.reduce((s, e) => s + Number(e.amount), 0);
+      const total_paid = payments.reduce((s, p) => s + Number(p.amount), 0);
+      const balance = total_earned - total_paid;
+
+      return successRes(
+        {
+          operator,
+          total_earned,
+          total_paid,
+          balance,
+          payments,
+        },
+        200,
+        'Operator balansi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async payOperator(
+    id: string,
+    dto: PayOperatorDto,
+    market: JwtPayload,
+  ): Promise<object> {
+    try {
+      const operator = await this.userRepo.findOne({
+        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+      });
+      if (!operator) {
+        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+      }
+
+      const paymentRepo = this.dataSource.getRepository(OperatorPaymentEntity);
+      const payment = paymentRepo.create({
+        operator_id: id,
+        market_id: market.id,
+        paid_by_id: market.id,
+        amount: dto.amount,
+        note: dto.note ?? null,
+      });
+      await paymentRepo.save(payment);
+
+      return successRes(payment, 201, "To'lov amalga oshirildi");
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getMyEarnings(operator: JwtPayload, fromDate?: string, toDate?: string): Promise<object> {
+    try {
+      const operatorUser = await this.userRepo.findOne({
+        where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
+        select: ['id', 'name', 'commission_type', 'commission_value', 'show_earnings'],
+      });
+      if (!operatorUser) {
+        throw new NotFoundException('Operator topilmadi');
+      }
+      if (!operatorUser.show_earnings) {
+        return successRes({ visible: false }, 200, 'Daromad ko\'rinmaydi');
+      }
+
+      const earningRepo = this.dataSource.getRepository(OperatorEarningEntity);
+      const paymentRepo = this.dataSource.getRepository(OperatorPaymentEntity);
+
+      // Sana filter uchun timestamp hisoblash
+      let dateFromMs: number | null = null;
+      let dateToMs: number | null = null;
+      if (fromDate) {
+        dateFromMs = new Date(fromDate + 'T00:00:00').getTime();
+      }
+      if (toDate) {
+        dateToMs = new Date(toDate + 'T23:59:59.999').getTime();
+      }
+
+      // Earnings query builder
+      const earningsQb = earningRepo.createQueryBuilder('e')
+        .where('e.operator_id = :opId', { opId: operator.id })
+        .orderBy('e.created_at', 'DESC');
+      if (dateFromMs) earningsQb.andWhere('e.created_at >= :from', { from: dateFromMs });
+      if (dateToMs) earningsQb.andWhere('e.created_at <= :to', { to: dateToMs });
+      const earnings = await earningsQb.getMany();
+
+      // Payments query builder
+      const paymentsQb = paymentRepo.createQueryBuilder('p')
+        .where('p.operator_id = :opId', { opId: operator.id })
+        .orderBy('p.created_at', 'DESC');
+      if (dateFromMs) paymentsQb.andWhere('p.created_at >= :from', { from: dateFromMs });
+      if (dateToMs) paymentsQb.andWhere('p.created_at <= :to', { to: dateToMs });
+      const payments = await paymentsQb.getMany();
+
+      // Har bir earning uchun order ma'lumotlarini olish
+      const orderRepo = this.dataSource.getRepository(OrderEntity);
+      const earningsWithOrders = await Promise.all(
+        earnings.map(async (earning) => {
+          const order = await orderRepo.findOne({
+            where: { id: earning.order_id },
+            select: ['id', 'total_price', 'status', 'created_at', 'sold_at', 'product_quantity', 'comment'],
+            relations: ['customer', 'items', 'items.product'],
+          });
+          return {
+            ...earning,
+            order: order
+              ? {
+                  id: order.id,
+                  total_price: order.total_price,
+                  status: order.status,
+                  created_at: order.created_at,
+                  sold_at: order.sold_at,
+                  product_quantity: order.product_quantity,
+                  customer_name: order.customer?.name || '-',
+                  items: order.items?.map((item) => ({
+                    name: item.product?.name || '-',
+                    quantity: item.quantity,
+                  })) || [],
+                  is_cancelled: [
+                    Order_status.CANCELLED,
+                    Order_status.CANCELLED_SENT,
+                  ].includes(order.status),
+                }
+              : null,
+          };
+        }),
+      );
+
+      const total_earned = earnings.reduce((s, e) => s + Number(e.amount), 0);
+      const total_paid = payments.reduce((s, p) => s + Number(p.amount), 0);
+
+      // Umumiy balans — barcha vaqt uchun (filter ta'sir qilmaydi)
+      const allEarnings = await earningRepo.find({ where: { operator_id: operator.id } });
+      const allPayments = await paymentRepo.find({ where: { operator_id: operator.id } });
+      const allEarned = allEarnings.reduce((s, e) => s + Number(e.amount), 0);
+      const allPaid = allPayments.reduce((s, p) => s + Number(p.amount), 0);
+      const balance = allEarned - allPaid;
+
+      return successRes(
+        {
+          visible: true,
+          operator: {
+            name: operatorUser.name,
+            commission_type: operatorUser.commission_type,
+            commission_value: operatorUser.commission_value,
+          },
+          total_earned,
+          total_paid,
+          balance,
+          earnings: earningsWithOrders,
+          payments,
+        },
+        200,
+        'Mening daromadlarim',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // Operator o'z buyurtmalarini ko'rish (pagination bilan)
+  async getMyOrders(
+    operator: JwtPayload,
+    page: number = 1,
+    limit: number = 20,
+    status?: string,
+  ): Promise<object> {
+    try {
+      const operatorUser = await this.userRepo.findOne({
+        where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
+        select: ['id', 'name', 'show_earnings', 'commission_type', 'commission_value'],
+      });
+      if (!operatorUser) {
+        throw new NotFoundException('Operator topilmadi');
+      }
+
+      const safeLimit = getSafeLimit(limit);
+      const skip = (page - 1) * safeLimit;
+
+      const orderRepo = this.dataSource.getRepository(OrderEntity);
+      const earningRepo = this.dataSource.getRepository(OperatorEarningEntity);
+
+      const where: any = {
+        operator_id: operator.id,
+        deleted: false,
+      };
+      if (status) {
+        where.status = status;
+      }
+
+      const [orders, total] = await orderRepo.findAndCount({
+        where,
+        relations: ['customer', 'items', 'items.product', 'district', 'district.region'],
+        order: { created_at: 'DESC' },
+        skip,
+        take: safeLimit,
+      });
+
+      // Har bir order uchun earning ma'lumotini olish
+      const ordersWithEarnings = await Promise.all(
+        orders.map(async (order) => {
+          let earning: OperatorEarningEntity | null = null;
+          if (operatorUser.show_earnings) {
+            earning = await earningRepo.findOne({
+              where: { order_id: order.id, operator_id: operator.id },
+            });
+          }
+
+          const isCancelled = [
+            Order_status.CANCELLED,
+            Order_status.CANCELLED_SENT,
+          ].includes(order.status);
+
+          const isSold = [
+            Order_status.SOLD,
+            Order_status.PAID,
+            Order_status.PARTLY_PAID,
+            Order_status.CLOSED,
+          ].includes(order.status);
+
+          return {
+            id: order.id,
+            total_price: order.total_price,
+            status: order.status,
+            product_quantity: order.product_quantity,
+            where_deliver: order.where_deliver,
+            comment: order.comment,
+            created_at: order.created_at,
+            sold_at: order.sold_at,
+            customer: order.customer
+              ? {
+                  id: order.customer.id,
+                  name: order.customer.name,
+                  phone_number: order.customer.phone_number,
+                }
+              : null,
+            district: order.district
+              ? {
+                  name: order.district.name,
+                  region: order.district.region?.name || null,
+                }
+              : null,
+            items: order.items?.map((item) => ({
+              name: item.product?.name || '-',
+              quantity: item.quantity,
+            })) || [],
+            earning: earning
+              ? {
+                  amount: earning.amount,
+                  is_deducted: isCancelled,
+                }
+              : null,
+            is_sold: isSold,
+            is_cancelled: isCancelled,
+          };
+        }),
+      );
+
+      // Statistika
+      const allOperatorOrders = await orderRepo.find({
+        where: { operator_id: operator.id, deleted: false },
+        select: ['id', 'status'],
+      });
+
+      const soldStatuses = [Order_status.SOLD, Order_status.PAID, Order_status.PARTLY_PAID, Order_status.CLOSED];
+      const cancelStatuses = [Order_status.CANCELLED, Order_status.CANCELLED_SENT];
+
+      const stats = {
+        total: allOperatorOrders.length,
+        sold: allOperatorOrders.filter((o) => soldStatuses.includes(o.status)).length,
+        cancelled: allOperatorOrders.filter((o) => cancelStatuses.includes(o.status)).length,
+        pending: 0,
+      };
+      stats.pending = stats.total - stats.sold - stats.cancelled;
+
+      return successRes(
+        {
+          orders: ordersWithEarnings,
+          stats,
+          show_earnings: operatorUser.show_earnings,
+          pagination: {
+            page,
+            limit: safeLimit,
+            total,
+            total_pages: Math.ceil(total / safeLimit),
+          },
+        },
+        200,
+        'Mening buyurtmalarim',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== INVESTOR METHODS ====================
+
+  // Investor kassasini topish yoki avtomatik yaratish
+  private async getOrCreateInvestorCashbox(
+    manager: any,
+    investorId: string,
+  ): Promise<CashEntity> {
+    let cashbox = await manager.findOne(CashEntity, {
+      where: { user_id: investorId, cashbox_type: Cashbox_type.FOR_INVESTOR },
+    });
+    if (!cashbox) {
+      cashbox = manager.create(CashEntity, {
+        cashbox_type: Cashbox_type.FOR_INVESTOR,
+        user_id: investorId,
+      });
+      await manager.save(cashbox);
+    }
+    return cashbox;
+  }
+
+  private computeEffectivePercent(investor: UserEntity): number {
+    const committed = investor.committed_amount ?? 0;
+    const sharePercent = investor.share_percent ?? 0;
+    if (committed === 0) return sharePercent; // sherik
+    const deposited = investor.deposited_amount ?? 0;
+    const ratio = Math.min(deposited / committed, 1.0);
+    return sharePercent * ratio;
+  }
+
+  async createInvestor(dto: CreateInvestorDto, admin: JwtPayload): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const existUser = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number: dto.phone_number, role: Not(Roles.CUSTOMER) },
+      });
+      if (existUser) {
+        throw new ConflictException(`${dto.phone_number} raqamli foydalanuvchi allaqachon mavjud`);
+      }
+
+      const hashedPassword = await this.bcrypt.encrypt(dto.password);
+      const user = queryRunner.manager.create(UserEntity, {
+        name: dto.name,
+        phone_number: dto.phone_number,
+        password: hashedPassword,
+        role: Roles.INVESTOR,
+        status: Status.ACTIVE,
+        committed_amount: dto.committed_amount,
+        share_percent: dto.share_percent,
+        deposited_amount: 0,
+      });
+      await queryRunner.manager.save(user);
+
+      // Investor uchun piggy bank (kassa) yaratish
+      const initialBalance = dto.initial_balance || 0;
+      const cashbox = queryRunner.manager.create(CashEntity, {
+        cashbox_type: Cashbox_type.FOR_INVESTOR,
+        user_id: user.id,
+        balance: initialBalance,
+      });
+      await queryRunner.manager.save(cashbox);
+
+      // Boshlang'ich balans bo'lsa — mos yozuvlar yaratish
+      if (initialBalance !== 0) {
+        // Piggy bank history
+        const historyEntry = queryRunner.manager.create(CashboxHistoryEntity, {
+          cashbox_id: cashbox.id,
+          operation_type: initialBalance > 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+          source_type: Source_type.CORRECTION,
+          amount: Math.abs(initialBalance),
+          balance_after: initialBalance,
+          comment: `Boshlang'ich balans: ${initialBalance > 0 ? 'ajratilmagan foyda' : 'oldingi qarz'}`,
+          created_by: admin.id,
+        });
+        await queryRunner.manager.save(historyEntry);
+
+        if (initialBalance < 0) {
+          // Qarz = avval ko'p to'langan → payout yozuvi
+          const payout = queryRunner.manager.create(InvestorPayoutEntity, {
+            investor_id: user.id,
+            amount: Math.abs(initialBalance),
+            note: 'Boshlang\'ich qarz (tizimdan oldingi to\'lovlar)',
+          });
+          await queryRunner.manager.save(InvestorPayoutEntity, payout);
+        } else {
+          // Musbat = ajratilmagan foyda → earning yozuvi
+          const earning = queryRunner.manager.create(InvestorEarningEntity, {
+            investor_id: user.id,
+            order_id: user.id, // placeholder — haqiqiy buyurtma yo'q
+            amount: initialBalance,
+            effective_percent: dto.share_percent,
+            profit: initialBalance,
+          });
+          await queryRunner.manager.save(InvestorEarningEntity, earning);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return successRes(user, 201, 'Yangi investor yaratildi');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async getAllInvestors(): Promise<object> {
+    try {
+      const investors = await this.userRepo.find({
+        where: { role: Roles.INVESTOR, is_deleted: false },
+        order: { created_at: 'DESC' },
+      });
+
+      // NULL statusli investorlarni avtomatik tuzatish
+      for (const inv of investors) {
+        if (!inv.status) {
+          inv.status = Status.ACTIVE;
+          await this.userRepo.save(inv);
+        }
+      }
+
+      const earningRepo = this.dataSource.getRepository(InvestorEarningEntity);
+      const payoutRepo = this.dataSource.getRepository(InvestorPayoutEntity);
+
+      // Bugungi sana oralig'i
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const depositRepo = this.dataSource.getRepository(InvestorDepositEntity);
+
+      const result = await Promise.all(
+        investors.map(async (inv) => {
+          // Bugungi daromad
+          const todayEarnings = await earningRepo.createQueryBuilder('e')
+            .where('e.investor_id = :id', { id: inv.id })
+            .andWhere('e.created_at >= :from', { from: todayStart.getTime() })
+            .andWhere('e.created_at <= :to', { to: todayEnd.getTime() })
+            .getMany();
+          const today_earned = todayEarnings.reduce((s, e) => s + Number(e.amount), 0);
+
+          // Jami earning (investor_earning jadvalidan)
+          const totalEarnedResult = await earningRepo
+            .createQueryBuilder('e')
+            .select('COALESCE(SUM(e.amount), 0)', 'total')
+            .where('e.investor_id = :id', { id: inv.id })
+            .getRawOne();
+          const totalEarned = Number(totalEarnedResult?.total || 0);
+
+          // Jami to'langan
+          const totalPaidResult = await this.dataSource.getRepository(InvestorPayoutEntity)
+            .createQueryBuilder('p')
+            .select('COALESCE(SUM(p.amount), 0)', 'total')
+            .where('p.investor_id = :id', { id: inv.id })
+            .getRawOne();
+          const totalPaid = Number(totalPaidResult?.total || 0);
+          const balance = Math.round(totalEarned - totalPaid);
+
+          // Qarzda bo'lsa pending_amount = 0 (earning'lar qarzni yopishga ketadi)
+          let pending_amount = 0;
+          if (balance > 0) {
+            const invCashbox = await this.dataSource.getRepository(CashEntity).findOne({
+              where: { user_id: inv.id, cashbox_type: Cashbox_type.FOR_INVESTOR },
+            });
+
+            if (invCashbox) {
+              const lastAllocated = await this.dataSource.getRepository(CashboxHistoryEntity)
+                .createQueryBuilder('h')
+                .select('MAX(h.created_at)', 'last_time')
+                .where('h.cashbox_id = :cid', { cid: invCashbox.id })
+                .andWhere('h.operation_type = :op', { op: Operation_type.INCOME })
+                .andWhere('h.source_type IN (:...types)', {
+                  types: [Source_type.INVESTOR_ALLOCATE, Source_type.MANUAL_INCOME],
+                })
+                .getRawOne();
+              const lastAllocatedTime = Number(lastAllocated?.last_time || 0);
+
+              const pendingResult = await earningRepo
+                .createQueryBuilder('e')
+                .select('COALESCE(SUM(e.amount), 0)', 'total')
+                .where('e.investor_id = :id', { id: inv.id })
+                .andWhere('e.created_at > :since', { since: lastAllocatedTime })
+                .getRawOne();
+              // pending_amount balansdan oshmasligi kerak
+              pending_amount = Math.min(
+                Math.max(Math.round(Number(pendingResult?.total || 0)), 0),
+                balance,
+              );
+            } else {
+              pending_amount = Math.min(Math.round(totalEarned), balance);
+            }
+          }
+
+          return {
+            id: inv.id,
+            name: inv.name,
+            today_earned,
+            is_partner: (inv.committed_amount ?? 0) === 0,
+            pending_amount,
+            balance,
+          };
+        }),
+      );
+
+      return successRes(result, 200, 'Investorlar');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getInvestorDetail(id: string, fromDate?: string, toDate?: string): Promise<object> {
+    try {
+      const investor = await this.userRepo.findOne({
+        where: { id, role: Roles.INVESTOR, is_deleted: false },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+
+      const depositRepo = this.dataSource.getRepository(InvestorDepositEntity);
+      const earningRepo = this.dataSource.getRepository(InvestorEarningEntity);
+      const payoutRepo = this.dataSource.getRepository(InvestorPayoutEntity);
+
+      let dateFromMs: number | null = null;
+      let dateToMs: number | null = null;
+      if (fromDate) dateFromMs = new Date(fromDate + 'T00:00:00').getTime();
+      if (toDate) dateToMs = new Date(toDate + 'T23:59:59.999').getTime();
+
+      // Deposits (always all)
+      const deposits = await depositRepo.find({
+        where: { investor_id: id },
+        order: { created_at: 'DESC' },
+      });
+
+      // Earnings with date filter
+      const earningsQb = earningRepo.createQueryBuilder('e')
+        .where('e.investor_id = :id', { id })
+        .orderBy('e.created_at', 'DESC');
+      if (dateFromMs) earningsQb.andWhere('e.created_at >= :from', { from: dateFromMs });
+      if (dateToMs) earningsQb.andWhere('e.created_at <= :to', { to: dateToMs });
+      const earnings = await earningsQb.getMany();
+
+      // Enrich earnings with order info
+      const orderRepo = this.dataSource.getRepository(OrderEntity);
+      const earningsWithOrders = await Promise.all(
+        earnings.map(async (earning) => {
+          const order = await orderRepo.findOne({
+            where: { id: earning.order_id },
+            select: ['id', 'total_price', 'status', 'created_at', 'sold_at'],
+            relations: ['customer', 'market'],
+          });
+          return {
+            ...earning,
+            order: order ? {
+              id: order.id,
+              total_price: order.total_price,
+              status: order.status,
+              customer_name: order.customer?.name || '-',
+              market_name: (order as any).market?.name || '-',
+              sold_at: order.sold_at,
+            } : null,
+          };
+        }),
+      );
+
+      // Payouts with date filter
+      const payoutsQb = payoutRepo.createQueryBuilder('p')
+        .where('p.investor_id = :id', { id })
+        .orderBy('p.created_at', 'DESC');
+      if (dateFromMs) payoutsQb.andWhere('p.created_at >= :from', { from: dateFromMs });
+      if (dateToMs) payoutsQb.andWhere('p.created_at <= :to', { to: dateToMs });
+      const payouts = await payoutsQb.getMany();
+
+      // Umumiy balans (filtersiz)
+      const allEarnings = await earningRepo.find({ where: { investor_id: id } });
+      const allPayouts = await payoutRepo.find({ where: { investor_id: id } });
+      const total_earned = allEarnings.reduce((s, e) => s + Number(e.amount), 0);
+      const total_paid = allPayouts.reduce((s, p) => s + Number(p.amount), 0);
+
+      // Davrdagi summalar
+      const period_earned = earnings.reduce((s, e) => s + Number(e.amount), 0);
+      const period_paid = payouts.reduce((s, p) => s + Number(p.amount), 0);
+
+      const result: any = {
+        investor: {
+          id: investor.id,
+          name: investor.name,
+          phone_number: investor.phone_number,
+          status: investor.status,
+          committed_amount: investor.committed_amount ?? 0,
+          deposited_amount: investor.deposited_amount ?? 0,
+          share_percent: investor.share_percent ?? 0,
+          effective_percent: this.computeEffectivePercent(investor),
+        },
+        total_earned,
+        total_paid,
+        balance: total_earned - total_paid,
+        period_earned,
+        period_paid,
+        deposits,
+        earnings: earningsWithOrders,
+        payouts,
+        cashbox_balance: 0,
+        today_total_profit: 0,
+        today_investor_share: 0,
+      };
+
+      // Investor kassasi (yo'q bo'lsa yaratadi)
+      let cashbox = await this.dataSource.getRepository(CashEntity).findOne({
+        where: { user_id: id, cashbox_type: Cashbox_type.FOR_INVESTOR },
+      });
+      if (!cashbox) {
+        cashbox = this.dataSource.getRepository(CashEntity).create({
+          cashbox_type: Cashbox_type.FOR_INVESTOR,
+          user_id: id,
+        });
+        await this.dataSource.getRepository(CashEntity).save(cashbox);
+      }
+      result.cashbox_balance = cashbox.balance;
+
+      // Bugungi umumiy profit hisoblash
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const todayEarnings = await earningRepo.createQueryBuilder('e')
+        .where('e.investor_id = :id', { id })
+        .andWhere('e.created_at >= :from', { from: todayStart.getTime() })
+        .andWhere('e.created_at <= :to', { to: todayEnd.getTime() })
+        .getMany();
+
+      const todayProfitSum = todayEarnings.reduce((s, e) => s + Number(e.profit), 0);
+      const todayShareSum = todayEarnings.reduce((s, e) => s + Number(e.amount), 0);
+      result.today_total_profit = todayProfitSum;
+      result.today_investor_share = todayShareSum;
+
+      return successRes(result, 200, 'Investor detail');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async recordInvestorDeposit(
+    investorId: string,
+    dto: RecordInvestorDepositDto,
+    superadmin: JwtPayload,
+  ): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const investor = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: investorId, role: Roles.INVESTOR, is_deleted: false },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+
+      // effective_date: berilgan sana yoki bugungi kun boshlanishi
+      const effectiveDate = dto.effective_date
+        ? new Date(dto.effective_date + 'T00:00:00').getTime()
+        : new Date(new Date().toISOString().split('T')[0] + 'T00:00:00').getTime();
+
+      const deposit = queryRunner.manager.create(InvestorDepositEntity, {
+        investor_id: investorId,
+        amount: dto.amount,
+        note: dto.note ?? null,
+        recorded_by: superadmin.id,
+        effective_date: effectiveDate,
+      });
+      await queryRunner.manager.save(deposit);
+
+      // deposited_amount yangilash (umumiy kiritilgan summa)
+      investor.deposited_amount = (investor.deposited_amount ?? 0) + dto.amount;
+      await queryRunner.manager.save(investor);
+
+      await queryRunner.commitTransaction();
+      return successRes(deposit, 201, 'Depozit qayd qilindi');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // Superadmin: investor kassasiga qo'lda daromad kiritish (eski daromadlar uchun)
+  async addManualEarning(
+    investorId: string,
+    dto: PayInvestorDto,
+    superadmin: JwtPayload,
+  ): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const investor = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: investorId, role: Roles.INVESTOR, is_deleted: false },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+
+      // Balans tekshiruvi: qarzda bo'lsa ajratish mumkin emas
+      const earningRepo = queryRunner.manager.getRepository(InvestorEarningEntity);
+      const payoutRepo = queryRunner.manager.getRepository(InvestorPayoutEntity);
+      const totalEarnedResult = await earningRepo
+        .createQueryBuilder('e')
+        .select('COALESCE(SUM(e.amount), 0)', 'total')
+        .where('e.investor_id = :id', { id: investorId })
+        .getRawOne();
+      const totalPaidResult = await payoutRepo
+        .createQueryBuilder('p')
+        .select('COALESCE(SUM(p.amount), 0)', 'total')
+        .where('p.investor_id = :id', { id: investorId })
+        .getRawOne();
+      const balance = Number(totalEarnedResult?.total || 0) - Number(totalPaidResult?.total || 0);
+
+      if (balance <= 0) {
+        throw new BadRequestException(
+          `Investor qarzda (${Math.round(balance)} so'm). Qarz yopilmaguncha ajratish mumkin emas.`,
+        );
+      }
+      if (dto.amount > balance) {
+        throw new BadRequestException(
+          `Ajratish summasi balansdan oshmasligi kerak. Mavjud balans: ${Math.round(balance)} so'm`,
+        );
+      }
+
+      const isCash = !dto.payment_method || dto.payment_method === PaymentMethod.CASH;
+
+      // 1. Asosiy kassadan yechish (naqd/karta bo'yicha)
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Asosiy kassa topilmadi');
+
+      if (isCash) {
+        if (mainCashbox.balance_cash < dto.amount) {
+          throw new BadRequestException(
+            `Naqd kassada yetarli mablag' yo'q. Kerak: ${dto.amount}, Mavjud: ${mainCashbox.balance_cash}`,
+          );
+        }
+        mainCashbox.balance_cash -= dto.amount;
+      } else {
+        if (mainCashbox.balance_card < dto.amount) {
+          throw new BadRequestException(
+            `Karta balansida yetarli mablag' yo'q. Kerak: ${dto.amount}, Mavjud: ${mainCashbox.balance_card}`,
+          );
+        }
+        mainCashbox.balance_card -= dto.amount;
+      }
+      mainCashbox.balance -= dto.amount;
+      await queryRunner.manager.save(mainCashbox);
+
+      const mainHistory = queryRunner.manager.create(CashboxHistoryEntity, {
+        operation_type: Operation_type.EXPENSE,
+        cashbox_id: mainCashbox.id,
+        source_type: Source_type.INVESTOR_ALLOCATE,
+        source_user_id: investorId,
+        amount: dto.amount,
+        balance_after: mainCashbox.balance,
+        payment_method: dto.payment_method || PaymentMethod.CASH,
+        comment: `${investor.name} ga investor ulushi ajratildi (${isCash ? 'naqd' : 'karta'})${dto.note ? ': ' + dto.note : ''}`,
+        created_by: superadmin.id,
+      });
+      await queryRunner.manager.save(mainHistory);
+
+      // 2. Investor kassasiga kirim
+      const invCashbox = await this.getOrCreateInvestorCashbox(queryRunner.manager, investorId);
+
+      invCashbox.balance += dto.amount;
+      await queryRunner.manager.save(invCashbox);
+
+      const invHistory = queryRunner.manager.create(CashboxHistoryEntity, {
+        operation_type: Operation_type.INCOME,
+        cashbox_id: invCashbox.id,
+        source_type: Source_type.INVESTOR_ALLOCATE,
+        amount: dto.amount,
+        balance_after: invCashbox.balance,
+        comment: dto.note || "Kassadan ajratilgan ulush",
+        created_by: superadmin.id,
+      });
+      await queryRunner.manager.save(invHistory);
+
+      await queryRunner.commitTransaction();
+      return successRes({ amount: dto.amount, balance: invCashbox.balance }, 201, "Investor ulushi ajratildi");
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async payInvestor(
+    investorId: string,
+    dto: PayInvestorDto,
+    admin: JwtPayload,
+  ): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const investor = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: investorId, role: Roles.INVESTOR, is_deleted: false },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+
+      const invCashbox = await this.getOrCreateInvestorCashbox(queryRunner.manager, investorId);
+
+      const amount = dto.amount;
+      // Investor kassasidan qancha yechiladi
+      const fromInvCashbox = Math.min(Math.max(invCashbox.balance, 0), amount);
+      // Asosiy kassadan qancha yechiladi (yetmagan qismi)
+      const fromMainCashbox = amount - fromInvCashbox;
+
+      // 1. Investor kassasidan yechish (qarzga tushishi mumkin)
+      invCashbox.balance -= amount;
+      await queryRunner.manager.save(invCashbox);
+
+      const invHistory = queryRunner.manager.create(CashboxHistoryEntity, {
+        operation_type: Operation_type.EXPENSE,
+        cashbox_id: invCashbox.id,
+        source_type: Source_type.INVESTOR_PAYOUT,
+        amount,
+        balance_after: invCashbox.balance,
+        comment: dto.note || "Investorga to'lov",
+        created_by: admin.id,
+      });
+      await queryRunner.manager.save(invHistory);
+
+      // 2. Asosiy kassadan faqat yetmagan qismini yechish
+      if (fromMainCashbox > 0) {
+        const isCash = !dto.payment_method || dto.payment_method === PaymentMethod.CASH;
+        const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+          where: { cashbox_type: Cashbox_type.MAIN },
+        });
+        if (!mainCashbox) throw new NotFoundException('Asosiy kassa topilmadi');
+
+        if (isCash) {
+          if (mainCashbox.balance_cash < fromMainCashbox) {
+            throw new BadRequestException(
+              `Naqd kassada yetarli mablag' yo'q. Kerak: ${fromMainCashbox}, Mavjud: ${mainCashbox.balance_cash}`,
+            );
+          }
+          mainCashbox.balance_cash -= fromMainCashbox;
+        } else {
+          if (mainCashbox.balance_card < fromMainCashbox) {
+            throw new BadRequestException(
+              `Karta balansida yetarli mablag' yo'q. Kerak: ${fromMainCashbox}, Mavjud: ${mainCashbox.balance_card}`,
+            );
+          }
+          mainCashbox.balance_card -= fromMainCashbox;
+        }
+        mainCashbox.balance -= fromMainCashbox;
+        await queryRunner.manager.save(mainCashbox);
+
+        const mainHistory = queryRunner.manager.create(CashboxHistoryEntity, {
+          operation_type: Operation_type.EXPENSE,
+          cashbox_id: mainCashbox.id,
+          source_type: Source_type.INVESTOR_PAYOUT,
+          source_user_id: investorId,
+          amount: fromMainCashbox,
+          balance_after: mainCashbox.balance,
+          payment_method: dto.payment_method || PaymentMethod.CASH,
+          comment: `${investor.name} ga investor to'lovi (${isCash ? 'naqd' : 'karta'})${dto.note ? ': ' + dto.note : ''}`,
+          created_by: admin.id,
+        });
+        await queryRunner.manager.save(mainHistory);
+      }
+
+      // Payout qayd
+      const payout = queryRunner.manager.create(InvestorPayoutEntity, {
+        investor_id: investorId,
+        amount: dto.amount,
+        note: dto.note ?? null,
+        paid_by_id: admin.id,
+      });
+      await queryRunner.manager.save(payout);
+
+      await queryRunner.commitTransaction();
+      return successRes(payout, 201, "To'lov amalga oshirildi");
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // Superadmin: tikilgan pulni qaytarish (investitsiyadan)
+  async refundInvestorDeposit(
+    investorId: string,
+    dto: PayInvestorDto,
+    superadmin: JwtPayload,
+  ): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const investor = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: investorId, role: Roles.INVESTOR, is_deleted: false },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+
+      if ((investor.deposited_amount ?? 0) < dto.amount) {
+        throw new BadRequestException(`Kiritilgan mablag'dan ko'p qaytarib bo'lmaydi. Kiritilgan: ${investor.deposited_amount}`);
+      }
+
+      // deposited_amount kamaytirish
+      investor.deposited_amount = (investor.deposited_amount ?? 0) - dto.amount;
+      await queryRunner.manager.save(investor);
+
+      // Depozit qaytarish qaydini saqlash (manfiy depozit sifatida)
+      const deposit = queryRunner.manager.create(InvestorDepositEntity, {
+        investor_id: investorId,
+        amount: -dto.amount,
+        note: dto.note || "Investitsiya qaytarildi",
+        recorded_by: superadmin.id,
+      });
+      await queryRunner.manager.save(deposit);
+
+      await queryRunner.commitTransaction();
+      return successRes(deposit, 201, "Investitsiya qaytarildi");
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Barcha investorlarning piggy bankini balansga sinxronlashtiradi.
+   * Bir martalik tuzatish — piggy bank = balance (earned - paid) bo'ladi.
+   */
+  async syncAllInvestorPiggyBanks(admin: JwtPayload): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const investors = await queryRunner.manager.find(UserEntity, {
+        where: { role: Roles.INVESTOR, is_deleted: false },
+      });
+
+      const results: any[] = [];
+
+      for (const inv of investors) {
+        // Balans hisoblash
+        const earnedResult = await queryRunner.manager
+          .getRepository(InvestorEarningEntity)
+          .createQueryBuilder('e')
+          .select('COALESCE(SUM(e.amount), 0)', 'total')
+          .where('e.investor_id = :id', { id: inv.id })
+          .getRawOne();
+        const paidResult = await queryRunner.manager
+          .getRepository(InvestorPayoutEntity)
+          .createQueryBuilder('p')
+          .select('COALESCE(SUM(p.amount), 0)', 'total')
+          .where('p.investor_id = :id', { id: inv.id })
+          .getRawOne();
+
+        const totalEarned = Number(earnedResult?.total || 0);
+        const totalPaid = Number(paidResult?.total || 0);
+        const balance = Math.round(totalEarned - totalPaid);
+
+        // Piggy bank topish/yaratish
+        const cashbox = await this.getOrCreateInvestorCashbox(queryRunner.manager, inv.id);
+        const currentPiggy = Math.round(cashbox.balance);
+
+        if (currentPiggy === balance) {
+          results.push({ name: inv.name, status: 'already_synced', balance });
+          continue;
+        }
+
+        const correction = balance - currentPiggy;
+
+        // Piggy bank balansini yangilash
+        cashbox.balance = balance;
+        await queryRunner.manager.save(cashbox);
+
+        // Correction history yozuvi
+        const history = queryRunner.manager.create(CashboxHistoryEntity, {
+          cashbox_id: cashbox.id,
+          operation_type: correction > 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+          source_type: Source_type.CORRECTION,
+          amount: Math.abs(correction),
+          balance_after: balance,
+          comment: `Piggy bank sinxronlash: ${currentPiggy} → ${balance} (farq: ${correction > 0 ? '+' : ''}${correction})`,
+          created_by: admin.id,
+        });
+        await queryRunner.manager.save(history);
+
+        results.push({
+          name: inv.name,
+          status: 'synced',
+          old_piggy: currentPiggy,
+          new_piggy: balance,
+          correction,
+        });
+      }
+
+      await queryRunner.commitTransaction();
+      return successRes(results, 200, 'Barcha investorlar sinxronlashtirildi');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async updateInvestor(id: string, dto: UpdateInvestorDto): Promise<object> {
+    try {
+      const investor = await this.userRepo.findOne({
+        where: { id, role: Roles.INVESTOR, is_deleted: false },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+
+      if (dto.phone_number && dto.phone_number !== investor.phone_number) {
+        const exist = await this.userRepo.findOne({
+          where: { phone_number: dto.phone_number, role: Not(Roles.CUSTOMER) },
+        });
+        if (exist) throw new ConflictException('Bu telefon raqam band');
+      }
+
+      if (dto.password) {
+        dto.password = await this.bcrypt.encrypt(dto.password);
+      }
+
+      const updated = this.userRepo.merge(investor, dto as DeepPartial<UserEntity>);
+      await this.userRepo.save(updated);
+
+      return successRes(updated, 200, 'Investor yangilandi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async deleteInvestor(id: string): Promise<object> {
+    try {
+      const investor = await this.userRepo.findOne({
+        where: { id, role: Roles.INVESTOR, is_deleted: false },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+
+      investor.is_deleted = true;
+      investor.status = Status.INACTIVE;
+      await this.userRepo.save(investor);
+
+      return successRes(null, 200, "Investor o'chirildi");
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  async getMyInvestorDashboard(
+    user: JwtPayload,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<object> {
+    try {
+      const investor = await this.userRepo.findOne({
+        where: { id: user.id, role: Roles.INVESTOR, is_deleted: false },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+
+      // Reuse getInvestorDetail
+      return this.getInvestorDetail(user.id, fromDate, toDate);
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== SALARY CRON ====================
+
+  /**
+   * Har kuni soat 00:05 da ishlaydi (Toshkent vaqti)
+   * Bugungi kun = payment_day bo'lgan barcha ACTIVE ishchilar uchun
+   * have_to_pay ga salary_amount qo'shiladi
+   *
+   * Qoidalar:
+   * - Bloklangan (INACTIVE) xodimlar uchun oylik hisoblanmaydi
+   * - Xodim ishga kirganidan keyin 1 oy to'lmaguncha oylik hisoblanmaydi
+   * - Ikki marta qo'shilishdan himoya: updated_at orqali tekshiriladi
+   */
+  @Cron('0 5 0 * * *', { timeZone: 'Asia/Tashkent' })
+  async handleMonthlySalary(): Promise<void> {
+    const today = new Date();
+    const currentDay = today.getDate();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    // Oyning oxirgi kunlari uchun: agar payment_day > oyning kunlari bo'lsa
+    // masalan: payment_day=31, lekin fevralda 28 kun → fevral 28-da hisoblanadi
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+    // Bugungi sana string (ikki marta qo'shilishdan himoya uchun)
+    const todayStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
+
+    // 1 oy oldingi sana (milliseconds) — faqat 1 oy to'lgan xodimlar uchun oylik hisoblanadi
+    const oneMonthAgo = new Date(currentYear, currentMonth - 1, currentDay).getTime();
+
+    try {
+      const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
+
+      const qb = salaryRepo
+        .createQueryBuilder('s')
+        .innerJoin('s.user', 'u')
+        .where('u.is_deleted = :del', { del: false })
+        .andWhere('u.status = :status', { status: Status.ACTIVE })
+        .andWhere('s.salary_amount > 0')
+        .andWhere('u.role IN (:...allowedRoles)', {
+          allowedRoles: [Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST],
+        })
+        // Xodim ishga kirganidan kamida 1 oy o'tgan bo'lishi kerak
+        .andWhere('u.created_at <= :oneMonthAgo', { oneMonthAgo });
+
+      // Payment day filter
+      if (currentDay === lastDayOfMonth) {
+        // Oyning oxirgi kunida: payment_day = bugun YOKI payment_day > oyning oxirgi kuni
+        qb.andWhere('(s.payment_day = :day OR s.payment_day > :lastDay)', {
+          day: currentDay,
+          lastDay: lastDayOfMonth,
+        });
+      } else {
+        qb.andWhere('s.payment_day = :day', { day: currentDay });
+      }
+
+      const salaries = await qb.getMany();
+
+      if (salaries.length === 0) {
+        this.logger.log(`[SALARY CRON] Bugun (${currentDay}-kun) uchun oylik to'lanadigan ishchi yo'q`);
+        return;
+      }
+
+      let updated = 0;
+      let skipped = 0;
+
+      for (const salary of salaries) {
+        // Ikki marta qo'shilishdan himoya: shu oy allaqachon qo'shilganmi?
+        // updated_at ni tekshiramiz — agar bugungi sana bilan bir xil bo'lsa, skip
+        const lastUpdate = new Date(Number(salary.updated_at));
+        const lastUpdateStr = `${lastUpdate.getFullYear()}-${String(lastUpdate.getMonth() + 1).padStart(2, '0')}-${String(lastUpdate.getDate()).padStart(2, '0')}`;
+
+        if (lastUpdateStr === todayStr) {
+          skipped++;
+          continue; // Bugun allaqachon yangilangan — o'tkazib yuboramiz
+        }
+
+        salary.have_to_pay += salary.salary_amount;
+        await salaryRepo.save(salary);
+        updated++;
+      }
+
+      this.logger.log(
+        `[SALARY CRON] ${updated} ta ishchiga oylik qo'shildi, ${skipped} ta o'tkazildi (${currentDay}-kun)`,
+      );
+    } catch (error) {
+      this.logger.error(`[SALARY CRON] Xatolik: ${error.message}`, error.stack);
     }
   }
 }

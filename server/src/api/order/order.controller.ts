@@ -52,7 +52,7 @@ export class OrderController {
   @ApiResponse({ status: 422, description: 'Validation error' })
   @ApiBody({ type: CreateOrderDto })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
   @Post()
   createOrder(
     @Body() creteOrderDto: CreateOrderDto,
@@ -85,7 +85,7 @@ export class OrderController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.COURIER)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
   @Get()
   findAll(
     @Query('status') status?: string | string[],
@@ -116,7 +116,7 @@ export class OrderController {
   @ApiOperation({ summary: 'Markets with new orders' })
   @ApiResponse({ status: 200, description: 'List of markets with new orders' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST)
   @Get('markets/new-orders')
   haveNewOrdersMarket(@Query('search') search?: string) {
     return this.orderService.haveNewOrderMarkets(search);
@@ -128,7 +128,7 @@ export class OrderController {
     description: 'List of new orders for current market',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.MARKET)
+  @AcceptRoles(Roles.MARKET, Roles.OPERATOR)
   @Get('market/my-new-orders')
   myNewOrders(
     @CurrentUser() user: JwtPayload,
@@ -143,7 +143,7 @@ export class OrderController {
   @ApiParam({ name: 'id', description: 'Market ID' })
   @ApiResponse({ status: 200, description: 'New orders for the market' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST, Roles.OPERATOR)
   @Get('market/:id')
   newOrdersByMarketId(
     @Param('id') id: string,
@@ -164,6 +164,8 @@ export class OrderController {
     Roles.COURIER,
     Roles.MARKET,
     Roles.REGISTRATOR,
+    Roles.LOGIST,
+    Roles.OPERATOR,
   )
   @Get(':id')
   findOne(@Param('id') id: string) {
@@ -193,7 +195,7 @@ export class OrderController {
   @ApiBody({ type: UpdateOrderDto })
   @ApiResponse({ status: 200, description: 'Order updated' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
   @Patch(':id')
   editOrder(
     @Param('id') id: string,
@@ -231,6 +233,17 @@ export class OrderController {
     return this.orderService.receiveNewOrders(ordersArray, search);
   }
 
+  @ApiOperation({ summary: 'Check if external order is duplicate' })
+  @ApiResponse({ status: 200, description: 'Duplicate check result' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('check-duplicate')
+  checkDuplicateOrder(
+    @Body() dto: { phone: string; qr_code: string; integration_id: string },
+  ) {
+    return this.orderService.checkDuplicateOrder(dto);
+  }
+
   @ApiOperation({ summary: 'Receive external orders (from Adosh, etc.)' })
   @ApiBody({ type: ReceiveExternalOrdersDto })
   @ApiResponse({ status: 201, description: 'External orders received and created' })
@@ -258,7 +271,7 @@ export class OrderController {
   })
   @ApiResponse({ status: 200, description: 'All orders for current market' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.MARKET)
+  @AcceptRoles(Roles.MARKET, Roles.OPERATOR)
   @Get('market/all/my-orders')
   allMarketsOrders(
     @CurrentUser() user: JwtPayload,
@@ -369,7 +382,7 @@ export class OrderController {
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order deleted' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
   @Delete(':id')
   delete(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.orderService.remove(id, user);

@@ -120,10 +120,8 @@ const RefusedMailDetail = () => {
   const postData = data?.data?.allOrdersByPostId || data?.data || [];
 
   useEffect(() => {
-    if (data?.data) {
-      setSelectedIds([]);
-    }
-  }, [data]);
+    setSelectedIds([]);
+  }, [id]);
 
   // Filter locally by name or phone
   const filteredPostData = useMemo(() => {

@@ -20,7 +20,7 @@ const ProductsCreate: FC = () => {
 
   const { getMyProducts, getProductsByMarket } = useProduct();
   const { data } =
-    role === "market"
+    role === "market" || role === "operator"
       ? getMyProducts()
       : getProductsByMarket(id, true, { page, limit });
 

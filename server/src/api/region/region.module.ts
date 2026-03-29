@@ -7,6 +7,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { DistrictEntity } from 'src/core/entity/district.entity';
+import { DistrictCourierEntity } from 'src/core/entity/district-courier.entity';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
       OrderEntity,
       UserEntity,
       DistrictEntity,
+      DistrictCourierEntity,
     ]),
   ],
   controllers: [RegionController],

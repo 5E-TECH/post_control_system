@@ -1,8 +1,12 @@
 import React, { useEffect, useState, useMemo } from "react";
 import Highcharts from "highcharts/highmaps";
 import HighchartsReact from "highcharts-react-official";
+import uzTopology from "@highcharts/map-collection/countries/uz/uz-all.topo.json";
+import { useSelector } from "react-redux";
+import { useTranslation } from "react-i18next";
 import { useRegion } from "../../../shared/api/hooks/useRegion/useRegion";
-import { Package, TrendingUp, Loader2 } from "lucide-react";
+import { Package, TrendingUp, Loader2, MapPin } from "lucide-react";
+import type { RootState } from "../../../app/store";
 
 // SATO kodi -> Highcharts hc-key mapping
 // Bu mapping SATO kodlari asosida ishlaydi - nomlardan ko'ra ishonchli
@@ -56,11 +60,13 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
   startDate,
   endDate,
 }) => {
+  const { t } = useTranslation(["regions"]);
   const [mapOptions, setMapOptions] = useState<any>(null);
-  const [topology, setTopology] = useState<any>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const { role } = useSelector((state: RootState) => state.roleSlice);
+  const isLogist = role === "logist";
   const { getAllRegionsStats } = useRegion();
-  const { data: statsData, isLoading } = getAllRegionsStats(startDate, endDate);
+  const { data: statsData, isLoading, isError } = getAllRegionsStats(startDate, endDate);
 
   // Dark mode detection
   useEffect(() => {
@@ -81,17 +87,19 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
   const regions: RegionStats[] = statsData?.data?.regions || [];
   const summary = statsData?.data?.summary;
 
-  // Topology yuklash
-  useEffect(() => {
-    fetch("https://code.highcharts.com/mapdata/countries/uz/uz-all.topo.json")
-      .then((res) => res.json())
-      .then(setTopology)
-      .catch(console.error);
-  }, []);
+  // Tooltip translation strings (captured as closure vars in useEffect)
+  const tTotalOrders = t("totalOrders");
+  const tDelivered = t("delivered");
+  const tCancelled = t("cancelled");
+  const tSuccessRate = t("successRate");
+  const tRevenue = t("revenue");
+  const tSum = t("sum");
+  const tCouriers = t("couriers");
+  const tClickForDetails = t("clickForDetails");
 
   // Xarita ma'lumotlarini yangilash
   useEffect(() => {
-    if (!topology || !regions.length) return;
+    if (!regions.length) return;
 
     const mapData = regions.map((region) => {
       const hcKey = getRegionHcKey(region.satoCode);
@@ -112,7 +120,7 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
 
     setMapOptions({
       chart: {
-        map: topology,
+        map: uzTopology,
         backgroundColor: "transparent",
         style: {
           fontFamily: "inherit",
@@ -167,32 +175,32 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
               </div>
               <div style="display: grid; gap: 4px;">
                 <div style="display: flex; justify-content: space-between; gap: 16px;">
-                  <span style="color: ${labelColor};">Jami buyurtmalar:</span>
+                  <span style="color: ${labelColor};">${tTotalOrders}:</span>
                   <span style="font-weight: 600; color: #60a5fa;">${point.value?.toLocaleString() || 0}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; gap: 16px;">
-                  <span style="color: ${labelColor};">Yetkazilgan:</span>
+                  <span style="color: ${labelColor};">${tDelivered}:</span>
                   <span style="font-weight: 600; color: #34d399;">${point.deliveredOrders?.toLocaleString() || 0}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; gap: 16px;">
-                  <span style="color: ${labelColor};">Bekor qilingan:</span>
+                  <span style="color: ${labelColor};">${tCancelled}:</span>
                   <span style="font-weight: 600; color: #f87171;">${point.cancelledOrders?.toLocaleString() || 0}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; gap: 16px;">
-                  <span style="color: ${labelColor};">Muvaffaqiyat:</span>
+                  <span style="color: ${labelColor};">${tSuccessRate}:</span>
                   <span style="font-weight: 600; color: ${point.successRate >= 70 ? '#34d399' : point.successRate >= 50 ? '#fbbf24' : '#f87171'};">${point.successRate || 0}%</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid ${borderColor}; padding-top: 4px; margin-top: 4px;">
-                  <span style="color: ${labelColor};">Tushum:</span>
-                  <span style="font-weight: 600; color: #a78bfa;">${(point.totalRevenue || 0).toLocaleString()} so'm</span>
-                </div>
+                ${!isLogist ? `<div style="display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid ${borderColor}; padding-top: 4px; margin-top: 4px;">
+                  <span style="color: ${labelColor};">${tRevenue}:</span>
+                  <span style="font-weight: 600; color: #a78bfa;">${(point.totalRevenue || 0).toLocaleString()} ${tSum}</span>
+                </div>` : ''}
                 <div style="display: flex; justify-content: space-between; gap: 16px;">
-                  <span style="color: ${labelColor};">Kuryerlar:</span>
+                  <span style="color: ${labelColor};">${tCouriers}:</span>
                   <span style="font-weight: 600; color: ${textColor};">${point.couriersCount || 0}</span>
                 </div>
               </div>
               <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed ${borderColor}; text-align: center; color: ${dark ? '#818cf8' : '#9ca3af'}; font-size: 11px;">
-                Batafsil ko'rish uchun bosing
+                ${tClickForDetails}
               </div>
             </div>
           `;
@@ -242,50 +250,71 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
         },
       ],
     });
-  }, [topology, regions, onRegionClick, isDarkMode]);
+  }, [regions, onRegionClick, isDarkMode, isLogist, tTotalOrders, tDelivered, tCancelled, tSuccessRate, tRevenue, tSum, tCouriers, tClickForDetails]);
 
   // Summary kartalar
   const summaryCards = useMemo(() => {
     if (!summary) return null;
     return [
       {
-        label: "Jami buyurtmalar",
+        label: t("totalOrders"),
         value: summary.totalOrders?.toLocaleString() || "0",
         icon: Package,
         color: "bg-blue-500",
         textColor: "text-blue-600",
       },
       {
-        label: "Yetkazilgan",
+        label: t("delivered"),
         value: summary.totalDelivered?.toLocaleString() || "0",
         icon: TrendingUp,
         color: "bg-emerald-500",
         textColor: "text-emerald-600",
       },
       {
-        label: "Bekor qilingan",
+        label: t("cancelled"),
         value: summary.totalCancelled?.toLocaleString() || "0",
         icon: Package,
         color: "bg-red-500",
         textColor: "text-red-600",
       },
-      {
-        label: "Jami tushum",
-        value: `${(summary.totalRevenue || 0).toLocaleString()} so'm`,
+      ...(!isLogist ? [{
+        label: t("totalRevenue"),
+        value: `${(summary.totalRevenue || 0).toLocaleString()} ${t("sum")}`,
         icon: TrendingUp,
         color: "bg-purple-500",
         textColor: "text-purple-600",
-      },
+      }] : []),
     ];
-  }, [summary]);
+  }, [summary, isLogist, t]);
+
+  // Error holati
+  if (isError) {
+    return (
+      <div className="bg-white dark:bg-[#2A263D] rounded-2xl p-8 text-center">
+        <MapPin className="w-16 h-16 text-red-300 dark:text-red-600 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-600 dark:text-gray-300 mb-2">
+          API xatolik: Ma'lumotlarni yuklab bo'lmadi
+        </h3>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+          Server javob bermadi yoki ruxsat yo'q. Sahifani yangilang.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600 transition-colors cursor-pointer"
+        >
+          Qayta urinish
+        </button>
+      </div>
+    );
+  }
 
   // Skeleton loading
   if (!mapOptions || isLoading) {
     return (
       <div className="space-y-4">
         {/* Summary skeleton */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map((i) => (
+        <div className={`grid grid-cols-2 ${isLogist ? "md:grid-cols-3" : "md:grid-cols-4"} gap-3`}>
+          {(isLogist ? [1, 2, 3] : [1, 2, 3, 4]).map((i) => (
             <div
               key={i}
               className="bg-white dark:bg-[#2A263D] rounded-xl p-4 animate-pulse"
@@ -301,7 +330,7 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shine_1.6s_infinite]" />
           <div className="flex flex-col items-center gap-2 z-10">
             <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
-            <span className="text-gray-500 dark:text-gray-400">Yuklanmoqda...</span>
+            <span className="text-gray-500 dark:text-gray-400">{t("loading")}</span>
           </div>
         </div>
       </div>
@@ -312,7 +341,7 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
     <div className="space-y-4">
       {/* Summary cards */}
       {summaryCards && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className={`grid grid-cols-2 ${isLogist ? "md:grid-cols-3" : "md:grid-cols-4"} gap-3`}>
           {summaryCards.map((card, idx) => (
             <div
               key={idx}

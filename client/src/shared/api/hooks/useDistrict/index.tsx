@@ -95,6 +95,22 @@ export const useDistrict = () => {
     },
   });
 
+  const addDistrictCourier = useMutation({
+    mutationFn: ({ districtId, name, phone_number }: { districtId: string; name: string; phone_number: string }) =>
+      api.post(`district/courier/${districtId}`, { name, phone_number }).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [region, "stats"] });
+    },
+  });
+
+  const removeDistrictCourier = useMutation({
+    mutationFn: (courierId: string) =>
+      api.delete(`district/courier/${courierId}`).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [region, "stats"] });
+    },
+  });
+
   const mergeDistricts = useMutation({
     mutationFn: (data: { source_district_ids: string[]; target_district_id: string }) =>
       api.post("district/merge", data).then((res) => res.data),
@@ -117,5 +133,7 @@ export const useDistrict = () => {
     updateDistrictSatoCode,
     deleteDistrict,
     mergeDistricts,
+    addDistrictCourier,
+    removeDistrictCourier,
   };
 };

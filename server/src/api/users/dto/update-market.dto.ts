@@ -30,6 +30,10 @@ export class UpdateMarketDto {
   add_order?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  require_operator_phone?: boolean;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   tariff_home?: number;

@@ -1,5 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
@@ -9,6 +9,7 @@ import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 
 @ApiTags('Dashboard')
+@ApiBearerAuth()
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
@@ -25,7 +26,7 @@ export class DashboardController {
     description: 'End date (ISO string)',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.LOGIST)
   getOverview(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -69,7 +70,7 @@ export class DashboardController {
     description: 'End date (ISO string)',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.MARKET)
+  @AcceptRoles(Roles.MARKET, Roles.OPERATOR)
   getStatsForMarket(
     @CurrentUser() user: JwtPayload,
     @Query('startDate') startDate?: string,

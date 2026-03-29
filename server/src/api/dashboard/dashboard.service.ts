@@ -130,14 +130,15 @@ export class DashboardService {
         }
       }
 
-      const [myStat, markets, topMarkets] = await Promise.all([
+      const [myStat, markets, topMarkets, topOperators] = await Promise.all([
         this.orderStats.marketStat(user, startDate, endDate),
         this.orderStats.getMarketStats(startDate, endDate),
         this.orderStats.getTopMarkets(),
+        this.orderStats.getTopOperatorsByMarket(user),
       ]);
 
       return successRes(
-        { myStat, markets, topMarkets },
+        { myStat, markets, topMarkets, topOperators },
         200,
         'Dashboard infos',
       );

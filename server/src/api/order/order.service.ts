@@ -11,7 +11,7 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { DataSource, In } from 'typeorm';
+import { DataSource, In, IsNull } from 'typeorm';
 import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { OrderItemRepository } from 'src/core/repository/order-item.repository';
 import {
@@ -22,6 +22,7 @@ import {
   Post_status,
   Roles,
   Source_type,
+  Status,
   Where_deliver,
 } from 'src/common/enums';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
@@ -61,6 +62,12 @@ import { Response } from 'express';
 import { ExternalIntegrationService } from '../external-integration/external-integration.service';
 import { FieldMapping } from 'src/core/entity/external-integration.entity';
 import { IntegrationSyncService } from '../integration-sync/integration-sync.service';
+import { OperatorEarningEntity } from 'src/core/entity/operator-earning.entity';
+import { InvestorEarningEntity } from 'src/core/entity/investor-earning.entity';
+import { InvestorDepositEntity } from 'src/core/entity/investor-deposit.entity';
+import { Commission_type, FinancialSource_type } from 'src/common/enums';
+import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
+import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -261,6 +268,21 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         market_id = user.id;
       }
 
+      // Agar operator buyurtma yaratayotgan bo'lsa, market_id ni operatorning market_id sidan olish
+      if (user.role === Roles.OPERATOR) {
+        const operatorUser = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: user.id, role: Roles.OPERATOR },
+        });
+        if (!operatorUser || !operatorUser.market_id) {
+          throw new BadRequestException('Operator marketga biriktirilmagan');
+        }
+        market_id = operatorUser.market_id;
+        // operator field yo'q bo'lsa, operator ismini avtomatik to'ldirish
+        if (!createOrderDto.operator) {
+          createOrderDto.operator = operatorUser.name;
+        }
+      }
+
       // Agar market boshqa market uchun buyurtma yaratmoqchi bo'lsa, rad etish
       if (user.role === Roles.MARKET && user.id !== market_id) {
         throw new BadRequestException('Market Id is not match!');
@@ -274,8 +296,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Market not found');
       }
 
-      if (user.role === Roles.MARKET && !market.add_order) {
+      if ((user.role === Roles.MARKET || user.role === Roles.OPERATOR) && !market.add_order) {
         throw new BadRequestException('You can not create order and product');
+      }
+
+      // Operator telefon raqami majburiy bo'lsa tekshirish
+      if (market.require_operator_phone && !createOrderDto.operator_phone) {
+        throw new BadRequestException('Operator telefon raqamini kiritish majburiy');
       }
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
@@ -294,7 +321,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const newOrder = queryRunner.manager.create(OrderEntity, {
         user_id: market_id,
         comment,
-        operator,
+        operator: createOrderDto.operator,
+        operator_phone: createOrderDto.operator_phone || null,
+        operator_id: user.role === Roles.OPERATOR ? user.id : null,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
         status: Order_status.NEW,
@@ -559,6 +588,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     limit: number = 10,
   ) {
     try {
+      // Operator uchun market_id ni olish
+      let effectiveUserId = user.id;
+      if (user.role === Roles.OPERATOR) {
+        const operatorUser = await this.userRepo.findOne({
+          where: { id: user.id, role: Roles.OPERATOR },
+        });
+        if (!operatorUser?.market_id) {
+          return successRes({ data: [], total: 0, page, limit, totalPages: 0 }, 200, 'No orders');
+        }
+        effectiveUserId = operatorUser.market_id;
+      }
+
       const query = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
@@ -570,7 +611,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('customer.district', 'district')
         .leftJoinAndSelect('district.region', 'region.name')
         .where('order.status = :status', { status: Order_status.NEW })
-        .andWhere('order.user_id = :userId', { userId: user.id });
+        .andWhere('order.user_id = :userId', { userId: effectiveUserId });
 
       if (search) {
         query.andWhere(
@@ -773,6 +814,31 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
       }
 
+      // Operator uchun qo'shimcha tekshiruvlar
+      if (user?.role === Roles.OPERATOR) {
+        const operatorUser = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: user.id, role: Roles.OPERATOR },
+        });
+        if (!operatorUser?.market_id) {
+          throw new BadRequestException('Operator marketga biriktirilmagan');
+        }
+        // Faqat o'z marketining buyurtmasini tahrirlash
+        if (editingOrder.user_id !== operatorUser.market_id) {
+          throw new BadRequestException('Bu buyurtma sizning marketingizga tegishli emas');
+        }
+        // Operator faqat NEW statusdagi buyurtmalarni tahrirlashi mumkin
+        if (editingOrder.status !== Order_status.NEW) {
+          throw new BadRequestException('Faqat yangi buyurtmalarni tahrirlash mumkin');
+        }
+        // add_order ruxsatini tekshirish
+        const market = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: operatorUser.market_id },
+        });
+        if (!market?.add_order) {
+          throw new BadRequestException('Marketga buyurtma tahrirlash ruxsati berilmagan');
+        }
+      }
+
       if (
         editingOrder.status === Order_status.NEW ||
         editingOrder.status === Order_status.RECEIVED
@@ -827,6 +893,78 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
         if (updateOrderDto.comment !== undefined) {
           editingOrder.comment = updateOrderDto.comment;
+        }
+        if (updateOrderDto.address !== undefined) {
+          editingOrder.address = updateOrderDto.address;
+        }
+
+        // 🟡 2.5. Mijoz ma'lumotlarini yangilash
+        if (updateOrderDto.client_name || updateOrderDto.client_phone_number) {
+          const customer = await queryRunner.manager.findOne(UserEntity, {
+            where: { id: editingOrder.customer_id, role: Roles.CUSTOMER },
+          });
+          if (customer) {
+            if (updateOrderDto.client_name) {
+              customer.name = updateOrderDto.client_name;
+            }
+            if (updateOrderDto.client_phone_number) {
+              customer.phone_number = updateOrderDto.client_phone_number;
+            }
+            await queryRunner.manager.save(customer);
+          }
+        }
+
+        // 🟡 2.6. District o'zgarganda pochtani ham yangilash
+        if (updateOrderDto.district_id && updateOrderDto.district_id !== editingOrder.district_id) {
+          const newDistrict = await queryRunner.manager.findOne(DistrictEntity, {
+            where: { id: updateOrderDto.district_id },
+          });
+          if (!newDistrict) {
+            throw new NotFoundException('District not found');
+          }
+          editingOrder.district_id = updateOrderDto.district_id;
+
+          // RECEIVED buyurtma uchun: viloyat o'zgarganda pochtani ham yangilash
+          if (editingOrder.status === Order_status.RECEIVED && editingOrder.post_id) {
+            const oldPost = await queryRunner.manager.findOne(PostEntity, {
+              where: { id: editingOrder.post_id },
+            });
+
+            if (oldPost && oldPost.region_id !== newDistrict.assigned_region) {
+              // Yangi viloyat uchun NEW post topish yoki yaratish
+              let newPost = await queryRunner.manager.findOne(PostEntity, {
+                where: {
+                  region_id: newDistrict.assigned_region,
+                  status: Post_status.NEW,
+                },
+              });
+              if (!newPost) {
+                newPost = queryRunner.manager.create(PostEntity, {
+                  region_id: newDistrict.assigned_region,
+                  qr_code_token: generateCustomToken(),
+                  post_total_price: 0,
+                  order_quantity: 0,
+                  status: Post_status.NEW,
+                });
+                await queryRunner.manager.save(newPost);
+              }
+
+              // Eski post statistikasini kamaytirish
+              oldPost.post_total_price =
+                Number(oldPost.post_total_price ?? 0) - Number(editingOrder.total_price ?? 0);
+              oldPost.order_quantity = Math.max(Number(oldPost.order_quantity ?? 0) - 1, 0);
+              await queryRunner.manager.save(oldPost);
+
+              // Yangi post statistikasini oshirish
+              newPost.post_total_price =
+                Number(newPost.post_total_price ?? 0) + Number(editingOrder.total_price ?? 0);
+              newPost.order_quantity = Number(newPost.order_quantity ?? 0) + 1;
+              await queryRunner.manager.save(newPost);
+
+              // Buyurtmaga yangi post tayinlash
+              editingOrder.post_id = newPost.id;
+            }
+          }
         }
 
         // 🟡 3. Yetkazib berish tariflarini o'zgartirish (admin/superadmin/registrator)
@@ -1237,6 +1375,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         query.fetchAll === true || (query.fetchAll as any) === 'true';
       const limit = getSafeLimit(query.limit, fetchAll);
 
+      // Operator uchun market_id ni olish
+      let effectiveUserId = user.id;
+      if (user.role === Roles.OPERATOR) {
+        const operatorUser = await this.userRepo.findOne({
+          where: { id: user.id, role: Roles.OPERATOR },
+        });
+        if (!operatorUser?.market_id) {
+          return successRes({ data: [], total: 0, page, limit, totalPages: 0 }, 200, 'No orders');
+        }
+        effectiveUserId = operatorUser.market_id;
+      }
+
       const qb = this.orderRepo
         .createQueryBuilder('order')
         .leftJoinAndSelect('order.customer', 'customer')
@@ -1246,7 +1396,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
-        .where('order.user_id = :userId', { userId: user.id })
+        .where('order.user_id = :userId', { userId: effectiveUserId })
         .orderBy('order.created_at', 'DESC');
 
       if (!status) {
@@ -1372,7 +1522,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             Order_status.CREATED,
             Order_status.NEW,
             Order_status.RECEIVED,
-            Order_status.ON_THE_ROAD,
           ],
         });
       }
@@ -1632,6 +1781,74 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.manager.save(order);
 
+      // === Operator earning hisoblash ===
+      if (order.operator_id) {
+        const operatorUser = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: order.operator_id },
+        });
+        const commVal = Number(operatorUser?.commission_value ?? 0);
+        if (operatorUser?.commission_type && commVal > 0) {
+          const earningAmount: number =
+            operatorUser.commission_type === Commission_type.PERCENT
+              ? (order.total_price * commVal) / 100
+              : commVal;
+
+          const existing = await queryRunner.manager.findOne(
+            OperatorEarningEntity,
+            { where: { order_id: order.id } },
+          );
+          if (existing) {
+            existing.amount = earningAmount;
+            await queryRunner.manager.save(existing);
+          } else {
+            const earning = new OperatorEarningEntity();
+            earning.operator_id = order.operator_id;
+            earning.order_id = order.id;
+            earning.market_id = order.user_id;
+            earning.amount = earningAmount;
+            await queryRunner.manager.save(OperatorEarningEntity, earning);
+          }
+        }
+      }
+
+      // === Investor earning hisoblash (vaqtinchalik o'chirilgan) ===
+      // const investorProfit = marketTarif - courierTarif;
+      // if (investorProfit > 0) {
+      //   const activeInvestors = await queryRunner.manager.find(UserEntity, {
+      //     where: [
+      //       { role: Roles.INVESTOR, status: Status.ACTIVE, is_deleted: false },
+      //       { role: Roles.INVESTOR, status: IsNull() as any, is_deleted: false },
+      //     ],
+      //   });
+      //   const now = Date.now();
+      //   for (const inv of activeInvestors) {
+      //     const committed = inv.committed_amount ?? 0;
+      //     const sharePercent = inv.share_percent ?? 0;
+      //     let activeDeposited = 0;
+      //     if (committed > 0) {
+      //       const deposits = await queryRunner.manager
+      //         .createQueryBuilder(InvestorDepositEntity, 'd')
+      //         .where('d.investor_id = :id', { id: inv.id })
+      //         .andWhere('d.effective_date <= :now', { now })
+      //         .andWhere('d.amount > 0')
+      //         .getMany();
+      //       activeDeposited = deposits.reduce((s, d) => s + Number(d.amount), 0);
+      //     }
+      //     const effPercent = committed === 0
+      //       ? sharePercent
+      //       : sharePercent * Math.min(activeDeposited / committed, 1.0);
+      //     if (effPercent <= 0) continue;
+      //     const earningAmount = (investorProfit * effPercent) / 100;
+      //     const invEarning = new InvestorEarningEntity();
+      //     invEarning.investor_id = inv.id;
+      //     invEarning.order_id = order.id;
+      //     invEarning.amount = earningAmount;
+      //     invEarning.effective_percent = effPercent;
+      //     invEarning.profit = investorProfit;
+      //     await queryRunner.manager.save(InvestorEarningEntity, invEarning);
+      //   }
+      // }
+
       // === Extra cost (agar bo'lsa) ===
       // Telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun raqamga aylantirish
       const extraCost = sellDto.extraCost
@@ -1639,6 +1856,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : 0;
 
       if (extraCost > 0) {
+        // Uyga yetkaziladigan buyurtmalarda sotishda ortiqcha xarajat yozish mumkin emas
+        if (order.where_deliver !== Where_deliver.CENTER) {
+          throw new BadRequestException(
+            'Uyga yetkaziladigan buyurtmalarda sotishda ortiqcha xarajat yozish mumkin emas',
+          );
+        }
+        // Markazga: ortiqcha xarajat + markaz tarifi <= uy tarifi
+        const courierHomeTarif = courier.tariff_home;
+        const maxExtraCost = Math.max(0, courierHomeTarif - courierTarif);
+        if (extraCost > maxExtraCost) {
+          throw new BadRequestException(
+            `Ortiqcha xarajat + yetkazish tarifi (${courierTarif.toLocaleString('uz-UZ')}) uy tarifidan (${courierHomeTarif.toLocaleString('uz-UZ')}) oshmasligi kerak. Maksimal: ${maxExtraCost.toLocaleString('uz-UZ')} so'm`,
+          );
+        }
         await Promise.all([
           updateCashbox(
             marketCashbox,
@@ -1659,6 +1890,29 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             courier.id,
           ),
         ]);
+      }
+
+      // === MOLIYAVIY TAROZI: pochta foydasi ===
+      // NET ta'sir = marketTarif - courierTarif (pochta foydasi)
+      const sellProfit = marketTarif - courierTarif;
+      if (sellProfit !== 0) {
+        const balanceBefore = await calculateFinancialBalance(queryRunner.manager);
+        // sell profit allaqachon cashbox balanslarida aks etgan, shuning uchun balance_after = balanceBefore
+        // Aslida sell paytida courier va market cashboxlar o'zgargani uchun profit allaqachon hisobga olingan
+        const balanceAfter = balanceBefore;
+
+        await queryRunner.manager.save(
+          queryRunner.manager.create(FinancialBalanceHistoryEntity, {
+            amount: sellProfit,
+            balance_before: balanceAfter - sellProfit,
+            balance_after: balanceAfter,
+            source_type: FinancialSource_type.SELL_PROFIT,
+            order_id: order.id,
+            related_user_id: marketId,
+            comment: `Buyurtma #${order.id.slice(0, 8)} — pochta foydasi: ${sellProfit} so'm`,
+            created_by: user.id,
+          }),
+        );
       }
 
       await queryRunner.commitTransaction();
@@ -1703,12 +1957,27 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       const marketId = order.user_id;
-      const market = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: marketId, role: Roles.MARKET },
-      });
+      const [market, courier] = await Promise.all([
+        queryRunner.manager.findOne(UserEntity, {
+          where: { id: marketId, role: Roles.MARKET },
+        }),
+        queryRunner.manager.findOne(UserEntity, {
+          where: { id: currentUser.id },
+        }),
+      ]);
       if (!market) {
         throw new NotFoundException('This orders owner is not found');
       }
+      if (!courier) {
+        throw new NotFoundException('Courier not found');
+      }
+
+      const courierTarif =
+        order.courier_tariff != null
+          ? order.courier_tariff
+          : order.where_deliver === Where_deliver.CENTER
+            ? courier.tariff_center
+            : courier.tariff_home;
 
       const finalComment = generateComment(
         order.comment,
@@ -1721,6 +1990,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : 0;
 
       if (extraCost > 0) {
+        // Bekor qilishda: maximum o'z xizmat haqqi (courierTarif)
+        const maxExtraCost = courierTarif;
+        if (extraCost > maxExtraCost) {
+          throw new BadRequestException(
+            `Ortiqcha xarajat o'z xizmat haqqingizdan (${maxExtraCost.toLocaleString('uz-UZ')} so'm) oshmasligi kerak`,
+          );
+        }
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
           where: { cashbox_type: Cashbox_type.FOR_MARKET, user_id: marketId },
         });
@@ -1774,6 +2050,21 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment: finalComment,
       });
       await queryRunner.manager.save(order);
+
+      // Operator earning ni o'chirish (agar sotilgan bo'lib, earning yaratilgan bo'lsa)
+      if (order.operator_id) {
+        const existingEarning = await queryRunner.manager.findOne(
+          OperatorEarningEntity,
+          { where: { order_id: order.id } },
+        );
+        if (existingEarning) {
+          await queryRunner.manager.remove(OperatorEarningEntity, existingEarning);
+        }
+      }
+
+      // Investor earning recordlarni o'chirish (kassaga tegmaydi — kassa faqat admin boshqaradi)
+      await queryRunner.manager.delete(InvestorEarningEntity, { order_id: order.id });
+
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id: order.customer_id },
         relations: ['district', 'district.region'],
@@ -2088,6 +2379,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         courier_tariff: order.courier_tariff ?? courierTarif,
       });
       await queryRunner.manager.save(order);
+
+      // === Operator earning hisoblash (partlySold) ===
+      if (order.operator_id) {
+        const operatorUserPs = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: order.operator_id },
+        });
+        const commValPs = Number(operatorUserPs?.commission_value ?? 0);
+        if (operatorUserPs?.commission_type && commValPs > 0) {
+          const earningAmount: number =
+            operatorUserPs.commission_type === Commission_type.PERCENT
+              ? (price * commValPs) / 100
+              : commValPs;
+
+          const existingEarning = await queryRunner.manager.findOne(
+            OperatorEarningEntity,
+            { where: { order_id: order.id } },
+          );
+          if (existingEarning) {
+            existingEarning.amount = earningAmount;
+            await queryRunner.manager.save(existingEarning);
+          } else {
+            const earning = new OperatorEarningEntity();
+            earning.operator_id = order.operator_id;
+            earning.order_id = order.id;
+            earning.market_id = order.user_id;
+            earning.amount = earningAmount;
+            await queryRunner.manager.save(OperatorEarningEntity, earning);
+          }
+        }
+      }
 
       // 9️⃣ Extra cost
       // Telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun raqamga aylantirish
@@ -2525,6 +2846,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
       }
 
+      // === Operator earning ni o'chirish (rollback) ===
+      if (order.operator_id) {
+        const existingEarning = await queryRunner.manager.findOne(
+          OperatorEarningEntity,
+          { where: { order_id: order.id } },
+        );
+        if (existingEarning) {
+          await queryRunner.manager.remove(OperatorEarningEntity, existingEarning);
+        }
+      }
+
+      // Investor earning recordlarni o'chirish (rollback — kassaga tegmaydi)
+      await queryRunner.manager.delete(InvestorEarningEntity, { order_id: order.id });
+
       // === Update order status ===
       const previousStatus = order.status;
       const targetStatus = dto?.target_status || RollbackTarget.WAITING;
@@ -2586,6 +2921,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.manager.save(order);
+
+      // === MOLIYAVIY TAROZI: rollback uchun teskari yozuv ===
+      const rollbackProfit = -(marketTarif - courierTarif);
+      if (rollbackProfit !== 0 && [Order_status.SOLD, Order_status.PAID, Order_status.PARTLY_PAID].includes(previousStatus)) {
+        const balanceAfter = await calculateFinancialBalance(queryRunner.manager);
+        await queryRunner.manager.save(
+          queryRunner.manager.create(FinancialBalanceHistoryEntity, {
+            amount: rollbackProfit,
+            balance_before: balanceAfter - rollbackProfit,
+            balance_after: balanceAfter,
+            source_type: FinancialSource_type.CORRECTION,
+            order_id: order.id,
+            related_user_id: market.id,
+            comment: `[ROLLBACK] Buyurtma #${order.id.slice(0, 8)} — pochta foydasi qaytarildi`,
+            created_by: user.id,
+          }),
+        );
+      }
 
       await queryRunner.commitTransaction();
       await this.orderBotService.syncStatusButton(order.id);
@@ -2921,6 +3274,50 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  async getTopOperatorsByMarket(user: JwtPayload, limit = 10) {
+    try {
+      // Market_id ni aniqlash
+      let marketId = user.id;
+      if (user.role === Roles.OPERATOR) {
+        const operatorUser = await this.userRepo.findOne({
+          where: { id: user.id, role: Roles.OPERATOR },
+        });
+        if (operatorUser?.market_id) {
+          marketId = operatorUser.market_id;
+        }
+      }
+
+      const lastMonth = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+      const result = await this.orderRepo.query(
+        `
+        SELECT
+          u.id as operator_id,
+          u.name as operator_name,
+          COUNT(o.id) as total_orders,
+          SUM(CASE WHEN o.status IN ('sold', 'paid', 'partly_paid') THEN 1 ELSE 0 END) as successful_orders,
+          ROUND(
+            (SUM(CASE WHEN o.status IN ('sold', 'paid', 'partly_paid') THEN 1 ELSE 0 END)::decimal
+            / NULLIF(COUNT(o.id), 0)) * 100, 2
+          ) as success_rate
+        FROM "order" o
+        INNER JOIN "users" u ON u.id = o.operator_id
+        WHERE u.role = 'operator'
+          AND u.market_id = $1
+          AND o.created_at >= $2
+        GROUP BY u.id, u.name
+        ORDER BY success_rate DESC NULLS LAST
+        LIMIT $3
+        `,
+        [marketId, lastMonth, limit],
+      );
+
+      return successRes(result, 200, 'Top Operators (last 30 days)');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async getTopCouriers(limit = 10) {
     try {
       const now = Date.now();
@@ -3198,6 +3595,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const start = Number(startDate);
       const end = Number(endDate);
 
+      // Operator uchun market_id ni olish
+      let effectiveMarketId = user.id;
+      if (user.role === Roles.OPERATOR) {
+        const operatorUser = await this.userRepo.findOne({
+          where: { id: user.id, role: Roles.OPERATOR },
+        });
+        if (operatorUser?.market_id) {
+          effectiveMarketId = operatorUser.market_id;
+        }
+      }
+
       const validStatuses = [
         Order_status.SOLD,
         Order_status.PAID,
@@ -3223,7 +3631,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           `SUM(CASE WHEN o.created_at BETWEEN :start AND :end AND o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) THEN o.to_be_paid ELSE 0 END)`,
           'profit',
         )
-        .where('o.user_id = :marketId', { marketId: user.id })
+        .where('o.user_id = :marketId', { marketId: effectiveMarketId })
         .setParameters({
           start,
           end,
@@ -3287,6 +3695,31 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         });
         if (!market?.add_order) {
           throw new BadRequestException("Sizga buyurtma o'chirish ruxsati berilmagan");
+        }
+      }
+
+      // Operator uchun qo'shimcha tekshiruvlar
+      if (user?.role === Roles.OPERATOR) {
+        const operatorUser = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: user.id, role: Roles.OPERATOR },
+        });
+        if (!operatorUser?.market_id) {
+          throw new BadRequestException('Operator marketga biriktirilmagan');
+        }
+        // Faqat o'z marketining buyurtmasini o'chirish
+        if (order.user_id !== operatorUser.market_id) {
+          throw new BadRequestException('Bu buyurtma sizning marketingizga tegishli emas');
+        }
+        // Operator faqat NEW statusdagi buyurtmalarni o'chirishi mumkin
+        if (order.status !== Order_status.NEW) {
+          throw new BadRequestException("Faqat yangi buyurtmalarni o'chirish mumkin");
+        }
+        // add_order ruxsatini tekshirish
+        const market = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: operatorUser.market_id },
+        });
+        if (!market?.add_order) {
+          throw new BadRequestException("Marketga buyurtma o'chirish ruxsati berilmagan");
         }
       }
 
@@ -3572,10 +4005,69 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           throw new NotFoundException('District not found');
         }
         order.district_id = updateOrderAddressDto.district_id;
+
+        // RECEIVED buyurtma uchun: viloyat o'zgarganda pochtani ham yangilash
+        if (order.status === Order_status.RECEIVED && order.post_id) {
+          const oldPost = await queryRunner.manager.findOne(PostEntity, {
+            where: { id: order.post_id },
+          });
+
+          // Yangi district ning viloyati eski post viloyatidan farq qilsa
+          if (oldPost && oldPost.region_id !== district.assigned_region) {
+            // Yangi viloyat uchun NEW post topish yoki yaratish
+            let newPost = await queryRunner.manager.findOne(PostEntity, {
+              where: {
+                region_id: district.assigned_region,
+                status: Post_status.NEW,
+              },
+            });
+            if (!newPost) {
+              newPost = queryRunner.manager.create(PostEntity, {
+                region_id: district.assigned_region,
+                qr_code_token: generateCustomToken(),
+                post_total_price: 0,
+                order_quantity: 0,
+                status: Post_status.NEW,
+              });
+              await queryRunner.manager.save(newPost);
+            }
+
+            // Eski post statistikasini kamaytirish
+            oldPost.post_total_price =
+              Number(oldPost.post_total_price ?? 0) - Number(order.total_price ?? 0);
+            oldPost.order_quantity = Math.max(Number(oldPost.order_quantity ?? 0) - 1, 0);
+            await queryRunner.manager.save(oldPost);
+
+            // Yangi post statistikasini oshirish
+            newPost.post_total_price =
+              Number(newPost.post_total_price ?? 0) + Number(order.total_price ?? 0);
+            newPost.order_quantity = Number(newPost.order_quantity ?? 0) + 1;
+            await queryRunner.manager.save(newPost);
+
+            // Buyurtmaga yangi post tayinlash
+            order.post_id = newPost.id;
+          }
+        }
       }
 
       if (updateOrderAddressDto.address !== undefined) {
         order.address = updateOrderAddressDto.address;
+      }
+
+      // Mijoz ma'lumotlarini yangilash
+      if (updateOrderAddressDto.client_name || updateOrderAddressDto.client_phone_number) {
+        const customer = await queryRunner.manager.findOne(UserEntity, {
+          where: { id: order.customer_id, role: Roles.CUSTOMER },
+        });
+        if (customer) {
+          if (updateOrderAddressDto.client_name) {
+            customer.name = updateOrderAddressDto.client_name;
+          }
+          if (updateOrderAddressDto.client_phone_number) {
+            customer.phone_number = updateOrderAddressDto.client_phone_number;
+          }
+          await queryRunner.manager.save(customer);
+        }
       }
 
       await queryRunner.manager.save(order);
@@ -3595,6 +4087,141 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
    * Buyurtmalar to'g'ridan-to'g'ri RECEIVED holatida yaratiladi va pochtaga qo'shiladi
    * Field mapping orqali har qanday tashqi API strukturasini qo'llab-quvvatlaydi
    */
+  /**
+   * Tashqi buyurtma dublikat ekanligini tekshirish
+   * Telefon raqami + qr_code bo'yicha bazada mavjud buyurtmani qidiradi
+   */
+  async checkDuplicateOrder(dto: {
+    phone: string;
+    qr_code: string;
+    integration_id: string;
+  }): Promise<object> {
+    try {
+      const { phone, qr_code, integration_id } = dto;
+
+      // Integratsiya orqali market_id ni olish
+      const integration =
+        await this.externalIntegrationService.getIntegrationEntity(
+          integration_id,
+        );
+
+      if (!integration) {
+        return successRes({ isDuplicate: false }, 200, 'Integration not found');
+      }
+
+      const { market_id } = integration;
+
+      // Telefon raqamni tozalash
+      let cleanPhone = phone?.replace(/\D/g, '') || '';
+      if (cleanPhone.length === 9) {
+        cleanPhone = `998${cleanPhone}`;
+      }
+
+      const duplicates: any[] = [];
+
+      // 1. qr_code (external_id) bo'yicha tekshirish - aynan shu buyurtma qayta qabul qilinayaptimi
+      if (qr_code) {
+        const existingByQr = await this.orderRepo
+          .createQueryBuilder('order')
+          .leftJoinAndSelect('order.customer', 'customer')
+          .leftJoinAndSelect('order.items', 'items')
+          .leftJoinAndSelect('items.product', 'product')
+          .where('order.user_id = :marketId', { marketId: market_id })
+          .andWhere('order.deleted = :deleted', { deleted: false })
+          .andWhere(
+            '(order.external_id = :externalId OR order.qr_code_token = :qrCode)',
+            { externalId: String(qr_code), qrCode: String(qr_code) },
+          )
+          .getMany();
+
+        if (existingByQr.length > 0) {
+          duplicates.push(
+            ...existingByQr.map((o) => ({
+              id: o.id,
+              status: o.status,
+              total_price: o.total_price,
+              created_at: o.created_at,
+              customer_name: o.customer?.name,
+              customer_phone: o.customer?.phone_number,
+              match_type: 'exact_qr',
+              items: o.items?.map((i) => ({
+                product_name: i.product?.name,
+                quantity: i.quantity,
+              })),
+            })),
+          );
+        }
+      }
+
+      // 2. Telefon raqami bo'yicha shu marketdagi yangi/qabul qilingan buyurtmalarni tekshirish
+      if (cleanPhone && cleanPhone.length >= 9) {
+        const phonePattern = `%${cleanPhone.slice(-9)}%`;
+
+        const existingByPhone = await this.orderRepo
+          .createQueryBuilder('order')
+          .leftJoinAndSelect('order.customer', 'customer')
+          .leftJoinAndSelect('order.items', 'items')
+          .leftJoinAndSelect('items.product', 'product')
+          .where('order.user_id = :marketId', { marketId: market_id })
+          .andWhere('order.deleted = :deleted', { deleted: false })
+          .andWhere('order.status IN (:...statuses)', {
+            statuses: [
+              Order_status.NEW,
+              Order_status.RECEIVED,
+              Order_status.ON_THE_ROAD,
+            ],
+          })
+          .andWhere('customer.phone_number ILIKE :phone', {
+            phone: phonePattern,
+          })
+          .andWhere(
+            // Allaqachon qr bo'yicha topilganlarni takrorlamaslik
+            duplicates.length > 0
+              ? 'order.id NOT IN (:...excludeIds)'
+              : '1=1',
+            {
+              excludeIds:
+                duplicates.length > 0 ? duplicates.map((d) => d.id) : [''],
+            },
+          )
+          .orderBy('order.created_at', 'DESC')
+          .take(5)
+          .getMany();
+
+        if (existingByPhone.length > 0) {
+          duplicates.push(
+            ...existingByPhone.map((o) => ({
+              id: o.id,
+              status: o.status,
+              total_price: o.total_price,
+              created_at: o.created_at,
+              customer_name: o.customer?.name,
+              customer_phone: o.customer?.phone_number,
+              match_type: 'phone',
+              items: o.items?.map((i) => ({
+                product_name: i.product?.name,
+                quantity: i.quantity,
+              })),
+            })),
+          );
+        }
+      }
+
+      return successRes(
+        {
+          isDuplicate: duplicates.length > 0,
+          duplicates,
+        },
+        200,
+        duplicates.length > 0
+          ? `${duplicates.length} ta dublikat topildi`
+          : 'Dublikat topilmadi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async receiveExternalOrders(
     dto: {
       integration_id: string;
@@ -3662,6 +4289,42 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // OPTIMIZATION: Customerlarni cache qilish
       const customerCache: Map<string, UserEntity> = new Map();
 
+      // DUBLIKAT HIMOYA: Barcha external_id va qr_code'larni oldindan tekshirish
+      const allExternalIds: string[] = [];
+      const allQrCodes: string[] = [];
+      for (const extOrder of orders) {
+        const extId = this.getFieldValue(extOrder, field_mapping.id_field);
+        const extQr = this.getFieldValue(extOrder, field_mapping.qr_code_field);
+        if (extId) allExternalIds.push(String(extId));
+        if (extQr) allQrCodes.push(String(extQr));
+      }
+
+      const existingExternalIds = new Set<string>();
+      if (allExternalIds.length > 0) {
+        const existingByExtId = await queryRunner.manager
+          .createQueryBuilder(OrderEntity, 'order')
+          .select('order.external_id')
+          .where('order.user_id = :marketId', { marketId: market_id })
+          .andWhere('order.deleted = :deleted', { deleted: false })
+          .andWhere('order.external_id IN (:...extIds)', { extIds: allExternalIds })
+          .getMany();
+        existingByExtId.forEach((o) => existingExternalIds.add(o.external_id));
+      }
+
+      const existingQrCodes = new Set<string>();
+      if (allQrCodes.length > 0) {
+        const existingByQr = await queryRunner.manager
+          .createQueryBuilder(OrderEntity, 'order')
+          .select('order.qr_code_token')
+          .where('order.user_id = :marketId', { marketId: market_id })
+          .andWhere('order.deleted = :deleted', { deleted: false })
+          .andWhere('order.qr_code_token IN (:...qrCodes)', { qrCodes: allQrCodes })
+          .getMany();
+        existingByQr.forEach((o) => existingQrCodes.add(o.qr_code_token));
+      }
+
+      const skippedOrders: string[] = [];
+
       for (const extOrder of orders) {
         // Field mapping orqali qiymatlarni olish
         const externalId = this.getFieldValue(extOrder, field_mapping.id_field);
@@ -3669,6 +4332,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           extOrder,
           field_mapping.qr_code_field,
         );
+
+        // DUBLIKAT TEKSHIRISH: external_id yoki qr_code allaqachon bazada bormi
+        if (externalId && existingExternalIds.has(String(externalId))) {
+          skippedOrders.push(String(externalId));
+          continue; // Bu buyurtma allaqachon qabul qilingan
+        }
+        if (qrCode && existingQrCodes.has(String(qrCode))) {
+          skippedOrders.push(String(qrCode));
+          continue; // Bu buyurtma allaqachon qabul qilingan
+        }
+
         const fullName = this.getFieldValue(
           extOrder,
           field_mapping.customer_name_field,
@@ -3873,9 +4547,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
 
+      const skippedMsg = skippedOrders.length > 0
+        ? `, ${skippedOrders.length} ta dublikat o'tkazib yuborildi`
+        : '';
+
       return successRes(
         {
           created_orders: createdOrders.length,
+          skipped_orders: skippedOrders.length,
+          skipped_ids: skippedOrders,
           integration: {
             id: integration.id,
             name: integration.name,
@@ -3889,7 +4569,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           })),
         },
         201,
-        `${createdOrders.length} ta tashqi buyurtma qabul qilindi (${integration.name})`,
+        `${createdOrders.length} ta tashqi buyurtma qabul qilindi (${integration.name})${skippedMsg}`,
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();

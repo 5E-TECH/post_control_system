@@ -29,6 +29,7 @@ const CourierOrder = lazy(() => import("../pages/orders/pages/courier"));
 const Regions = lazy(() => import("../pages/regions"));
 const Districts = lazy(() => import("../pages/regions/pages/districts"));
 const SatoManagement = lazy(() => import("../pages/regions/pages/sato-management"));
+const LogistAssignment = lazy(() => import("../pages/regions/pages/logist-assignment"));
 const Users = lazy(() => import("../pages/users"));
 const Mails = lazy(() => import("../pages/mails"));
 const Products = lazy(() => import("../pages/products"));
@@ -50,6 +51,12 @@ const RefusedMailDetail = lazy(
 const CreateRegistrator = lazy(
   () => import("../pages/users/pages/create-registrator")
 );
+const CreateLogist = lazy(
+  () => import("../pages/users/pages/create-logist")
+);
+// const CreateInvestor = lazy(
+//   () => import("../pages/users/pages/create-investor")
+// );
 const CreateOrder = lazy(
   () => import("../pages/orders/pages/superadmin/create-order")
 );
@@ -110,9 +117,18 @@ const CourierRefusedMails = lazy(
 const CourierOldMails = lazy(
   () => import("../pages/mails/components/courier/old-mails")
 );
-const BalanceDashboard = lazy(() => import("../pages/history"));
+const FinancialHistory = lazy(() => import("../pages/payments/pages/financial-history"));
 const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
 const Integrations = lazy(() => import("../pages/integrations"));
+const MarketOperators = lazy(() => import("../pages/market-operators"));
+const OperatorStats = lazy(
+  () => import("../pages/market-operators/pages/operator-stats")
+);
+const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
+const OperatorOrders = lazy(() => import("../pages/operator-orders"));
+// const Investors = lazy(() => import("../pages/investors"));
+// const InvestorDetail = lazy(() => import("../pages/investors/pages/investor-detail"));
+// const InvestorDashboard = lazy(() => import("../pages/investor-dashboard"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -222,6 +238,8 @@ const AppRouters = () => {
                     { path: "registrator", element: <CreateRegistrator /> },
                     { path: "courier", element: <CreateCourier /> },
                     { path: "market", element: <CreateMarket /> },
+                    { path: "logist", element: <CreateLogist /> },
+                    // { path: "investor", element: <CreateInvestor /> },
                   ],
                 },
               ],
@@ -270,7 +288,7 @@ const AppRouters = () => {
               children: [{ path: "create/:id", element: <ProductCreate /> }],
             },
             { path: "send-message", element: <SendMessage /> },
-            { path: "m-balance", element: <BalanceDashboard /> },
+            { path: "m-balance", element: <FinancialHistory /> },
             { path: "logs", element: <LogsPage /> },
             {
               path: "payments",
@@ -303,12 +321,44 @@ const AppRouters = () => {
                   path: "sato-management",
                   element: <SatoManagement />,
                 },
+                {
+                  path: "logist-assignment",
+                  element: <LogistAssignment />,
+                },
               ],
             },
             {
               path: "integrations",
               element: <Integrations />,
             },
+            {
+              path: "market-operators",
+              element: <MarketOperators />,
+            },
+            {
+              path: "market-operators/:id/stats",
+              element: <OperatorStats />,
+            },
+            {
+              path: "my-earnings",
+              element: <OperatorEarnings />,
+            },
+            {
+              path: "my-orders",
+              element: <OperatorOrders />,
+            },
+            // {
+            //   path: "investors",
+            //   element: <Investors />,
+            // },
+            // {
+            //   path: "investors/:id",
+            //   element: <InvestorDetail />,
+            // },
+            // {
+            //   path: "my-investments",
+            //   element: <InvestorDashboard />,
+            // },
           ],
         },
       ],

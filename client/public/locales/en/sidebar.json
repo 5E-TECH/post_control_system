@@ -8,5 +8,6 @@
     "payments": "Payments",
     "balance": "Financial Balance",
     "logs": "Logs",
-    "region": "Region"
+    "region": "Region",
+    "financialHistory": "Financial History"
 }

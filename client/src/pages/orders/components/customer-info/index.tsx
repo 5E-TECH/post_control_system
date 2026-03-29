@@ -26,6 +26,7 @@ import {
   X,
   UserCheck,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 
 export interface ICustomer {
@@ -101,10 +102,14 @@ const CustomerInfocomp = () => {
     suggestCustomer(phoneSearch, market_id);
   const suggestions: SuggestedCustomer[] = suggestionsData?.data || [];
 
-  // Customer order history
+  // Customer order history - mijoz tanlanganda doim fetch qilinadi (yangi buyurtmalar ogohlantirishini tekshirish uchun)
   const { data: historyData, isLoading: historyLoading } =
-    getCustomerOrderHistory(selectedCustomerId || "", market_id, !!selectedCustomerId && showHistory);
+    getCustomerOrderHistory(selectedCustomerId || "", market_id, !!selectedCustomerId);
   const orderHistory: OrderHistoryItem[] = historyData?.data?.orders || [];
+
+  // Shu marketda "new" holatdagi buyurtmalar bormi tekshirish
+  const newStatusOrders = orderHistory.filter((o) => o.status === "new");
+  const hasNewOrders = newStatusOrders.length > 0;
 
   const regions = allRegions?.data?.map((item: any) => ({
     value: item.id,
@@ -323,6 +328,48 @@ const CustomerInfocomp = () => {
           )}
         </div>
       </div>
+
+      {/* Yangi holatdagi buyurtmalar ogohlantirilishi */}
+      {selectedCustomerId && hasNewOrders && (
+        <div className="mx-5 mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-amber-800 dark:text-amber-300 text-sm">
+                Diqqat! Bu mijozda yangi holatdagi buyurtma mavjud
+              </h4>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                Shu marketda bu mijoz uchun {newStatusOrders.length} ta "yangi" holatdagi buyurtma bor. Takroriy buyurtma yaratmasligingizga ishonch hosil qiling.
+              </p>
+              <div className="mt-3 space-y-2">
+                {newStatusOrders.slice(0, 3).map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between p-2.5 bg-white dark:bg-gray-800/50 rounded-lg border border-amber-100 dark:border-amber-800/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4 text-amber-500" />
+                      <span className="text-xs text-gray-700 dark:text-gray-300">
+                        {order.items.map((i) => `${i.product_name} x${i.quantity}`).join(", ")}
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 whitespace-nowrap ml-2">
+                      {order.total_price?.toLocaleString()} so'm
+                    </span>
+                  </div>
+                ))}
+                {newStatusOrders.length > 3 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                    va yana {newStatusOrders.length - 3} ta...
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form Content */}
       <div className="p-5 space-y-5">
