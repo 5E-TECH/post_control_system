@@ -13,7 +13,7 @@ jobs:
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -21,11 +21,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       # 3️⃣ Generate GitHub App token
       - name: Setup GitHub App token
-        uses: tibdex/github-app-token@v1
+        uses: tibdex/github-app-token@v2
         id: generate_token
         with:
           app_id: ${{ secrets.GH_APP_ID }}
@@ -44,7 +44,7 @@ jobs:
       # 5️⃣ Cache client node_modules
       - name: Cache client node_modules
         if: contains(steps.changes.outputs.changed, 'client')
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: client/node_modules
           key: client-${{ hashFiles('client/package-lock.json') }}
@@ -53,7 +53,7 @@ jobs:
       # 6️⃣ Cache server node_modules
       - name: Cache server node_modules
         if: contains(steps.changes.outputs.changed, 'server')
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: server/node_modules
           key: server-${{ hashFiles('server/package-lock.json') }}
