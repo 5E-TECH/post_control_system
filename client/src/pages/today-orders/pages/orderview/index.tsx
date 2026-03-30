@@ -46,6 +46,7 @@ const OrderView = () => {
   const { id } = useParams();
   const user = useSelector((state: RootState) => state.roleSlice);
   const canSeeTotal = user.role === "superadmin" || user.role === "admin";
+  const canPrint = canSeeTotal || user.role === "registrator";
   const canManageOrders = canSeeTotal && user.role !== "operator";
   const [deleteId, setDeleteId] = useState("");
   const [isPrintDisabled, setIsPrintDisabled] = useState(false);
@@ -288,7 +289,7 @@ const OrderView = () => {
               </div>
 
               {/* Print button with dropdown */}
-              {canManageOrders && (
+              {canPrint && (
                 <div className="relative" ref={printDropdownRef}>
                   <button
                     onClick={() => {
