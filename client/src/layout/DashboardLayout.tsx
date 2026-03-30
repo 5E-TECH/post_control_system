@@ -1,6 +1,6 @@
-import { memo, Suspense } from "react";
+import { memo, Suspense, useEffect, useRef } from "react";
 import Sidebar from "./components/Sidebar";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Suspensee from "../shared/ui/Suspensee";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -18,6 +18,12 @@ import RenderMediaSidebar from "../shared/components/render-media-sidebar/Render
 
 const DashboardLayout = () => {
   const role = useSelector((state: RootState) => state.roleSlice.role);
+  const { pathname } = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [pathname]);
 
   let sidebar;
 
@@ -66,7 +72,7 @@ const DashboardLayout = () => {
 
       {/* Dashboard container */}
       <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pl-4 pb-8 max-[650px]:pb-24">
-        <main className="w-full h-full bg-[#fff] dark:bg-[#312d48] rounded-4xl overflow-y-auto">
+        <main ref={mainRef} className="w-full h-full bg-[#fff] dark:bg-[#312d48] rounded-4xl overflow-y-auto">
           <Suspense fallback={<Suspensee />}>
             <Outlet />
           </Suspense>
