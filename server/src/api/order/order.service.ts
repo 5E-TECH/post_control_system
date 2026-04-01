@@ -4175,7 +4175,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         action: 'updated',
         new_value: { district_id: order.district_id, address: order.address },
         description: `Buyurtma manzili yangilandi`,
-        user,
       });
 
       return successRes(order, 200, 'Order address updated');
