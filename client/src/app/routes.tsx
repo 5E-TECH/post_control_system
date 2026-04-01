@@ -1,4 +1,4 @@
-// Post Control System - Routes
+// Beepost - Routes
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
 
