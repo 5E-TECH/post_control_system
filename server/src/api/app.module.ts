@@ -1,3 +1,4 @@
+// Beepost - App Module
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -49,6 +50,7 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
       logging: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     }),
     JwtModule.register({ global: true }),
+    ActivityLogModule,
     UsersModule,
     ProductModule,
     CashBoxModule,
@@ -65,7 +67,6 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
     ExternalProxyModule,
     ExternalIntegrationModule,
     IntegrationSyncModule,
-    ActivityLogModule,
   ],
   providers: [OrderGateaway],
 })
