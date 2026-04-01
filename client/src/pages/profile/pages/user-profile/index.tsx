@@ -38,6 +38,8 @@ const UserProfile = () => {
 
   // Local state to control formatted phone input display
   const [phoneDisplay, setPhoneDisplay] = useState<string>("+998 ");
+  const [defaultPhoneEditing, setDefaultPhoneEditing] = useState(false);
+  const [defaultPhoneValue, setDefaultPhoneValue] = useState("");
 
   // Maosh progress hisoblash
   const salaryProgress = useMemo(() => {
@@ -287,6 +289,26 @@ const UserProfile = () => {
           ),
         onError: (err) =>
           handleApiError(err, "Sozlamani yangilashda xatolik"),
+      }
+    );
+  };
+
+  const onSaveDefaultOperatorPhone = (user: any) => {
+    const id = user?.id;
+    const role = user?.role;
+    const phone = defaultPhoneValue.replace(/\D/g, "");
+    const normalized = phone.startsWith("998") ? `+${phone}` : phone.length === 9 ? `+998${phone}` : defaultPhoneValue;
+
+    updateUser.mutate(
+      { role, id, data: { default_operator_phone: normalized } },
+      {
+        onSuccess: () => {
+          handleSuccess("Javob beruvchi telefon raqam saqlandi");
+          setDefaultPhoneEditing(false);
+          refetch();
+        },
+        onError: (err) =>
+          handleApiError(err, "Telefon raqamni saqlashda xatolik"),
       }
     );
   };
@@ -606,6 +628,64 @@ const UserProfile = () => {
                     onChangeRequireOperatorPhone(checked, user);
                   }}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Default Operator Phone - Only for Market */}
+          {user?.role === "market" && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500/10 to-cyan-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Phone className="w-6 h-6 text-teal-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                      Javob beruvchi telefon raqam
+                    </p>
+                    {defaultPhoneEditing ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <Input
+                          value={defaultPhoneValue}
+                          onChange={(e) => setDefaultPhoneValue(e.target.value)}
+                          placeholder="+998 90 123 45 67"
+                          className="max-w-[200px]"
+                          size="small"
+                        />
+                        <Button
+                          type="primary"
+                          size="small"
+                          onClick={() => onSaveDefaultOperatorPhone(user)}
+                          loading={updateUser.isPending}
+                        >
+                          Saqlash
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() => setDefaultPhoneEditing(false)}
+                        >
+                          Bekor
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                        {user.default_operator_phone || "Kiritilmagan"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {!defaultPhoneEditing && (
+                  <button
+                    onClick={() => {
+                      setDefaultPhoneValue(user.default_operator_phone || "");
+                      setDefaultPhoneEditing(true);
+                    }}
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <Edit3 size={16} className="text-gray-500" />
+                  </button>
+                )}
               </div>
             </div>
           )}

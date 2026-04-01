@@ -14,6 +14,7 @@ import {
   Between,
   DataSource,
   DeepPartial,
+  In,
   IsNull,
   Repository,
 } from 'typeorm';
@@ -49,6 +50,7 @@ import * as ExcelJS from 'exceljs';
 import { ShiftEntity, ShiftStatus } from 'src/core/entity/shift.entity';
 import { ShiftRepository } from 'src/core/repository/shift.repository';
 import { getSafeLimit } from 'src/common/constants/pagination';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Injectable()
 export class CashBoxService
@@ -75,6 +77,7 @@ export class CashBoxService
     private readonly financialHistoryRepo: Repository<FinancialBalanceHistoryEntity>,
 
     private readonly dataSource: DataSource,
+    private readonly activityLog: ActivityLogService,
   ) {
     super(cashboxRepo);
   }
@@ -133,7 +136,7 @@ export class CashBoxService
           cashbox_id: mainCashbox.id,
           created_at: Between(Number(startDate), Number(endDate)), // bigint timestamp
         },
-        relations: ['createdByUser'],
+        relations: ['createdByUser', 'sourceUser'],
         order: { created_at: 'DESC' },
       });
 
@@ -158,9 +161,43 @@ export class CashBoxService
     }
   }
 
+  /**
+   * Barcha main cashbox tarixini olish (sana filtersiz)
+   */
+  private async getAllMainCashboxHistory() {
+    const mainCashbox = await this.cashboxRepo.findOne({
+      where: { cashbox_type: Cashbox_type.MAIN },
+    });
+    if (!mainCashbox) {
+      throw new NotFoundException('Main cashbox not found');
+    }
+
+    const cashboxHistory = await this.cashboxHistoryRepo.find({
+      where: { cashbox_id: mainCashbox.id },
+      relations: ['createdByUser', 'sourceUser'],
+      order: { created_at: 'DESC' },
+    });
+
+    let income = 0;
+    let outcome = 0;
+    for (const history of cashboxHistory) {
+      if (history.operation_type === Operation_type.INCOME) {
+        income += history.amount;
+      } else {
+        outcome += history.amount;
+      }
+    }
+
+    return successRes(
+      { cashbox: mainCashbox, cashboxHistory, income, outcome },
+      200,
+      'All main cashbox history',
+    );
+  }
+
   async getCashboxByUserId(
     id: string,
-    filters?: { fromDate?: string; toDate?: string },
+    filters?: { fromDate?: string; toDate?: string; sourceTypes?: string },
   ) {
     try {
       const user = await this.userRepo.findOne({
@@ -204,11 +241,17 @@ export class CashBoxService
         }
       }
 
+      // source_type filter
+      const whereCondition: any = {
+        cashbox_id: cashbox.id,
+        created_at: Between(Number(startDate), Number(endDate)),
+      };
+      if (filters?.sourceTypes) {
+        whereCondition.source_type = In(filters.sourceTypes.split(','));
+      }
+
       const cashboxHistory = await this.cashboxHistoryRepo.find({
-        where: {
-          cashbox_id: cashbox.id,
-          created_at: Between(Number(startDate), Number(endDate)), // bigint timestamp filter
-        },
+        where: whereCondition,
         relations: ['createdByUser'],
         order: { created_at: 'DESC' },
       });
@@ -236,7 +279,7 @@ export class CashBoxService
 
   async myCashbox(
     user: JwtPayload,
-    filters?: { fromDate?: string; toDate?: string },
+    filters?: { fromDate?: string; toDate?: string; sourceTypes?: string },
   ) {
     try {
       const myCashbox = await this.cashboxRepo.findOne({
@@ -271,11 +314,17 @@ export class CashBoxService
         }
       }
 
+      // source_type filter
+      const whereCondition: any = {
+        cashbox_id: myCashbox.id,
+        created_at: Between(Number(startDate), Number(endDate)),
+      };
+      if (filters?.sourceTypes) {
+        whereCondition.source_type = In(filters.sourceTypes.split(','));
+      }
+
       const cashboxHistory = await this.cashboxHistoryRepo.find({
-        where: {
-          cashbox_id: myCashbox.id,
-          created_at: Between(Number(startDate), Number(endDate)), // bigint timestamp
-        },
+        where: whereCondition,
         relations: ['createdByUser'],
         order: { created_at: 'DESC' },
       });
@@ -498,6 +547,14 @@ export class CashBoxService
       }
 
       await transaction.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'cashbox',
+        entity_id: createPaymentsFromCourierDto.courier_id,
+        action: 'courier_payment',
+        new_value: { amount: createPaymentsFromCourierDto.amount, payment_method: createPaymentsFromCourierDto.payment_method },
+        description: `Kuryerdan ${createPaymentsFromCourierDto.amount} so'm qabul qilindi (${createPaymentsFromCourierDto.payment_method})`,
+        user,
+      });
       return successRes({}, 201, "To'lov qabul qilindi !!! ");
     } catch (error) {
       await transaction.rollbackTransaction();
@@ -631,6 +688,14 @@ export class CashBoxService
       );
 
       await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'cashbox',
+        entity_id: market_id,
+        action: 'market_payment',
+        new_value: { amount, payment_method },
+        description: `Marketga ${amount} so'm to'landi (${payment_method})`,
+        user,
+      });
       return successRes({}, 200, `Marketga ${amount} so'm to'landi`);
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1103,6 +1168,14 @@ export class CashBoxService
       );
 
       await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'cashbox',
+        entity_id: 'main',
+        action: 'manual_expense',
+        new_value: { amount: updateCashboxDto.amount, type: updateCashboxDto.type, comment: updateCashboxDto.comment },
+        description: `Qo'lda chiqim: ${updateCashboxDto.amount} so'm — ${updateCashboxDto.comment || ''}`,
+        user,
+      });
       return successRes({}, 200, 'Manual expense created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1158,6 +1231,14 @@ export class CashBoxService
       );
 
       await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'cashbox',
+        entity_id: 'main',
+        action: 'manual_income',
+        new_value: { amount: updateCashboxDto.amount, type: updateCashboxDto.type, comment: updateCashboxDto.comment },
+        description: `Qo'lda kirim: ${updateCashboxDto.amount} so'm — ${updateCashboxDto.comment || ''}`,
+        user,
+      });
       return successRes({}, 200, 'Cashbox filled');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1247,6 +1328,14 @@ export class CashBoxService
       );
 
       await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'cashbox',
+        entity_id: user_id,
+        action: 'salary',
+        new_value: { amount, staff_name: staff?.name },
+        description: `Maosh to'landi: ${staff?.name || 'Hodim'} — ${amount} so'm`,
+        user,
+      });
       return successRes({}, 200, 'Staff salary paid');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1264,16 +1353,23 @@ export class CashBoxService
   async exportMainCashboxToExcel(query: {
     fromDate?: string;
     toDate?: string;
+    allHistory?: boolean;
   }): Promise<Buffer> {
     try {
-      // 1. Fetch cashbox data using existing method
-      const result = await this.getMainCashbox(query);
+      // 1. Fetch cashbox data
+      let result: any;
+      if (query.allHistory) {
+        // Sana belgilanmagan - barcha tarixni olish
+        result = await this.getAllMainCashboxHistory();
+      } else {
+        result = await this.getMainCashbox({ fromDate: query.fromDate, toDate: query.toDate });
+      }
       const data = result.data;
 
       const { cashbox, cashboxHistory, income, outcome } = data;
 
-      // 2. Process and group transactions
-      const groupedTransactions = this.groupTransactionsByUser(cashboxHistory);
+      // 2. Process transactions - har biri alohida qator
+      const individualTransactions = this.getIndividualTransactions(cashboxHistory);
       const expenseTransactions =
         this.filterExpenseTransactions(cashboxHistory);
       const clickTransactions = this.filterClickTransactions(cashboxHistory);
@@ -1293,16 +1389,16 @@ export class CashBoxService
       // 5. Build Table 1 (Main table)
       this.buildMainTable(
         worksheet,
-        groupedTransactions,
+        individualTransactions,
         balances,
         expenseTransactions,
         query,
       );
 
-      // 6. Build Table 2 (Card analysis) - starts at column J
+      // 6. Build Table 2 (Card analysis) - starts at column M
       this.buildCardAnalysisTable(worksheet, clickTransactions, balances);
 
-      // 7. Build Table 3 (Expenses) - starts at column P
+      // 7. Build Table 3 (Expenses) - starts at column S
       this.buildExpensesTable(worksheet, expenseTransactions);
 
       // 8. Apply styling (colors, borders, fonts)
@@ -1319,65 +1415,38 @@ export class CashBoxService
   /**
    * Group transactions by user/market/courier name
    */
-  private groupTransactionsByUser(histories: CashboxHistoryEntity[]) {
-    const grouped = new Map<
-      string,
-      {
-        name: string;
-        income_cash: number;
-        income_card: number;
-        expense_cash: number;
-        expense_card: number;
-        comments: string[];
-      }
-    >();
+  /**
+   * Har bir tranzaksiyani alohida qator sifatida qaytaradi
+   * Kirim va Chiqim alohida massivlarda (mustaqil to'ldiriladi)
+   */
+  private getIndividualTransactions(histories: CashboxHistoryEntity[]) {
+    const filtered = histories.filter(
+      (tx) =>
+        tx.source_type !== Source_type.MANUAL_EXPENSE &&
+        tx.source_type !== Source_type.SALARY,
+    );
 
-    for (const tx of histories) {
-      // Exclude MANUAL_EXPENSE and SALARY from main table (they go to Table 3)
-      if (
-        tx.source_type === Source_type.MANUAL_EXPENSE ||
-        tx.source_type === Source_type.SALARY
-      ) {
-        continue;
-      }
+    const income = filtered
+      .filter((tx) => tx.operation_type === Operation_type.INCOME)
+      .sort((a, b) => Number(a.created_at) - Number(b.created_at))
+      .map((tx) => ({
+        name: this.getUserNameFromTransaction(tx),
+        cash: tx.payment_method === PaymentMethod.CASH ? tx.amount : 0,
+        card: tx.payment_method !== PaymentMethod.CASH ? tx.amount : 0,
+        comment: tx.comment || '',
+      }));
 
-      // Determine user name (from creator, or related market/courier)
-      const userName = this.getUserNameFromTransaction(tx);
+    const expense = filtered
+      .filter((tx) => tx.operation_type === Operation_type.EXPENSE)
+      .sort((a, b) => Number(a.created_at) - Number(b.created_at))
+      .map((tx) => ({
+        name: this.getUserNameFromTransaction(tx),
+        cash: tx.payment_method === PaymentMethod.CASH ? tx.amount : 0,
+        card: tx.payment_method !== PaymentMethod.CASH ? tx.amount : 0,
+        comment: tx.comment || '',
+      }));
 
-      if (!grouped.has(userName)) {
-        grouped.set(userName, {
-          name: userName,
-          income_cash: 0,
-          income_card: 0,
-          expense_cash: 0,
-          expense_card: 0,
-          comments: [],
-        });
-      }
-
-      const group = grouped.get(userName)!;
-
-      if (tx.operation_type === Operation_type.INCOME) {
-        if (tx.payment_method === PaymentMethod.CASH) {
-          group.income_cash += tx.amount;
-        } else {
-          // CLICK + CARD + CLICK_TO_MARKET all go to "card" column
-          group.income_card += tx.amount;
-        }
-      } else {
-        if (tx.payment_method === PaymentMethod.CASH) {
-          group.expense_cash += tx.amount;
-        } else {
-          group.expense_card += tx.amount;
-        }
-      }
-
-      if (tx.comment) {
-        group.comments.push(tx.comment);
-      }
-    }
-
-    return Array.from(grouped.values());
+    return { income, expense };
   }
 
   /**
@@ -1407,7 +1476,8 @@ export class CashBoxService
    * Extract user name from transaction
    */
   private getUserNameFromTransaction(tx: CashboxHistoryEntity): string {
-    // Priority: created_by user name
+    // Priority: sourceUser (courier/market), then createdByUser
+    if (tx.sourceUser?.name) return tx.sourceUser.name;
     if (tx.createdByUser?.name) return tx.createdByUser.name;
     return 'Unknown';
   }
@@ -1467,121 +1537,101 @@ export class CashBoxService
 
   /**
    * Build main income/expense table (Table 1)
+   * Kirim (chap tomon) va Chiqim (o'ng tomon) mustaqil to'ldiriladi
    */
   private buildMainTable(
     worksheet: ExcelJS.Worksheet,
-    transactions: any[],
+    transactions: { income: any[]; expense: any[] },
     balances: any,
     expenses: CashboxHistoryEntity[],
     query: { fromDate?: string; toDate?: string },
   ) {
-    // Header row (row 1)
-    worksheet.mergeCells('A1:I1');
-    const dateStr =
-      query.fromDate || new Date().toISOString().split('T')[0];
-    worksheet.getCell('A1').value = `${dateStr} noch`;
-    worksheet.getCell('A1').fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFD3D3D3' },
-    };
-    worksheet.getCell('A1').font = { bold: true, size: 12 };
-    worksheet.getCell('A1').alignment = {
-      horizontal: 'center',
-      vertical: 'middle',
+    const fillCell = (cell: string, bg: string, opts?: { bold?: boolean; size?: number; color?: string; hAlign?: 'center' | 'left' | 'right' }) => {
+      const c = worksheet.getCell(cell);
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      if (opts?.bold) c.font = { bold: true, size: opts.size || 11, color: opts.color ? { argb: opts.color } : undefined };
+      if (opts?.hAlign) c.alignment = { horizontal: opts.hAlign, vertical: 'middle' };
     };
 
-    // Column headers (row 2) - split into two sections
-    worksheet.mergeCells('A2:A3');
-    worksheet.getCell('A2').value = 'No';
+    // ===== ROW 1: Sana =====
+    worksheet.mergeCells('A1:K1');
+    let dateStr: string;
+    if (!query.fromDate && !query.toDate) {
+      dateStr = 'Umumiy tarix';
+    } else if (query.fromDate === query.toDate) {
+      dateStr = `${query.fromDate} noch`;
+    } else if (query.fromDate && query.toDate) {
+      dateStr = `${query.fromDate} — ${query.toDate}`;
+    } else {
+      dateStr = `${query.fromDate || new Date().toISOString().split('T')[0]} noch`;
+    }
+    worksheet.getCell('A1').value = dateStr;
+    worksheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FFFF0000' } };
+    worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
 
-    worksheet.mergeCells('B2:E2');
-    worksheet.getCell('B2').value = 'Kirim';
-    worksheet.mergeCells('F2:I2');
-    worksheet.getCell('F2').value = 'Chiqim';
+    // ===== ROW 2: ASOSIY KASSA sarlavha =====
+    worksheet.mergeCells('A2:K2');
+    worksheet.getCell('A2').value = 'ASOSIY KASSA';
+    fillCell('A2', 'FFFF0000', { bold: true, size: 14, color: 'FF006400', hAlign: 'center' });
 
-    // Sub-headers (row 3)
-    worksheet.getCell('B3').value = 'QAYERDAN';
-    worksheet.getCell('C3').value = 'NAQD';
-    worksheet.getCell('D3').value = 'KARTA';
-    worksheet.getCell('E3').value = 'Reja';
+    // ===== ROW 3: Kirim / Chiqim =====
+    worksheet.mergeCells('B3:F3');
+    worksheet.getCell('B3').value = 'Kirim';
+    fillCell('B3', 'FF90EE90', { bold: true, hAlign: 'center' });
 
-    worksheet.getCell('F3').value = 'QAYERGA';
-    worksheet.getCell('G3').value = 'NAQD';
-    worksheet.getCell('H3').value = 'KARTA';
-    worksheet.getCell('I3').value = 'Reja';
+    worksheet.mergeCells('G3:K3');
+    worksheet.getCell('G3').value = 'Chiqim';
+    fillCell('G3', 'FFFFC0CB', { bold: true, hAlign: 'center' });
 
-    // Style headers
-    ['A2', 'B2', 'F2'].forEach((cell) => {
-      worksheet.getCell(cell).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF90EE90' },
-      };
-      worksheet.getCell(cell).font = { bold: true };
-      worksheet.getCell(cell).alignment = {
-        horizontal: 'center',
-        vertical: 'middle',
-      };
+    // ===== ROW 4: Ustun nomlari =====
+    const headers = [
+      ['A4', 'No'], ['B4', 'QAYERDAN'], ['C4', 'NAQD'], ['D4', 'KARTA'], ['E4', 'DOLLAR'], ['F4', 'Reja'],
+      ['G4', 'QAYERGA'], ['H4', 'NAQD'], ['I4', 'KARTA'], ['J4', 'DOLLAR'], ['K4', 'Reja'],
+    ];
+    headers.forEach(([cell, val]) => {
+      worksheet.getCell(cell).value = val;
+      fillCell(cell, 'FF90EE90', { bold: true, size: 10, hAlign: 'center' });
     });
 
-    ['B3', 'C3', 'D3', 'E3', 'F3', 'G3', 'H3', 'I3'].forEach((cell) => {
-      worksheet.getCell(cell).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF90EE90' },
-      };
-      worksheet.getCell(cell).font = { bold: true, size: 10 };
-      worksheet.getCell(cell).alignment = {
-        horizontal: 'center',
-        vertical: 'middle',
-      };
-    });
+    // ===== ROW 5: Qoldiq (ochilish balansi) - faqat kirim tomonida =====
+    const dataStartRow = 5;
+    worksheet.getCell(`A${dataStartRow}`).value = 1;
+    worksheet.getCell(`C${dataStartRow}`).value = balances.opening.cash;
+    worksheet.getCell(`D${dataStartRow}`).value = balances.opening.card;
+    fillCell(`C${dataStartRow}`, 'FF00BFFF');
+    fillCell(`D${dataStartRow}`, 'FF0000FF');
+    worksheet.getCell(`D${dataStartRow}`).font = { color: { argb: 'FFFFFFFF' }, bold: true };
 
-    let rowNum = 4;
+    // ===== DATA ROWS: Kirim (chap) va Chiqim (o'ng) mustaqil to'ldiriladi =====
+    const incomeRows = transactions.income;
+    const expenseRows = transactions.expense;
+    const maxRows = Math.max(incomeRows.length, expenseRows.length);
 
-    // Opening balance row
-    worksheet.getCell(`A${rowNum}`).value = 1;
-    worksheet.getCell(`B${rowNum}`).value = 'Qoldiq';
-    worksheet.getCell(`C${rowNum}`).value = balances.opening.cash;
-    worksheet.getCell(`D${rowNum}`).value = balances.opening.card;
+    let incomeNo = 2;
+    let expenseNo = 1;
 
-    worksheet.getCell(`C${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF00BFFF' },
-    };
-    worksheet.getCell(`D${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFFFFF00' },
-    };
-    rowNum++;
+    for (let i = 0; i < maxRows; i++) {
+      const row = dataStartRow + 1 + i;
 
-    // Transaction rows
-    let no = 2;
-    transactions.forEach((tx) => {
-      const comments = tx.comments.join(', ');
-
-      if (tx.income_cash > 0 || tx.income_card > 0) {
-        // Income row
-        worksheet.getCell(`A${rowNum}`).value = no++;
-        worksheet.getCell(`B${rowNum}`).value = tx.name;
-        worksheet.getCell(`C${rowNum}`).value = tx.income_cash || '';
-        worksheet.getCell(`D${rowNum}`).value = tx.income_card || '';
-        worksheet.getCell(`E${rowNum}`).value = comments;
-      } else {
-        // Expense row
-        worksheet.getCell(`A${rowNum}`).value = no++;
-        worksheet.getCell(`F${rowNum}`).value = tx.name;
-        worksheet.getCell(`G${rowNum}`).value = tx.expense_cash || '';
-        worksheet.getCell(`H${rowNum}`).value = tx.expense_card || '';
-        worksheet.getCell(`I${rowNum}`).value = comments;
+      // Kirim (chap tomon)
+      if (i < incomeRows.length) {
+        const tx = incomeRows[i];
+        worksheet.getCell(`A${row}`).value = incomeNo++;
+        worksheet.getCell(`B${row}`).value = tx.name;
+        if (tx.cash) worksheet.getCell(`C${row}`).value = tx.cash;
+        if (tx.card) worksheet.getCell(`D${row}`).value = tx.card;
       }
-      rowNum++;
-    });
 
-    // Expenses summary row (from Table 3)
+      // Chiqim (o'ng tomon)
+      if (i < expenseRows.length) {
+        const tx = expenseRows[i];
+        worksheet.getCell(`G${row}`).value = tx.name;
+        if (tx.cash) worksheet.getCell(`H${row}`).value = tx.cash;
+        if (tx.card) worksheet.getCell(`I${row}`).value = tx.card;
+      }
+    }
+
+    // ===== XARAJATLAR SUMMARY ROW =====
     const expenseTotalCash = expenses
       .filter((e) => e.payment_method === PaymentMethod.CASH)
       .reduce((sum, e) => sum + e.amount, 0);
@@ -1589,197 +1639,188 @@ export class CashBoxService
       .filter((e) => e.payment_method !== PaymentMethod.CASH)
       .reduce((sum, e) => sum + e.amount, 0);
 
-    if (expenseTotalCash > 0 || expenseTotalCard > 0) {
-      worksheet.getCell(`F${rowNum}`).value = 'Xarajatlar';
-      worksheet.getCell(`G${rowNum}`).value = expenseTotalCash;
-      worksheet.getCell(`H${rowNum}`).value = expenseTotalCard;
-      worksheet.getCell(`F${rowNum}`).font = { bold: true };
-      rowNum++;
-    }
+    // 2 ta bo'sh qator qo'yib
+    const xarajatlarRow = dataStartRow + 1 + maxRows + 1;
+    worksheet.getCell(`G${xarajatlarRow}`).value = 'Xarajatlar';
+    worksheet.getCell(`G${xarajatlarRow}`).font = { bold: true };
+    worksheet.getCell(`H${xarajatlarRow}`).value = expenseTotalCash || 0;
+    worksheet.getCell(`I${xarajatlarRow}`).value = expenseTotalCard || 0;
+    worksheet.getCell(`J${xarajatlarRow}`).value = 0;
+    fillCell(`H${xarajatlarRow}`, 'FF00FF00');
+    fillCell(`I${xarajatlarRow}`, 'FF00FF00');
+    fillCell(`J${xarajatlarRow}`, 'FF00FF00');
 
-    // Total row
-    worksheet.getCell(`C${rowNum}`).value = balances.income.cash;
-    worksheet.getCell(`D${rowNum}`).value = balances.income.card;
-    worksheet.getCell(`G${rowNum}`).value = balances.expense.cash;
-    worksheet.getCell(`H${rowNum}`).value = balances.expense.card;
+    // ===== EMPTY ROW =====
+    const emptyRow = xarajatlarRow + 1;
 
-    ['C', 'D', 'G', 'H'].forEach((col) => {
-      worksheet.getCell(`${col}${rowNum}`).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF00BFFF' },
-      };
-      worksheet.getCell(`${col}${rowNum}`).font = { bold: true };
+    // ===== TOTAL ROW (jami kirim/chiqim) =====
+    const totalRow = emptyRow + 1;
+    worksheet.getCell(`C${totalRow}`).value = balances.income.cash;
+    worksheet.getCell(`D${totalRow}`).value = balances.income.card;
+    worksheet.getCell(`E${totalRow}`).value = 0;
+    worksheet.getCell(`H${totalRow}`).value = balances.expense.cash;
+    worksheet.getCell(`I${totalRow}`).value = balances.expense.card;
+    worksheet.getCell(`J${totalRow}`).value = 0;
+    ['C', 'D', 'E'].forEach((col) => fillCell(`${col}${totalRow}`, 'FF00FF00', { bold: true }));
+    ['H', 'I', 'J'].forEach((col) => fillCell(`${col}${totalRow}`, 'FF00FF00', { bold: true }));
+
+    // ===== JAMI QOLDIQ =====
+    const qoldiqLabelRow = totalRow + 1;
+    const qoldiqRow = totalRow + 2;
+    worksheet.mergeCells(`C${qoldiqLabelRow}:E${qoldiqLabelRow}`);
+    worksheet.getCell(`C${qoldiqLabelRow}`).value = 'Jami qoldiq:';
+    worksheet.getCell(`C${qoldiqLabelRow}`).font = { bold: true, size: 12 };
+    worksheet.getCell(`C${qoldiqLabelRow}`).alignment = { horizontal: 'right' };
+
+    // Naqd | Karta | Dollar labels
+    worksheet.getCell(`H${qoldiqLabelRow}`).value = 'Naqt';
+    worksheet.getCell(`I${qoldiqLabelRow}`).value = 'Karta';
+    worksheet.getCell(`J${qoldiqLabelRow}`).value = 'Dollar';
+    ['H', 'I', 'J'].forEach((col) => {
+      worksheet.getCell(`${col}${qoldiqLabelRow}`).font = { bold: true };
+      worksheet.getCell(`${col}${qoldiqLabelRow}`).alignment = { horizontal: 'center' };
     });
-    rowNum++;
 
-    // Final balance row
-    worksheet.mergeCells(`A${rowNum}:B${rowNum}`);
-    worksheet.getCell(`A${rowNum}`).value = 'Jami qoldiq:';
-    worksheet.getCell(`A${rowNum}`).font = { bold: true };
-    worksheet.getCell(`C${rowNum}`).value = balances.closing.cash;
-    worksheet.getCell(`D${rowNum}`).value = balances.closing.card;
-    worksheet.getCell(`C${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF87CEEB' },
-    };
-    worksheet.getCell(`D${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFDA70D6' },
-    };
-    worksheet.getCell(`C${rowNum}`).font = { bold: true };
-    worksheet.getCell(`D${rowNum}`).font = { bold: true };
+    worksheet.getCell(`G${qoldiqRow}`).value = 'Jami qoldiq:';
+    worksheet.getCell(`G${qoldiqRow}`).font = { bold: true };
+    worksheet.getCell(`H${qoldiqRow}`).value = balances.closing.cash;
+    worksheet.getCell(`I${qoldiqRow}`).value = balances.closing.card;
+    worksheet.getCell(`J${qoldiqRow}`).value = 0;
+    fillCell(`H${qoldiqRow}`, 'FF00BFFF', { bold: true });
+    fillCell(`I${qoldiqRow}`, 'FFDA70D6', { bold: true });
+    fillCell(`J${qoldiqRow}`, 'FF90EE90', { bold: true });
   }
 
   /**
-   * Build card analysis table (Table 2) starting at column J
+   * Build card analysis table (Table 2) - Bekzod aka Kartasi
+   * Kirim va Chiqim alohida to'ldiriladi
    */
   private buildCardAnalysisTable(
     worksheet: ExcelJS.Worksheet,
     clickTransactions: CashboxHistoryEntity[],
     balances: any,
   ) {
-    // Header row (row 1)
-    worksheet.mergeCells('J1:M1');
-    worksheet.getCell('J1').value = 'Bekzod aka Kartasi';
-    worksheet.getCell('J1').fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFFFC0CB' },
-    };
-    worksheet.getCell('J1').font = { bold: true, size: 12 };
-    worksheet.getCell('J1').alignment = {
-      horizontal: 'center',
-      vertical: 'middle',
+    const COL = { no: 'M', kirimName: 'N', kirimAmount: 'O', chiqimName: 'P', chiqimAmount: 'Q' };
+
+    const fillCell = (cell: string, bg: string, opts?: { bold?: boolean }) => {
+      const c = worksheet.getCell(cell);
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      if (opts?.bold) c.font = { bold: true };
     };
 
-    // Column headers (row 2)
-    worksheet.mergeCells('J2:J3');
-    worksheet.getCell('J2').value = 'No';
+    // Row 2: Title
+    worksheet.mergeCells(`${COL.no}2:${COL.chiqimAmount}2`);
+    worksheet.getCell(`${COL.no}2`).value = 'Bekzod aka Kartasi';
+    worksheet.getCell(`${COL.no}2`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } };
+    worksheet.getCell(`${COL.no}2`).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    worksheet.getCell(`${COL.no}2`).alignment = { horizontal: 'center', vertical: 'middle' };
 
-    worksheet.mergeCells('K2:L2');
-    worksheet.getCell('K2').value = 'Kirim';
-    worksheet.mergeCells('M2:M2');
-    worksheet.getCell('M2').value = 'Chiqim';
+    // Row 3: Kirim / Chiqim
+    worksheet.mergeCells(`${COL.no}3:${COL.kirimAmount}3`);
+    worksheet.getCell(`${COL.no}3`).value = 'Kirim';
+    worksheet.getCell(`${COL.no}3`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
+    worksheet.getCell(`${COL.no}3`).font = { bold: true };
+    worksheet.getCell(`${COL.no}3`).alignment = { horizontal: 'center' };
 
-    worksheet.getCell('K3').value = 'Summa';
-    worksheet.getCell('L3').value = 'al hilal';
-    worksheet.getCell('M3').value = '';
+    worksheet.mergeCells(`${COL.chiqimName}3:${COL.chiqimAmount}3`);
+    worksheet.getCell(`${COL.chiqimName}3`).value = 'Chiqim';
+    worksheet.getCell(`${COL.chiqimName}3`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC0CB' } };
+    worksheet.getCell(`${COL.chiqimName}3`).font = { bold: true };
+    worksheet.getCell(`${COL.chiqimName}3`).alignment = { horizontal: 'center' };
 
-    // Style headers
-    ['J2', 'K2', 'M2', 'J3', 'K3', 'L3', 'M3'].forEach((cell) => {
-      worksheet.getCell(cell).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF90EE90' },
-      };
+    // Row 4: Sub-headers
+    ['M4', 'N4', 'O4', 'P4', 'Q4'].forEach((cell) => {
+      worksheet.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
       worksheet.getCell(cell).font = { bold: true, size: 10 };
-      worksheet.getCell(cell).alignment = {
-        horizontal: 'center',
-        vertical: 'middle',
-      };
+      worksheet.getCell(cell).alignment = { horizontal: 'center' };
     });
+    worksheet.getCell('M4').value = 'No';
 
-    let rowNum = 4;
-
-    // Opening balance
-    worksheet.getCell(`J${rowNum}`).value = 1;
-    worksheet.getCell(`K${rowNum}`).value = 'Qoldiq';
-    worksheet.getCell(`L${rowNum}`).value = balances.opening.card;
-    worksheet.getCell(`K${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF00BFFF' },
-    };
-    rowNum++;
-
-    // CLICK transactions
-    let no = 2;
-    clickTransactions.forEach((tx) => {
-      worksheet.getCell(`J${rowNum}`).value = no++;
-      if (tx.operation_type === Operation_type.INCOME) {
-        worksheet.getCell(`K${rowNum}`).value = tx.amount;
-        worksheet.getCell(`L${rowNum}`).value =
-          tx.comment || tx.createdByUser?.name || '';
-      } else {
-        worksheet.getCell(`M${rowNum}`).value = tx.amount;
-      }
-      rowNum++;
-    });
-
-    // Total row
+    // Data
     const clickIncome = clickTransactions
       .filter((tx) => tx.operation_type === Operation_type.INCOME)
-      .reduce((sum, tx) => sum + tx.amount, 0);
-    worksheet.getCell(`K${rowNum}`).value = clickIncome;
-    worksheet.getCell(`K${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF90EE90' },
-    };
-    rowNum++;
+      .sort((a, b) => Number(a.created_at) - Number(b.created_at));
+    const clickExpense = clickTransactions
+      .filter((tx) => tx.operation_type === Operation_type.EXPENSE)
+      .sort((a, b) => Number(a.created_at) - Number(b.created_at));
 
-    // Final balance
-    worksheet.getCell(`K${rowNum}`).value = 'Qoldiq';
-    worksheet.getCell(`L${rowNum}`).value = balances.closing.card;
-    worksheet.getCell(`K${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF00BFFF' },
-    };
+    // Row 5: Qoldiq (ochilish balansi)
+    worksheet.getCell('M5').value = 1;
+    worksheet.getCell('O5').value = balances.opening.card;
+    fillCell('O5', 'FF0000FF');
+    worksheet.getCell('O5').font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+    const maxClickRows = Math.max(clickIncome.length, clickExpense.length);
+    let no = 2;
+    for (let i = 0; i < maxClickRows; i++) {
+      const row = 6 + i;
+      if (i < clickIncome.length) {
+        const tx = clickIncome[i];
+        worksheet.getCell(`${COL.no}${row}`).value = no++;
+        worksheet.getCell(`${COL.kirimName}${row}`).value = tx.sourceUser?.name || tx.createdByUser?.name || '';
+        worksheet.getCell(`${COL.kirimAmount}${row}`).value = tx.amount;
+      }
+      if (i < clickExpense.length) {
+        const tx = clickExpense[i];
+        worksheet.getCell(`${COL.chiqimName}${row}`).value = tx.sourceUser?.name || tx.createdByUser?.name || '';
+        worksheet.getCell(`${COL.chiqimAmount}${row}`).value = tx.amount;
+      }
+    }
+
+    // Totals
+    const totalIncome = clickIncome.reduce((sum, tx) => sum + tx.amount, 0);
+    const totalExpense = clickExpense.reduce((sum, tx) => sum + tx.amount, 0);
+    const totalRow = 6 + maxClickRows;
+    worksheet.getCell(`${COL.kirimAmount}${totalRow}`).value = totalIncome;
+    worksheet.getCell(`${COL.chiqimAmount}${totalRow}`).value = totalExpense;
+    fillCell(`${COL.kirimAmount}${totalRow}`, 'FF00FF00', { bold: true });
+    fillCell(`${COL.chiqimAmount}${totalRow}`, 'FF00FF00', { bold: true });
+
+    // Qoldiq
+    const qoldiqRow = totalRow + 1;
+    worksheet.getCell(`${COL.chiqimName}${qoldiqRow}`).value = 'Qoldiq:';
+    worksheet.getCell(`${COL.chiqimName}${qoldiqRow}`).font = { bold: true };
+    worksheet.getCell(`${COL.chiqimAmount}${qoldiqRow}`).value = balances.closing.card;
+    fillCell(`${COL.chiqimAmount}${qoldiqRow}`, 'FF00BFFF', { bold: true });
   }
 
   /**
-   * Build expenses table (Table 3) starting at column P
+   * Build expenses table (Table 3) - XARAJAT
    */
   private buildExpensesTable(
     worksheet: ExcelJS.Worksheet,
     expenses: CashboxHistoryEntity[],
   ) {
-    // Header row (row 1)
-    worksheet.mergeCells('P1:R1');
-    worksheet.getCell('P1').value = 'XARAJAT';
-    worksheet.getCell('P1').fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFFF6347' },
-    };
-    worksheet.getCell('P1').font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-    worksheet.getCell('P1').alignment = {
-      horizontal: 'center',
-      vertical: 'middle',
-    };
+    const COL = { name: 'S', naqd: 'T', karta: 'U', dollar: 'V', reja: 'W' };
 
-    // Column headers (row 2)
-    worksheet.getCell('P2').value = 'KOMENT';
-    worksheet.getCell('Q2').value = 'NAQD';
-    worksheet.getCell('R2').value = 'KARTA';
+    // Row 2: Title
+    worksheet.mergeCells(`${COL.name}2:${COL.reja}2`);
+    worksheet.getCell(`${COL.name}2`).value = 'XARAJAT';
+    worksheet.getCell(`${COL.name}2`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } };
+    worksheet.getCell(`${COL.name}2`).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    worksheet.getCell(`${COL.name}2`).alignment = { horizontal: 'center', vertical: 'middle' };
 
-    ['P2', 'Q2', 'R2'].forEach((cell) => {
-      worksheet.getCell(cell).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFFA500' },
-      };
+    // Row 3: Column headers
+    const hdrs = [
+      [COL.name, ''], [COL.naqd, 'NAQD'], [COL.karta, 'KARTA'], [COL.dollar, 'DOLLAR'], [COL.reja, 'REJA'],
+    ];
+    hdrs.forEach(([col, val]) => {
+      const cell = `${col}3`;
+      worksheet.getCell(cell).value = val;
+      worksheet.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
       worksheet.getCell(cell).font = { bold: true, size: 10 };
-      worksheet.getCell(cell).alignment = {
-        horizontal: 'center',
-        vertical: 'middle',
-      };
+      worksheet.getCell(cell).alignment = { horizontal: 'center' };
     });
 
-    let rowNum = 3;
-
-    // List each expense
+    // Expense rows
+    let rowNum = 4;
     expenses.forEach((expense) => {
-      worksheet.getCell(`P${rowNum}`).value =
-        expense.comment || expense.createdByUser?.name || 'Xarajat';
+      worksheet.getCell(`${COL.name}${rowNum}`).value =
+        expense.comment || expense.sourceUser?.name || expense.createdByUser?.name || 'Xarajat';
       if (expense.payment_method === PaymentMethod.CASH) {
-        worksheet.getCell(`Q${rowNum}`).value = expense.amount;
+        worksheet.getCell(`${COL.naqd}${rowNum}`).value = expense.amount;
       } else {
-        worksheet.getCell(`R${rowNum}`).value = expense.amount;
+        worksheet.getCell(`${COL.karta}${rowNum}`).value = expense.amount;
       }
       rowNum++;
     });
@@ -1792,48 +1833,58 @@ export class CashBoxService
       .filter((e) => e.payment_method !== PaymentMethod.CASH)
       .reduce((sum, e) => sum + e.amount, 0);
 
-    worksheet.getCell(`Q${rowNum}`).value = totalCash;
-    worksheet.getCell(`R${rowNum}`).value = totalCard;
-    worksheet.getCell(`Q${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF00BFFF' },
+    const fillCell = (cell: string, bg: string) => {
+      worksheet.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      worksheet.getCell(cell).font = { bold: true };
     };
-    worksheet.getCell(`R${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFDA70D6' },
-    };
-    worksheet.getCell(`Q${rowNum}`).font = { bold: true };
-    worksheet.getCell(`R${rowNum}`).font = { bold: true };
+
+    worksheet.getCell(`${COL.naqd}${rowNum}`).value = totalCash;
+    worksheet.getCell(`${COL.karta}${rowNum}`).value = totalCard;
+    worksheet.getCell(`${COL.dollar}${rowNum}`).value = 0;
+    fillCell(`${COL.naqd}${rowNum}`, 'FF00BFFF');
+    fillCell(`${COL.karta}${rowNum}`, 'FFDA70D6');
+    fillCell(`${COL.dollar}${rowNum}`, 'FF90EE90');
   }
 
   /**
    * Apply Excel styling to the worksheet
    */
   private applyExcelStyling(worksheet: ExcelJS.Worksheet) {
-    // Set column widths
-    worksheet.getColumn('A').width = 5; // No
-    worksheet.getColumn('B').width = 15; // QAYERDAN
-    worksheet.getColumn('C').width = 12; // Kirim NAQD
-    worksheet.getColumn('D').width = 12; // Kirim KARTA
-    worksheet.getColumn('E').width = 20; // COMMENT
-    worksheet.getColumn('F').width = 15; // QAYERGA
-    worksheet.getColumn('G').width = 12; // Chiqim NAQD
-    worksheet.getColumn('H').width = 12; // Chiqim KARTA
-    worksheet.getColumn('I').width = 20; // COMMENT
+    // ASOSIY KASSA columns (A-K)
+    worksheet.getColumn('A').width = 5;
+    worksheet.getColumn('B').width = 16;
+    worksheet.getColumn('C').width = 12;
+    worksheet.getColumn('D').width = 12;
+    worksheet.getColumn('E').width = 10;
+    worksheet.getColumn('F').width = 8;
+    worksheet.getColumn('G').width = 16;
+    worksheet.getColumn('H').width = 12;
+    worksheet.getColumn('I').width = 12;
+    worksheet.getColumn('J').width = 10;
+    worksheet.getColumn('K').width = 8;
 
-    worksheet.getColumn('J').width = 5; // No
-    worksheet.getColumn('K').width = 12; // Kirim
-    worksheet.getColumn('L').width = 15; // al hilal
-    worksheet.getColumn('M').width = 12; // Chiqim
+    // Gap column
+    worksheet.getColumn('L').width = 3;
 
-    worksheet.getColumn('P').width = 20; // KOMENT
-    worksheet.getColumn('Q').width = 12; // NAQD
-    worksheet.getColumn('R').width = 12; // KARTA
+    // Bekzod aka Kartasi (M-Q)
+    worksheet.getColumn('M').width = 5;
+    worksheet.getColumn('N').width = 14;
+    worksheet.getColumn('O').width = 12;
+    worksheet.getColumn('P').width = 14;
+    worksheet.getColumn('Q').width = 12;
 
-    // Add borders to all cells
-    worksheet.eachRow((row, rowNumber) => {
+    // Gap column
+    worksheet.getColumn('R').width = 3;
+
+    // XARAJAT (S-W)
+    worksheet.getColumn('S').width = 20;
+    worksheet.getColumn('T').width = 12;
+    worksheet.getColumn('U').width = 12;
+    worksheet.getColumn('V').width = 10;
+    worksheet.getColumn('W').width = 8;
+
+    // Borders
+    worksheet.eachRow((row) => {
       row.eachCell((cell) => {
         cell.border = {
           top: { style: 'thin' },
@@ -1914,6 +1965,15 @@ export class CashBoxService
 
       await this.shiftRepo.save(shift);
 
+      this.activityLog.log({
+        entity_type: 'shift',
+        entity_id: shift.id,
+        action: 'opened',
+        new_value: { opening_balance_cash: balances.cash, opening_balance_card: balances.card },
+        description: `Smena ochildi — naqd: ${balances.cash}, karta: ${balances.card}`,
+        user,
+      });
+
       return successRes({ shift }, 201, 'Smena ochildi');
     } catch (error) {
       return catchError(error);
@@ -1960,17 +2020,18 @@ export class CashBoxService
       let totalExpenseCard = 0;
 
       for (const tx of shiftHistories) {
+        const amount = Number(tx.amount);
         if (tx.operation_type === Operation_type.INCOME) {
           if (tx.payment_method === PaymentMethod.CASH) {
-            totalIncomeCash += tx.amount;
+            totalIncomeCash += amount;
           } else {
-            totalIncomeCard += tx.amount;
+            totalIncomeCard += amount;
           }
         } else {
           if (tx.payment_method === PaymentMethod.CASH) {
-            totalExpenseCash += tx.amount;
+            totalExpenseCash += amount;
           } else {
-            totalExpenseCard += tx.amount;
+            totalExpenseCard += amount;
           }
         }
       }
@@ -2024,6 +2085,20 @@ export class CashBoxService
         transactions: shiftHistories,
       };
 
+      this.activityLog.log({
+        entity_type: 'shift',
+        entity_id: openShift.id,
+        action: 'closed',
+        new_value: {
+          closing_balance_cash: openShift.closing_balance_cash,
+          closing_balance_card: openShift.closing_balance_card,
+          total_income_cash: openShift.total_income_cash,
+          total_expense_cash: openShift.total_expense_cash,
+        },
+        description: `Smena yopildi — jami kirim: ${openShift.total_income_cash + openShift.total_income_card}, jami chiqim: ${openShift.total_expense_cash + openShift.total_expense_card}`,
+        user,
+      });
+
       return successRes(reportData, 200, 'Smena yopildi');
     } catch (error) {
       return catchError(error);
@@ -2070,7 +2145,7 @@ export class CashBoxService
           cashbox_id: mainCashbox.id,
           created_at: Between(shift.opened_at, shift.closed_at || Date.now()),
         },
-        relations: ['createdByUser'],
+        relations: ['createdByUser', 'sourceUser'],
       });
 
       // Generate Excel
@@ -2088,220 +2163,73 @@ export class CashBoxService
   }
 
   /**
-   * Build shift report Excel
+   * Build shift report Excel — asosiy kassa shabloni bilan bir xil
    */
   private buildShiftReportExcel(
     worksheet: ExcelJS.Worksheet,
     shift: ShiftEntity,
     histories: CashboxHistoryEntity[],
   ) {
-    // Title
-    worksheet.mergeCells('A1:H1');
-    const openDate = new Date(shift.opened_at).toLocaleDateString('uz-UZ');
-    const closeDate = shift.closed_at
-      ? new Date(shift.closed_at).toLocaleDateString('uz-UZ')
-      : 'Hali yopilmagan';
-    worksheet.getCell('A1').value = `SMENA HISOBOTI: ${openDate} - ${closeDate}`;
-    worksheet.getCell('A1').font = { bold: true, size: 14 };
-    worksheet.getCell('A1').alignment = { horizontal: 'center' };
-    worksheet.getCell('A1').fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF4472C4' },
-    };
-    worksheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    // Shift balanslarini hisoblash
+    let totalIncome = 0;
+    let totalExpense = 0;
+    for (const h of histories) {
+      if (h.operation_type === Operation_type.INCOME) totalIncome += h.amount;
+      else totalExpense += h.amount;
+    }
 
-    // Shift info
-    worksheet.getCell('A3').value = 'Smena ochgan:';
-    worksheet.getCell('B3').value = shift.openedByUser?.name || 'Noma\'lum';
-    worksheet.getCell('A4').value = 'Smena yopgan:';
-    worksheet.getCell('B4').value = shift.closedByUser?.name || '-';
-
-    // Opening balances section
-    worksheet.mergeCells('A6:D6');
-    worksheet.getCell('A6').value = 'SMENA BOSHIDAGI QOLDIQ';
-    worksheet.getCell('A6').font = { bold: true };
-    worksheet.getCell('A6').fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF92D050' },
+    const balances = {
+      opening: {
+        cash: shift.opening_balance_cash || 0,
+        card: shift.opening_balance_card || 0,
+        total: (shift.opening_balance_cash || 0) + (shift.opening_balance_card || 0),
+      },
+      income: this.calculateMethodTotals(histories, Operation_type.INCOME),
+      expense: this.calculateMethodTotals(histories, Operation_type.EXPENSE),
+      closing: {
+        cash: shift.closing_balance_cash || (shift.opening_balance_cash || 0),
+        card: shift.closing_balance_card || (shift.opening_balance_card || 0),
+        total: (shift.closing_balance_cash || 0) + (shift.closing_balance_card || 0),
+      },
     };
 
-    worksheet.getCell('A7').value = 'Naqd:';
-    worksheet.getCell('B7').value = shift.opening_balance_cash;
-    worksheet.getCell('C7').value = 'Karta/Click:';
-    worksheet.getCell('D7').value = shift.opening_balance_card;
-
-    // Process transactions
-    const groupedTransactions = this.groupTransactionsByUser(histories);
+    const transactions = this.getIndividualTransactions(histories);
     const expenseTransactions = this.filterExpenseTransactions(histories);
     const clickTransactions = this.filterClickTransactions(histories);
 
-    // Main transactions table
-    worksheet.mergeCells('A9:H9');
-    worksheet.getCell('A9').value = 'SMENA DAVOMIDAGI OPERATSIYALAR';
-    worksheet.getCell('A9').font = { bold: true };
-    worksheet.getCell('A9').fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF00B0F0' },
-    };
+    // Sana formati (bigint timestamp)
+    const openDate = new Date(Number(shift.opened_at)).toLocaleDateString('uz-UZ');
+    const closeDate = shift.closed_at
+      ? new Date(Number(shift.closed_at)).toLocaleDateString('uz-UZ')
+      : 'davom etmoqda';
+    const query = { fromDate: openDate, toDate: closeDate };
 
-    // Headers
-    worksheet.getCell('A10').value = '#';
-    worksheet.getCell('B10').value = 'QAYERDAN';
-    worksheet.getCell('C10').value = 'NAQD KIRIM';
-    worksheet.getCell('D10').value = 'KARTA KIRIM';
-    worksheet.getCell('E10').value = 'QAYERGA';
-    worksheet.getCell('F10').value = 'NAQD CHIQIM';
-    worksheet.getCell('G10').value = 'KARTA CHIQIM';
-    worksheet.getCell('H10').value = 'IZOH';
+    // Xuddi asosiy kassa shabloni bilan bir xil 3 ta jadval
+    this.buildMainTable(worksheet, transactions, balances, expenseTransactions, query);
+    this.buildCardAnalysisTable(worksheet, clickTransactions, balances);
+    this.buildExpensesTable(worksheet, expenseTransactions);
+    this.applyExcelStyling(worksheet);
+  }
 
-    ['A10', 'B10', 'C10', 'D10', 'E10', 'F10', 'G10', 'H10'].forEach((cell) => {
-      worksheet.getCell(cell).font = { bold: true };
-      worksheet.getCell(cell).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFD9E1F2' },
-      };
-    });
-
-    let rowNum = 11;
-    let no = 1;
-
-    groupedTransactions.forEach((tx) => {
-      worksheet.getCell(`A${rowNum}`).value = no++;
-      if (tx.income_cash > 0 || tx.income_card > 0) {
-        worksheet.getCell(`B${rowNum}`).value = tx.name;
-        worksheet.getCell(`C${rowNum}`).value = tx.income_cash || '';
-        worksheet.getCell(`D${rowNum}`).value = tx.income_card || '';
-      }
-      if (tx.expense_cash > 0 || tx.expense_card > 0) {
-        worksheet.getCell(`E${rowNum}`).value = tx.name;
-        worksheet.getCell(`F${rowNum}`).value = tx.expense_cash || '';
-        worksheet.getCell(`G${rowNum}`).value = tx.expense_card || '';
-      }
-      worksheet.getCell(`H${rowNum}`).value = tx.comments.join(', ');
-      rowNum++;
-    });
-
-    // Expenses section
-    if (expenseTransactions.length > 0) {
-      rowNum++;
-      worksheet.mergeCells(`A${rowNum}:D${rowNum}`);
-      worksheet.getCell(`A${rowNum}`).value = 'XARAJATLAR';
-      worksheet.getCell(`A${rowNum}`).font = { bold: true };
-      worksheet.getCell(`A${rowNum}`).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFF6347' },
-      };
-      rowNum++;
-
-      worksheet.getCell(`A${rowNum}`).value = 'Izoh';
-      worksheet.getCell(`B${rowNum}`).value = 'Naqd';
-      worksheet.getCell(`C${rowNum}`).value = 'Karta';
-      rowNum++;
-
-      expenseTransactions.forEach((expense) => {
-        worksheet.getCell(`A${rowNum}`).value =
-          expense.comment || expense.createdByUser?.name || 'Xarajat';
-        if (expense.payment_method === PaymentMethod.CASH) {
-          worksheet.getCell(`B${rowNum}`).value = expense.amount;
-        } else {
-          worksheet.getCell(`C${rowNum}`).value = expense.amount;
-        }
-        rowNum++;
-      });
+  /**
+   * Calculate income/expense totals by payment method
+   */
+  private calculateMethodTotals(
+    histories: CashboxHistoryEntity[],
+    operationType: Operation_type,
+  ) {
+    let cash = 0;
+    let card = 0;
+    for (const tx of histories) {
+      if (tx.operation_type !== operationType) continue;
+      if (
+        tx.source_type === Source_type.MANUAL_EXPENSE ||
+        tx.source_type === Source_type.SALARY
+      ) continue;
+      if (tx.payment_method === PaymentMethod.CASH) cash += tx.amount;
+      else card += tx.amount;
     }
-
-    // Summary section
-    rowNum += 2;
-    worksheet.mergeCells(`A${rowNum}:H${rowNum}`);
-    worksheet.getCell(`A${rowNum}`).value = 'SMENA YAKUNLARI';
-    worksheet.getCell(`A${rowNum}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`A${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFFFC000' },
-    };
-    rowNum++;
-
-    // Totals
-    worksheet.getCell(`A${rowNum}`).value = 'Jami kirim (naqd):';
-    worksheet.getCell(`B${rowNum}`).value = shift.total_income_cash;
-    worksheet.getCell(`C${rowNum}`).value = 'Jami kirim (karta):';
-    worksheet.getCell(`D${rowNum}`).value = shift.total_income_card;
-    rowNum++;
-
-    worksheet.getCell(`A${rowNum}`).value = 'Jami chiqim (naqd):';
-    worksheet.getCell(`B${rowNum}`).value = shift.total_expense_cash;
-    worksheet.getCell(`C${rowNum}`).value = 'Jami chiqim (karta):';
-    worksheet.getCell(`D${rowNum}`).value = shift.total_expense_card;
-    rowNum++;
-
-    // Closing balances
-    rowNum++;
-    worksheet.mergeCells(`A${rowNum}:D${rowNum}`);
-    worksheet.getCell(`A${rowNum}`).value = 'SMENA OXIRIDAGI QOLDIQ';
-    worksheet.getCell(`A${rowNum}`).font = { bold: true };
-    worksheet.getCell(`A${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF92D050' },
-    };
-    rowNum++;
-
-    worksheet.getCell(`A${rowNum}`).value = 'Naqd qoldiq:';
-    worksheet.getCell(`B${rowNum}`).value = shift.closing_balance_cash;
-    worksheet.getCell(`B${rowNum}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`B${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF00BFFF' },
-    };
-    worksheet.getCell(`C${rowNum}`).value = 'Karta/Click qoldiq:';
-    worksheet.getCell(`D${rowNum}`).value = shift.closing_balance_card;
-    worksheet.getCell(`D${rowNum}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`D${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFDA70D6' },
-    };
-    rowNum++;
-
-    worksheet.getCell(`A${rowNum}`).value = 'UMUMIY QOLDIQ:';
-    worksheet.getCell(`A${rowNum}`).font = { bold: true };
-    worksheet.getCell(`B${rowNum}`).value =
-      shift.closing_balance_cash + shift.closing_balance_card;
-    worksheet.getCell(`B${rowNum}`).font = { bold: true, size: 14 };
-    worksheet.getCell(`B${rowNum}`).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF00FF00' },
-    };
-
-    // Set column widths
-    worksheet.getColumn('A').width = 20;
-    worksheet.getColumn('B').width = 15;
-    worksheet.getColumn('C').width = 15;
-    worksheet.getColumn('D').width = 15;
-    worksheet.getColumn('E').width = 15;
-    worksheet.getColumn('F').width = 15;
-    worksheet.getColumn('G').width = 15;
-    worksheet.getColumn('H').width = 25;
-
-    // Add borders
-    worksheet.eachRow((row) => {
-      row.eachCell((cell) => {
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' },
-        };
-      });
-    });
+    return { cash, card, total: cash + card };
   }
 
   /**

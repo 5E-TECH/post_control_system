@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import type { RootState } from "../../../../../app/store";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import OrderItems from "../../../components/order-items";
@@ -100,6 +100,13 @@ const CreateOrder = () => {
         handleApiError(err, "Buyurtma yaratishda xatolik yuz berdi"),
     });
   };
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey && !(e.target as HTMLElement).closest(".ant-select") && !(e.target as HTMLTextAreaElement).closest("textarea")) {
+      e.preventDefault();
+      handleClick();
+    }
+  }, [orderItems, productInfo, market_id, customer_id]);
 
   const handleBack = () => {
     navigate(buildAdminPath("orders/customer-info"));
@@ -254,7 +261,7 @@ const CreateOrder = () => {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 space-y-5">
+          <div className="flex-1 space-y-5" onKeyDown={handleKeyDown}>
             {/* Order Items */}
             <OrderItems />
 

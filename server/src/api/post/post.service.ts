@@ -23,6 +23,7 @@ import { ReceivePostDto } from './dto/receive-post.dto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { PostDto } from './dto/postId.dto';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Injectable()
 export class PostService {
@@ -37,6 +38,7 @@ export class PostService {
     private readonly userRepo: UserRepository,
 
     private readonly dataSource: DataSource,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async findAll(page: number, limit: number): Promise<object> {
@@ -409,6 +411,84 @@ export class PostService {
     }
   }
 
+  /**
+   * Jo'natilgan pochtani boshqa kurierga o'tkazish (faqat superadmin)
+   */
+  async reassignCourier(postId: string, newCourierId: string, user: JwtPayload) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id: postId },
+        relations: ['courier', 'region'],
+      });
+      if (!post) {
+        throw new NotFoundException('Pochta topilmadi');
+      }
+      if (post.status !== Post_status.SENT) {
+        throw new BadRequestException("Faqat jo'natilgan pochtani o'tkazish mumkin");
+      }
+
+      const oldCourier = post.courier;
+      const oldCourierId = post.courier_id;
+
+      if (oldCourierId === newCourierId) {
+        throw new BadRequestException('Pochta allaqachon shu kuryerda');
+      }
+
+      const newCourier = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: newCourierId, role: Roles.COURIER },
+      });
+      if (!newCourier) {
+        throw new NotFoundException('Kuryer topilmadi');
+      }
+
+      // Kuryerni o'zgartirish
+      post.courier_id = newCourierId;
+      await queryRunner.manager.save(post);
+
+      await queryRunner.commitTransaction();
+
+      // Activity log
+      this.activityLog.log({
+        entity_type: 'post',
+        entity_id: postId,
+        action: 'reassigned',
+        old_value: { courier_id: oldCourierId, courier_name: oldCourier?.name },
+        new_value: { courier_id: newCourierId, courier_name: newCourier.name },
+        description: `Pochta kuryer o'zgartirildi: ${oldCourier?.name || '-'} → ${newCourier.name}`,
+        user,
+      });
+
+      // Pochta ichidagi har bir buyurtma uchun ham log
+      const orders = await this.orderRepo.find({ where: { post_id: postId } });
+      for (const order of orders) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: order.id,
+          action: 'courier_changed',
+          old_value: { courier_name: oldCourier?.name },
+          new_value: { courier_name: newCourier.name },
+          description: `Kuryer o'zgartirildi: ${oldCourier?.name || '-'} → ${newCourier.name}`,
+          user,
+        });
+      }
+
+      return successRes(
+        { post_id: postId, old_courier: oldCourier?.name, new_courier: newCourier.name },
+        200,
+        `Pochta ${newCourier.name} ga o'tkazildi`,
+      );
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async sendPost(id: string, dto: SendPostDto): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -524,6 +604,19 @@ export class PostService {
       });
 
       await queryRunner.commitTransaction();
+
+      // Activity log — har bir buyurtma uchun
+      for (const order of newOrders) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: order.id,
+          action: 'status_change',
+          old_value: { status: Order_status.RECEIVED },
+          new_value: { status: Order_status.ON_THE_ROAD, courier: updatedPost?.courier?.name },
+          description: `Pochta jo'natildi — kuryer: ${updatedPost?.courier?.name || '-'}`,
+        });
+      }
+
       return successRes(
         { updatedPost, newOrders, postTotalInfo },
         200,
@@ -578,59 +671,23 @@ export class PostService {
         );
       }
 
-      // 3️⃣ Post ichidagi qolgan ON_THE_ROAD orderlarni topamiz
+      // 3️⃣ Post ichidagi qolgan ON_THE_ROAD orderlarni topamiz (courier tanlamagan)
       const remainingOrders = post.orders.filter(
         (order) =>
           order.status === Order_status.ON_THE_ROAD &&
           !waitingOrderIds.includes(order.id),
       );
 
-      // 4️⃣ Yangi (yoki mavjud) postni topamiz / yaratamiz
-      let newPost: PostEntity | null = null;
-
+      // 4️⃣ Tanlanmagan orderlarni WAITING statusga o'tkazib, return_requested = true qilamiz
+      //    Buyurtmalar courier hisobida qoladi, faqat admin tasdiqlasa pochtaga qaytadi
       if (remainingOrders.length > 0) {
-        newPost = await queryRunner.manager.findOne(PostEntity, {
-          where: { region_id: post.region_id, status: Post_status.NEW },
-        });
-
-        if (!newPost) {
-          const customToken = generateCustomToken();
-          newPost = queryRunner.manager.create(PostEntity, {
-            region_id: post.region_id,
-            order_quantity: 0,
-            post_total_price: 0,
-            status: Post_status.NEW,
-            qr_code_token: customToken,
-          });
-          newPost = await queryRunner.manager.save(newPost);
-        }
-
-        // 5️⃣ Har bir qolgan orderni yangi postga RECEIVED holatda o'tkazamiz
-        let totalAdded = 0;
-        let countAdded = 0;
-
         for (const o of remainingOrders) {
-          const order = await queryRunner.manager.findOne(OrderEntity, {
-            where: { id: o.id, status: Order_status.ON_THE_ROAD },
-          });
-          if (!order) continue;
-
-          order.status = Order_status.RECEIVED;
-          order.post_id = newPost.id;
-          await queryRunner.manager.save(order);
-
-          totalAdded += Number(order.total_price) || 0;
-          countAdded += 1;
-        }
-
-        // Yangi postni umumiy qiymat va son bilan yangilaymiz
-        if (countAdded > 0) {
           await queryRunner.manager.update(
-            PostEntity,
-            { id: newPost.id },
+            OrderEntity,
+            { id: o.id, status: Order_status.ON_THE_ROAD },
             {
-              order_quantity: (Number(newPost.order_quantity) || 0) + countAdded,
-              post_total_price: (Number(newPost.post_total_price) || 0) + totalAdded,
+              status: Order_status.WAITING,
+              return_requested: true,
             },
           );
         }
@@ -651,6 +708,30 @@ export class PostService {
         : [];
 
       await queryRunner.commitTransaction();
+
+      // Activity log
+      for (const orderId of waitingOrderIds) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: orderId,
+          action: 'status_change',
+          old_value: { status: Order_status.ON_THE_ROAD },
+          new_value: { status: Order_status.WAITING },
+          description: `Kuryer qabul qildi`,
+          user,
+        });
+      }
+      for (const o of remainingOrders) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: o.id,
+          action: 'return_requested',
+          old_value: { status: Order_status.ON_THE_ROAD },
+          new_value: { status: Order_status.WAITING, return_requested: true },
+          description: `Kuryer qaytarish so'rovi yubordi`,
+          user,
+        });
+      }
 
       return successRes(allOrdersInThePost, 200, 'Post received successfully');
     } catch (error) {
@@ -832,7 +913,18 @@ export class PostService {
       // 🔟 Transactionni yakunlash
       await queryRunner.commitTransaction();
 
-      // ✅ Javob
+      // Activity log
+      for (const oid of order_ids) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: oid,
+          action: 'status_change',
+          new_value: { status: Order_status.CANCELLED_SENT },
+          description: `Bekor qilingan buyurtma pochtaga qaytarildi`,
+          user,
+        });
+      }
+
       return successRes(
         { post_id: canceledPost.id, order_ids },
         200,
@@ -920,12 +1012,220 @@ export class PostService {
 
       await queryRunner.commitTransaction();
 
+      // Activity log
+      for (const oid of (ordersArrayDto.order_ids || [])) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: oid,
+          action: 'status_change',
+          new_value: { status: Order_status.CLOSED },
+          description: `Bekor qilingan buyurtma qabul qilindi (CLOSED)`,
+        });
+      }
+      for (const oid of remainingOrderIds) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: oid,
+          action: 'status_change',
+          new_value: { status: Order_status.CANCELLED },
+          description: `Buyurtma qabul qilinmadi — kuryerga qaytarildi`,
+        });
+      }
+
       return successRes({}, 200, 'Post received successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  /**
+   * Qaytarish so'rovi yuborilgan buyurtmalarni olish (admin uchun)
+   * Courier bo'yicha guruhlab qaytaradi
+   */
+  async getReturnRequests() {
+    try {
+      const orders = await this.orderRepo.find({
+        where: {
+          return_requested: true,
+          status: Order_status.WAITING,
+        },
+        relations: ['customer', 'district', 'district.region', 'post', 'post.courier'],
+        order: { created_at: 'DESC' },
+      });
+
+      // Courier bo'yicha guruhlash
+      const courierMap = new Map<string, { courier: any; orders: any[] }>();
+      for (const order of orders) {
+        const courierId = order.post?.courier_id || 'unknown';
+        if (!courierMap.has(courierId)) {
+          courierMap.set(courierId, {
+            courier: order.post?.courier || null,
+            orders: [],
+          });
+        }
+        courierMap.get(courierId)!.orders.push(order);
+      }
+
+      const grouped = Array.from(courierMap.values());
+
+      return successRes(
+        { total: orders.length, groups: grouped },
+        200,
+        'Return requests',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Qaytarish so'rovlarini tasdiqlash (admin)
+   * Buyurtmalar courier hisobidan olinib pochtaga (NEW post) qaytariladi
+   */
+  async approveReturnRequests(ordersArrayDto: { order_ids: string[] }) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const orderIds = ordersArrayDto.order_ids;
+      if (!orderIds || orderIds.length === 0) {
+        throw new BadRequestException('Order IDs required');
+      }
+
+      const orders = await queryRunner.manager.find(OrderEntity, {
+        where: {
+          id: In(orderIds),
+          return_requested: true,
+          status: Order_status.WAITING,
+        },
+        relations: ['post'],
+      });
+
+      if (orders.length === 0) {
+        throw new NotFoundException('No return-requested orders found');
+      }
+
+      // Region bo'yicha guruhlash
+      const regionOrdersMap = new Map<string, OrderEntity[]>();
+      for (const order of orders) {
+        const regionId = order.post?.region_id || order.district_id;
+        if (!regionId) continue;
+        if (!regionOrdersMap.has(regionId)) {
+          regionOrdersMap.set(regionId, []);
+        }
+        regionOrdersMap.get(regionId)!.push(order);
+      }
+
+      // Har bir region uchun NEW post topish/yaratish va orderlarni ko'chirish
+      for (const [regionId, regionOrders] of regionOrdersMap) {
+        let newPost = await queryRunner.manager.findOne(PostEntity, {
+          where: { region_id: regionId, status: Post_status.NEW },
+        });
+
+        if (!newPost) {
+          const customToken = generateCustomToken();
+          newPost = queryRunner.manager.create(PostEntity, {
+            region_id: regionId,
+            order_quantity: 0,
+            post_total_price: 0,
+            status: Post_status.NEW,
+            qr_code_token: customToken,
+          });
+          newPost = await queryRunner.manager.save(newPost);
+        }
+
+        let totalAdded = 0;
+        let countAdded = 0;
+
+        for (const order of regionOrders) {
+          order.status = Order_status.RECEIVED;
+          order.return_requested = false;
+          order.post_id = newPost.id;
+          await queryRunner.manager.save(order);
+
+          totalAdded += Number(order.total_price) || 0;
+          countAdded += 1;
+        }
+
+        if (countAdded > 0) {
+          await queryRunner.manager.update(
+            PostEntity,
+            { id: newPost.id },
+            {
+              order_quantity: (Number(newPost.order_quantity) || 0) + countAdded,
+              post_total_price: (Number(newPost.post_total_price) || 0) + totalAdded,
+            },
+          );
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
+      for (const order of orders) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: order.id,
+          action: 'return_approved',
+          old_value: { status: Order_status.WAITING, return_requested: true },
+          new_value: { status: Order_status.RECEIVED, return_requested: false },
+          description: `Qaytarish so'rovi tasdiqlandi — buyurtma pochtaga qaytarildi`,
+        });
+      }
+
+      return successRes(
+        { approved: orders.length },
+        200,
+        'Return requests approved',
+      );
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Qaytarish so'rovlarini rad etish (admin)
+   * Buyurtmalar courier hisobida qoladi, return_requested = false
+   */
+  async rejectReturnRequests(ordersArrayDto: { order_ids: string[] }) {
+    try {
+      const orderIds = ordersArrayDto.order_ids;
+      if (!orderIds || orderIds.length === 0) {
+        throw new BadRequestException('Order IDs required');
+      }
+
+      await this.orderRepo.update(
+        {
+          id: In(orderIds),
+          return_requested: true,
+          status: Order_status.WAITING,
+        },
+        { return_requested: false },
+      );
+
+      for (const oid of orderIds) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: oid,
+          action: 'return_rejected',
+          new_value: { return_requested: false },
+          description: `Qaytarish so'rovi rad etildi — buyurtma kuryerda qoldi`,
+        });
+      }
+
+      return successRes(
+        { rejected: orderIds.length },
+        200,
+        'Return requests rejected — orders remain with courier',
+      );
+    } catch (error) {
+      return catchError(error);
     }
   }
 }

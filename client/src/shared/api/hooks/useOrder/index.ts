@@ -195,6 +195,12 @@ export const useOrder = () => {
     receivePostByScan,
     createOrderBot,
     updateOrderAddress,
-    receiveExternalOrders
+    receiveExternalOrders,
+    getOrderActivityLog: (orderId: string, enabled: boolean = true) =>
+      useQuery({
+        queryKey: [order, "activity-log", orderId],
+        queryFn: () => api.get(`activity-log/order/${orderId}`).then((res) => res.data),
+        enabled,
+      }),
   };
 };

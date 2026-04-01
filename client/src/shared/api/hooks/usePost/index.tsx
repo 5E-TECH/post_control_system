@@ -113,6 +113,31 @@ export const usePost = () => {
       api.post(`post/check/cancel/${id}`, data).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
   });
+
+  const getReturnRequests = () =>
+    useQuery({
+      queryKey: [post, "return-requests"],
+      queryFn: () => api.get("post/return-requests/list").then((res) => res.data),
+    });
+
+  const approveReturnRequests = useMutation({
+    mutationFn: (data: { order_ids: string[] }) =>
+      api.post("post/return-requests/approve", data).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+  });
+
+  const rejectReturnRequests = useMutation({
+    mutationFn: (data: { order_ids: string[] }) =>
+      api.post("post/return-requests/reject", data).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+  });
+
+  const reassignPost = useMutation({
+    mutationFn: ({ id, courier_id }: { id: string; courier_id: string }) =>
+      api.patch(`post/reassign/${id}`, { courier_id }).then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+  });
+
   return {
     createPost,
     createPrint,
@@ -129,6 +154,10 @@ export const usePost = () => {
     canceledPost,
     receiveCanceledPost,
     checkPost,
-    checkRefusedPost
+    checkRefusedPost,
+    getReturnRequests,
+    approveReturnRequests,
+    rejectReturnRequests,
+    reassignPost,
   };
 };

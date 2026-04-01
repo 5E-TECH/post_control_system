@@ -7,6 +7,11 @@ export enum ShiftStatus {
   CLOSED = 'closed',
 }
 
+const bigintTransformer = {
+  to: (value: number) => value,
+  from: (value: string) => (value ? Number(value) : 0),
+};
+
 @Entity('shifts')
 @Index('IDX_SHIFT_OPENED_BY', ['opened_by'])
 @Index('IDX_SHIFT_STATUS', ['status'])
@@ -19,40 +24,40 @@ export class ShiftEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   closed_by: string;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   opened_at: number;
 
-  @Column({ type: 'bigint', nullable: true })
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
   closed_at: number;
 
   @Column({ type: 'enum', enum: ShiftStatus, default: ShiftStatus.OPEN })
   status: ShiftStatus;
 
   // Smena boshidagi qoldiqlar
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   opening_balance_cash: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   opening_balance_card: number;
 
   // Smena oxiridagi qoldiqlar
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   closing_balance_cash: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   closing_balance_card: number;
 
   // Smena davomidagi kirim/chiqim
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   total_income_cash: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   total_income_card: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   total_expense_cash: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   total_expense_card: number;
 
   @Column({ type: 'text', nullable: true })
