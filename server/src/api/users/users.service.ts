@@ -71,6 +71,7 @@ import { PayInvestorDto } from './dto/pay-investor.dto';
 import { UpdateInvestorDto } from './dto/update-investor.dto';
 import { Cron } from '@nestjs/schedule';
 import { Logger, OnModuleInit } from '@nestjs/common';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Injectable()
 export class UserService implements OnModuleInit {
@@ -99,6 +100,7 @@ export class UserService implements OnModuleInit {
     private readonly token: Token,
     private readonly jwtService: JwtService,
     private readonly dataSource: DataSource,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   // Test for CI/CD
@@ -159,6 +161,7 @@ export class UserService implements OnModuleInit {
       });
       await queryRunner.manager.save(adminSalary);
       await queryRunner.commitTransaction();
+      this.activityLog.log({ entity_type: 'user', entity_id: admin.id, action: 'created', new_value: { name: admin.name, role: admin.role }, description: `Admin yaratildi: ${admin.name}` });
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -207,6 +210,7 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(userSalary);
 
       await queryRunner.commitTransaction();
+      this.activityLog.log({ entity_type: 'user', entity_id: user.id, action: 'created', new_value: { name: user.name, role: user.role }, description: `Registrator yaratildi: ${user.name}` });
       return successRes(user, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -264,6 +268,7 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(cashbox);
 
       await queryRunner.commitTransaction();
+      this.activityLog.log({ entity_type: 'user', entity_id: courier.id, action: 'created', new_value: { name: courier.name, role: Roles.COURIER }, description: `Kuryer yaratildi: ${courier.name}` });
       return successRes(courier, 201, `New courier created`);
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -315,6 +320,7 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(cashbox);
 
       await queryRunner.commitTransaction();
+      this.activityLog.log({ entity_type: 'user', entity_id: newMarket.id, action: 'created', new_value: { name: newMarket.name, role: Roles.MARKET }, description: `Market yaratildi: ${newMarket.name}` });
       return successRes(newMarket, 201, 'New market created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -848,6 +854,7 @@ export class UserService implements OnModuleInit {
       });
 
       const { password: _, ...safeUser } = updatedUser;
+      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'updated', new_value: { name: updatedUser.name, role: updatedUser.role }, description: `Admin yangilandi: ${updatedUser.name}` });
       return successRes(safeUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
@@ -982,6 +989,7 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(courier);
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
+      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'updated', description: `Kuryer yangilandi: ${updatedUser?.name}` });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
@@ -1022,6 +1030,7 @@ export class UserService implements OnModuleInit {
 
       const updatedMarket = await this.userRepo.save(market);
 
+      this.activityLog.log({ entity_type: 'user', entity_id: market.id, action: 'updated', description: `Market yangilandi: ${updatedMarket.name}` });
       return successRes(updatedMarket, 200, 'Market updated');
     } catch (error) {
       return catchError(error);
@@ -1240,6 +1249,7 @@ export class UserService implements OnModuleInit {
         throw new BadRequestException('Super admin can not be deleted!');
       }
       await this.userRepo.delete({ id });
+      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: user.name, role: user.role }, description: `Foydalanuvchi o'chirildi: ${user.name} (${user.role})` });
       return successRes({}, 200, 'User deleted');
     } catch (error) {
       return catchError(error);
@@ -1401,9 +1411,10 @@ export class UserService implements OnModuleInit {
             { marketId: effectiveMarketId },
           )
           .where('customer.role = :role', { role: Roles.CUSTOMER })
-          .andWhere('customer.phone_number ILIKE :phone', {
-            phone: `%${cleanPhone}%`,
-          })
+          .andWhere(
+            '(customer.phone_number ILIKE :phone OR customer.extra_number ILIKE :phone)',
+            { phone: `%${cleanPhone}%` },
+          )
           .orderBy('customer.created_at', 'DESC')
           .take(10)
           .getMany();
@@ -1417,9 +1428,10 @@ export class UserService implements OnModuleInit {
           .leftJoinAndSelect('customer.district', 'district')
           .leftJoinAndSelect('district.region', 'region')
           .where('customer.role = :role', { role: Roles.CUSTOMER })
-          .andWhere('customer.phone_number ILIKE :phone', {
-            phone: `%${cleanPhone}%`,
-          })
+          .andWhere(
+            '(customer.phone_number ILIKE :phone OR customer.extra_number ILIKE :phone)',
+            { phone: `%${cleanPhone}%` },
+          )
           .orderBy('customer.created_at', 'DESC')
           .take(10)
           .getMany();
@@ -1707,6 +1719,7 @@ export class UserService implements OnModuleInit {
       logist.is_deleted = true;
       await this.userRepo.save(logist);
 
+      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: logist.name, role: Roles.LOGIST }, description: `Logist o'chirildi: ${logist.name}` });
       return successRes({}, 200, 'Logist o\'chirildi');
     } catch (error) {
       return catchError(error);
@@ -1738,6 +1751,7 @@ export class UserService implements OnModuleInit {
       });
       await this.userRepo.save(operator);
 
+      this.activityLog.log({ entity_type: 'user', entity_id: operator.id, action: 'created', new_value: { name: operator.name, role: Roles.OPERATOR }, description: `Operator yaratildi: ${operator.name}`, user: market });
       return successRes(operator, 201, 'Yangi operator yaratildi');
     } catch (error) {
       return catchError(error);
@@ -1767,6 +1781,7 @@ export class UserService implements OnModuleInit {
       }
       operator.is_deleted = true;
       await this.userRepo.save(operator);
+      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: operator.name, role: Roles.OPERATOR }, description: `Operator o'chirildi: ${operator.name}`, user: market });
       return successRes({}, 200, 'Operator o\'chirildi');
     } catch (error) {
       return catchError(error);

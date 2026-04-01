@@ -82,6 +82,10 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   require_operator_phone: boolean;
 
+  // Market uchun: standart operator telefon raqami (avtomatik to'ldiriladi)
+  @Column({ type: 'varchar', nullable: true })
+  default_operator_phone: string;
+
   // Operator uchun komissiya sozlamalari
   @Column({ type: 'enum', enum: Commission_type, nullable: true })
   commission_type: Commission_type | null;

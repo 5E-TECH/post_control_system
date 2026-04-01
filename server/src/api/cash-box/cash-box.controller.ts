@@ -89,9 +89,10 @@ export class CasheBoxController {
     const buffer = await this.cashBoxService.exportMainCashboxToExcel({
       fromDate,
       toDate,
+      allHistory: !fromDate && !toDate,
     });
 
-    const filename = `cashbox-${fromDate || 'daily'}.xlsx`;
+    const filename = `cashbox-${fromDate || 'umumiy'}.xlsx`;
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -122,8 +123,9 @@ export class CasheBoxController {
     @Param('id') id: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('sourceTypes') sourceTypes?: string,
   ) {
-    return this.cashBoxService.getCashboxByUserId(id, { fromDate, toDate });
+    return this.cashBoxService.getCashboxByUserId(id, { fromDate, toDate, sourceTypes });
   }
 
   @ApiOperation({ summary: 'Get my cashbox (courier/market)' })
@@ -147,8 +149,9 @@ export class CasheBoxController {
     @CurrentUser() user: JwtPayload,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('sourceTypes') sourceTypes?: string,
   ) {
-    return this.cashBoxService.myCashbox(user, { fromDate, toDate });
+    return this.cashBoxService.myCashbox(user, { fromDate, toDate, sourceTypes });
   }
 
   @ApiOperation({ summary: 'Accept payment from courier' })

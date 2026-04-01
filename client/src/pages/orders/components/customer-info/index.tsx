@@ -52,6 +52,7 @@ interface SuggestedCustomer {
   id: string;
   name: string;
   phone_number: string;
+  extra_number?: string;
   address?: string;
   district_id?: string;
   district?: {
@@ -204,16 +205,32 @@ const CustomerInfocomp = () => {
     dispatch(setCustomerData(updated));
   };
 
+  // Format raw phone number to display format
+  const formatPhoneDisplay = (raw: string | undefined | null): string => {
+    if (!raw) return "";
+    let digits = raw.replace(/\D/g, "");
+    if (digits.startsWith("998")) digits = digits.slice(3);
+    if (!digits) return "";
+    let formatted = "+998 ";
+    formatted += digits
+      .slice(0, 9)
+      .replace(/(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/, (_, a, b, c, d) =>
+        [a, b, c, d].filter(Boolean).join(" ")
+      )
+      .trim();
+    return formatted;
+  };
+
   // Select a suggested customer
   const handleSelectCustomer = (customer: SuggestedCustomer) => {
     const updated: ICustomer = {
       id: customer.id,
-      phone_number: customer.phone_number,
+      phone_number: formatPhoneDisplay(customer.phone_number),
       name: customer.name,
       address: customer.address || "",
       district_id: customer.district_id || null,
       region_id: customer.district?.region?.id || null,
-      extra_number: "",
+      extra_number: formatPhoneDisplay(customer.extra_number),
     };
     setFormData(updated);
     dispatch(setCustomerData(updated));

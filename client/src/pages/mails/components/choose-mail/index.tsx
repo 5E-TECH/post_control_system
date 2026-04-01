@@ -1,7 +1,7 @@
 import { memo, type FC } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
-import { Package, AlertTriangle, Clock } from "lucide-react";
+import { Package, AlertTriangle, Clock, RotateCcw } from "lucide-react";
 
 interface Props {
   role: string;
@@ -14,6 +14,7 @@ const ChooseMail: FC<Props> = ({ role }) => {
     role === "superadmin"
       ? [
           { to: "/mails", label: t("todayMails"), icon: Package, color: "emerald" },
+          { to: "/mails/return-requests", label: "Qaytarish", icon: RotateCcw, color: "amber" },
           { to: "/mails/refused", label: t("refusedMails"), icon: AlertTriangle, color: "red" },
           { to: "/mails/old", label: t("oldMails"), icon: Clock, color: "blue" },
         ]
@@ -31,6 +32,11 @@ const ChooseMail: FC<Props> = ({ role }) => {
       inactive: "bg-white dark:bg-[#2A263D] text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border border-gray-200 dark:border-gray-700",
       iconBg: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400",
     },
+    amber: {
+      active: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25",
+      inactive: "bg-white dark:bg-[#2A263D] text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 border border-gray-200 dark:border-gray-700",
+      iconBg: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+    },
     red: {
       active: "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25",
       inactive: "bg-white dark:bg-[#2A263D] text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 border border-gray-200 dark:border-gray-700",
@@ -44,7 +50,7 @@ const ChooseMail: FC<Props> = ({ role }) => {
   };
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className={`grid gap-2 ${links.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
       {links.map((link) => {
         const Icon = link.icon;
         const colors = colorClasses[link.color];

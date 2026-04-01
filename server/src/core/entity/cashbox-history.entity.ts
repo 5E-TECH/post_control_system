@@ -5,6 +5,11 @@ import { CashEntity } from './cash-box.entity';
 import { UserEntity } from './users.entity';
 import { OrderEntity } from './order.entity';
 
+const bigintTransformer = {
+  to: (value: number) => value,
+  from: (value: string) => (value ? Number(value) : 0),
+};
+
 @Entity('cashbox_history')
 @Index('IDX_CASHBOX_HISTORY_CASHBOX_ID', ['cashbox_id'])
 @Index('IDX_CASHBOX_HISTORY_CREATED_AT', ['created_at'])
@@ -29,10 +34,10 @@ export class CashboxHistoryEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   source_user_id: string | null;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   amount: number;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   balance_after: number;
 
   @Column({ type: 'enum', enum: PaymentMethod, nullable: true })

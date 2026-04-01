@@ -91,6 +91,10 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   deleted: boolean;
 
+  // Courier buyurtmani qaytarish so'rovi yuborgan
+  @Column({ type: 'boolean', default: false })
+  return_requested: boolean;
+
   @Column({ type: 'jsonb', nullable: true })
   create_bot_messages: { chatId: number; messageId: number }[];
 

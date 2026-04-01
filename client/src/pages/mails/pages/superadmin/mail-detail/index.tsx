@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Printer, Trash2, ArrowLeft, Search, Package, Home, MapPin, Phone, User, Store, Calendar, Send, Loader2, CheckCircle, XCircle, RefreshCw, ChevronDown, Globe, FileText, AlertTriangle } from "lucide-react";
+import { Check, Printer, Trash2, ArrowLeft, Search, Package, Home, MapPin, Phone, User, Store, Calendar, Send, Loader2, CheckCircle, XCircle, RefreshCw, ChevronDown, Globe, FileText, AlertTriangle, Repeat } from "lucide-react";
 
 // Skeleton Loading Component
 const SkeletonCard = () => (
@@ -115,11 +115,16 @@ const MailDetail = () => {
 
   const role = useSelector((state: RootState) => state.roleSlice.role);
 
-  const { getPostById, sendAndGetCouriersByPostId, sendPost, createBrowserPrint, createThermalPdf } =
+  const { getPostById, sendAndGetCouriersByPostId, sendPost, createBrowserPrint, createThermalPdf, reassignPost } =
     usePost();
   const { deleteOrders } = useOrder();
   const { mutate: sendAndGetCouriers } = sendAndGetCouriersByPostId();
   const { mutate: sendCouriersToPost, isPending } = sendPost();
+
+  // Reassign courier state
+  const [showReassign, setShowReassign] = useState(false);
+  const [reassignCouriers, setReassignCouriers] = useState<any[]>([]);
+  const [selectedCourierId, setSelectedCourierId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
 
@@ -226,7 +231,7 @@ const MailDetail = () => {
     condition = true;
   }
 
-  const { data, isLoading } = getPostById(id as string, endpoint, condition);
+  const { data, isLoading, refetch } = getPostById(id as string, endpoint, condition);
   const postData = data?.data?.allOrdersByPostId || data?.data;
 
   // Filter locally by name or phone
@@ -367,9 +372,6 @@ const MailDetail = () => {
     });
   };
 
-  const [selectedCourierId, setSelectedCourierId] = useState<string | null>(
-    null
-  );
   const handleSelectedCourier = (id: string) => {
     setSelectedCourierId(id);
   };
@@ -450,6 +452,33 @@ const MailDetail = () => {
 
   const hideSend = state?.hideSend;
 
+  const handleOpenReassign = () => {
+    if (!id) return;
+    sendAndGetCouriers(id, {
+      onSuccess: (res: any) => {
+        setReassignCouriers(res?.data?.couriers || []);
+        setSelectedCourierId(null);
+        setShowReassign(true);
+      },
+      onError: (err: any) => handleApiError(err, "Kurierlarni yuklashda xatolik"),
+    });
+  };
+
+  const handleReassign = () => {
+    if (!id || !selectedCourierId) return;
+    reassignPost.mutate(
+      { id, courier_id: selectedCourierId },
+      {
+        onSuccess: (res: any) => {
+          handleSuccess(res?.message || "Pochta boshqa kuryerga o'tkazildi");
+          setShowReassign(false);
+          refetch();
+        },
+        onError: (err: any) => handleApiError(err, "Kuryerni o'zgartirishda xatolik"),
+      }
+    );
+  };
+
   const formatPhone = (phone: string | undefined) => {
     if (!phone) return "-";
     const cleaned = phone.replace(/\D/g, "");
@@ -506,6 +535,17 @@ const MailDetail = () => {
                   className="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A263D] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 />
               </div>
+
+              {/* Reassign Courier Button - faqat superadmin va jo'natilgan pochtalar uchun */}
+              {hideSend && role === "superadmin" && (
+                <button
+                  onClick={handleOpenReassign}
+                  className="h-11 px-4 rounded-xl flex items-center gap-2 text-sm font-medium border border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <Repeat className="w-4 h-4" />
+                  <span className="hidden sm:inline">Kuryerni o'zgartirish</span>
+                </button>
+              )}
 
               {/* Bulk Print Dropdown */}
               {!hideSend && (
@@ -1065,6 +1105,81 @@ const MailDetail = () => {
                 {visualFeedback.message}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Reassign Courier Modal */}
+      {showReassign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowReassign(false)}>
+          <div
+            className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[450px] max-w-[95vw] overflow-hidden max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-4 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Repeat className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">Kuryerni o'zgartirish</h2>
+                  <p className="text-xs text-white/70">Shu viloyatning boshqa kuryerini tanlang</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Courier List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {reassignCouriers.length === 0 ? (
+                <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+                  <User className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Bu viloyatda boshqa kuryer topilmadi</p>
+                </div>
+              ) : (
+                reassignCouriers.map((courier: any) => (
+                  <div
+                    key={courier.id}
+                    onClick={() => setSelectedCourierId(courier.id)}
+                    className={`p-3 rounded-xl cursor-pointer transition-all ${
+                      selectedCourierId === courier.id
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg"
+                        : "bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                        selectedCourierId === courier.id ? "bg-white/20" : "bg-amber-100 dark:bg-amber-900/30"
+                      }`}>
+                        <User className={`w-4 h-4 ${selectedCourierId === courier.id ? "text-white" : "text-amber-600 dark:text-amber-400"}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{courier.name}</p>
+                        <p className={`text-xs ${selectedCourierId === courier.id ? "text-white/70" : "text-gray-500"}`}>{courier.phone_number}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 py-3 bg-gray-50 dark:bg-[#312D4B] border-t border-gray-100 dark:border-gray-800 flex gap-3 justify-end flex-shrink-0">
+              <button
+                onClick={() => setShowReassign(false)}
+                className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium transition-all cursor-pointer text-sm"
+              >
+                Bekor qilish
+              </button>
+              <button
+                disabled={!selectedCourierId || reassignPost.isPending}
+                onClick={handleReassign}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer text-sm flex items-center gap-2"
+              >
+                {reassignPost.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Repeat className="w-4 h-4" />}
+                O'tkazish
+              </button>
+            </div>
           </div>
         </div>
       )}
