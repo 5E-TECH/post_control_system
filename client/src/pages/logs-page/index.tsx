@@ -9,7 +9,6 @@ import {
   ArrowRight,
   User,
   Package,
-  Truck,
   XCircle,
   CheckCircle,
   RotateCcw,

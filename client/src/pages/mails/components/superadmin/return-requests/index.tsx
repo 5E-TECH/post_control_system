@@ -6,7 +6,6 @@ import {
   Check,
   X,
   Loader2,
-  Package,
   Phone,
   MapPin,
   User,

@@ -231,7 +231,7 @@ const MailDetail = () => {
     condition = true;
   }
 
-  const { data, isLoading } = getPostById(id as string, endpoint, condition);
+  const { data, isLoading, refetch } = getPostById(id as string, endpoint, condition);
   const postData = data?.data?.allOrdersByPostId || data?.data;
 
   // Filter locally by name or phone
@@ -372,9 +372,6 @@ const MailDetail = () => {
     });
   };
 
-  const [selectedCourierId, setSelectedCourierId] = useState<string | null>(
-    null
-  );
   const handleSelectedCourier = (id: string) => {
     setSelectedCourierId(id);
   };
