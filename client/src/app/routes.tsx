@@ -96,6 +96,9 @@ const TodayMails = lazy(
   () => import("../pages/mails/components/superadmin/today-mails")
 );
 const Orderview = lazy(() => import("../pages/today-orders/pages/orderview"));
+const ReturnRequests = lazy(
+  () => import("../pages/mails/components/superadmin/return-requests")
+);
 const RefusedMails = lazy(
   () => import("../pages/mails/components/superadmin/refused-mails")
 );
@@ -251,6 +254,10 @@ const AppRouters = () => {
                 {
                   index: true,
                   element: <TodayMails />,
+                },
+                {
+                  path: "return-requests",
+                  element: <ReturnRequests />,
                 },
                 {
                   path: "refused",

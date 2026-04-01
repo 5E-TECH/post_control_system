@@ -41,6 +41,7 @@ const Auth = () => {
                 name: res?.data?.data?.name,
                 phone_number: res?.data?.data?.phone_number,
                 require_operator_phone: res?.data?.data?.require_operator_phone || false,
+                default_operator_phone: res?.data?.data?.default_operator_phone || "",
               }),
             );
         }
@@ -59,6 +60,7 @@ const Auth = () => {
                 name: res.data.data.market.name,
                 phone_number: res.data.data.market.phone_number,
                 require_operator_phone: res.data.data.market.require_operator_phone || false,
+                default_operator_phone: res.data.data.market.default_operator_phone || "",
               }),
             );
           }

@@ -219,7 +219,7 @@ const MainDetail = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `cashbox-${form.from || "daily"}.xlsx`;
+      a.download = `cashbox-${form.from && form.to ? `${form.from}-${form.to}` : form.from || "umumiy"}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -628,7 +628,7 @@ const MainDetail = () => {
 
       {/* === POPUP MARKET === */}
       <PaymentPopup isShow={showMarket} onClose={() => handleClose()}>
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[600px] max-md:w-full overflow-hidden max-h-[85vh] sm:max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[600px] max-w-[95vw] max-md:w-full overflow-hidden max-h-[85vh] sm:max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 px-4 py-4 sm:px-6 sm:py-5 flex-shrink-0">
             <div className="flex items-center justify-between">
@@ -669,7 +669,7 @@ const MainDetail = () => {
           {/* List */}
           <div className="flex-1 overflow-y-auto px-3 py-3">
             <div className="space-y-2">
-              {marketData?.data?.data?.map((item: any, inx: number) => (
+              {[...(marketData?.data?.data || [])].sort((a: any, b: any) => Math.abs(b?.cashbox?.balance || 0) - Math.abs(a?.cashbox?.balance || 0)).map((item: any, inx: number) => (
                 <div
                   key={item?.id}
                   onClick={() => setSelect(item?.id)}
@@ -995,7 +995,7 @@ const MainDetail = () => {
 
       {/* === POPUP CURIER === */}
       <PaymentPopup isShow={showCurier} onClose={() => handleClose()}>
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[650px] max-md:w-full overflow-hidden max-h-[85vh] sm:max-h-[90vh] flex flex-col">
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-[650px] max-w-[95vw] max-md:w-full overflow-hidden max-h-[85vh] sm:max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 px-4 py-4 sm:px-6 sm:py-5 flex-shrink-0">
             <div className="flex items-center justify-between">
@@ -1036,7 +1036,7 @@ const MainDetail = () => {
           {/* List */}
           <div className="flex-1 overflow-y-auto px-3 py-3">
             <div className="space-y-2">
-              {courierData?.data?.map((item: any, inx: number) => (
+              {[...(courierData?.data || [])].sort((a: any, b: any) => Math.abs(b?.cashbox?.balance || 0) - Math.abs(a?.cashbox?.balance || 0)).map((item: any, inx: number) => (
                 <div
                   key={item?.id || inx}
                   onClick={() => setSelect(item?.id)}

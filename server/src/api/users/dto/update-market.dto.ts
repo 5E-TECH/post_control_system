@@ -34,6 +34,10 @@ export class UpdateMarketDto {
   require_operator_phone?: boolean;
 
   @IsOptional()
+  @IsString()
+  default_operator_phone?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   tariff_home?: number;

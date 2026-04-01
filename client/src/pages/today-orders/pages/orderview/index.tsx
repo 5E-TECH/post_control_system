@@ -47,7 +47,9 @@ const OrderView = () => {
   const user = useSelector((state: RootState) => state.roleSlice);
   const canSeeTotal = user.role === "superadmin" || user.role === "admin";
   const canPrint = canSeeTotal || user.role === "registrator";
+  const canSelectOrders = canSeeTotal || user.role === "registrator";
   const canManageOrders = canSeeTotal && user.role !== "operator";
+  const canDeleteNewOrders = canManageOrders || user.role === "registrator" || user.role === "market";
   const [deleteId, setDeleteId] = useState("");
   const [isPrintDisabled, setIsPrintDisabled] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -436,7 +438,7 @@ const OrderView = () => {
         ) : (
           <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1">
             {/* Select all header - fixed */}
-            {canManageOrders && (
+            {canSelectOrders && (
               <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex items-center justify-between flex-shrink-0">
                 <button
                   onClick={toggleSelectAll}
@@ -462,9 +464,9 @@ const OrderView = () => {
               {orders.map((order: any, inx: number) => (
                 <div
                   key={order.id}
-                  onClick={() => canManageOrders && toggleSelect(order.id)}
+                  onClick={() => canSelectOrders && toggleSelect(order.id)}
                   className={`p-4 rounded-xl transition-all border ${
-                    canManageOrders ? "cursor-pointer" : ""
+                    canSelectOrders ? "cursor-pointer" : ""
                   } ${
                     duplicateInfo.orderIds.has(order.id)
                       ? "ring-2 ring-amber-400 dark:ring-amber-500 bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50"
@@ -484,7 +486,7 @@ const OrderView = () => {
                         </span>
                       )}
                       {/* Checkbox */}
-                      {canManageOrders && (
+                      {canSelectOrders && (
                         <div
                           onClick={(e) => {
                             e.stopPropagation();
@@ -539,8 +541,9 @@ const OrderView = () => {
                       <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       {formatPhone(order.customer?.phone_number)}
                     </span>
-                    {canManageOrders && (
+                    {(canManageOrders || canDeleteNewOrders) && (
                     <div className="flex items-center gap-1 flex-shrink-0">
+                      {canManageOrders && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -551,6 +554,8 @@ const OrderView = () => {
                       >
                         <Edit className="w-4 h-4" />
                       </button>
+                      )}
+                      {(canManageOrders || (canDeleteNewOrders && order.status === "new")) && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -562,6 +567,7 @@ const OrderView = () => {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
+                      )}
                     </div>
                     )}
                   </div>

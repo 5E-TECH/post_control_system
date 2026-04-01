@@ -32,18 +32,21 @@ const ProductInfo = () => {
   const default_tariff = useSelector(
     (state: RootState) => state.authSlice.default_tariff
   );
+  const userRole = useSelector((state: RootState) => state.roleSlice.role);
   const OperatorName = useSelector((state: RootState) => state.roleSlice.name);
   const marketData = useSelector(
     (state: RootState) => state.authSlice.marketData
   );
   // Market yoki localStorage dan require_operator_phone ni olish
   const requireOperatorPhone = market?.require_operator_phone || marketData?.require_operator_phone || false;
+  // Default operator telefon raqamini olish
+  const defaultOperatorPhone = market?.default_operator_phone || marketData?.default_operator_phone || "";
   const initialState: IProductInfo = {
     total_price: "",
     where_deliver: market?.default_tariff || default_tariff || "center",
     comment: "",
-    operator: OperatorName || "",
-    operator_phone: "",
+    operator: userRole === "operator" ? (OperatorName || "") : "",
+    operator_phone: requireOperatorPhone ? defaultOperatorPhone : "",
   };
 
   const { t } = useTranslation("createOrder");

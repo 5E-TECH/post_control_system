@@ -68,6 +68,7 @@ import { InvestorDepositEntity } from 'src/core/entity/investor-deposit.entity';
 import { Commission_type, FinancialSource_type } from 'src/common/enums';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
@@ -108,6 +109,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     private readonly orderBotService: OrderBotService,
     private readonly externalIntegrationService: ExternalIntegrationService,
     private readonly integrationSyncService: IntegrationSyncService,
+    private readonly activityLog: ActivityLogService,
   ) {
     super(orderRepo);
   }
@@ -370,6 +372,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
 
       await queryRunner.commitTransaction();
+
+      // Activity log
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: newOrder.id,
+        action: 'created',
+        new_value: { status: Order_status.NEW, total_price, customer_id, market_id },
+        description: `Buyurtma yaratildi — ${total_price} so'm`,
+        user,
+      });
+
       return successRes(newOrder, 201, 'New order created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -518,6 +531,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'created',
+        new_value: { status: Order_status.NEW, total_price: order.total_price, source: 'telegram_bot' },
+        description: `Buyurtma Telegram bot orqali yaratildi — ${order.total_price} so'm`,
+        user,
+      });
+
       return successRes(order, 201, 'New order created');
     } catch (error) {
       this.logger.log(error);
@@ -1040,6 +1063,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         await queryRunner.manager.save(editingOrder);
 
         await queryRunner.commitTransaction();
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: id,
+          action: 'updated',
+          new_value: updateOrderDto as any,
+          description: `Buyurtma tahrirlandi`,
+          user,
+        });
         return successRes(editingOrder, 200, 'Order updated');
       } else if (
         (user?.role === Roles.ADMIN || user?.role === Roles.SUPERADMIN || user?.role === Roles.REGISTRATOR) &&
@@ -1115,6 +1146,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         await queryRunner.manager.save(editingOrder);
 
         await queryRunner.commitTransaction();
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: id,
+          action: 'updated',
+          new_value: { market_tariff: editingOrder.market_tariff, courier_tariff: editingOrder.courier_tariff },
+          description: `Buyurtma tarifi yangilandi`,
+          user,
+        });
         return successRes(editingOrder, 200, 'Order tariff updated');
       } else {
         throw new BadRequestException('You can not edit this order');
@@ -1774,6 +1813,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         paid_amount: paidAfter,
         comment: finalComment,
         sold_at: Date.now(),
+        return_requested: false,
         // Sotilgan paytdagi tariflarni saqlash (tarix uchun)
         market_tariff: marketTarif,
         courier_tariff: courierTarif,
@@ -1916,6 +1956,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+
+      // Activity log
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'sold',
+        old_value: { status: Order_status.WAITING },
+        new_value: { status: order.status, total_price: order.total_price, paid_amount: order.paid_amount },
+        description: `Buyurtma sotildi — ${order.total_price} so'm (${order.status})`,
+        user,
+      });
+
       await this.orderBotService.syncStatusButton(order.id);
 
       // Tashqi integratsiya bilan sinxronlash (async, kurierga halaqit bermaydi)
@@ -2048,6 +2100,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       Object.assign(order, {
         status: Order_status.CANCELLED,
         comment: finalComment,
+        return_requested: false,
       });
       await queryRunner.manager.save(order);
 
@@ -2100,6 +2153,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       await queryRunner.commitTransaction();
+
+      // Activity log
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'cancelled',
+        old_value: { status: Order_status.WAITING },
+        new_value: { status: Order_status.CANCELLED, comment: order.comment },
+        description: `Buyurtma bekor qilindi — ${order.total_price} so'm`,
+        user: currentUser,
+      });
+
       await this.orderBotService.syncStatusButton(order.id);
 
       // Tashqi integratsiya bilan sinxronlash (async, kurierga halaqit bermaydi)
@@ -2374,6 +2439,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment: finalComment,
         product_quantity: totalNewQty,
         sold_at: order.sold_at ?? Date.now(),
+        return_requested: false,
         // Sotilgan paytdagi tariflarni saqlash (tarix uchun)
         market_tariff: order.market_tariff ?? marketTarif,
         courier_tariff: order.courier_tariff ?? courierTarif,
@@ -2544,6 +2610,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'partly_sold',
+        old_value: { status: Order_status.WAITING },
+        new_value: { status: order.status, total_price: order.total_price, paid_amount: order.paid_amount },
+        description: `Buyurtma qisman sotildi — ${order.total_price} so'm (${order.status})`,
+        user,
+      });
       await this.orderBotService.syncStatusButton(order.id);
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
@@ -2942,6 +3017,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
       await this.orderBotService.syncStatusButton(order.id);
+
+      // Activity log
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'rollback',
+        old_value: { status: previousStatus },
+        new_value: { status: order.status },
+        description: `Buyurtma rollback: ${previousStatus} → ${order.status}`,
+        user,
+      });
 
       // Tashqi integratsiya bilan sinxronlash
       this.integrationSyncService.queueStatusSync(
@@ -3728,6 +3814,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new BadRequestException('You can not delete...!!!');
       }
 
+      // Activity log — o'chirishdan oldin yozamiz
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { status: order.status, total_price: order.total_price, customer_id: order.customer_id },
+        description: `Buyurtma o'chirildi — ${order.total_price} so'm (${order.status})`,
+        user,
+      });
+
       // Post ID ni olish (oddiy post yoki canceled post)
       const postId = order.post_id || order.canceled_post_id;
 
@@ -4072,6 +4168,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.manager.save(order);
       await queryRunner.commitTransaction();
+
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'updated',
+        new_value: { district_id: order.district_id, address: order.address },
+        description: `Buyurtma manzili yangilandi`,
+        user,
+      });
 
       return successRes(order, 200, 'Order address updated');
     } catch (error) {

@@ -331,10 +331,17 @@ const WaitingOrders = () => {
           >
             {/* Header: Status + Index */}
             <div className="flex items-center justify-between mb-3">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
-                <Package className="w-3.5 h-3.5" />
-                {st("waiting")}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                  <Package className="w-3.5 h-3.5" />
+                  {st("waiting")}
+                </span>
+                {item?.return_requested && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400">
+                    Qaytarish kutilmoqda
+                  </span>
+                )}
+              </div>
               <span className="text-xs text-gray-400">
                 #{(page - 1) * limit + index + 1}
               </span>

@@ -22,7 +22,9 @@ import {
   X,
   BanknoteArrowUp,
   BanknoteArrowDown,
-  Send
+  Send,
+  ArrowLeftRight,
+  List,
 } from "lucide-react";
 
 const { RangePicker } = DatePicker;
@@ -40,6 +42,7 @@ const CashDetail = () => {
     market: "",
     comment: "",
   });
+  const [historyTab, setHistoryTab] = useState<"all" | "payments">("all");
 
   const [isMobile, setIsMobile] = useState(false);
 
@@ -52,10 +55,13 @@ const CashDetail = () => {
 
   const [search, setSearch] = useState("");
 
-  const params = {
+  const params: any = {
     fromDate: form.from,
     toDate: form.to,
   };
+  if (historyTab === "payments") {
+    params.sourceTypes = "courier_payment,market_payment";
+  }
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -441,6 +447,32 @@ const CashDetail = () => {
                 </button>
               )}
             </div>
+          </div>
+
+          {/* History Tabs */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setHistoryTab("all")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                historyTab === "all"
+                  ? "bg-purple-600 text-white shadow-lg shadow-purple-500/30"
+                  : "bg-white dark:bg-[#2A263D] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#312D4B]"
+              }`}
+            >
+              <List size={16} />
+              Barcha tarix
+            </button>
+            <button
+              onClick={() => setHistoryTab("payments")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                historyTab === "payments"
+                  ? "bg-purple-600 text-white shadow-lg shadow-purple-500/30"
+                  : "bg-white dark:bg-[#2A263D] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#312D4B]"
+              }`}
+            >
+              <ArrowLeftRight size={16} />
+              Oldi-berdi
+            </button>
           </div>
 
           {/* History Section */}

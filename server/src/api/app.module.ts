@@ -20,6 +20,7 @@ import { OrderBotModule } from './bots/order_create-bot/order-bot.module';
 import { ExternalProxyModule } from './external-proxy/external-proxy.module';
 import { ExternalIntegrationModule } from './external-integration/external-integration.module';
 import { IntegrationSyncModule } from './integration-sync/integration-sync.module';
+import { ActivityLogModule } from './activity-log/activity-log.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { IntegrationSyncModule } from './integration-sync/integration-sync.modul
     ExternalProxyModule,
     ExternalIntegrationModule,
     IntegrationSyncModule,
+    ActivityLogModule,
   ],
   providers: [OrderGateaway],
 })

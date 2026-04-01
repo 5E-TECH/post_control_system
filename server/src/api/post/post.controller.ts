@@ -96,6 +96,15 @@ export class PostController {
     return this.postService.rejectedPostsForCourier(user);
   }
 
+  @ApiOperation({ summary: 'Get return-requested orders (admin)' })
+  @ApiResponse({ status: 200, description: 'Return requested orders list' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Get('return-requests/list')
+  getReturnRequests() {
+    return this.postService.getReturnRequests();
+  }
+
   @ApiOperation({ summary: 'Get post by id' })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Post data' })
@@ -147,6 +156,20 @@ export class PostController {
   @Get('orders/rejected/:id')
   getAllRejectedOrdersByPostId(@Param('id') id: string) {
     return this.postService.getRejectedPostsOrders(id);
+  }
+
+  @ApiOperation({ summary: 'Reassign post to different courier' })
+  @ApiParam({ name: 'id', description: 'Post ID' })
+  @ApiResponse({ status: 200, description: 'Post reassigned to new courier' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN)
+  @Patch('reassign/:id')
+  reassignPost(
+    @Param('id') id: string,
+    @Body() body: { courier_id: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.postService.reassignCourier(id, body.courier_id, user);
   }
 
   @ApiOperation({ summary: 'Send post (assign orders to post)' })
@@ -243,5 +266,23 @@ export class PostController {
     @Body() ordersArrayDto: OrdersArrayDto,
   ) {
     return this.postService.receiveCanceledPost(id, ordersArrayDto);
+  }
+
+  @ApiOperation({ summary: 'Approve return requests (admin)' })
+  @ApiResponse({ status: 200, description: 'Return requests approved' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('return-requests/approve')
+  approveReturnRequests(@Body() ordersArrayDto: OrdersArrayDto) {
+    return this.postService.approveReturnRequests(ordersArrayDto);
+  }
+
+  @ApiOperation({ summary: 'Reject return requests (admin)' })
+  @ApiResponse({ status: 200, description: 'Return requests rejected' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('return-requests/reject')
+  rejectReturnRequests(@Body() ordersArrayDto: OrdersArrayDto) {
+    return this.postService.rejectReturnRequests(ordersArrayDto);
   }
 }

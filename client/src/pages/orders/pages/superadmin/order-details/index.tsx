@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Home,
 } from "lucide-react";
+import OrderTracking from "../../../components/order-tracking";
 
 const statusConfig: Record<
   string,
@@ -454,6 +455,11 @@ const OrderDetails = () => {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Order Tracking History */}
+            {id && (currentRole === "superadmin" || currentRole === "admin" || currentRole === "registrator") && (
+              <OrderTracking orderId={id} />
             )}
           </div>
         </div>

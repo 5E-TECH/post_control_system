@@ -15,7 +15,7 @@ import {
   Home,
   Building2,
 } from "lucide-react";
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
@@ -90,24 +90,23 @@ const CustomerInfoOrder = () => {
 
   const handleClick = () => {
     if (
-      !customerData?.name ||
       !customerData?.phone_number ||
       !customerData?.district_id
     ) {
       handleWarning(
         "Foydalanuvchi malumotlari to'liq emas",
-        "Iltimos malumotlarni to'ldiring"
+        "Iltimos telefon raqam va tumanni to'ldiring"
       );
       return;
     }
 
     const customer = {
-      phone_number: customerData?.phone_number.split(" ").join(""),
+      phone_number: customerData?.phone_number.replace(/\D/g, "").replace(/^(\d)/, "+$1"),
       district_id: customerData?.district_id,
-      name: customerData?.name,
+      name: customerData?.name?.trim() || "Mijoz",
       address: customerData.address,
       market_id,
-      extra_number: customerData.extra_number,
+      extra_number: customerData.extra_number ? customerData.extra_number.replace(/\D/g, "").replace(/^(\d)/, "+$1") : "",
     };
     createUser.mutate(customer, {
       onSuccess: (res) => {
@@ -118,6 +117,13 @@ const CustomerInfoOrder = () => {
         handleApiError(err, "Foydalanuvchi yaratishda xatolik yuz berdi"),
     });
   };
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey && !(e.target as HTMLElement).closest(".ant-select")) {
+      e.preventDefault();
+      handleClick();
+    }
+  }, [customerData, market_id]);
 
   const handleBack = () => {
     // Operator va market uchun buyurtmalar ro'yxatiga qaytish (market tanlash bosqichi yo'q)
@@ -258,7 +264,7 @@ const CustomerInfoOrder = () => {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 space-y-5">
+          <div className="flex-1 space-y-5" onKeyDown={handleKeyDown}>
             {/* Customer Info Form */}
             <CustomerInfo />
 
