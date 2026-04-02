@@ -32,7 +32,10 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
       // universal path: src yoki dist uchun ishlaydi
       entities: [__dirname + '/../core/entity/*.entity{.ts,.js}'],
       autoLoadEntities: true,
-      synchronize: true,
+      // XAVFLI: production'da synchronize: true ishlatilmasin!
+      // Column o'zgarganda DROP + ADD qiladi va ma'lumot yo'qoladi.
+      // Production uchun migration ishlatilsin.
+      synchronize: process.env.NODE_ENV !== 'production',
       // Connection Pool sozlamalari - yuqori yuklanish uchun
       extra: {
         // Maksimal ulanishlar soni (default: 10)
