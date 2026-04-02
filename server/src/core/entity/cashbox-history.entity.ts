@@ -34,11 +34,11 @@ export class CashboxHistoryEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   source_user_id: string | null;
 
-  @Column({ type: 'bigint', transformer: bigintTransformer, nullable: true })
-  amount: number | null;
+  @Column({ type: 'bigint', transformer: bigintTransformer })
+  amount: number;
 
-  @Column({ type: 'bigint', transformer: bigintTransformer, nullable: true })
-  balance_after: number | null;
+  @Column({ type: 'bigint', transformer: bigintTransformer })
+  balance_after: number;
 
   @Column({ type: 'enum', enum: PaymentMethod, nullable: true })
   payment_method: PaymentMethod | null;
