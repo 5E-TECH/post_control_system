@@ -1,4 +1,4 @@
-// Beepost - Main App Module
+// Beepost - Root Application Module
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
