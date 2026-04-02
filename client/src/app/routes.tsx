@@ -1,4 +1,4 @@
-// Beepost - Client Routes v2
+// Beepost - Client Routes v3
 import { lazy, memo } from "react";
 import { useRoutes } from "react-router-dom";
 

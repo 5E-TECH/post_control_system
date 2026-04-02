@@ -1,4 +1,4 @@
-// Beepost - Server App Module v2
+// Beepost - Server App Module v3
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
