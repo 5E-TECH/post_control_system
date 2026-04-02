@@ -37,8 +37,8 @@ export class CashboxHistoryEntity extends BaseEntity {
   @Column({ type: 'bigint', transformer: bigintTransformer, nullable: true })
   amount: number | null;
 
-  @Column({ type: 'bigint', transformer: bigintTransformer })
-  balance_after: number;
+  @Column({ type: 'bigint', transformer: bigintTransformer, nullable: true })
+  balance_after: number | null;
 
   @Column({ type: 'enum', enum: PaymentMethod, nullable: true })
   payment_method: PaymentMethod | null;
