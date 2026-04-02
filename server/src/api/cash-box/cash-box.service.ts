@@ -145,9 +145,9 @@ export class CashBoxService
 
       for (const history of cashboxHistory) {
         if (history.operation_type === Operation_type.INCOME) {
-          income += history.amount;
+          income += history.amount ?? 0;
         } else {
-          outcome += history.amount;
+          outcome += history.amount ?? 0;
         }
       }
 
@@ -182,9 +182,9 @@ export class CashBoxService
     let outcome = 0;
     for (const history of cashboxHistory) {
       if (history.operation_type === Operation_type.INCOME) {
-        income += history.amount;
+        income += history.amount ?? 0;
       } else {
-        outcome += history.amount;
+        outcome += history.amount ?? 0;
       }
     }
 
@@ -261,9 +261,9 @@ export class CashBoxService
 
       for (const history of cashboxHistory) {
         if (history.operation_type === Operation_type.INCOME) {
-          income += history.amount;
+          income += history.amount ?? 0;
         } else {
-          outcome += history.amount;
+          outcome += history.amount ?? 0;
         }
       }
 
@@ -334,9 +334,9 @@ export class CashBoxService
 
       for (const history of cashboxHistory) {
         if (history.operation_type === Operation_type.INCOME) {
-          income += history.amount;
+          income += history.amount ?? 0;
         } else {
-          outcome += history.amount;
+          outcome += history.amount ?? 0;
         }
       }
 
@@ -1502,15 +1502,15 @@ export class CashBoxService
     for (const tx of histories) {
       if (tx.operation_type === Operation_type.INCOME) {
         if (tx.payment_method === PaymentMethod.CASH) {
-          incomeCash += tx.amount;
+          incomeCash += tx.amount ?? 0;
         } else {
-          incomeCard += tx.amount;
+          incomeCard += tx.amount ?? 0;
         }
       } else {
         if (tx.payment_method === PaymentMethod.CASH) {
-          expenseCash += tx.amount;
+          expenseCash += tx.amount ?? 0;
         } else {
-          expenseCard += tx.amount;
+          expenseCard += tx.amount ?? 0;
         }
       }
     }
@@ -1634,10 +1634,10 @@ export class CashBoxService
     // ===== XARAJATLAR SUMMARY ROW =====
     const expenseTotalCash = expenses
       .filter((e) => e.payment_method === PaymentMethod.CASH)
-      .reduce((sum, e) => sum + e.amount, 0);
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
     const expenseTotalCard = expenses
       .filter((e) => e.payment_method !== PaymentMethod.CASH)
-      .reduce((sum, e) => sum + e.amount, 0);
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
     // 2 ta bo'sh qator qo'yib
     const xarajatlarRow = dataStartRow + 1 + maxRows + 1;
@@ -1768,8 +1768,8 @@ export class CashBoxService
     }
 
     // Totals
-    const totalIncome = clickIncome.reduce((sum, tx) => sum + tx.amount, 0);
-    const totalExpense = clickExpense.reduce((sum, tx) => sum + tx.amount, 0);
+    const totalIncome = clickIncome.reduce((sum, tx) => sum + (tx.amount ?? 0), 0);
+    const totalExpense = clickExpense.reduce((sum, tx) => sum + (tx.amount ?? 0), 0);
     const totalRow = 6 + maxClickRows;
     worksheet.getCell(`${COL.kirimAmount}${totalRow}`).value = totalIncome;
     worksheet.getCell(`${COL.chiqimAmount}${totalRow}`).value = totalExpense;
@@ -1828,10 +1828,10 @@ export class CashBoxService
     // Total row
     const totalCash = expenses
       .filter((e) => e.payment_method === PaymentMethod.CASH)
-      .reduce((sum, e) => sum + e.amount, 0);
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
     const totalCard = expenses
       .filter((e) => e.payment_method !== PaymentMethod.CASH)
-      .reduce((sum, e) => sum + e.amount, 0);
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
     const fillCell = (cell: string, bg: string) => {
       worksheet.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
@@ -2174,8 +2174,8 @@ export class CashBoxService
     let totalIncome = 0;
     let totalExpense = 0;
     for (const h of histories) {
-      if (h.operation_type === Operation_type.INCOME) totalIncome += h.amount;
-      else totalExpense += h.amount;
+      if (h.operation_type === Operation_type.INCOME) totalIncome += h.amount ?? 0;
+      else totalExpense += h.amount ?? 0;
     }
 
     const balances = {
@@ -2226,8 +2226,8 @@ export class CashBoxService
         tx.source_type === Source_type.MANUAL_EXPENSE ||
         tx.source_type === Source_type.SALARY
       ) continue;
-      if (tx.payment_method === PaymentMethod.CASH) cash += tx.amount;
-      else card += tx.amount;
+      if (tx.payment_method === PaymentMethod.CASH) cash += tx.amount ?? 0;
+      else card += tx.amount ?? 0;
     }
     return { cash, card, total: cash + card };
   }
@@ -2245,15 +2245,15 @@ export class CashBoxService
     for (const tx of histories) {
       if (tx.operation_type === Operation_type.INCOME) {
         if (tx.payment_method === PaymentMethod.CASH) {
-          cashBalance += tx.amount;
+          cashBalance += tx.amount ?? 0;
         } else {
-          cardBalance += tx.amount;
+          cardBalance += tx.amount ?? 0;
         }
       } else {
         if (tx.payment_method === PaymentMethod.CASH) {
-          cashBalance -= tx.amount;
+          cashBalance -= tx.amount ?? 0;
         } else {
-          cardBalance -= tx.amount;
+          cardBalance -= tx.amount ?? 0;
         }
       }
     }
