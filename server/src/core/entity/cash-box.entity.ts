@@ -3,11 +3,7 @@ import { Cashbox_type } from 'src/common/enums';
 import { Column, Entity, OneToOne, OneToMany, JoinColumn, Index } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { CashboxHistoryEntity } from './cashbox-history.entity';
-
-const bigintTransformer = {
-  to: (value: number) => value,
-  from: (value: string) => (value ? Number(value) : 0),
-};
+import { bigintTransformerNonNull as bigintTransformer } from 'src/common/database/bigint.transformer';
 
 @Entity('cash_box')
 @Index('IDX_CASH_BOX_USER_ID', ['user_id'])

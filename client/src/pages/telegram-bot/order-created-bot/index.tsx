@@ -26,16 +26,30 @@ const CreateOrderBot = () => {
   );
   const dispatch = useDispatch();
   const { handleSuccess, handleApiError } = useApiNotification();
-  const [succes, setSucces] = useState(false)
+  const [success, setSuccess] = useState(false);
 
-  const handleShowData = () => {
+  const canSubmit =
+    !!customerData?.name &&
+    !!customerData?.phone_number &&
+    !!customerData?.district_id &&
+    !!productInfo?.total_price &&
+    (orderItems || []).length > 0;
+
+  const handleSubmit = () => {
+    if (!canSubmit) {
+      handleApiError(
+        { message: "Ma'lumotlar to'liq emas" },
+        "Iltimos barcha majburiy maydonlarni to'ldiring"
+      );
+      return;
+    }
+
     const data = {
       name: customerData?.name,
       phone_number: customerData?.phone_number?.replace(/\s/g, ""),
       district_id: customerData?.district_id,
       extra_number: customerData?.extra_number?.replace(/\s/g, ""),
       address: customerData?.address,
-
       order_item_info: (orderItems || []).map((item) => ({
         product_id: item.product_id,
         quantity: item.quantity,
@@ -52,11 +66,11 @@ const CreateOrderBot = () => {
         dispatch(setCustomerData(null));
         dispatch(resetOrderItems());
         dispatch(setProductInfo(null));
-        setSucces(true)
+        setSuccess(true);
       },
-      onError:(err:any) => {
-        handleApiError(err, "buyurtma kiritishda hatolik yuz berdi")
-      }
+      onError: (err: any) => {
+        handleApiError(err, "Buyurtma kiritishda xatolik yuz berdi");
+      },
     });
   };
 
@@ -74,10 +88,12 @@ const CreateOrderBot = () => {
 
       <div className="p-5 text-center mb-5 w-full">
         <Button
-          onClick={handleShowData}
+          onClick={handleSubmit}
+          loading={createOrderBot.isPending}
+          disabled={createOrderBot.isPending}
           className="!w-full !h-[45px] !text-[16px] !font-bold !text-white !bg-[#9069fe]"
         >
-          {succes ? "Buyurtmani qo'shildi" : "Buyurtmani qo'shishshshhs"}
+          {success ? "Buyurtma qo'shildi" : "Buyurtmani qo'shish"}
         </Button>
       </div>
     </div>

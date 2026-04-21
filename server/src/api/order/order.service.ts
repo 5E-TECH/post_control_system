@@ -302,9 +302,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new BadRequestException('You can not create order and product');
       }
 
-      // Operator telefon raqami majburiy bo'lsa tekshirish
-      if (market.require_operator_phone && !createOrderDto.operator_phone) {
-        throw new BadRequestException('Operator telefon raqamini kiritish majburiy');
+      // Operator telefon raqami — DTO dan yoki market default'idan olish
+      const finalOperatorPhone =
+        createOrderDto.operator_phone || market.default_operator_phone || null;
+
+      // Majburiy bo'lsa va hech qayerda bo'lmasa xato berish
+      if (market.require_operator_phone && !finalOperatorPhone) {
+        throw new BadRequestException(
+          "Operator telefon raqamini kiritish majburiy. Market profiliga default operator raqamini qo'shing yoki buyurtmada to'g'ridan-to'g'ri kiriting.",
+        );
       }
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
@@ -320,13 +326,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const orderDistrictId = district_id || customer.district_id;
       const orderAddress = address !== undefined ? address : customer.address;
 
+      // ✅ Batch: Barcha productlarni bir so'rovda olish va tekshirish
+      const productIds = order_item_info.map((item) => item.product_id);
+      const existingProducts = await queryRunner.manager.find(ProductEntity, {
+        where: { id: In(productIds) },
+      });
+      const existingProductIds = new Set(existingProducts.map((p) => p.id));
+      for (const productId of productIds) {
+        if (!existingProductIds.has(productId)) {
+          throw new NotFoundException(`Product not found: ${productId}`);
+        }
+      }
+
+      // product_quantity ni avvaldan hisoblash — DB ga to'g'ri saqlanishi uchun
+      const product_quantity = order_item_info.reduce(
+        (sum, o_item) => sum + Number(o_item.quantity),
+        0,
+      );
+
       const newOrder = queryRunner.manager.create(OrderEntity, {
         user_id: market_id,
         comment,
         operator: createOrderDto.operator,
-        operator_phone: createOrderDto.operator_phone || null,
+        operator_phone: finalOperatorPhone,
         operator_id: user.role === Roles.OPERATOR ? user.id : null,
         total_price,
+        product_quantity,
         where_deliver: where_deliver || Where_deliver.CENTER,
         status: Order_status.NEW,
         qr_code_token,
@@ -337,39 +362,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.manager.save(newOrder);
 
-      // ✅ Batch: Barcha productlarni bir so'rovda olish
-      const productIds = order_item_info.map((item) => item.product_id);
-      const existingProducts = await queryRunner.manager.find(ProductEntity, {
-        where: { id: In(productIds) },
-      });
-
-      // Mavjud productlar ro'yxatini yaratish
-      const existingProductIds = new Set(existingProducts.map((p) => p.id));
-
-      // Mavjud bo'lmagan productlarni tekshirish
-      for (const productId of productIds) {
-        if (!existingProductIds.has(productId)) {
-          throw new NotFoundException(`Product not found: ${productId}`);
-        }
-      }
-
       // ✅ Batch: Barcha order itemlarni bir vaqtda yaratish va saqlash
-      let product_quantity: number = 0;
-      const orderItems = order_item_info.map((o_item) => {
-        product_quantity += Number(o_item.quantity);
-        return queryRunner.manager.create(OrderItemEntity, {
+      const orderItems = order_item_info.map((o_item) =>
+        queryRunner.manager.create(OrderItemEntity, {
           productId: o_item.product_id,
           quantity: o_item.quantity,
           orderId: newOrder.id,
-        });
-      });
+        }),
+      );
 
-      // Batch save - bitta so'rovda
       await queryRunner.manager.save(orderItems);
-
-      Object.assign(newOrder, {
-        product_quantity,
-      });
 
       await queryRunner.commitTransaction();
 
@@ -412,12 +414,29 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       this.logger.log(dto, 'Incoming DTO');
 
-      const currentOperator = await queryRunner.manager.findOne(UserEntity, {
+      const currentUser = await queryRunner.manager.findOne(UserEntity, {
         where: { id: user.id },
       });
-      if (!currentOperator) {
-        throw new NotFoundException('Operator not found');
+      if (!currentUser) {
+        throw new NotFoundException('User not found');
       }
+
+      let marketId: string;
+      if (currentUser.role === Roles.MARKET) {
+        marketId = currentUser.id;
+      } else if (currentUser.role === Roles.OPERATOR) {
+        if (!currentUser.market_id) {
+          throw new BadRequestException(
+            'Operator is not linked to any market',
+          );
+        }
+        marketId = currentUser.market_id;
+      } else {
+        throw new BadRequestException(
+          'Only market or operator can create orders via bot',
+        );
+      }
+
       const newCustomer = queryRunner.manager.create(UserEntity, {
         name,
         phone_number,
@@ -441,8 +460,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const newOrder = queryRunner.manager.create(OrderEntity, {
         customer_id: customer.id,
-        user_id: currentOperator.market_id,
-        operator: operator ? operator : currentOperator.name,
+        user_id: marketId,
+        operator: operator ? operator : currentUser.name,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
         status: Order_status.CREATED,

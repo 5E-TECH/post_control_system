@@ -82,6 +82,20 @@ export class CashBoxService
     super(cashboxRepo);
   }
 
+  /**
+   * Smena ochiqligini tekshirish — asosiy kassa operatsiyalari uchun
+   */
+  private async requireOpenShift(): Promise<void> {
+    const openShift = await this.shiftRepo.findOne({
+      where: { status: ShiftStatus.OPEN },
+    });
+    if (!openShift) {
+      throw new BadRequestException(
+        'Smena ochilmagan! Bu operatsiyani bajarish uchun avval smenani oching.',
+      );
+    }
+  }
+
   async onModuleInit() {
     try {
       const existsCashe = await this.cashboxRepo.find();
@@ -358,6 +372,7 @@ export class CashBoxService
     await transaction.connect();
     await transaction.startTransaction();
     try {
+      await this.requireOpenShift();
       const {
         courier_id,
         amount,
@@ -558,7 +573,7 @@ export class CashBoxService
       return successRes({}, 201, "To'lov qabul qilindi !!! ");
     } catch (error) {
       await transaction.rollbackTransaction();
-      return catchError(error.message);
+      return catchError(error);
     } finally {
       await transaction.release();
     }
@@ -572,6 +587,7 @@ export class CashBoxService
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      await this.requireOpenShift();
       const { amount, market_id, comment, payment_date, payment_method } =
         paymentToMarketDto;
       let paymentInProcess = amount;
@@ -991,6 +1007,91 @@ export class CashBoxService
     }
   }
 
+  /**
+   * Eng katta ta'sir ko'rsatgan tranzaksiyalar — paginated.
+   * Absolute amount bo'yicha tartiblanadi.
+   */
+  async financialBalanceTopImpacts(filters?: {
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    try {
+      let fromTs: number | null = null;
+      let toTs: number | null = null;
+
+      if (filters?.fromDate) {
+        fromTs = toUzbekistanTimestamp(filters.fromDate, false);
+      }
+      if (filters?.toDate) {
+        toTs = toUzbekistanTimestamp(filters.toDate, true);
+      }
+
+      const page = Math.max(1, Number(filters?.page) || 1);
+      const limit = Math.max(1, Math.min(100, Number(filters?.limit) || 20));
+
+      const qb = this.financialHistoryRepo
+        .createQueryBuilder('h')
+        .leftJoinAndSelect('h.createdByUser', 'createdByUser')
+        .leftJoinAndSelect('h.relatedUser', 'relatedUser')
+        .leftJoinAndSelect('h.order', 'order')
+        .addSelect(
+          'CASE WHEN h.amount >= 0 THEN h.amount ELSE (-1 * h.amount) END',
+          'abs_amount',
+        )
+        .orderBy('abs_amount', 'DESC')
+        .addOrderBy('h.created_at', 'DESC');
+
+      if (fromTs !== null) {
+        qb.andWhere('h.created_at >= :fromTs', { fromTs });
+      }
+      if (toTs !== null) {
+        qb.andWhere('h.created_at <= :toTs', { toTs });
+      }
+
+      const total = await qb.getCount();
+      const items = await qb.skip((page - 1) * limit).take(limit).getMany();
+
+      return successRes(
+        {
+          items: items.map((h) => ({
+            id: h.id,
+            created_at: h.created_at,
+            source_type: h.source_type,
+            amount: h.amount,
+            balance_before: h.balance_before,
+            balance_after: h.balance_after,
+            comment: h.comment,
+            created_by: h.createdByUser
+              ? { id: h.createdByUser.id, name: h.createdByUser.name }
+              : null,
+            related_user: h.relatedUser
+              ? {
+                  id: h.relatedUser.id,
+                  name: h.relatedUser.name,
+                  role: h.relatedUser.role,
+                }
+              : null,
+            order: h.order
+              ? { id: h.order.id, total_price: h.order.total_price }
+              : null,
+          })),
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+        200,
+        'Top impact transactions',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async allCashboxesTotal(filters?: {
     operationType?: Operation_type;
     sourceType?: Source_type;
@@ -1115,6 +1216,7 @@ export class CashBoxService
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      await this.requireOpenShift();
       const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: { cashbox_type: Cashbox_type.MAIN },
       });
@@ -1170,7 +1272,7 @@ export class CashBoxService
       await queryRunner.commitTransaction();
       this.activityLog.log({
         entity_type: 'cashbox',
-        entity_id: 'main',
+        entity_id: mainCashbox.id,
         action: 'manual_expense',
         new_value: { amount: updateCashboxDto.amount, type: updateCashboxDto.type, comment: updateCashboxDto.comment },
         description: `Qo'lda chiqim: ${updateCashboxDto.amount} so'm — ${updateCashboxDto.comment || ''}`,
@@ -1190,6 +1292,7 @@ export class CashBoxService
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      await this.requireOpenShift();
       const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: { cashbox_type: Cashbox_type.MAIN },
       });
@@ -1233,7 +1336,7 @@ export class CashBoxService
       await queryRunner.commitTransaction();
       this.activityLog.log({
         entity_type: 'cashbox',
-        entity_id: 'main',
+        entity_id: mainCashbox.id,
         action: 'manual_income',
         new_value: { amount: updateCashboxDto.amount, type: updateCashboxDto.type, comment: updateCashboxDto.comment },
         description: `Qo'lda kirim: ${updateCashboxDto.amount} so'm — ${updateCashboxDto.comment || ''}`,
@@ -1253,6 +1356,7 @@ export class CashBoxService
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      await this.requireOpenShift();
       const { user_id, amount } = salaryDto;
       const staff = await queryRunner.manager.findOne(UserEntity, {
         where: { id: user_id },
@@ -1940,27 +2044,19 @@ export class CashBoxService
         throw new NotFoundException('Main cashbox not found');
       }
 
-      // Calculate current cash/card split from today's transactions
-      const { start, end } = getUzbekistanDayRange();
-      const todayHistories = await this.cashboxHistoryRepo.find({
-        where: {
-          cashbox_id: mainCashbox.id,
-          created_at: Between(start, end),
-        },
-      });
-
-      const balances = this.calculateCurrentBalances(
-        mainCashbox.balance,
-        todayHistories,
-      );
+      // Kassaning hozirgi haqiqiy balansini olish
+      // balance_cash va balance_card har bir tranzaksiyada yangilanadi,
+      // shuning uchun smenalar orasida bo'lgan tranzaksiyalar ham hisobga olinadi
+      const openingCash = mainCashbox.balance_cash ?? 0;
+      const openingCard = mainCashbox.balance_card ?? 0;
 
       // Create new shift
       const shift = this.shiftRepo.create({
         opened_by: user.id,
         opened_at: Date.now(),
         status: ShiftStatus.OPEN,
-        opening_balance_cash: balances.cash,
-        opening_balance_card: balances.card,
+        opening_balance_cash: openingCash,
+        opening_balance_card: openingCard,
       });
 
       await this.shiftRepo.save(shift);
@@ -1969,8 +2065,8 @@ export class CashBoxService
         entity_type: 'shift',
         entity_id: shift.id,
         action: 'opened',
-        new_value: { opening_balance_cash: balances.cash, opening_balance_card: balances.card },
-        description: `Smena ochildi — naqd: ${balances.cash}, karta: ${balances.card}`,
+        new_value: { opening_balance_cash: openingCash, opening_balance_card: openingCard },
+        description: `Smena ochildi — naqd: ${openingCash}, karta: ${openingCard}`,
         user,
       });
 

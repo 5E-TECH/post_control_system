@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -23,9 +24,16 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { MyLogger } from 'src/logger/logger.service';
+import { randomBytes } from 'crypto';
+
+const MARKDOWN_ESCAPE_REGEX = /[_*`\[\]]/g;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_ATTEMPTS = 5;
 
 @Injectable()
 export class OrderBotService {
+  private readonly tokenAttempts = new Map<number, number[]>();
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: UserRepository,
@@ -43,6 +51,19 @@ export class OrderBotService {
     private readonly bcrypt: BcryptEncryption,
     private readonly logger: MyLogger,
   ) {}
+
+  private escapeMarkdown(value: unknown): string {
+    if (value === null || value === undefined) return '-';
+    return String(value).replace(
+      MARKDOWN_ESCAPE_REGEX,
+      (match) => `\\${match}`,
+    );
+  }
+
+  private formatPrice(value: number | string) {
+    const numeric = Number(value) || 0;
+    return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
 
   private statusButtonLabel(order: OrderEntity) {
     const status = order.deleted
@@ -68,17 +89,40 @@ export class OrderBotService {
     return `Holat: ${icon} ${status}`;
   }
 
-  private formatPrice(value: number | string) {
-    const numeric = Number(value) || 0;
-    return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  private normalizePhone(input: string): string {
+    const trimmed = (input || '').trim();
+    return trimmed.startsWith('+') ? trimmed : `+${trimmed}`;
+  }
+
+  private isTokenRateLimited(userId: number): boolean {
+    const now = Date.now();
+    const previous = (this.tokenAttempts.get(userId) || []).filter(
+      (t) => now - t < RATE_LIMIT_WINDOW_MS,
+    );
+    previous.push(now);
+    this.tokenAttempts.set(userId, previous);
+    return previous.length > RATE_LIMIT_MAX_ATTEMPTS;
+  }
+
+  private resolveWebAppUrl(): string {
+    const raw = (config.WEB_APP_URL || '').trim();
+    if (!raw) {
+      throw new BadRequestException('WEB_APP_URL is not configured');
+    }
+    return raw.replace(/\/$/, '');
+  }
+
+  private rotateMarketToken(
+    manager: import('typeorm').EntityManager,
+    market: UserEntity,
+  ) {
+    market.market_tg_token = 'group_token-' + generateCustomToken();
+    return manager.save(UserEntity, market);
   }
 
   async syncStatusButton(orderId: string) {
     try {
-      const order = await this.orderRepo.findOne({
-        where: { id: orderId },
-      });
-
+      const order = await this.orderRepo.findOne({ where: { id: orderId } });
       if (!order || !order.create_bot_messages?.length) return;
 
       const inline_keyboard = [
@@ -99,13 +143,19 @@ export class OrderBotService {
               undefined,
               { inline_keyboard },
             );
-          } catch (error) {
-            // fallback: ignore
+          } catch (err) {
+            this.logger.log(
+              `syncStatusButton edit failed: ${(err as Error).message}`,
+              'OrderBot',
+            );
           }
         }),
       );
-    } catch (error) {
-      // silent fail
+    } catch (err) {
+      this.logger.log(
+        `syncStatusButton error: ${(err as Error).message}`,
+        'OrderBot',
+      );
     }
   }
 
@@ -116,12 +166,13 @@ export class OrderBotService {
     try {
       const groupId = String(ctx.chat?.id);
       const market = await queryRunner.manager.findOne(UserEntity, {
-        where: { market_tg_token: text },
+        where: { market_tg_token: text, role: Roles.MARKET },
       });
 
       if (!market) {
-        throw new NotFoundException('Market not found');
+        throw new NotFoundException("Token noto'g'ri yoki eskirgan.");
       }
+
       const isGroupConnected = await queryRunner.manager.findOne(
         TelegramEntity,
         {
@@ -130,47 +181,34 @@ export class OrderBotService {
       );
       if (isGroupConnected) {
         throw new ConflictException(
-          'This bot already activated for this group',
+          'Bu guruh allaqachon buyurtmalar uchun ulangan.',
         );
       }
+
       const telegram = queryRunner.manager.create(TelegramEntity, {
         token: text,
-        market_id: market?.id,
-        group_id: String(ctx.chat?.id),
+        market_id: market.id,
+        group_id: groupId,
         group_type: Group_type.CREATE,
       });
       await queryRunner.manager.save(telegram);
 
-      const telegram_token = 'group_token-' + generateCustomToken();
-      market.market_tg_token = telegram_token;
-      await queryRunner.manager.save(market);
-
+      await this.rotateMarketToken(queryRunner.manager, market);
       await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `Group ${groupId} activated for market ${market.id}`,
+        'OrderBot',
+      );
+
       return successRes(
-        market,
+        { market_id: market.id },
         200,
-        `${market?.name} nomidan yaratilgan yangi buyurtmalar ushbu guruhga jo'natiladi!`,
+        `✅ ${market.name} nomidan yaratilgan yangi buyurtmalar shu guruhga yuboriladi!`,
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      // token ishlatilgan hisoblanadi
-      try {
-        const market = await this.userRepo.findOne({
-          where: { market_tg_token: text },
-        });
-        if (market) {
-          const telegram_token = 'group_token-' + generateCustomToken();
-          market.market_tg_token = telegram_token;
-          await this.userRepo.save(market);
-        }
-      } catch (_) {
-        // ignore
-      }
-      const message =
-        error?.response?.message ||
-        error?.message ||
-        'Noma’lum xatolik yuz berdi';
-      return { message: message || 'error' };
+      return catchError(error);
     } finally {
       await queryRunner.release();
     }
@@ -181,39 +219,23 @@ export class OrderBotService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      // const chatId = String(ctx.chat?.id);
       const market = await queryRunner.manager.findOne(UserEntity, {
-        where: { market_tg_token: text },
+        where: { market_tg_token: text, role: Roles.MARKET },
       });
       if (!market) {
-        throw new NotFoundException('Market not found');
+        throw new NotFoundException("Token noto'g'ri yoki eskirgan.");
       }
 
-      const telegram_token = 'group_token-' + generateCustomToken();
-      market.market_tg_token = telegram_token;
-      await queryRunner.manager.save(market);
+      await this.rotateMarketToken(queryRunner.manager, market);
       await queryRunner.commitTransaction();
 
       return successRes(
-        market,
+        { id: market.id, name: market.name, add_order: market.add_order },
         200,
-        `${market.name} uchun operator ro'yxatdan o'tmoqchi`,
+        `${market.name} uchun ro'yxatdan o'tmoqchisiz`,
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      // token ishlatilgan hisoblanadi
-      try {
-        const market = await this.userRepo.findOne({
-          where: { market_tg_token: text },
-        });
-        if (market) {
-          const telegram_token = 'group_token-' + generateCustomToken();
-          market.market_tg_token = telegram_token;
-          await this.userRepo.save(market);
-        }
-      } catch (_) {
-        // ignore
-      }
       return catchError(error);
     } finally {
       await queryRunner.release();
@@ -225,42 +247,124 @@ export class OrderBotService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      const contact = phone_number.startsWith('+')
-        ? phone_number
-        : `+${phone_number}`;
-      const isExistUser = await queryRunner.manager.findOne(UserEntity, {
-        where: {
-          phone_number: contact,
-          is_deleted: false,
-        },
-      });
-      if (isExistUser?.status === Status.INACTIVE) {
-        throw new BadRequestException('Sorry you have blocked!');
-      }
-      if (isExistUser) {
-        return successRes(
-          {},
-          200,
-          `Siz ushbu platformada allaqachon ${isExistUser.role} sifatida ro'yxatdan o'tgansiz`,
+      if (!ctx.session.marketData?.id) {
+        throw new BadRequestException(
+          "Avval market tokenini yuboring va so'ng raqamingizni ulashing.",
         );
       }
-      const hashedPassword = await this.bcrypt.encrypt(config.ADMIN_PASSWORD);
+
+      const contact = this.normalizePhone(phone_number);
+      const telegramUserId = ctx.from?.id;
+
+      const existingUser = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number: contact, is_deleted: false },
+      });
+
+      if (existingUser) {
+        if (existingUser.status === Status.INACTIVE) {
+          throw new ForbiddenException(
+            'Kechirasiz, siz tizimda bloklangansiz.',
+          );
+        }
+
+        if (
+          existingUser.role !== Roles.MARKET &&
+          existingUser.role !== Roles.OPERATOR
+        ) {
+          throw new ForbiddenException(
+            'Bu telefon raqam market yoki operator sifatida ishlatilmaydi.',
+          );
+        }
+
+        if (
+          existingUser.telegram_id &&
+          Number(existingUser.telegram_id) !== Number(telegramUserId)
+        ) {
+          throw new ConflictException(
+            "Bu telefon raqam boshqa Telegram hisobi bilan bog'langan. Admin bilan bog'laning.",
+          );
+        }
+
+        if (!existingUser.telegram_id && telegramUserId) {
+          existingUser.telegram_id = telegramUserId;
+          await queryRunner.manager.save(existingUser);
+          this.logger.log(
+            `Linked telegram_id=${telegramUserId} to existing user ${existingUser.id} (${existingUser.role})`,
+            'OrderBot',
+          );
+        }
+
+        await queryRunner.commitTransaction();
+        return successRes(
+          { id: existingUser.id, role: existingUser.role },
+          200,
+          existingUser.role === Roles.MARKET
+            ? "Siz market sifatida ro'yxatdan o'tgansiz. Buyurtma yaratishingiz mumkin."
+            : "Siz operator sifatida ro'yxatdan o'tgansiz. Buyurtma yaratishingiz mumkin.",
+        );
+      }
+
+      if (telegramUserId) {
+        const existingByTelegramId = await queryRunner.manager.findOne(
+          UserEntity,
+          {
+            where: { telegram_id: telegramUserId, is_deleted: false },
+          },
+        );
+        if (existingByTelegramId) {
+          throw new ConflictException(
+            "Bu Telegram hisobi boshqa foydalanuvchiga bog'langan. Admin bilan bog'laning.",
+          );
+        }
+      }
+
+      const market = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: ctx.session.marketData.id, is_deleted: false },
+      });
+      if (!market || market.role !== Roles.MARKET) {
+        throw new NotFoundException(
+          "Market topilmadi. Tokenni qayta yuborib ko'ring.",
+        );
+      }
+
+      const tempPassword = randomBytes(6).toString('hex');
+      const hashedPassword = await this.bcrypt.encrypt(tempPassword);
       const operator = queryRunner.manager.create(UserEntity, {
-        name: ctx.session.name,
+        name: ctx.session.name || 'Operator',
         phone_number: contact,
         password: hashedPassword,
         role: Roles.OPERATOR,
-        add_order: ctx.session.marketData.add_order,
+        add_order: ctx.session.marketData.add_order ?? true,
         market_id: ctx.session.marketData.id,
-        telegram_id: ctx.from?.id,
+        telegram_id: telegramUserId,
       });
 
       await queryRunner.manager.save(operator);
       await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `New operator ${operator.id} registered via bot for market ${ctx.session.marketData.id}`,
+        'OrderBot',
+      );
+
+      try {
+        await this.bot.telegram.sendMessage(
+          ctx.from?.id as number,
+          `🔐 *Vaqtinchalik parolingiz:* \`${tempPassword}\`\n\n` +
+            `Ushbu parol bilan platformaga kira olasiz, lekin darhol yangilash tavsiya etiladi.`,
+          { parse_mode: 'Markdown' },
+        );
+      } catch (err) {
+        this.logger.log(
+          `Temp password DM failed: ${(err as Error).message}`,
+          'OrderBot',
+        );
+      }
+
       return successRes(
-        operator,
+        { id: operator.id, role: operator.role },
         201,
-        "Siz Beepost platoformasida muvofaqiyatli ro'yxatdan o'tdingiz! Pastdagi tugma orqali buyurtma yaratishingiz mumkin!",
+        "Siz Beepost platformasida muvaffaqiyatli ro'yxatdan o'tdingiz! Buyurtma yaratishingiz mumkin.",
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -272,64 +376,73 @@ export class OrderBotService {
 
   async signInWithTelegram(ctx: Context) {
     try {
+      const telegramId = ctx.from?.id;
+      if (!telegramId) {
+        throw new BadRequestException('Telegram foydalanuvchi aniqlanmadi.');
+      }
+
       const user = await this.userRepo.findOne({
-        where: { telegram_id: ctx.from?.id },
+        where: { telegram_id: telegramId, is_deleted: false },
       });
-      this.logger.log('Singning in user: ', `${user}`);
+
       if (!user) {
         throw new NotFoundException("Siz platformadan ro'yxatdan o'tmagansiz!");
       }
+
       if (user.status === Status.INACTIVE) {
-        throw new BadRequestException('Siz ushbu platformadan blocklangansiz');
+        throw new ForbiddenException('Siz ushbu platformadan bloklangansiz.');
       }
-      if (user.role !== Roles.OPERATOR) {
-        throw new BadRequestException(
-          "Kechirasiz siz operator sifatida ro'yxardan o'tmagansiz",
+
+      if (user.role !== Roles.OPERATOR && user.role !== Roles.MARKET) {
+        throw new ForbiddenException(
+          'Kechirasiz, siz bot orqali buyurtma yaratish huquqiga ega emassiz.',
         );
       }
+
       const { id, role, status } = user;
       const payload: JwtPayload = { id, role, status };
       const accessToken = await this.token.generateAccessToken(payload);
-      this.logger.log('Access token with Telegram: ', accessToken);
+
       return successRes(
-        { access_token: accessToken, user },
+        { access_token: accessToken, user: { id, role, name: user.name } },
         200,
         'Logged in successfully',
       );
     } catch (error) {
-      this.logger.log('Telegram sign in Error: ', error);
       return catchError(error);
     }
   }
 
   private buildOrderMessage(order: OrderEntity) {
     const customerDistrict = order.customer?.district;
-    const regionName = customerDistrict?.region?.name;
-    const districtName = customerDistrict?.name;
+    const regionName = this.escapeMarkdown(customerDistrict?.region?.name);
+    const districtName = this.escapeMarkdown(customerDistrict?.name);
     const addressLine =
-      regionName && districtName
+      regionName !== '-' && districtName !== '-'
         ? `${regionName}, ${districtName}`
-        : districtName || regionName || '-';
+        : districtName !== '-'
+          ? districtName
+          : regionName;
 
     const itemsText = order.items
       ?.map(
         (item, i) =>
-          `   ${i + 1}. ${item.product?.name || '-'} — ${item.quantity} dona`,
+          `   ${i + 1}. ${this.escapeMarkdown(item.product?.name)} — ${item.quantity} dona`,
       )
       .join('\n');
 
     return (
       `*✅ Yangi buyurtma!*\n\n` +
-      `👤 *Mijoz:* ${order.customer?.name || '-'}\n` +
-      `📞 *Telefon:* ${order.customer?.phone_number || '-'}\n` +
+      `👤 *Mijoz:* ${this.escapeMarkdown(order.customer?.name)}\n` +
+      `📞 *Telefon:* ${this.escapeMarkdown(order.customer?.phone_number)}\n` +
       `📍 *Manzil:* ${addressLine}\n\n` +
       `📦 *Buyurtmalar:*\n${itemsText || '-'}\n\n` +
-      `💰 *Narxi:* ${this.formatPrice(order.total_price)} so‘m\n` +
+      `💰 *Narxi:* ${this.formatPrice(order.total_price)} so'm\n` +
       `🕒 *Yaratilgan vaqti:* ${new Date(
         Number(order.created_at),
       ).toLocaleString('uz-UZ')}\n\n` +
-      `🧑‍💻 *Operator:* ${order.operator || '-'}\n\n` +
-      `📝 *Izoh:* ${order.comment || '-'}\n`
+      `🧑‍💻 *Operator:* ${this.escapeMarkdown(order.operator)}\n\n` +
+      `📝 *Izoh:* ${this.escapeMarkdown(order.comment)}\n`
     );
   }
 
@@ -380,12 +493,27 @@ export class OrderBotService {
         },
       };
     } catch (error) {
-      const message =
-        error?.response?.message ||
-        error?.message ||
-        'Noma’lum xatolik yuz berdi';
-      return { success: false, message: message || 'error' };
+      this.logger.log(
+        `sendOrderForApproval failed: ${(error as Error).message}`,
+        'OrderBot',
+      );
+      return { success: false, message: (error as Error).message || 'error' };
     }
+  }
+
+  private async isCallbackAuthorized(
+    marketId: string,
+    chatId: number | string | undefined,
+  ): Promise<boolean> {
+    if (!chatId || !marketId) return false;
+    const telegramGroup = await this.telegramRepo.findOne({
+      where: {
+        group_id: String(chatId),
+        market_id: marketId,
+        group_type: Group_type.CREATE,
+      },
+    });
+    return !!telegramGroup;
   }
 
   async processOrderAction(
@@ -409,11 +537,23 @@ export class OrderBotService {
       });
 
       if (!order) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException('Buyurtma topilmadi.');
+      }
+
+      const authorized = await this.isCallbackAuthorized(
+        order.user_id,
+        ctx.chat?.id,
+      );
+      if (!authorized) {
+        throw new ForbiddenException("Bu amal uchun sizda ruxsat yo'q.");
       }
 
       if (order.deleted || order.status !== Order_status.CREATED) {
-        return successRes(order, 200, 'Order already processed');
+        return successRes(
+          order,
+          200,
+          "Bu buyurtma allaqachon ko'rib chiqilgan",
+        );
       }
 
       if (action === 'approve') {
@@ -480,10 +620,22 @@ export class OrderBotService {
                 { inline_keyboard },
               );
             } catch {
-              await this.bot.telegram.sendMessage(chatId, statusText);
+              try {
+                await this.bot.telegram.sendMessage(chatId, statusText);
+              } catch (sendErr) {
+                this.logger.log(
+                  `Fallback send failed chat=${chatId}: ${(sendErr as Error).message}`,
+                  'OrderBot',
+                );
+              }
             }
           }
         }),
+      );
+
+      this.logger.log(
+        `Order ${order.id} ${action} by chat=${ctx.chat?.id}`,
+        'OrderBot',
       );
 
       return successRes(order, 200, statusText);
@@ -505,61 +657,40 @@ export class OrderBotService {
       });
       return { success: true, message: 'Message sent successfully' };
     } catch (error) {
-      const message =
-        error?.response?.message ||
-        error?.message ||
-        'Noma’lum xatolik yuz berdi';
-      return { message: message || 'error' };
+      return { success: false, message: (error as Error).message || 'error' };
     }
   }
 
+  checkTokenRateLimit(userId: number): boolean {
+    return !this.isTokenRateLimited(userId);
+  }
+
   shareContact() {
-    const number = {
+    return {
       keyboard: [[{ text: '📞 Raqamni ulashish', request_contact: true }]],
       resize_keyboard: true,
       one_time_keyboard: true,
     };
-    return number;
   }
 
   openWebApp() {
-    const webAppUrl = config.WEB_APP_URL?.replace(/\/$/, '') || '';
-
-    this.logger.log('Web App url: ', webAppUrl);
-    // const url =
-    //   webAppUrl && !webAppUrl.endsWith('/bot')
-    //     ? `${webAppUrl}/bot`
-    //     : webAppUrl || 'https://beepost.uz/admin/bot';
-
-    const url = 'https://beepost.uz/admin/bot';
-
-    this.logger.log('Custom url: ', url);
-
-    const webAppButton = {
+    const url = this.resolveWebAppUrl();
+    return {
       inline_keyboard: [
         [
           {
-            text: '🚀 WebAppni ochish',
-            web_app: {
-              url,
-            },
+            text: '🛍️ Buyurtma yaratish',
+            web_app: { url },
           },
         ],
       ],
     };
-    return webAppButton;
   }
 
   openWebAppbtn() {
-    const webAppButton = {
-      keyboard: [[{ text: '➕ Add order' }]],
+    return {
+      keyboard: [[{ text: '➕ Yangi buyurtma' }]],
       resize_keyboard: true,
-      // one_time_keyboard: true,
     };
-    return webAppButton;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} bot`;
   }
 }

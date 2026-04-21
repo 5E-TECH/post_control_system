@@ -283,6 +283,28 @@ export class CasheBoxController {
     return this.cashBoxService.financialBalanceAnalytics({ fromDate, toDate });
   }
 
+  @ApiOperation({ summary: 'Paginated top-impact transactions by absolute amount' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String })
+  @ApiQuery({ name: 'toDate', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('financial-balanse/top-impacts')
+  financialBalanceTopImpacts(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.financialBalanceTopImpacts({
+      fromDate,
+      toDate,
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+    });
+  }
+
   @ApiOperation({ summary: 'Spend money' })
   @ApiResponse({ status: 200, description: 'Spend money' })
   @UseGuards(JwtGuard, RolesGuard)

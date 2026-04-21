@@ -5,6 +5,7 @@ import {
   BeforeInsert,
   BeforeUpdate,
 } from 'typeorm';
+import { bigintTransformerNonNull } from './bigint.transformer';
 
 @Entity()
 export class BaseEntity {
@@ -14,12 +15,14 @@ export class BaseEntity {
   @Column({
     name: 'created_at',
     type: 'bigint',
+    transformer: bigintTransformerNonNull,
   })
   created_at: number;
 
   @Column({
     name: 'updated_at',
     type: 'bigint',
+    transformer: bigintTransformerNonNull,
   })
   updated_at: number;
 

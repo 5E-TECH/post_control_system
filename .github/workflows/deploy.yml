@@ -105,6 +105,38 @@ jobs:
               cd server
               npm ci --prefer-offline --legacy-peer-deps
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
+
+              # ----- 🛡️ DB BACKUP (migration oldidan, MAJBURIY) -----
+              echo '📦 Pre-migration DB backup...'
+              if ! command -v pg_dump >/dev/null; then
+                echo '❌ pg_dump topilmadi! sudo apt install -y postgresql-client kerak.'
+                exit 1
+              fi
+              npm run db:backup
+
+              # ----- 🩺 Cashbox invariant — DEPLOY OLDIDAN -----
+              echo '🩺 Pre-migration cashbox invariant check...'
+              if ! npm run db:check-cashbox; then
+                echo '❌ Pre-deploy invariant FAILED. Migration to'\''xtatildi.'
+                exit 1
+              fi
+
+              # ----- 🧬 Migration ishga tushirish -----
+              echo '🧬 Running TypeORM migrations...'
+              npm run migration:show || true
+              if ! npm run migration:run; then
+                echo '❌ Migration XATO. App restart QILINMAYDI. Backupdan tiklash mumkin: server/backups/'
+                exit 1
+              fi
+
+              # ----- 🩺 Cashbox invariant — DEPLOY KEYIN -----
+              echo '🩺 Post-migration cashbox invariant check...'
+              if ! npm run db:check-cashbox; then
+                echo '❌ POST-MIGRATION INVARIANT FAILED! App restart QILINMAYDI.'
+                echo '   Ko'\''rib chiqing: npm run migration:revert yoki backupdan tiklang.'
+                exit 1
+              fi
+
               cd ..
             fi
 
@@ -112,7 +144,15 @@ jobs:
             if [[ '$CHANGED_DIRS' == *'server'* ]] || [[ '$CHANGED_DIRS' == *'client'* ]]; then
               echo '🔁 Restarting backend systemd service...'
               sudo systemctl restart nestapp.service
+              sleep 3
               sudo systemctl status nestapp --no-pager
+
+              # ----- ✅ App ishga tushganini tekshirish -----
+              if ! sudo systemctl is-active --quiet nestapp.service; then
+                echo '❌ nestapp.service ishga tushmadi!'
+                exit 1
+              fi
+              echo '✅ nestapp.service ishga tushdi.'
             fi
 
             echo '✅ Deployment completed successfully.'

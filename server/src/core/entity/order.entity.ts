@@ -5,6 +5,10 @@ import { OrderItemEntity } from './order-item.entity';
 import { PostEntity } from './post.entity';
 import { UserEntity } from './users.entity';
 import { DistrictEntity } from './district.entity';
+import {
+  bigintTransformer as bigintTransformerNullable,
+  bigintTransformerNonNull as bigintTransformer,
+} from 'src/common/database/bigint.transformer';
 
 @Entity('order')
 @Index('IDX_ORDER_STATUS', ['status'])
@@ -34,10 +38,10 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'float' })
   total_price: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   to_be_paid: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   paid_amount: number;
 
   @Column({ type: 'enum', enum: Order_status })
@@ -78,14 +82,14 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   address: string;
 
-  @Column({ type: 'bigint', nullable: true })
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
   sold_at: number | null;
 
   // Sotilgan paytdagi tariflar (tarix uchun saqlanadi)
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
   market_tariff: number | null;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
   courier_tariff: number | null;
 
   @Column({ type: 'boolean', default: false })

@@ -241,15 +241,16 @@ export class UsersController {
   async signIn(
     @Body() signInuser: SignInUserDto,
     @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
   ) {
-    return this.userService.signInUser(signInuser, res);
+    return this.userService.signInUser(signInuser, res, req);
   }
 
   @ApiOperation({ summary: 'Login with telegram' })
   @ApiResponse({ status: 200, description: 'Loggen in with telegram' })
   @Post('telegram/signin')
-  telegramLogin(@Body() initData: TelegramInitData) {
-    return this.userService.loginTelegram(initData);
+  telegramLogin(@Body() initData: TelegramInitData, @Req() req: Request) {
+    return this.userService.loginTelegram(initData, req);
   }
 
   @ApiOperation({

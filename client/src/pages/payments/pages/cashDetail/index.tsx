@@ -25,7 +25,11 @@ import {
   Send,
   ArrowLeftRight,
   List,
+  Magnet,
+  LockOpen,
+  AlertCircle,
 } from "lucide-react";
+import Popup from "../../../../shared/ui/Popup";
 
 const { RangePicker } = DatePicker;
 
@@ -86,9 +90,13 @@ const CashDetail = () => {
 
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
-  const { getCashBoxById, createPaymentMarket, createPaymentCourier } =
+  const { getCashBoxById, createPaymentMarket, createPaymentCourier, getCurrentShift, openShift } =
     useCashBox();
   const { getMarkets } = useMarket();
+
+  const { data: shiftData, refetch: refetchShift } = getCurrentShift();
+  const hasOpenShift = !!shiftData?.data?.shift;
+  const [showShiftModal, setShowShiftModal] = useState(false);
 
   const { data, refetch } = getCashBoxById(
     id,
@@ -104,8 +112,9 @@ const CashDetail = () => {
     setSearch(value);
   }, 500);
 
-  const { handleApiError } = useApiNotification();
-  const handleSubmit = () => {
+  const { handleApiError, handleSuccess } = useApiNotification();
+
+  const performPayment = () => {
     const dataCourier = {
       courier_id: id,
       amount: Number(form.summa),
@@ -139,6 +148,10 @@ const CashDetail = () => {
           const err = error as AxiosError<{ error?: { message?: string } }>;
           const msg =
             err.response?.data?.error?.message || "Xatolik yuz berdi!";
+          if (/smena/i.test(msg)) {
+            setShowShiftModal(true);
+            return;
+          }
           handleApiError(err, `${msg}`);
         },
       });
@@ -160,10 +173,38 @@ const CashDetail = () => {
           const err = error as AxiosError<{ error?: { message?: string } }>;
           const msg =
             err.response?.data?.error?.message || "Xatolik yuz berdi!";
+          if (/smena/i.test(msg)) {
+            setShowShiftModal(true);
+            return;
+          }
           handleApiError(err, `${msg}`);
         },
       });
     }
+  };
+
+  const handleSubmit = () => {
+    if (!hasOpenShift) {
+      setShowShiftModal(true);
+      return;
+    }
+    performPayment();
+  };
+
+  const handleOpenShiftAndContinue = () => {
+    openShift.mutate(undefined, {
+      onSuccess: () => {
+        handleSuccess("Smena muvaffaqiyatli ochildi");
+        setShowShiftModal(false);
+        refetchShift();
+        performPayment();
+      },
+      onError: (error) => {
+        const err = error as AxiosError<{ error?: { message?: string } }>;
+        const msg = err.response?.data?.error?.message || "Smenani ochib bo'lmadi";
+        handleApiError(err, msg);
+      },
+    });
   };
 
   useEffect(() => {
@@ -254,12 +295,28 @@ const CashDetail = () => {
                       onChange={handleChange}
                       type="text"
                       placeholder="0"
-                      className={`w-full px-4 py-3 pr-16 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] outline-none transition-all text-lg font-semibold ${
+                      className={`w-full px-4 py-3 pr-24 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#312D4B] outline-none transition-all text-lg font-semibold ${
                         isMarket
                           ? "focus:border-blue-400 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/30"
                           : "focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:focus:ring-emerald-900/30"
                       }`}
                     />
+                    {(role === "superadmin" || role === "admin") && Math.abs(Math.round(raw)) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) => ({ ...prev, summa: String(Math.abs(Math.round(raw))) }))
+                        }
+                        className={`absolute right-12 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
+                          isMarket
+                            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800/50"
+                            : "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/50"
+                        }`}
+                        title={`To'liq summani to'ldirish: ${new Intl.NumberFormat("uz-UZ").format(Math.abs(Math.round(raw)))} so'm`}
+                      >
+                        <Magnet className="w-4 h-4" />
+                      </button>
+                    )}
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
                       UZS
                     </span>
@@ -484,6 +541,54 @@ const CashDetail = () => {
           />
         </div>
       </div>
+
+      {/* Shift required modal */}
+      <Popup isShow={showShiftModal} onClose={() => setShowShiftModal(false)}>
+        <div className="w-[92vw] max-w-md bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                <AlertCircle size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold">Smena ochilmagan</h3>
+                <p className="text-sm text-white/80">Kassa operatsiyasi uchun smena ochish kerak</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-5">
+              Kuryerdan to'lov qabul qilish yoki marketga to'lash — asosiy kassaga ta'sir ko'rsatadi.
+              Avval ish smenasini oching, so'ngra amaliyotni davom ettiring.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row gap-2.5">
+              <button
+                onClick={() => setShowShiftModal(false)}
+                className="sm:w-32 h-12 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm whitespace-nowrap"
+              >
+                Bekor qilish
+              </button>
+              <button
+                onClick={handleOpenShiftAndContinue}
+                disabled={openShift.isPending}
+                className="flex-1 h-12 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm whitespace-nowrap"
+              >
+                {openShift.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin flex-shrink-0" />
+                    <span>Ochilmoqda...</span>
+                  </>
+                ) : (
+                  <>
+                    <LockOpen size={16} className="flex-shrink-0" />
+                    <span>Smenani ochish</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Popup>
     </div>
   );
 };
