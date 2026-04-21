@@ -26,18 +26,31 @@ async function main() {
   await dataSource.initialize();
   console.log('🔌 DB ulandi. Cashbox invariant tekshirilmoqda...\n');
 
+  // MUHIM: cashbox_history.amount DOIM MUSBAT saqlanadi; kirim/chiqim
+  // operation_type ('income' / 'expense') orqali aniqlanadi.
+  // Shuning uchun SUM(amount) emas, signed sum kerak.
   const rows: DriftRow[] = await dataSource.query(`
+    WITH signed AS (
+      SELECT
+        ch.cashbox_id,
+        CASE
+          WHEN ch.operation_type = 'income'  THEN  ch.amount
+          WHEN ch.operation_type = 'expense' THEN -ch.amount
+          ELSE 0
+        END AS delta
+      FROM cashbox_history ch
+    )
     SELECT
       cb.id              AS cashbox_id,
       cb.user_id         AS user_id,
       cb.cashbox_type    AS cashbox_type,
       cb.balance::text   AS current_balance,
-      COALESCE(SUM(ch.amount), 0)::text AS history_sum,
-      (cb.balance - COALESCE(SUM(ch.amount), 0))::text AS diff
+      COALESCE(SUM(s.delta), 0)::text AS history_sum,
+      (cb.balance - COALESCE(SUM(s.delta), 0))::text AS diff
     FROM cash_box cb
-    LEFT JOIN cashbox_history ch ON ch.cashbox_id = cb.id
+    LEFT JOIN signed s ON s.cashbox_id = cb.id
     GROUP BY cb.id, cb.user_id, cb.cashbox_type, cb.balance
-    ORDER BY ABS(cb.balance - COALESCE(SUM(ch.amount), 0)) DESC
+    ORDER BY ABS(cb.balance - COALESCE(SUM(s.delta), 0)) DESC
   `);
 
   let drifted = 0;
