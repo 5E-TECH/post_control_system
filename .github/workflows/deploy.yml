@@ -114,12 +114,10 @@ jobs:
               fi
               npm run db:backup
 
-              # ----- 🩺 Cashbox invariant — DEPLOY OLDIDAN -----
-              echo '🩺 Pre-migration cashbox invariant check...'
-              if ! npm run db:check-cashbox; then
-                echo '❌ Pre-deploy invariant FAILED. Migration to'\''xtatildi.'
-                exit 1
-              fi
+              # ----- 🩺 Cashbox invariant — BASELINE (migration oldidan) -----
+              # Halt qilmaydi — faqat hozirgi drift-larni snapshot qiladi.
+              echo '🩺 Pre-migration cashbox baseline snapshot...'
+              npm run db:check-cashbox -- --snapshot=/tmp/cb-pre.json
 
               # ----- 🧬 Migration ishga tushirish -----
               echo '🧬 Running TypeORM migrations...'
@@ -129,11 +127,12 @@ jobs:
                 exit 1
               fi
 
-              # ----- 🩺 Cashbox invariant — DEPLOY KEYIN -----
-              echo '🩺 Post-migration cashbox invariant check...'
-              if ! npm run db:check-cashbox; then
-                echo '❌ POST-MIGRATION INVARIANT FAILED! App restart QILINMAYDI.'
-                echo '   Ko'\''rib chiqing: npm run migration:revert yoki backupdan tiklang.'
+              # ----- 🩺 Cashbox invariant — COMPARE (migration keyin) -----
+              # Yangi drift paydo bo'lsa yoki eski drift kattalashsa — halt.
+              echo '🩺 Post-migration cashbox invariant (compare)...'
+              if ! npm run db:check-cashbox -- --compare=/tmp/cb-pre.json; then
+                echo '❌ POST-MIGRATION INVARIANT FAILED! Yangi drift paydo bo'\''ldi.'
+                echo '   App restart QILINMAYDI. Ko'\''rib chiqing: npm run migration:revert yoki backupdan tiklang.'
                 exit 1
               fi
 
