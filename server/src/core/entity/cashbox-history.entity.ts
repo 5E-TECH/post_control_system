@@ -4,11 +4,7 @@ import { Column, Entity, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { CashEntity } from './cash-box.entity';
 import { UserEntity } from './users.entity';
 import { OrderEntity } from './order.entity';
-
-const bigintTransformer = {
-  to: (value: number) => value,
-  from: (value: string) => (value ? Number(value) : 0),
-};
+import { bigintTransformerNonNull as bigintTransformer } from 'src/common/database/bigint.transformer';
 
 @Entity('cashbox_history')
 @Index('IDX_CASHBOX_HISTORY_CASHBOX_ID', ['cashbox_id'])

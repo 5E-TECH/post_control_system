@@ -19,6 +19,7 @@ export class ActivityLogController {
   getAllLogs(
     @Query('entity_type') entity_type?: string,
     @Query('action') action?: string,
+    @Query('excludeAction') excludeAction?: string,
     @Query('user_id') user_id?: string,
     @Query('search') search?: string,
     @Query('fromDate') fromDate?: string,
@@ -29,6 +30,7 @@ export class ActivityLogController {
     return this.activityLogService.getAllLogs({
       entity_type,
       action,
+      excludeAction,
       user_id,
       search,
       fromDate,

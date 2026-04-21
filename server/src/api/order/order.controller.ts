@@ -392,7 +392,7 @@ export class OrderController {
   @ApiBody({ type: CreateOrderByBotDto })
   @ApiResponse({ status: 201, description: 'Order created by bot' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.OPERATOR)
+  @AcceptRoles(Roles.OPERATOR, Roles.MARKET)
   @Post('telegram/bot/create')
   botOrderCreate(
     @Body() body: CreateOrderByBotDto,

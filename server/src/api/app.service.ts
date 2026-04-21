@@ -10,6 +10,23 @@ import { AppModule } from './app.module';
 
 export default class Application {
   public static async main(): Promise<void> {
+    // ⚠️ XAVFSIZLIK SHARTI: TypeORM synchronize HECH QACHON true bo'lmasligi kerak.
+    // Aks holda ustun tipi o'zgartirilsa, TypeORM DROP+ADD qiladi va PUL/BALANS
+    // ma'lumotlari yo'qoladi (oldin shunday bo'lgan: 2026-04-02 incident).
+    // Migration ishlatilsin: `npm run migration:run`.
+    if (process.env.TYPEORM_SYNCHRONIZE === 'true') {
+      console.error(
+        '❌ FATAL: TYPEORM_SYNCHRONIZE=true bilan ishga tushirib bo\'lmaydi. ' +
+          'Migration ishlatilsin (npm run migration:run).',
+      );
+      process.exit(1);
+    }
+    if (!process.env.NODE_ENV) {
+      console.warn(
+        '⚠️  NODE_ENV o\'rnatilmagan. Production deploy uchun NODE_ENV=production majburiy.',
+      );
+    }
+
     // Telegram bot timeout xatoliklari serverni crash qilmasligi uchun
     process.on('unhandledRejection', (reason: any) => {
       const message = reason?.message || String(reason);

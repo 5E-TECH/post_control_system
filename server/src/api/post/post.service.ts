@@ -17,6 +17,7 @@ import {
   Order_status,
   Post_status,
   Roles,
+  Status,
   Where_deliver,
 } from 'src/common/enums';
 import { ReceivePostDto } from './dto/receive-post.dto';
@@ -276,11 +277,14 @@ export class PostService {
         throw new NotFoundException();
       }
       const couriers = await this.userRepo.find({
-        where: { region_id: post.region_id },
+        where: {
+          region_id: post.region_id,
+          status: Status.ACTIVE,
+        },
       });
       if (couriers.length === 0) {
         throw new NotFoundException(
-          'There are not any couriers for this region',
+          'There are not any active couriers for this region',
         );
       }
       const moreThanOneCourier: boolean = couriers.length === 1 ? false : true;
@@ -445,9 +449,11 @@ export class PostService {
         throw new NotFoundException('Kuryer topilmadi');
       }
 
-      // Kuryerni o'zgartirish
-      post.courier_id = newCourierId;
-      await queryRunner.manager.save(post);
+      // Kuryerni o'zgartirish — update() ishlatamiz
+      // save() da yuklangan courier relation yangi courier_id ni bekor qiladi
+      await queryRunner.manager.update(PostEntity, { id: postId }, {
+        courier_id: newCourierId,
+      });
 
       await queryRunner.commitTransaction();
 
@@ -1102,22 +1108,52 @@ export class PostService {
           return_requested: true,
           status: Order_status.WAITING,
         },
-        relations: ['post'],
+        relations: ['district', 'customer', 'customer.district', 'post'],
       });
 
       if (orders.length === 0) {
         throw new NotFoundException('No return-requested orders found');
       }
 
-      // Region bo'yicha guruhlash
+      // Region bo'yicha guruhlash (newPosts() bilan bir xil mantiq)
       const regionOrdersMap = new Map<string, OrderEntity[]>();
       for (const order of orders) {
-        const regionId = order.post?.region_id || order.district_id;
+        const district = order.district || order.customer?.district;
+        if (!district) {
+          throw new NotFoundException(
+            `District not found for order ${order.id}`,
+          );
+        }
+        const regionId = district.assigned_region;
         if (!regionId) continue;
         if (!regionOrdersMap.has(regionId)) {
           regionOrdersMap.set(regionId, []);
         }
         regionOrdersMap.get(regionId)!.push(order);
+      }
+
+      // Eski pochtalardan buyurtma soni va summasini kamaytirish uchun
+      const oldPostUpdates = new Map<string, { count: number; total: number }>();
+      for (const order of orders) {
+        if (order.post_id) {
+          const existing = oldPostUpdates.get(order.post_id) || { count: 0, total: 0 };
+          existing.count += 1;
+          existing.total += Number(order.total_price) || 0;
+          oldPostUpdates.set(order.post_id, existing);
+        }
+      }
+
+      // Eski pochtalar statistikasini kamaytirish
+      for (const [oldPostId, delta] of oldPostUpdates) {
+        const oldPost = await queryRunner.manager.findOne(PostEntity, {
+          where: { id: oldPostId },
+        });
+        if (oldPost) {
+          await queryRunner.manager.update(PostEntity, { id: oldPostId }, {
+            order_quantity: Math.max(0, (Number(oldPost.order_quantity) || 0) - delta.count),
+            post_total_price: Math.max(0, (Number(oldPost.post_total_price) || 0) - delta.total),
+          });
+        }
       }
 
       // Har bir region uchun NEW post topish/yaratish va orderlarni ko'chirish
@@ -1142,10 +1178,13 @@ export class PostService {
         let countAdded = 0;
 
         for (const order of regionOrders) {
-          order.status = Order_status.RECEIVED;
-          order.return_requested = false;
-          order.post_id = newPost.id;
-          await queryRunner.manager.save(order);
+          // update() ishlatamiz — save() da yuklangan post relation
+          // yangi post_id ni bekor qilib eski qiymatni saqlab qo'yadi
+          await queryRunner.manager.update(OrderEntity, { id: order.id }, {
+            status: Order_status.RECEIVED,
+            return_requested: false,
+            post_id: newPost.id,
+          });
 
           totalAdded += Number(order.total_price) || 0;
           countAdded += 1;

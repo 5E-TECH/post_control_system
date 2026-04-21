@@ -3,21 +3,22 @@ import { FinancialSource_type } from 'src/common/enums';
 import { Column, Entity, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { OrderEntity } from './order.entity';
+import { bigintTransformerNonNull as bigintTransformer } from 'src/common/database/bigint.transformer';
 
 @Entity('financial_balance_history')
 @Index('IDX_FBH_CREATED_AT', ['created_at'])
 @Index('IDX_FBH_SOURCE_TYPE', ['source_type'])
 export class FinancialBalanceHistoryEntity extends BaseEntity {
   // Taroziga ta'sir miqdori (+ musbat, - manfiy)
-  @Column({ type: 'int' })
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   amount: number;
 
   // O'zgarishdan OLDINGI moliyaviy balans
-  @Column({ type: 'int' })
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   balance_before: number;
 
   // O'zgarishdan KEYINGI moliyaviy balans
-  @Column({ type: 'int' })
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   balance_after: number;
 
   // Manba turi

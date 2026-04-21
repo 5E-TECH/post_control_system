@@ -1,75 +1,122 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { useLoginTelegran } from "./service/useTelelgram";
 import { useDispatch } from "react-redux";
-import { setToken } from "../../shared/lib/features/login/authSlice";
+import { removeToken, setToken } from "../../shared/lib/features/login/authSlice";
 import { useNavigate } from "react-router-dom";
 import Suspensee from "../../shared/ui/Suspensee";
 import { buildAdminPath } from "../../shared/const";
-const TelegramBot = () => {
-  const [tg, setTg] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
+type BotState =
+  | { status: "loading" }
+  | { status: "outside-telegram" }
+  | { status: "error"; message: string }
+  | { status: "ready" };
+
+const TelegramBot = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
   const { signinUser } = useLoginTelegran();
 
+  const [state, setState] = useState<BotState>({ status: "loading" });
+  const ranRef = useRef(false);
+
   useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+
+    dispatch(removeToken());
+
     const script = document.createElement("script");
     script.src = "https://telegram.org/js/telegram-web-app.js";
     script.async = true;
 
-    script.onload = () => {
+    const handleLoad = () => {
       const telegram = (window as any).Telegram?.WebApp;
-      if (!telegram) return;
+      if (!telegram || !telegram.initData) {
+        setState({ status: "outside-telegram" });
+        return;
+      }
 
-      setTg(telegram);
-      telegram.ready();
-      telegram.expand();
+      try {
+        telegram.ready();
+        telegram.expand();
+      } catch (_) {
+        /* ignore */
+      }
 
-      const data = { data: telegram.initData };
+      signinUser.mutate(
+        { data: telegram.initData },
+        {
+          onSuccess: (res: any) => {
+            const accessToken = res?.data?.data?.access_token;
+            if (!accessToken) {
+              setState({
+                status: "error",
+                message:
+                  "Kirish tokenini olib bo'lmadi. Iltimos, botda tokenni yuborib ro'yxatdan o'ting.",
+              });
+              return;
+            }
+            dispatch(setToken({ access_token: accessToken }));
+            setState({ status: "ready" });
+            navigate(buildAdminPath("authtelegram"), { replace: true });
+          },
+          onError: (err: any) => {
+            const message =
+              err?.response?.data?.error?.message ||
+              err?.response?.data?.message ||
+              "Siz botda ro'yxatdan o'tmagansiz. Iltimos, @bot chatiga kirib market tokeningizni yuboring.";
+            setState({ status: "error", message });
+          },
+        }
+      );
+    };
 
-      signinUser.mutate(data, {
-        onSuccess: (res: any) => {
-          dispatch(setToken({ access_token: res?.data?.data?.access_token }));
-          navigate(buildAdminPath("authtelegram"));
-        },
+    const handleError = () => {
+      setState({
+        status: "error",
+        message:
+          "Telegram skriptini yuklab bo'lmadi. Internetni tekshirib qayta urinib ko'ring.",
       });
-
-      setIsLoading(false);
     };
 
-    script.onerror = () => {
-      setIsLoading(false);
-    };
-
+    script.addEventListener("load", handleLoad);
+    script.addEventListener("error", handleError);
     document.head.appendChild(script);
 
     return () => {
-      document.head.removeChild(script);
+      script.removeEventListener("load", handleLoad);
+      script.removeEventListener("error", handleError);
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
     };
-  }, []); // <-- faqat bir marta ishlasin
+  }, [dispatch, navigate, signinUser]);
 
-  if (isLoading) {
-    return (
-      <div>
-        <Suspensee />
-      </div>
-    );
+  if (state.status === "loading" || state.status === "ready") {
+    return <Suspensee />;
   }
 
-  if (!tg) {
+  if (state.status === "outside-telegram") {
     return (
-      <div className="bg-white p-4">
-        <h2>Telegram WebApp not available</h2>
-        <p>Please open this page in Telegram app</p>
+      <div className="flex min-h-screen items-center justify-center bg-white p-6">
+        <div className="max-w-md text-center">
+          <h2 className="text-xl font-semibold mb-2">Telegram WebApp topilmadi</h2>
+          <p className="text-gray-600">
+            Ushbu sahifa faqat Telegram ilovasi ichidagi bot WebApp tugmasi
+            orqali ochilishi kerak.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <Suspensee />
+    <div className="flex min-h-screen items-center justify-center bg-white p-6">
+      <div className="max-w-md text-center">
+        <h2 className="text-xl font-semibold mb-2">Kirish amalga oshmadi</h2>
+        <p className="text-gray-600 whitespace-pre-line">{state.message}</p>
+      </div>
     </div>
   );
 };

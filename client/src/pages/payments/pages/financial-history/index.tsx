@@ -206,11 +206,12 @@ const DetailPopup = ({ item, onClose }: { item: any; onClose: () => void }) => {
 // ==================== MAIN COMPONENT ====================
 const FinancialHistory: React.FC = () => {
   const { t: th } = useTranslation("history");
-  const { getFinancialBalanceHistory, getFinancialBalanceAnalytics } = useCashBox();
+  const { getFinancialBalanceHistory, getFinancialBalanceAnalytics, getFinancialBalanceTopImpacts } = useCashBox();
   const { data: balanceData, isLoading: balanceLoading } = useHistory().getHistory();
 
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [page, setPage] = useState(1);
+  const [topImpactPage, setTopImpactPage] = useState(1);
   const today = dayjs().format("YYYY-MM-DD");
   const [filters, setFilters] = useState<{ fromDate?: string; toDate?: string; sourceType?: string }>({ fromDate: today, toDate: today });
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -228,11 +229,22 @@ const FinancialHistory: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  useEffect(() => {
+    setTopImpactPage(1);
+  }, [filters.fromDate, filters.toDate]);
+
   const { data: historyData, isLoading: historyLoading } = getFinancialBalanceHistory({ ...filters, page, limit: 20 });
   const { data: analyticsData, isLoading: analyticsLoading } = getFinancialBalanceAnalytics({ fromDate: filters.fromDate, toDate: filters.toDate });
+  const { data: topImpactsData, isLoading: topImpactsLoading } = getFinancialBalanceTopImpacts({
+    fromDate: filters.fromDate,
+    toDate: filters.toDate,
+    page: topImpactPage,
+    limit: 20,
+  });
 
   const history = historyData?.data;
   const analytics = analyticsData?.data;
+  const topImpacts = topImpactsData?.data;
 
   const bd = balanceData?.data;
   const markets = bd?.markets?.allMarketCashboxes?.map((o: any) => ({ name: o?.user?.name, amount: o?.balance }));
@@ -638,28 +650,102 @@ const FinancialHistory: React.FC = () => {
                 </div>
               </div>
 
-              {analytics.topTransactions?.length > 0 && (
-                <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2"><Zap size={16} className="text-amber-500" />Eng katta ta'sir ko'rsatgan tranzaksiyalar</h3>
-                  {analytics.topTransactions.map((item: any, idx: number) => {
-                    const amt = Number(item.amount);
-                    const pos = amt >= 0;
-                    return (
-                      <div key={idx} className="flex items-center justify-between py-3 border-b border-gray-50 dark:border-gray-700/50 last:border-0">
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-gray-400 w-6">#{idx + 1}</span>
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${pos ? "bg-green-100" : "bg-red-100"}`}>{pos ? <ArrowUpRight size={14} className="text-green-600" /> : <ArrowDownLeft size={14} className="text-red-600" />}</div>
-                          <div>
-                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${financialSourceColors[item.source_type] || "bg-gray-100 text-gray-700"}`}>{financialSourceLabels[item.source_type] || item.source_type}</span>
-                            {item.related_user && <span className="text-xs text-gray-400 ml-2">{item.related_user.name}</span>}
-                          </div>
-                        </div>
-                        <span className={`text-sm font-bold ${pos ? "text-green-600" : "text-red-600"}`}>{pos ? "+" : ""}{formatNumber(item.amount)} so'm</span>
-                      </div>
-                    );
-                  })}
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <Zap size={16} className="text-amber-500" />
+                    Eng katta ta'sir ko'rsatgan tranzaksiyalar
+                  </h3>
+                  {topImpacts?.pagination?.total > 0 && (
+                    <span className="text-xs text-gray-400">
+                      {topImpacts.pagination.total} ta jami
+                    </span>
+                  )}
                 </div>
-              )}
+                {topImpactsLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <SkeletonBox key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : !topImpacts?.items?.length ? (
+                  <div className="py-10 text-center text-sm text-gray-400">
+                    Ma'lumot topilmadi
+                  </div>
+                ) : (
+                  <>
+                    {topImpacts.items.map((item: any, idx: number) => {
+                      const amt = Number(item.amount);
+                      const pos = amt >= 0;
+                      const rank =
+                        (topImpacts.pagination.page - 1) * topImpacts.pagination.limit + idx + 1;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setSelectedItem(item)}
+                          className="w-full flex items-center justify-between py-3 border-b border-gray-50 dark:border-gray-700/50 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/30 rounded-lg px-2 -mx-2 transition-colors text-left cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-xs font-bold text-gray-400 w-7 flex-shrink-0">
+                              #{rank}
+                            </span>
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                pos ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"
+                              }`}
+                            >
+                              {pos ? (
+                                <ArrowUpRight size={14} className="text-green-600 dark:text-green-400" />
+                              ) : (
+                                <ArrowDownLeft size={14} className="text-red-600 dark:text-red-400" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                    financialSourceColors[item.source_type] || "bg-gray-100 text-gray-700"
+                                  }`}
+                                >
+                                  {financialSourceLabels[item.source_type] || item.source_type}
+                                </span>
+                                {item.related_user && (
+                                  <span className="text-xs text-gray-400 truncate">
+                                    {item.related_user.name}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-gray-400 block mt-0.5">
+                                {formatDate(item.created_at)}
+                              </span>
+                            </div>
+                          </div>
+                          <span
+                            className={`text-sm font-bold flex-shrink-0 ml-2 ${
+                              pos ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                            }`}
+                          >
+                            {pos ? "+" : ""}
+                            {formatNumber(item.amount)} so'm
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {topImpacts.pagination.totalPages > 1 && (
+                      <div className="flex justify-center mt-4">
+                        <Pagination
+                          current={topImpacts.pagination.page}
+                          total={topImpacts.pagination.total}
+                          pageSize={topImpacts.pagination.limit}
+                          onChange={(p) => setTopImpactPage(p)}
+                          showSizeChanger={false}
+                          size="small"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>

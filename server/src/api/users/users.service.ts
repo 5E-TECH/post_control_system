@@ -1256,7 +1256,19 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async signInUser(signInDto: SignInUserDto, res: Response): Promise<object> {
+  private extractLoginMetadata(req?: Request): Record<string, any> {
+    if (!req) return {};
+    const userAgent = (req.headers?.['user-agent'] as string) || '';
+    const forwardedFor = (req.headers?.['x-forwarded-for'] as string) || '';
+    const ip = forwardedFor.split(',')[0]?.trim() || (req as any).ip || '';
+    return { user_agent: userAgent, ip };
+  }
+
+  async signInUser(
+    signInDto: SignInUserDto,
+    res: Response,
+    req?: Request,
+  ): Promise<object> {
     try {
       const { phone_number, password } = signInDto;
 
@@ -1282,6 +1294,16 @@ export class UserService implements OnModuleInit {
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
       const refreshTokenExpiresAt = Date.now() + parseDurationToMs(config.REFRESH_TOKEN_TIME);
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'login',
+        description: `${user.name} tizimga kirdi`,
+        user: { id, name: user.name, role },
+        metadata: { ...this.extractLoginMetadata(req), source: 'web' },
+      });
+
       return successRes(
         { access_token: accessToken, refresh_token_expires_at: refreshTokenExpiresAt },
         200,
@@ -1292,9 +1314,9 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async loginTelegram(initData: TelegramInitData) {
+  async loginTelegram(initData: TelegramInitData, req?: Request) {
     try {
-      
+
       const { data } = initData;
       const params = new URLSearchParams(data);
       const userStr = params.get('user');
@@ -1315,6 +1337,15 @@ export class UserService implements OnModuleInit {
       const { id, role, status } = isRegisteredUser;
       const payload: JwtPayload = { id, role, status };
       const accessToken = await this.token.generateAccessToken(payload);
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'login',
+        description: `${isRegisteredUser.name} Telegram orqali tizimga kirdi`,
+        user: { id, name: isRegisteredUser.name, role },
+        metadata: { ...this.extractLoginMetadata(req), source: 'telegram' },
+      });
 
       return successRes(
         { access_token: accessToken },

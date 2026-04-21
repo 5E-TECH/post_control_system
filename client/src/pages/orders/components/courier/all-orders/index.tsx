@@ -1,7 +1,6 @@
 import {
   Form,
   Input,
-  InputNumber,
   Pagination,
   type FormProps,
   type PaginationProps,
@@ -36,6 +35,7 @@ import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import { useProfile } from "../../../../../shared/api/hooks/useProfile";
 
 const statusConfig: Record<
   string,
@@ -151,8 +151,11 @@ const AllOrders = () => {
 
   const [isShow, setIsShow] = useState<boolean>(false);
   const [isShowModal, setIsShowModal] = useState<boolean>(false);
+  const [extraCostValue, setExtraCostValue] = useState<string>("");
   const orderId = useRef<string | null>(null);
   const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
+  const { getUser: getProfile } = useProfile();
+  const { data: profileData } = getProfile();
 
   const order = useRef<any | null>(null);
   const urlType = useRef<string | null>(null);
@@ -203,6 +206,7 @@ const AllOrders = () => {
     setPartlySoldShow(false);
     setOrderItemInfo([]);
     setTotalPrice("");
+    setExtraCostValue("");
     order.current = null;
     urlType.current = null;
   };
@@ -217,8 +221,7 @@ const AllOrders = () => {
     const item = order.current;
     const type = urlType.current;
 
-    // Parse extraCost - handle formatted numbers like "300,000" or "300 000"
-    const extraCostValue = values?.extraCost;
+    // Parse extraCost from formatted state string
     const parsedExtraCost = extraCostValue
       ? Number(String(extraCostValue).replace(/[^\d]/g, ""))
       : undefined;
@@ -703,185 +706,307 @@ const AllOrders = () => {
 
       {/* Sell/Cancel Popup */}
       <Popup isShow={isShow} onClose={closePopup}>
-        <div className="w-[95vw] max-w-[420px] bg-white dark:bg-[#2A263D] shadow-xl rounded-2xl relative pb-6 px-5 max-h-[90vh] overflow-hidden overflow-y-auto">
-          <button
-            onClick={closePopup}
-            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+        <div className="w-[95vw] max-w-[420px] bg-white dark:bg-[#2A263D] shadow-2xl rounded-2xl relative max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header with gradient */}
+          <div
+            className={`px-5 pt-5 pb-4 ${
+              urlType.current === "sell"
+                ? "bg-gradient-to-r from-green-500 to-emerald-600"
+                : "bg-gradient-to-r from-red-500 to-rose-600"
+            }`}
           >
-            <X className="w-5 h-5" />
-          </button>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-white">
+                {partleSoldShow
+                  ? `Qisman ${urlType.current === "sell" ? "sotish" : "bekor qilish"}`
+                  : urlType.current === "sell"
+                    ? "Sotish"
+                    : "Bekor qilish"}
+              </h2>
+              <button
+                onClick={closePopup}
+                className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-          {/* Header */}
-          <div className="pt-4 pb-3 border-b border-gray-100 dark:border-gray-700 mb-4">
-            <h2 className="text-lg font-bold text-gray-800 dark:text-white">
-              {partleSoldShow
-                ? `Qisman ${urlType.current === "sell" ? "sotish" : "bekor qilish"}`
-                : urlType.current === "sell"
-                  ? "Buyurtmani sotish"
-                  : "Buyurtmani bekor qilish"}
-            </h2>
-          </div>
-
-          {/* Order Info */}
-          <div className="space-y-2 mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                {order.current?.customer?.name || "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                {order.current?.customer?.phone_number || "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-gray-400" />
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                {order.current?.district?.name || order.current?.customer?.district?.name || "—"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-600">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Umumiy summa:
-              </span>
-              <span className="font-bold text-blue-600 dark:text-blue-400">
-                {order.current?.total_price
-                  ? formatPrice(order.current.total_price)
-                  : "0"}{" "}
-                so'm
-              </span>
-            </div>
-          </div>
-
-          {/* Partial Sell/Cancel Items */}
-          {partleSoldShow && (
-            <div className="mb-4">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Mahsulotlar:
-              </p>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {orderItemInfo.map((item, index) => (
-                  <div
-                    key={item.product_id}
-                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                  >
-                    <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1 mr-2">
-                      {item.name}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleMinus(index)}
-                        disabled={
-                          item.quantity <= 0 ||
-                          orderItemInfo.reduce(
-                            (sum, i) => sum + i.quantity,
-                            0
-                          ) <= 1
-                        }
-                        className="w-7 h-7 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center disabled:opacity-30"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="w-8 text-center font-medium text-gray-800 dark:text-white">
-                        {item.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handlePlus(index)}
-                        disabled={item.quantity >= (item.maxQuantity ?? Infinity)}
-                        className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center disabled:opacity-30"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
+            {/* Customer Info Card */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <User className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-white truncate">
+                    {order.current?.customer?.name || "—"}
+                  </h3>
+                  <div className="flex items-center gap-1 text-white/80 text-sm">
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>{formatPhone(order.current?.customer?.phone_number) || "—"}</span>
                   </div>
-                ))}
+                </div>
               </div>
-
-              <div className="mt-3">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">
-                  To'lov summasi
-                </label>
-                <Input
-                  className="h-11 rounded-xl"
-                  placeholder="To'lov summasi"
-                  value={totalPrice}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, "");
-                    const formatted = new Intl.NumberFormat("uz-UZ").format(
-                      Number(raw || 0)
-                    );
-                    setTotalPrice(formatted);
-                  }}
-                />
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20">
+                <div className="flex items-center gap-1 text-white/80 text-sm">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>{order.current?.district?.name || order.current?.customer?.district?.name || "—"}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-white/70 text-xs">Jami summa</p>
+                  <p className="font-bold text-white text-lg">
+                    {order.current?.total_price
+                      ? formatPrice(order.current.total_price)
+                      : "0"}{" "}
+                    <span className="text-sm font-normal">so'm</span>
+                  </p>
+                </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Form */}
-          <Form form={form} onFinish={onFinish} layout="vertical">
-            <Form.Item
-              name="extraCost"
-              label={
-                <span className="text-gray-700 dark:text-gray-300">
-                  Qo'shimcha (pul)
-                </span>
-              }
-              className="mb-3"
-            >
-              <InputNumber
-                placeholder="Qo'shimcha pul"
-                className="w-full h-11 rounded-xl"
-                formatter={(v) =>
-                  v ? v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : ""
-                }
-                parser={(v) => v?.replace(/,/g, "") || ""}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="comment"
-              label={
-                <span className="text-gray-700 dark:text-gray-300">Izoh</span>
-              }
-              className="mb-4"
-            >
-              <Input.TextArea
-                className="rounded-xl dark:bg-[#312D4B] dark:border-gray-600 dark:text-white"
-                placeholder="Izoh qoldiring (ixtiyoriy)"
-                rows={3}
-                style={{ resize: "none" }}
-              />
-            </Form.Item>
-
-            <div className="flex gap-3">
-              {urlType.current === "sell" && (
-                <button
-                  type="button"
-                  onClick={() => setPartlySoldShow((p) => !p)}
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center transition-colors ${
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            {/* Partial Toggle Button - ONLY FOR SELL */}
+            {urlType.current === "sell" && (
+              <button
+                type="button"
+                onClick={() => setPartlySoldShow((p) => !p)}
+                className={`w-full mb-4 p-3 rounded-xl border-2 border-dashed transition-all flex items-center gap-3 ${
+                  partleSoldShow
+                    ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20"
+                    : "border-gray-200 dark:border-gray-700 hover:border-amber-300 dark:hover:border-amber-700"
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     partleSoldShow
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                      ? "bg-amber-500 text-white"
+                      : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   <AlertCircle className="w-5 h-5" />
-                </button>
-              )}
+                </div>
+                <div className="text-left flex-1">
+                  <p
+                    className={`font-medium text-sm ${
+                      partleSoldShow
+                        ? "text-amber-700 dark:text-amber-400"
+                        : "text-gray-700 dark:text-gray-300"
+                    }`}
+                  >
+                    Qisman sotish
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Mahsulotlarni alohida tanlash
+                  </p>
+                </div>
+                <div
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    partleSoldShow
+                      ? "border-amber-500 bg-amber-500"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
+                >
+                  {partleSoldShow && (
+                    <div className="w-2 h-2 rounded-full bg-white" />
+                  )}
+                </div>
+              </button>
+            )}
 
-              <button
-                type="submit"
-                disabled={getIsPending()}
-                className={`flex-1 h-11 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
-                  urlType.current === "sell"
-                    ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white"
-                    : "bg-gradient-to-r from-red-500 to-rose-600 text-white"
-                } ${getIsPending() ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                {getIsPending() ? (
+            {/* Partial Sell Items - ONLY FOR SELL */}
+            {partleSoldShow && urlType.current === "sell" && (
+              <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                  <Package className="w-4 h-4" />
+                  Mahsulotlar
+                </p>
+                <div className="space-y-2 max-h-36 overflow-y-auto">
+                  {orderItemInfo.map((item, index) => (
+                    <div
+                      key={item.product_id}
+                      className="flex items-center gap-3 p-2.5 bg-white dark:bg-gray-800 rounded-lg shadow-sm"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Max: {item.maxQuantity} ta
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleMinus(index)}
+                          disabled={
+                            item.quantity <= 0 ||
+                            orderItemInfo.reduce(
+                              (sum, i) => sum + i.quantity,
+                              0
+                            ) <= 1
+                          }
+                          className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
+                        >
+                          <Minus className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                        </button>
+                        <span className="w-10 text-center font-bold text-gray-800 dark:text-white text-lg">
+                          {item.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handlePlus(index)}
+                          disabled={item.quantity >= (item.maxQuantity ?? Infinity)}
+                          className="w-9 h-9 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                    To'lov summasi <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Input
+                      className="h-12 rounded-xl text-lg font-semibold pr-16"
+                      placeholder="0"
+                      value={totalPrice}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, "");
+                        const formatted = new Intl.NumberFormat("uz-UZ").format(
+                          Number(raw || 0)
+                        );
+                        setTotalPrice(formatted);
+                      }}
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">
+                      so'm
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Form */}
+            <Form form={form} onFinish={onFinish} layout="vertical">
+              {/* Qo'shimcha to'lov — faqat markazga yetkazishda yoki bekor qilishda ko'rsatiladi */}
+              {(() => {
+                const profile = profileData?.data;
+                const currentOrder = order.current;
+                const isCenter = currentOrder?.where_deliver === "center";
+                const isSell = urlType.current === "sell";
+
+                // Uyga yetkazish + sotish = ortiqcha xarajat yozish mumkin emas
+                if (!isCenter && isSell) return null;
+
+                const courierCenterTariff = currentOrder?.courier_tariff != null && isCenter
+                  ? currentOrder.courier_tariff
+                  : (profile?.tariff_center ?? 0);
+                const courierHomeTariff = profile?.tariff_home ?? 0;
+                const courierTariff = isCenter ? courierCenterTariff : courierHomeTariff;
+
+                // Sotishda (faqat markaz): max = uyTarif - markazTarif
+                // Bekor qilishda: max = o'z xizmat haqqi (courierTariff)
+                const maxExtraCost = isSell
+                  ? Math.max(0, courierHomeTariff - courierTariff)
+                  : courierTariff;
+
+                const parsedExtra = extraCostValue
+                  ? Number(extraCostValue.replace(/[^\d]/g, ""))
+                  : 0;
+                const isOverLimit = parsedExtra > maxExtraCost && maxExtraCost > 0;
+
+                return (
+                  <div className="mb-4">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <Plus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      Qo'shimcha to'lov
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={extraCostValue}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\D/g, "");
+                          const formatted = raw ? new Intl.NumberFormat("uz-UZ").format(Number(raw)) : "";
+                          setExtraCostValue(formatted);
+                          form.setFieldValue("extraCost", raw ? Number(raw) : undefined);
+                        }}
+                        className={`w-full h-14 px-4 pr-16 rounded-xl text-lg font-semibold bg-white dark:bg-[#312D4B] border text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent ${
+                          isOverLimit
+                            ? "border-red-400 focus:ring-red-400"
+                            : "border-gray-200 dark:border-gray-600 focus:ring-blue-500"
+                        }`}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-base">
+                        so'm
+                      </span>
+                    </div>
+                    {maxExtraCost > 0 && (
+                      <div className={`mt-2 flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${
+                        isOverLimit
+                          ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                          : "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
+                      }`}>
+                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <span>
+                          {isOverLimit
+                            ? isSell
+                              ? `Limit oshib ketdi! Ortiqcha xarajat + yetkazish (${courierTariff.toLocaleString("uz-UZ")}) uy tarifidan (${courierHomeTariff.toLocaleString("uz-UZ")}) oshmasligi kerak. Maks: ${maxExtraCost.toLocaleString("uz-UZ")} so'm`
+                              : `Limit oshib ketdi! Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm (xizmat haqqingiz)`
+                            : `Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm (xizmat haqqingiz)`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Izoh */}
+              <div className="mb-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                  </div>
+                  Izoh
+                  <span className="text-xs text-gray-400 font-normal">(ixtiyoriy)</span>
+                </label>
+                <Form.Item name="comment" className="mb-0">
+                  <Input.TextArea
+                    className="!rounded-xl !bg-white dark:!bg-[#312D4B] !border-gray-200 dark:!border-gray-600 dark:!text-white !min-h-[100px] !text-base !p-4"
+                    placeholder="Izoh yozing..."
+                    rows={3}
+                    style={{ resize: "none" }}
+                  />
+                </Form.Item>
+              </div>
+            </Form>
+          </div>
+
+          {/* Fixed Bottom Button - Single Full Width */}
+          <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <button
+              type="button"
+              onClick={() => form.submit()}
+              disabled={getIsPending()}
+              className={`w-full h-14 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                urlType.current === "sell"
+                  ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25"
+                  : "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25"
+              } ${getIsPending() ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {getIsPending() ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : urlType.current === "sell" ? (
                   <>
@@ -896,7 +1021,6 @@ const AllOrders = () => {
                 )}
               </button>
             </div>
-          </Form>
         </div>
       </Popup>
     </div>
