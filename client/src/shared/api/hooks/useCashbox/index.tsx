@@ -94,6 +94,20 @@ export const useCashBox = () => {
           .then((res) => res.data),
     });
 
+  const getFinancialBalanceTopImpacts = (params?: {
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    useQuery({
+      queryKey: [cashbox, "financial-top-impacts", params],
+      queryFn: () =>
+        api
+          .get("cashbox/financial-balanse/top-impacts", { params })
+          .then((res) => res.data),
+    });
+
   // ==================== SHIFT (SMENA) HOOKS ====================
 
   const getCurrentShift = () =>
@@ -148,6 +162,7 @@ export const useCashBox = () => {
     // Financial balance hooks
     getFinancialBalanceHistory,
     getFinancialBalanceAnalytics,
+    getFinancialBalanceTopImpacts,
     // Shift hooks
     getCurrentShift,
     openShift,

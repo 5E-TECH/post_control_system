@@ -2,6 +2,7 @@ import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Column, Entity, OneToOne, JoinColumn, Index } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { Max, Min } from 'class-validator';
+import { bigintTransformerNonNull as bigintTransformer } from 'src/common/database/bigint.transformer';
 
 @Entity('user_salary')
 @Index('IDX_USER_SALARY_USER_ID', ['user_id'])
@@ -10,10 +11,10 @@ export class UserSalaryEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   salary_amount: number;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'bigint', transformer: bigintTransformer })
   have_to_pay: number;
 
   // faqat 1 dan 30 gacha son qabul qiladi

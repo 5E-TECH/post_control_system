@@ -1,16 +1,15 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Column, Entity, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { UserEntity } from './users.entity';
+import {
+  bigintTransformer as bigintTransformerNullable,
+  bigintTransformerNonNull as bigintTransformer,
+} from 'src/common/database/bigint.transformer';
 
 export enum ShiftStatus {
   OPEN = 'open',
   CLOSED = 'closed',
 }
-
-const bigintTransformer = {
-  to: (value: number) => value,
-  from: (value: string) => (value ? Number(value) : 0),
-};
 
 @Entity('shifts')
 @Index('IDX_SHIFT_OPENED_BY', ['opened_by'])
@@ -27,7 +26,7 @@ export class ShiftEntity extends BaseEntity {
   @Column({ type: 'bigint', transformer: bigintTransformer })
   opened_at: number;
 
-  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
   closed_at: number;
 
   @Column({ type: 'enum', enum: ShiftStatus, default: ShiftStatus.OPEN })

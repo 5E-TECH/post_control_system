@@ -430,7 +430,7 @@ const Payments = () => {
 
         {/* Market Popup */}
         <PaymentPopup isShow={showMarket} onClose={hendlerClose}>
-          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full sm:w-[95%] sm:min-w-[700px] max-h-[85vh] sm:max-h-[90vh] px-3 sm:px-6 py-4 sm:py-6 relative flex flex-col">
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full sm:max-w-[560px] max-h-[85vh] sm:max-h-[90vh] px-3 sm:px-6 py-4 sm:py-6 relative flex flex-col">
             <button
               onClick={hendlerClose}
               className="absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110 cursor-pointer z-10"
@@ -470,27 +470,33 @@ const Payments = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {data?.data?.data?.map((item: any, inx: number) => (
-                  <div
-                    key={item?.id}
-                    onClick={() => setSelect(item?.id)}
-                    className={`flex items-center px-3 sm:px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 transition-all ${
-                      item.id === select
-                        ? "bg-purple-100 dark:bg-purple-900/30"
-                        : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                    }`}
-                  >
-                    <div className="w-8 sm:w-10 text-purple-600 dark:text-purple-400 font-medium text-sm">
-                      {inx + 1}
+                {(data?.data?.data || [])
+                  .slice()
+                  .sort(
+                    (a: any, b: any) =>
+                      Number(b?.cashbox?.balance || 0) - Number(a?.cashbox?.balance || 0),
+                  )
+                  .map((item: any, inx: number) => (
+                    <div
+                      key={item?.id}
+                      onClick={() => setSelect(item?.id)}
+                      className={`flex items-center px-3 sm:px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 transition-all ${
+                        item.id === select
+                          ? "bg-purple-100 dark:bg-purple-900/30"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      }`}
+                    >
+                      <div className="w-8 sm:w-10 text-purple-600 dark:text-purple-400 font-medium text-sm">
+                        {inx + 1}
+                      </div>
+                      <div className="flex-1 min-w-0 text-sm text-gray-800 dark:text-white font-medium truncate">
+                        {item?.name}
+                      </div>
+                      <div className="text-right text-sm text-gray-600 dark:text-gray-300 flex-shrink-0 ml-2">
+                        {item?.cashbox?.balance?.toLocaleString()} UZS
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0 text-sm text-gray-800 dark:text-white font-medium truncate">
-                      {item?.name}
-                    </div>
-                    <div className="text-right text-sm text-gray-600 dark:text-gray-300 flex-shrink-0 ml-2">
-                      {item?.cashbox?.balance?.toLocaleString()} UZS
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
@@ -512,7 +518,7 @@ const Payments = () => {
 
         {/* Courier Popup */}
         <PaymentPopup isShow={showCurier} onClose={hendlerClose}>
-          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full sm:w-[95%] sm:min-w-[700px] max-h-[85vh] sm:max-h-[90vh] px-3 sm:px-6 py-4 sm:py-6 relative flex flex-col">
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full sm:max-w-[560px] max-h-[85vh] sm:max-h-[90vh] px-3 sm:px-6 py-4 sm:py-6 relative flex flex-col">
             <button
               onClick={() => hendlerClose()}
               className="absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all hover:scale-110 cursor-pointer z-10"
@@ -553,35 +559,41 @@ const Payments = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {courierData?.data?.map((item: any, inx: number) => (
-                  <div
-                    key={item?.id}
-                    onClick={() => setSelect(item?.id)}
-                    className={`flex items-center px-3 sm:px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 transition-all ${
-                      item.id === select
-                        ? "bg-amber-100 dark:bg-amber-900/30"
-                        : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                    }`}
-                  >
-                    <div className="w-8 sm:w-10 text-amber-600 dark:text-amber-400 font-medium text-sm">
-                      {inx + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800 dark:text-white font-medium truncate">
-                        {item?.name}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate sm:hidden">
+                {(courierData?.data || [])
+                  .slice()
+                  .sort(
+                    (a: any, b: any) =>
+                      Number(b?.cashbox?.balance || 0) - Number(a?.cashbox?.balance || 0),
+                  )
+                  .map((item: any, inx: number) => (
+                    <div
+                      key={item?.id}
+                      onClick={() => setSelect(item?.id)}
+                      className={`flex items-center px-3 sm:px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700/50 transition-all ${
+                        item.id === select
+                          ? "bg-amber-100 dark:bg-amber-900/30"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      }`}
+                    >
+                      <div className="w-8 sm:w-10 text-amber-600 dark:text-amber-400 font-medium text-sm">
+                        {inx + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-800 dark:text-white font-medium truncate">
+                          {item?.name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate sm:hidden">
+                          {item?.region?.name}
+                        </p>
+                      </div>
+                      <div className="hidden sm:block w-[120px] text-center text-sm text-gray-500 dark:text-gray-400 truncate">
                         {item?.region?.name}
-                      </p>
+                      </div>
+                      <div className="text-right text-sm text-gray-600 dark:text-gray-300 flex-shrink-0 ml-2">
+                        {item?.cashbox?.balance?.toLocaleString()} UZS
+                      </div>
                     </div>
-                    <div className="hidden sm:block w-[120px] text-center text-sm text-gray-500 dark:text-gray-400 truncate">
-                      {item?.region?.name}
-                    </div>
-                    <div className="text-right text-sm text-gray-600 dark:text-gray-300 flex-shrink-0 ml-2">
-                      {item?.cashbox?.balance?.toLocaleString()} UZS
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 

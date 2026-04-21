@@ -108,6 +108,7 @@ export class ActivityLogService {
     filters: {
       entity_type?: string;
       action?: string;
+      excludeAction?: string;
       user_id?: string;
       search?: string;
       fromDate?: string;
@@ -131,6 +132,9 @@ export class ActivityLogService {
       }
       if (filters.action) {
         qb.andWhere('log.action = :action', { action: filters.action });
+      }
+      if (filters.excludeAction) {
+        qb.andWhere('log.action != :excludeAction', { excludeAction: filters.excludeAction });
       }
       if (filters.user_id) {
         qb.andWhere('log.user_id = :user_id', { user_id: filters.user_id });
