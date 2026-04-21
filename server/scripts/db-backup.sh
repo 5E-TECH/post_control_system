@@ -24,11 +24,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# .env ni to'g'ridan-to'g'ri `source` qilmaymiz — qiymatlarda bo'shliq (masalan
+# SUPERADMIN_LASTNAME="Shodiyor Ergashev") bo'lsa shell xato beradi. Faqat
+# kerakli o'zgaruvchilarni `grep` bilan ajratib olamiz.
 if [[ -f "$ROOT_DIR/.env" ]]; then
-  # shellcheck disable=SC1091
-  set -a
-  source "$ROOT_DIR/.env"
-  set +a
+  env_get() {
+    grep -E "^$1=" "$ROOT_DIR/.env" | head -n1 | cut -d= -f2- | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
+  }
+  : "${DB_URL:=$(env_get DB_URL)}"
+  : "${S3_BACKUP_BUCKET:=$(env_get S3_BACKUP_BUCKET)}"
+  export DB_URL S3_BACKUP_BUCKET
 fi
 
 if [[ -z "${DB_URL:-}" ]]; then
