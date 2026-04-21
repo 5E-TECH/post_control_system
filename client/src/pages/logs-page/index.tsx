@@ -1,4 +1,4 @@
-// deploy: bigint migration + invariant fix (2026-04-21)
+// deploy: bigint migration + invariant baseline/compare (2026-04-21)
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../shared/api";
