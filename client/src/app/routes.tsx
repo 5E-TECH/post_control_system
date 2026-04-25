@@ -55,9 +55,6 @@ const CreateRegistrator = lazy(
 const CreateLogist = lazy(
   () => import("../pages/users/pages/create-logist")
 );
-// const CreateInvestor = lazy(
-//   () => import("../pages/users/pages/create-investor")
-// );
 const CreateOrder = lazy(
   () => import("../pages/orders/pages/superadmin/create-order")
 );
@@ -130,9 +127,6 @@ const OperatorStats = lazy(
 );
 const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
 const OperatorOrders = lazy(() => import("../pages/operator-orders"));
-// const Investors = lazy(() => import("../pages/investors"));
-// const InvestorDetail = lazy(() => import("../pages/investors/pages/investor-detail"));
-// const InvestorDashboard = lazy(() => import("../pages/investor-dashboard"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -243,7 +237,6 @@ const AppRouters = () => {
                     { path: "courier", element: <CreateCourier /> },
                     { path: "market", element: <CreateMarket /> },
                     { path: "logist", element: <CreateLogist /> },
-                    // { path: "investor", element: <CreateInvestor /> },
                   ],
                 },
               ],
@@ -355,18 +348,6 @@ const AppRouters = () => {
               path: "my-orders",
               element: <OperatorOrders />,
             },
-            // {
-            //   path: "investors",
-            //   element: <Investors />,
-            // },
-            // {
-            //   path: "investors/:id",
-            //   element: <InvestorDetail />,
-            // },
-            // {
-            //   path: "my-investments",
-            //   element: <InvestorDashboard />,
-            // },
           ],
         },
       ],

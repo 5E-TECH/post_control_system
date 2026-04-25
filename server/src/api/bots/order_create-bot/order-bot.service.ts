@@ -66,7 +66,7 @@ export class OrderBotService {
   }
 
   private statusButtonLabel(order: OrderEntity) {
-    const status = order.deleted
+    const status = order.deleted_at
       ? 'deleted'
       : order.status || Order_status.CREATED;
 
@@ -548,7 +548,7 @@ export class OrderBotService {
         throw new ForbiddenException("Bu amal uchun sizda ruxsat yo'q.");
       }
 
-      if (order.deleted || order.status !== Order_status.CREATED) {
+      if (order.deleted_at || order.status !== Order_status.CREATED) {
         return successRes(
           order,
           200,
@@ -558,11 +558,13 @@ export class OrderBotService {
 
       if (action === 'approve') {
         order.status = Order_status.NEW;
+        await queryRunner.manager.save(order);
       } else {
-        order.deleted = true;
+        // Soft delete — TypeORM deleted_at = NOW yozadi
+        await queryRunner.manager.softDelete(OrderEntity, { id: order.id });
+        order.deleted_at = new Date();
       }
 
-      await queryRunner.manager.save(order);
       await queryRunner.commitTransaction();
 
       const statusText =

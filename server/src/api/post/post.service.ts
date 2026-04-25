@@ -583,14 +583,27 @@ export class PostService {
       /**
        * 7️⃣ Original postni yangilash.
        * Yuborilgan orderlar chiqib ketdi — qolganlarni qayta hisoblaymiz.
-       * Agar hech narsa qolmagan bo'lsa, original postni o'chiramiz.
+       *
+       * MUHIM: aktiv (soft-delete bo'lmagan) orderlar bo'yicha hisoblaymiz,
+       * lekin postni o'chirishda HAR QANDAY (soft-deleted'lar bilan) order qolmaganini
+       * tekshiramiz — aks holda soft-deleted orderlar yetim qoladi (audit uziladi).
        */
       const remainingOrders = await queryRunner.manager.find(OrderEntity, {
         where: { post_id: id },
       });
+      const totalIncludingDeleted = await queryRunner.manager.count(OrderEntity, {
+        where: { post_id: id },
+        withDeleted: true,
+      });
 
-      if (remainingOrders.length === 0) {
+      if (totalIncludingDeleted === 0) {
         await queryRunner.manager.delete(PostEntity, { id });
+      } else if (remainingOrders.length === 0) {
+        // Aktiv order yo'q, lekin soft-deleted'lar bor — postni o'chirmaymiz, faqat
+        // 0 ga tushirib qoldiramiz (post tarix uchun saqlanadi).
+        originalPost.order_quantity = 0;
+        originalPost.post_total_price = 0;
+        await queryRunner.manager.save(originalPost);
       } else {
         const remainingTotal = remainingOrders.reduce(
           (s, o) => s + (Number(o.total_price) || 0),
@@ -780,6 +793,25 @@ export class PostService {
       await queryRunner.manager.save(post);
 
       await queryRunner.commitTransaction();
+
+      // Activity log — har bir order uchun (scanner orqali ommaviy qabul qilindi)
+      for (const order of orders) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: order.id,
+          action: 'status_change',
+          old_value: { status: Order_status.ON_THE_ROAD },
+          new_value: {
+            status: Order_status.WAITING,
+            post_id: post.id,
+            total_price: order.total_price,
+          },
+          description: `Kuryer QR skaner orqali pochtani qabul qildi`,
+          user,
+          metadata: { source: 'scanner', post_token: post.qr_code_token },
+        });
+      }
+
       return successRes({}, 200, 'Post received successfully');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -833,6 +865,22 @@ export class PostService {
 
       // 5) Commit
       await queryRunner.commitTransaction();
+
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'status_change',
+        old_value: { status: Order_status.ON_THE_ROAD },
+        new_value: {
+          status: Order_status.WAITING,
+          post_id: post.id,
+          total_price: order.total_price,
+        },
+        description: `Kuryer QR skaner orqali bittalab qabul qildi`,
+        user,
+        metadata: { source: 'scanner', post_token: post.qr_code_token },
+      });
+
       return successRes({}, 200, 'Order received');
     } catch (error) {
       await queryRunner.rollbackTransaction();

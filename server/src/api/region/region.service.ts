@@ -251,7 +251,7 @@ export class RegionService implements OnModuleInit {
             const ordersQuery = this.orderRepository
               .createQueryBuilder('order')
               .where('order.post_id IN (:...postIds)', { postIds })
-              .andWhere('order.deleted = false');
+              .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
               ordersQuery
@@ -266,7 +266,7 @@ export class RegionService implements OnModuleInit {
               .createQueryBuilder('order')
               .where('order.post_id IN (:...postIds)', { postIds })
               .andWhere('order.status = :status', { status: Order_status.SOLD })
-              .andWhere('order.deleted = false');
+              .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
               deliveredQuery
@@ -283,7 +283,7 @@ export class RegionService implements OnModuleInit {
               .andWhere('order.status IN (:...statuses)', {
                 statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
               })
-              .andWhere('order.deleted = false');
+              .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
               cancelledQuery
@@ -302,7 +302,7 @@ export class RegionService implements OnModuleInit {
               .select('SUM(order.total_price)', 'revenue')
               .where('order.post_id IN (:...postIds)', { postIds })
               .andWhere('order.status = :status', { status: Order_status.SOLD })
-              .andWhere('order.deleted = false');
+              .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
               revenueQuery
@@ -435,7 +435,7 @@ export class RegionService implements OnModuleInit {
             const totalQuery = this.orderRepository
               .createQueryBuilder('order')
               .where('order.post_id IN (:...postIds)', { postIds: courierPostIds })
-              .andWhere('order.deleted = false');
+              .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
               totalQuery
@@ -449,7 +449,7 @@ export class RegionService implements OnModuleInit {
               .createQueryBuilder('order')
               .where('order.post_id IN (:...postIds)', { postIds: courierPostIds })
               .andWhere('order.status = :status', { status: Order_status.SOLD })
-              .andWhere('order.deleted = false');
+              .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
               deliveredQuery
@@ -465,7 +465,7 @@ export class RegionService implements OnModuleInit {
               .andWhere('order.status IN (:...statuses)', {
                 statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
               })
-              .andWhere('order.deleted = false');
+              .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
               cancelledQuery
@@ -480,7 +480,7 @@ export class RegionService implements OnModuleInit {
               .select('SUM(order.total_price)', 'revenue')
               .where('order.post_id IN (:...postIds)', { postIds: courierPostIds })
               .andWhere('order.status = :status', { status: Order_status.SOLD })
-              .andWhere('order.deleted = false');
+              .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
               revenueQuery
@@ -521,7 +521,7 @@ export class RegionService implements OnModuleInit {
           const districtTotalQuery = this.orderRepository
             .createQueryBuilder('order')
             .where('order.district_id = :districtId', { districtId: district.id })
-            .andWhere('order.deleted = false');
+            .andWhere('order.deleted_at IS NULL');
 
           if (hasDateFilter) {
             districtTotalQuery
@@ -535,7 +535,7 @@ export class RegionService implements OnModuleInit {
             .createQueryBuilder('order')
             .where('order.district_id = :districtId', { districtId: district.id })
             .andWhere('order.status = :status', { status: Order_status.SOLD })
-            .andWhere('order.deleted = false');
+            .andWhere('order.deleted_at IS NULL');
 
           if (hasDateFilter) {
             districtDeliveredQuery
@@ -551,7 +551,7 @@ export class RegionService implements OnModuleInit {
             .andWhere('order.status IN (:...statuses)', {
               statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
             })
-            .andWhere('order.deleted = false');
+            .andWhere('order.deleted_at IS NULL');
 
           if (hasDateFilter) {
             districtCancelledQuery
@@ -566,7 +566,7 @@ export class RegionService implements OnModuleInit {
             .select('SUM(order.total_price)', 'revenue')
             .where('order.district_id = :districtId', { districtId: district.id })
             .andWhere('order.status = :status', { status: Order_status.SOLD })
-            .andWhere('order.deleted = false');
+            .andWhere('order.deleted_at IS NULL');
 
           if (hasDateFilter) {
             districtRevenueQuery
@@ -605,7 +605,7 @@ export class RegionService implements OnModuleInit {
         const overallTotalQuery = this.orderRepository
           .createQueryBuilder('order')
           .where('order.post_id IN (:...postIds)', { postIds })
-          .andWhere('order.deleted = false');
+          .andWhere('order.deleted_at IS NULL');
 
         if (hasDateFilter) {
           overallTotalQuery
@@ -619,7 +619,7 @@ export class RegionService implements OnModuleInit {
           .createQueryBuilder('order')
           .where('order.post_id IN (:...postIds)', { postIds })
           .andWhere('order.status = :status', { status: Order_status.SOLD })
-          .andWhere('order.deleted = false');
+          .andWhere('order.deleted_at IS NULL');
 
         if (hasDateFilter) {
           overallDeliveredQuery
@@ -635,7 +635,7 @@ export class RegionService implements OnModuleInit {
           .andWhere('order.status IN (:...statuses)', {
             statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
           })
-          .andWhere('order.deleted = false');
+          .andWhere('order.deleted_at IS NULL');
 
         if (hasDateFilter) {
           overallCancelledQuery
@@ -652,7 +652,7 @@ export class RegionService implements OnModuleInit {
           .select('SUM(order.total_price)', 'revenue')
           .where('order.post_id IN (:...postIds)', { postIds })
           .andWhere('order.status = :status', { status: Order_status.SOLD })
-          .andWhere('order.deleted = false');
+          .andWhere('order.deleted_at IS NULL');
 
         if (hasDateFilter) {
           overallRevenueQuery

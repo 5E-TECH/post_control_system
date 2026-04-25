@@ -63,8 +63,6 @@ import { ExternalIntegrationService } from '../external-integration/external-int
 import { FieldMapping } from 'src/core/entity/external-integration.entity';
 import { IntegrationSyncService } from '../integration-sync/integration-sync.service';
 import { OperatorEarningEntity } from 'src/core/entity/operator-earning.entity';
-import { InvestorEarningEntity } from 'src/core/entity/investor-earning.entity';
-import { InvestorDepositEntity } from 'src/core/entity/investor-deposit.entity';
 import { Commission_type, FinancialSource_type } from 'src/common/enums';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
@@ -302,14 +300,33 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new BadRequestException('You can not create order and product');
       }
 
-      // Operator telefon raqami — DTO dan yoki market default'idan olish
-      const finalOperatorPhone =
-        createOrderDto.operator_phone || market.default_operator_phone || null;
+      // Asosiy operator telefon raqami — HAR DOIM market profilidagi default'dan olinadi
+      const finalOperatorPhone = market.default_operator_phone || null;
 
-      // Majburiy bo'lsa va hech qayerda bo'lmasa xato berish
-      if (market.require_operator_phone && !finalOperatorPhone) {
+      // 2-raqam (ixtiyoriy): avval buyurtma formasida kiritilgan `operator_phone`
+      // (u formadagi yagona input), so'ng DTO dagi aniq `secondary_operator_phone`,
+      // so'ng market sozlamasidagi `secondary_operator_phone`.
+      const candidateSecondary =
+        createOrderDto.operator_phone ||
+        createOrderDto.secondary_operator_phone ||
+        market.secondary_operator_phone ||
+        null;
+      // Agar 2-raqam asosiy bilan bir xil bo'lsa — takrorlamaymiz
+      const finalSecondaryOperatorPhone =
+        candidateSecondary && candidateSecondary !== finalOperatorPhone
+          ? candidateSecondary
+          : null;
+
+      // Market sozlamasida majburiy qilib qo'yilgan bo'lsa — chekda hech bo'lmasa
+      // bitta raqam bo'lishi shart. Ya'ni: market default bor bo'lsa yetarli;
+      // default yo'q bo'lsa, operator formadagi inputda raqam kiritishi kerak.
+      if (
+        market.require_operator_phone &&
+        !market.default_operator_phone &&
+        !createOrderDto.operator_phone
+      ) {
         throw new BadRequestException(
-          "Operator telefon raqamini kiritish majburiy. Market profiliga default operator raqamini qo'shing yoki buyurtmada to'g'ridan-to'g'ri kiriting.",
+          'Market sozlamasiga ko\'ra operator telefon raqami majburiy. Market profiliga default raqam qo\'shing yoki formaga kiriting.',
         );
       }
 
@@ -349,6 +366,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment,
         operator: createOrderDto.operator,
         operator_phone: finalOperatorPhone,
+        secondary_operator_phone: finalSecondaryOperatorPhone,
         operator_id: user.role === Roles.OPERATOR ? user.id : null,
         total_price,
         product_quantity,
@@ -458,10 +476,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const qr_code_token = generateCustomToken();
 
+      // Market default va 2-operator raqamlarini snapshot sifatida olish
+      const botMarket = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: marketId },
+      });
+
       const newOrder = queryRunner.manager.create(OrderEntity, {
         customer_id: customer.id,
         user_id: marketId,
         operator: operator ? operator : currentUser.name,
+        operator_phone: botMarket?.default_operator_phone || null,
+        secondary_operator_phone: botMarket?.secondary_operator_phone || null,
         total_price,
         where_deliver: where_deliver || Where_deliver.CENTER,
         status: Order_status.CREATED,
@@ -1328,7 +1353,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async receiveWithScaner(id: string, orderDto: OrderDto) {
+  async receiveWithScaner(id: string, orderDto: OrderDto, user: JwtPayload) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1351,6 +1376,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         await queryRunner.manager.save(order);
 
         await queryRunner.commitTransaction();
+
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: order.id,
+          action: 'status_change',
+          old_value: { status: Order_status.CANCELLED_SENT },
+          new_value: { status: Order_status.CLOSED, total_price: order.total_price },
+          description: `QR skaner orqali qabul qilindi va yopildi — ${order.total_price} so'm`,
+          user,
+          metadata: { source: 'scanner' },
+        });
+
         return successRes({}, 200, 'Order closed');
       }
       const customer = await queryRunner.manager.findOne(UserEntity, {
@@ -1398,6 +1435,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
       await this.orderBotService.syncStatusButton(order.id);
+
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'status_change',
+        old_value: { status: Order_status.NEW },
+        new_value: {
+          status: Order_status.RECEIVED,
+          total_price: order.total_price,
+          post_id: newPost.id,
+          region_id: newPost.region_id,
+        },
+        description: `QR skaner orqali qabul qilindi — ${order.total_price} so'm`,
+        user,
+        metadata: { source: 'scanner' },
+      });
+
       return successRes({}, 200, 'Order received');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1665,8 +1719,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     };
 
     try {
+      // Pessimistic write lock — ikki marta sotishni bloklaydi
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id, status: Order_status.WAITING },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order)
         throw new NotFoundException('Order not found or not in waiting status');
@@ -1870,44 +1926,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         }
       }
 
-      // === Investor earning hisoblash (vaqtinchalik o'chirilgan) ===
-      // const investorProfit = marketTarif - courierTarif;
-      // if (investorProfit > 0) {
-      //   const activeInvestors = await queryRunner.manager.find(UserEntity, {
-      //     where: [
-      //       { role: Roles.INVESTOR, status: Status.ACTIVE, is_deleted: false },
-      //       { role: Roles.INVESTOR, status: IsNull() as any, is_deleted: false },
-      //     ],
-      //   });
-      //   const now = Date.now();
-      //   for (const inv of activeInvestors) {
-      //     const committed = inv.committed_amount ?? 0;
-      //     const sharePercent = inv.share_percent ?? 0;
-      //     let activeDeposited = 0;
-      //     if (committed > 0) {
-      //       const deposits = await queryRunner.manager
-      //         .createQueryBuilder(InvestorDepositEntity, 'd')
-      //         .where('d.investor_id = :id', { id: inv.id })
-      //         .andWhere('d.effective_date <= :now', { now })
-      //         .andWhere('d.amount > 0')
-      //         .getMany();
-      //       activeDeposited = deposits.reduce((s, d) => s + Number(d.amount), 0);
-      //     }
-      //     const effPercent = committed === 0
-      //       ? sharePercent
-      //       : sharePercent * Math.min(activeDeposited / committed, 1.0);
-      //     if (effPercent <= 0) continue;
-      //     const earningAmount = (investorProfit * effPercent) / 100;
-      //     const invEarning = new InvestorEarningEntity();
-      //     invEarning.investor_id = inv.id;
-      //     invEarning.order_id = order.id;
-      //     invEarning.amount = earningAmount;
-      //     invEarning.effective_percent = effPercent;
-      //     invEarning.profit = investorProfit;
-      //     await queryRunner.manager.save(InvestorEarningEntity, invEarning);
-      //   }
-      // }
-
       // === Extra cost (agar bo'lsa) ===
       // Telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun raqamga aylantirish
       const extraCost = sellDto.extraCost
@@ -2019,9 +2037,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      // Pessimistic write lock — sotilayotgan yoki qayta tiklanayotgan order bilan racy bo'lmasligi uchun
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
         relations: ['items', 'items.product', 'district', 'district.region'],
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order) {
         throw new NotFoundException('Order not found');
@@ -2061,11 +2081,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : 0;
 
       if (extraCost > 0) {
-        // Bekor qilishda: maximum o'z xizmat haqqi (courierTarif)
-        const maxExtraCost = courierTarif;
+        // Bekor qilishda ham sotuv qoidasi qo'llaniladi:
+        // ortiqcha xarajat + yetkazish tarifi <= kuryerning uy tarifi.
+        // Bu sotish/bekor qilish o'rtasida bir xil formula uchun.
+        const courierHomeTarif = courier.tariff_home ?? 0;
+        const maxExtraCost = Math.max(0, courierHomeTarif - courierTarif);
         if (extraCost > maxExtraCost) {
           throw new BadRequestException(
-            `Ortiqcha xarajat o'z xizmat haqqingizdan (${maxExtraCost.toLocaleString('uz-UZ')} so'm) oshmasligi kerak`,
+            `Ortiqcha xarajat + yetkazish tarifi (${courierTarif.toLocaleString('uz-UZ')}) uy tarifidan (${courierHomeTarif.toLocaleString('uz-UZ')}) oshmasligi kerak. Maksimal: ${maxExtraCost.toLocaleString('uz-UZ')} so'm`,
           );
         }
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
@@ -2133,9 +2156,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           await queryRunner.manager.remove(OperatorEarningEntity, existingEarning);
         }
       }
-
-      // Investor earning recordlarni o'chirish (kassaga tegmaydi — kassa faqat admin boshqaradi)
-      await queryRunner.manager.delete(InvestorEarningEntity, { order_id: order.id });
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id: order.customer_id },
@@ -2240,10 +2260,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     try {
       const { order_item_info, totalPrice, extraCost, comment } = partlySoldDto;
 
-      // 1️⃣ Check order
+      // 1️⃣ Check order (pessimistic write lock — qismiy sotuvni parallel sotuv bilan aralashmasligi uchun)
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id, status: Order_status.WAITING },
         relations: ['items', 'items.product', 'district', 'district.region'],
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
@@ -2654,9 +2675,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.startTransaction();
 
     try {
+      // Pessimistic write lock — rollback va sotuvning bir-biriga urilib ketmasligi uchun
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
         relations: ['market', 'post'],
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order) throw new NotFoundException('Order not found');
 
@@ -2950,9 +2973,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           await queryRunner.manager.remove(OperatorEarningEntity, existingEarning);
         }
       }
-
-      // Investor earning recordlarni o'chirish (rollback — kassaga tegmaydi)
-      await queryRunner.manager.delete(InvestorEarningEntity, { order_id: order.id });
 
       // === Update order status ===
       const previousStatus = order.status;
@@ -3846,8 +3866,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // Post ID ni olish (oddiy post yoki canceled post)
       const postId = order.post_id || order.canceled_post_id;
 
-      // Orderni o'chirish
-      await queryRunner.manager.delete(OrderEntity, { id });
+      // Orderni soft-delete qilish (deleted_at = NOW). Fizik o'chirilmaydi —
+      // moliyaviy audit va activity log uchun saqlanib qoladi.
+      await queryRunner.manager.softDelete(OrderEntity, { id });
 
       // Agar order postga tegishli bo'lsa, postni yangilash
       if (postId) {
@@ -4250,7 +4271,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           .leftJoinAndSelect('order.items', 'items')
           .leftJoinAndSelect('items.product', 'product')
           .where('order.user_id = :marketId', { marketId: market_id })
-          .andWhere('order.deleted = :deleted', { deleted: false })
+          .andWhere('order.deleted_at IS NULL')
           .andWhere(
             '(order.external_id = :externalId OR order.qr_code_token = :qrCode)',
             { externalId: String(qr_code), qrCode: String(qr_code) },
@@ -4286,7 +4307,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           .leftJoinAndSelect('order.items', 'items')
           .leftJoinAndSelect('items.product', 'product')
           .where('order.user_id = :marketId', { marketId: market_id })
-          .andWhere('order.deleted = :deleted', { deleted: false })
+          .andWhere('order.deleted_at IS NULL')
           .andWhere('order.status IN (:...statuses)', {
             statuses: [
               Order_status.NEW,
@@ -4428,7 +4449,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           .createQueryBuilder(OrderEntity, 'order')
           .select('order.external_id')
           .where('order.user_id = :marketId', { marketId: market_id })
-          .andWhere('order.deleted = :deleted', { deleted: false })
+          .andWhere('order.deleted_at IS NULL')
           .andWhere('order.external_id IN (:...extIds)', { extIds: allExternalIds })
           .getMany();
         existingByExtId.forEach((o) => existingExternalIds.add(o.external_id));
@@ -4440,7 +4461,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           .createQueryBuilder(OrderEntity, 'order')
           .select('order.qr_code_token')
           .where('order.user_id = :marketId', { marketId: market_id })
-          .andWhere('order.deleted = :deleted', { deleted: false })
+          .andWhere('order.deleted_at IS NULL')
           .andWhere('order.qr_code_token IN (:...qrCodes)', { qrCodes: allQrCodes })
           .getMany();
         existingByQr.forEach((o) => existingQrCodes.add(o.qr_code_token));

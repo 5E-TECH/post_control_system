@@ -262,8 +262,12 @@ export class OrderController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('receive/:id')
-  receiveOrderWithScaner(@Param('id') id: string, @Body() orderDto: OrderDto) {
-    return this.orderService.receiveWithScaner(id, orderDto);
+  receiveOrderWithScaner(
+    @Param('id') id: string,
+    @Body() orderDto: OrderDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.orderService.receiveWithScaner(id, orderDto, user);
   }
 
   @ApiOperation({

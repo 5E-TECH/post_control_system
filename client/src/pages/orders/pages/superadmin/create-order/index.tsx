@@ -76,6 +76,25 @@ const CreateOrder = () => {
       return;
     }
 
+    // Market sozlamasida majburiy qilib qo'yilgan bo'lsa — chekda kamida bitta raqam
+    // bo'lishi shart. Market'ning default raqami bor bo'lsa yetarli (u chekda avtomatik
+    // chiqadi). Default yo'q bo'lsa, operator formaga raqam kiritishi kerak.
+    const requireOperatorPhone =
+      market?.require_operator_phone || marketdata?.require_operator_phone || false;
+    const marketDefaultOperatorPhone =
+      market?.default_operator_phone || marketdata?.default_operator_phone || "";
+    if (
+      requireOperatorPhone &&
+      !marketDefaultOperatorPhone &&
+      !productInfo?.operator_phone
+    ) {
+      handleWarning(
+        "Operator telefon raqami majburiy",
+        "Market sozlamasiga ko'ra chekda raqam bo'lishi shart. Market default raqami ham, formadagi raqam ham bo'sh.",
+      );
+      return;
+    }
+
     const newOrder = {
       market_id,
       customer_id,

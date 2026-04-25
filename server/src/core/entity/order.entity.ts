@@ -1,6 +1,6 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Order_status, Where_deliver } from 'src/common/enums';
-import { Column, Entity, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany, JoinColumn, Index, DeleteDateColumn } from 'typeorm';
 import { OrderItemEntity } from './order-item.entity';
 import { PostEntity } from './post.entity';
 import { UserEntity } from './users.entity';
@@ -56,6 +56,10 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   operator_phone: string | null;
 
+  // Ixtiyoriy 2-operator telefon raqami (market sozlamasidan snapshot)
+  @Column({ type: 'varchar', nullable: true })
+  secondary_operator_phone: string | null;
+
   // Buyurtmani yaratgan operatorning user ID si
   @Column({ type: 'uuid', nullable: true })
   operator_id: string | null;
@@ -92,8 +96,10 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
   courier_tariff: number | null;
 
-  @Column({ type: 'boolean', default: false })
-  deleted: boolean;
+  // Soft delete — TypeORM avtomatik filter qiladi (find/findOne/QueryBuilder).
+  // Yo'qotilgan ma'lumotni qaytarish uchun `withDeleted()` chaqirig'i kerak.
+  @DeleteDateColumn({ type: 'timestamp', nullable: true })
+  deleted_at: Date | null;
 
   // Courier buyurtmani qaytarish so'rovi yuborgan
   @Column({ type: 'boolean', default: false })

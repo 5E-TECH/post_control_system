@@ -88,6 +88,17 @@ export class PrinterService {
         const market = order.market?.name ?? 'N/A';
         const operator = order.operator ?? '-';
         const operatorPhone = order.operator_phone ? this.formatPhoneNumber(order.operator_phone) : '';
+        const secondaryOperatorPhone = order.secondary_operator_phone
+          ? this.formatPhoneNumber(order.secondary_operator_phone)
+          : '';
+        // "Muammo bo'lsa:" qatori — qaysi raqamlar mavjud bo'lsa shular chiqariladi
+        const phoneListHtml = [operatorPhone, secondaryOperatorPhone].filter(Boolean);
+        const contactPhonesHtml =
+          phoneListHtml.length === 0
+            ? '-'
+            : phoneListHtml.length === 1
+              ? `<b>${phoneListHtml[0]}</b>`
+              : `<b>${phoneListHtml[0]}</b> <b class="logist-phone">${phoneListHtml[1]}</b>`;
         const createdTime = this.formatDateStr(order.created_at);
         const whereDeliver = order.where_deliver === Where_deliver.ADDRESS ? 'UYGACHA' : 'MARKAZGA';
         const qrCode = order.qr_code_token ?? '';
@@ -141,7 +152,7 @@ export class PrinterService {
                 <div class="b-row b-row-compact"><span class="lbl-b">Mahsulot:</span><span class="val-b">${productStr || '-'}</span></div>
                 <div class="b-row b-row-compact"><span class="lbl-b">Mo'ljal:</span><span class="val-b">${address || '-'}</span></div>
                 <div class="b-row b-row-compact b-row-izoh"><span class="lbl-b">Izoh:</span><span class="val-b">${comment || '-'}</span></div>
-                <div class="b-row b-row-last b-row-logist"><span class="lbl-b">Logist:</span><span class="val-b val-b-logist">${logistName ? `<b>${logistName}</b> <span class="logist-phone">${logistPhone}</span>` : '-'}</span></div>
+                <div class="b-row b-row-last b-row-logist"><span class="lbl-b">Muammo bo'lsa:</span><span class="val-b val-b-logist">${contactPhonesHtml}</span></div>
               </div>
             </div>
           </div>
@@ -334,7 +345,7 @@ export class PrinterService {
     background:#f8f8f8;
   }
   .val-b-logist{font-size:8px}
-  .logist-phone{font-size:7.5px;color:#333;font-weight:bold;margin-left:3px}
+  .logist-phone{font-size:8px;color:#000;font-weight:bold;margin-left:4px}
 
   @media print{
     html,body{background:#fff!important;margin:0!important;padding:0!important}
@@ -420,11 +431,17 @@ ${pages.join('\n')}
       const whereDeliver = order.where_deliver === Where_deliver.ADDRESS ? 'UYGACHA' : 'MARKAZGA';
       const qrCode = order.qr_code_token ?? '';
 
-      // Logist ma'lumoti (region orqali)
+      // Logist ma'lumoti (region orqali) — auto-fetch saqlanadi, hozir chekda ishlatilmaydi
       const logistPdf = (order.customer?.district?.assignedToRegion as any)?.logist;
       const logistPhonePdf = logistPdf ? this.formatPhoneNumber(logistPdf.phone_number) : '';
       const logistNamePdf = logistPdf?.name ?? '';
-      const logistDisplay = logistNamePdf ? `${logistNamePdf}  ${logistPhonePdf}` : '-';
+
+      // Chekning pastki qatorida faqat market operator raqami (va ixtiyoriy 2-raqam) ko'rsatiladi
+      const secondaryOperatorPhonePdf = order.secondary_operator_phone
+        ? this.formatPhoneNumber(order.secondary_operator_phone)
+        : '';
+      const pdfPhoneList = [operatorPhone, secondaryOperatorPhonePdf].filter(Boolean);
+      const contactDisplay = pdfPhoneList.length === 0 ? '-' : pdfPhoneList.join('    ');
 
       const productStr = (order.items || [])
         .map((item) => `${item.product?.name ?? 'N/A'}-${item.quantity ?? 1}`)
@@ -457,14 +474,14 @@ ${pages.join('\n')}
         productStr || '-',
         address || '-',
         comment || '-',
-        logistDisplay,
+        contactDisplay,
       ];
 
       const zoneBRows = [
         { label: 'Mahsulot:', h: MAHSULOT_H },
         { label: "Mo'ljal:", h: MOLJAL_H },
         { label: 'Izoh:',    h: IZOH_H },
-        { label: 'Logist:',  h: LOGIST_H },
+        { label: "Muammo bo'lsa:", h: LOGIST_H },
       ];
 
       // ZONE A: Qolgan barcha joy (chap=logo+QR+sana | o'ng=jadval)

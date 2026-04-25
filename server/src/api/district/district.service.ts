@@ -532,9 +532,9 @@ export class DistrictService implements OnModuleInit {
         where: { district_id: id },
       });
 
-      // Raw SQL count
+      // Raw SQL count (soft-deleted'larni hisobga olmaymiz)
       const rawCount = await this.dataSource.query(
-        `SELECT COUNT(*) as count FROM "order" WHERE district_id = $1`,
+        `SELECT COUNT(*) as count FROM "order" WHERE district_id = $1 AND deleted_at IS NULL`,
         [id],
       );
 
@@ -544,9 +544,9 @@ export class DistrictService implements OnModuleInit {
         select: ['id', 'district_id', 'status', 'created_at'],
       });
 
-      // Address orqali qidirish
+      // Address orqali qidirish (soft-deleted'larni o'tkazib yuboramiz)
       const addressOrders = await this.dataSource.query(
-        `SELECT id, district_id, address, status FROM "order" WHERE address ILIKE $1 LIMIT 10`,
+        `SELECT id, district_id, address, status FROM "order" WHERE address ILIKE $1 AND deleted_at IS NULL LIMIT 10`,
         [`%${district.name}%`],
       );
 

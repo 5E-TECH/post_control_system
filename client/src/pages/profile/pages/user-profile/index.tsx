@@ -169,6 +169,7 @@ const UserProfile = () => {
         ? {
             default_tariff: user.default_tariff || "center",
             default_operator_phone: user.default_operator_phone || "",
+            secondary_operator_phone: user.secondary_operator_phone || "",
           }
         : {}),
       ...(currentUserRole === "superadmin" && (user.role === "admin" || user.role === "registrator")
@@ -244,6 +245,25 @@ const UserProfile = () => {
         delete payload.default_operator_phone;
       } else {
         payload.default_operator_phone = normalizedOp;
+      }
+    }
+
+    // secondary_operator_phone — ixtiyoriy; bo'sh bo'lsa null yuboramiz
+    if (payload.secondary_operator_phone !== undefined) {
+      const phoneRaw2 = String(payload.secondary_operator_phone || "").replace(/\D/g, "");
+      let normalizedOp2: string | null = null;
+      if (phoneRaw2) {
+        normalizedOp2 = phoneRaw2.startsWith("998")
+          ? `+${phoneRaw2}`
+          : phoneRaw2.length === 9
+            ? `+998${phoneRaw2}`
+            : `+${phoneRaw2}`;
+      }
+      const current2 = user.secondary_operator_phone || "";
+      if ((normalizedOp2 || "") === current2) {
+        delete payload.secondary_operator_phone;
+      } else {
+        payload.secondary_operator_phone = normalizedOp2;
       }
     }
 
@@ -697,6 +717,27 @@ const UserProfile = () => {
               </div>
             </div>
           )}
+
+          {/* Secondary Operator Phone - Only for Market (read-only, edit via modal) */}
+          {user?.role === "market" && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500/10 to-cyan-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Phone className="w-6 h-6 text-teal-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                      2-operator telefon raqam (ixtiyoriy)
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                      {user.secondary_operator_phone || "Kiritilmagan"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Salary Card - faqat salary mavjud bo'lganda ko'rsatish */}
@@ -927,6 +968,26 @@ const UserProfile = () => {
                   </span>
                 }
                 name="default_operator_phone"
+                className="mb-4"
+              >
+                <Input
+                  placeholder="+998 90 123 45 67"
+                  size="large"
+                  maxLength={20}
+                  className="rounded-lg"
+                />
+              </Form.Item>
+            )}
+
+            {user.role === "market" && (
+              <Form.Item
+                label={
+                  <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
+                    <Phone className="w-4 h-4" />
+                    2-operator telefon raqam (ixtiyoriy)
+                  </span>
+                }
+                name="secondary_operator_phone"
                 className="mb-4"
               >
                 <Input

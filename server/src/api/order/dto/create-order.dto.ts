@@ -93,6 +93,14 @@ export class CreateOrderDto {
   operator_phone?: string;
 
   @ApiPropertyOptional({
+    description: 'Secondary operator phone number (optional)',
+    example: '+998901234568',
+  })
+  @IsOptional()
+  @IsString()
+  secondary_operator_phone?: string;
+
+  @ApiPropertyOptional({
     description: 'District ID for delivery address',
     type: String,
     format: 'uuid',

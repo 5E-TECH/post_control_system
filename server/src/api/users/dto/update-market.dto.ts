@@ -38,6 +38,10 @@ export class UpdateMarketDto {
   default_operator_phone?: string;
 
   @IsOptional()
+  @IsString()
+  secondary_operator_phone?: string | null;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   tariff_home?: number;

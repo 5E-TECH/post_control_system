@@ -7,7 +7,6 @@ export enum Roles {
   CUSTOMER = 'customer',
   OPERATOR = 'operator',
   LOGIST = 'logist',
-  INVESTOR = 'investor',
 }
 
 export enum Status {
@@ -42,10 +41,6 @@ export enum Source_type {
   CANCEL = 'cancel',
   EXTRA_COST = 'extra_cost',
   BILLS = 'bills',
-  INVESTOR_EARNING = 'investor_earning',
-  INVESTOR_ALLOCATE = 'investor_allocate',
-  INVESTOR_PAYOUT = 'investor_payout',
-  INVESTOR_REFUND = 'investor_refund',
 }
 
 export enum Order_status {
@@ -66,7 +61,6 @@ export enum Cashbox_type {
   MAIN = 'main',
   FOR_COURIER = 'couriers',
   FOR_MARKET = 'markets',
-  FOR_INVESTOR = 'investors',
 }
 
 export enum Where_deliver {

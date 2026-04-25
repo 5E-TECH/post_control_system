@@ -37,16 +37,21 @@ const ProductInfo = () => {
   const marketData = useSelector(
     (state: RootState) => state.authSlice.marketData
   );
-  // Market yoki localStorage dan require_operator_phone ni olish
-  const requireOperatorPhone = market?.require_operator_phone || marketData?.require_operator_phone || false;
-  // Default operator telefon raqamini olish
-  const defaultOperatorPhone = market?.default_operator_phone || marketData?.default_operator_phone || "";
+  // Market sozlamasida majburiy qilib qo'yilgan, LEKIN default raqam YO'Q bo'lsa —
+  // formaga raqam kiritish shart (chekda hech bo'lmasa bitta raqam bo'lishi uchun).
+  const requireOperatorPhone =
+    market?.require_operator_phone || marketData?.require_operator_phone || false;
+  const marketDefaultOperatorPhone =
+    market?.default_operator_phone || marketData?.default_operator_phone || "";
+  const formPhoneRequired = requireOperatorPhone && !marketDefaultOperatorPhone;
+  // Asosiy operator raqami chekda market profilidan avtomatik ketadi.
+  // Formadagi `operator_phone` input — ixtiyoriy 2-raqam sifatida chop etiladi.
   const initialState: IProductInfo = {
     total_price: "",
     where_deliver: market?.default_tariff || default_tariff || "center",
     comment: "",
     operator: userRole === "operator" ? (OperatorName || "") : "",
-    operator_phone: requireOperatorPhone ? defaultOperatorPhone : "",
+    operator_phone: "",
   };
 
   const { t } = useTranslation("createOrder");
@@ -182,7 +187,7 @@ const ProductInfo = () => {
         </div>
 
         {/* Operator */}
-        <div className={`grid grid-cols-1 ${requireOperatorPhone ? 'sm:grid-cols-2' : ''} gap-4`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
               <User className="w-4 h-4 text-purple-500" />
@@ -196,22 +201,26 @@ const ProductInfo = () => {
               className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
             />
           </div>
-          {requireOperatorPhone && (
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                <Phone className="w-4 h-4 text-purple-500" />
-                Operator telefon raqami
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <Phone className="w-4 h-4 text-purple-500" />
+              Operator telefon raqami {formPhoneRequired ? (
                 <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="operator_phone"
-                value={formData.operator_phone || ""}
-                onChange={handleChange}
-                placeholder="+998 90 123 45 67"
-                className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-              />
-            </div>
-          )}
+              ) : (
+                <span className="text-gray-400">(ixtiyoriy)</span>
+              )}
+            </label>
+            <input
+              name="operator_phone"
+              value={formData.operator_phone || ""}
+              onChange={handleChange}
+              placeholder="+998 90 123 45 67"
+              className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Chekdagi 1-raqam — market default'idan avtomatik. Shu yerda yozsangiz — chekda 2-raqam sifatida chop etiladi.
+            </p>
+          </div>
         </div>
 
         {/* Comment */}

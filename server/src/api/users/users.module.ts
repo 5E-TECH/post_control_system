@@ -12,9 +12,6 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { CustomerMarketEntity } from 'src/core/entity/customer-market.entity';
 import { OperatorEarningEntity } from 'src/core/entity/operator-earning.entity';
 import { OperatorPaymentEntity } from 'src/core/entity/operator-payment.entity';
-import { InvestorDepositEntity } from 'src/core/entity/investor-deposit.entity';
-import { InvestorEarningEntity } from 'src/core/entity/investor-earning.entity';
-import { InvestorPayoutEntity } from 'src/core/entity/investor-payout.entity';
 
 @Module({
   imports: [
@@ -27,9 +24,6 @@ import { InvestorPayoutEntity } from 'src/core/entity/investor-payout.entity';
       CustomerMarketEntity,
       OperatorEarningEntity,
       OperatorPaymentEntity,
-      InvestorDepositEntity,
-      InvestorEarningEntity,
-      InvestorPayoutEntity,
     ]),
   ],
   controllers: [UsersController],
