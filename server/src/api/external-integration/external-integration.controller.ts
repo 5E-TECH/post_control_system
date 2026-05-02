@@ -40,14 +40,14 @@ export class ExternalIntegrationController {
 
   @Get(':id')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @ApiOperation({ summary: 'ID bo\'yicha integratsiyani olish' })
+  @ApiOperation({ summary: "ID bo'yicha integratsiyani olish" })
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }
 
   @Get('slug/:slug')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @ApiOperation({ summary: 'Slug bo\'yicha integratsiyani olish' })
+  @ApiOperation({ summary: "Slug bo'yicha integratsiyani olish" })
   findBySlug(@Param('slug') slug: string) {
     return this.service.findBySlug(slug);
   }
@@ -68,7 +68,7 @@ export class ExternalIntegrationController {
 
   @Delete(':id')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @ApiOperation({ summary: 'Integratsiyani o\'chirish' })
+  @ApiOperation({ summary: "Integratsiyani o'chirish" })
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
@@ -82,21 +82,28 @@ export class ExternalIntegrationController {
 
   @Post(':id/reset-synced')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @ApiOperation({ summary: 'Bitta integratsiya sinxronlangan buyurtmalar sonini 0 ga tushirish' })
+  @ApiOperation({
+    summary:
+      'Bitta integratsiya sinxronlangan buyurtmalar sonini 0 ga tushirish',
+  })
   resetSyncedOrders(@Param('id') id: string) {
     return this.service.resetSyncedOrders(id);
   }
 
   @Post('reset-all-synced')
   @AcceptRoles(Roles.SUPERADMIN)
-  @ApiOperation({ summary: 'Barcha integratsiyalarni 0 ga tushirish (faqat superadmin)' })
+  @ApiOperation({
+    summary: 'Barcha integratsiyalarni 0 ga tushirish (faqat superadmin)',
+  })
   resetAllSyncedOrders() {
     return this.service.resetAllSyncedOrders();
   }
 
   @Get('sync/history')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @ApiOperation({ summary: 'Barcha integratsiyalar sinxronlash tarixini olish' })
+  @ApiOperation({
+    summary: 'Barcha integratsiyalar sinxronlash tarixini olish',
+  })
   getSyncHistory(@Query('limit') limit?: number) {
     return this.service.getSyncHistory(undefined, limit || 30);
   }

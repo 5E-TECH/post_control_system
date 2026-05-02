@@ -1,5 +1,10 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Commission_type, Roles, Status, Where_deliver } from 'src/common/enums';
+import {
+  Commission_type,
+  Roles,
+  Status,
+  Where_deliver,
+} from 'src/common/enums';
 import {
   Column,
   Entity,

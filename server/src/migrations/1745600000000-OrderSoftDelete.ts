@@ -23,10 +23,10 @@ export class OrderSoftDelete1745600000000 implements MigrationInterface {
 
     // 2) Eski yumshoq-o'chirilgan rowlarni yangi ustun bilan sinxronlash
     //    (faqat agar eski `deleted` ustun mavjud bo'lsa)
-    const hasOld = await queryRunner.query(
+    const hasOld: Array<{ exists: number }> = await queryRunner.query(
       `SELECT 1 FROM information_schema.columns WHERE table_name = 'order' AND column_name = 'deleted'`,
     );
-    if (hasOld && hasOld.length > 0) {
+    if (Array.isArray(hasOld) && hasOld.length > 0) {
       await queryRunner.query(
         `UPDATE "order" SET "deleted_at" = NOW() WHERE "deleted" = true AND "deleted_at" IS NULL`,
       );
@@ -44,7 +44,9 @@ export class OrderSoftDelete1745600000000 implements MigrationInterface {
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_ORDER_DELETED_AT"`);
 
     // Yangi ustunni olib tashlash
-    await queryRunner.query(`ALTER TABLE "order" DROP COLUMN IF EXISTS "deleted_at"`);
+    await queryRunner.query(
+      `ALTER TABLE "order" DROP COLUMN IF EXISTS "deleted_at"`,
+    );
 
     // Eski `deleted` ustun migration ichida o'chirilmagan, shuning uchun qaytarish ham yo'q.
   }

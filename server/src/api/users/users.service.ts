@@ -99,7 +99,7 @@ export class UserService implements OnModuleInit {
   // Test for CI/CD
 
   async onModuleInit() {
-    console.log('🟢 [SALARY CRON] Oylik maosh cron job ro\'yxatga olindi');
+    console.log("🟢 [SALARY CRON] Oylik maosh cron job ro'yxatga olindi");
     try {
       const isSuperAdmin = await this.userRepo.findOne({
         where: { role: Roles.SUPERADMIN },
@@ -154,7 +154,13 @@ export class UserService implements OnModuleInit {
       });
       await queryRunner.manager.save(adminSalary);
       await queryRunner.commitTransaction();
-      this.activityLog.log({ entity_type: 'user', entity_id: admin.id, action: 'created', new_value: { name: admin.name, role: admin.role }, description: `Admin yaratildi: ${admin.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: admin.id,
+        action: 'created',
+        new_value: { name: admin.name, role: admin.role },
+        description: `Admin yaratildi: ${admin.name}`,
+      });
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -203,7 +209,13 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(userSalary);
 
       await queryRunner.commitTransaction();
-      this.activityLog.log({ entity_type: 'user', entity_id: user.id, action: 'created', new_value: { name: user.name, role: user.role }, description: `Registrator yaratildi: ${user.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: user.id,
+        action: 'created',
+        new_value: { name: user.name, role: user.role },
+        description: `Registrator yaratildi: ${user.name}`,
+      });
       return successRes(user, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -261,7 +273,13 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(cashbox);
 
       await queryRunner.commitTransaction();
-      this.activityLog.log({ entity_type: 'user', entity_id: courier.id, action: 'created', new_value: { name: courier.name, role: Roles.COURIER }, description: `Kuryer yaratildi: ${courier.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: courier.id,
+        action: 'created',
+        new_value: { name: courier.name, role: Roles.COURIER },
+        description: `Kuryer yaratildi: ${courier.name}`,
+      });
       return successRes(courier, 201, `New courier created`);
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -313,7 +331,13 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(cashbox);
 
       await queryRunner.commitTransaction();
-      this.activityLog.log({ entity_type: 'user', entity_id: newMarket.id, action: 'created', new_value: { name: newMarket.name, role: Roles.MARKET }, description: `Market yaratildi: ${newMarket.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: newMarket.id,
+        action: 'created',
+        new_value: { name: newMarket.name, role: Roles.MARKET },
+        description: `Market yaratildi: ${newMarket.name}`,
+      });
       return successRes(newMarket, 201, 'New market created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -326,7 +350,7 @@ export class UserService implements OnModuleInit {
   async createCustomer(
     user: JwtPayload,
     createCustomerDto: CreateCustomerDto,
-  ): Promise<Object> {
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -547,8 +571,18 @@ export class UserService implements OnModuleInit {
           'user.default_tariff',
           'user.created_at',
           'user.add_order',
+          'user.require_operator_phone',
+          'user.default_operator_phone',
+          'user.secondary_operator_phone',
           'cashbox', // cashboxni to'liq olish uchun
         ]);
+
+      // Bloklanganlar (status = inactive) hech kimga ko'rinmaydi —
+      // superadmin ham bu ro'yxatdan ko'rmaydi (boshqarish uchun userlar
+      // sahifasidan kirish kerak)
+      query.andWhere('user.status = :activeStatus', {
+        activeStatus: Status.ACTIVE,
+      });
 
       if (search) {
         query.andWhere(
@@ -702,13 +736,17 @@ export class UserService implements OnModuleInit {
 
   async allCouriers(search: string | undefined): Promise<object> {
     try {
+      // Bloklanganlar (status = inactive) hech kimga ko'rinmaydi —
+      // superadmin ham bu ro'yxatdan ko'rmaydi
+      const baseFilter = { role: Roles.COURIER, status: Status.ACTIVE };
+
       const allCouriers = await this.userRepo.find({
         where: search
           ? [
-              { role: Roles.COURIER, name: ILike(`%${search}%`) },
-              { role: Roles.COURIER, phone_number: ILike(`%${search}%`) },
+              { ...baseFilter, name: ILike(`%${search}%`) },
+              { ...baseFilter, phone_number: ILike(`%${search}%`) },
             ]
-          : { role: Roles.COURIER },
+          : baseFilter,
         select: ['id', 'name', 'phone_number', 'status', 'created_at'],
         relations: ['cashbox', 'region'],
         order: { created_at: 'DESC' },
@@ -781,12 +819,12 @@ export class UserService implements OnModuleInit {
       if (otherFields.role) {
         if (currentUser.role !== Roles.SUPERADMIN) {
           throw new BadRequestException(
-            'Faqat SuperAdmin foydalanuvchi rolini o\'zgartira oladi',
+            "Faqat SuperAdmin foydalanuvchi rolini o'zgartira oladi",
           );
         }
         if (![Roles.ADMIN, Roles.REGISTRATOR].includes(otherFields.role)) {
           throw new BadRequestException(
-            'Faqat admin yoki registrator roliga o\'zgartirilishi mumkin',
+            "Faqat admin yoki registrator roliga o'zgartirilishi mumkin",
           );
         }
       }
@@ -812,7 +850,12 @@ export class UserService implements OnModuleInit {
       }
 
       // salary va payment_day ni alohida olamiz
-      const { salary: newSalary, payment_day: newPaymentDay, have_to_pay: newHaveToPay, ...fieldsToUpdate } = otherFields;
+      const {
+        salary: newSalary,
+        payment_day: newPaymentDay,
+        have_to_pay: newHaveToPay,
+        ...fieldsToUpdate
+      } = otherFields;
 
       Object.assign(user, {
         ...fieldsToUpdate,
@@ -821,7 +864,11 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(user);
 
       // Salary yangilash (faqat superadmin)
-      if (newSalary !== undefined || newPaymentDay !== undefined || newHaveToPay !== undefined) {
+      if (
+        newSalary !== undefined ||
+        newPaymentDay !== undefined ||
+        newHaveToPay !== undefined
+      ) {
         const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
         let salary = await salaryRepo.findOne({ where: { user_id: id } });
         if (salary) {
@@ -847,7 +894,13 @@ export class UserService implements OnModuleInit {
       });
 
       const { password: _, ...safeUser } = updatedUser;
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'updated', new_value: { name: updatedUser.name, role: updatedUser.role }, description: `Admin yangilandi: ${updatedUser.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'updated',
+        new_value: { name: updatedUser.name, role: updatedUser.role },
+        description: `Admin yangilandi: ${updatedUser.name}`,
+      });
       return successRes(safeUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
@@ -871,12 +924,12 @@ export class UserService implements OnModuleInit {
       if (otherFields.role) {
         if (!currentUser || currentUser.role !== Roles.SUPERADMIN) {
           throw new BadRequestException(
-            'Faqat SuperAdmin foydalanuvchi rolini o\'zgartira oladi',
+            "Faqat SuperAdmin foydalanuvchi rolini o'zgartira oladi",
           );
         }
         if (![Roles.ADMIN, Roles.REGISTRATOR].includes(otherFields.role)) {
           throw new BadRequestException(
-            'Faqat admin yoki registrator roliga o\'zgartirilishi mumkin',
+            "Faqat admin yoki registrator roliga o'zgartirilishi mumkin",
           );
         }
       }
@@ -899,7 +952,12 @@ export class UserService implements OnModuleInit {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
       // salary va payment_day ni alohida olamiz
-      const { salary: newSalary, payment_day: newPaymentDay, have_to_pay: newHaveToPay, ...fieldsToUpdate } = otherFields;
+      const {
+        salary: newSalary,
+        payment_day: newPaymentDay,
+        have_to_pay: newHaveToPay,
+        ...fieldsToUpdate
+      } = otherFields;
 
       Object.assign(registrator, {
         ...fieldsToUpdate,
@@ -908,7 +966,11 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(registrator);
 
       // Salary yangilash
-      if (newSalary !== undefined || newPaymentDay !== undefined || newHaveToPay !== undefined) {
+      if (
+        newSalary !== undefined ||
+        newPaymentDay !== undefined ||
+        newHaveToPay !== undefined
+      ) {
         const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
         let salary = await salaryRepo.findOne({ where: { user_id: id } });
         if (salary) {
@@ -950,7 +1012,11 @@ export class UserService implements OnModuleInit {
       // Update qilganda telefon nomer databasada bor yoki yo'qligini tekshirish
       if (otherFields.phone_number) {
         const existUser = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
         });
         if (existUser) {
           throw new ConflictException(
@@ -982,7 +1048,12 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(courier);
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'updated', description: `Kuryer yangilandi: ${updatedUser?.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'updated',
+        description: `Kuryer yangilandi: ${updatedUser?.name}`,
+      });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
@@ -995,14 +1066,20 @@ export class UserService implements OnModuleInit {
   ): Promise<object> {
     try {
       const { password, ...otherFields } = updateMarketDto;
-      const market = await this.userRepo.findOne({ where: { id } });
+      const market = await this.userRepo.findOne({
+        where: { id, role: Roles.MARKET },
+      });
       if (!market) {
-        throw new NotFoundException('Market nottt found');
+        throw new NotFoundException('Market not found');
       }
 
       if (otherFields.phone_number) {
         const isExistPhoneNumber = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
         });
         if (isExistPhoneNumber) {
           throw new ConflictException(
@@ -1023,7 +1100,12 @@ export class UserService implements OnModuleInit {
 
       const updatedMarket = await this.userRepo.save(market);
 
-      this.activityLog.log({ entity_type: 'user', entity_id: market.id, action: 'updated', description: `Market yangilandi: ${updatedMarket.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: market.id,
+        action: 'updated',
+        description: `Market yangilandi: ${updatedMarket.name}`,
+      });
       return successRes(updatedMarket, 200, 'Market updated');
     } catch (error) {
       return catchError(error);
@@ -1033,7 +1115,7 @@ export class UserService implements OnModuleInit {
   async updateCustomerNamePhone(
     id: string,
     dto: UpdateCustomerDto,
-  ): Promise<Object> {
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1063,7 +1145,7 @@ export class UserService implements OnModuleInit {
   async updateCustomerAddress(
     id: string,
     dto: UpdateCustomerDto,
-  ): Promise<Object> {
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1200,7 +1282,10 @@ export class UserService implements OnModuleInit {
       if (!myProfile) throw new NotFoundException('Your infos not found');
       if (otherFields.phone_number) {
         const phoneNumber = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            id: Not(user.id),
+          },
         });
         if (phoneNumber) {
           throw new ConflictException(
@@ -1242,7 +1327,13 @@ export class UserService implements OnModuleInit {
         throw new BadRequestException('Super admin can not be deleted!');
       }
       await this.userRepo.delete({ id });
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: user.name, role: user.role }, description: `Foydalanuvchi o'chirildi: ${user.name} (${user.role})` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { name: user.name, role: user.role },
+        description: `Foydalanuvchi o'chirildi: ${user.name} (${user.role})`,
+      });
       return successRes({}, 200, 'User deleted');
     } catch (error) {
       return catchError(error);
@@ -1286,7 +1377,8 @@ export class UserService implements OnModuleInit {
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
-      const refreshTokenExpiresAt = Date.now() + parseDurationToMs(config.REFRESH_TOKEN_TIME);
+      const refreshTokenExpiresAt =
+        Date.now() + parseDurationToMs(config.REFRESH_TOKEN_TIME);
 
       this.activityLog.log({
         entity_type: 'user',
@@ -1298,7 +1390,10 @@ export class UserService implements OnModuleInit {
       });
 
       return successRes(
-        { access_token: accessToken, refresh_token_expires_at: refreshTokenExpiresAt },
+        {
+          access_token: accessToken,
+          refresh_token_expires_at: refreshTokenExpiresAt,
+        },
         200,
         'Logged in successfully',
       );
@@ -1309,7 +1404,6 @@ export class UserService implements OnModuleInit {
 
   async loginTelegram(initData: TelegramInitData, req?: Request) {
     try {
-
       const { data } = initData;
       const params = new URLSearchParams(data);
       const userStr = params.get('user');
@@ -1362,7 +1456,11 @@ export class UserService implements OnModuleInit {
         const decoded = this.jwtService.verify(token, {
           secret: config.REFRESH_TOKEN_KEY,
         });
-        payload = { id: decoded.id, role: decoded.role, status: decoded.status };
+        payload = {
+          id: decoded.id,
+          role: decoded.role,
+          status: decoded.status,
+        };
       } catch {
         res.clearCookie('refreshToken');
         throw new UnauthorizedException('Refresh token expired or invalid');
@@ -1374,7 +1472,11 @@ export class UserService implements OnModuleInit {
         throw new UnauthorizedException('User not found or inactive');
       }
 
-      const newPayload: JwtPayload = { id: user.id, role: user.role, status: user.status };
+      const newPayload: JwtPayload = {
+        id: user.id,
+        role: user.role,
+        status: user.status,
+      };
       const accessToken = await this.token.generateAccessToken(newPayload);
 
       return successRes(
@@ -1506,7 +1608,9 @@ export class UserService implements OnModuleInit {
 
       // Get statistics for ALL orders (not limited)
       const statsQb = baseQb.clone();
-      const allOrders = await statsQb.select(['order.status', 'order.total_price']).getMany();
+      const allOrders = await statsQb
+        .select(['order.status', 'order.total_price'])
+        .getMany();
 
       const stats = {
         total: allOrders.length,
@@ -1517,10 +1621,16 @@ export class UserService implements OnModuleInit {
       };
 
       for (const order of allOrders) {
-        if (order.status === Order_status.SOLD || order.status === Order_status.PAID) {
+        if (
+          order.status === Order_status.SOLD ||
+          order.status === Order_status.PAID
+        ) {
           stats.delivered++;
           stats.total_spent += Number(order.total_price) || 0;
-        } else if (order.status === Order_status.CANCELLED || order.status === Order_status.CANCELLED_SENT) {
+        } else if (
+          order.status === Order_status.CANCELLED ||
+          order.status === Order_status.CANCELLED_SENT
+        ) {
           stats.cancelled++;
         } else {
           stats.pending++;
@@ -1708,14 +1818,20 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(logist);
 
       // Salary yangilash
-      if (dto.salary !== undefined || dto.payment_day !== undefined || dto.have_to_pay !== undefined) {
+      if (
+        dto.salary !== undefined ||
+        dto.payment_day !== undefined ||
+        dto.have_to_pay !== undefined
+      ) {
         const salary = await this.dataSource
           .getRepository(UserSalaryEntity)
           .findOne({ where: { user_id: id } });
         if (salary) {
           if (dto.salary !== undefined) salary.salary_amount = dto.salary;
-          if (dto.payment_day !== undefined) salary.payment_day = dto.payment_day;
-          if (dto.have_to_pay !== undefined) salary.have_to_pay = dto.have_to_pay;
+          if (dto.payment_day !== undefined)
+            salary.payment_day = dto.payment_day;
+          if (dto.have_to_pay !== undefined)
+            salary.have_to_pay = dto.have_to_pay;
           await this.dataSource.getRepository(UserSalaryEntity).save(salary);
         }
       }
@@ -1743,8 +1859,14 @@ export class UserService implements OnModuleInit {
       logist.is_deleted = true;
       await this.userRepo.save(logist);
 
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: logist.name, role: Roles.LOGIST }, description: `Logist o'chirildi: ${logist.name}` });
-      return successRes({}, 200, 'Logist o\'chirildi');
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { name: logist.name, role: Roles.LOGIST },
+        description: `Logist o'chirildi: ${logist.name}`,
+      });
+      return successRes({}, 200, "Logist o'chirildi");
     } catch (error) {
       return catchError(error);
     }
@@ -1752,7 +1874,10 @@ export class UserService implements OnModuleInit {
 
   // ==================== OPERATOR CRUD ====================
 
-  async createOperator(dto: CreateOperatorDto, market: JwtPayload): Promise<object> {
+  async createOperator(
+    dto: CreateOperatorDto,
+    market: JwtPayload,
+  ): Promise<object> {
     try {
       const { password, phone_number, name } = dto;
 
@@ -1775,7 +1900,14 @@ export class UserService implements OnModuleInit {
       });
       await this.userRepo.save(operator);
 
-      this.activityLog.log({ entity_type: 'user', entity_id: operator.id, action: 'created', new_value: { name: operator.name, role: Roles.OPERATOR }, description: `Operator yaratildi: ${operator.name}`, user: market });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: operator.id,
+        action: 'created',
+        new_value: { name: operator.name, role: Roles.OPERATOR },
+        description: `Operator yaratildi: ${operator.name}`,
+        user: market,
+      });
       return successRes(operator, 201, 'Yangi operator yaratildi');
     } catch (error) {
       return catchError(error);
@@ -1785,7 +1917,11 @@ export class UserService implements OnModuleInit {
   async getMyOperators(market: JwtPayload): Promise<object> {
     try {
       const operators = await this.userRepo.find({
-        where: { market_id: market.id, role: Roles.OPERATOR, is_deleted: false },
+        where: {
+          market_id: market.id,
+          role: Roles.OPERATOR,
+          is_deleted: false,
+        },
         order: { created_at: 'DESC' },
         select: ['id', 'name', 'phone_number', 'status', 'created_at'],
       });
@@ -1798,15 +1934,29 @@ export class UserService implements OnModuleInit {
   async deleteOperator(id: string, market: JwtPayload): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
       operator.is_deleted = true;
       await this.userRepo.save(operator);
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: operator.name, role: Roles.OPERATOR }, description: `Operator o'chirildi: ${operator.name}`, user: market });
-      return successRes({}, 200, 'Operator o\'chirildi');
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { name: operator.name, role: Roles.OPERATOR },
+        description: `Operator o'chirildi: ${operator.name}`,
+        user: market,
+      });
+      return successRes({}, 200, "Operator o'chirildi");
     } catch (error) {
       return catchError(error);
     }
@@ -1815,10 +1965,17 @@ export class UserService implements OnModuleInit {
   async getOperatorStats(id: string, market: JwtPayload): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
 
       const orderRepo = this.dataSource.getRepository(OrderEntity);
@@ -1840,7 +1997,9 @@ export class UserService implements OnModuleInit {
       const success_rate = total > 0 ? Math.round((sold / total) * 100) : 0;
 
       const total_revenue = orders
-        .filter((o) => ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status))
+        .filter((o) =>
+          ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status),
+        )
         .reduce((sum, o) => sum + Number(o.total_price || 0), 0);
 
       return successRes(
@@ -1879,28 +2038,44 @@ export class UserService implements OnModuleInit {
   ): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
 
-      if (dto.commission_type !== undefined) operator.commission_type = dto.commission_type;
-      if (dto.commission_value !== undefined) operator.commission_value = dto.commission_value;
-      if (dto.show_earnings !== undefined) operator.show_earnings = dto.show_earnings;
+      if (dto.commission_type !== undefined)
+        operator.commission_type = dto.commission_type;
+      if (dto.commission_value !== undefined)
+        operator.commission_value = dto.commission_value;
+      if (dto.show_earnings !== undefined)
+        operator.show_earnings = dto.show_earnings;
 
       // Komissiya qiymatini turi bo'yicha tekshirish (har order'ga noto'g'ri hisob ketmasligi uchun).
       // PERCENT bo'lsa 0-100 oraliqda; FIXED bo'lsa keskin yuqori chegara qo'yamiz (1 mln so'm),
       // chunki real holatda fixed komissiya bunchalik katta bo'lmaydi.
       if (operator.commission_type && operator.commission_value != null) {
         if (operator.commission_type === Commission_type.PERCENT) {
-          if (operator.commission_value < 0 || operator.commission_value > 100) {
+          if (
+            operator.commission_value < 0 ||
+            operator.commission_value > 100
+          ) {
             throw new BadRequestException(
               "Komissiya foizi 0 dan 100 gacha bo'lishi kerak",
             );
           }
         } else if (operator.commission_type === Commission_type.FIXED) {
-          if (operator.commission_value < 0 || operator.commission_value > 1_000_000) {
+          if (
+            operator.commission_value < 0 ||
+            operator.commission_value > 1_000_000
+          ) {
             throw new BadRequestException(
               "Belgilangan komissiya 0 dan 1 000 000 so'mgacha bo'lishi kerak",
             );
@@ -1927,11 +2102,26 @@ export class UserService implements OnModuleInit {
   async getOperatorBalance(id: string, market: JwtPayload): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
-        select: ['id', 'name', 'phone_number', 'status', 'commission_type', 'commission_value', 'show_earnings'],
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
+        select: [
+          'id',
+          'name',
+          'phone_number',
+          'status',
+          'commission_type',
+          'commission_value',
+          'show_earnings',
+        ],
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
 
       const earningRepo = this.dataSource.getRepository(OperatorEarningEntity);
@@ -1974,10 +2164,17 @@ export class UserService implements OnModuleInit {
   ): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
 
       const paymentRepo = this.dataSource.getRepository(OperatorPaymentEntity);
@@ -1996,17 +2193,27 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async getMyEarnings(operator: JwtPayload, fromDate?: string, toDate?: string): Promise<object> {
+  async getMyEarnings(
+    operator: JwtPayload,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<object> {
     try {
       const operatorUser = await this.userRepo.findOne({
         where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
-        select: ['id', 'name', 'commission_type', 'commission_value', 'show_earnings'],
+        select: [
+          'id',
+          'name',
+          'commission_type',
+          'commission_value',
+          'show_earnings',
+        ],
       });
       if (!operatorUser) {
         throw new NotFoundException('Operator topilmadi');
       }
       if (!operatorUser.show_earnings) {
-        return successRes({ visible: false }, 200, 'Daromad ko\'rinmaydi');
+        return successRes({ visible: false }, 200, "Daromad ko'rinmaydi");
       }
 
       const earningRepo = this.dataSource.getRepository(OperatorEarningEntity);
@@ -2023,19 +2230,25 @@ export class UserService implements OnModuleInit {
       }
 
       // Earnings query builder
-      const earningsQb = earningRepo.createQueryBuilder('e')
+      const earningsQb = earningRepo
+        .createQueryBuilder('e')
         .where('e.operator_id = :opId', { opId: operator.id })
         .orderBy('e.created_at', 'DESC');
-      if (dateFromMs) earningsQb.andWhere('e.created_at >= :from', { from: dateFromMs });
-      if (dateToMs) earningsQb.andWhere('e.created_at <= :to', { to: dateToMs });
+      if (dateFromMs)
+        earningsQb.andWhere('e.created_at >= :from', { from: dateFromMs });
+      if (dateToMs)
+        earningsQb.andWhere('e.created_at <= :to', { to: dateToMs });
       const earnings = await earningsQb.getMany();
 
       // Payments query builder
-      const paymentsQb = paymentRepo.createQueryBuilder('p')
+      const paymentsQb = paymentRepo
+        .createQueryBuilder('p')
         .where('p.operator_id = :opId', { opId: operator.id })
         .orderBy('p.created_at', 'DESC');
-      if (dateFromMs) paymentsQb.andWhere('p.created_at >= :from', { from: dateFromMs });
-      if (dateToMs) paymentsQb.andWhere('p.created_at <= :to', { to: dateToMs });
+      if (dateFromMs)
+        paymentsQb.andWhere('p.created_at >= :from', { from: dateFromMs });
+      if (dateToMs)
+        paymentsQb.andWhere('p.created_at <= :to', { to: dateToMs });
       const payments = await paymentsQb.getMany();
 
       // Har bir earning uchun order ma'lumotlarini olish
@@ -2044,7 +2257,15 @@ export class UserService implements OnModuleInit {
         earnings.map(async (earning) => {
           const order = await orderRepo.findOne({
             where: { id: earning.order_id },
-            select: ['id', 'total_price', 'status', 'created_at', 'sold_at', 'product_quantity', 'comment'],
+            select: [
+              'id',
+              'total_price',
+              'status',
+              'created_at',
+              'sold_at',
+              'product_quantity',
+              'comment',
+            ],
             relations: ['customer', 'items', 'items.product'],
           });
           return {
@@ -2058,10 +2279,11 @@ export class UserService implements OnModuleInit {
                   sold_at: order.sold_at,
                   product_quantity: order.product_quantity,
                   customer_name: order.customer?.name || '-',
-                  items: order.items?.map((item) => ({
-                    name: item.product?.name || '-',
-                    quantity: item.quantity,
-                  })) || [],
+                  items:
+                    order.items?.map((item) => ({
+                      name: item.product?.name || '-',
+                      quantity: item.quantity,
+                    })) || [],
                   is_cancelled: [
                     Order_status.CANCELLED,
                     Order_status.CANCELLED_SENT,
@@ -2076,8 +2298,12 @@ export class UserService implements OnModuleInit {
       const total_paid = payments.reduce((s, p) => s + Number(p.amount), 0);
 
       // Umumiy balans — barcha vaqt uchun (filter ta'sir qilmaydi)
-      const allEarnings = await earningRepo.find({ where: { operator_id: operator.id } });
-      const allPayments = await paymentRepo.find({ where: { operator_id: operator.id } });
+      const allEarnings = await earningRepo.find({
+        where: { operator_id: operator.id },
+      });
+      const allPayments = await paymentRepo.find({
+        where: { operator_id: operator.id },
+      });
       const allEarned = allEarnings.reduce((s, e) => s + Number(e.amount), 0);
       const allPaid = allPayments.reduce((s, p) => s + Number(p.amount), 0);
       const balance = allEarned - allPaid;
@@ -2114,7 +2340,13 @@ export class UserService implements OnModuleInit {
     try {
       const operatorUser = await this.userRepo.findOne({
         where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
-        select: ['id', 'name', 'show_earnings', 'commission_type', 'commission_value'],
+        select: [
+          'id',
+          'name',
+          'show_earnings',
+          'commission_type',
+          'commission_value',
+        ],
       });
       if (!operatorUser) {
         throw new NotFoundException('Operator topilmadi');
@@ -2136,7 +2368,13 @@ export class UserService implements OnModuleInit {
 
       const [orders, total] = await orderRepo.findAndCount({
         where,
-        relations: ['customer', 'items', 'items.product', 'district', 'district.region'],
+        relations: [
+          'customer',
+          'items',
+          'items.product',
+          'district',
+          'district.region',
+        ],
         order: { created_at: 'DESC' },
         skip,
         take: safeLimit,
@@ -2186,10 +2424,11 @@ export class UserService implements OnModuleInit {
                   region: order.district.region?.name || null,
                 }
               : null,
-            items: order.items?.map((item) => ({
-              name: item.product?.name || '-',
-              quantity: item.quantity,
-            })) || [],
+            items:
+              order.items?.map((item) => ({
+                name: item.product?.name || '-',
+                quantity: item.quantity,
+              })) || [],
             earning: earning
               ? {
                   amount: earning.amount,
@@ -2208,13 +2447,24 @@ export class UserService implements OnModuleInit {
         select: ['id', 'status'],
       });
 
-      const soldStatuses = [Order_status.SOLD, Order_status.PAID, Order_status.PARTLY_PAID, Order_status.CLOSED];
-      const cancelStatuses = [Order_status.CANCELLED, Order_status.CANCELLED_SENT];
+      const soldStatuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+        Order_status.CLOSED,
+      ];
+      const cancelStatuses = [
+        Order_status.CANCELLED,
+        Order_status.CANCELLED_SENT,
+      ];
 
       const stats = {
         total: allOperatorOrders.length,
-        sold: allOperatorOrders.filter((o) => soldStatuses.includes(o.status)).length,
-        cancelled: allOperatorOrders.filter((o) => cancelStatuses.includes(o.status)).length,
+        sold: allOperatorOrders.filter((o) => soldStatuses.includes(o.status))
+          .length,
+        cancelled: allOperatorOrders.filter((o) =>
+          cancelStatuses.includes(o.status),
+        ).length,
         pending: 0,
       };
       stats.pending = stats.total - stats.sold - stats.cancelled;
@@ -2266,7 +2516,11 @@ export class UserService implements OnModuleInit {
     const todayStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
 
     // 1 oy oldingi sana (milliseconds) — faqat 1 oy to'lgan xodimlar uchun oylik hisoblanadi
-    const oneMonthAgo = new Date(currentYear, currentMonth - 1, currentDay).getTime();
+    const oneMonthAgo = new Date(
+      currentYear,
+      currentMonth - 1,
+      currentDay,
+    ).getTime();
 
     try {
       const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
@@ -2297,7 +2551,9 @@ export class UserService implements OnModuleInit {
       const salaries = await qb.getMany();
 
       if (salaries.length === 0) {
-        this.logger.log(`[SALARY CRON] Bugun (${currentDay}-kun) uchun oylik to'lanadigan ishchi yo'q`);
+        this.logger.log(
+          `[SALARY CRON] Bugun (${currentDay}-kun) uchun oylik to'lanadigan ishchi yo'q`,
+        );
         return;
       }
 

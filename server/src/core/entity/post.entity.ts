@@ -1,6 +1,13 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Post_status } from 'src/common/enums';
-import { Column, Entity, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+  Index,
+} from 'typeorm';
 import { UserEntity } from './users.entity';
 import { RegionEntity } from './region.entity';
 import { OrderEntity } from './order.entity';

@@ -16,8 +16,6 @@ import {
   Clock,
   Play,
   Square,
-  Landmark,
-  PiggyBank,
   Magnet,
   ChevronLeft,
 } from "lucide-react";

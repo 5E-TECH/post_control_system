@@ -38,7 +38,10 @@ export class UpdateLogistDto {
   @Max(30)
   payment_day: number;
 
-  @ApiPropertyOptional({ example: -2000000, description: 'Boshlang\'ich oylik qoldiq (manfiy = qarz)' })
+  @ApiPropertyOptional({
+    example: -2000000,
+    description: "Boshlang'ich oylik qoldiq (manfiy = qarz)",
+  })
   @IsOptional()
   @IsNumber()
   have_to_pay: number;

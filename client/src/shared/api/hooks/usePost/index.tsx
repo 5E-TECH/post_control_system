@@ -138,6 +138,25 @@ export const usePost = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
   });
 
+  // Kuryer post ichidagi bitta buyurtmani QR token orqali skaner bilan qabul qiladi
+  const receiveOrderByToken = useMutation({
+    mutationFn: (token: string) =>
+      api
+        .patch(`post/receive/order/scan/token/${token}`)
+        .then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+  });
+
+  // Kuryer pochta qabul qilingach, biror buyurtma kelmagan deb qaytarish
+  // so'rovini yuboradi
+  const requestOrderReturnByCourier = useMutation({
+    mutationFn: (orderId: string) =>
+      api
+        .patch(`post/order/${orderId}/request-return`)
+        .then((res) => res.data),
+    onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+  });
+
   return {
     createPost,
     createPrint,
@@ -159,5 +178,7 @@ export const usePost = () => {
     approveReturnRequests,
     rejectReturnRequests,
     reassignPost,
+    receiveOrderByToken,
+    requestOrderReturnByCourier,
   };
 };

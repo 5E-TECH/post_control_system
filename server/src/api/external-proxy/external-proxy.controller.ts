@@ -1,5 +1,10 @@
 import { Controller, Post, Body, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiProperty } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiProperty,
+} from '@nestjs/swagger';
 import { IsNotEmpty, IsString } from 'class-validator';
 import { ExternalProxyService } from './external-proxy.service';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
@@ -33,7 +38,9 @@ export class ExternalProxyController {
   // Dinamik route - har qanday integratsiya uchun QR qidirish
   @Post(':slug/qrorder/find')
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
-  @ApiOperation({ summary: 'Dinamik integratsiya orqali QR kod bilan buyurtma qidirish' })
+  @ApiOperation({
+    summary: 'Dinamik integratsiya orqali QR kod bilan buyurtma qidirish',
+  })
   async findByQr(@Param('slug') slug: string, @Body() dto: QrSearchDto) {
     return this.externalProxyService.findByQr(slug, dto.qr_code);
   }

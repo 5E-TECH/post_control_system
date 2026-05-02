@@ -6,7 +6,7 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { Where_deliver } from 'src/common/enums';
 import * as QRCode from 'qrcode';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+
 const PDFDocument = require('pdfkit');
 
 @Injectable()
@@ -76,23 +76,31 @@ export class PrinterService {
 
       for (const order of orders) {
         const customerName = order.customer?.name ?? 'N/A';
-        const customerPhone = this.formatPhoneNumber(order.customer?.phone_number ?? '');
+        const customerPhone = this.formatPhoneNumber(
+          order.customer?.phone_number ?? '',
+        );
         const extraNumber = order.customer?.extra_number
           ? this.formatPhoneNumber(order.customer.extra_number)
           : '';
         const orderPrice = this.formatCurrency(order.total_price);
-        const region = this.formatRegionName(order.customer?.district?.assignedToRegion?.name);
+        const region = this.formatRegionName(
+          order.customer?.district?.assignedToRegion?.name,
+        );
         const district = order.customer?.district?.name ?? 'N/A';
         const address = order.customer?.address ?? '-';
         const comment = order.comment ?? '-';
         const market = order.market?.name ?? 'N/A';
         const operator = order.operator ?? '-';
-        const operatorPhone = order.operator_phone ? this.formatPhoneNumber(order.operator_phone) : '';
+        const operatorPhone = order.operator_phone
+          ? this.formatPhoneNumber(order.operator_phone)
+          : '';
         const secondaryOperatorPhone = order.secondary_operator_phone
           ? this.formatPhoneNumber(order.secondary_operator_phone)
           : '';
         // "Muammo bo'lsa:" qatori — qaysi raqamlar mavjud bo'lsa shular chiqariladi
-        const phoneListHtml = [operatorPhone, secondaryOperatorPhone].filter(Boolean);
+        const phoneListHtml = [operatorPhone, secondaryOperatorPhone].filter(
+          Boolean,
+        );
         const contactPhonesHtml =
           phoneListHtml.length === 0
             ? '-'
@@ -100,12 +108,18 @@ export class PrinterService {
               ? `<b>${phoneListHtml[0]}</b>`
               : `<b>${phoneListHtml[0]}</b> <b class="logist-phone">${phoneListHtml[1]}</b>`;
         const createdTime = this.formatDateStr(order.created_at);
-        const whereDeliver = order.where_deliver === Where_deliver.ADDRESS ? 'UYGACHA' : 'MARKAZGA';
+        const whereDeliver =
+          order.where_deliver === Where_deliver.ADDRESS
+            ? 'UYGACHA'
+            : 'MARKAZGA';
         const qrCode = order.qr_code_token ?? '';
 
         // Logist ma'lumoti (region orqali)
-        const logist = (order.customer?.district?.assignedToRegion as any)?.logist;
-        const logistPhone = logist ? this.formatPhoneNumber(logist.phone_number) : '';
+        const logist = (order.customer?.district?.assignedToRegion as any)
+          ?.logist;
+        const logistPhone = logist
+          ? this.formatPhoneNumber(logist.phone_number)
+          : '';
         const logistName = logist?.name ?? '';
 
         const productStr = (order.items || [])
@@ -115,7 +129,10 @@ export class PrinterService {
         let qrDataUrl = '';
         if (qrCode) {
           try {
-            qrDataUrl = await QRCode.toDataURL(qrCode, { width: 140, margin: 0 });
+            qrDataUrl = await QRCode.toDataURL(qrCode, {
+              width: 140,
+              margin: 0,
+            });
           } catch {}
         }
 
@@ -145,14 +162,14 @@ export class PrinterService {
                   <div class="a-row a-row-phone"><span class="lbl">Telefon:</span><span class="val val-phone">${phoneDisplay}</span></div>
                   <div class="a-row a-row-manzil"><span class="lbl">Manzil:</span><span class="val val-manzil">${region} ${district}</span></div>
                   <div class="a-row"><span class="lbl">Jami:</span><span class="val val-price"><b>${orderPrice}</b> <span class="deliver-badge">${whereDeliver}</span></span></div>
-                  <div class="a-row a-row-last"><span class="lbl">Jo'natuvchi:</span><span class="val val-sender"><b>${market}</b> <span style="font-size:7px;color:#555">/ ${operator}${operatorPhone ? ` (${operatorPhone})` : ''}</span></span></div>
+                  <div class="a-row a-row-last"><span class="lbl">Jo'natuvchi:</span><span class="val val-sender"><b>${market}</b> <span style="font-size:7px;color:#555">/ ${operator}</span></span></div>
                 </div>
               </div>
               <div class="zone-b">
                 <div class="b-row b-row-compact"><span class="lbl-b">Mahsulot:</span><span class="val-b">${productStr || '-'}</span></div>
                 <div class="b-row b-row-compact"><span class="lbl-b">Mo'ljal:</span><span class="val-b">${address || '-'}</span></div>
                 <div class="b-row b-row-compact b-row-izoh"><span class="lbl-b">Izoh:</span><span class="val-b">${comment || '-'}</span></div>
-                <div class="b-row b-row-last b-row-logist"><span class="lbl-b">Muammo bo'lsa:</span><span class="val-b val-b-logist">${contactPhonesHtml}</span></div>
+                <div class="b-row b-row-last b-row-logist"><table class="logist-tbl"><tr><td class="logist-td-lbl">Muammo bo'lsa:</td><td class="logist-td-val">${contactPhonesHtml}</td></tr></table></div>
               </div>
             </div>
           </div>
@@ -173,7 +190,8 @@ export class PrinterService {
         for (let r = 0; r < ROWS_PER_PAGE; r++) {
           const idx = r * COLS;
           const left = pageReceipts[idx] || '<div class="cell empty"></div>';
-          const right = pageReceipts[idx + 1] || '<div class="cell empty"></div>';
+          const right =
+            pageReceipts[idx + 1] || '<div class="cell empty"></div>';
           rows.push(`<div class="grid-row">${left}${right}</div>`);
         }
         pages.push(`<div class="page">${rows.join('\n')}</div>`);
@@ -317,7 +335,7 @@ export class PrinterService {
     border-bottom:0.5px solid #ccc;
     overflow:hidden;
   }
-  .b-row-compact{flex:none}
+  .b-row-compact{flex:1}
   .b-row-last{border-bottom:none}
   .lbl-b{
     width:14mm;flex-shrink:0;
@@ -343,9 +361,39 @@ export class PrinterService {
   }
   .b-row-logist{
     background:#f8f8f8;
+    align-items:center;
+    overflow:hidden;
+    position:relative;
+    z-index:2; /* yuqorigi qatorlardan kelgan 14mm divider chizig'ini berkitadi */
   }
-  .val-b-logist{font-size:8px}
-  .logist-phone{font-size:8px;color:#000;font-weight:bold;margin-left:4px}
+  /* Logist qatori — TABLE bilan qatiy ustun kengliklari, vertikal markazda */
+  .logist-tbl{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    background:#f8f8f8;
+  }
+  .logist-td-lbl{
+    width:22mm;
+    font-size:7px;
+    font-weight:bold;
+    color:#333;
+    padding:2px 4px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    border-right:0.5px solid #ddd;
+    vertical-align:middle;
+  }
+  .logist-td-val{
+    font-size:8px;
+    padding:2px 4px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    vertical-align:middle;
+  }
+  .logist-phone{font-size:8px;color:#000;font-weight:bold;margin-left:6px}
 
   @media print{
     html,body{background:#fff!important;margin:0!important;padding:0!important}
@@ -377,7 +425,9 @@ ${pages.join('\n')}
    * MUHIM: Printer driver sozlamalarida qog'oz o'lchami 100x60mm bo'lishi kerak,
    * va "Auto-rotate" o'chirilgan bo'lishi kerak.
    */
-  async generateThermalReceiptPdf(ordersInfoDto: CreatePrinterDto): Promise<Buffer> {
+  async generateThermalReceiptPdf(
+    ordersInfoDto: CreatePrinterDto,
+  ): Promise<Buffer> {
     const { orderIds } = ordersInfoDto;
     if (!orderIds || orderIds.length === 0) {
       throw new BadRequestException('No orders provided');
@@ -392,8 +442,8 @@ ${pages.join('\n')}
     const MM = 2.83465;
 
     // Landscape PDF — fizik etiketka o'lchamiga mos: 100mm(en) x 60mm(bo'y)
-    const PAGE_W = 100 * MM;  // 100mm = 283.46pt
-    const PAGE_H = 60 * MM;   // 60mm  = 170.08pt
+    const PAGE_W = 100 * MM; // 100mm = 283.46pt
+    const PAGE_H = 60 * MM; // 60mm  = 170.08pt
 
     const doc = new PDFDocument({
       size: [PAGE_W, PAGE_H],
@@ -415,33 +465,46 @@ ${pages.join('\n')}
       doc.addPage({ size: [PAGE_W, PAGE_H], margin: 0 });
 
       const customerName = order.customer?.name ?? 'N/A';
-      const customerPhone = this.formatPhoneNumber(order.customer?.phone_number ?? '');
+      const customerPhone = this.formatPhoneNumber(
+        order.customer?.phone_number ?? '',
+      );
       const extraNumber = order.customer?.extra_number
         ? this.formatPhoneNumber(order.customer.extra_number)
         : '';
       const orderPrice = this.formatCurrency(order.total_price);
-      const region = this.formatRegionName(order.customer?.district?.assignedToRegion?.name);
+      const region = this.formatRegionName(
+        order.customer?.district?.assignedToRegion?.name,
+      );
       const district = order.customer?.district?.name ?? 'N/A';
       const address = order.customer?.address ?? '-';
       const comment = order.comment ?? '-';
       const market = order.market?.name ?? 'N/A';
       const operator = order.operator ?? '-';
-      const operatorPhone = order.operator_phone ? this.formatPhoneNumber(order.operator_phone) : '';
+      const operatorPhone = order.operator_phone
+        ? this.formatPhoneNumber(order.operator_phone)
+        : '';
       const createdTime = this.formatDateStr(order.created_at);
-      const whereDeliver = order.where_deliver === Where_deliver.ADDRESS ? 'UYGACHA' : 'MARKAZGA';
+      const whereDeliver =
+        order.where_deliver === Where_deliver.ADDRESS ? 'UYGACHA' : 'MARKAZGA';
       const qrCode = order.qr_code_token ?? '';
 
       // Logist ma'lumoti (region orqali) — auto-fetch saqlanadi, hozir chekda ishlatilmaydi
-      const logistPdf = (order.customer?.district?.assignedToRegion as any)?.logist;
-      const logistPhonePdf = logistPdf ? this.formatPhoneNumber(logistPdf.phone_number) : '';
+      const logistPdf = (order.customer?.district?.assignedToRegion as any)
+        ?.logist;
+      const logistPhonePdf = logistPdf
+        ? this.formatPhoneNumber(logistPdf.phone_number)
+        : '';
       const logistNamePdf = logistPdf?.name ?? '';
 
       // Chekning pastki qatorida faqat market operator raqami (va ixtiyoriy 2-raqam) ko'rsatiladi
       const secondaryOperatorPhonePdf = order.secondary_operator_phone
         ? this.formatPhoneNumber(order.secondary_operator_phone)
         : '';
-      const pdfPhoneList = [operatorPhone, secondaryOperatorPhonePdf].filter(Boolean);
-      const contactDisplay = pdfPhoneList.length === 0 ? '-' : pdfPhoneList.join('    ');
+      const pdfPhoneList = [operatorPhone, secondaryOperatorPhonePdf].filter(
+        Boolean,
+      );
+      const contactDisplay =
+        pdfPhoneList.length === 0 ? '-' : pdfPhoneList.join('    ');
 
       const productStr = (order.items || [])
         .map((item) => `${item.product?.name ?? 'N/A'}-${item.quantity ?? 1}`)
@@ -453,7 +516,7 @@ ${pages.join('\n')}
       const LEFT_W = 28 * MM;
       const RIGHT_X = M + LEFT_W;
       const RIGHT_W = FULL_W - LEFT_W;
-      const LABEL_COL = 17 * MM;     // Label ustuni
+      const LABEL_COL = 17 * MM; // Label ustuni
       const PAD = 3;
       const TABLE_TOP = M;
       const TABLE_BOT = PAGE_H - M;
@@ -480,7 +543,7 @@ ${pages.join('\n')}
       const zoneBRows = [
         { label: 'Mahsulot:', h: MAHSULOT_H },
         { label: "Mo'ljal:", h: MOLJAL_H },
-        { label: 'Izoh:',    h: IZOH_H },
+        { label: 'Izoh:', h: IZOH_H },
         { label: "Muammo bo'lsa:", h: LOGIST_H },
       ];
 
@@ -489,11 +552,11 @@ ${pages.join('\n')}
       const ZONE_B_Y = TABLE_TOP + ZONE_A_H;
 
       const zoneARows = [
-        { label: 'F.I.O:',    h: 16 },
-        { label: 'Telefon:',  h: 28 },
-        { label: 'Manzil:',   h: 28 },
-        { label: 'Jami:',     h: 15 },
-        { label: "Jo'natuvchi:", h: 0 },    // qoldiq
+        { label: 'F.I.O:', h: 16 },
+        { label: 'Telefon:', h: 28 },
+        { label: 'Manzil:', h: 28 },
+        { label: 'Jami:', h: 15 },
+        { label: "Jo'natuvchi:", h: 0 }, // qoldiq
       ];
       const zoneAFixed = zoneARows.slice(0, -1).reduce((s, r) => s + r.h, 0);
       zoneARows[zoneARows.length - 1].h = ZONE_A_H - zoneAFixed;
@@ -502,13 +565,12 @@ ${pages.join('\n')}
       const phoneValue = extraNumber
         ? `${customerPhone}\n${extraNumber}`
         : customerPhone;
-      const operatorDisplay = operatorPhone ? `${operator} (${operatorPhone})` : operator;
       const zoneAValues = [
         customerName,
         phoneValue,
         `${region} ${district}`,
         `${orderPrice}   ${whereDeliver}`,
-        `${market} / ${operatorDisplay}`,
+        `${market} / ${operator}`,
       ];
 
       // ====== CHAP PANEL (logo + brend + QR + sana) ======
@@ -530,14 +592,32 @@ ${pages.join('\n')}
       doc.save();
       doc.translate(brandStartX, leftY);
       doc.scale(logoScale);
-      doc.path('M1.38591 0.141343L6.38352 3.22731C6.65167 3.39289 6.81493 3.68563 6.81493 4.00089V18.0987C6.81493 18.4185 6.64707 18.7147 6.37285 18.8788L1.37524 21.8707C0.94461 22.1285 0.386623 21.9882 0.128938 21.5574C0.0445607 21.4164 0 21.255 0 21.0906V0.914925C0 0.412862 0.40682 0.00585938 0.908658 0.00585938C1.07722 0.00585938 1.24246 0.0527689 1.38591 0.141343Z').fill('#000');
-      doc.path('M26.7836 0.137942L21.786 3.21357C21.5172 3.379 21.3534 3.67212 21.3534 3.98786V18.0989C21.3534 18.4186 21.5213 18.7148 21.7955 18.879L26.7931 21.8709C27.2237 22.1287 27.7817 21.9884 28.0394 21.5576C28.1238 21.4165 28.1683 21.2552 28.1683 21.0908V0.91224C28.1683 0.410177 27.7615 0.00317383 27.2597 0.00317383C27.0916 0.00317383 26.9268 0.0498263 26.7836 0.137942Z').fill('#000');
-      doc.path('M1.38349 0.133995L14.0842 7.9218V15.4216L0 7.35155V0.909066C0 0.407003 0.40682 0 0.908657 0C1.07626 0 1.24059 0.0463746 1.38349 0.133995Z').fill('#444');
-      doc.path('M26.7848 0.133995L14.0841 7.9218V15.4216L28.1683 7.35155V0.909066C28.1683 0.407003 27.7615 0 27.2597 0C27.0921 0 26.9277 0.0463746 26.7848 0.133995Z').fill('#666');
+      doc
+        .path(
+          'M1.38591 0.141343L6.38352 3.22731C6.65167 3.39289 6.81493 3.68563 6.81493 4.00089V18.0987C6.81493 18.4185 6.64707 18.7147 6.37285 18.8788L1.37524 21.8707C0.94461 22.1285 0.386623 21.9882 0.128938 21.5574C0.0445607 21.4164 0 21.255 0 21.0906V0.914925C0 0.412862 0.40682 0.00585938 0.908658 0.00585938C1.07722 0.00585938 1.24246 0.0527689 1.38591 0.141343Z',
+        )
+        .fill('#000');
+      doc
+        .path(
+          'M26.7836 0.137942L21.786 3.21357C21.5172 3.379 21.3534 3.67212 21.3534 3.98786V18.0989C21.3534 18.4186 21.5213 18.7148 21.7955 18.879L26.7931 21.8709C27.2237 22.1287 27.7817 21.9884 28.0394 21.5576C28.1238 21.4165 28.1683 21.2552 28.1683 21.0908V0.91224C28.1683 0.410177 27.7615 0.00317383 27.2597 0.00317383C27.0916 0.00317383 26.9268 0.0498263 26.7836 0.137942Z',
+        )
+        .fill('#000');
+      doc
+        .path(
+          'M1.38349 0.133995L14.0842 7.9218V15.4216L0 7.35155V0.909066C0 0.407003 0.40682 0 0.908657 0C1.07626 0 1.24059 0.0463746 1.38349 0.133995Z',
+        )
+        .fill('#444');
+      doc
+        .path(
+          'M26.7848 0.133995L14.0841 7.9218V15.4216L28.1683 7.35155V0.909066C28.1683 0.407003 27.7615 0 27.2597 0C27.0921 0 26.9277 0.0463746 26.7848 0.133995Z',
+        )
+        .fill('#666');
       doc.restore();
 
       doc.font('Sans-Bold').fontSize(11);
-      doc.text(brandText, brandStartX + logoW + 3, leftY + (logoH - 11) / 2, { lineBreak: false });
+      doc.text(brandText, brandStartX + logoW + 3, leftY + (logoH - 11) / 2, {
+        lineBreak: false,
+      });
       leftY += logoH + 5;
 
       // QR Code
@@ -568,7 +648,10 @@ ${pages.join('\n')}
       const A_VALUE_W = RIGHT_W - LABEL_COL;
 
       doc.rect(RIGHT_X, TABLE_TOP, RIGHT_W, ZONE_A_H).stroke();
-      doc.moveTo(A_VALUE_X, TABLE_TOP).lineTo(A_VALUE_X, TABLE_TOP + ZONE_A_H).stroke();
+      doc
+        .moveTo(A_VALUE_X, TABLE_TOP)
+        .lineTo(A_VALUE_X, TABLE_TOP + ZONE_A_H)
+        .stroke();
 
       let rowY = TABLE_TOP;
       for (let r = 0; r < zoneARows.length; r++) {
@@ -576,7 +659,10 @@ ${pages.join('\n')}
         const val = zoneAValues[r];
 
         if (r > 0) {
-          doc.moveTo(RIGHT_X, rowY).lineTo(RIGHT_X + RIGHT_W, rowY).stroke();
+          doc
+            .moveTo(RIGHT_X, rowY)
+            .lineTo(RIGHT_X + RIGHT_W, rowY)
+            .stroke();
         }
 
         // Value — maxsus formatlash
@@ -596,9 +682,16 @@ ${pages.join('\n')}
           // Narx (katta bold) | yetkazish turi (kichik bold)
           doc.font('Sans-Bold').fontSize(9);
           const priceW = doc.widthOfString(orderPrice);
-          doc.text(orderPrice, A_VALUE_X + PAD, rowY + PAD, { lineBreak: false });
+          doc.text(orderPrice, A_VALUE_X + PAD, rowY + PAD, {
+            lineBreak: false,
+          });
           doc.font('Sans-Bold').fontSize(7);
-          doc.text(' | ' + whereDeliver, A_VALUE_X + PAD + priceW, rowY + PAD + 2, { lineBreak: false });
+          doc.text(
+            ' | ' + whereDeliver,
+            A_VALUE_X + PAD + priceW,
+            rowY + PAD + 2,
+            { lineBreak: false },
+          );
         } else if (isSender) {
           // Market (bold) | operator (oddiy) — vertikalda markazda
           const senderFontSize = 8.5;
@@ -614,7 +707,9 @@ ${pages.join('\n')}
           const mktW = doc.widthOfString(market);
           doc.text(market, A_VALUE_X + PAD, senderValY, { lineBreak: false });
           doc.font('Sans').fontSize(7);
-          doc.text(' | ' + operatorDisplay, A_VALUE_X + PAD + mktW, senderValY + 1.5, { lineBreak: false });
+          doc.text(' | ' + operator, A_VALUE_X + PAD + mktW, senderValY + 1.5, {
+            lineBreak: false,
+          });
           doc.restore();
         } else {
           if (isPhone) {
@@ -637,24 +732,49 @@ ${pages.join('\n')}
       }
 
       // ====== ZONE B — to'liq kenglikdagi jadval (manzil, mahsulot, izoh) ======
+      // Logist qatori uchun yorliq ustuni kengroq — "Muammo bo'lsa:" sig'ishi uchun
+      const LOGIST_LABEL_COL = 24 * MM;
+      const LOGIST_VALUE_X = M + LOGIST_LABEL_COL;
+      const LOGIST_VALUE_W = FULL_W - LOGIST_LABEL_COL;
+      const availBW_LOGIST = LOGIST_VALUE_W - 2 * PAD;
+      const LOGIST_ROW_Y = TABLE_BOT - LOGIST_H; // logist qatorining yuqori cheti
+
       doc.rect(M, ZONE_B_Y, FULL_W, TABLE_BOT - ZONE_B_Y).stroke();
-      doc.moveTo(B_VALUE_X, ZONE_B_Y).lineTo(B_VALUE_X, TABLE_BOT).stroke();
+      // Yuqorigi qatorlar uchun vertikal chiziq (oddiy 17mm da)
+      doc.moveTo(B_VALUE_X, ZONE_B_Y).lineTo(B_VALUE_X, LOGIST_ROW_Y).stroke();
+      // Logist qatori uchun vertikal chiziq (kengroq 24mm da)
+      doc
+        .moveTo(LOGIST_VALUE_X, LOGIST_ROW_Y)
+        .lineTo(LOGIST_VALUE_X, TABLE_BOT)
+        .stroke();
 
       let bRowY = ZONE_B_Y;
       for (let r = 0; r < zoneBRows.length; r++) {
         const row = zoneBRows[r];
         const val = zoneBTexts[r];
+        const isLogist = r === zoneBRows.length - 1;
 
         if (r > 0) {
-          doc.moveTo(M, bRowY).lineTo(M + FULL_W, bRowY).stroke();
+          doc
+            .moveTo(M, bRowY)
+            .lineTo(M + FULL_W, bRowY)
+            .stroke();
         }
 
+        const labelColWidth = isLogist ? LOGIST_LABEL_COL : B_LABEL_COL;
+        const valueX = isLogist ? LOGIST_VALUE_X : B_VALUE_X;
+        const valueW = isLogist ? availBW_LOGIST : availBW;
+
         doc.font('Sans-Bold').fontSize(6.5);
-        doc.text(row.label, M + PAD, bRowY + PAD, { lineBreak: false });
+        doc.text(row.label, M + PAD, bRowY + PAD, {
+          width: labelColWidth - 2 * PAD,
+          lineBreak: false,
+          ellipsis: false,
+        });
 
         doc.font('Sans').fontSize(8);
-        doc.text(val, B_VALUE_X + PAD, bRowY + PAD, {
-          width: availBW,
+        doc.text(val, valueX + PAD, bRowY + PAD, {
+          width: valueW,
           lineBreak: true,
           height: row.h - 2 * PAD,
           ellipsis: true,

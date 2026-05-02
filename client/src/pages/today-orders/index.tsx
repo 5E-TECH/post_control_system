@@ -35,6 +35,10 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { message, Modal } from "antd";
+import {
+  transliterateLatin,
+  isAcceptableScanChar,
+} from "../../shared/helpers/transliterateLatin";
 
 // API base URL - VITE_BASE_URL dan olinadi
 const API_BASE = import.meta.env.VITE_BASE_URL?.replace(/\/api\/v1\/?$/, "") || "";
@@ -153,6 +157,9 @@ const ExternalOrdersTab = () => {
   const [orders, setOrders] = useState<ExternalOrder[]>([]);
   const [scannerBuffer, setScannerBuffer] = useState("");
   const [integrationSearch, setIntegrationSearch] = useState("");
+  // Caps Lock holatini ko'rsatamiz — external API'lar case-sensitive bo'lishi
+  // mumkin, shuning uchun foydalanuvchini ogohlantirish muhim
+  const [capsLockOn, setCapsLockOn] = useState(false);
 
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState<ConfirmationModal>({
@@ -393,7 +400,25 @@ const ExternalOrdersTab = () => {
     }, 2000);
   };
 
+  // Caps Lock holatini har bir keyup/keydown'da kuzatamiz
+  useEffect(() => {
+    const onKeyEvent = (e: KeyboardEvent) => {
+      if (typeof e.getModifierState === "function") {
+        setCapsLockOn(e.getModifierState("CapsLock"));
+      }
+    };
+    window.addEventListener("keydown", onKeyEvent);
+    window.addEventListener("keyup", onKeyEvent);
+    return () => {
+      window.removeEventListener("keydown", onKeyEvent);
+      window.removeEventListener("keyup", onKeyEvent);
+    };
+  }, []);
+
   // Scanner listener - klaviaturadan tez kiritilgan ma'lumotni ushlab oladi
+  // RU klaviatura layout'i va Caps Lock muammosi bilan ishlaydi:
+  //   - Cyrillic harflar qabul qilinadi va Latin'ga transliteratsiya qilinadi
+  //   - Caps Lock holati sahifa yuqorisida banner bilan ko'rsatiladi
   useEffect(() => {
     if (!isReady || !selectedIntegration) return;
 
@@ -402,14 +427,18 @@ const ExternalOrdersTab = () => {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Agar input elementida bo'lsa, ishlamasin
-      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") {
+      if (
+        (e.target as HTMLElement).tagName === "INPUT" ||
+        (e.target as HTMLElement).tagName === "TEXTAREA"
+      ) {
         return;
       }
 
       // Enter bosilganda va buffer bo'sh bo'lmasa - qidirish
       if (e.key === "Enter" && buffer.length > 0) {
         e.preventDefault();
-        const scannedCode = buffer;
+        // Cyrillic chars Latin'ga aylantiriladi (case saqlanadi)
+        const scannedCode = transliterateLatin(buffer);
         buffer = "";
         setScannerBuffer("");
 
@@ -418,17 +447,19 @@ const ExternalOrdersTab = () => {
         return;
       }
 
-      // Faqat raqam va harflarni qabul qilish
-      if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) {
+      // Latin yoki Cyrillic harf, yoki raqam — qabul qilamiz
+      if (e.key.length === 1 && isAcceptableScanChar(e.key)) {
         buffer += e.key;
-        setScannerBuffer(buffer);
+        setScannerBuffer(transliterateLatin(buffer));
 
-        // 100ms ichida keyingi tugma bosilmasa - bufferni tozalash
+        // 1500ms ichida keyingi tugma bosilmasa - bufferni tozalash
+        // (eski 100ms juda agressiv edi — sekin skanerlar uchun mid-stream
+        // tozalanib, "boshidagi harflar yo'qolardi")
         clearTimeout(timeout);
         timeout = setTimeout(() => {
           buffer = "";
           setScannerBuffer("");
-        }, 100);
+        }, 1500);
       }
     };
 
@@ -1092,6 +1123,16 @@ const ExternalOrdersTab = () => {
                     <div className="mt-4 p-3 bg-white dark:bg-[#2A263D] rounded-lg border border-gray-200 dark:border-gray-700 inline-block">
                       <p className="text-xs text-gray-400 mb-1">Skanerlanmoqda:</p>
                       <p className="text-lg font-mono font-bold text-gray-800 dark:text-white">{scannerBuffer}</p>
+                    </div>
+                  )}
+
+                  {capsLockOn && (
+                    <div className="mt-3 mx-auto max-w-md px-4 py-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 flex items-center justify-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>
+                        Caps Lock yoqiq — QR kodlari noto'g'ri o'qilishi mumkin.
+                        Iltimos, o'chiring va qaytadan urinib ko'ring.
+                      </span>
                     </div>
                   )}
                 </>

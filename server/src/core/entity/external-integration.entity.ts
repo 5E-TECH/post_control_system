@@ -25,11 +25,11 @@ export interface FieldMapping {
 
 // Status mapping interfeysi - bizning statuslarni tashqi tizim statuslariga moslashtirish
 export interface StatusMapping {
-  sold: string;        // Sotildi → tashqi tizimdagi status
-  canceled: string;    // Bekor qilindi → tashqi tizimdagi status
-  paid: string;        // To'landi → tashqi tizimdagi status
-  rollback: string;    // Qaytarildi → tashqi tizimdagi status
-  waiting: string;     // Kutilmoqda → tashqi tizimdagi status
+  sold: string; // Sotildi → tashqi tizimdagi status
+  canceled: string; // Bekor qilindi → tashqi tizimdagi status
+  paid: string; // To'landi → tashqi tizimdagi status
+  rollback: string; // Qaytarildi → tashqi tizimdagi status
+  waiting: string; // Kutilmoqda → tashqi tizimdagi status
 }
 
 // Default status mapping
@@ -43,13 +43,13 @@ export const DEFAULT_STATUS_MAPPING: StatusMapping = {
 
 // Status sync configuration interfeysi
 export interface StatusSyncConfig {
-  enabled: boolean;              // Sync yoqilganmi
-  endpoint: string;              // API endpoint (e.g., '/orders/{id}/status' yoki '/orderstatus/update')
-  method: 'PUT' | 'PATCH' | 'POST';  // HTTP method
-  status_field: string;          // Request body dagi status field nomi
-  use_auth: boolean;             // Authorization header ishlatilsinmi
-  include_order_id_in_body: boolean;  // Order ID ni body ga qo'shish kerakmi
-  order_id_field: string;        // Body dagi order ID field nomi (masalan: 'order_id')
+  enabled: boolean; // Sync yoqilganmi
+  endpoint: string; // API endpoint (e.g., '/orders/{id}/status' yoki '/orderstatus/update')
+  method: 'PUT' | 'PATCH' | 'POST'; // HTTP method
+  status_field: string; // Request body dagi status field nomi
+  use_auth: boolean; // Authorization header ishlatilsinmi
+  include_order_id_in_body: boolean; // Order ID ni body ga qo'shish kerakmi
+  order_id_field: string; // Body dagi order ID field nomi (masalan: 'order_id')
 }
 
 // Default status sync config

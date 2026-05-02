@@ -83,10 +83,27 @@ const CreateOrder = () => {
       market?.require_operator_phone || marketdata?.require_operator_phone || false;
     const marketDefaultOperatorPhone =
       market?.default_operator_phone || marketdata?.default_operator_phone || "";
+
+    // Formadagi raqamni normalize qilish: faqat raqamlardan +998XXXXXXXXX yasash
+    const operatorPhoneRaw = String(productInfo?.operator_phone || "").replace(/\D/g, "");
+    const operatorPhoneDigits = operatorPhoneRaw.startsWith("998")
+      ? operatorPhoneRaw.slice(3)
+      : operatorPhoneRaw;
+    const normalizedOperatorPhone =
+      operatorPhoneDigits.length === 9 ? `+998${operatorPhoneDigits}` : "";
+
+    if (operatorPhoneDigits.length > 0 && operatorPhoneDigits.length !== 9) {
+      handleWarning(
+        "Operator telefon raqami noto'g'ri",
+        "Telefon raqami to'liq emas. +998 dan keyin 9 ta raqam kiritilishi kerak.",
+      );
+      return;
+    }
+
     if (
       requireOperatorPhone &&
       !marketDefaultOperatorPhone &&
-      !productInfo?.operator_phone
+      !normalizedOperatorPhone
     ) {
       handleWarning(
         "Operator telefon raqami majburiy",
@@ -103,7 +120,7 @@ const CreateOrder = () => {
       where_deliver: productInfo?.where_deliver,
       comment: productInfo?.comment,
       operator: productInfo?.operator,
-      operator_phone: productInfo?.operator_phone || undefined,
+      operator_phone: normalizedOperatorPhone || undefined,
       // Buyurtma uchun yetkazib berish manzili
       district_id: customer?.district_id,
       address: customer?.address,

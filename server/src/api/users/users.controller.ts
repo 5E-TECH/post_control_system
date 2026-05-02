@@ -201,7 +201,13 @@ export class UsersController {
     },
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
   @Post('customer')
   createCustomer(
     @CurrentUser() user: JwtPayload,
@@ -344,7 +350,13 @@ export class UsersController {
     description: 'Customer suggestions retrieved successfully',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
   @Get('customer/suggest')
   suggestCustomer(
     @CurrentUser() user: JwtPayload,
@@ -370,7 +382,14 @@ export class UsersController {
     description: 'Customer order history retrieved successfully',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR, Roles.COURIER)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+    Roles.COURIER,
+  )
   @Get('customer/:id/history')
   getCustomerOrderHistory(
     @CurrentUser() user: JwtPayload,
@@ -386,7 +405,13 @@ export class UsersController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Markets retrieved successfully' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.COURIER,
+    Roles.LOGIST,
+  )
   @Get('markets')
   findAllMarkets(
     @Query('search') search?: string,
@@ -637,8 +662,16 @@ export class UsersController {
   }
 
   @ApiOperation({ summary: 'Get my earnings (operator role)' })
-  @ApiQuery({ name: 'fromDate', required: false, description: 'Start date YYYY-MM-DD' })
-  @ApiQuery({ name: 'toDate', required: false, description: 'End date YYYY-MM-DD' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    description: 'Start date YYYY-MM-DD',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    description: 'End date YYYY-MM-DD',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.OPERATOR)
   @Get('my-earnings')
@@ -653,7 +686,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Get my orders (operator role)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by order status' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by order status',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.OPERATOR)
   @Get('my-orders')
@@ -761,7 +798,15 @@ export class UsersController {
   @ApiBody({ type: UpdateSelfDto })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.COURIER,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.LOGIST,
+    Roles.OPERATOR,
+  )
   @Patch('self')
   selfUpdate(
     @CurrentUser() user: JwtPayload,
@@ -810,13 +855,18 @@ export class UsersController {
 
   // ==================== SALARY CRON MANUAL TRIGGER ====================
 
-  @ApiOperation({ summary: 'Manually trigger monthly salary cron (superadmin only)' })
+  @ApiOperation({
+    summary: 'Manually trigger monthly salary cron (superadmin only)',
+  })
   @ApiResponse({ status: 200, description: 'Salary cron triggered' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Post('salary/trigger-cron')
   async triggerSalaryCron() {
     await this.userService.handleMonthlySalary();
-    return { message: 'Salary cron manually triggered', timestamp: new Date().toISOString() };
+    return {
+      message: 'Salary cron manually triggered',
+      timestamp: new Date().toISOString(),
+    };
   }
 }

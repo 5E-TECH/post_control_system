@@ -24,11 +24,9 @@ export class OrderGateaway
     this.server = server;
   }
 
-  handleConnection(client: any, ...args: any[]) {
-  }
+  handleConnection(client: any, ...args: any[]) {}
 
-  handleDisconnect(client: any) {
-  }
+  handleDisconnect(client: any) {}
 
   @SubscribeMessage('order_sold')
   handleOrderSold(@MessageBody() data: any, @ConnectedSocket() client: Socket) {

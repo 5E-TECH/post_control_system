@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { House, ShoppingBag, MailOpen, CreditCard } from 'lucide-react';
+import { House, ShoppingBag, MailOpen, CreditCard, Zap } from 'lucide-react';
 import SidebarLink from './SidebarLink';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
@@ -15,6 +15,7 @@ const CourierSidebar = () => {
       icon: <ShoppingBag />,
       label: t('orders'),
     },
+    { to: '/courier-bulk', icon: <Zap />, label: t('courier_bulk') },
     { to: '/courier-mails', icon: <MailOpen />, label: t('mails') },
     { to: '/cash-box', icon: <CreditCard />, label: t('payments') },
   ];

@@ -38,6 +38,7 @@ import { CreateOrderByBotDto } from './dto/create-order-bot.dto';
 import { UpdateOrderAddressDto } from './dto/update-order-address.dto';
 import { ReceiveExternalOrdersDto } from './dto/receive-external-orders.dto';
 import { RollbackOrderDto } from './dto/rollback-order.dto';
+import { BulkOrderActionDto } from './dto/bulk-order-action.dto';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
@@ -52,7 +53,13 @@ export class OrderController {
   @ApiResponse({ status: 422, description: 'Validation error' })
   @ApiBody({ type: CreateOrderDto })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
   @Post()
   createOrder(
     @Body() creteOrderDto: CreateOrderDto,
@@ -85,7 +92,13 @@ export class OrderController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.COURIER,
+    Roles.LOGIST,
+  )
   @Get()
   findAll(
     @Query('status') status?: string | string[],
@@ -143,7 +156,13 @@ export class OrderController {
   @ApiParam({ name: 'id', description: 'Market ID' })
   @ApiResponse({ status: 200, description: 'New orders for the market' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST, Roles.OPERATOR)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.LOGIST,
+    Roles.OPERATOR,
+  )
   @Get('market/:id')
   newOrdersByMarketId(
     @Param('id') id: string,
@@ -195,7 +214,13 @@ export class OrderController {
   @ApiBody({ type: UpdateOrderDto })
   @ApiResponse({ status: 200, description: 'Order updated' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
   @Patch(':id')
   editOrder(
     @Param('id') id: string,
@@ -246,7 +271,10 @@ export class OrderController {
 
   @ApiOperation({ summary: 'Receive external orders (from Adosh, etc.)' })
   @ApiBody({ type: ReceiveExternalOrdersDto })
-  @ApiResponse({ status: 201, description: 'External orders received and created' })
+  @ApiResponse({
+    status: 201,
+    description: 'External orders received and created',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('receive/external')
@@ -352,6 +380,66 @@ export class OrderController {
     return this.orderService.cancelOrder(currentUser, id, cancelDto);
   }
 
+  // ==================== BULK OPERATIONS (KURIER UCHUN) ====================
+
+  @ApiOperation({
+    summary: 'Bulk sell — bir nechta buyurtmani bir martada sotildi qilish',
+    description:
+      'Kurier ofisda kompyuter orqali bir nechta orderni bir martada sotildi qiladi. ' +
+      "Telegram xabari yuborilmaydi. Extra_cost yo'q (kerak bo'lsa single sell ishlatiladi).",
+  })
+  @ApiBody({ type: BulkOrderActionDto })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Bulk natija — har order uchun muvaffaqiyatli/xato. Qisman muvaffaqiyat ham bo'lishi mumkin.",
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Post('bulk/sell')
+  bulkSellOrders(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: BulkOrderActionDto,
+  ) {
+    return this.orderService.bulkSellOrders(user, dto);
+  }
+
+  @ApiOperation({
+    summary: 'Bulk cancel — bir nechta buyurtmani bir martada bekor qilish',
+    description:
+      'Skanerlangan orderlarni bir vaqtda bekor qiladi. Telegram xabari yuborilmaydi.',
+  })
+  @ApiBody({ type: BulkOrderActionDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk natija — muvaffaqiyatli/xato',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Post('bulk/cancel')
+  bulkCancelOrders(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: BulkOrderActionDto,
+  ) {
+    return this.orderService.bulkCancelOrders(user, dto);
+  }
+
+  @ApiOperation({
+    summary: 'Skan paytida tezkor tekshirish — QR token orqali order topish',
+    description:
+      'Kurier orderni skan qilganda darhol tekshiradi: tegishlimi, WAITING holatdami.',
+  })
+  @ApiParam({ name: 'token', description: 'QR code token' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Get('by-token/courier/:token')
+  findByQrTokenForCourier(
+    @CurrentUser() user: JwtPayload,
+    @Param('token') token: string,
+  ) {
+    return this.orderService.findByQrTokenForCourier(token, user);
+  }
+
   @ApiOperation({ summary: 'Rollback order' })
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiBody({ type: RollbackOrderDto })
@@ -386,7 +474,13 @@ export class OrderController {
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order deleted' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
   @Delete(':id')
   delete(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.orderService.remove(id, user);
@@ -413,7 +507,10 @@ export class OrderController {
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   @ApiResponse({ status: 200, description: 'Excel file stream' })
-  @Header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  @Header(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR)
   @Get('export/excel')

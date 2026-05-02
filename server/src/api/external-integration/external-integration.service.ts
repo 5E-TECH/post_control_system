@@ -215,16 +215,22 @@ export class ExternalIntegrationService {
 
       await this.repo.delete(id);
 
-      return successRes(null, 200, 'Integratsiya muvaffaqiyatli o\'chirildi');
+      return successRes(null, 200, "Integratsiya muvaffaqiyatli o'chirildi");
     } catch (error) {
       return catchError(error);
     }
   }
 
   // Login qilib token olish (login-based auth uchun)
-  private async loginAndGetToken(integration: ExternalIntegrationEntity): Promise<string> {
-    if (!integration.auth_url || !integration.username || !integration.password) {
-      throw new BadRequestException('Login konfiguratsiyasi to\'liq emas');
+  private async loginAndGetToken(
+    integration: ExternalIntegrationEntity,
+  ): Promise<string> {
+    if (
+      !integration.auth_url ||
+      !integration.username ||
+      !integration.password
+    ) {
+      throw new BadRequestException("Login konfiguratsiyasi to'liq emas");
     }
 
     try {
@@ -260,7 +266,9 @@ export class ExternalIntegrationService {
   }
 
   // Integratsiya uchun valid token olish
-  async getValidToken(integration: ExternalIntegrationEntity): Promise<string | null> {
+  async getValidToken(
+    integration: ExternalIntegrationEntity,
+  ): Promise<string | null> {
     // API key auth bo'lsa, api_key ni qaytarish
     if (integration.auth_type === 'api_key') {
       return integration.api_key || null;
@@ -282,7 +290,9 @@ export class ExternalIntegrationService {
   }
 
   // Majburiy yangi token olish (401 xatolik uchun)
-  async refreshToken(integration: ExternalIntegrationEntity): Promise<string | null> {
+  async refreshToken(
+    integration: ExternalIntegrationEntity,
+  ): Promise<string | null> {
     if (integration.auth_type === 'api_key') {
       return integration.api_key || null;
     }
@@ -371,10 +381,13 @@ export class ExternalIntegrationService {
       if (integration) {
         // Qiymatlarni yangilash
         integration.last_sync_at = Date.now();
-        integration.total_synced_orders = (integration.total_synced_orders || 0) + ordersCount;
+        integration.total_synced_orders =
+          (integration.total_synced_orders || 0) + ordersCount;
 
         await this.repo.save(integration);
-        console.log(`✅ Integration sync updated: ${integration.name}, orders: +${ordersCount}, total: ${integration.total_synced_orders}`);
+        console.log(
+          `✅ Integration sync updated: ${integration.name}, orders: +${ordersCount}, total: ${integration.total_synced_orders}`,
+        );
       }
     } catch (error) {
       console.error('❌ Last sync update error:', error);
@@ -382,7 +395,9 @@ export class ExternalIntegrationService {
   }
 
   // Integratsiya entity sini to'g'ridan-to'g'ri olish (OrderService uchun)
-  async getIntegrationEntity(id: string): Promise<ExternalIntegrationEntity | null> {
+  async getIntegrationEntity(
+    id: string,
+  ): Promise<ExternalIntegrationEntity | null> {
     return this.repo.findOne({
       where: { id },
       relations: ['market'],
@@ -517,7 +532,9 @@ export class ExternalIntegrationService {
       // 0 ga tushirish
       await this.repo.update(id, { total_synced_orders: 0 });
 
-      console.log(`🔄 [MANUAL] ${integration.name} sinxronlangan buyurtmalar soni 0 ga tushirildi`);
+      console.log(
+        `🔄 [MANUAL] ${integration.name} sinxronlangan buyurtmalar soni 0 ga tushirildi`,
+      );
 
       return successRes(
         { previous_count: integration.total_synced_orders },

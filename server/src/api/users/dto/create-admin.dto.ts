@@ -31,7 +31,12 @@ export class CreateAdminDto {
   @Min(0)
   salary: number;
 
-  @ApiPropertyOptional({ example: 10, minimum: 1, maximum: 30, description: 'Payment day of month' })
+  @ApiPropertyOptional({
+    example: 10,
+    minimum: 1,
+    maximum: 30,
+    description: 'Payment day of month',
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)

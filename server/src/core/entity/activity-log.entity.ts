@@ -12,7 +12,11 @@ import { UserEntity } from './users.entity';
 @Index('IDX_ACTIVITY_LOG_ACTION', ['action'])
 @Index('IDX_ACTIVITY_LOG_CREATED_AT', ['created_at'])
 @Index('IDX_ACTIVITY_LOG_USER', ['user_id'])
-@Index('IDX_ACTIVITY_LOG_ENTITY_CREATED', ['entity_type', 'entity_id', 'created_at'])
+@Index('IDX_ACTIVITY_LOG_ENTITY_CREATED', [
+  'entity_type',
+  'entity_id',
+  'created_at',
+])
 export class ActivityLogEntity extends BaseEntity {
   // Qaysi resurs turi: 'order', 'post', 'user', 'cashbox', 'shift'
   @Column({ type: 'varchar', length: 50 })

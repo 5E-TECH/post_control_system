@@ -1,6 +1,14 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Order_status, Where_deliver } from 'src/common/enums';
-import { Column, Entity, ManyToOne, OneToMany, JoinColumn, Index, DeleteDateColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+  DeleteDateColumn,
+} from 'typeorm';
 import { OrderItemEntity } from './order-item.entity';
 import { PostEntity } from './post.entity';
 import { UserEntity } from './users.entity';
@@ -86,14 +94,26 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   address: string;
 
-  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
   sold_at: number | null;
 
   // Sotilgan paytdagi tariflar (tarix uchun saqlanadi)
-  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
   market_tariff: number | null;
 
-  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
   courier_tariff: number | null;
 
   // Soft delete — TypeORM avtomatik filter qiladi (find/findOne/QueryBuilder).

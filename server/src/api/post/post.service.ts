@@ -23,6 +23,7 @@ import {
 import { ReceivePostDto } from './dto/receive-post.dto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import { normalizeQrToken } from 'src/infrastructure/lib/qr-token/normalize';
 import { PostDto } from './dto/postId.dto';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 
@@ -91,12 +92,13 @@ export class PostService {
         lock: { mode: 'pessimistic_write' },
       });
       // Keyin relationsni alohida yuklash
-      const orphanOrders = lockedOrders.length > 0
-        ? await queryRunner.manager.find(OrderEntity, {
-            where: { id: In(lockedOrders.map(o => o.id)) },
-            relations: ['district', 'customer', 'customer.district'],
-          })
-        : [];
+      const orphanOrders =
+        lockedOrders.length > 0
+          ? await queryRunner.manager.find(OrderEntity, {
+              where: { id: In(lockedOrders.map((o) => o.id)) },
+              relations: ['district', 'customer', 'customer.district'],
+            })
+          : [];
 
       const regionPostMap = new Map<string, PostEntity>();
 
@@ -124,7 +126,8 @@ export class PostService {
         // keyin statistikani to'plash uchun
         const post = regionPostMap.get(regionId)!;
         post.post_total_price =
-          (Number(post.post_total_price) || 0) + (Number(order.total_price) || 0);
+          (Number(post.post_total_price) || 0) +
+          (Number(order.total_price) || 0);
         post.order_quantity = (Number(post.order_quantity) || 0) + 1;
       }
 
@@ -139,7 +142,8 @@ export class PostService {
 
       // 5️⃣ Endi orderlarga post_id biriktiramiz
       for (const order of orphanOrders) {
-        const regionId = (order.district || order.customer?.district)?.assigned_region;
+        const regionId = (order.district || order.customer?.district)
+          ?.assigned_region;
         const postId = idMap.get(regionId);
         order.post_id = postId!;
       }
@@ -259,7 +263,7 @@ export class PostService {
   async findWithQr(id: string, user: JwtPayload): Promise<object> {
     try {
       const post = await this.postRepo.findOne({
-        where: { qr_code_token: id },
+        where: { qr_code_token: normalizeQrToken(id) },
       });
       if (!post) {
         throw new NotFoundException('Post not found');
@@ -348,6 +352,13 @@ export class PostService {
           allOrdersByPostId,
           homeOrders: { homeOrders, homeOrdersTotalPrice },
           centerOrders: { centerOrders, centerOrdersTotalPrice },
+          post: {
+            id: post.id,
+            status: post.status,
+            order_quantity: post.order_quantity,
+            qr_code_token: post.qr_code_token,
+            courier_id: post.courier_id,
+          },
         },
         200,
         'All orders by post id',
@@ -361,7 +372,15 @@ export class PostService {
     try {
       const allOrdersByPostId = await this.orderRepo.find({
         where: { canceled_post_id: id },
-        relations: ['customer', 'district', 'district.region', 'customer.district', 'items', 'items.product', 'market'],
+        relations: [
+          'customer',
+          'district',
+          'district.region',
+          'customer.district',
+          'items',
+          'items.product',
+          'market',
+        ],
       });
       return successRes(allOrdersByPostId, 200, 'All orders by post id');
     } catch (error) {
@@ -375,9 +394,10 @@ export class PostService {
       if (!postId) {
         throw new BadRequestException('Pochta topilmadi');
       }
+      // Caps Lock yoki RU layout muammosini bartaraf qilamiz
       const order = await this.orderRepo.findOne({
         where: {
-          qr_code_token: id,
+          qr_code_token: normalizeQrToken(id),
           status: Order_status.RECEIVED,
           post_id: postId,
         },
@@ -398,9 +418,10 @@ export class PostService {
       if (!postId) {
         throw new BadRequestException('Pochta topilmadi');
       }
+      // Caps Lock yoki RU layout muammosini bartaraf qilamiz
       const order = await this.orderRepo.findOne({
         where: {
-          qr_code_token: id,
+          qr_code_token: normalizeQrToken(id),
           status: Order_status.CANCELLED_SENT,
           canceled_post_id: postId,
         },
@@ -418,7 +439,11 @@ export class PostService {
   /**
    * Jo'natilgan pochtani boshqa kurierga o'tkazish (faqat superadmin)
    */
-  async reassignCourier(postId: string, newCourierId: string, user: JwtPayload) {
+  async reassignCourier(
+    postId: string,
+    newCourierId: string,
+    user: JwtPayload,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -432,7 +457,9 @@ export class PostService {
         throw new NotFoundException('Pochta topilmadi');
       }
       if (post.status !== Post_status.SENT) {
-        throw new BadRequestException("Faqat jo'natilgan pochtani o'tkazish mumkin");
+        throw new BadRequestException(
+          "Faqat jo'natilgan pochtani o'tkazish mumkin",
+        );
       }
 
       const oldCourier = post.courier;
@@ -443,17 +470,27 @@ export class PostService {
       }
 
       const newCourier = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: newCourierId, role: Roles.COURIER },
+        where: {
+          id: newCourierId,
+          role: Roles.COURIER,
+          status: Status.ACTIVE,
+        },
       });
       if (!newCourier) {
-        throw new NotFoundException('Kuryer topilmadi');
+        throw new NotFoundException(
+          "Faol kuryer topilmadi (bloklangan kuryerga pochta biriktirib bo'lmaydi)",
+        );
       }
 
       // Kuryerni o'zgartirish — update() ishlatamiz
       // save() da yuklangan courier relation yangi courier_id ni bekor qiladi
-      await queryRunner.manager.update(PostEntity, { id: postId }, {
-        courier_id: newCourierId,
-      });
+      await queryRunner.manager.update(
+        PostEntity,
+        { id: postId },
+        {
+          courier_id: newCourierId,
+        },
+      );
 
       await queryRunner.commitTransaction();
 
@@ -483,7 +520,11 @@ export class PostService {
       }
 
       return successRes(
-        { post_id: postId, old_courier: oldCourier?.name, new_courier: newCourier.name },
+        {
+          post_id: postId,
+          old_courier: oldCourier?.name,
+          new_courier: newCourier.name,
+        },
         200,
         `Pochta ${newCourier.name} ga o'tkazildi`,
       );
@@ -517,16 +558,27 @@ export class PostService {
       });
       if (!originalPost) throw new NotFoundException('Post not found');
       if (originalPost.status !== Post_status.NEW) {
-        throw new BadRequestException('Post topilmadi yoki artiq jo\'natib bo\'lmaydi');
+        throw new BadRequestException(
+          "Post topilmadi yoki artiq jo'natib bo'lmaydi",
+        );
       }
 
       /**
-       * 2️⃣ Kuryerni tekshirish
+       * 2️⃣ Kuryerni tekshirish — faqat ACTIVE statusidagi kuryerga
+       * pochta jo'natilishi mumkin (bloklangan kuryerlar chiqarib tashlanadi).
        */
       const courier = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: courierId, role: Roles.COURIER },
+        where: {
+          id: courierId,
+          role: Roles.COURIER,
+          status: Status.ACTIVE,
+        },
       });
-      if (!courier) throw new NotFoundException('Courier not found');
+      if (!courier) {
+        throw new NotFoundException(
+          "Faol kuryer topilmadi. Iltimos, ro'yxatdan boshqa kuryerni tanlang.",
+        );
+      }
 
       /**
        * 3️⃣ Order IDs tekshirish
@@ -542,11 +594,19 @@ export class PostService {
        */
       const newOrders = await queryRunner.manager.find(OrderEntity, {
         where: { id: In(orderIds), post_id: id },
-        relations: ['market', 'customer', 'district', 'district.region', 'customer.district'],
+        relations: [
+          'market',
+          'customer',
+          'district',
+          'district.region',
+          'customer.district',
+        ],
       });
 
       if (newOrders.length === 0)
-        throw new BadRequestException('Tanlangan buyurtmalar bu pochtada topilmadi');
+        throw new BadRequestException(
+          'Tanlangan buyurtmalar bu pochtada topilmadi',
+        );
 
       // Agar ba'zi orderlar allaqachon boshqa device tomonidan jo'natilgan bo'lsa,
       // faqat mavjud orderlar bilan davom etamiz (xato otmaymiz).
@@ -591,10 +651,13 @@ export class PostService {
       const remainingOrders = await queryRunner.manager.find(OrderEntity, {
         where: { post_id: id },
       });
-      const totalIncludingDeleted = await queryRunner.manager.count(OrderEntity, {
-        where: { post_id: id },
-        withDeleted: true,
-      });
+      const totalIncludingDeleted = await queryRunner.manager.count(
+        OrderEntity,
+        {
+          where: { post_id: id },
+          withDeleted: true,
+        },
+      );
 
       if (totalIncludingDeleted === 0) {
         await queryRunner.manager.delete(PostEntity, { id });
@@ -631,7 +694,10 @@ export class PostService {
           entity_id: order.id,
           action: 'status_change',
           old_value: { status: Order_status.RECEIVED },
-          new_value: { status: Order_status.ON_THE_ROAD, courier: updatedPost?.courier?.name },
+          new_value: {
+            status: Order_status.ON_THE_ROAD,
+            courier: updatedPost?.courier?.name,
+          },
           description: `Pochta jo'natildi — kuryer: ${updatedPost?.courier?.name || '-'}`,
         });
       }
@@ -767,7 +833,7 @@ export class PostService {
     await queryRunner.startTransaction();
     try {
       const post = await queryRunner.manager.findOne(PostEntity, {
-        where: { qr_code_token: id, courier_id: user.id },
+        where: { qr_code_token: normalizeQrToken(id), courier_id: user.id },
       });
 
       if (!post) {
@@ -890,6 +956,258 @@ export class PostService {
     }
   }
 
+  /**
+   * QR token bo'yicha bittalab buyurtmani qabul qilish (kuryer skaneri).
+   * Postdagi har bir buyurtma uchun bir marta chaqiriladi — ON_THE_ROAD → WAITING.
+   * Oxirgi buyurtma qabul qilinganda post.status avtomatik RECEIVED bo'ladi.
+   *
+   * Bu metod xuddi receiveOrderWithScanerCourier kabi, lekin order ID o'rniga
+   * QR token oladi — frontend skanerdan to'g'ridan-to'g'ri token kelganda qulay.
+   */
+  async receiveOrderByQrTokenForCourier(token: string, user: JwtPayload) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1) Tokenga qarab orderni topamiz (Caps Lock / RU layout uchun normalize)
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { qr_code_token: normalizeQrToken(token) },
+        relations: ['customer'],
+      });
+      if (!order) {
+        throw new NotFoundException('QR koddagi buyurtma topilmadi');
+      }
+
+      if (!order.post_id) {
+        throw new BadRequestException(
+          "Bu buyurtma hali pochtaga biriktirilmagan",
+        );
+      }
+
+      // 2) Post kuryer'niki ekanligini va SENT statusda ekanligini tekshiramiz
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id: order.post_id, courier_id: user.id },
+      });
+      if (!post) {
+        throw new NotFoundException(
+          'Pochta topilmadi yoki sizga biriktirilmagan',
+        );
+      }
+      if (post.status !== Post_status.SENT) {
+        throw new BadRequestException(
+          'Bu pochta allaqachon qabul qilingan yoki yo\'lda emas',
+        );
+      }
+
+      // 3) Buyurtma allaqachon qabul qilingan bo'lsa — error
+      if (order.status !== Order_status.ON_THE_ROAD) {
+        throw new BadRequestException(
+          `Bu buyurtma allaqachon qabul qilingan (${order.status})`,
+        );
+      }
+
+      // 4) Buyurtmani WAITING ga o'tkazamiz
+      order.status = Order_status.WAITING;
+      await queryRunner.manager.save(order);
+
+      // 5) Postda yana ON_THE_ROAD buyurtma qolganmi?
+      const remaining = await queryRunner.manager.count(OrderEntity, {
+        where: { post_id: post.id, status: Order_status.ON_THE_ROAD },
+      });
+
+      let postReceived = false;
+      if (remaining === 0) {
+        post.status = Post_status.RECEIVED;
+        await queryRunner.manager.save(post);
+        postReceived = true;
+      }
+
+      await queryRunner.commitTransaction();
+
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'status_change',
+        old_value: { status: Order_status.ON_THE_ROAD },
+        new_value: {
+          status: Order_status.WAITING,
+          post_id: post.id,
+        },
+        description: `Kuryer QR skaner orqali bittalab qabul qildi`,
+        user,
+        metadata: {
+          source: 'scanner',
+          scan_target: 'order',
+          token,
+        },
+      });
+
+      return successRes(
+        {
+          order_id: order.id,
+          customer_name: order.customer?.name || null,
+          remaining,
+          postReceived,
+        },
+        200,
+        postReceived
+          ? 'Oxirgi buyurtma qabul qilindi — pochta RECEIVED'
+          : 'Buyurtma qabul qilindi',
+      );
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Kuryer YANGI (SENT) pochta ichidagi hali skanerlanmagan buyurtmani
+   * "kelmagan/kelmay qoldi" deb belgilab, qaytarish so'rovini yuboradi.
+   *
+   * Mantiq:
+   *  - Buyurtma ON_THE_ROAD bo'lishi kerak (hali qabul qilinmagan)
+   *  - Post SENT bo'lishi kerak (hali yo'lda)
+   *  - Buyurtma WAITING ga o'tadi + return_requested = true bo'ladi
+   *  - Agar oxirgi ON_THE_ROAD buyurtma bo'lsa — post avtomatik RECEIVED bo'ladi
+   *    (xuddi skaner orqali oxirgini qabul qilgandagiday)
+   */
+  async markOrderForReturnRequestByCourier(orderId: string, user: JwtPayload) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id: orderId },
+      });
+      if (!order) {
+        throw new NotFoundException('Buyurtma topilmadi');
+      }
+      if (!order.post_id) {
+        throw new BadRequestException(
+          'Bu buyurtma pochtaga biriktirilmagan',
+        );
+      }
+
+      const post = await queryRunner.manager.findOne(PostEntity, {
+        where: { id: order.post_id, courier_id: user.id },
+      });
+      if (!post) {
+        throw new NotFoundException(
+          'Pochta topilmadi yoki sizga biriktirilmagan',
+        );
+      }
+      if (post.status !== Post_status.SENT) {
+        throw new BadRequestException(
+          "Bu pochta allaqachon qabul qilingan yoki yo'lda emas",
+        );
+      }
+      if (order.status !== Order_status.ON_THE_ROAD) {
+        throw new BadRequestException(
+          `Bu buyurtmani qaytarishga belgilab bo'lmaydi (status: ${order.status})`,
+        );
+      }
+
+      order.status = Order_status.WAITING;
+      order.return_requested = true;
+      await queryRunner.manager.save(order);
+
+      const remaining = await queryRunner.manager.count(OrderEntity, {
+        where: { post_id: post.id, status: Order_status.ON_THE_ROAD },
+      });
+
+      let postReceived = false;
+      if (remaining === 0) {
+        post.status = Post_status.RECEIVED;
+        await queryRunner.manager.save(post);
+        postReceived = true;
+      }
+
+      await queryRunner.commitTransaction();
+
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'return_requested',
+        old_value: { status: Order_status.ON_THE_ROAD },
+        new_value: {
+          status: Order_status.WAITING,
+          return_requested: true,
+        },
+        description: `Kuryer buyurtmani qaytarishga belgiladi (skanerlanmagan)`,
+        user,
+        metadata: { source: 'courier_return_button' },
+      });
+
+      return successRes(
+        {
+          order_id: order.id,
+          return_requested: true,
+          remaining,
+          postReceived,
+        },
+        200,
+        postReceived
+          ? "Qaytarish so'rovi yuborildi — pochta to'liq qabul qilindi"
+          : "Qaytarish so'rovi yuborildi",
+      );
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Kuryer noto'g'ri belgilagan return-request'ni bekor qilishi mumkin
+   * (admin hali approve/reject qilib ulgurmagan paytda).
+   */
+  async cancelReturnRequestByCourier(orderId: string, user: JwtPayload) {
+    try {
+      const order = await this.orderRepo.findOne({
+        where: { id: orderId },
+        relations: ['post'],
+      });
+      if (!order) {
+        throw new NotFoundException('Buyurtma topilmadi');
+      }
+      if (!order.post || order.post.courier_id !== user.id) {
+        throw new NotFoundException(
+          'Buyurtmaning pochtasi sizga biriktirilmagan',
+        );
+      }
+      if (!order.return_requested) {
+        throw new BadRequestException(
+          "Bu buyurtmada qaytarish so'rovi yo'q",
+        );
+      }
+
+      order.return_requested = false;
+      await this.orderRepo.save(order);
+
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'return_request_cancelled',
+        new_value: { return_requested: false },
+        description: `Kuryer qaytarish so'rovini bekor qildi`,
+        user,
+      });
+
+      return successRes(
+        { order_id: order.id, return_requested: false },
+        200,
+        "Qaytarish so'rovi bekor qilindi",
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async createCanceledPost(user: JwtPayload, ordersArrayDto: ReceivePostDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -946,7 +1264,8 @@ export class PostService {
 
       // 6️⃣ Canceled postning mavjud qiymatlarini olish
       let canceledOrderQt: number = Number(canceledPost.order_quantity) || 0;
-      let canPostTotalPrice: number = Number(canceledPost.post_total_price) || 0;
+      let canPostTotalPrice: number =
+        Number(canceledPost.post_total_price) || 0;
 
       // 7️⃣ Har bir orderni yangilash
       for (const order of orders) {
@@ -1067,7 +1386,7 @@ export class PostService {
       await queryRunner.commitTransaction();
 
       // Activity log
-      for (const oid of (ordersArrayDto.order_ids || [])) {
+      for (const oid of ordersArrayDto.order_ids || []) {
         this.activityLog.log({
           entity_type: 'order',
           entity_id: oid,
@@ -1106,7 +1425,13 @@ export class PostService {
           return_requested: true,
           status: Order_status.WAITING,
         },
-        relations: ['customer', 'district', 'district.region', 'post', 'post.courier'],
+        relations: [
+          'customer',
+          'district',
+          'district.region',
+          'post',
+          'post.courier',
+        ],
         order: { created_at: 'DESC' },
       });
 
@@ -1181,10 +1506,16 @@ export class PostService {
       }
 
       // Eski pochtalardan buyurtma soni va summasini kamaytirish uchun
-      const oldPostUpdates = new Map<string, { count: number; total: number }>();
+      const oldPostUpdates = new Map<
+        string,
+        { count: number; total: number }
+      >();
       for (const order of orders) {
         if (order.post_id) {
-          const existing = oldPostUpdates.get(order.post_id) || { count: 0, total: 0 };
+          const existing = oldPostUpdates.get(order.post_id) || {
+            count: 0,
+            total: 0,
+          };
           existing.count += 1;
           existing.total += Number(order.total_price) || 0;
           oldPostUpdates.set(order.post_id, existing);
@@ -1197,10 +1528,20 @@ export class PostService {
           where: { id: oldPostId },
         });
         if (oldPost) {
-          await queryRunner.manager.update(PostEntity, { id: oldPostId }, {
-            order_quantity: Math.max(0, (Number(oldPost.order_quantity) || 0) - delta.count),
-            post_total_price: Math.max(0, (Number(oldPost.post_total_price) || 0) - delta.total),
-          });
+          await queryRunner.manager.update(
+            PostEntity,
+            { id: oldPostId },
+            {
+              order_quantity: Math.max(
+                0,
+                (Number(oldPost.order_quantity) || 0) - delta.count,
+              ),
+              post_total_price: Math.max(
+                0,
+                (Number(oldPost.post_total_price) || 0) - delta.total,
+              ),
+            },
+          );
         }
       }
 
@@ -1228,11 +1569,15 @@ export class PostService {
         for (const order of regionOrders) {
           // update() ishlatamiz — save() da yuklangan post relation
           // yangi post_id ni bekor qilib eski qiymatni saqlab qo'yadi
-          await queryRunner.manager.update(OrderEntity, { id: order.id }, {
-            status: Order_status.RECEIVED,
-            return_requested: false,
-            post_id: newPost.id,
-          });
+          await queryRunner.manager.update(
+            OrderEntity,
+            { id: order.id },
+            {
+              status: Order_status.RECEIVED,
+              return_requested: false,
+              post_id: newPost.id,
+            },
+          );
 
           totalAdded += Number(order.total_price) || 0;
           countAdded += 1;
@@ -1243,8 +1588,10 @@ export class PostService {
             PostEntity,
             { id: newPost.id },
             {
-              order_quantity: (Number(newPost.order_quantity) || 0) + countAdded,
-              post_total_price: (Number(newPost.post_total_price) || 0) + totalAdded,
+              order_quantity:
+                (Number(newPost.order_quantity) || 0) + countAdded,
+              post_total_price:
+                (Number(newPost.post_total_price) || 0) + totalAdded,
             },
           );
         }

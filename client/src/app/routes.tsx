@@ -127,6 +127,7 @@ const OperatorStats = lazy(
 );
 const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
 const OperatorOrders = lazy(() => import("../pages/operator-orders"));
+const CourierBulk = lazy(() => import("../pages/courier-bulk"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -262,6 +263,11 @@ const AppRouters = () => {
                   element: <OldMails />,
                 },
               ],
+            },
+
+            {
+              path: "courier-bulk",
+              element: <CourierBulk />,
             },
 
             {

@@ -28,7 +28,8 @@ export class CreateIntegrationDto {
   @IsNotEmpty({ message: 'Slug kiritilishi shart' })
   @IsString()
   @Matches(/^[a-z0-9-]+$/, {
-    message: "Slug faqat kichik harflar, raqamlar va tire (-) dan iborat bo'lishi kerak",
+    message:
+      "Slug faqat kichik harflar, raqamlar va tire (-) dan iborat bo'lishi kerak",
   })
   slug: string;
 

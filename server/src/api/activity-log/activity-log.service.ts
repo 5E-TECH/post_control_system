@@ -63,7 +63,11 @@ export class ActivityLogService {
     oldStatus: string,
     newStatus: string,
     user: JwtPayload | null,
-    extra?: { description?: string; metadata?: Record<string, any>; manager?: EntityManager },
+    extra?: {
+      description?: string;
+      metadata?: Record<string, any>;
+      manager?: EntityManager;
+    },
   ): Promise<void> {
     await this.log({
       entity_type: 'order',
@@ -71,7 +75,8 @@ export class ActivityLogService {
       action: 'status_change',
       old_value: { status: oldStatus },
       new_value: { status: newStatus },
-      description: extra?.description || `Buyurtma holati: ${oldStatus} → ${newStatus}`,
+      description:
+        extra?.description || `Buyurtma holati: ${oldStatus} → ${newStatus}`,
       user,
       metadata: extra?.metadata,
       manager: extra?.manager,
@@ -96,7 +101,11 @@ export class ActivityLogService {
       });
 
       const enriched = await this.enrichLogs(logs);
-      return successRes({ logs: enriched, total, page, limit }, 200, 'Activity logs');
+      return successRes(
+        { logs: enriched, total, page, limit },
+        200,
+        'Activity logs',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -167,7 +176,9 @@ export class ActivityLogService {
     const orderMap = new Map<string, any>(orders.map((o: any) => [o.id, o]));
     const postMap = new Map<string, any>(posts.map((p: any) => [p.id, p]));
     const userMap = new Map<string, any>(users.map((u: any) => [u.id, u]));
-    const cashboxMap = new Map<string, any>(cashboxes.map((c: any) => [c.id, c]));
+    const cashboxMap = new Map<string, any>(
+      cashboxes.map((c: any) => [c.id, c]),
+    );
 
     return logs.map((log) => {
       let entity_summary: any = null;
@@ -187,21 +198,20 @@ export class ActivityLogService {
   /**
    * Umumiy loglar (barcha entity_type) — admin panel uchun
    */
-  async getAllLogs(
-    filters: {
-      entity_type?: string;
-      action?: string;
-      excludeAction?: string;
-      user_id?: string;
-      search?: string;
-      fromDate?: string;
-      toDate?: string;
-      page?: number;
-      limit?: number;
-    },
-  ) {
+  async getAllLogs(filters: {
+    entity_type?: string;
+    action?: string;
+    excludeAction?: string;
+    user_id?: string;
+    search?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
     try {
-      const qb = this.logRepo.createQueryBuilder('log')
+      const qb = this.logRepo
+        .createQueryBuilder('log')
         .orderBy('log.created_at', 'DESC');
 
       if (filters.search) {
@@ -211,13 +221,17 @@ export class ActivityLogService {
         );
       }
       if (filters.entity_type) {
-        qb.andWhere('log.entity_type = :entity_type', { entity_type: filters.entity_type });
+        qb.andWhere('log.entity_type = :entity_type', {
+          entity_type: filters.entity_type,
+        });
       }
       if (filters.action) {
         qb.andWhere('log.action = :action', { action: filters.action });
       }
       if (filters.excludeAction) {
-        qb.andWhere('log.action != :excludeAction', { excludeAction: filters.excludeAction });
+        qb.andWhere('log.action != :excludeAction', {
+          excludeAction: filters.excludeAction,
+        });
       }
       if (filters.user_id) {
         qb.andWhere('log.user_id = :user_id', { user_id: filters.user_id });
@@ -240,7 +254,11 @@ export class ActivityLogService {
       const [logs, total] = await qb.getManyAndCount();
       const enriched = await this.enrichLogs(logs);
 
-      return successRes({ logs: enriched, total, page, limit }, 200, 'All activity logs');
+      return successRes(
+        { logs: enriched, total, page, limit },
+        200,
+        'All activity logs',
+      );
     } catch (error) {
       return catchError(error);
     }

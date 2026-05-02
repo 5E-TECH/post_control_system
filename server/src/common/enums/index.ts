@@ -93,10 +93,10 @@ export enum Commission_type {
 
 // Moliyaviy taroziga ta'sir qiluvchi manba turlari
 export enum FinancialSource_type {
-  SELL_PROFIT = 'sell_profit',           // Sotuvdan pochta foydasi
-  MANUAL_EXPENSE = 'manual_expense',     // Qo'lda chiqim
-  MANUAL_INCOME = 'manual_income',       // Qo'lda kirim
-  SALARY = 'salary',                     // Maosh to'lovi
-  CORRECTION = 'correction',             // Tuzatish (rollback)
-  BILLS = 'bills',                       // Hisob-fakturalar
+  SELL_PROFIT = 'sell_profit', // Sotuvdan pochta foydasi
+  MANUAL_EXPENSE = 'manual_expense', // Qo'lda chiqim
+  MANUAL_INCOME = 'manual_income', // Qo'lda kirim
+  SALARY = 'salary', // Maosh to'lovi
+  CORRECTION = 'correction', // Tuzatish (rollback)
+  BILLS = 'bills', // Hisob-fakturalar
 }

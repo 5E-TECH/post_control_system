@@ -29,11 +29,16 @@ import {
 export class RegionService implements OnModuleInit {
   constructor(
     @InjectRepository(RegionEntity) private regionRepository: RegionRepository,
-    @InjectRepository(PostEntity) private postRepository: Repository<PostEntity>,
-    @InjectRepository(OrderEntity) private orderRepository: Repository<OrderEntity>,
-    @InjectRepository(UserEntity) private userRepository: Repository<UserEntity>,
-    @InjectRepository(DistrictEntity) private districtRepository: Repository<DistrictEntity>,
-    @InjectRepository(DistrictCourierEntity) private districtCourierRepository: Repository<DistrictCourierEntity>,
+    @InjectRepository(PostEntity)
+    private postRepository: Repository<PostEntity>,
+    @InjectRepository(OrderEntity)
+    private orderRepository: Repository<OrderEntity>,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
+    @InjectRepository(DistrictEntity)
+    private districtRepository: Repository<DistrictEntity>,
+    @InjectRepository(DistrictCourierEntity)
+    private districtCourierRepository: Repository<DistrictCourierEntity>,
   ) {}
 
   async onModuleInit() {
@@ -343,11 +348,16 @@ export class RegionService implements OnModuleInit {
         totalCancelled: stats.reduce((sum, s) => sum + s.cancelledOrders, 0),
         totalRevenue: stats.reduce((sum, s) => sum + s.totalRevenue, 0),
         avgSuccessRate: Math.round(
-          stats.reduce((sum, s) => sum + s.successRate, 0) / (stats.length || 1),
+          stats.reduce((sum, s) => sum + s.successRate, 0) /
+            (stats.length || 1),
         ),
       };
 
-      return successRes({ regions: stats, summary }, 200, 'Viloyatlar statistikasi');
+      return successRes(
+        { regions: stats, summary },
+        200,
+        'Viloyatlar statistikasi',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -397,7 +407,11 @@ export class RegionService implements OnModuleInit {
             districtId,
             allDistrictCouriers
               .filter((c) => c.district_id === districtId)
-              .map((c) => ({ id: c.id, name: c.name, phone_number: c.phone_number })),
+              .map((c) => ({
+                id: c.id,
+                name: c.name,
+                phone_number: c.phone_number,
+              })),
           );
         }
       }
@@ -434,7 +448,9 @@ export class RegionService implements OnModuleInit {
           if (courierPostIds.length > 0) {
             const totalQuery = this.orderRepository
               .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', { postIds: courierPostIds })
+              .where('order.post_id IN (:...postIds)', {
+                postIds: courierPostIds,
+              })
               .andWhere('order.deleted_at IS NULL');
 
             if (hasDateFilter) {
@@ -447,7 +463,9 @@ export class RegionService implements OnModuleInit {
 
             const deliveredQuery = this.orderRepository
               .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', { postIds: courierPostIds })
+              .where('order.post_id IN (:...postIds)', {
+                postIds: courierPostIds,
+              })
               .andWhere('order.status = :status', { status: Order_status.SOLD })
               .andWhere('order.deleted_at IS NULL');
 
@@ -461,7 +479,9 @@ export class RegionService implements OnModuleInit {
 
             const cancelledQuery = this.orderRepository
               .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', { postIds: courierPostIds })
+              .where('order.post_id IN (:...postIds)', {
+                postIds: courierPostIds,
+              })
               .andWhere('order.status IN (:...statuses)', {
                 statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
               })
@@ -478,7 +498,9 @@ export class RegionService implements OnModuleInit {
             const revenueQuery = this.orderRepository
               .createQueryBuilder('order')
               .select('SUM(order.total_price)', 'revenue')
-              .where('order.post_id IN (:...postIds)', { postIds: courierPostIds })
+              .where('order.post_id IN (:...postIds)', {
+                postIds: courierPostIds,
+              })
               .andWhere('order.status = :status', { status: Order_status.SOLD })
               .andWhere('order.deleted_at IS NULL');
 
@@ -520,7 +542,9 @@ export class RegionService implements OnModuleInit {
           // Tumandagi buyurtmalar
           const districtTotalQuery = this.orderRepository
             .createQueryBuilder('order')
-            .where('order.district_id = :districtId', { districtId: district.id })
+            .where('order.district_id = :districtId', {
+              districtId: district.id,
+            })
             .andWhere('order.deleted_at IS NULL');
 
           if (hasDateFilter) {
@@ -533,7 +557,9 @@ export class RegionService implements OnModuleInit {
 
           const districtDeliveredQuery = this.orderRepository
             .createQueryBuilder('order')
-            .where('order.district_id = :districtId', { districtId: district.id })
+            .where('order.district_id = :districtId', {
+              districtId: district.id,
+            })
             .andWhere('order.status = :status', { status: Order_status.SOLD })
             .andWhere('order.deleted_at IS NULL');
 
@@ -547,7 +573,9 @@ export class RegionService implements OnModuleInit {
 
           const districtCancelledQuery = this.orderRepository
             .createQueryBuilder('order')
-            .where('order.district_id = :districtId', { districtId: district.id })
+            .where('order.district_id = :districtId', {
+              districtId: district.id,
+            })
             .andWhere('order.status IN (:...statuses)', {
               statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
             })
@@ -564,7 +592,9 @@ export class RegionService implements OnModuleInit {
           const districtRevenueQuery = this.orderRepository
             .createQueryBuilder('order')
             .select('SUM(order.total_price)', 'revenue')
-            .where('order.district_id = :districtId', { districtId: district.id })
+            .where('order.district_id = :districtId', {
+              districtId: district.id,
+            })
             .andWhere('order.status = :status', { status: Order_status.SOLD })
             .andWhere('order.deleted_at IS NULL');
 
@@ -689,11 +719,16 @@ export class RegionService implements OnModuleInit {
                 ? Math.round((deliveredOrders / totalOrders) * 100)
                 : 0,
             totalCouriers: couriers.length,
-            activeCouriers: couriers.filter((c) => c.status === Status.ACTIVE).length,
+            activeCouriers: couriers.filter((c) => c.status === Status.ACTIVE)
+              .length,
             totalDistricts: region.assignedDistricts.length,
           },
-          couriers: courierStats.sort((a, b) => b.deliveredOrders - a.deliveredOrders),
-          districts: districtStats.sort((a, b) => b.totalOrders - a.totalOrders),
+          couriers: courierStats.sort(
+            (a, b) => b.deliveredOrders - a.deliveredOrders,
+          ),
+          districts: districtStats.sort(
+            (a, b) => b.totalOrders - a.totalOrders,
+          ),
         },
         200,
         'Viloyat batafsil statistikasi',
@@ -710,7 +745,9 @@ export class RegionService implements OnModuleInit {
    */
   async assignMainCourier(regionId: string, courierId: string | null) {
     try {
-      const region = await this.regionRepository.findOne({ where: { id: regionId } });
+      const region = await this.regionRepository.findOne({
+        where: { id: regionId },
+      });
       if (!region) {
         throw new NotFoundException('Viloyat topilmadi');
       }
@@ -727,7 +764,13 @@ export class RegionService implements OnModuleInit {
       region.main_courier_id = courierId as any;
       await this.regionRepository.save(region);
 
-      return successRes(region, 200, courierId ? 'Asosiy kuryer biriktirildi' : 'Asosiy kuryer olib tashlandi');
+      return successRes(
+        region,
+        200,
+        courierId
+          ? 'Asosiy kuryer biriktirildi'
+          : 'Asosiy kuryer olib tashlandi',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -759,7 +802,11 @@ export class RegionService implements OnModuleInit {
       region.logist_id = logistId as any;
       await this.regionRepository.save(region);
 
-      return successRes(region, 200, logistId ? 'Logist biriktirildi' : 'Logist olib tashlandi');
+      return successRes(
+        region,
+        200,
+        logistId ? 'Logist biriktirildi' : 'Logist olib tashlandi',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -793,7 +840,11 @@ export class RegionService implements OnModuleInit {
           .execute();
       }
 
-      return successRes({}, 200, `Logist ${regionIds.length} ta viloyatga biriktirildi`);
+      return successRes(
+        {},
+        200,
+        `Logist ${regionIds.length} ta viloyatga biriktirildi`,
+      );
     } catch (error) {
       return catchError(error);
     }
