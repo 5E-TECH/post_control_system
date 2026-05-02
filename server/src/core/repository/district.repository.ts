@@ -1,4 +1,4 @@
-import { Repository } from "typeorm";
-import { DistrictEntity } from "../entity/district.entity";
+import { Repository } from 'typeorm';
+import { DistrictEntity } from '../entity/district.entity';
 
-export type DistrictRepository = Repository<DistrictEntity>
+export type DistrictRepository = Repository<DistrictEntity>;

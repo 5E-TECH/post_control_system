@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, LessThanOrEqual } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
@@ -25,8 +21,8 @@ import { successRes, catchError } from 'src/infrastructure/lib/response';
 
 // Retry delays (milliseconds)
 const RETRY_DELAYS = [
-  60 * 1000,      // 1 daqiqa
-  5 * 60 * 1000,  // 5 daqiqa
+  60 * 1000, // 1 daqiqa
+  5 * 60 * 1000, // 5 daqiqa
   15 * 60 * 1000, // 15 daqiqa
 ];
 
@@ -90,7 +86,7 @@ export class IntegrationSyncService {
       }
 
       // Mapped external status
-      const statusMapping = integration.status_mapping as StatusMapping;
+      const statusMapping = integration.status_mapping;
       const externalStatus = statusMapping?.[action] || newStatus;
 
       // Config dan qiymatlarni olish
@@ -125,7 +121,9 @@ export class IntegrationSyncService {
       });
 
       await this.syncQueueRepo.save(syncJob);
-      this.logger.log(`✅ Sync job qo'shildi: Order #${order.external_id}, Action: ${action}`);
+      this.logger.log(
+        `✅ Sync job qo'shildi: Order #${order.external_id}, Action: ${action}`,
+      );
 
       // Worker ni trigger qilish (agar ishlamayotgan bo'lsa)
       this.triggerWorker();
@@ -218,7 +216,8 @@ export class IntegrationSyncService {
 
     try {
       // Token olish
-      const token = await this.externalIntegrationService.getValidToken(integration);
+      const token =
+        await this.externalIntegrationService.getValidToken(integration);
 
       // API endpoint ni tayyorlash
       const config = integration.status_sync_config;
@@ -269,7 +268,9 @@ export class IntegrationSyncService {
       job.last_error = null;
       await this.syncQueueRepo.save(job);
 
-      this.logger.log(`✅ Sync muvaffaqiyatli: Order #${job.external_order_id}`);
+      this.logger.log(
+        `✅ Sync muvaffaqiyatli: Order #${job.external_order_id}`,
+      );
     } catch (error) {
       const axiosError = error as AxiosError;
       const errorMessage = axiosError.response?.data
@@ -288,7 +289,9 @@ export class IntegrationSyncService {
       if (job.attempts >= job.max_attempts) {
         job.status = 'failed';
         job.next_retry_at = null;
-        this.logger.error(`❌ Sync failed (max attempts): Order #${job.external_order_id}`);
+        this.logger.error(
+          `❌ Sync failed (max attempts): Order #${job.external_order_id}`,
+        );
       } else {
         // Keyingi retry vaqtini hisoblash
         const delayIndex = Math.min(job.attempts - 1, RETRY_DELAYS.length - 1);
@@ -423,10 +426,7 @@ export class IntegrationSyncService {
   async getPendingSyncs() {
     try {
       const data = await this.syncQueueRepo.find({
-        where: [
-          { status: 'pending' },
-          { status: 'processing' },
-        ],
+        where: [{ status: 'pending' }, { status: 'processing' }],
         relations: ['integration', 'order'],
         order: { created_at: 'ASC' },
       });
@@ -497,7 +497,11 @@ export class IntegrationSyncService {
       // Worker ni trigger qilish
       this.triggerWorker();
 
-      return successRes({ id: job.id }, 200, 'Sync job qayta queue ga qo\'shildi');
+      return successRes(
+        { id: job.id },
+        200,
+        "Sync job qayta queue ga qo'shildi",
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -580,7 +584,7 @@ export class IntegrationSyncService {
         throw new NotFoundException('Sync job topilmadi');
       }
 
-      return successRes(null, 200, 'Sync job o\'chirildi');
+      return successRes(null, 200, "Sync job o'chirildi");
     } catch (error) {
       return catchError(error);
     }
@@ -698,7 +702,9 @@ export class IntegrationSyncService {
         this.triggerWorker();
       }
 
-      this.logger.log(`📦 ${queuedCount} ta eski buyurtma sync queue ga qo'shildi`);
+      this.logger.log(
+        `📦 ${queuedCount} ta eski buyurtma sync queue ga qo'shildi`,
+      );
 
       return successRes(
         { queued: queuedCount, total_found: orders.length },

@@ -69,7 +69,10 @@ export class IntegrationSyncController {
     @Query('integration_id') integrationId?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.syncService.getSuccessfulSyncs(integrationId, Number(limit) || 50);
+    return this.syncService.getSuccessfulSyncs(
+      integrationId,
+      Number(limit) || 50,
+    );
   }
 
   /**

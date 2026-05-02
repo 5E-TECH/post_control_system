@@ -35,6 +35,7 @@ function createQueryRunnerMock() {
       return Promise.resolve(entity);
     }),
     update: jest.fn(() => Promise.resolve({ affected: 1 })),
+    softDelete: jest.fn(() => Promise.resolve({ affected: 1 })),
   };
 
   const qr = {
@@ -412,7 +413,7 @@ describe('OrderBotService', () => {
     const makeOrder = (overrides: any = {}): any => ({
       id: uuid(20),
       status: Order_status.CREATED,
-      deleted: false,
+      deleted_at: null,
       user_id: uuid(30),
       customer: { name: 'Cust', phone_number: '+998901111111', district: null },
       items: [],
@@ -477,7 +478,8 @@ describe('OrderBotService', () => {
       });
 
       await service.processOrderAction('cancel', order.id, ctx);
-      expect(order.deleted).toBe(true);
+      // Soft-delete: deleted_at TypeORM softDelete chaqiriqi orqali yoziladi
+      expect(queryRunnerFactory.qr.manager.softDelete).toHaveBeenCalled();
     });
 
     it('returns early if order already processed', async () => {

@@ -955,7 +955,7 @@ const MailDetail = () => {
               <button
                 disabled={isPending}
                 onClick={() => handleClick(id as string)}
-                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full px-6 py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl font-semibold text-base hover:shadow-lg hover:shadow-emerald-500/25 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isPending ? (
                   <Loader2 className="w-5 h-5 animate-spin" />

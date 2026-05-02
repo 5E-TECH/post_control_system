@@ -1,5 +1,13 @@
 import { Roles, Status } from 'src/common/enums';
-import { IsEnum, IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateAdminDto {
@@ -25,7 +33,7 @@ export class UpdateAdminDto {
 
   @ApiPropertyOptional({
     enum: [Roles.ADMIN, Roles.REGISTRATOR],
-    description: 'Faqat superadmin admin<->registrator o\'zgartira oladi',
+    description: "Faqat superadmin admin<->registrator o'zgartira oladi",
   })
   @IsOptional()
   @IsIn([Roles.ADMIN, Roles.REGISTRATOR])
@@ -44,7 +52,10 @@ export class UpdateAdminDto {
   @Max(30)
   payment_day?: number;
 
-  @ApiPropertyOptional({ example: -2000000, description: 'Boshlang\'ich oylik qoldiq (manfiy = qarz)' })
+  @ApiPropertyOptional({
+    example: -2000000,
+    description: "Boshlang'ich oylik qoldiq (manfiy = qarz)",
+  })
   @IsOptional()
   @IsNumber()
   have_to_pay?: number;

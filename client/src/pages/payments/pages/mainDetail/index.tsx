@@ -16,8 +16,6 @@ import {
   Clock,
   Play,
   Square,
-  Landmark,
-  PiggyBank,
   Magnet,
   ChevronLeft,
 } from "lucide-react";
@@ -80,15 +78,6 @@ const MainDetail = () => {
   const [salaryAmount, setSalaryAmount] = useState("");
   const [salaryPayMethod, setSalaryPayMethod] = useState<"cash" | "click">("cash");
   const [salaryComment, setSalaryComment] = useState("");
-  // Investor popup states
-  const [showInvestorPopup, setShowInvestorPopup] = useState(false);
-  const [selectedInvestor, setSelectedInvestor] = useState<any>(null);
-  const [, setInvestorAction] = useState<"piggy" | "pay">("piggy");
-  const [investorAmount, setInvestorAmount] = useState("");
-  const [investorNote, setInvestorNote] = useState("");
-  const [investorPayMethod, setInvestorPayMethod] = useState<"cash" | "click">("cash");
-  const [investorSearch, setInvestorSearch] = useState("");
-  const [showInvestorActionModal, setShowInvestorActionModal] = useState(false);
   const { handleApiError } = useApiNotification();
 
   const navigate = useNavigate();
@@ -118,17 +107,10 @@ const MainDetail = () => {
   const { getMarkets } = useMarket();
   const { getCourier } = useCourier();
   const { getCashBoxMain, cashboxSpand, cashboxFill, paySalary, getCurrentShift, openShift, closeShift } = useCashBox();
-  const { getAdminAndRegister, getInvestors, addManualEarning } = useUser();
+  const { getAdminAndRegister } = useUser();
 
   // Get current shift status
   const { data: shiftData, refetch: refetchShift } = getCurrentShift();
-
-  // Investors
-  const { data: investorsData } = getInvestors(showInvestorPopup);
-  const allInvestors = investorsData?.data || [];
-  const filteredInvestors = investorSearch
-    ? allInvestors.filter((i: any) => i.name?.toLowerCase().includes(investorSearch.toLowerCase()))
-    : allInvestors;
 
   const searchParam = form.search
     ? { search: form.search } // ✅ faqat search bo‘lsa qo‘shiladi
@@ -456,20 +438,6 @@ const MainDetail = () => {
                 </span>
               </button>
 
-              {/* Investor ulushi (vaqtinchalik o'chirilgan) */}
-              {/* <button
-                onClick={() => setShowInvestorPopup(true)}
-                className="group flex flex-col items-center gap-2 cursor-pointer"
-              >
-                <div className="relative">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-violet-500 via-purple-600 to-fuchsia-500 flex items-center justify-center shadow-xl shadow-purple-500/40 group-hover:shadow-purple-500/60 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
-                    <Landmark size={24} className="text-white" />
-                  </div>
-                </div>
-                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
-                  Investor
-                </span>
-              </button> */}
             </div>
 
             {/* Secondary Actions - Pills */}
@@ -1508,252 +1476,6 @@ const MainDetail = () => {
         </div>
       </PaymentPopup>
 
-      {/* ===== INVESTOR SELECTION POPUP ===== */}
-      <PaymentPopup isShow={showInvestorPopup} onClose={() => { setShowInvestorPopup(false); setInvestorSearch(""); }}>
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl overflow-hidden shadow-2xl w-[95vw] sm:w-[90vw] max-w-lg max-h-[85vh] flex flex-col">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-violet-600 to-purple-700 p-5 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Landmark size={24} className="text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">Investorni tanlang</h2>
-                <p className="text-sm text-white/70">Ulush ajratish yoki to'lov</p>
-              </div>
-            </div>
-            <button onClick={() => { setShowInvestorPopup(false); setInvestorSearch(""); }}
-              className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer">
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={investorSearch}
-                onChange={(e) => setInvestorSearch(e.target.value)}
-                placeholder="Investor qidirish..."
-                className="w-full h-10 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
-              />
-            </div>
-          </div>
-
-          {/* List */}
-          <div className="flex-1 overflow-y-auto p-2">
-            {filteredInvestors.length === 0 ? (
-              <div className="py-12 text-center text-gray-400">
-                <Landmark className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Investor topilmadi</p>
-              </div>
-            ) : filteredInvestors.map((inv: any) => (
-              <div
-                key={inv.id}
-                onClick={() => {
-                  setSelectedInvestor(inv);
-                  setShowInvestorPopup(false);
-                  setInvestorSearch("");
-                  setInvestorAction("piggy");
-                  setInvestorAmount("");
-                  setInvestorNote("");
-                  setShowInvestorActionModal(true);
-                }}
-                className="flex items-center gap-3 p-3 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer transition-all"
-              >
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                  {inv.name?.charAt(0)?.toUpperCase() || "I"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-800 dark:text-white truncate">{inv.name}</p>
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${inv.is_partner ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" : "bg-green-100 dark:bg-green-900/30 text-green-600"}`}>
-                    {inv.is_partner ? "Sherik" : "Investor"}
-                  </span>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  {(inv.balance ?? 0) < 0 ? (
-                    <p className="text-[10px] font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded mb-0.5">
-                      Qarz: {Number(inv.balance).toLocaleString("uz-UZ")}
-                    </p>
-                  ) : inv.pending_amount > 0 ? (
-                    <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded mb-0.5">
-                      {Number(inv.pending_amount).toLocaleString("uz-UZ")} kutmoqda
-                    </p>
-                  ) : null}
-                  <p className={`text-sm font-bold ${inv.today_earned > 0 ? "text-emerald-600" : "text-gray-400"}`}>
-                    {inv.today_earned > 0 ? `+${Number(inv.today_earned).toLocaleString("uz-UZ")}` : "0"} <span className="text-[10px] font-normal text-gray-400">bugun</span>
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </PaymentPopup>
-
-      {/* ===== INVESTOR ACTION MODAL ===== */}
-      <PaymentPopup isShow={showInvestorActionModal} onClose={() => setShowInvestorActionModal(false)}>
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl overflow-hidden shadow-2xl w-[95vw] sm:w-[90vw] max-w-md">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-violet-600 to-purple-700 p-5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <Landmark size={24} className="text-white" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-white">{selectedInvestor?.name}</h2>
-                <p className="text-sm text-white/70">
-                  {selectedInvestor?.is_partner ? "Sherik" : "Investor"}
-                </p>
-              </div>
-            </div>
-            <button onClick={() => setShowInvestorActionModal(false)}
-              className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer">
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="p-5 space-y-4">
-            {/* Qarz yoki pending ko'rsatish */}
-            {(selectedInvestor?.balance ?? 0) < 0 ? (
-              <div className="flex items-center justify-between p-3 rounded-xl border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/30">
-                <div>
-                  <p className="text-xs text-red-700 dark:text-red-400">Investor qarzda</p>
-                  <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                    {Number(selectedInvestor?.balance || 0).toLocaleString("uz-UZ")} so'm
-                  </p>
-                </div>
-                <p className="text-[10px] text-red-500 dark:text-red-400 max-w-[140px] text-right">
-                  Qarz yopilmaguncha ajratish mumkin emas
-                </p>
-              </div>
-            ) : (
-              <div className={`flex items-center justify-between p-3 rounded-xl border ${
-                (selectedInvestor?.pending_amount || 0) > 0
-                  ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/30"
-                  : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
-              }`}>
-                <div>
-                  <p className={`text-xs ${(selectedInvestor?.pending_amount || 0) > 0 ? "text-amber-700 dark:text-amber-400" : "text-gray-500 dark:text-gray-400"}`}>
-                    Ajratib olinmagan summa
-                  </p>
-                  <p className={`text-lg font-bold ${(selectedInvestor?.pending_amount || 0) > 0 ? "text-amber-800 dark:text-amber-300" : "text-gray-400"}`}>
-                    {Number(selectedInvestor?.pending_amount || 0).toLocaleString("uz-UZ")} so'm
-                  </p>
-                </div>
-                {(selectedInvestor?.pending_amount || 0) > 0 && (
-                  <button
-                    onClick={() => setInvestorAmount(Number(selectedInvestor.pending_amount).toLocaleString("uz-UZ"))}
-                    className="w-10 h-10 rounded-xl bg-amber-200 dark:bg-amber-800/50 flex items-center justify-center text-amber-700 dark:text-amber-300 hover:bg-amber-300 dark:hover:bg-amber-700/50 transition-all cursor-pointer"
-                    title="Summani avtomatik to'ldirish"
-                  >
-                    <Magnet className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Summa */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Summa</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={investorAmount}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/\D/g, "");
-                    setInvestorAmount(v ? Number(v).toLocaleString("uz-UZ") : "");
-                  }}
-                  placeholder="0"
-                  className="w-full h-12 px-4 pr-12 text-lg font-bold rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
-                />
-                {(selectedInvestor?.pending_amount || 0) > 0 && (selectedInvestor?.balance ?? 0) > 0 && (
-                  <button
-                    onClick={() => setInvestorAmount(Number(selectedInvestor.pending_amount).toLocaleString("uz-UZ"))}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-all cursor-pointer"
-                    title="Tavsiya etilgan summani to'ldirish"
-                  >
-                    <Magnet className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Izoh */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Izoh</label>
-              <input
-                type="text"
-                value={investorNote}
-                onChange={(e) => setInvestorNote(e.target.value)}
-                placeholder="Ixtiyoriy"
-                className="w-full h-10 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-sm"
-              />
-            </div>
-
-            {/* Naqd / Karta tanlash */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">To'lov usuli</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setInvestorPayMethod("cash")}
-                  className={`flex-1 h-10 rounded-xl text-sm font-medium transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    investorPayMethod === "cash"
-                      ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-2 border-green-400 dark:border-green-600"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
-                  }`}
-                >
-                  Naqd
-                </button>
-                <button
-                  onClick={() => setInvestorPayMethod("click")}
-                  className={`flex-1 h-10 rounded-xl text-sm font-medium transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                    investorPayMethod === "click"
-                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-2 border-blue-400 dark:border-blue-600"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
-                  }`}
-                >
-                  Karta
-                </button>
-              </div>
-            </div>
-
-            <p className="text-xs text-purple-500 dark:text-purple-400">
-              Asosiy kassaning {investorPayMethod === "cash" ? "naqd" : "karta"} balansidan yechiladi va investor kassasiga qo'shiladi
-            </p>
-
-            {/* Submit */}
-            <button
-              onClick={() => {
-                const amount = Number(investorAmount.replace(/\D/g, ""));
-                if (!amount || !selectedInvestor?.id) return;
-                addManualEarning.mutate(
-                  { id: selectedInvestor.id, data: { amount, note: investorNote || "Kassadan ajratildi", payment_method: investorPayMethod } },
-                  {
-                    onSuccess: () => {
-                      message.success("Investor kassasiga ajratildi");
-                      setShowInvestorActionModal(false);
-                      refetch();
-                    },
-                    onError: (err: any) => handleApiError(err, "Xatolik"),
-                  },
-                );
-              }}
-              disabled={!investorAmount || addManualEarning.isPending || (selectedInvestor?.balance ?? 0) <= 0}
-              className="w-full h-12 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-medium shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
-            >
-              {addManualEarning.isPending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (selectedInvestor?.balance ?? 0) <= 0 ? (
-                <><PiggyBank className="w-5 h-5" /> Qarzda — ajratish mumkin emas</>
-              ) : (
-                <><PiggyBank className="w-5 h-5" /> Ajratib olish</>
-              )}
-            </button>
-          </div>
-        </div>
-      </PaymentPopup>
 
       </div>
     </div>

@@ -259,19 +259,6 @@ const Navbar = ({ role }: { role: string }) => {
             </div>
           </div>
         );
-      // case "investor":
-      //   return (
-      //     <div className={navContainerClass}>
-      //       <div className="flex justify-between items-center px-4 py-2">
-      //       <NavLink to={buildAdminPath()} className={({ isActive }) => getNavItemClass(isActive)}>
-      //         <House className="w-5 h-5" />
-      //       </NavLink>
-      //       <NavLink to={buildAdminPath("my-investments")} className={({ isActive }) => getNavItemClass(isActive)}>
-      //         <TrendingUp className="w-5 h-5" />
-      //       </NavLink>
-      //       </div>
-      //     </div>
-      //   );
       default:
         return null;
     }

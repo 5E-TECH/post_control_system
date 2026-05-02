@@ -1,6 +1,13 @@
 // region.entity.ts
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Column, Entity, OneToMany, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Column,
+  Entity,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { DistrictEntity } from './district.entity';
 import { UserEntity } from './users.entity';
 import { PostEntity } from './post.entity';

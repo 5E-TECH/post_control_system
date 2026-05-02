@@ -30,6 +30,25 @@ export const useOrder = () => {
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
+  // Bulk operatsiyalar — kuryer ofisda kompyuter+skaner bilan ishlaydi
+  const bulkSellOrders = useMutation({
+    mutationFn: (data: { order_ids: string[]; comment?: string }) =>
+      api.post(`order/bulk/sell`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
+  const bulkCancelOrders = useMutation({
+    mutationFn: (data: { order_ids: string[]; comment?: string }) =>
+      api.post(`order/bulk/cancel`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
+  });
+
+  // Skan paytida tezkor tekshirish
+  const findOrderByQrToken = (token: string) =>
+    api.get(`order/by-token/courier/${token}`).then((res) => res.data);
+
   const rollbackOrder = useMutation({
     mutationFn: ({ id, target_status }: { id: string; target_status: string }) =>
       api.post(`order/rollback/${id}`, { target_status }).then((res) => res.data),
@@ -196,6 +215,9 @@ export const useOrder = () => {
     createOrderBot,
     updateOrderAddress,
     receiveExternalOrders,
+    bulkSellOrders,
+    bulkCancelOrders,
+    findOrderByQrToken,
     getOrderActivityLog: (orderId: string, enabled: boolean = true) =>
       useQuery({
         queryKey: [order, "activity-log", orderId],

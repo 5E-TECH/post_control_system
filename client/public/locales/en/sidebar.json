@@ -9,5 +9,6 @@
     "balance": "Financial Balance",
     "logs": "Logs",
     "region": "Region",
-    "financialHistory": "Financial History"
+    "financialHistory": "Financial History",
+    "courier_bulk": "Quick action"
 }

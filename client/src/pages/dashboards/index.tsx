@@ -30,9 +30,6 @@ const SkeletonBox = ({ className }: { className?: string }) => (
   />
 );
 
-// Investor roli uchun lazy import (vaqtinchalik o'chirilgan)
-// const InvestorDashboardLazy = lazy(() => import("../investor-dashboard"));
-
 const Dashboards = () => {
   const { t } = useTranslation(["dashboard"]);
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
@@ -52,11 +49,6 @@ const Dashboards = () => {
   // Redux'dan role va id olish
   const role = useSelector((state: RootState) => state.roleSlice.role);
   const currentUserId = useSelector((state: RootState) => state.roleSlice.id);
-
-  // Investor roli uchun alohida dashboard (vaqtinchalik o'chirilgan)
-  // if (role === "investor") {
-  //   return <InvestorDashboardLazy />;
-  // }
 
   let data: any;
   let isLoading: boolean = false;

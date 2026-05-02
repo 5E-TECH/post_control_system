@@ -57,7 +57,7 @@ export class DistrictService implements OnModuleInit {
       return;
     }
 
-    console.log('📦 Boshlang\'ich tumanlar yaratilmoqda...');
+    console.log("📦 Boshlang'ich tumanlar yaratilmoqda...");
 
     for (const region of regions) {
       const regionEntity = await this.regionRepository.findOne({
@@ -79,7 +79,7 @@ export class DistrictService implements OnModuleInit {
       }
     }
 
-    console.log('✅ Boshlang\'ich tumanlar yaratildi');
+    console.log("✅ Boshlang'ich tumanlar yaratildi");
   }
 
   async create(createDistrictDto: CreateDistrictDto) {
@@ -339,7 +339,9 @@ export class DistrictService implements OnModuleInit {
 
       console.log('🔄 MERGE BOSHLANDI (TRANSACTION)');
       console.log(`📍 Target: ${targetDistrict.name} (${target_district_id})`);
-      console.log(`📍 Sources: ${sourceDistricts.map(d => `${d.name} (${d.id})`).join(', ')}`);
+      console.log(
+        `📍 Sources: ${sourceDistricts.map((d) => `${d.name} (${d.id})`).join(', ')}`,
+      );
 
       // Har bir source district uchun buyurtmalarni va userlarni ko'chirish
       let totalOrdersMoved = 0;
@@ -356,7 +358,9 @@ export class DistrictService implements OnModuleInit {
         const ordersCount = await queryRunner.manager.count(OrderEntity, {
           where: { district_id: sourceDistrict.id },
         });
-        console.log(`📦 ${sourceDistrict.name}: ${ordersCount} ta buyurtma (order.district_id)`);
+        console.log(
+          `📦 ${sourceDistrict.name}: ${ordersCount} ta buyurtma (order.district_id)`,
+        );
 
         if (ordersCount > 0) {
           const updateResult = await queryRunner.manager
@@ -372,7 +376,9 @@ export class DistrictService implements OnModuleInit {
         const usersCount = await queryRunner.manager.count(UserEntity, {
           where: { district_id: sourceDistrict.id },
         });
-        console.log(`👤 ${sourceDistrict.name}: ${usersCount} ta user (user.district_id)`);
+        console.log(
+          `👤 ${sourceDistrict.name}: ${usersCount} ta user (user.district_id)`,
+        );
 
         if (usersCount > 0) {
           const updateUsersResult = await queryRunner.manager
@@ -391,10 +397,14 @@ export class DistrictService implements OnModuleInit {
         const remainingUsers = await queryRunner.manager.count(UserEntity, {
           where: { district_id: sourceDistrict.id },
         });
-        console.log(`🔍 ${sourceDistrict.name}: ${remainingOrders} order, ${remainingUsers} user qoldi (0 bo'lishi kerak)`);
+        console.log(
+          `🔍 ${sourceDistrict.name}: ${remainingOrders} order, ${remainingUsers} user qoldi (0 bo'lishi kerak)`,
+        );
 
         if (remainingOrders > 0 || remainingUsers > 0) {
-          throw new Error(`Ma'lumotlar to'liq ko'chirilmadi! ${sourceDistrict.name} da ${remainingOrders} order, ${remainingUsers} user qoldi`);
+          throw new Error(
+            `Ma'lumotlar to'liq ko'chirilmadi! ${sourceDistrict.name} da ${remainingOrders} order, ${remainingUsers} user qoldi`,
+          );
         }
 
         mergeDetails.push({
@@ -415,7 +425,9 @@ export class DistrictService implements OnModuleInit {
       const targetUsersAfter = await queryRunner.manager.count(UserEntity, {
         where: { district_id: target_district_id },
       });
-      console.log(`📊 Target tumanda: ${targetOrdersAfter} order, ${targetUsersAfter} user`);
+      console.log(
+        `📊 Target tumanda: ${targetOrdersAfter} order, ${targetUsersAfter} user`,
+      );
 
       // Source tumanlarni o'chirish
       console.log(`🗑️ ${source_district_ids.length} ta tuman o'chirilmoqda...`);
@@ -427,7 +439,7 @@ export class DistrictService implements OnModuleInit {
         .where('id IN (:...ids)', { ids: source_district_ids })
         .execute();
 
-      console.log('✅ Tumanlar o\'chirildi');
+      console.log("✅ Tumanlar o'chirildi");
 
       // O'chirilgandan keyin tekshirish
       const targetOrdersFinal = await queryRunner.manager.count(OrderEntity, {
@@ -436,10 +448,14 @@ export class DistrictService implements OnModuleInit {
       const targetUsersFinal = await queryRunner.manager.count(UserEntity, {
         where: { district_id: target_district_id },
       });
-      console.log(`📊 O'chirilgandan keyin: ${targetOrdersFinal} order, ${targetUsersFinal} user`);
+      console.log(
+        `📊 O'chirilgandan keyin: ${targetOrdersFinal} order, ${targetUsersFinal} user`,
+      );
 
       if (targetOrdersFinal !== targetOrdersAfter) {
-        throw new Error(`Buyurtmalar yo'qoldi! Oldin: ${targetOrdersAfter}, Keyin: ${targetOrdersFinal}`);
+        throw new Error(
+          `Buyurtmalar yo'qoldi! Oldin: ${targetOrdersAfter}, Keyin: ${targetOrdersFinal}`,
+        );
       }
 
       // Transaction ni commit qilish
@@ -475,9 +491,14 @@ export class DistrictService implements OnModuleInit {
   /**
    * Tumanga kuryer qo'shish (faqat ism va telefon)
    */
-  async addDistrictCourier(districtId: string, dto: { name: string; phone_number: string }) {
+  async addDistrictCourier(
+    districtId: string,
+    dto: { name: string; phone_number: string },
+  ) {
     try {
-      const district = await this.districtRepository.findOne({ where: { id: districtId } });
+      const district = await this.districtRepository.findOne({
+        where: { id: districtId },
+      });
       if (!district) {
         throw new NotFoundException('Tuman topilmadi');
       }
@@ -489,7 +510,7 @@ export class DistrictService implements OnModuleInit {
       });
       await this.districtCourierRepository.save(courier);
 
-      return successRes(courier, 201, 'Kuryer qo\'shildi');
+      return successRes(courier, 201, "Kuryer qo'shildi");
     } catch (error) {
       return catchError(error);
     }
@@ -500,14 +521,16 @@ export class DistrictService implements OnModuleInit {
    */
   async removeDistrictCourier(courierId: string) {
     try {
-      const courier = await this.districtCourierRepository.findOne({ where: { id: courierId } });
+      const courier = await this.districtCourierRepository.findOne({
+        where: { id: courierId },
+      });
       if (!courier) {
         throw new NotFoundException('Kuryer topilmadi');
       }
 
       await this.districtCourierRepository.delete({ id: courierId });
 
-      return successRes({}, 200, 'Kuryer o\'chirildi');
+      return successRes({}, 200, "Kuryer o'chirildi");
     } catch (error) {
       return catchError(error);
     }
@@ -532,9 +555,9 @@ export class DistrictService implements OnModuleInit {
         where: { district_id: id },
       });
 
-      // Raw SQL count
+      // Raw SQL count (soft-deleted'larni hisobga olmaymiz)
       const rawCount = await this.dataSource.query(
-        `SELECT COUNT(*) as count FROM "order" WHERE district_id = $1`,
+        `SELECT COUNT(*) as count FROM "order" WHERE district_id = $1 AND deleted_at IS NULL`,
         [id],
       );
 
@@ -544,9 +567,9 @@ export class DistrictService implements OnModuleInit {
         select: ['id', 'district_id', 'status', 'created_at'],
       });
 
-      // Address orqali qidirish
+      // Address orqali qidirish (soft-deleted'larni o'tkazib yuboramiz)
       const addressOrders = await this.dataSource.query(
-        `SELECT id, district_id, address, status FROM "order" WHERE address ILIKE $1 LIMIT 10`,
+        `SELECT id, district_id, address, status FROM "order" WHERE address ILIKE $1 AND deleted_at IS NULL LIMIT 10`,
         [`%${district.name}%`],
       );
 
@@ -595,7 +618,7 @@ export class DistrictService implements OnModuleInit {
       return successRes(
         { deletedDistrict: { id: district.id, name: district.name } },
         200,
-        'Tuman muvaffaqiyatli o\'chirildi',
+        "Tuman muvaffaqiyatli o'chirildi",
       );
     } catch (error) {
       return catchError(error);

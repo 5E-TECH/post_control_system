@@ -205,10 +205,6 @@ const Payments = () => {
     "cancel",
     "extra_cost",
     "bills",
-    "investor_earning",
-    "investor_allocate",
-    "investor_payout",
-    "investor_refund",
   ];
   const sourceOptions = sourceType.map((status: string) => ({
     value: status,
@@ -265,10 +261,6 @@ const Payments = () => {
     cancel: "Bekor qilish",
     extra_cost: "Qo'shimcha xarajat",
     bills: "To'lovlar",
-    investor_earning: "Investor daromadi",
-    investor_allocate: "Investor ulushi",
-    investor_payout: "Investorga to'lov",
-    investor_refund: "Investitsiya qaytarish",
   };
 
   const getPaymentMethodBadge = (method: string) => {

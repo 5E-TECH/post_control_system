@@ -9,6 +9,8 @@ export class UpdateRegionSatoCodeDto {
   })
   @IsNotEmpty()
   @IsString()
-  @Matches(/^\d+$/, { message: 'SATO code faqat raqamlardan iborat bo\'lishi kerak' })
+  @Matches(/^\d+$/, {
+    message: "SATO code faqat raqamlardan iborat bo'lishi kerak",
+  })
   sato_code: string;
 }

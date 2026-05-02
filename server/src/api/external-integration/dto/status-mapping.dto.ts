@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsBoolean, IsIn, ValidateNested } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsBoolean,
+  IsIn,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Status mapping DTO - bizning statuslarni tashqi tizim statuslariga moslashtirish
@@ -90,7 +96,7 @@ export class StatusSyncConfigDto {
   use_auth?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Order ID ni request body ga qo\'shish kerakmi',
+    description: "Order ID ni request body ga qo'shish kerakmi",
     example: true,
     default: false,
   })

@@ -566,7 +566,10 @@ export class CashBoxService
         entity_type: 'cashbox',
         entity_id: createPaymentsFromCourierDto.courier_id,
         action: 'courier_payment',
-        new_value: { amount: createPaymentsFromCourierDto.amount, payment_method: createPaymentsFromCourierDto.payment_method },
+        new_value: {
+          amount: createPaymentsFromCourierDto.amount,
+          payment_method: createPaymentsFromCourierDto.payment_method,
+        },
         description: `Kuryerdan ${createPaymentsFromCourierDto.amount} so'm qabul qilindi (${createPaymentsFromCourierDto.payment_method})`,
         user,
       });
@@ -736,7 +739,7 @@ export class CashBoxService
         where: { cashbox_type: Cashbox_type.FOR_COURIER },
         relations: ['user', 'user.region'],
       });
-      let courierBalanses: object[] = [];
+      const courierBalanses: object[] = [];
       let couriersTotalBalanse: number = 0;
       for (const cashbox of allCourierCashboxes) {
         courierBalanses.push({
@@ -752,7 +755,7 @@ export class CashBoxService
         where: { cashbox_type: Cashbox_type.FOR_MARKET },
         relations: ['user'],
       });
-      let marketCashboxes: object[] = [];
+      const marketCashboxes: object[] = [];
       let marketsTotalBalans: number = 0;
       for (const cashbox of allMarketCashboxes) {
         marketCashboxes.push({
@@ -791,7 +794,9 @@ export class CashBoxService
     limit?: number;
   }) {
     try {
-      const currentBalance = await calculateFinancialBalance(this.dataSource.manager);
+      const currentBalance = await calculateFinancialBalance(
+        this.dataSource.manager,
+      );
 
       const page = filters?.page && filters.page > 0 ? filters.page : 1;
       const limit = getSafeLimit(filters?.limit);
@@ -842,7 +847,11 @@ export class CashBoxService
           ? { id: h.createdByUser.id, name: h.createdByUser.name }
           : null,
         related_user: h.relatedUser
-          ? { id: h.relatedUser.id, name: h.relatedUser.name, role: h.relatedUser.role }
+          ? {
+              id: h.relatedUser.id,
+              name: h.relatedUser.name,
+              role: h.relatedUser.role,
+            }
           : null,
         order: h.order
           ? { id: h.order.id, total_price: h.order.total_price }
@@ -875,7 +884,9 @@ export class CashBoxService
     toDate?: string;
   }) {
     try {
-      const currentBalance = await calculateFinancialBalance(this.dataSource.manager);
+      const currentBalance = await calculateFinancialBalance(
+        this.dataSource.manager,
+      );
 
       let fromTs: number | null = null;
       let toTs: number | null = null;
@@ -891,8 +902,14 @@ export class CashBoxService
       const sourceQb = this.financialHistoryRepo
         .createQueryBuilder('h')
         .select('h.source_type', 'source_type')
-        .addSelect('SUM(CASE WHEN h.amount > 0 THEN h.amount ELSE 0 END)', 'positive_total')
-        .addSelect('SUM(CASE WHEN h.amount < 0 THEN (-1 * h.amount) ELSE 0 END)', 'negative_total')
+        .addSelect(
+          'SUM(CASE WHEN h.amount > 0 THEN h.amount ELSE 0 END)',
+          'positive_total',
+        )
+        .addSelect(
+          'SUM(CASE WHEN h.amount < 0 THEN (-1 * h.amount) ELSE 0 END)',
+          'negative_total',
+        )
         .addSelect('SUM(h.amount)', 'net_total')
         .addSelect('COUNT(h.id)', 'transaction_count')
         .groupBy('h.source_type')
@@ -910,8 +927,14 @@ export class CashBoxService
       // === 2. Umumiy statistika ===
       const totalsQb = this.financialHistoryRepo
         .createQueryBuilder('h')
-        .select('SUM(CASE WHEN h.amount > 0 THEN h.amount ELSE 0 END)', 'total_positive')
-        .addSelect('SUM(CASE WHEN h.amount < 0 THEN (-1 * h.amount) ELSE 0 END)', 'total_negative')
+        .select(
+          'SUM(CASE WHEN h.amount > 0 THEN h.amount ELSE 0 END)',
+          'total_positive',
+        )
+        .addSelect(
+          'SUM(CASE WHEN h.amount < 0 THEN (-1 * h.amount) ELSE 0 END)',
+          'total_negative',
+        )
         .addSelect('SUM(h.amount)', 'net_change')
         .addSelect('COUNT(h.id)', 'total_count');
 
@@ -935,9 +958,11 @@ export class CashBoxService
           source_type: s.source_type,
           total_amount: Number(s.positive_total),
           transaction_count: Number(s.transaction_count),
-          percentage: totalPositive > 0
-            ? Math.round((Number(s.positive_total) / totalPositive) * 10000) / 100
-            : 0,
+          percentage:
+            totalPositive > 0
+              ? Math.round((Number(s.positive_total) / totalPositive) * 10000) /
+                100
+              : 0,
         }))
         .sort((a, b) => b.total_amount - a.total_amount);
 
@@ -948,9 +973,11 @@ export class CashBoxService
           source_type: s.source_type,
           total_amount: Number(s.negative_total),
           transaction_count: Number(s.transaction_count),
-          percentage: totalNegative > 0
-            ? Math.round((Number(s.negative_total) / totalNegative) * 10000) / 100
-            : 0,
+          percentage:
+            totalNegative > 0
+              ? Math.round((Number(s.negative_total) / totalNegative) * 10000) /
+                100
+              : 0,
         }))
         .sort((a, b) => b.total_amount - a.total_amount);
 
@@ -959,7 +986,10 @@ export class CashBoxService
         .createQueryBuilder('h')
         .leftJoinAndSelect('h.createdByUser', 'createdByUser')
         .leftJoinAndSelect('h.relatedUser', 'relatedUser')
-        .addSelect('CASE WHEN h.amount >= 0 THEN h.amount ELSE (-1 * h.amount) END', 'abs_amount')
+        .addSelect(
+          'CASE WHEN h.amount >= 0 THEN h.amount ELSE (-1 * h.amount) END',
+          'abs_amount',
+        )
         .orderBy('abs_amount', 'DESC')
         .take(10);
 
@@ -995,7 +1025,11 @@ export class CashBoxService
               ? { id: h.createdByUser.id, name: h.createdByUser.name }
               : null,
             related_user: h.relatedUser
-              ? { id: h.relatedUser.id, name: h.relatedUser.name, role: h.relatedUser.role }
+              ? {
+                  id: h.relatedUser.id,
+                  name: h.relatedUser.name,
+                  role: h.relatedUser.role,
+                }
               : null,
           })),
         },
@@ -1051,7 +1085,10 @@ export class CashBoxService
       }
 
       const total = await qb.getCount();
-      const items = await qb.skip((page - 1) * limit).take(limit).getMany();
+      const items = await qb
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getMany();
 
       return successRes(
         {
@@ -1257,7 +1294,9 @@ export class CashBoxService
       await queryRunner.manager.save(cashboxHistory);
 
       // === MOLIYAVIY TAROZI: qo'lda chiqim ===
-      const expBalanceAfter = await calculateFinancialBalance(queryRunner.manager);
+      const expBalanceAfter = await calculateFinancialBalance(
+        queryRunner.manager,
+      );
       await queryRunner.manager.save(
         queryRunner.manager.create(FinancialBalanceHistoryEntity, {
           amount: -updateCashboxDto.amount,
@@ -1274,7 +1313,11 @@ export class CashBoxService
         entity_type: 'cashbox',
         entity_id: mainCashbox.id,
         action: 'manual_expense',
-        new_value: { amount: updateCashboxDto.amount, type: updateCashboxDto.type, comment: updateCashboxDto.comment },
+        new_value: {
+          amount: updateCashboxDto.amount,
+          type: updateCashboxDto.type,
+          comment: updateCashboxDto.comment,
+        },
         description: `Qo'lda chiqim: ${updateCashboxDto.amount} so'm — ${updateCashboxDto.comment || ''}`,
         user,
       });
@@ -1321,7 +1364,9 @@ export class CashBoxService
       await queryRunner.manager.save(cashboxHistory);
 
       // === MOLIYAVIY TAROZI: qo'lda kirim ===
-      const fillBalanceAfter = await calculateFinancialBalance(queryRunner.manager);
+      const fillBalanceAfter = await calculateFinancialBalance(
+        queryRunner.manager,
+      );
       await queryRunner.manager.save(
         queryRunner.manager.create(FinancialBalanceHistoryEntity, {
           amount: updateCashboxDto.amount,
@@ -1338,7 +1383,11 @@ export class CashBoxService
         entity_type: 'cashbox',
         entity_id: mainCashbox.id,
         action: 'manual_income',
-        new_value: { amount: updateCashboxDto.amount, type: updateCashboxDto.type, comment: updateCashboxDto.comment },
+        new_value: {
+          amount: updateCashboxDto.amount,
+          type: updateCashboxDto.type,
+          comment: updateCashboxDto.comment,
+        },
         description: `Qo'lda kirim: ${updateCashboxDto.amount} so'm — ${updateCashboxDto.comment || ''}`,
         user,
       });
@@ -1408,7 +1457,8 @@ export class CashBoxService
         amount,
         balance_after: mainCashbox.balance,
         cashbox_id: mainCashbox.id,
-        comment: salaryDto?.comment || `${staff?.name || 'Hodim'} ga maosh to'landi`,
+        comment:
+          salaryDto?.comment || `${staff?.name || 'Hodim'} ga maosh to'landi`,
         created_by: user.id,
         payment_method: salaryDto.type,
         operation_type: Operation_type.EXPENSE,
@@ -1418,7 +1468,9 @@ export class CashBoxService
       await queryRunner.manager.save(cashboxHistory);
 
       // === MOLIYAVIY TAROZI: maosh to'lovi ===
-      const salaryBalanceAfter = await calculateFinancialBalance(queryRunner.manager);
+      const salaryBalanceAfter = await calculateFinancialBalance(
+        queryRunner.manager,
+      );
       await queryRunner.manager.save(
         queryRunner.manager.create(FinancialBalanceHistoryEntity, {
           amount: -amount,
@@ -1426,7 +1478,8 @@ export class CashBoxService
           balance_after: salaryBalanceAfter,
           source_type: FinancialSource_type.SALARY,
           related_user_id: user_id,
-          comment: salaryDto?.comment || `${staff?.name || 'Hodim'} ga maosh to'landi`,
+          comment:
+            salaryDto?.comment || `${staff?.name || 'Hodim'} ga maosh to'landi`,
           created_by: user.id,
         }),
       );
@@ -1466,14 +1519,18 @@ export class CashBoxService
         // Sana belgilanmagan - barcha tarixni olish
         result = await this.getAllMainCashboxHistory();
       } else {
-        result = await this.getMainCashbox({ fromDate: query.fromDate, toDate: query.toDate });
+        result = await this.getMainCashbox({
+          fromDate: query.fromDate,
+          toDate: query.toDate,
+        });
       }
       const data = result.data;
 
       const { cashbox, cashboxHistory, income, outcome } = data;
 
       // 2. Process transactions - har biri alohida qator
-      const individualTransactions = this.getIndividualTransactions(cashboxHistory);
+      const individualTransactions =
+        this.getIndividualTransactions(cashboxHistory);
       const expenseTransactions =
         this.filterExpenseTransactions(cashboxHistory);
       const clickTransactions = this.filterClickTransactions(cashboxHistory);
@@ -1650,11 +1707,26 @@ export class CashBoxService
     expenses: CashboxHistoryEntity[],
     query: { fromDate?: string; toDate?: string },
   ) {
-    const fillCell = (cell: string, bg: string, opts?: { bold?: boolean; size?: number; color?: string; hAlign?: 'center' | 'left' | 'right' }) => {
+    const fillCell = (
+      cell: string,
+      bg: string,
+      opts?: {
+        bold?: boolean;
+        size?: number;
+        color?: string;
+        hAlign?: 'center' | 'left' | 'right';
+      },
+    ) => {
       const c = worksheet.getCell(cell);
       c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
-      if (opts?.bold) c.font = { bold: true, size: opts.size || 11, color: opts.color ? { argb: opts.color } : undefined };
-      if (opts?.hAlign) c.alignment = { horizontal: opts.hAlign, vertical: 'middle' };
+      if (opts?.bold)
+        c.font = {
+          bold: true,
+          size: opts.size || 11,
+          color: opts.color ? { argb: opts.color } : undefined,
+        };
+      if (opts?.hAlign)
+        c.alignment = { horizontal: opts.hAlign, vertical: 'middle' };
     };
 
     // ===== ROW 1: Sana =====
@@ -1670,13 +1742,25 @@ export class CashBoxService
       dateStr = `${query.fromDate || new Date().toISOString().split('T')[0]} noch`;
     }
     worksheet.getCell('A1').value = dateStr;
-    worksheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FFFF0000' } };
-    worksheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getCell('A1').font = {
+      bold: true,
+      size: 14,
+      color: { argb: 'FFFF0000' },
+    };
+    worksheet.getCell('A1').alignment = {
+      horizontal: 'center',
+      vertical: 'middle',
+    };
 
     // ===== ROW 2: ASOSIY KASSA sarlavha =====
     worksheet.mergeCells('A2:K2');
     worksheet.getCell('A2').value = 'ASOSIY KASSA';
-    fillCell('A2', 'FFFF0000', { bold: true, size: 14, color: 'FF006400', hAlign: 'center' });
+    fillCell('A2', 'FFFF0000', {
+      bold: true,
+      size: 14,
+      color: 'FF006400',
+      hAlign: 'center',
+    });
 
     // ===== ROW 3: Kirim / Chiqim =====
     worksheet.mergeCells('B3:F3');
@@ -1689,8 +1773,17 @@ export class CashBoxService
 
     // ===== ROW 4: Ustun nomlari =====
     const headers = [
-      ['A4', 'No'], ['B4', 'QAYERDAN'], ['C4', 'NAQD'], ['D4', 'KARTA'], ['E4', 'DOLLAR'], ['F4', 'Reja'],
-      ['G4', 'QAYERGA'], ['H4', 'NAQD'], ['I4', 'KARTA'], ['J4', 'DOLLAR'], ['K4', 'Reja'],
+      ['A4', 'No'],
+      ['B4', 'QAYERDAN'],
+      ['C4', 'NAQD'],
+      ['D4', 'KARTA'],
+      ['E4', 'DOLLAR'],
+      ['F4', 'Reja'],
+      ['G4', 'QAYERGA'],
+      ['H4', 'NAQD'],
+      ['I4', 'KARTA'],
+      ['J4', 'DOLLAR'],
+      ['K4', 'Reja'],
     ];
     headers.forEach(([cell, val]) => {
       worksheet.getCell(cell).value = val;
@@ -1704,7 +1797,10 @@ export class CashBoxService
     worksheet.getCell(`D${dataStartRow}`).value = balances.opening.card;
     fillCell(`C${dataStartRow}`, 'FF00BFFF');
     fillCell(`D${dataStartRow}`, 'FF0000FF');
-    worksheet.getCell(`D${dataStartRow}`).font = { color: { argb: 'FFFFFFFF' }, bold: true };
+    worksheet.getCell(`D${dataStartRow}`).font = {
+      color: { argb: 'FFFFFFFF' },
+      bold: true,
+    };
 
     // ===== DATA ROWS: Kirim (chap) va Chiqim (o'ng) mustaqil to'ldiriladi =====
     const incomeRows = transactions.income;
@@ -1712,7 +1808,7 @@ export class CashBoxService
     const maxRows = Math.max(incomeRows.length, expenseRows.length);
 
     let incomeNo = 2;
-    let expenseNo = 1;
+    const expenseNo = 1;
 
     for (let i = 0; i < maxRows; i++) {
       const row = dataStartRow + 1 + i;
@@ -1765,8 +1861,12 @@ export class CashBoxService
     worksheet.getCell(`H${totalRow}`).value = balances.expense.cash;
     worksheet.getCell(`I${totalRow}`).value = balances.expense.card;
     worksheet.getCell(`J${totalRow}`).value = 0;
-    ['C', 'D', 'E'].forEach((col) => fillCell(`${col}${totalRow}`, 'FF00FF00', { bold: true }));
-    ['H', 'I', 'J'].forEach((col) => fillCell(`${col}${totalRow}`, 'FF00FF00', { bold: true }));
+    ['C', 'D', 'E'].forEach((col) =>
+      fillCell(`${col}${totalRow}`, 'FF00FF00', { bold: true }),
+    );
+    ['H', 'I', 'J'].forEach((col) =>
+      fillCell(`${col}${totalRow}`, 'FF00FF00', { bold: true }),
+    );
 
     // ===== JAMI QOLDIQ =====
     const qoldiqLabelRow = totalRow + 1;
@@ -1782,7 +1882,9 @@ export class CashBoxService
     worksheet.getCell(`J${qoldiqLabelRow}`).value = 'Dollar';
     ['H', 'I', 'J'].forEach((col) => {
       worksheet.getCell(`${col}${qoldiqLabelRow}`).font = { bold: true };
-      worksheet.getCell(`${col}${qoldiqLabelRow}`).alignment = { horizontal: 'center' };
+      worksheet.getCell(`${col}${qoldiqLabelRow}`).alignment = {
+        horizontal: 'center',
+      };
     });
 
     worksheet.getCell(`G${qoldiqRow}`).value = 'Jami qoldiq:';
@@ -1804,7 +1906,13 @@ export class CashBoxService
     clickTransactions: CashboxHistoryEntity[],
     balances: any,
   ) {
-    const COL = { no: 'M', kirimName: 'N', kirimAmount: 'O', chiqimName: 'P', chiqimAmount: 'Q' };
+    const COL = {
+      no: 'M',
+      kirimName: 'N',
+      kirimAmount: 'O',
+      chiqimName: 'P',
+      chiqimAmount: 'Q',
+    };
 
     const fillCell = (cell: string, bg: string, opts?: { bold?: boolean }) => {
       const c = worksheet.getCell(cell);
@@ -1815,26 +1923,51 @@ export class CashBoxService
     // Row 2: Title
     worksheet.mergeCells(`${COL.no}2:${COL.chiqimAmount}2`);
     worksheet.getCell(`${COL.no}2`).value = 'Bekzod aka Kartasi';
-    worksheet.getCell(`${COL.no}2`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } };
-    worksheet.getCell(`${COL.no}2`).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-    worksheet.getCell(`${COL.no}2`).alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getCell(`${COL.no}2`).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFF0000' },
+    };
+    worksheet.getCell(`${COL.no}2`).font = {
+      bold: true,
+      size: 12,
+      color: { argb: 'FFFFFFFF' },
+    };
+    worksheet.getCell(`${COL.no}2`).alignment = {
+      horizontal: 'center',
+      vertical: 'middle',
+    };
 
     // Row 3: Kirim / Chiqim
     worksheet.mergeCells(`${COL.no}3:${COL.kirimAmount}3`);
     worksheet.getCell(`${COL.no}3`).value = 'Kirim';
-    worksheet.getCell(`${COL.no}3`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
+    worksheet.getCell(`${COL.no}3`).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF90EE90' },
+    };
     worksheet.getCell(`${COL.no}3`).font = { bold: true };
     worksheet.getCell(`${COL.no}3`).alignment = { horizontal: 'center' };
 
     worksheet.mergeCells(`${COL.chiqimName}3:${COL.chiqimAmount}3`);
     worksheet.getCell(`${COL.chiqimName}3`).value = 'Chiqim';
-    worksheet.getCell(`${COL.chiqimName}3`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC0CB' } };
+    worksheet.getCell(`${COL.chiqimName}3`).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFFC0CB' },
+    };
     worksheet.getCell(`${COL.chiqimName}3`).font = { bold: true };
-    worksheet.getCell(`${COL.chiqimName}3`).alignment = { horizontal: 'center' };
+    worksheet.getCell(`${COL.chiqimName}3`).alignment = {
+      horizontal: 'center',
+    };
 
     // Row 4: Sub-headers
     ['M4', 'N4', 'O4', 'P4', 'Q4'].forEach((cell) => {
-      worksheet.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
+      worksheet.getCell(cell).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF90EE90' },
+      };
       worksheet.getCell(cell).font = { bold: true, size: 10 };
       worksheet.getCell(cell).alignment = { horizontal: 'center' };
     });
@@ -1861,19 +1994,27 @@ export class CashBoxService
       if (i < clickIncome.length) {
         const tx = clickIncome[i];
         worksheet.getCell(`${COL.no}${row}`).value = no++;
-        worksheet.getCell(`${COL.kirimName}${row}`).value = tx.sourceUser?.name || tx.createdByUser?.name || '';
+        worksheet.getCell(`${COL.kirimName}${row}`).value =
+          tx.sourceUser?.name || tx.createdByUser?.name || '';
         worksheet.getCell(`${COL.kirimAmount}${row}`).value = tx.amount;
       }
       if (i < clickExpense.length) {
         const tx = clickExpense[i];
-        worksheet.getCell(`${COL.chiqimName}${row}`).value = tx.sourceUser?.name || tx.createdByUser?.name || '';
+        worksheet.getCell(`${COL.chiqimName}${row}`).value =
+          tx.sourceUser?.name || tx.createdByUser?.name || '';
         worksheet.getCell(`${COL.chiqimAmount}${row}`).value = tx.amount;
       }
     }
 
     // Totals
-    const totalIncome = clickIncome.reduce((sum, tx) => sum + (tx.amount ?? 0), 0);
-    const totalExpense = clickExpense.reduce((sum, tx) => sum + (tx.amount ?? 0), 0);
+    const totalIncome = clickIncome.reduce(
+      (sum, tx) => sum + (tx.amount ?? 0),
+      0,
+    );
+    const totalExpense = clickExpense.reduce(
+      (sum, tx) => sum + (tx.amount ?? 0),
+      0,
+    );
     const totalRow = 6 + maxClickRows;
     worksheet.getCell(`${COL.kirimAmount}${totalRow}`).value = totalIncome;
     worksheet.getCell(`${COL.chiqimAmount}${totalRow}`).value = totalExpense;
@@ -1884,7 +2025,8 @@ export class CashBoxService
     const qoldiqRow = totalRow + 1;
     worksheet.getCell(`${COL.chiqimName}${qoldiqRow}`).value = 'Qoldiq:';
     worksheet.getCell(`${COL.chiqimName}${qoldiqRow}`).font = { bold: true };
-    worksheet.getCell(`${COL.chiqimAmount}${qoldiqRow}`).value = balances.closing.card;
+    worksheet.getCell(`${COL.chiqimAmount}${qoldiqRow}`).value =
+      balances.closing.card;
     fillCell(`${COL.chiqimAmount}${qoldiqRow}`, 'FF00BFFF', { bold: true });
   }
 
@@ -1900,18 +2042,37 @@ export class CashBoxService
     // Row 2: Title
     worksheet.mergeCells(`${COL.name}2:${COL.reja}2`);
     worksheet.getCell(`${COL.name}2`).value = 'XARAJAT';
-    worksheet.getCell(`${COL.name}2`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF0000' } };
-    worksheet.getCell(`${COL.name}2`).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-    worksheet.getCell(`${COL.name}2`).alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getCell(`${COL.name}2`).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFFF0000' },
+    };
+    worksheet.getCell(`${COL.name}2`).font = {
+      bold: true,
+      size: 12,
+      color: { argb: 'FFFFFFFF' },
+    };
+    worksheet.getCell(`${COL.name}2`).alignment = {
+      horizontal: 'center',
+      vertical: 'middle',
+    };
 
     // Row 3: Column headers
     const hdrs = [
-      [COL.name, ''], [COL.naqd, 'NAQD'], [COL.karta, 'KARTA'], [COL.dollar, 'DOLLAR'], [COL.reja, 'REJA'],
+      [COL.name, ''],
+      [COL.naqd, 'NAQD'],
+      [COL.karta, 'KARTA'],
+      [COL.dollar, 'DOLLAR'],
+      [COL.reja, 'REJA'],
     ];
     hdrs.forEach(([col, val]) => {
       const cell = `${col}3`;
       worksheet.getCell(cell).value = val;
-      worksheet.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF90EE90' } };
+      worksheet.getCell(cell).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF90EE90' },
+      };
       worksheet.getCell(cell).font = { bold: true, size: 10 };
       worksheet.getCell(cell).alignment = { horizontal: 'center' };
     });
@@ -1920,7 +2081,10 @@ export class CashBoxService
     let rowNum = 4;
     expenses.forEach((expense) => {
       worksheet.getCell(`${COL.name}${rowNum}`).value =
-        expense.comment || expense.sourceUser?.name || expense.createdByUser?.name || 'Xarajat';
+        expense.comment ||
+        expense.sourceUser?.name ||
+        expense.createdByUser?.name ||
+        'Xarajat';
       if (expense.payment_method === PaymentMethod.CASH) {
         worksheet.getCell(`${COL.naqd}${rowNum}`).value = expense.amount;
       } else {
@@ -1938,7 +2102,11 @@ export class CashBoxService
       .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
     const fillCell = (cell: string, bg: string) => {
-      worksheet.getCell(cell).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      worksheet.getCell(cell).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: bg },
+      };
       worksheet.getCell(cell).font = { bold: true };
     };
 
@@ -2030,9 +2198,7 @@ export class CashBoxService
       });
 
       if (existingOpenShift) {
-        throw new BadRequestException(
-          'Ochiq smena mavjud. Avval uni yoping!',
-        );
+        throw new BadRequestException('Ochiq smena mavjud. Avval uni yoping!');
       }
 
       // Get main cashbox balance
@@ -2065,7 +2231,10 @@ export class CashBoxService
         entity_type: 'shift',
         entity_id: shift.id,
         action: 'opened',
-        new_value: { opening_balance_cash: openingCash, opening_balance_card: openingCard },
+        new_value: {
+          opening_balance_cash: openingCash,
+          opening_balance_card: openingCard,
+        },
         description: `Smena ochildi — naqd: ${openingCash}, karta: ${openingCard}`,
         user,
       });
@@ -2270,7 +2439,8 @@ export class CashBoxService
     let totalIncome = 0;
     let totalExpense = 0;
     for (const h of histories) {
-      if (h.operation_type === Operation_type.INCOME) totalIncome += h.amount ?? 0;
+      if (h.operation_type === Operation_type.INCOME)
+        totalIncome += h.amount ?? 0;
       else totalExpense += h.amount ?? 0;
     }
 
@@ -2278,14 +2448,16 @@ export class CashBoxService
       opening: {
         cash: shift.opening_balance_cash || 0,
         card: shift.opening_balance_card || 0,
-        total: (shift.opening_balance_cash || 0) + (shift.opening_balance_card || 0),
+        total:
+          (shift.opening_balance_cash || 0) + (shift.opening_balance_card || 0),
       },
       income: this.calculateMethodTotals(histories, Operation_type.INCOME),
       expense: this.calculateMethodTotals(histories, Operation_type.EXPENSE),
       closing: {
-        cash: shift.closing_balance_cash || (shift.opening_balance_cash || 0),
-        card: shift.closing_balance_card || (shift.opening_balance_card || 0),
-        total: (shift.closing_balance_cash || 0) + (shift.closing_balance_card || 0),
+        cash: shift.closing_balance_cash || shift.opening_balance_cash || 0,
+        card: shift.closing_balance_card || shift.opening_balance_card || 0,
+        total:
+          (shift.closing_balance_cash || 0) + (shift.closing_balance_card || 0),
       },
     };
 
@@ -2294,14 +2466,22 @@ export class CashBoxService
     const clickTransactions = this.filterClickTransactions(histories);
 
     // Sana formati (bigint timestamp)
-    const openDate = new Date(Number(shift.opened_at)).toLocaleDateString('uz-UZ');
+    const openDate = new Date(Number(shift.opened_at)).toLocaleDateString(
+      'uz-UZ',
+    );
     const closeDate = shift.closed_at
       ? new Date(Number(shift.closed_at)).toLocaleDateString('uz-UZ')
       : 'davom etmoqda';
     const query = { fromDate: openDate, toDate: closeDate };
 
     // Xuddi asosiy kassa shabloni bilan bir xil 3 ta jadval
-    this.buildMainTable(worksheet, transactions, balances, expenseTransactions, query);
+    this.buildMainTable(
+      worksheet,
+      transactions,
+      balances,
+      expenseTransactions,
+      query,
+    );
     this.buildCardAnalysisTable(worksheet, clickTransactions, balances);
     this.buildExpensesTable(worksheet, expenseTransactions);
     this.applyExcelStyling(worksheet);
@@ -2321,7 +2501,8 @@ export class CashBoxService
       if (
         tx.source_type === Source_type.MANUAL_EXPENSE ||
         tx.source_type === Source_type.SALARY
-      ) continue;
+      )
+        continue;
       if (tx.payment_method === PaymentMethod.CASH) cash += tx.amount ?? 0;
       else card += tx.amount ?? 0;
     }
@@ -2366,7 +2547,11 @@ export class CashBoxService
   /**
    * Get shift history (list of all shifts)
    */
-  async getShiftHistory(query: { page?: number; limit?: number; fetchAll?: boolean }) {
+  async getShiftHistory(query: {
+    page?: number;
+    limit?: number;
+    fetchAll?: boolean;
+  }) {
     try {
       const page = query.page || 1;
       const limit = getSafeLimit(query.limit, query.fetchAll);

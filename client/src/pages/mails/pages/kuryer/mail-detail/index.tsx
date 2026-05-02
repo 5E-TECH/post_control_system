@@ -6,6 +6,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { useTranslation } from "react-i18next";
 import { buildAdminPath } from "../../../../../shared/const";
+import { useCourierOrderScanner } from "../../../../../shared/components/courier-order-scanner";
 import {
   ArrowLeft,
   Phone,
@@ -19,6 +20,10 @@ import {
   User,
   Search,
   Check,
+  ScanLine,
+  XCircle,
+  CheckCircle,
+  RefreshCw,
 } from "lucide-react";
 
 const CourierMailDetail = () => {
@@ -27,8 +32,10 @@ const CourierMailDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { getPostById, receivePost } = usePost();
+  const { getPostById, receivePost, requestOrderReturnByCourier } = usePost();
   const { mutate: receivePostsByPostId, isPending } = receivePost();
+  const { mutate: requestReturn, isPending: isReturning } =
+    requestOrderReturnByCourier;
   const { handleSuccess, handleApiError } = useApiNotification();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -52,8 +59,31 @@ const CourierMailDetail = () => {
     condition = true;
   }
 
-  const { data, isLoading } = getPostById(id as string, endpoint, condition);
+  const { data, isLoading, refetch } = getPostById(
+    id as string,
+    endpoint,
+    condition,
+  );
   const postData = data?.data?.allOrdersByPostId || [];
+  const postInfo = data?.data?.post;
+  const postStatus: string | undefined = postInfo?.status;
+
+  // Skaner va return-request tugmasi faqat SENT (yo'lda) post uchun aktiv bo'ladi.
+  // Qabul qilingan/eski pochtada esa kuryer faqat ko'rish rejimida —
+  // buyurtmalarni faqat o'qiy oladi.
+  const isSentPost = postStatus === "sent";
+
+  const { feedback, successCount, errorCount, lastReceived } =
+    useCourierOrderScanner({
+      enabled: isSentPost,
+      refetch,
+      onPostReceived: () => {
+        // Pochta to'liq qabul qilindi — qisqa muddatdan keyin orqaga
+        setTimeout(() => {
+          navigate(buildAdminPath("courier-mails"));
+        }, 1500);
+      },
+    });
 
   useEffect(() => {
     if (postData?.length > 0) {
@@ -100,6 +130,26 @@ const CourierMailDetail = () => {
 
   const handleBack = () => {
     navigate(-1);
+  };
+
+  // Yangi (SENT) pochtada hali skanerlanmagan buyurtmani "kelmagan" deb belgilash —
+  // serverga qaytarish so'rovi yuboriladi, buyurtma WAITING ga o'tadi.
+  // Agar oxirgisi bo'lsa, post ham RECEIVED bo'ladi va orqaga qaytamiz.
+  const handleRequestReturn = (orderId: string) => {
+    requestReturn(orderId, {
+      onSuccess: (res: any) => {
+        handleSuccess("Qaytarish so'rovi yuborildi");
+        if (res?.data?.postReceived) {
+          setTimeout(() => {
+            navigate(buildAdminPath("courier-mails"));
+          }, 800);
+        } else {
+          refetch();
+        }
+      },
+      onError: (err: any) =>
+        handleApiError(err, "Qaytarish so'rovini yuborishda xatolik"),
+    });
   };
 
   // Filter orders by search
@@ -176,6 +226,97 @@ const CourierMailDetail = () => {
           </div>
         </div>
 
+        {/* Scanner Banner — faqat SENT pochta uchun */}
+        {isSentPost && (
+          <div className="mb-4 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 py-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <ScanLine className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm">
+                    Skaner aktiv — buyurtmani QR kod orqali qabul qiling
+                  </p>
+                  <p className="text-xs text-emerald-100/90 truncate">
+                    Har skanerlashda 1 ta buyurtma qabul qilinadi.
+                    Oxirgisida pochta avtomatik yopiladi.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end text-xs flex-shrink-0">
+                <span className="font-bold">
+                  ✓ {successCount}
+                  {errorCount > 0 ? `  ✗ ${errorCount}` : ""}
+                </span>
+                {lastReceived?.customer_name && (
+                  <span className="text-emerald-100/80 truncate max-w-[120px]">
+                    {lastReceived.customer_name}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============ FULL-SCREEN VISUAL FEEDBACK OVERLAY ============
+            Bugungi buyurtmalar va pochta tekshirish skanerlari kabi —
+            butun ekranni qoplaydigan katta vizual feedback. */}
+        {isSentPost && feedback.show && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+            <div
+              className={`absolute inset-0 transition-opacity duration-200 ${
+                feedback.type === "success"
+                  ? "bg-green-500/20"
+                  : feedback.type === "warning"
+                    ? "bg-amber-500/20"
+                    : "bg-red-500/20"
+              }`}
+            />
+            <div className="relative flex flex-col items-center justify-center animate-in zoom-in duration-200 px-6">
+              <div
+                className={`w-40 h-40 sm:w-52 sm:h-52 rounded-full flex items-center justify-center shadow-2xl ${
+                  feedback.type === "success"
+                    ? "bg-green-500 shadow-green-500/50"
+                    : feedback.type === "warning"
+                      ? "bg-amber-500 shadow-amber-500/50"
+                      : "bg-red-500 shadow-red-500/50"
+                }`}
+              >
+                {feedback.type === "success" ? (
+                  <CheckCircle
+                    className="w-24 h-24 sm:w-32 sm:h-32 text-white"
+                    strokeWidth={2.5}
+                  />
+                ) : feedback.type === "warning" ? (
+                  <RefreshCw
+                    className="w-24 h-24 sm:w-32 sm:h-32 text-white"
+                    strokeWidth={2.5}
+                  />
+                ) : (
+                  <XCircle
+                    className="w-24 h-24 sm:w-32 sm:h-32 text-white"
+                    strokeWidth={2.5}
+                  />
+                )}
+              </div>
+              {feedback.message && (
+                <p
+                  className={`mt-6 text-2xl sm:text-3xl font-bold text-center max-w-md ${
+                    feedback.type === "success"
+                      ? "text-green-600"
+                      : feedback.type === "warning"
+                        ? "text-amber-600"
+                        : "text-red-600"
+                  }`}
+                >
+                  {feedback.message}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-white dark:bg-[#2A263D] rounded-xl p-3 sm:p-4 shadow-sm">
@@ -195,11 +336,11 @@ const CourierMailDetail = () => {
             <div className="flex items-center gap-2 mb-1">
               <CheckCircle2 className="w-4 h-4 text-green-500" />
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                Tanlangan
+                {isSentPost ? "Tanlangan" : "Qabul qilingan"}
               </span>
             </div>
             <p className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">
-              {selectedIds.length}{" "}
+              {isSentPost ? selectedIds.length : postData.length}{" "}
               <span className="text-xs font-normal text-gray-500">
                 / {postData.length} ta
               </span>
@@ -222,7 +363,7 @@ const CourierMailDetail = () => {
         </div>
 
         {/* Select All */}
-        {!hideSend && postData.length > 0 && (
+        {isSentPost && !hideSend && postData.length > 0 && (
           <div className="flex items-center justify-between mb-3 px-1">
             <button
               onClick={toggleSelectAll}
@@ -263,22 +404,31 @@ const CourierMailDetail = () => {
           ) : (
             filteredOrders.map((order: any) => {
               const isSelected = selectedIds.includes(order.id);
+              // SENT pochta uchun: checkbox + tanlash imkoni
+              // RECEIVED pochta uchun: checkbox yo'q, return-request tugma
+              const showCheckbox = isSentPost && !hideSend;
+              const allowSelectClick = showCheckbox;
+              const orderReturnRequested = Boolean(order?.return_requested);
 
               return (
                 <div
                   key={order.id}
-                  onClick={() => !hideSend && toggleSelect(order.id)}
+                  onClick={() => allowSelectClick && toggleSelect(order.id)}
                   className={`bg-white dark:bg-[#2A263D] rounded-xl p-4 shadow-sm transition-all ${
-                    !hideSend ? "cursor-pointer active:scale-[0.98]" : ""
+                    allowSelectClick ? "cursor-pointer active:scale-[0.98]" : ""
                   } ${
-                    isSelected && !hideSend
+                    isSelected && allowSelectClick
                       ? "ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-900/10"
+                      : ""
+                  } ${
+                    orderReturnRequested
+                      ? "ring-2 ring-amber-400 bg-amber-50/50 dark:bg-amber-900/10"
                       : ""
                   }`}
                 >
                   {/* Top: Checkbox + Customer Info */}
                   <div className="flex items-start gap-3">
-                    {!hideSend && (
+                    {showCheckbox && (
                       <div
                         className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
                           isSelected
@@ -355,6 +505,25 @@ const CourierMailDetail = () => {
                           <span>{formatDate(order?.created_at)}</span>
                         </div>
                       </div>
+
+                      {/* Return-request action — yangi (SENT) pochta uchun
+                          skanerlanmagan ON_THE_ROAD buyurtma ustida ishlaydi */}
+                      {isSentPost && order?.status === "on the road" && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRequestReturn(order.id);
+                            }}
+                            disabled={isReturning}
+                            className="w-full text-xs px-3 py-2 rounded-lg border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Bu buyurtma kelmagan — qaytarish so'rovi
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -363,8 +532,8 @@ const CourierMailDetail = () => {
           )}
         </div>
 
-        {/* Bottom Button */}
-        {!hideSend && postData.length > 0 && (
+        {/* Bottom Button — qo'lda qabul (faqat SENT pochta uchun) */}
+        {isSentPost && !hideSend && postData.length > 0 && (
           <div className="mt-4 pb-4">
             <button
               onClick={handleReceive}
@@ -383,10 +552,13 @@ const CourierMailDetail = () => {
               ) : (
                 <>
                   <CheckCircle2 className="w-5 h-5" />
-                  {selectedIds.length} ta buyurtmani qabul qilish
+                  Tanlangan {selectedIds.length} tasini qo'lda qabul qilish
                 </>
               )}
             </button>
+            <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
+              Yoki har bitta buyurtmani QR skaner orqali qabul qiling — yuqorida "Skaner aktiv" yozuvi
+            </p>
           </div>
         )}
       </div>

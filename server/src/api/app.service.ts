@@ -16,22 +16,28 @@ export default class Application {
     // Migration ishlatilsin: `npm run migration:run`.
     if (process.env.TYPEORM_SYNCHRONIZE === 'true') {
       console.error(
-        '❌ FATAL: TYPEORM_SYNCHRONIZE=true bilan ishga tushirib bo\'lmaydi. ' +
+        "❌ FATAL: TYPEORM_SYNCHRONIZE=true bilan ishga tushirib bo'lmaydi. " +
           'Migration ishlatilsin (npm run migration:run).',
       );
       process.exit(1);
     }
     if (!process.env.NODE_ENV) {
       console.warn(
-        '⚠️  NODE_ENV o\'rnatilmagan. Production deploy uchun NODE_ENV=production majburiy.',
+        "⚠️  NODE_ENV o'rnatilmagan. Production deploy uchun NODE_ENV=production majburiy.",
       );
     }
 
     // Telegram bot timeout xatoliklari serverni crash qilmasligi uchun
     process.on('unhandledRejection', (reason: any) => {
       const message = reason?.message || String(reason);
-      if (message.includes('ETIMEDOUT') || message.includes('ECONNREFUSED') || message.includes('getMe')) {
-        console.warn(`⚠️  Telegram bot ulanish xatosi (server davom etmoqda): ${message}`);
+      if (
+        message.includes('ETIMEDOUT') ||
+        message.includes('ECONNREFUSED') ||
+        message.includes('getMe')
+      ) {
+        console.warn(
+          `⚠️  Telegram bot ulanish xatosi (server davom etmoqda): ${message}`,
+        );
       } else {
         console.error('Unhandled Rejection:', reason);
       }
@@ -85,7 +91,7 @@ export default class Application {
             {
               statusCode: HttpStatus.UNPROCESSABLE_ENTITY,
               message: messages,
-              error: 'Ma\'lumotlar validatsiyadan o\'tmadi',
+              error: "Ma'lumotlar validatsiyadan o'tmadi",
             },
             HttpStatus.UNPROCESSABLE_ENTITY,
           );

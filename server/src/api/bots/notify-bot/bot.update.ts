@@ -28,7 +28,10 @@ export class BotUpdate {
         `👋 Salom men Beepost botman. Ushbu guruhga xabar jo'natishim uchun platformadagi telegram tokenni shu yerga jo'nating`,
       );
     } catch (error) {
-      console.log('Bot start error (user may have blocked the bot):', error.message);
+      console.log(
+        'Bot start error (user may have blocked the bot):',
+        error.message,
+      );
     }
   }
 

@@ -142,7 +142,6 @@ const ROLE_LABEL: Record<string, string> = {
   market: "Market",
   operator: "Operator",
   logist: "Logist",
-  investor: "Investor",
   customer: "Mijoz",
 };
 
@@ -154,7 +153,6 @@ const ROLE_BADGE: Record<string, string> = {
   market: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   operator: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
   logist: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
-  investor: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
 };
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
@@ -250,6 +248,343 @@ type LogRow = {
   user_role?: string;
   metadata?: any;
   created_at: number | string;
+  // Server enrichment — bog'liq entity xulosasi (customer_name, market_name, ...)
+  entity_summary?: any;
+};
+
+// Xom field nomini Uzbek labelga moslashtiradi
+const FIELD_LABEL: Record<string, string> = {
+  status: "Holat",
+  total_price: "Jami narx",
+  paid_amount: "To'langan",
+  to_be_paid: "To'lashi kerak",
+  customer_id: "Mijoz ID",
+  market_id: "Market ID",
+  courier_id: "Kuryer ID",
+  operator_id: "Operator ID",
+  post_id: "Pochta ID",
+  region_id: "Region ID",
+  region_name: "Region",
+  courier_name: "Kuryer",
+  market_name: "Market",
+  customer_name: "Mijoz",
+  customer_phone: "Mijoz telefoni",
+  operator_name: "Operator",
+  operator: "Operator",
+  operator_phone: "Operator telefoni",
+  name: "Ism",
+  role: "Rol",
+  phone_number: "Telefon",
+  address: "Manzil",
+  district_id: "Tuman ID",
+  comment: "Izoh",
+  amount: "Miqdor",
+  payment_method: "To'lov turi",
+  staff_name: "Xodim",
+  type: "Tur",
+  source: "Manba",
+  opening_balance_cash: "Ochilish naqd",
+  opening_balance_card: "Ochilish karta",
+  closing_balance_cash: "Yopilish naqd",
+  closing_balance_card: "Yopilish karta",
+  total_income_cash: "Kirim (naqd)",
+  total_expense_cash: "Chiqim (naqd)",
+  total_income: "Jami kirim",
+  total_expense: "Jami chiqim",
+  return_requested: "Qaytarish so'ralgan",
+  market_tariff: "Market tarifi",
+  courier_tariff: "Kuryer tarifi",
+  where_deliver: "Yetkazib berish",
+  product_quantity: "Mahsulot soni",
+  user_agent: "Qurilma",
+  ip: "IP manzil",
+  post_token: "Pochta kodi",
+};
+
+const WHERE_DELIVER_LABEL: Record<string, string> = {
+  center: "Markazga",
+  address: "Uygacha",
+};
+
+// Field qiymatini insonga moslab chiqaradi
+const formatFieldValue = (key: string, value: any): React.ReactNode => {
+  if (value === null || value === undefined || value === "") return <span className="text-gray-400">—</span>;
+
+  // Status — pill ko'rinishida
+  if (key === "status" || key === "old_status" || key === "new_status") {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+        {STATUS_LABEL[String(value)] || String(value)}
+      </span>
+    );
+  }
+
+  // Pul maydonlari
+  if (
+    /price|amount|balance|tarif|paid|income|expense/i.test(key) &&
+    !isNaN(Number(value))
+  ) {
+    return (
+      <span className="font-semibold text-gray-800 dark:text-gray-200">
+        {formatPrice(value)} <span className="text-gray-500 text-xs">so'm</span>
+      </span>
+    );
+  }
+
+  // Telefon raqam
+  if (/phone/i.test(key) && typeof value === "string") {
+    return <span className="font-mono text-gray-700 dark:text-gray-300">{value}</span>;
+  }
+
+  // Rol
+  if (key === "role") {
+    return <RoleBadge role={String(value)} />;
+  }
+
+  // To'lov turi
+  if (key === "payment_method") {
+    return <span>{PAYMENT_METHOD_LABEL[String(value)] || String(value)}</span>;
+  }
+
+  // Yetkazib berish
+  if (key === "where_deliver") {
+    return <span>{WHERE_DELIVER_LABEL[String(value)] || String(value)}</span>;
+  }
+
+  // Boolean
+  if (typeof value === "boolean") {
+    return <span>{value ? "Ha" : "Yo'q"}</span>;
+  }
+
+  // UUID — qisqartiramiz
+  if (typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+    return (
+      <Tooltip title={value}>
+        <span className="font-mono text-xs text-gray-500">{value.slice(0, 8)}…</span>
+      </Tooltip>
+    );
+  }
+
+  // Obyekt yoki massiv — kichik formatted JSON
+  if (typeof value === "object") {
+    return (
+      <pre className="text-[10px] text-gray-600 dark:text-gray-400 whitespace-pre-wrap break-all">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    );
+  }
+
+  return <span className="text-gray-700 dark:text-gray-300 break-words">{String(value)}</span>;
+};
+
+// Bitta obyektdagi field'larni jadval qator sifatida chiqaradi
+const RenderFields: React.FC<{ data: Record<string, any> }> = ({ data }) => {
+  const entries = Object.entries(data).filter(([_, v]) => v !== null && v !== undefined && v !== "");
+  if (entries.length === 0) return <span className="text-xs text-gray-400">Bo'sh</span>;
+  return (
+    <div className="grid grid-cols-1 gap-1.5">
+      {entries.map(([key, value]) => (
+        <div key={key} className="flex items-start gap-2 text-xs">
+          <span className="text-gray-500 dark:text-gray-400 min-w-[110px] flex-shrink-0">
+            {FIELD_LABEL[key] || key}:
+          </span>
+          <div className="flex-1 min-w-0">{formatFieldValue(key, value)}</div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Before/After farqini vizual ko'rsatadi
+const DiffFields: React.FC<{ oldData: Record<string, any>; newData: Record<string, any> }> = ({
+  oldData,
+  newData,
+}) => {
+  const allKeys = Array.from(new Set([...Object.keys(oldData), ...Object.keys(newData)])).filter(
+    (k) => oldData[k] !== null && oldData[k] !== undefined || newData[k] !== null && newData[k] !== undefined,
+  );
+  if (allKeys.length === 0) return null;
+  return (
+    <div className="grid grid-cols-1 gap-2">
+      {allKeys.map((key) => {
+        const oldV = oldData[key];
+        const newV = newData[key];
+        const changed = JSON.stringify(oldV) !== JSON.stringify(newV);
+        return (
+          <div key={key} className="flex items-start gap-2 text-xs">
+            <span className="text-gray-500 dark:text-gray-400 min-w-[110px] flex-shrink-0">
+              {FIELD_LABEL[key] || key}:
+            </span>
+            <div className="flex-1 flex items-center gap-2 flex-wrap min-w-0">
+              {oldV !== undefined && oldV !== null && (
+                <span className={changed ? "line-through decoration-rose-400/60 opacity-70" : ""}>
+                  {formatFieldValue(key, oldV)}
+                </span>
+              )}
+              {changed && oldV !== undefined && newV !== undefined && (
+                <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
+              )}
+              {newV !== undefined && newV !== null && (
+                <span className={changed ? "font-medium" : ""}>{formatFieldValue(key, newV)}</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Server'dan kelgan entity_summary'ni ko'rsatadi
+const EntitySummary: React.FC<{ log: LogRow }> = ({ log }) => {
+  const s = log.entity_summary;
+  if (!s) return null;
+
+  if (log.entity_type === "order") {
+    return (
+      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/40 space-y-1.5">
+        <div className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400 font-semibold">
+          Buyurtma ma'lumoti
+        </div>
+        <div className="grid grid-cols-1 gap-1 text-xs">
+          {s.customer_name && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Mijoz:</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">
+                {s.customer_name}
+                {s.customer_phone && <span className="ml-2 text-gray-500 font-mono">{s.customer_phone}</span>}
+              </span>
+            </div>
+          )}
+          {s.market_name && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Market:</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">{s.market_name}</span>
+            </div>
+          )}
+          {s.total_price != null && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Jami narx:</span>
+              <span className="font-semibold text-gray-800 dark:text-gray-200">
+                {formatPrice(s.total_price)} <span className="text-gray-500">so'm</span>
+              </span>
+            </div>
+          )}
+          {s.status && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Hozirgi holat:</span>
+              <span>{formatFieldValue("status", s.status)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (log.entity_type === "post") {
+    return (
+      <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-900/40 space-y-1.5">
+        <div className="text-[10px] uppercase tracking-wide text-purple-600 dark:text-purple-400 font-semibold">
+          Pochta ma'lumoti
+        </div>
+        <div className="grid grid-cols-1 gap-1 text-xs">
+          {s.region_name && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Region:</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">{s.region_name}</span>
+            </div>
+          )}
+          {s.courier_name && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Kuryer:</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">{s.courier_name}</span>
+            </div>
+          )}
+          {s.order_quantity != null && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Buyurtmalar:</span>
+              <span className="font-semibold">{s.order_quantity} ta</span>
+            </div>
+          )}
+          {s.post_total_price != null && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Jami narx:</span>
+              <span className="font-semibold">{formatPrice(s.post_total_price)} so'm</span>
+            </div>
+          )}
+          {s.status && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Holat:</span>
+              <span className="text-gray-700 dark:text-gray-300">{s.status}</span>
+            </div>
+          )}
+          {s.qr_code_token && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">QR kod:</span>
+              <span className="font-mono text-[11px] text-gray-600">{s.qr_code_token.slice(0, 16)}…</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (log.entity_type === "user") {
+    return (
+      <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/40 space-y-1.5">
+        <div className="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400 font-semibold">
+          Foydalanuvchi
+        </div>
+        <div className="grid grid-cols-1 gap-1 text-xs">
+          {s.name && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Ism:</span>
+              <span className="font-medium">{s.name}</span>
+            </div>
+          )}
+          {s.phone_number && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Telefon:</span>
+              <span className="font-mono">{s.phone_number}</span>
+            </div>
+          )}
+          {s.role && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Rol:</span>
+              <RoleBadge role={s.role} />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (log.entity_type === "cashbox") {
+    return (
+      <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/40 space-y-1.5">
+        <div className="text-[10px] uppercase tracking-wide text-emerald-600 dark:text-emerald-400 font-semibold">
+          Kassa
+        </div>
+        <div className="grid grid-cols-1 gap-1 text-xs">
+          {s.owner_name && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Egasi:</span>
+              <span className="font-medium">{s.owner_name}</span>
+              {s.owner_role && <RoleBadge role={s.owner_role} />}
+            </div>
+          )}
+          {s.cashbox_type && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Turi:</span>
+              <span className="text-gray-700 dark:text-gray-300">{s.cashbox_type}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 };
 
 const RoleBadge: React.FC<{ role?: string }> = ({ role }) => {
@@ -345,12 +680,27 @@ const describeLog = (log: LogRow): { title: string; extras: React.ReactNode } =>
     const amount = nv.total_price ?? nv.paid_amount;
     const fromStatus = ov.status;
     const toStatus = nv.status;
+    const s = log.entity_summary;
     return {
       title: desc,
       extras: (
         <div className="flex flex-wrap items-center gap-2 mt-2">
           <StatusTransition from={fromStatus} to={toStatus} />
           {amount != null && <AmountPill amount={amount} />}
+          {/* Bog'liq entity — mijoz va market nomi kartochkada ham ko'rinadi */}
+          {s?.customer_name && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
+              <User className="w-3 h-3" />
+              {s.customer_name}
+              {s.customer_phone && <span className="text-[10px] text-blue-500 font-mono">· {s.customer_phone}</span>}
+            </span>
+          )}
+          {s?.market_name && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">
+              <Briefcase className="w-3 h-3" />
+              {s.market_name}
+            </span>
+          )}
           {nv.courier_name && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
               <Truck className="w-3 h-3" />
@@ -362,6 +712,33 @@ const describeLog = (log: LogRow): { title: string; extras: React.ReactNode } =>
           )}
         </div>
       ),
+    };
+  }
+
+  if (log.entity_type === "post") {
+    const s = log.entity_summary;
+    return {
+      title: desc,
+      extras: s ? (
+        <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+          {s.region_name && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400">
+              {s.region_name}
+            </span>
+          )}
+          {s.courier_name && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
+              <Truck className="w-3 h-3" />
+              {s.courier_name}
+            </span>
+          )}
+          {s.order_quantity != null && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+              {s.order_quantity} ta buyurtma
+            </span>
+          )}
+        </div>
+      ) : null,
     };
   }
 
@@ -519,35 +896,49 @@ const LogCard: React.FC<{
           </div>
 
           {showDebug && (
-            <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900/60 rounded-xl space-y-2 text-[11px] border border-gray-200 dark:border-gray-800">
-              <div className="flex gap-2">
-                <span className="text-gray-500 w-20 flex-shrink-0">Entity ID:</span>
-                <span className="text-gray-700 dark:text-gray-300 font-mono break-all">{log.entity_id}</span>
-              </div>
-              {log.old_value && (
-                <div className="flex gap-2">
-                  <span className="text-gray-500 w-20 flex-shrink-0">Oldingi:</span>
-                  <pre className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all flex-1">
-                    {JSON.stringify(log.old_value, null, 2)}
-                  </pre>
+            <div className="mt-3 space-y-3">
+              {/* Bog'liq entity xulosasi — customer, market, courier ismlari */}
+              <EntitySummary log={log} />
+
+              {/* Oldingi va Yangi qiymatlar — farq ko'rinishida */}
+              {log.old_value && log.new_value ? (
+                <div className="p-3 bg-gray-50 dark:bg-gray-900/60 rounded-xl border border-gray-200 dark:border-gray-800">
+                  <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-2">
+                    O'zgarishlar
+                  </div>
+                  <DiffFields oldData={log.old_value} newData={log.new_value} />
                 </div>
-              )}
-              {log.new_value && (
-                <div className="flex gap-2">
-                  <span className="text-gray-500 w-20 flex-shrink-0">Yangi:</span>
-                  <pre className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all flex-1">
-                    {JSON.stringify(log.new_value, null, 2)}
-                  </pre>
+              ) : log.new_value ? (
+                <div className="p-3 bg-gray-50 dark:bg-gray-900/60 rounded-xl border border-gray-200 dark:border-gray-800">
+                  <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-2">
+                    Yangi qiymatlar
+                  </div>
+                  <RenderFields data={log.new_value} />
                 </div>
-              )}
+              ) : log.old_value ? (
+                <div className="p-3 bg-gray-50 dark:bg-gray-900/60 rounded-xl border border-gray-200 dark:border-gray-800">
+                  <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-2">
+                    Oldingi qiymatlar
+                  </div>
+                  <RenderFields data={log.old_value} />
+                </div>
+              ) : null}
+
+              {/* Metadata — qurilma, IP, manba */}
               {log.metadata && Object.keys(log.metadata).length > 0 && (
-                <div className="flex gap-2">
-                  <span className="text-gray-500 w-20 flex-shrink-0">Metadata:</span>
-                  <pre className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all flex-1">
-                    {JSON.stringify(log.metadata, null, 2)}
-                  </pre>
+                <div className="p-3 bg-gray-50 dark:bg-gray-900/60 rounded-xl border border-gray-200 dark:border-gray-800">
+                  <div className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 font-semibold mb-2">
+                    Qo'shimcha ma'lumot
+                  </div>
+                  <RenderFields data={log.metadata} />
                 </div>
               )}
+
+              {/* Entity ID — har ehtimolga qarshi ko'rinadi */}
+              <div className="flex gap-2 text-[11px] text-gray-400">
+                <Hash className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                <span className="font-mono break-all">{log.entity_id}</span>
+              </div>
             </div>
           )}
         </div>

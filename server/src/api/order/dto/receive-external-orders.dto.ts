@@ -1,10 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsNotEmpty,
-  IsUUID,
-  ArrayNotEmpty,
-} from 'class-validator';
+import { IsArray, IsNotEmpty, IsUUID, ArrayNotEmpty } from 'class-validator';
 
 // Tashqi buyurtmalarni qabul qilish uchun DTO
 // Integratsiya ID orqali market va field_mapping avtomatik olinadi

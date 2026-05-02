@@ -47,7 +47,8 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
       // Query timeout (30 sekund)
       maxQueryExecutionTime: 30000,
       // Logging (development uchun)
-      logging: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+      logging:
+        process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     }),
     JwtModule.register({ global: true }),
     ActivityLogModule,

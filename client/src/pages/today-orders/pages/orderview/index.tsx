@@ -76,14 +76,21 @@ const OrderView = () => {
       ? getMarketsByMyNewOrders(params)
       : getOrderByMarket(id, params);
 
-  // Offline queue scanner
+  // Offline queue scanner — faqat order qabul qilish ruxsati bor rollar uchun.
+  // MARKET va OPERATOR rollari skanerlash endpoint'iga ruxsatsiz (server 403
+  // qaytaradi), shuning uchun listener'ni umuman o'rnatmaymiz: bu keraksiz
+  // xato xabarlarni va chalkashlikni oldini oladi.
+  const canScanReceive =
+    user.role === "superadmin" ||
+    user.role === "admin" ||
+    user.role === "registrator";
   const {
     successCount,
     errorCount,
     isOnline,
     visualFeedback,
     clearHistory
-  } = useGlobalScanner(refetch);
+  } = useGlobalScanner(refetch, { enabled: canScanReceive });
 
   useEffect(() => {
     if (data?.data?.total === 0 && searchData == null) {

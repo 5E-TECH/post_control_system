@@ -1,5 +1,10 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Commission_type, Roles, Status, Where_deliver } from 'src/common/enums';
+import {
+  Commission_type,
+  Roles,
+  Status,
+  Where_deliver,
+} from 'src/common/enums';
 import {
   Column,
   Entity,
@@ -86,6 +91,10 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   default_operator_phone: string;
 
+  // Market uchun: ixtiyoriy 2-operator telefon raqami (chekda ham chiqadi)
+  @Column({ type: 'varchar', nullable: true })
+  secondary_operator_phone: string | null;
+
   // Operator uchun komissiya sozlamalari
   @Column({ type: 'enum', enum: Commission_type, nullable: true })
   commission_type: Commission_type | null;
@@ -96,16 +105,6 @@ export class UserEntity extends BaseEntity {
   // Operatorga uning daromadlarini ko'rsatish/yashirish
   @Column({ type: 'boolean', default: false })
   show_earnings: boolean;
-
-  // Investor uchun
-  @Column({ type: 'float', nullable: true, default: 0 })
-  committed_amount: number | null;
-
-  @Column({ type: 'float', nullable: true, default: 0 })
-  share_percent: number | null;
-
-  @Column({ type: 'float', nullable: true, default: 0 })
-  deposited_amount: number | null;
 
   @Column({
     type: 'enum',

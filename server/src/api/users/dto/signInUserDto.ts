@@ -7,7 +7,7 @@ export class SignInUserDto {
     example: '+998905234382',
   })
   @IsNotEmpty({ message: 'Telefon raqam kiritilishi shart' })
-  @IsString({ message: 'Telefon raqam matn formatida bo\'lishi kerak' })
+  @IsString({ message: "Telefon raqam matn formatida bo'lishi kerak" })
   phone_number: string;
 
   @ApiProperty({
@@ -15,6 +15,6 @@ export class SignInUserDto {
     example: '0990',
   })
   @IsNotEmpty({ message: 'Parol kiritilishi shart' })
-  @IsString({ message: 'Parol matn formatida bo\'lishi kerak' })
+  @IsString({ message: "Parol matn formatida bo'lishi kerak" })
   password: string;
 }

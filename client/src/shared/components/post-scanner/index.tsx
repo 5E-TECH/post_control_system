@@ -12,6 +12,7 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "../../api";
+import { normalizeQrToken } from "../../helpers/normalizeQrToken";
 
 const BASE_URL = import.meta.env.BASE_URL || '/';
 
@@ -57,6 +58,9 @@ interface UsePostScannerOptions {
   setSelectedIds?: React.Dispatch<React.SetStateAction<string[]>>;
   onSuccess?: (orderId: string, token: string) => void;
   onError?: (error: any, token: string) => void;
+  // Skanerni o'chirib qo'yish — ruxsatsiz rollar uchun listener'ni
+  // umuman o'rnatmaymiz va keraksiz 403 xatolarni oldini olamiz
+  enabled?: boolean;
 }
 
 interface ScanResult {
@@ -97,6 +101,7 @@ export function usePostScanner(
   options?: Omit<UsePostScannerOptions, 'refetch' | 'setSelectedIds'>
 ): UsePostScannerReturn {
   const location = useLocation();
+  const isEnabled = options?.enabled !== false;
 
   // URL dan postId ni ajratib olish
   const pathParts = location.pathname.split("/");
@@ -261,9 +266,12 @@ export function usePostScanner(
     if (!tokenValue) return;
 
     // Agar URL bo'lsa faqat token qismini olamiz
-    const token = tokenValue.startsWith("http")
+    const rawToken = tokenValue.startsWith("http")
       ? tokenValue.split("/").pop() || tokenValue
       : tokenValue;
+
+    // Caps Lock va RU layout muammosini bartaraf qilamiz
+    const token = normalizeQrToken(rawToken);
 
     // Darhol tekshirish
     checkOrderDirect(token);
@@ -271,6 +279,8 @@ export function usePostScanner(
 
   // ============ KEYBOARD LISTENER ============
   useEffect(() => {
+    if (!isEnabled) return;
+
     let scanned = "";
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -302,7 +312,7 @@ export function usePostScanner(
       window.removeEventListener("keypress", handleKeyPress);
       if (timer) clearTimeout(timer);
     };
-  }, [handleScan]);
+  }, [handleScan, isEnabled]);
 
   // ============ COMPUTED VALUES ============
   const successCount = scanHistory.filter(s => s.success).length;

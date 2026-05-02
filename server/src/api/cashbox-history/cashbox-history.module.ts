@@ -5,9 +5,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 
 @Module({
-  imports:[TypeOrmModule.forFeature([CashboxHistoryEntity])],
+  imports: [TypeOrmModule.forFeature([CashboxHistoryEntity])],
   controllers: [CashboxHistoryController],
   providers: [CashboxHistoryService],
-  exports: [TypeOrmModule]
+  exports: [TypeOrmModule],
 })
 export class CashboxHistoryModule {}
