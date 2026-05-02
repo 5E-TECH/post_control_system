@@ -24,11 +24,15 @@ import {
   Truck,
 } from "lucide-react";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
+import { setUserData } from "../../../../shared/lib/features/login/authSlice";
 
 const UserProfile = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
   const currentUserRole = useSelector((state: RootState) => state.roleSlice.role);
+  const cachedMarketData = useSelector(
+    (state: RootState) => state.authSlice.marketData,
+  );
   const { getUserById, updateUser } = useUser();
   const { data, isLoading, refetch } = getUserById(id);
   const [open, setOpen] = useState(false);
@@ -39,9 +43,11 @@ const UserProfile = () => {
   // Local state to control formatted phone input display
   const [phoneDisplay, setPhoneDisplay] = useState<string>("+998 ");
 
-  // Toggle ON bosilgandagi popup holatlari (default_operator_phone yo'q bo'lsa so'raydi)
-  const [operatorPhonePromptOpen, setOperatorPhonePromptOpen] = useState(false);
-  const [operatorPhonePromptValue, setOperatorPhonePromptValue] = useState("");
+  // Default operator telefon — sahifada inline tahrirlash uchun
+  const [defaultOperatorPhoneEditing, setDefaultOperatorPhoneEditing] =
+    useState(false);
+  const [defaultOperatorPhoneValue, setDefaultOperatorPhoneValue] =
+    useState("");
 
   // Maosh progress hisoblash
   const salaryProgress = useMemo(() => {
@@ -168,7 +174,6 @@ const UserProfile = () => {
       ...(user.role === "market"
         ? {
             default_tariff: user.default_tariff || "center",
-            default_operator_phone: user.default_operator_phone || "",
           }
         : {}),
       ...(currentUserRole === "superadmin" && (user.role === "admin" || user.role === "registrator")
@@ -229,24 +234,6 @@ const UserProfile = () => {
     if (payload.default_tariff === user.default_tariff)
       delete payload.default_tariff;
 
-    // default_operator_phone — normalize va solishtirish
-    if (payload.default_operator_phone !== undefined) {
-      const phoneRaw = String(payload.default_operator_phone || "").replace(/\D/g, "");
-      let normalizedOp = "";
-      if (phoneRaw) {
-        normalizedOp = phoneRaw.startsWith("998")
-          ? `+${phoneRaw}`
-          : phoneRaw.length === 9
-            ? `+998${phoneRaw}`
-            : `+${phoneRaw}`;
-      }
-      if (normalizedOp === (user.default_operator_phone || "")) {
-        delete payload.default_operator_phone;
-      } else {
-        payload.default_operator_phone = normalizedOp;
-      }
-    }
-
     // Rol o'zgarganmi tekshirish
     if (payload.role === user.role) delete payload.role;
 
@@ -295,6 +282,15 @@ const UserProfile = () => {
     );
   };
 
+  // Market user o'z profilini ko'rayotgani — toggle/default raqam o'zgarganda
+  // redux'dagi marketData ni ham yangilab qo'yamiz, shunda buyurtma yaratish
+  // sahifasi har safar refresh qilmasdan ham fresh ma'lumotni oladi.
+  const refreshMarketDataIfSelf = (user: any, patch: Record<string, any>) => {
+    if (currentUserRole !== "market") return;
+    if (user?.role !== "market") return;
+    dispatch(setUserData({ ...(cachedMarketData || {}), ...user, ...patch }));
+  };
+
   const persistRequireOperatorPhone = (
     checked: boolean,
     user: any,
@@ -316,6 +312,10 @@ const UserProfile = () => {
               ? "Operator telefon raqami majburiy qilindi"
               : "Operator telefon raqami ixtiyoriy qilindi",
           );
+          refreshMarketDataIfSelf(user, {
+            require_operator_phone: checked,
+            ...(extraData || {}),
+          });
           refetch();
         },
         onError: (err) =>
@@ -325,37 +325,74 @@ const UserProfile = () => {
   };
 
   const onChangeRequireOperatorPhone = (checked: boolean, user: any) => {
-    // Agar yoqmoqchi bo'lsa va default_operator_phone yo'q bo'lsa — popup bilan so'rash
-    if (checked && !user?.default_operator_phone) {
-      setOperatorPhonePromptValue("");
-      setOperatorPhonePromptOpen(true);
-      return;
-    }
+    // Toggle mustaqil — default raqam alohida tahrirlanadi (popup yo'q)
     persistRequireOperatorPhone(checked, user);
   };
 
-  const handleOperatorPhonePromptSave = () => {
-    const phoneRaw = operatorPhonePromptValue.replace(/\D/g, "");
-    if (!phoneRaw) {
-      handleApiError(null, "Telefon raqamni kiriting");
-      return;
-    }
-    const normalized = phoneRaw.startsWith("998")
-      ? `+${phoneRaw}`
-      : phoneRaw.length === 9
-        ? `+998${phoneRaw}`
-        : `+${phoneRaw}`;
-
-    persistRequireOperatorPhone(true, user, {
-      default_operator_phone: normalized,
-    });
-    setOperatorPhonePromptOpen(false);
+  const startEditDefaultOperatorPhone = () => {
+    setDefaultOperatorPhoneValue(
+      formatPhoneForDisplay(user?.default_operator_phone || "+998"),
+    );
+    setDefaultOperatorPhoneEditing(true);
   };
 
-  const handleOperatorPhonePromptCancel = () => {
-    // Bekor qilindi — toggle yoqilmaydi (hech narsa o'zgarmaydi, refetch shart emas)
-    setOperatorPhonePromptOpen(false);
-    setOperatorPhonePromptValue("");
+  const cancelEditDefaultOperatorPhone = () => {
+    setDefaultOperatorPhoneEditing(false);
+    setDefaultOperatorPhoneValue("");
+  };
+
+  const handleDefaultOperatorPhoneChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setDefaultOperatorPhoneValue(formatPhoneForDisplay(e.target.value));
+  };
+
+  const saveDefaultOperatorPhone = () => {
+    let phoneRaw = defaultOperatorPhoneValue.replace(/\D/g, "");
+    // 998 prefiksini olib tashlaymiz, qolgan raqamlar bilan ishlaymiz
+    if (phoneRaw.startsWith("998")) {
+      phoneRaw = phoneRaw.slice(3);
+    }
+    let normalized: string | null = null;
+    if (phoneRaw) {
+      if (phoneRaw.length !== 9) {
+        handleApiError(
+          null,
+          "Telefon raqami to'liq emas. 9 ta raqam kiriting (+998 dan keyin).",
+        );
+        return;
+      }
+      normalized = `+998${phoneRaw}`;
+    }
+
+    if ((normalized || "") === (user?.default_operator_phone || "")) {
+      // O'zgarmagan — yopib qo'yamiz
+      cancelEditDefaultOperatorPhone();
+      return;
+    }
+
+    updateUser.mutate(
+      {
+        role: user.role,
+        id: user.id,
+        data: { default_operator_phone: normalized },
+      },
+      {
+        onSuccess: () => {
+          handleSuccess(
+            normalized
+              ? "Default operator raqami saqlandi"
+              : "Default operator raqami o'chirildi",
+          );
+          refreshMarketDataIfSelf(user, {
+            default_operator_phone: normalized,
+          });
+          refetch();
+          cancelEditDefaultOperatorPhone();
+        },
+        onError: (err) => handleApiError(err, "Saqlashda xatolik"),
+      },
+    );
   };
 
   const getRoleColor = (role: string) => {
@@ -674,29 +711,77 @@ const UserProfile = () => {
                   }}
                 />
               </div>
+              {user?.require_operator_phone && !user?.default_operator_phone && (
+                <div className="mt-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 text-xs text-amber-700 dark:text-amber-300">
+                  Diqqat: majburiy yoqilgan, lekin default raqam kiritilmagan.
+                  Pastdagi maydondan default raqamni kiriting — aks holda
+                  buyurtma yaratilganda har safar raqam talab qilinadi.
+                </div>
+              )}
             </div>
           )}
 
-          {/* Default Operator Phone - Only for Market (read-only, edit via modal) */}
+          {/* Default Operator Phone - inline editable for Market */}
           {user?.role === "market" && (
             <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-4 flex-1">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500/10 to-cyan-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Phone className="w-6 h-6 text-teal-500" />
                   </div>
                   <div className="flex-1">
                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
-                      Javob beruvchi telefon raqam
+                      Default operator raqami
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
-                      {user.default_operator_phone || "Kiritilmagan"}
-                    </p>
+                    {defaultOperatorPhoneEditing ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Input
+                          size="middle"
+                          autoFocus
+                          inputMode="tel"
+                          placeholder="+998 90 123 45 67"
+                          value={defaultOperatorPhoneValue}
+                          onChange={handleDefaultOperatorPhoneChange}
+                          onPressEnter={saveDefaultOperatorPhone}
+                          maxLength={20}
+                          className="max-w-xs"
+                        />
+                        <Button
+                          type="primary"
+                          size="middle"
+                          onClick={saveDefaultOperatorPhone}
+                          loading={updateUser.isPending}
+                        >
+                          Saqlash
+                        </Button>
+                        <Button
+                          size="middle"
+                          onClick={cancelEditDefaultOperatorPhone}
+                        >
+                          Bekor qilish
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                        {user.default_operator_phone || "Kiritilmagan"}
+                      </p>
+                    )}
                   </div>
                 </div>
+                {!defaultOperatorPhoneEditing && (
+                  <button
+                    type="button"
+                    onClick={startEditDefaultOperatorPhone}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-600 dark:bg-teal-900/20 dark:hover:bg-teal-900/40 dark:text-teal-300 transition-colors flex items-center gap-1"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Tahrirlash
+                  </button>
+                )}
               </div>
             </div>
           )}
+
         </div>
 
         {/* Salary Card - faqat salary mavjud bo'lganda ko'rsatish */}
@@ -918,26 +1003,6 @@ const UserProfile = () => {
               </Form.Item>
             )}
 
-            {user.role === "market" && (
-              <Form.Item
-                label={
-                  <span className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
-                    <Phone className="w-4 h-4" />
-                    Javob beruvchi (operator) telefon raqam
-                  </span>
-                }
-                name="default_operator_phone"
-                className="mb-4"
-              >
-                <Input
-                  placeholder="+998 90 123 45 67"
-                  size="large"
-                  maxLength={20}
-                  className="rounded-lg"
-                />
-              </Form.Item>
-            )}
-
             {currentUserRole === "superadmin" && (user.role === "admin" || user.role === "registrator") && (
               <Form.Item
                 label={
@@ -1065,40 +1130,6 @@ const UserProfile = () => {
         </Modal>
       )}
 
-      {/* Operator telefon raqamni so'rash popup'i —
-          require_operator_phone yoqmoqchi bo'lingan lekin raqam yo'q bo'lsa chiqadi */}
-      <Modal
-        open={operatorPhonePromptOpen}
-        title="Operator telefon raqamini kiriting"
-        onCancel={handleOperatorPhonePromptCancel}
-        footer={[
-          <Button key="cancel" onClick={handleOperatorPhonePromptCancel}>
-            Bekor qilish
-          </Button>,
-          <Button
-            key="save"
-            type="primary"
-            onClick={handleOperatorPhonePromptSave}
-            loading={updateUser.isPending}
-          >
-            Saqlash va yoqish
-          </Button>,
-        ]}
-      >
-        <p className="text-sm text-gray-500 mb-3">
-          Operator telefon raqamini majburiy qilish uchun avval default operator
-          raqamini kiriting. Agar bekor qilsangiz sozlama yoqilmaydi.
-        </p>
-        <Input
-          size="large"
-          placeholder="+998 90 123 45 67"
-          value={operatorPhonePromptValue}
-          onChange={(e) => setOperatorPhonePromptValue(e.target.value)}
-          maxLength={20}
-          autoFocus
-          onPressEnter={handleOperatorPhonePromptSave}
-        />
-      </Modal>
     </div>
   );
 };

@@ -26,7 +26,11 @@ export class ShiftEntity extends BaseEntity {
   @Column({ type: 'bigint', transformer: bigintTransformer })
   opened_at: number;
 
-  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformerNullable })
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
   closed_at: number;
 
   @Column({ type: 'enum', enum: ShiftStatus, default: ShiftStatus.OPEN })

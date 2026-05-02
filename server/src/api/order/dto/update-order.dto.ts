@@ -11,7 +11,11 @@ import { Where_deliver } from 'src/common/enums';
 import { OrderItems } from 'src/common/utils/types/order-item.type';
 
 export class UpdateOrderDto {
-  @ApiPropertyOptional({ enum: Where_deliver, example: 'CENTER', description: 'Updated delivery destination' })
+  @ApiPropertyOptional({
+    enum: Where_deliver,
+    example: 'CENTER',
+    description: 'Updated delivery destination',
+  })
   @IsOptional()
   @IsEnum(Where_deliver)
   where_deliver?: Where_deliver;
@@ -51,20 +55,32 @@ export class UpdateOrderDto {
     description: 'Updated order items',
     type: 'array',
     example: [
-      { product_id: '11111111-2222-3333-4444-555555555555', quantity: 1, price: 15000 },
+      {
+        product_id: '11111111-2222-3333-4444-555555555555',
+        quantity: 1,
+        price: 15000,
+      },
     ],
   })
   @IsOptional()
   @IsArray()
   order_item_info?: OrderItems[];
 
-  @ApiPropertyOptional({ example: 25000, minimum: 1, description: 'Custom market delivery tariff' })
+  @ApiPropertyOptional({
+    example: 25000,
+    minimum: 1,
+    description: 'Custom market delivery tariff',
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
   market_tariff?: number;
 
-  @ApiPropertyOptional({ example: 20000, minimum: 1, description: 'Custom courier delivery tariff' })
+  @ApiPropertyOptional({
+    example: 20000,
+    minimum: 1,
+    description: 'Custom courier delivery tariff',
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)

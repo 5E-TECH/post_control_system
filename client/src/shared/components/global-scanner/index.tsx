@@ -12,6 +12,7 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "../../api";
+import { normalizeQrToken } from "../../helpers/normalizeQrToken";
 
 const BASE_URL = import.meta.env.BASE_URL || '/';
 
@@ -56,6 +57,10 @@ interface UseGlobalScannerOptions {
   refetch?: () => void;
   onSuccess?: (token: string) => void;
   onError?: (error: any, token: string) => void;
+  // Skanerni o'chirib qo'yish (masalan: MARKET/OPERATOR roli uchun —
+  // ular qabul qilish endpoint'iga ruxsatsiz, shuning uchun keypress
+  // listener'ni o'rnatmaymiz va keraksiz 403 xatolarni oldini olamiz)
+  enabled?: boolean;
 }
 
 interface ScanResult {
@@ -94,6 +99,7 @@ export function useGlobalScanner(
   options?: Omit<UseGlobalScannerOptions, 'refetch'>
 ): UseGlobalScannerReturn {
   const location = useLocation();
+  const isEnabled = options?.enabled !== false;
 
   // URL dan marketId ni ajratib olish
   const pathParts = location.pathname.split("/");
@@ -261,9 +267,13 @@ export function useGlobalScanner(
     if (!tokenValue) return;
 
     // Agar URL bo'lsa faqat token qismini olamiz
-    const token = tokenValue.startsWith("http")
+    const rawToken = tokenValue.startsWith("http")
       ? tokenValue.split("/").pop() || tokenValue
       : tokenValue;
+
+    // Caps Lock va RU layout muammosini bartaraf qilamiz
+    // (hex token har doim lowercase saqlanadi, RU layout'da yozilgani Latin'ga ko'chiriladi)
+    const token = normalizeQrToken(rawToken);
 
     // Darhol tekshirish
     receiveOrderDirect(token);
@@ -271,6 +281,10 @@ export function useGlobalScanner(
 
   // ============ KEYBOARD LISTENER ============
   useEffect(() => {
+    // Agar skaner o'chirilgan bo'lsa (masalan: MARKET roli) — listener
+    // o'rnatilmaydi va hech qanday API chaqirilmaydi
+    if (!isEnabled) return;
+
     let scanned = "";
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -302,7 +316,7 @@ export function useGlobalScanner(
       window.removeEventListener("keypress", handleKeyPress);
       if (timer) clearTimeout(timer);
     };
-  }, [handleScan]);
+  }, [handleScan, isEnabled]);
 
   // ============ COMPUTED VALUES ============
   const successCount = scanHistory.filter(s => s.success).length;

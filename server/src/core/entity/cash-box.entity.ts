@@ -1,6 +1,13 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Cashbox_type } from 'src/common/enums';
-import { Column, Entity, OneToOne, OneToMany, JoinColumn, Index } from 'typeorm';
+import {
+  Column,
+  Entity,
+  OneToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { UserEntity } from './users.entity';
 import { CashboxHistoryEntity } from './cashbox-history.entity';
 import { bigintTransformerNonNull as bigintTransformer } from 'src/common/database/bigint.transformer';

@@ -1,5 +1,12 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ActivityLogService } from './activity-log.service';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -41,7 +48,10 @@ export class ActivityLogController {
   }
 
   @ApiOperation({ summary: 'Get logs for specific entity (order, post, etc.)' })
-  @ApiParam({ name: 'type', description: 'Entity type: order, post, user, cashbox' })
+  @ApiParam({
+    name: 'type',
+    description: 'Entity type: order, post, user, cashbox',
+  })
   @ApiParam({ name: 'id', description: 'Entity ID' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
@@ -52,6 +62,11 @@ export class ActivityLogController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.activityLogService.getLogsByEntity(type, id, Number(page) || 1, Number(limit) || 50);
+    return this.activityLogService.getLogsByEntity(
+      type,
+      id,
+      Number(page) || 1,
+      Number(limit) || 50,
+    );
   }
 }

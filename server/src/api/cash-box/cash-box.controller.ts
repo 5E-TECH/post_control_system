@@ -125,7 +125,11 @@ export class CasheBoxController {
     @Query('toDate') toDate?: string,
     @Query('sourceTypes') sourceTypes?: string,
   ) {
-    return this.cashBoxService.getCashboxByUserId(id, { fromDate, toDate, sourceTypes });
+    return this.cashBoxService.getCashboxByUserId(id, {
+      fromDate,
+      toDate,
+      sourceTypes,
+    });
   }
 
   @ApiOperation({ summary: 'Get my cashbox (courier/market)' })
@@ -151,7 +155,11 @@ export class CasheBoxController {
     @Query('toDate') toDate?: string,
     @Query('sourceTypes') sourceTypes?: string,
   ) {
-    return this.cashBoxService.myCashbox(user, { fromDate, toDate, sourceTypes });
+    return this.cashBoxService.myCashbox(user, {
+      fromDate,
+      toDate,
+      sourceTypes,
+    });
   }
 
   @ApiOperation({ summary: 'Accept payment from courier' })
@@ -243,12 +251,39 @@ export class CasheBoxController {
     return this.cashBoxService.financialBalance();
   }
 
-  @ApiOperation({ summary: 'Get financial balance history (only balance-affecting events)' })
-  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Start date (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'End date (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'sourceType', required: false, enum: FinancialSource_type, description: 'Filter by source type' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  @ApiOperation({
+    summary: 'Get financial balance history (only balance-affecting events)',
+  })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'sourceType',
+    required: false,
+    enum: FinancialSource_type,
+    description: 'Filter by source type',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page (default: 20)',
+  })
   @ApiResponse({ status: 200, description: 'Financial balance history' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
@@ -269,10 +304,26 @@ export class CasheBoxController {
     });
   }
 
-  @ApiOperation({ summary: 'Get financial balance analytics and impact analysis' })
-  @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'Start date (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'End date (YYYY-MM-DD)' })
-  @ApiResponse({ status: 200, description: 'Analytics: top sources, users, transactions affecting balance' })
+  @ApiOperation({
+    summary: 'Get financial balance analytics and impact analysis',
+  })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD)',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Analytics: top sources, users, transactions affecting balance',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('financial-balanse/analytics')
@@ -283,7 +334,9 @@ export class CasheBoxController {
     return this.cashBoxService.financialBalanceAnalytics({ fromDate, toDate });
   }
 
-  @ApiOperation({ summary: 'Paginated top-impact transactions by absolute amount' })
+  @ApiOperation({
+    summary: 'Paginated top-impact transactions by absolute amount',
+  })
   @ApiQuery({ name: 'fromDate', required: false, type: String })
   @ApiQuery({ name: 'toDate', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -338,10 +391,7 @@ export class CasheBoxController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('salary')
-  paySalary(
-    @CurrentUser() user: JwtPayload,
-    @Body() salaryDto: SalaryDto,
-  ) {
+  paySalary(@CurrentUser() user: JwtPayload, @Body() salaryDto: SalaryDto) {
     return this.cashBoxService.paySalary(user, salaryDto);
   }
 
@@ -404,10 +454,7 @@ export class CasheBoxController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('shift/export')
-  async exportShift(
-    @Res() res: Response,
-    @Query('shiftId') shiftId?: string,
-  ) {
+  async exportShift(@Res() res: Response, @Query('shiftId') shiftId?: string) {
     const buffer = await this.cashBoxService.exportShiftToExcel(shiftId);
 
     const filename = `smena-hisobot-${new Date().toISOString().split('T')[0]}.xlsx`;

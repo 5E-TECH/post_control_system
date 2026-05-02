@@ -35,7 +35,11 @@ export class UpdateMarketDto {
 
   @IsOptional()
   @IsString()
-  default_operator_phone?: string;
+  default_operator_phone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  secondary_operator_phone?: string | null;
 
   @IsOptional()
   @IsNumber()

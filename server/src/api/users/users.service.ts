@@ -62,13 +62,6 @@ import { UpdateOperatorCommissionDto } from './dto/update-operator-commission.dt
 import { PayOperatorDto } from './dto/pay-operator.dto';
 import { getSafeLimit } from 'src/common/constants/pagination';
 import { TelegramInitData } from './dto/initData.dto';
-import { InvestorDepositEntity } from 'src/core/entity/investor-deposit.entity';
-import { InvestorEarningEntity } from 'src/core/entity/investor-earning.entity';
-import { InvestorPayoutEntity } from 'src/core/entity/investor-payout.entity';
-import { CreateInvestorDto } from './dto/create-investor.dto';
-import { RecordInvestorDepositDto } from './dto/record-investor-deposit.dto';
-import { PayInvestorDto } from './dto/pay-investor.dto';
-import { UpdateInvestorDto } from './dto/update-investor.dto';
 import { Cron } from '@nestjs/schedule';
 import { Logger, OnModuleInit } from '@nestjs/common';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -106,7 +99,7 @@ export class UserService implements OnModuleInit {
   // Test for CI/CD
 
   async onModuleInit() {
-    console.log('🟢 [SALARY CRON] Oylik maosh cron job ro\'yxatga olindi');
+    console.log("🟢 [SALARY CRON] Oylik maosh cron job ro'yxatga olindi");
     try {
       const isSuperAdmin = await this.userRepo.findOne({
         where: { role: Roles.SUPERADMIN },
@@ -161,7 +154,13 @@ export class UserService implements OnModuleInit {
       });
       await queryRunner.manager.save(adminSalary);
       await queryRunner.commitTransaction();
-      this.activityLog.log({ entity_type: 'user', entity_id: admin.id, action: 'created', new_value: { name: admin.name, role: admin.role }, description: `Admin yaratildi: ${admin.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: admin.id,
+        action: 'created',
+        new_value: { name: admin.name, role: admin.role },
+        description: `Admin yaratildi: ${admin.name}`,
+      });
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -210,7 +209,13 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(userSalary);
 
       await queryRunner.commitTransaction();
-      this.activityLog.log({ entity_type: 'user', entity_id: user.id, action: 'created', new_value: { name: user.name, role: user.role }, description: `Registrator yaratildi: ${user.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: user.id,
+        action: 'created',
+        new_value: { name: user.name, role: user.role },
+        description: `Registrator yaratildi: ${user.name}`,
+      });
       return successRes(user, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -268,7 +273,13 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(cashbox);
 
       await queryRunner.commitTransaction();
-      this.activityLog.log({ entity_type: 'user', entity_id: courier.id, action: 'created', new_value: { name: courier.name, role: Roles.COURIER }, description: `Kuryer yaratildi: ${courier.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: courier.id,
+        action: 'created',
+        new_value: { name: courier.name, role: Roles.COURIER },
+        description: `Kuryer yaratildi: ${courier.name}`,
+      });
       return successRes(courier, 201, `New courier created`);
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -320,7 +331,13 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(cashbox);
 
       await queryRunner.commitTransaction();
-      this.activityLog.log({ entity_type: 'user', entity_id: newMarket.id, action: 'created', new_value: { name: newMarket.name, role: Roles.MARKET }, description: `Market yaratildi: ${newMarket.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: newMarket.id,
+        action: 'created',
+        new_value: { name: newMarket.name, role: Roles.MARKET },
+        description: `Market yaratildi: ${newMarket.name}`,
+      });
       return successRes(newMarket, 201, 'New market created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -333,7 +350,7 @@ export class UserService implements OnModuleInit {
   async createCustomer(
     user: JwtPayload,
     createCustomerDto: CreateCustomerDto,
-  ): Promise<Object> {
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -554,8 +571,18 @@ export class UserService implements OnModuleInit {
           'user.default_tariff',
           'user.created_at',
           'user.add_order',
+          'user.require_operator_phone',
+          'user.default_operator_phone',
+          'user.secondary_operator_phone',
           'cashbox', // cashboxni to'liq olish uchun
         ]);
+
+      // Bloklanganlar (status = inactive) hech kimga ko'rinmaydi —
+      // superadmin ham bu ro'yxatdan ko'rmaydi (boshqarish uchun userlar
+      // sahifasidan kirish kerak)
+      query.andWhere('user.status = :activeStatus', {
+        activeStatus: Status.ACTIVE,
+      });
 
       if (search) {
         query.andWhere(
@@ -709,13 +736,17 @@ export class UserService implements OnModuleInit {
 
   async allCouriers(search: string | undefined): Promise<object> {
     try {
+      // Bloklanganlar (status = inactive) hech kimga ko'rinmaydi —
+      // superadmin ham bu ro'yxatdan ko'rmaydi
+      const baseFilter = { role: Roles.COURIER, status: Status.ACTIVE };
+
       const allCouriers = await this.userRepo.find({
         where: search
           ? [
-              { role: Roles.COURIER, name: ILike(`%${search}%`) },
-              { role: Roles.COURIER, phone_number: ILike(`%${search}%`) },
+              { ...baseFilter, name: ILike(`%${search}%`) },
+              { ...baseFilter, phone_number: ILike(`%${search}%`) },
             ]
-          : { role: Roles.COURIER },
+          : baseFilter,
         select: ['id', 'name', 'phone_number', 'status', 'created_at'],
         relations: ['cashbox', 'region'],
         order: { created_at: 'DESC' },
@@ -788,12 +819,12 @@ export class UserService implements OnModuleInit {
       if (otherFields.role) {
         if (currentUser.role !== Roles.SUPERADMIN) {
           throw new BadRequestException(
-            'Faqat SuperAdmin foydalanuvchi rolini o\'zgartira oladi',
+            "Faqat SuperAdmin foydalanuvchi rolini o'zgartira oladi",
           );
         }
         if (![Roles.ADMIN, Roles.REGISTRATOR].includes(otherFields.role)) {
           throw new BadRequestException(
-            'Faqat admin yoki registrator roliga o\'zgartirilishi mumkin',
+            "Faqat admin yoki registrator roliga o'zgartirilishi mumkin",
           );
         }
       }
@@ -819,7 +850,12 @@ export class UserService implements OnModuleInit {
       }
 
       // salary va payment_day ni alohida olamiz
-      const { salary: newSalary, payment_day: newPaymentDay, have_to_pay: newHaveToPay, ...fieldsToUpdate } = otherFields;
+      const {
+        salary: newSalary,
+        payment_day: newPaymentDay,
+        have_to_pay: newHaveToPay,
+        ...fieldsToUpdate
+      } = otherFields;
 
       Object.assign(user, {
         ...fieldsToUpdate,
@@ -828,7 +864,11 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(user);
 
       // Salary yangilash (faqat superadmin)
-      if (newSalary !== undefined || newPaymentDay !== undefined || newHaveToPay !== undefined) {
+      if (
+        newSalary !== undefined ||
+        newPaymentDay !== undefined ||
+        newHaveToPay !== undefined
+      ) {
         const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
         let salary = await salaryRepo.findOne({ where: { user_id: id } });
         if (salary) {
@@ -854,7 +894,13 @@ export class UserService implements OnModuleInit {
       });
 
       const { password: _, ...safeUser } = updatedUser;
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'updated', new_value: { name: updatedUser.name, role: updatedUser.role }, description: `Admin yangilandi: ${updatedUser.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'updated',
+        new_value: { name: updatedUser.name, role: updatedUser.role },
+        description: `Admin yangilandi: ${updatedUser.name}`,
+      });
       return successRes(safeUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
@@ -878,12 +924,12 @@ export class UserService implements OnModuleInit {
       if (otherFields.role) {
         if (!currentUser || currentUser.role !== Roles.SUPERADMIN) {
           throw new BadRequestException(
-            'Faqat SuperAdmin foydalanuvchi rolini o\'zgartira oladi',
+            "Faqat SuperAdmin foydalanuvchi rolini o'zgartira oladi",
           );
         }
         if (![Roles.ADMIN, Roles.REGISTRATOR].includes(otherFields.role)) {
           throw new BadRequestException(
-            'Faqat admin yoki registrator roliga o\'zgartirilishi mumkin',
+            "Faqat admin yoki registrator roliga o'zgartirilishi mumkin",
           );
         }
       }
@@ -906,7 +952,12 @@ export class UserService implements OnModuleInit {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
       // salary va payment_day ni alohida olamiz
-      const { salary: newSalary, payment_day: newPaymentDay, have_to_pay: newHaveToPay, ...fieldsToUpdate } = otherFields;
+      const {
+        salary: newSalary,
+        payment_day: newPaymentDay,
+        have_to_pay: newHaveToPay,
+        ...fieldsToUpdate
+      } = otherFields;
 
       Object.assign(registrator, {
         ...fieldsToUpdate,
@@ -915,7 +966,11 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(registrator);
 
       // Salary yangilash
-      if (newSalary !== undefined || newPaymentDay !== undefined || newHaveToPay !== undefined) {
+      if (
+        newSalary !== undefined ||
+        newPaymentDay !== undefined ||
+        newHaveToPay !== undefined
+      ) {
         const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
         let salary = await salaryRepo.findOne({ where: { user_id: id } });
         if (salary) {
@@ -957,7 +1012,11 @@ export class UserService implements OnModuleInit {
       // Update qilganda telefon nomer databasada bor yoki yo'qligini tekshirish
       if (otherFields.phone_number) {
         const existUser = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
         });
         if (existUser) {
           throw new ConflictException(
@@ -989,7 +1048,12 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(courier);
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'updated', description: `Kuryer yangilandi: ${updatedUser?.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'updated',
+        description: `Kuryer yangilandi: ${updatedUser?.name}`,
+      });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
@@ -1002,14 +1066,20 @@ export class UserService implements OnModuleInit {
   ): Promise<object> {
     try {
       const { password, ...otherFields } = updateMarketDto;
-      const market = await this.userRepo.findOne({ where: { id } });
+      const market = await this.userRepo.findOne({
+        where: { id, role: Roles.MARKET },
+      });
       if (!market) {
-        throw new NotFoundException('Market nottt found');
+        throw new NotFoundException('Market not found');
       }
 
       if (otherFields.phone_number) {
         const isExistPhoneNumber = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
         });
         if (isExistPhoneNumber) {
           throw new ConflictException(
@@ -1030,7 +1100,12 @@ export class UserService implements OnModuleInit {
 
       const updatedMarket = await this.userRepo.save(market);
 
-      this.activityLog.log({ entity_type: 'user', entity_id: market.id, action: 'updated', description: `Market yangilandi: ${updatedMarket.name}` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: market.id,
+        action: 'updated',
+        description: `Market yangilandi: ${updatedMarket.name}`,
+      });
       return successRes(updatedMarket, 200, 'Market updated');
     } catch (error) {
       return catchError(error);
@@ -1040,7 +1115,7 @@ export class UserService implements OnModuleInit {
   async updateCustomerNamePhone(
     id: string,
     dto: UpdateCustomerDto,
-  ): Promise<Object> {
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1070,7 +1145,7 @@ export class UserService implements OnModuleInit {
   async updateCustomerAddress(
     id: string,
     dto: UpdateCustomerDto,
-  ): Promise<Object> {
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1207,7 +1282,10 @@ export class UserService implements OnModuleInit {
       if (!myProfile) throw new NotFoundException('Your infos not found');
       if (otherFields.phone_number) {
         const phoneNumber = await this.userRepo.findOne({
-          where: { phone_number: otherFields.phone_number },
+          where: {
+            phone_number: otherFields.phone_number,
+            id: Not(user.id),
+          },
         });
         if (phoneNumber) {
           throw new ConflictException(
@@ -1249,7 +1327,13 @@ export class UserService implements OnModuleInit {
         throw new BadRequestException('Super admin can not be deleted!');
       }
       await this.userRepo.delete({ id });
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: user.name, role: user.role }, description: `Foydalanuvchi o'chirildi: ${user.name} (${user.role})` });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { name: user.name, role: user.role },
+        description: `Foydalanuvchi o'chirildi: ${user.name} (${user.role})`,
+      });
       return successRes({}, 200, 'User deleted');
     } catch (error) {
       return catchError(error);
@@ -1293,7 +1377,8 @@ export class UserService implements OnModuleInit {
       const accessToken = await this.token.generateAccessToken(payload);
       const refreshToken = await this.token.generateRefreshToken(payload);
       writeToCookie(res, 'refreshToken', refreshToken);
-      const refreshTokenExpiresAt = Date.now() + parseDurationToMs(config.REFRESH_TOKEN_TIME);
+      const refreshTokenExpiresAt =
+        Date.now() + parseDurationToMs(config.REFRESH_TOKEN_TIME);
 
       this.activityLog.log({
         entity_type: 'user',
@@ -1305,7 +1390,10 @@ export class UserService implements OnModuleInit {
       });
 
       return successRes(
-        { access_token: accessToken, refresh_token_expires_at: refreshTokenExpiresAt },
+        {
+          access_token: accessToken,
+          refresh_token_expires_at: refreshTokenExpiresAt,
+        },
         200,
         'Logged in successfully',
       );
@@ -1316,7 +1404,6 @@ export class UserService implements OnModuleInit {
 
   async loginTelegram(initData: TelegramInitData, req?: Request) {
     try {
-
       const { data } = initData;
       const params = new URLSearchParams(data);
       const userStr = params.get('user');
@@ -1369,7 +1456,11 @@ export class UserService implements OnModuleInit {
         const decoded = this.jwtService.verify(token, {
           secret: config.REFRESH_TOKEN_KEY,
         });
-        payload = { id: decoded.id, role: decoded.role, status: decoded.status };
+        payload = {
+          id: decoded.id,
+          role: decoded.role,
+          status: decoded.status,
+        };
       } catch {
         res.clearCookie('refreshToken');
         throw new UnauthorizedException('Refresh token expired or invalid');
@@ -1381,7 +1472,11 @@ export class UserService implements OnModuleInit {
         throw new UnauthorizedException('User not found or inactive');
       }
 
-      const newPayload: JwtPayload = { id: user.id, role: user.role, status: user.status };
+      const newPayload: JwtPayload = {
+        id: user.id,
+        role: user.role,
+        status: user.status,
+      };
       const accessToken = await this.token.generateAccessToken(newPayload);
 
       return successRes(
@@ -1502,7 +1597,7 @@ export class UserService implements OnModuleInit {
         .getRepository(OrderEntity)
         .createQueryBuilder('order')
         .where('order.customer_id = :customerId', { customerId })
-        .andWhere('order.deleted = :deleted', { deleted: false });
+        .andWhere('order.deleted_at IS NULL');
 
       // If market role or market_id provided, filter by market
       if (effectiveMarketId) {
@@ -1513,7 +1608,9 @@ export class UserService implements OnModuleInit {
 
       // Get statistics for ALL orders (not limited)
       const statsQb = baseQb.clone();
-      const allOrders = await statsQb.select(['order.status', 'order.total_price']).getMany();
+      const allOrders = await statsQb
+        .select(['order.status', 'order.total_price'])
+        .getMany();
 
       const stats = {
         total: allOrders.length,
@@ -1524,10 +1621,16 @@ export class UserService implements OnModuleInit {
       };
 
       for (const order of allOrders) {
-        if (order.status === Order_status.SOLD || order.status === Order_status.PAID) {
+        if (
+          order.status === Order_status.SOLD ||
+          order.status === Order_status.PAID
+        ) {
           stats.delivered++;
           stats.total_spent += Number(order.total_price) || 0;
-        } else if (order.status === Order_status.CANCELLED || order.status === Order_status.CANCELLED_SENT) {
+        } else if (
+          order.status === Order_status.CANCELLED ||
+          order.status === Order_status.CANCELLED_SENT
+        ) {
           stats.cancelled++;
         } else {
           stats.pending++;
@@ -1542,7 +1645,7 @@ export class UserService implements OnModuleInit {
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.market', 'market')
         .where('order.customer_id = :customerId', { customerId })
-        .andWhere('order.deleted = :deleted', { deleted: false })
+        .andWhere('order.deleted_at IS NULL')
         .andWhere(effectiveMarketId ? 'order.user_id = :marketId' : '1=1', {
           marketId: effectiveMarketId,
         })
@@ -1715,14 +1818,20 @@ export class UserService implements OnModuleInit {
       await this.userRepo.save(logist);
 
       // Salary yangilash
-      if (dto.salary !== undefined || dto.payment_day !== undefined || dto.have_to_pay !== undefined) {
+      if (
+        dto.salary !== undefined ||
+        dto.payment_day !== undefined ||
+        dto.have_to_pay !== undefined
+      ) {
         const salary = await this.dataSource
           .getRepository(UserSalaryEntity)
           .findOne({ where: { user_id: id } });
         if (salary) {
           if (dto.salary !== undefined) salary.salary_amount = dto.salary;
-          if (dto.payment_day !== undefined) salary.payment_day = dto.payment_day;
-          if (dto.have_to_pay !== undefined) salary.have_to_pay = dto.have_to_pay;
+          if (dto.payment_day !== undefined)
+            salary.payment_day = dto.payment_day;
+          if (dto.have_to_pay !== undefined)
+            salary.have_to_pay = dto.have_to_pay;
           await this.dataSource.getRepository(UserSalaryEntity).save(salary);
         }
       }
@@ -1750,8 +1859,14 @@ export class UserService implements OnModuleInit {
       logist.is_deleted = true;
       await this.userRepo.save(logist);
 
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: logist.name, role: Roles.LOGIST }, description: `Logist o'chirildi: ${logist.name}` });
-      return successRes({}, 200, 'Logist o\'chirildi');
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { name: logist.name, role: Roles.LOGIST },
+        description: `Logist o'chirildi: ${logist.name}`,
+      });
+      return successRes({}, 200, "Logist o'chirildi");
     } catch (error) {
       return catchError(error);
     }
@@ -1759,7 +1874,10 @@ export class UserService implements OnModuleInit {
 
   // ==================== OPERATOR CRUD ====================
 
-  async createOperator(dto: CreateOperatorDto, market: JwtPayload): Promise<object> {
+  async createOperator(
+    dto: CreateOperatorDto,
+    market: JwtPayload,
+  ): Promise<object> {
     try {
       const { password, phone_number, name } = dto;
 
@@ -1782,7 +1900,14 @@ export class UserService implements OnModuleInit {
       });
       await this.userRepo.save(operator);
 
-      this.activityLog.log({ entity_type: 'user', entity_id: operator.id, action: 'created', new_value: { name: operator.name, role: Roles.OPERATOR }, description: `Operator yaratildi: ${operator.name}`, user: market });
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: operator.id,
+        action: 'created',
+        new_value: { name: operator.name, role: Roles.OPERATOR },
+        description: `Operator yaratildi: ${operator.name}`,
+        user: market,
+      });
       return successRes(operator, 201, 'Yangi operator yaratildi');
     } catch (error) {
       return catchError(error);
@@ -1792,7 +1917,11 @@ export class UserService implements OnModuleInit {
   async getMyOperators(market: JwtPayload): Promise<object> {
     try {
       const operators = await this.userRepo.find({
-        where: { market_id: market.id, role: Roles.OPERATOR, is_deleted: false },
+        where: {
+          market_id: market.id,
+          role: Roles.OPERATOR,
+          is_deleted: false,
+        },
         order: { created_at: 'DESC' },
         select: ['id', 'name', 'phone_number', 'status', 'created_at'],
       });
@@ -1805,15 +1934,29 @@ export class UserService implements OnModuleInit {
   async deleteOperator(id: string, market: JwtPayload): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
       operator.is_deleted = true;
       await this.userRepo.save(operator);
-      this.activityLog.log({ entity_type: 'user', entity_id: id, action: 'deleted', old_value: { name: operator.name, role: Roles.OPERATOR }, description: `Operator o'chirildi: ${operator.name}`, user: market });
-      return successRes({}, 200, 'Operator o\'chirildi');
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { name: operator.name, role: Roles.OPERATOR },
+        description: `Operator o'chirildi: ${operator.name}`,
+        user: market,
+      });
+      return successRes({}, 200, "Operator o'chirildi");
     } catch (error) {
       return catchError(error);
     }
@@ -1822,10 +1965,17 @@ export class UserService implements OnModuleInit {
   async getOperatorStats(id: string, market: JwtPayload): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
 
       const orderRepo = this.dataSource.getRepository(OrderEntity);
@@ -1847,7 +1997,9 @@ export class UserService implements OnModuleInit {
       const success_rate = total > 0 ? Math.round((sold / total) * 100) : 0;
 
       const total_revenue = orders
-        .filter((o) => ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status))
+        .filter((o) =>
+          ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status),
+        )
         .reduce((sum, o) => sum + Number(o.total_price || 0), 0);
 
       return successRes(
@@ -1886,15 +2038,50 @@ export class UserService implements OnModuleInit {
   ): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
 
-      if (dto.commission_type !== undefined) operator.commission_type = dto.commission_type;
-      if (dto.commission_value !== undefined) operator.commission_value = dto.commission_value;
-      if (dto.show_earnings !== undefined) operator.show_earnings = dto.show_earnings;
+      if (dto.commission_type !== undefined)
+        operator.commission_type = dto.commission_type;
+      if (dto.commission_value !== undefined)
+        operator.commission_value = dto.commission_value;
+      if (dto.show_earnings !== undefined)
+        operator.show_earnings = dto.show_earnings;
+
+      // Komissiya qiymatini turi bo'yicha tekshirish (har order'ga noto'g'ri hisob ketmasligi uchun).
+      // PERCENT bo'lsa 0-100 oraliqda; FIXED bo'lsa keskin yuqori chegara qo'yamiz (1 mln so'm),
+      // chunki real holatda fixed komissiya bunchalik katta bo'lmaydi.
+      if (operator.commission_type && operator.commission_value != null) {
+        if (operator.commission_type === Commission_type.PERCENT) {
+          if (
+            operator.commission_value < 0 ||
+            operator.commission_value > 100
+          ) {
+            throw new BadRequestException(
+              "Komissiya foizi 0 dan 100 gacha bo'lishi kerak",
+            );
+          }
+        } else if (operator.commission_type === Commission_type.FIXED) {
+          if (
+            operator.commission_value < 0 ||
+            operator.commission_value > 1_000_000
+          ) {
+            throw new BadRequestException(
+              "Belgilangan komissiya 0 dan 1 000 000 so'mgacha bo'lishi kerak",
+            );
+          }
+        }
+      }
 
       await this.userRepo.save(operator);
       return successRes(
@@ -1915,11 +2102,26 @@ export class UserService implements OnModuleInit {
   async getOperatorBalance(id: string, market: JwtPayload): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
-        select: ['id', 'name', 'phone_number', 'status', 'commission_type', 'commission_value', 'show_earnings'],
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
+        select: [
+          'id',
+          'name',
+          'phone_number',
+          'status',
+          'commission_type',
+          'commission_value',
+          'show_earnings',
+        ],
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
 
       const earningRepo = this.dataSource.getRepository(OperatorEarningEntity);
@@ -1962,10 +2164,17 @@ export class UserService implements OnModuleInit {
   ): Promise<object> {
     try {
       const operator = await this.userRepo.findOne({
-        where: { id, role: Roles.OPERATOR, market_id: market.id, is_deleted: false },
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
       });
       if (!operator) {
-        throw new NotFoundException('Operator topilmadi yoki sizga tegishli emas');
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
       }
 
       const paymentRepo = this.dataSource.getRepository(OperatorPaymentEntity);
@@ -1984,17 +2193,27 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async getMyEarnings(operator: JwtPayload, fromDate?: string, toDate?: string): Promise<object> {
+  async getMyEarnings(
+    operator: JwtPayload,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<object> {
     try {
       const operatorUser = await this.userRepo.findOne({
         where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
-        select: ['id', 'name', 'commission_type', 'commission_value', 'show_earnings'],
+        select: [
+          'id',
+          'name',
+          'commission_type',
+          'commission_value',
+          'show_earnings',
+        ],
       });
       if (!operatorUser) {
         throw new NotFoundException('Operator topilmadi');
       }
       if (!operatorUser.show_earnings) {
-        return successRes({ visible: false }, 200, 'Daromad ko\'rinmaydi');
+        return successRes({ visible: false }, 200, "Daromad ko'rinmaydi");
       }
 
       const earningRepo = this.dataSource.getRepository(OperatorEarningEntity);
@@ -2011,19 +2230,25 @@ export class UserService implements OnModuleInit {
       }
 
       // Earnings query builder
-      const earningsQb = earningRepo.createQueryBuilder('e')
+      const earningsQb = earningRepo
+        .createQueryBuilder('e')
         .where('e.operator_id = :opId', { opId: operator.id })
         .orderBy('e.created_at', 'DESC');
-      if (dateFromMs) earningsQb.andWhere('e.created_at >= :from', { from: dateFromMs });
-      if (dateToMs) earningsQb.andWhere('e.created_at <= :to', { to: dateToMs });
+      if (dateFromMs)
+        earningsQb.andWhere('e.created_at >= :from', { from: dateFromMs });
+      if (dateToMs)
+        earningsQb.andWhere('e.created_at <= :to', { to: dateToMs });
       const earnings = await earningsQb.getMany();
 
       // Payments query builder
-      const paymentsQb = paymentRepo.createQueryBuilder('p')
+      const paymentsQb = paymentRepo
+        .createQueryBuilder('p')
         .where('p.operator_id = :opId', { opId: operator.id })
         .orderBy('p.created_at', 'DESC');
-      if (dateFromMs) paymentsQb.andWhere('p.created_at >= :from', { from: dateFromMs });
-      if (dateToMs) paymentsQb.andWhere('p.created_at <= :to', { to: dateToMs });
+      if (dateFromMs)
+        paymentsQb.andWhere('p.created_at >= :from', { from: dateFromMs });
+      if (dateToMs)
+        paymentsQb.andWhere('p.created_at <= :to', { to: dateToMs });
       const payments = await paymentsQb.getMany();
 
       // Har bir earning uchun order ma'lumotlarini olish
@@ -2032,7 +2257,15 @@ export class UserService implements OnModuleInit {
         earnings.map(async (earning) => {
           const order = await orderRepo.findOne({
             where: { id: earning.order_id },
-            select: ['id', 'total_price', 'status', 'created_at', 'sold_at', 'product_quantity', 'comment'],
+            select: [
+              'id',
+              'total_price',
+              'status',
+              'created_at',
+              'sold_at',
+              'product_quantity',
+              'comment',
+            ],
             relations: ['customer', 'items', 'items.product'],
           });
           return {
@@ -2046,10 +2279,11 @@ export class UserService implements OnModuleInit {
                   sold_at: order.sold_at,
                   product_quantity: order.product_quantity,
                   customer_name: order.customer?.name || '-',
-                  items: order.items?.map((item) => ({
-                    name: item.product?.name || '-',
-                    quantity: item.quantity,
-                  })) || [],
+                  items:
+                    order.items?.map((item) => ({
+                      name: item.product?.name || '-',
+                      quantity: item.quantity,
+                    })) || [],
                   is_cancelled: [
                     Order_status.CANCELLED,
                     Order_status.CANCELLED_SENT,
@@ -2064,8 +2298,12 @@ export class UserService implements OnModuleInit {
       const total_paid = payments.reduce((s, p) => s + Number(p.amount), 0);
 
       // Umumiy balans — barcha vaqt uchun (filter ta'sir qilmaydi)
-      const allEarnings = await earningRepo.find({ where: { operator_id: operator.id } });
-      const allPayments = await paymentRepo.find({ where: { operator_id: operator.id } });
+      const allEarnings = await earningRepo.find({
+        where: { operator_id: operator.id },
+      });
+      const allPayments = await paymentRepo.find({
+        where: { operator_id: operator.id },
+      });
       const allEarned = allEarnings.reduce((s, e) => s + Number(e.amount), 0);
       const allPaid = allPayments.reduce((s, p) => s + Number(p.amount), 0);
       const balance = allEarned - allPaid;
@@ -2102,7 +2340,13 @@ export class UserService implements OnModuleInit {
     try {
       const operatorUser = await this.userRepo.findOne({
         where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
-        select: ['id', 'name', 'show_earnings', 'commission_type', 'commission_value'],
+        select: [
+          'id',
+          'name',
+          'show_earnings',
+          'commission_type',
+          'commission_value',
+        ],
       });
       if (!operatorUser) {
         throw new NotFoundException('Operator topilmadi');
@@ -2114,9 +2358,9 @@ export class UserService implements OnModuleInit {
       const orderRepo = this.dataSource.getRepository(OrderEntity);
       const earningRepo = this.dataSource.getRepository(OperatorEarningEntity);
 
+      // soft-deleted'lar TypeORM tomonidan avtomatik filter qilinadi
       const where: any = {
         operator_id: operator.id,
-        deleted: false,
       };
       if (status) {
         where.status = status;
@@ -2124,7 +2368,13 @@ export class UserService implements OnModuleInit {
 
       const [orders, total] = await orderRepo.findAndCount({
         where,
-        relations: ['customer', 'items', 'items.product', 'district', 'district.region'],
+        relations: [
+          'customer',
+          'items',
+          'items.product',
+          'district',
+          'district.region',
+        ],
         order: { created_at: 'DESC' },
         skip,
         take: safeLimit,
@@ -2174,10 +2424,11 @@ export class UserService implements OnModuleInit {
                   region: order.district.region?.name || null,
                 }
               : null,
-            items: order.items?.map((item) => ({
-              name: item.product?.name || '-',
-              quantity: item.quantity,
-            })) || [],
+            items:
+              order.items?.map((item) => ({
+                name: item.product?.name || '-',
+                quantity: item.quantity,
+              })) || [],
             earning: earning
               ? {
                   amount: earning.amount,
@@ -2190,19 +2441,30 @@ export class UserService implements OnModuleInit {
         }),
       );
 
-      // Statistika
+      // Statistika (soft-deleted'lar TypeORM tomonidan avtomatik filter qilinadi)
       const allOperatorOrders = await orderRepo.find({
-        where: { operator_id: operator.id, deleted: false },
+        where: { operator_id: operator.id },
         select: ['id', 'status'],
       });
 
-      const soldStatuses = [Order_status.SOLD, Order_status.PAID, Order_status.PARTLY_PAID, Order_status.CLOSED];
-      const cancelStatuses = [Order_status.CANCELLED, Order_status.CANCELLED_SENT];
+      const soldStatuses = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+        Order_status.CLOSED,
+      ];
+      const cancelStatuses = [
+        Order_status.CANCELLED,
+        Order_status.CANCELLED_SENT,
+      ];
 
       const stats = {
         total: allOperatorOrders.length,
-        sold: allOperatorOrders.filter((o) => soldStatuses.includes(o.status)).length,
-        cancelled: allOperatorOrders.filter((o) => cancelStatuses.includes(o.status)).length,
+        sold: allOperatorOrders.filter((o) => soldStatuses.includes(o.status))
+          .length,
+        cancelled: allOperatorOrders.filter((o) =>
+          cancelStatuses.includes(o.status),
+        ).length,
         pending: 0,
       };
       stats.pending = stats.total - stats.sold - stats.cancelled;
@@ -2222,779 +2484,6 @@ export class UserService implements OnModuleInit {
         200,
         'Mening buyurtmalarim',
       );
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  // ==================== INVESTOR METHODS ====================
-
-  // Investor kassasini topish yoki avtomatik yaratish
-  private async getOrCreateInvestorCashbox(
-    manager: any,
-    investorId: string,
-  ): Promise<CashEntity> {
-    let cashbox = await manager.findOne(CashEntity, {
-      where: { user_id: investorId, cashbox_type: Cashbox_type.FOR_INVESTOR },
-    });
-    if (!cashbox) {
-      cashbox = manager.create(CashEntity, {
-        cashbox_type: Cashbox_type.FOR_INVESTOR,
-        user_id: investorId,
-      });
-      await manager.save(cashbox);
-    }
-    return cashbox;
-  }
-
-  private computeEffectivePercent(investor: UserEntity): number {
-    const committed = investor.committed_amount ?? 0;
-    const sharePercent = investor.share_percent ?? 0;
-    if (committed === 0) return sharePercent; // sherik
-    const deposited = investor.deposited_amount ?? 0;
-    const ratio = Math.min(deposited / committed, 1.0);
-    return sharePercent * ratio;
-  }
-
-  async createInvestor(dto: CreateInvestorDto, admin: JwtPayload): Promise<object> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const existUser = await queryRunner.manager.findOne(UserEntity, {
-        where: { phone_number: dto.phone_number, role: Not(Roles.CUSTOMER) },
-      });
-      if (existUser) {
-        throw new ConflictException(`${dto.phone_number} raqamli foydalanuvchi allaqachon mavjud`);
-      }
-
-      const hashedPassword = await this.bcrypt.encrypt(dto.password);
-      const user = queryRunner.manager.create(UserEntity, {
-        name: dto.name,
-        phone_number: dto.phone_number,
-        password: hashedPassword,
-        role: Roles.INVESTOR,
-        status: Status.ACTIVE,
-        committed_amount: dto.committed_amount,
-        share_percent: dto.share_percent,
-        deposited_amount: 0,
-      });
-      await queryRunner.manager.save(user);
-
-      // Investor uchun piggy bank (kassa) yaratish
-      const initialBalance = dto.initial_balance || 0;
-      const cashbox = queryRunner.manager.create(CashEntity, {
-        cashbox_type: Cashbox_type.FOR_INVESTOR,
-        user_id: user.id,
-        balance: initialBalance,
-      });
-      await queryRunner.manager.save(cashbox);
-
-      // Boshlang'ich balans bo'lsa — mos yozuvlar yaratish
-      if (initialBalance !== 0) {
-        // Piggy bank history
-        const historyEntry = queryRunner.manager.create(CashboxHistoryEntity, {
-          cashbox_id: cashbox.id,
-          operation_type: initialBalance > 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
-          source_type: Source_type.CORRECTION,
-          amount: Math.abs(initialBalance),
-          balance_after: initialBalance,
-          comment: `Boshlang'ich balans: ${initialBalance > 0 ? 'ajratilmagan foyda' : 'oldingi qarz'}`,
-          created_by: admin.id,
-        });
-        await queryRunner.manager.save(historyEntry);
-
-        if (initialBalance < 0) {
-          // Qarz = avval ko'p to'langan → payout yozuvi
-          const payout = queryRunner.manager.create(InvestorPayoutEntity, {
-            investor_id: user.id,
-            amount: Math.abs(initialBalance),
-            note: 'Boshlang\'ich qarz (tizimdan oldingi to\'lovlar)',
-          });
-          await queryRunner.manager.save(InvestorPayoutEntity, payout);
-        } else {
-          // Musbat = ajratilmagan foyda → earning yozuvi
-          const earning = queryRunner.manager.create(InvestorEarningEntity, {
-            investor_id: user.id,
-            order_id: user.id, // placeholder — haqiqiy buyurtma yo'q
-            amount: initialBalance,
-            effective_percent: dto.share_percent,
-            profit: initialBalance,
-          });
-          await queryRunner.manager.save(InvestorEarningEntity, earning);
-        }
-      }
-
-      await queryRunner.commitTransaction();
-      return successRes(user, 201, 'Yangi investor yaratildi');
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async getAllInvestors(): Promise<object> {
-    try {
-      const investors = await this.userRepo.find({
-        where: { role: Roles.INVESTOR, is_deleted: false },
-        order: { created_at: 'DESC' },
-      });
-
-      // NULL statusli investorlarni avtomatik tuzatish
-      for (const inv of investors) {
-        if (!inv.status) {
-          inv.status = Status.ACTIVE;
-          await this.userRepo.save(inv);
-        }
-      }
-
-      const earningRepo = this.dataSource.getRepository(InvestorEarningEntity);
-      const payoutRepo = this.dataSource.getRepository(InvestorPayoutEntity);
-
-      // Bugungi sana oralig'i
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-
-      const depositRepo = this.dataSource.getRepository(InvestorDepositEntity);
-
-      const result = await Promise.all(
-        investors.map(async (inv) => {
-          // Bugungi daromad
-          const todayEarnings = await earningRepo.createQueryBuilder('e')
-            .where('e.investor_id = :id', { id: inv.id })
-            .andWhere('e.created_at >= :from', { from: todayStart.getTime() })
-            .andWhere('e.created_at <= :to', { to: todayEnd.getTime() })
-            .getMany();
-          const today_earned = todayEarnings.reduce((s, e) => s + Number(e.amount), 0);
-
-          // Jami earning (investor_earning jadvalidan)
-          const totalEarnedResult = await earningRepo
-            .createQueryBuilder('e')
-            .select('COALESCE(SUM(e.amount), 0)', 'total')
-            .where('e.investor_id = :id', { id: inv.id })
-            .getRawOne();
-          const totalEarned = Number(totalEarnedResult?.total || 0);
-
-          // Jami to'langan
-          const totalPaidResult = await this.dataSource.getRepository(InvestorPayoutEntity)
-            .createQueryBuilder('p')
-            .select('COALESCE(SUM(p.amount), 0)', 'total')
-            .where('p.investor_id = :id', { id: inv.id })
-            .getRawOne();
-          const totalPaid = Number(totalPaidResult?.total || 0);
-          const balance = Math.round(totalEarned - totalPaid);
-
-          // Qarzda bo'lsa pending_amount = 0 (earning'lar qarzni yopishga ketadi)
-          let pending_amount = 0;
-          if (balance > 0) {
-            const invCashbox = await this.dataSource.getRepository(CashEntity).findOne({
-              where: { user_id: inv.id, cashbox_type: Cashbox_type.FOR_INVESTOR },
-            });
-
-            if (invCashbox) {
-              const lastAllocated = await this.dataSource.getRepository(CashboxHistoryEntity)
-                .createQueryBuilder('h')
-                .select('MAX(h.created_at)', 'last_time')
-                .where('h.cashbox_id = :cid', { cid: invCashbox.id })
-                .andWhere('h.operation_type = :op', { op: Operation_type.INCOME })
-                .andWhere('h.source_type IN (:...types)', {
-                  types: [Source_type.INVESTOR_ALLOCATE, Source_type.MANUAL_INCOME],
-                })
-                .getRawOne();
-              const lastAllocatedTime = Number(lastAllocated?.last_time || 0);
-
-              const pendingResult = await earningRepo
-                .createQueryBuilder('e')
-                .select('COALESCE(SUM(e.amount), 0)', 'total')
-                .where('e.investor_id = :id', { id: inv.id })
-                .andWhere('e.created_at > :since', { since: lastAllocatedTime })
-                .getRawOne();
-              // pending_amount balansdan oshmasligi kerak
-              pending_amount = Math.min(
-                Math.max(Math.round(Number(pendingResult?.total || 0)), 0),
-                balance,
-              );
-            } else {
-              pending_amount = Math.min(Math.round(totalEarned), balance);
-            }
-          }
-
-          return {
-            id: inv.id,
-            name: inv.name,
-            today_earned,
-            is_partner: (inv.committed_amount ?? 0) === 0,
-            pending_amount,
-            balance,
-          };
-        }),
-      );
-
-      return successRes(result, 200, 'Investorlar');
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  async getInvestorDetail(id: string, fromDate?: string, toDate?: string): Promise<object> {
-    try {
-      const investor = await this.userRepo.findOne({
-        where: { id, role: Roles.INVESTOR, is_deleted: false },
-      });
-      if (!investor) throw new NotFoundException('Investor topilmadi');
-
-      const depositRepo = this.dataSource.getRepository(InvestorDepositEntity);
-      const earningRepo = this.dataSource.getRepository(InvestorEarningEntity);
-      const payoutRepo = this.dataSource.getRepository(InvestorPayoutEntity);
-
-      let dateFromMs: number | null = null;
-      let dateToMs: number | null = null;
-      if (fromDate) dateFromMs = new Date(fromDate + 'T00:00:00').getTime();
-      if (toDate) dateToMs = new Date(toDate + 'T23:59:59.999').getTime();
-
-      // Deposits (always all)
-      const deposits = await depositRepo.find({
-        where: { investor_id: id },
-        order: { created_at: 'DESC' },
-      });
-
-      // Earnings with date filter
-      const earningsQb = earningRepo.createQueryBuilder('e')
-        .where('e.investor_id = :id', { id })
-        .orderBy('e.created_at', 'DESC');
-      if (dateFromMs) earningsQb.andWhere('e.created_at >= :from', { from: dateFromMs });
-      if (dateToMs) earningsQb.andWhere('e.created_at <= :to', { to: dateToMs });
-      const earnings = await earningsQb.getMany();
-
-      // Enrich earnings with order info
-      const orderRepo = this.dataSource.getRepository(OrderEntity);
-      const earningsWithOrders = await Promise.all(
-        earnings.map(async (earning) => {
-          const order = await orderRepo.findOne({
-            where: { id: earning.order_id },
-            select: ['id', 'total_price', 'status', 'created_at', 'sold_at'],
-            relations: ['customer', 'market'],
-          });
-          return {
-            ...earning,
-            order: order ? {
-              id: order.id,
-              total_price: order.total_price,
-              status: order.status,
-              customer_name: order.customer?.name || '-',
-              market_name: (order as any).market?.name || '-',
-              sold_at: order.sold_at,
-            } : null,
-          };
-        }),
-      );
-
-      // Payouts with date filter
-      const payoutsQb = payoutRepo.createQueryBuilder('p')
-        .where('p.investor_id = :id', { id })
-        .orderBy('p.created_at', 'DESC');
-      if (dateFromMs) payoutsQb.andWhere('p.created_at >= :from', { from: dateFromMs });
-      if (dateToMs) payoutsQb.andWhere('p.created_at <= :to', { to: dateToMs });
-      const payouts = await payoutsQb.getMany();
-
-      // Umumiy balans (filtersiz)
-      const allEarnings = await earningRepo.find({ where: { investor_id: id } });
-      const allPayouts = await payoutRepo.find({ where: { investor_id: id } });
-      const total_earned = allEarnings.reduce((s, e) => s + Number(e.amount), 0);
-      const total_paid = allPayouts.reduce((s, p) => s + Number(p.amount), 0);
-
-      // Davrdagi summalar
-      const period_earned = earnings.reduce((s, e) => s + Number(e.amount), 0);
-      const period_paid = payouts.reduce((s, p) => s + Number(p.amount), 0);
-
-      const result: any = {
-        investor: {
-          id: investor.id,
-          name: investor.name,
-          phone_number: investor.phone_number,
-          status: investor.status,
-          committed_amount: investor.committed_amount ?? 0,
-          deposited_amount: investor.deposited_amount ?? 0,
-          share_percent: investor.share_percent ?? 0,
-          effective_percent: this.computeEffectivePercent(investor),
-        },
-        total_earned,
-        total_paid,
-        balance: total_earned - total_paid,
-        period_earned,
-        period_paid,
-        deposits,
-        earnings: earningsWithOrders,
-        payouts,
-        cashbox_balance: 0,
-        today_total_profit: 0,
-        today_investor_share: 0,
-      };
-
-      // Investor kassasi (yo'q bo'lsa yaratadi)
-      let cashbox = await this.dataSource.getRepository(CashEntity).findOne({
-        where: { user_id: id, cashbox_type: Cashbox_type.FOR_INVESTOR },
-      });
-      if (!cashbox) {
-        cashbox = this.dataSource.getRepository(CashEntity).create({
-          cashbox_type: Cashbox_type.FOR_INVESTOR,
-          user_id: id,
-        });
-        await this.dataSource.getRepository(CashEntity).save(cashbox);
-      }
-      result.cashbox_balance = cashbox.balance;
-
-      // Bugungi umumiy profit hisoblash
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-
-      const todayEarnings = await earningRepo.createQueryBuilder('e')
-        .where('e.investor_id = :id', { id })
-        .andWhere('e.created_at >= :from', { from: todayStart.getTime() })
-        .andWhere('e.created_at <= :to', { to: todayEnd.getTime() })
-        .getMany();
-
-      const todayProfitSum = todayEarnings.reduce((s, e) => s + Number(e.profit), 0);
-      const todayShareSum = todayEarnings.reduce((s, e) => s + Number(e.amount), 0);
-      result.today_total_profit = todayProfitSum;
-      result.today_investor_share = todayShareSum;
-
-      return successRes(result, 200, 'Investor detail');
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  async recordInvestorDeposit(
-    investorId: string,
-    dto: RecordInvestorDepositDto,
-    superadmin: JwtPayload,
-  ): Promise<object> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const investor = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: investorId, role: Roles.INVESTOR, is_deleted: false },
-      });
-      if (!investor) throw new NotFoundException('Investor topilmadi');
-
-      // effective_date: berilgan sana yoki bugungi kun boshlanishi
-      const effectiveDate = dto.effective_date
-        ? new Date(dto.effective_date + 'T00:00:00').getTime()
-        : new Date(new Date().toISOString().split('T')[0] + 'T00:00:00').getTime();
-
-      const deposit = queryRunner.manager.create(InvestorDepositEntity, {
-        investor_id: investorId,
-        amount: dto.amount,
-        note: dto.note ?? null,
-        recorded_by: superadmin.id,
-        effective_date: effectiveDate,
-      });
-      await queryRunner.manager.save(deposit);
-
-      // deposited_amount yangilash (umumiy kiritilgan summa)
-      investor.deposited_amount = (investor.deposited_amount ?? 0) + dto.amount;
-      await queryRunner.manager.save(investor);
-
-      await queryRunner.commitTransaction();
-      return successRes(deposit, 201, 'Depozit qayd qilindi');
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  // Superadmin: investor kassasiga qo'lda daromad kiritish (eski daromadlar uchun)
-  async addManualEarning(
-    investorId: string,
-    dto: PayInvestorDto,
-    superadmin: JwtPayload,
-  ): Promise<object> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const investor = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: investorId, role: Roles.INVESTOR, is_deleted: false },
-      });
-      if (!investor) throw new NotFoundException('Investor topilmadi');
-
-      // Balans tekshiruvi: qarzda bo'lsa ajratish mumkin emas
-      const earningRepo = queryRunner.manager.getRepository(InvestorEarningEntity);
-      const payoutRepo = queryRunner.manager.getRepository(InvestorPayoutEntity);
-      const totalEarnedResult = await earningRepo
-        .createQueryBuilder('e')
-        .select('COALESCE(SUM(e.amount), 0)', 'total')
-        .where('e.investor_id = :id', { id: investorId })
-        .getRawOne();
-      const totalPaidResult = await payoutRepo
-        .createQueryBuilder('p')
-        .select('COALESCE(SUM(p.amount), 0)', 'total')
-        .where('p.investor_id = :id', { id: investorId })
-        .getRawOne();
-      const balance = Number(totalEarnedResult?.total || 0) - Number(totalPaidResult?.total || 0);
-
-      if (balance <= 0) {
-        throw new BadRequestException(
-          `Investor qarzda (${Math.round(balance)} so'm). Qarz yopilmaguncha ajratish mumkin emas.`,
-        );
-      }
-      if (dto.amount > balance) {
-        throw new BadRequestException(
-          `Ajratish summasi balansdan oshmasligi kerak. Mavjud balans: ${Math.round(balance)} so'm`,
-        );
-      }
-
-      const isCash = !dto.payment_method || dto.payment_method === PaymentMethod.CASH;
-
-      // 1. Asosiy kassadan yechish (naqd/karta bo'yicha)
-      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
-        where: { cashbox_type: Cashbox_type.MAIN },
-      });
-      if (!mainCashbox) throw new NotFoundException('Asosiy kassa topilmadi');
-
-      if (isCash) {
-        if (mainCashbox.balance_cash < dto.amount) {
-          throw new BadRequestException(
-            `Naqd kassada yetarli mablag' yo'q. Kerak: ${dto.amount}, Mavjud: ${mainCashbox.balance_cash}`,
-          );
-        }
-        mainCashbox.balance_cash -= dto.amount;
-      } else {
-        if (mainCashbox.balance_card < dto.amount) {
-          throw new BadRequestException(
-            `Karta balansida yetarli mablag' yo'q. Kerak: ${dto.amount}, Mavjud: ${mainCashbox.balance_card}`,
-          );
-        }
-        mainCashbox.balance_card -= dto.amount;
-      }
-      mainCashbox.balance -= dto.amount;
-      await queryRunner.manager.save(mainCashbox);
-
-      const mainHistory = queryRunner.manager.create(CashboxHistoryEntity, {
-        operation_type: Operation_type.EXPENSE,
-        cashbox_id: mainCashbox.id,
-        source_type: Source_type.INVESTOR_ALLOCATE,
-        source_user_id: investorId,
-        amount: dto.amount,
-        balance_after: mainCashbox.balance,
-        payment_method: dto.payment_method || PaymentMethod.CASH,
-        comment: `${investor.name} ga investor ulushi ajratildi (${isCash ? 'naqd' : 'karta'})${dto.note ? ': ' + dto.note : ''}`,
-        created_by: superadmin.id,
-      });
-      await queryRunner.manager.save(mainHistory);
-
-      // 2. Investor kassasiga kirim
-      const invCashbox = await this.getOrCreateInvestorCashbox(queryRunner.manager, investorId);
-
-      invCashbox.balance += dto.amount;
-      await queryRunner.manager.save(invCashbox);
-
-      const invHistory = queryRunner.manager.create(CashboxHistoryEntity, {
-        operation_type: Operation_type.INCOME,
-        cashbox_id: invCashbox.id,
-        source_type: Source_type.INVESTOR_ALLOCATE,
-        amount: dto.amount,
-        balance_after: invCashbox.balance,
-        comment: dto.note || "Kassadan ajratilgan ulush",
-        created_by: superadmin.id,
-      });
-      await queryRunner.manager.save(invHistory);
-
-      await queryRunner.commitTransaction();
-      return successRes({ amount: dto.amount, balance: invCashbox.balance }, 201, "Investor ulushi ajratildi");
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async payInvestor(
-    investorId: string,
-    dto: PayInvestorDto,
-    admin: JwtPayload,
-  ): Promise<object> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const investor = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: investorId, role: Roles.INVESTOR, is_deleted: false },
-      });
-      if (!investor) throw new NotFoundException('Investor topilmadi');
-
-      const invCashbox = await this.getOrCreateInvestorCashbox(queryRunner.manager, investorId);
-
-      const amount = dto.amount;
-      // Investor kassasidan qancha yechiladi
-      const fromInvCashbox = Math.min(Math.max(invCashbox.balance, 0), amount);
-      // Asosiy kassadan qancha yechiladi (yetmagan qismi)
-      const fromMainCashbox = amount - fromInvCashbox;
-
-      // 1. Investor kassasidan yechish (qarzga tushishi mumkin)
-      invCashbox.balance -= amount;
-      await queryRunner.manager.save(invCashbox);
-
-      const invHistory = queryRunner.manager.create(CashboxHistoryEntity, {
-        operation_type: Operation_type.EXPENSE,
-        cashbox_id: invCashbox.id,
-        source_type: Source_type.INVESTOR_PAYOUT,
-        amount,
-        balance_after: invCashbox.balance,
-        comment: dto.note || "Investorga to'lov",
-        created_by: admin.id,
-      });
-      await queryRunner.manager.save(invHistory);
-
-      // 2. Asosiy kassadan faqat yetmagan qismini yechish
-      if (fromMainCashbox > 0) {
-        const isCash = !dto.payment_method || dto.payment_method === PaymentMethod.CASH;
-        const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
-          where: { cashbox_type: Cashbox_type.MAIN },
-        });
-        if (!mainCashbox) throw new NotFoundException('Asosiy kassa topilmadi');
-
-        if (isCash) {
-          if (mainCashbox.balance_cash < fromMainCashbox) {
-            throw new BadRequestException(
-              `Naqd kassada yetarli mablag' yo'q. Kerak: ${fromMainCashbox}, Mavjud: ${mainCashbox.balance_cash}`,
-            );
-          }
-          mainCashbox.balance_cash -= fromMainCashbox;
-        } else {
-          if (mainCashbox.balance_card < fromMainCashbox) {
-            throw new BadRequestException(
-              `Karta balansida yetarli mablag' yo'q. Kerak: ${fromMainCashbox}, Mavjud: ${mainCashbox.balance_card}`,
-            );
-          }
-          mainCashbox.balance_card -= fromMainCashbox;
-        }
-        mainCashbox.balance -= fromMainCashbox;
-        await queryRunner.manager.save(mainCashbox);
-
-        const mainHistory = queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.EXPENSE,
-          cashbox_id: mainCashbox.id,
-          source_type: Source_type.INVESTOR_PAYOUT,
-          source_user_id: investorId,
-          amount: fromMainCashbox,
-          balance_after: mainCashbox.balance,
-          payment_method: dto.payment_method || PaymentMethod.CASH,
-          comment: `${investor.name} ga investor to'lovi (${isCash ? 'naqd' : 'karta'})${dto.note ? ': ' + dto.note : ''}`,
-          created_by: admin.id,
-        });
-        await queryRunner.manager.save(mainHistory);
-      }
-
-      // Payout qayd
-      const payout = queryRunner.manager.create(InvestorPayoutEntity, {
-        investor_id: investorId,
-        amount: dto.amount,
-        note: dto.note ?? null,
-        paid_by_id: admin.id,
-      });
-      await queryRunner.manager.save(payout);
-
-      await queryRunner.commitTransaction();
-      return successRes(payout, 201, "To'lov amalga oshirildi");
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  // Superadmin: tikilgan pulni qaytarish (investitsiyadan)
-  async refundInvestorDeposit(
-    investorId: string,
-    dto: PayInvestorDto,
-    superadmin: JwtPayload,
-  ): Promise<object> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const investor = await queryRunner.manager.findOne(UserEntity, {
-        where: { id: investorId, role: Roles.INVESTOR, is_deleted: false },
-      });
-      if (!investor) throw new NotFoundException('Investor topilmadi');
-
-      if ((investor.deposited_amount ?? 0) < dto.amount) {
-        throw new BadRequestException(`Kiritilgan mablag'dan ko'p qaytarib bo'lmaydi. Kiritilgan: ${investor.deposited_amount}`);
-      }
-
-      // deposited_amount kamaytirish
-      investor.deposited_amount = (investor.deposited_amount ?? 0) - dto.amount;
-      await queryRunner.manager.save(investor);
-
-      // Depozit qaytarish qaydini saqlash (manfiy depozit sifatida)
-      const deposit = queryRunner.manager.create(InvestorDepositEntity, {
-        investor_id: investorId,
-        amount: -dto.amount,
-        note: dto.note || "Investitsiya qaytarildi",
-        recorded_by: superadmin.id,
-      });
-      await queryRunner.manager.save(deposit);
-
-      await queryRunner.commitTransaction();
-      return successRes(deposit, 201, "Investitsiya qaytarildi");
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  /**
-   * Barcha investorlarning piggy bankini balansga sinxronlashtiradi.
-   * Bir martalik tuzatish — piggy bank = balance (earned - paid) bo'ladi.
-   */
-  async syncAllInvestorPiggyBanks(admin: JwtPayload): Promise<object> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const investors = await queryRunner.manager.find(UserEntity, {
-        where: { role: Roles.INVESTOR, is_deleted: false },
-      });
-
-      const results: any[] = [];
-
-      for (const inv of investors) {
-        // Balans hisoblash
-        const earnedResult = await queryRunner.manager
-          .getRepository(InvestorEarningEntity)
-          .createQueryBuilder('e')
-          .select('COALESCE(SUM(e.amount), 0)', 'total')
-          .where('e.investor_id = :id', { id: inv.id })
-          .getRawOne();
-        const paidResult = await queryRunner.manager
-          .getRepository(InvestorPayoutEntity)
-          .createQueryBuilder('p')
-          .select('COALESCE(SUM(p.amount), 0)', 'total')
-          .where('p.investor_id = :id', { id: inv.id })
-          .getRawOne();
-
-        const totalEarned = Number(earnedResult?.total || 0);
-        const totalPaid = Number(paidResult?.total || 0);
-        const balance = Math.round(totalEarned - totalPaid);
-
-        // Piggy bank topish/yaratish
-        const cashbox = await this.getOrCreateInvestorCashbox(queryRunner.manager, inv.id);
-        const currentPiggy = Math.round(cashbox.balance);
-
-        if (currentPiggy === balance) {
-          results.push({ name: inv.name, status: 'already_synced', balance });
-          continue;
-        }
-
-        const correction = balance - currentPiggy;
-
-        // Piggy bank balansini yangilash
-        cashbox.balance = balance;
-        await queryRunner.manager.save(cashbox);
-
-        // Correction history yozuvi
-        const history = queryRunner.manager.create(CashboxHistoryEntity, {
-          cashbox_id: cashbox.id,
-          operation_type: correction > 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
-          source_type: Source_type.CORRECTION,
-          amount: Math.abs(correction),
-          balance_after: balance,
-          comment: `Piggy bank sinxronlash: ${currentPiggy} → ${balance} (farq: ${correction > 0 ? '+' : ''}${correction})`,
-          created_by: admin.id,
-        });
-        await queryRunner.manager.save(history);
-
-        results.push({
-          name: inv.name,
-          status: 'synced',
-          old_piggy: currentPiggy,
-          new_piggy: balance,
-          correction,
-        });
-      }
-
-      await queryRunner.commitTransaction();
-      return successRes(results, 200, 'Barcha investorlar sinxronlashtirildi');
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      return catchError(error);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  async updateInvestor(id: string, dto: UpdateInvestorDto): Promise<object> {
-    try {
-      const investor = await this.userRepo.findOne({
-        where: { id, role: Roles.INVESTOR, is_deleted: false },
-      });
-      if (!investor) throw new NotFoundException('Investor topilmadi');
-
-      if (dto.phone_number && dto.phone_number !== investor.phone_number) {
-        const exist = await this.userRepo.findOne({
-          where: { phone_number: dto.phone_number, role: Not(Roles.CUSTOMER) },
-        });
-        if (exist) throw new ConflictException('Bu telefon raqam band');
-      }
-
-      if (dto.password) {
-        dto.password = await this.bcrypt.encrypt(dto.password);
-      }
-
-      const updated = this.userRepo.merge(investor, dto as DeepPartial<UserEntity>);
-      await this.userRepo.save(updated);
-
-      return successRes(updated, 200, 'Investor yangilandi');
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  async deleteInvestor(id: string): Promise<object> {
-    try {
-      const investor = await this.userRepo.findOne({
-        where: { id, role: Roles.INVESTOR, is_deleted: false },
-      });
-      if (!investor) throw new NotFoundException('Investor topilmadi');
-
-      investor.is_deleted = true;
-      investor.status = Status.INACTIVE;
-      await this.userRepo.save(investor);
-
-      return successRes(null, 200, "Investor o'chirildi");
-    } catch (error) {
-      return catchError(error);
-    }
-  }
-
-  async getMyInvestorDashboard(
-    user: JwtPayload,
-    fromDate?: string,
-    toDate?: string,
-  ): Promise<object> {
-    try {
-      const investor = await this.userRepo.findOne({
-        where: { id: user.id, role: Roles.INVESTOR, is_deleted: false },
-      });
-      if (!investor) throw new NotFoundException('Investor topilmadi');
-
-      // Reuse getInvestorDetail
-      return this.getInvestorDetail(user.id, fromDate, toDate);
     } catch (error) {
       return catchError(error);
     }
@@ -3027,7 +2516,11 @@ export class UserService implements OnModuleInit {
     const todayStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
 
     // 1 oy oldingi sana (milliseconds) — faqat 1 oy to'lgan xodimlar uchun oylik hisoblanadi
-    const oneMonthAgo = new Date(currentYear, currentMonth - 1, currentDay).getTime();
+    const oneMonthAgo = new Date(
+      currentYear,
+      currentMonth - 1,
+      currentDay,
+    ).getTime();
 
     try {
       const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
@@ -3058,7 +2551,9 @@ export class UserService implements OnModuleInit {
       const salaries = await qb.getMany();
 
       if (salaries.length === 0) {
-        this.logger.log(`[SALARY CRON] Bugun (${currentDay}-kun) uchun oylik to'lanadigan ishchi yo'q`);
+        this.logger.log(
+          `[SALARY CRON] Bugun (${currentDay}-kun) uchun oylik to'lanadigan ishchi yo'q`,
+        );
         return;
       }
 

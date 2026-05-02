@@ -5,5 +5,4 @@ export type UserRole =
   | "market"
   | "registrator"
   | "logist"
-  | "operator"
-  | "investor";
+  | "operator";

@@ -133,7 +133,13 @@ export class ProductService {
     }
   }
 
-  async findAll(search?: string, marketId?: string, page = 1, limit?: number, fetchAll = false) {
+  async findAll(
+    search?: string,
+    marketId?: string,
+    page = 1,
+    limit?: number,
+    fetchAll = false,
+  ) {
     try {
       const safeLimit = getSafeLimit(limit, fetchAll);
 
@@ -207,7 +213,13 @@ export class ProductService {
     }
   }
 
-  async getMyProducts(user: JwtPayload, search?: string, page = 1, limit?: number, fetchAll = false) {
+  async getMyProducts(
+    user: JwtPayload,
+    search?: string,
+    page = 1,
+    limit?: number,
+    fetchAll = false,
+  ) {
     try {
       const safeLimit = getSafeLimit(limit, fetchAll);
 

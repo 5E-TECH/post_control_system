@@ -39,7 +39,15 @@ import { IntegrationSyncModule } from '../integration-sync/integration-sync.modu
     IntegrationSyncModule,
   ],
   controllers: [DashboardController],
-  providers: [DashboardService, OrderService, OrderGateaway, MyLogger, OrderBotService, Token, BcryptEncryption],
+  providers: [
+    DashboardService,
+    OrderService,
+    OrderGateaway,
+    MyLogger,
+    OrderBotService,
+    Token,
+    BcryptEncryption,
+  ],
   exports: [MyLogger],
 })
 export class DashboardModule {}

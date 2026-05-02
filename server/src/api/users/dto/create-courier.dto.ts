@@ -8,7 +8,10 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCourierDto {
-  @ApiProperty({ description: 'Region ID', example: 'f3b2c1d4-5678-90ab-cdef-1234567890ab' })
+  @ApiProperty({
+    description: 'Region ID',
+    example: 'f3b2c1d4-5678-90ab-cdef-1234567890ab',
+  })
   @IsNotEmpty()
   @IsString()
   region_id: string;

@@ -8,6 +8,7 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { usePost } from "../../api/hooks/usePost";
+import { normalizeQrToken } from "../../helpers/normalizeQrToken";
 
 const BASE_URL = import.meta.env.BASE_URL || '/';
 
@@ -61,10 +62,12 @@ interface UseRefusedPostScannerReturn {
 // ============ HOOK ============
 export function useRefusedPostScanner(
   refetch?: () => void,
-  setSelectedIds?: React.Dispatch<React.SetStateAction<string[]>>
+  setSelectedIds?: React.Dispatch<React.SetStateAction<string[]>>,
+  options?: { enabled?: boolean }
 ): UseRefusedPostScannerReturn {
   const { checkRefusedPost } = usePost();
   const location = useLocation();
+  const isEnabled = options?.enabled !== false;
 
   const pathParts = location.pathname.split("/");
   const postId = pathParts[pathParts.length - 1];
@@ -95,6 +98,8 @@ export function useRefusedPostScanner(
   }, [postId]);
 
   useEffect(() => {
+    if (!isEnabled) return;
+
     let scanned = "";
     let timer: any = null;
 
@@ -110,11 +115,14 @@ export function useRefusedPostScanner(
 
         if (!tokenValue) return;
 
-        const token = tokenValue.startsWith("http")
+        const rawToken = tokenValue.startsWith("http")
           ? tokenValue.split("/").pop()
           : tokenValue;
 
-        if (!token) return;
+        if (!rawToken) return;
+
+        // Caps Lock va RU layout muammosini bartaraf qilamiz
+        const token = normalizeQrToken(rawToken);
 
         // Allaqachon topilgan
         if (successTokens.current.has(token)) {
@@ -189,6 +197,7 @@ export function useRefusedPostScanner(
       if (timer) clearTimeout(timer);
     };
   }, [
+    isEnabled,
     checkRefusedPost,
     showVisualFeedback,
     postId,

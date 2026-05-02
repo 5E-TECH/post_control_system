@@ -3,12 +3,19 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
 export class SellCancelOrderDto {
-  @ApiPropertyOptional({ example: 'Customer not available', description: 'Reason or note' })
+  @ApiPropertyOptional({
+    example: 'Customer not available',
+    description: 'Reason or note',
+  })
   @IsOptional()
   @IsString()
   comment: string;
 
-  @ApiPropertyOptional({ example: 5000, minimum: 0, description: 'Additional cost if any' })
+  @ApiPropertyOptional({
+    example: 5000,
+    minimum: 0,
+    description: 'Additional cost if any',
+  })
   @IsOptional()
   @Transform(({ value }) => {
     if (value === undefined || value === null || value === '') return undefined;

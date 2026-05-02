@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Post,
-  Body,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Body, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { PrinterService } from './printer.service';
@@ -17,7 +11,13 @@ import { Roles } from 'src/common/enums';
 @ApiTags('Printer')
 @ApiBearerAuth()
 @UseGuards(JwtGuard, RolesGuard)
-@AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+@AcceptRoles(
+  Roles.ADMIN,
+  Roles.SUPERADMIN,
+  Roles.REGISTRATOR,
+  Roles.MARKET,
+  Roles.OPERATOR,
+)
 @Controller('printer')
 export class PrinterController {
   constructor(private readonly printerService: PrinterService) {}
@@ -37,7 +37,8 @@ export class PrinterController {
     @Body() printOrderDto: CreatePrinterDto,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.printerService.generateThermalReceiptPdf(printOrderDto);
+    const pdfBuffer =
+      await this.printerService.generateThermalReceiptPdf(printOrderDto);
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="beepost-chek-${Date.now()}.pdf"`,

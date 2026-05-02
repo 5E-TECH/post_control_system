@@ -46,10 +46,6 @@ import { UpdateLogistDto } from './dto/update-logist.dto';
 import { CreateOperatorDto } from './dto/create-operator.dto';
 import { UpdateOperatorCommissionDto } from './dto/update-operator-commission.dto';
 import { PayOperatorDto } from './dto/pay-operator.dto';
-import { CreateInvestorDto } from './dto/create-investor.dto';
-import { RecordInvestorDepositDto } from './dto/record-investor-deposit.dto';
-import { PayInvestorDto } from './dto/pay-investor.dto';
-import { UpdateInvestorDto } from './dto/update-investor.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -205,7 +201,13 @@ export class UsersController {
     },
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
   @Post('customer')
   createCustomer(
     @CurrentUser() user: JwtPayload,
@@ -348,7 +350,13 @@ export class UsersController {
     description: 'Customer suggestions retrieved successfully',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
   @Get('customer/suggest')
   suggestCustomer(
     @CurrentUser() user: JwtPayload,
@@ -374,7 +382,14 @@ export class UsersController {
     description: 'Customer order history retrieved successfully',
   })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET, Roles.OPERATOR, Roles.COURIER)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+    Roles.COURIER,
+  )
   @Get('customer/:id/history')
   getCustomerOrderHistory(
     @CurrentUser() user: JwtPayload,
@@ -390,7 +405,13 @@ export class UsersController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiResponse({ status: 200, description: 'Markets retrieved successfully' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.COURIER,
+    Roles.LOGIST,
+  )
   @Get('markets')
   findAllMarkets(
     @Query('search') search?: string,
@@ -641,8 +662,16 @@ export class UsersController {
   }
 
   @ApiOperation({ summary: 'Get my earnings (operator role)' })
-  @ApiQuery({ name: 'fromDate', required: false, description: 'Start date YYYY-MM-DD' })
-  @ApiQuery({ name: 'toDate', required: false, description: 'End date YYYY-MM-DD' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    description: 'Start date YYYY-MM-DD',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    description: 'End date YYYY-MM-DD',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.OPERATOR)
   @Get('my-earnings')
@@ -657,7 +686,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Get my orders (operator role)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by order status' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by order status',
+  })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.OPERATOR)
   @Get('my-orders')
@@ -686,148 +719,11 @@ export class UsersController {
     Roles.MARKET,
     Roles.OPERATOR,
     Roles.LOGIST,
-    Roles.INVESTOR
   )
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload) {
     return this.userService.profile(user);
   }
-
-  // ==================== INVESTOR ENDPOINTS ====================
-  // NB: Bu endpointlar @Get(':id') dan OLDIN turishi shart!
-
-  @ApiOperation({ summary: 'Get all investors' })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Get('investors')
-  getAllInvestors() {
-    return this.userService.getAllInvestors();
-  }
-
-  @ApiOperation({ summary: 'Investor own dashboard' })
-  @ApiQuery({ name: 'fromDate', required: false })
-  @ApiQuery({ name: 'toDate', required: false })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.INVESTOR)
-  @Get('my-investor-dashboard')
-  getMyInvestorDashboard(
-    @CurrentUser() user: JwtPayload,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
-  ) {
-    return this.userService.getMyInvestorDashboard(user, fromDate, toDate);
-  }
-
-  @ApiOperation({ summary: 'Create investor' })
-  @ApiBody({ type: CreateInvestorDto })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Post('investor')
-  createInvestor(@Body() dto: CreateInvestorDto, @CurrentUser() user: JwtPayload) {
-    return this.userService.createInvestor(dto, user);
-  }
-
-  @ApiOperation({ summary: 'Get investor detail' })
-  @ApiParam({ name: 'id', description: 'Investor ID' })
-  @ApiQuery({ name: 'fromDate', required: false })
-  @ApiQuery({ name: 'toDate', required: false })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Get('investor/:id')
-  getInvestorDetail(
-    @Param('id') id: string,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
-  ) {
-    return this.userService.getInvestorDetail(id, fromDate, toDate);
-  }
-
-  @ApiOperation({ summary: 'Update investor' })
-  @ApiParam({ name: 'id', description: 'Investor ID' })
-  @ApiBody({ type: UpdateInvestorDto })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Patch('investor/:id')
-  updateInvestor(@Param('id') id: string, @Body() dto: UpdateInvestorDto) {
-    return this.userService.updateInvestor(id, dto);
-  }
-
-  @ApiOperation({ summary: 'Delete investor (soft)' })
-  @ApiParam({ name: 'id', description: 'Investor ID' })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Delete('investor/:id')
-  deleteInvestor(@Param('id') id: string) {
-    return this.userService.deleteInvestor(id);
-  }
-
-  @ApiOperation({ summary: 'Add manual earning to investor cashbox (superadmin only)' })
-  @ApiParam({ name: 'id', description: 'Investor ID' })
-  @ApiBody({ type: PayInvestorDto })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Post('investor/:id/manual-earning')
-  addManualEarning(
-    @Param('id') id: string,
-    @Body() dto: PayInvestorDto,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.userService.addManualEarning(id, dto, user);
-  }
-
-  @ApiOperation({ summary: 'Sync all investor piggy banks with balance (one-time correction)' })
-  @ApiResponse({ status: 200, description: 'All investor piggy banks synced' })
-  @ApiBearerAuth()
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN)
-  @Post('investors/sync-piggy-banks')
-  syncPiggyBanks(@CurrentUser() user: JwtPayload) {
-    return this.userService.syncAllInvestorPiggyBanks(user);
-  }
-
-  @ApiOperation({ summary: 'Record deposit for investor' })
-  @ApiParam({ name: 'id', description: 'Investor ID' })
-  @ApiBody({ type: RecordInvestorDepositDto })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Post('investor/:id/deposit')
-  recordInvestorDeposit(
-    @Param('id') id: string,
-    @Body() dto: RecordInvestorDepositDto,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.userService.recordInvestorDeposit(id, dto, user);
-  }
-
-  @ApiOperation({ summary: 'Pay investor' })
-  @ApiParam({ name: 'id', description: 'Investor ID' })
-  @ApiBody({ type: PayInvestorDto })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Post('investor/:id/pay')
-  payInvestor(
-    @Param('id') id: string,
-    @Body() dto: PayInvestorDto,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.userService.payInvestor(id, dto, user);
-  }
-
-  @ApiOperation({ summary: 'Refund investor deposit (superadmin only)' })
-  @ApiParam({ name: 'id', description: 'Investor ID' })
-  @ApiBody({ type: PayInvestorDto })
-  @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN)
-  @Post('investor/:id/refund')
-  refundInvestorDeposit(
-    @Param('id') id: string,
-    @Body() dto: PayInvestorDto,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.userService.refundInvestorDeposit(id, dto, user);
-  }
-
-  // ==================== END INVESTOR ====================
 
   @ApiOperation({ summary: 'Get user by id' })
   @ApiParam({ name: 'id', description: 'User ID' })
@@ -902,7 +798,15 @@ export class UsersController {
   @ApiBody({ type: UpdateSelfDto })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.COURIER, Roles.REGISTRATOR)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.COURIER,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.LOGIST,
+    Roles.OPERATOR,
+  )
   @Patch('self')
   selfUpdate(
     @CurrentUser() user: JwtPayload,
@@ -951,13 +855,18 @@ export class UsersController {
 
   // ==================== SALARY CRON MANUAL TRIGGER ====================
 
-  @ApiOperation({ summary: 'Manually trigger monthly salary cron (superadmin only)' })
+  @ApiOperation({
+    summary: 'Manually trigger monthly salary cron (superadmin only)',
+  })
   @ApiResponse({ status: 200, description: 'Salary cron triggered' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Post('salary/trigger-cron')
   async triggerSalaryCron() {
     await this.userService.handleMonthlySalary();
-    return { message: 'Salary cron manually triggered', timestamp: new Date().toISOString() };
+    return {
+      message: 'Salary cron manually triggered',
+      timestamp: new Date().toISOString(),
+    };
   }
 }

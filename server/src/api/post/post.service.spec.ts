@@ -19,9 +19,7 @@ const makeDistrict = (regionId: string) => ({
   assigned_region: regionId,
 });
 
-const makeOrder = (
-  overrides: Record<string, any>,
-): any => ({
+const makeOrder = (overrides: Record<string, any>): any => ({
   id: uuid(1),
   total_price: 50000,
   status: Order_status.WAITING,
@@ -84,7 +82,10 @@ describe('PostService — Return Requests', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PostService,
-        { provide: getRepositoryToken(PostEntity), useValue: { find: jest.fn() } },
+        {
+          provide: getRepositoryToken(PostEntity),
+          useValue: { find: jest.fn() },
+        },
         { provide: getRepositoryToken(OrderEntity), useValue: orderRepoMock },
         { provide: getRepositoryToken(UserEntity), useValue: {} },
         { provide: DataSource, useValue: dataSourceMock },
@@ -99,7 +100,7 @@ describe('PostService — Return Requests', () => {
   // approveReturnRequests
   // ═══════════════════════════════════════════════════════════════
   describe('approveReturnRequests', () => {
-    it('buyurtmalarni to\'g\'ri regiondagi yangi pochtaga ko\'chirishi kerak', async () => {
+    it("buyurtmalarni to'g'ri regiondagi yangi pochtaga ko'chirishi kerak", async () => {
       const regionId = uuid(70);
       const oldPostId = uuid(80);
       const order = makeOrder({ id: uuid(1), post_id: oldPostId });
@@ -186,12 +187,10 @@ describe('PostService — Return Requests', () => {
       );
 
       // ✅ Muvaffaqiyatli javob
-      expect(result).toEqual(
-        expect.objectContaining({ statusCode: 200 }),
-      );
+      expect(result).toEqual(expect.objectContaining({ statusCode: 200 }));
     });
 
-    it('mavjud NEW pochtaga qo\'shishi kerak (yangi yaratmasdan)', async () => {
+    it("mavjud NEW pochtaga qo'shishi kerak (yangi yaratmasdan)", async () => {
       const regionId = uuid(70);
       const existingNewPostId = uuid(55);
       const order = makeOrder({ id: uuid(1) });
@@ -267,8 +266,16 @@ describe('PostService — Return Requests', () => {
 
       // Eski pochtalar uchun findOne
       manager.findOne
-        .mockResolvedValueOnce({ id: uuid(80), order_quantity: 5, post_total_price: 250000 })
-        .mockResolvedValueOnce({ id: uuid(81), order_quantity: 3, post_total_price: 200000 })
+        .mockResolvedValueOnce({
+          id: uuid(80),
+          order_quantity: 5,
+          post_total_price: 250000,
+        })
+        .mockResolvedValueOnce({
+          id: uuid(81),
+          order_quantity: 3,
+          post_total_price: 200000,
+        })
         // Yangi pochtalar uchun findOne (NEW post yo'q)
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(null);
@@ -317,7 +324,7 @@ describe('PostService — Return Requests', () => {
       expect(qr.commitTransaction).not.toHaveBeenCalled();
     });
 
-    it('bo\'sh order_ids bo\'lsa xato tashlashi kerak', async () => {
+    it("bo'sh order_ids bo'lsa xato tashlashi kerak", async () => {
       const { qr } = createQueryRunnerMock();
       dataSourceMock.createQueryRunner.mockReturnValue(qr);
 
@@ -328,7 +335,7 @@ describe('PostService — Return Requests', () => {
       expect(qr.rollbackTransaction).toHaveBeenCalled();
     });
 
-    it('return_requested bo\'lmagan orderlar topilmasa xato tashlashi kerak', async () => {
+    it("return_requested bo'lmagan orderlar topilmasa xato tashlashi kerak", async () => {
       const { qr, manager } = createQueryRunnerMock();
       dataSourceMock.createQueryRunner.mockReturnValue(qr);
 
@@ -341,7 +348,7 @@ describe('PostService — Return Requests', () => {
       expect(qr.rollbackTransaction).toHaveBeenCalled();
     });
 
-    it('customer.district dan region aniqlanishi kerak (order.district null bo\'lsa)', async () => {
+    it("customer.district dan region aniqlanishi kerak (order.district null bo'lsa)", async () => {
       const regionId = uuid(70);
       const order = makeOrder({
         id: uuid(1),
@@ -354,7 +361,11 @@ describe('PostService — Return Requests', () => {
 
       manager.find.mockResolvedValue([order]);
       manager.findOne
-        .mockResolvedValueOnce({ id: uuid(80), order_quantity: 1, post_total_price: 50000 })
+        .mockResolvedValueOnce({
+          id: uuid(80),
+          order_quantity: 1,
+          post_total_price: 50000,
+        })
         .mockResolvedValueOnce(null); // NEW post yo'q
 
       await service.approveReturnRequests({ order_ids: [uuid(1)] });
@@ -407,12 +418,10 @@ describe('PostService — Return Requests', () => {
       expect(updateCall[1]).not.toHaveProperty('status');
 
       // ✅ Muvaffaqiyatli javob
-      expect(result).toEqual(
-        expect.objectContaining({ statusCode: 200 }),
-      );
+      expect(result).toEqual(expect.objectContaining({ statusCode: 200 }));
     });
 
-    it('bo\'sh order_ids bo\'lsa xato tashlashi kerak', async () => {
+    it("bo'sh order_ids bo'lsa xato tashlashi kerak", async () => {
       await expect(
         service.rejectReturnRequests({ order_ids: [] }),
       ).rejects.toThrow();
@@ -421,7 +430,7 @@ describe('PostService — Return Requests', () => {
       expect(orderRepoMock.update).not.toHaveBeenCalled();
     });
 
-    it('post_id o\'zgarmasligi kerak (buyurtma eski pochtada qoladi)', async () => {
+    it("post_id o'zgarmasligi kerak (buyurtma eski pochtada qoladi)", async () => {
       await service.rejectReturnRequests({ order_ids: [uuid(1)] });
 
       // ✅ Faqat return_requested yangilandi, post_id yoki boshqa field emas

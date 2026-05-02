@@ -14,7 +14,7 @@ export class CreatePostDto {
     example: 'b7c9e8f2-3a34-4c6e-91fd-d30cce5591f3',
     description: 'Kuryerning ID raqami',
   })
-  @IsUUID(4, { message: 'Kuryer ID noto\'g\'ri formatda' })
+  @IsUUID(4, { message: "Kuryer ID noto'g'ri formatda" })
   @IsNotEmpty({ message: 'Kuryer ID kiritilishi shart' })
   courier_id: string;
 
@@ -23,7 +23,7 @@ export class CreatePostDto {
     example: 'QR123TOKEN456',
     description: 'QR kod orqali berilgan token',
   })
-  @IsString({ message: 'QR kod token matn formatida bo\'lishi kerak' })
+  @IsString({ message: "QR kod token matn formatida bo'lishi kerak" })
   @IsNotEmpty({ message: 'QR kod token kiritilishi shart' })
   qr_code_token: string;
 
@@ -35,8 +35,8 @@ export class CreatePostDto {
     ],
     description: 'Postga boglanadigan buyurtmalar ID lar royxati',
   })
-  @IsArray({ message: 'Buyurtmalar array formatida bo\'lishi kerak' })
+  @IsArray({ message: "Buyurtmalar array formatida bo'lishi kerak" })
   @ArrayNotEmpty({ message: 'Kamida bitta buyurtma tanlanishi shart' })
-  @IsUUID('all', { each: true, message: 'Buyurtma ID lari noto\'g\'ri formatda' })
+  @IsUUID('all', { each: true, message: "Buyurtma ID lari noto'g'ri formatda" })
   orderIDs: string[];
 }

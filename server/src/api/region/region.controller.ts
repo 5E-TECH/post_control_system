@@ -120,7 +120,10 @@ export class RegionController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.regionService.getRegionDetailedStats(id, { startDate, endDate });
+    return this.regionService.getRegionDetailedStats(id, {
+      startDate,
+      endDate,
+    });
   }
 
   // ==================== MAIN COURIER ASSIGNMENT ====================

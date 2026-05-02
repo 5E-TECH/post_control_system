@@ -8,7 +8,14 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { DistrictCourierEntity } from 'src/core/entity/district-courier.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DistrictEntity, RegionEntity, OrderEntity, DistrictCourierEntity])],
+  imports: [
+    TypeOrmModule.forFeature([
+      DistrictEntity,
+      RegionEntity,
+      OrderEntity,
+      DistrictCourierEntity,
+    ]),
+  ],
   controllers: [DistrictController],
   providers: [DistrictService],
 })

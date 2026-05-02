@@ -8,7 +8,7 @@ export class CreateProductDto {
     example: 'Pepsi',
   })
   @IsNotEmpty({ message: 'Mahsulot nomi kiritilishi shart' })
-  @IsString({ message: 'Mahsulot nomi matn formatida bo\'lishi kerak' })
+  @IsString({ message: "Mahsulot nomi matn formatida bo'lishi kerak" })
   name: string;
 
   @ApiProperty({
@@ -18,7 +18,7 @@ export class CreateProductDto {
     description: 'Market ID',
   })
   @IsOptional()
-  @IsUUID(4, { message: 'Market ID noto\'g\'ri formatda' })
+  @IsUUID(4, { message: "Market ID noto'g'ri formatda" })
   market_id?: string;
 
   @IsOptional()

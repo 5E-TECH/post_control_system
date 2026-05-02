@@ -1,4 +1,9 @@
-import { Injectable, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
@@ -21,7 +26,9 @@ export class ExternalProxyService {
   /**
    * Slug bo'yicha integratsiyani olish
    */
-  private async getIntegration(slug: string): Promise<ExternalIntegrationEntity> {
+  private async getIntegration(
+    slug: string,
+  ): Promise<ExternalIntegrationEntity> {
     const result = await this.integrationService.findBySlug(slug);
 
     if (!result?.data) {
@@ -80,7 +87,7 @@ export class ExternalProxyService {
           {
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
+              Authorization: `Bearer ${token}`,
             },
             timeout: 15000,
           },
@@ -101,14 +108,20 @@ export class ExternalProxyService {
           const integration = await this.getIntegration(slug);
 
           // Majburiy yangi token olish
-          const newToken = await this.integrationService.refreshToken(integration);
+          const newToken =
+            await this.integrationService.refreshToken(integration);
 
           if (!newToken) {
-            throw new HttpException('Yangi token olib bo\'lmadi', HttpStatus.UNAUTHORIZED);
+            throw new HttpException(
+              "Yangi token olib bo'lmadi",
+              HttpStatus.UNAUTHORIZED,
+            );
           }
 
           const apiUrl = integration.api_url.replace(/\/+$/, '');
-          const searchUrl = apiUrl.includes('/qrorder/find') ? apiUrl : `${apiUrl}/qrorder/find`;
+          const searchUrl = apiUrl.includes('/qrorder/find')
+            ? apiUrl
+            : `${apiUrl}/qrorder/find`;
 
           const retryResponse = await firstValueFrom(
             this.httpService.post(
@@ -117,7 +130,7 @@ export class ExternalProxyService {
               {
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${newToken}`,
+                  Authorization: `Bearer ${newToken}`,
                 },
                 timeout: 15000,
               },

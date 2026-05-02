@@ -37,7 +37,13 @@ export class PostController {
   @ApiOperation({ summary: 'List all posts (with pagination)' })
   @ApiResponse({ status: 200, description: 'Paginated posts list' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.COURIER,
+    Roles.LOGIST,
+  )
   @Get()
   findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 8) {
     return this.postService.findAll(Number(page), Number(limit));
@@ -109,7 +115,13 @@ export class PostController {
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Post data' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.COURIER,
+    Roles.LOGIST,
+  )
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.postService.findOne(id);
@@ -139,7 +151,13 @@ export class PostController {
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Orders for post' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.COURIER,
+    Roles.LOGIST,
+  )
   @Get('orders/:id')
   getAllOrdersByPostId(
     @Param('id') id: string,
@@ -152,7 +170,13 @@ export class PostController {
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Rejected orders for post' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.COURIER, Roles.LOGIST)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.COURIER,
+    Roles.LOGIST,
+  )
   @Get('orders/rejected/:id')
   getAllRejectedOrdersByPostId(@Param('id') id: string) {
     return this.postService.getRejectedPostsOrders(id);
@@ -241,6 +265,57 @@ export class PostController {
   @Patch('receive/order/:id')
   receive(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.postService.receiveOrderWithScanerCourier(user, id);
+  }
+
+  @ApiOperation({
+    summary: 'Receive order by QR token (courier scanner — bittalab)',
+    description:
+      "Kuryer post ichidagi buyurtmalarni QR skaner orqali bittalab qabul qiladi. Oxirgi buyurtma qabul qilinganda post avtomatik RECEIVED bo'ladi.",
+  })
+  @ApiParam({ name: 'token', description: 'Order QR code token' })
+  @ApiResponse({ status: 200, description: 'Order received via scanner' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Patch('receive/order/scan/token/:token')
+  receiveOrderByToken(
+    @CurrentUser() user: JwtPayload,
+    @Param('token') token: string,
+  ) {
+    return this.postService.receiveOrderByQrTokenForCourier(token, user);
+  }
+
+  @ApiOperation({
+    summary: 'Mark order as not delivered — request return (courier)',
+    description:
+      "Kuryer pochtani qabul qilganidan keyin ham aniq bir buyurtma kelmagan deb belgilashi va qaytarish so'rovini yuborishi mumkin.",
+  })
+  @ApiParam({ name: 'orderId', description: 'Order ID' })
+  @ApiResponse({ status: 200, description: 'Return request submitted' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Patch('order/:orderId/request-return')
+  requestOrderReturn(
+    @CurrentUser() user: JwtPayload,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.postService.markOrderForReturnRequestByCourier(orderId, user);
+  }
+
+  @ApiOperation({
+    summary: 'Cancel return request (courier)',
+    description:
+      "Kuryer noto'g'ri belgilagan qaytarish so'rovini admin approve/reject qilmaguncha bekor qilishi mumkin.",
+  })
+  @ApiParam({ name: 'orderId', description: 'Order ID' })
+  @ApiResponse({ status: 200, description: 'Return request cancelled' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Delete('order/:orderId/request-return')
+  cancelOrderReturnRequest(
+    @CurrentUser() user: JwtPayload,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.postService.cancelReturnRequestByCourier(orderId, user);
   }
 
   @ApiOperation({ summary: 'Create canceled post (courier)' })

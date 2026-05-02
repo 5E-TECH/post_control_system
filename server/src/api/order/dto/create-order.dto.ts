@@ -20,7 +20,7 @@ export class CreateOrderDto {
     example: '8b2c1a8e-3b6f-4a6e-9a2f-71d8a5c9d123',
   })
   @IsOptional()
-  @IsUUID(4, { message: 'Market ID noto\'g\'ri formatda' })
+  @IsUUID(4, { message: "Market ID noto'g'ri formatda" })
   market_id: string;
 
   @ApiProperty({
@@ -30,7 +30,7 @@ export class CreateOrderDto {
     example: '2c3f5b7a-1d9e-44f7-8a1b-0a1d2b3c4d5e',
   })
   @IsNotEmpty({ message: 'Mijoz ID kiritilishi shart' })
-  @IsUUID(4, { message: 'Mijoz ID noto\'g\'ri formatda' })
+  @IsUUID(4, { message: "Mijoz ID noto'g'ri formatda" })
   customer_id: string;
 
   @ApiProperty({
@@ -50,13 +50,13 @@ export class CreateOrderDto {
     ],
   })
   @IsNotEmpty({ message: 'Buyurtma mahsulotlari kiritilishi shart' })
-  @IsArray({ message: 'Buyurtma mahsulotlari array formatda bo\'lishi kerak' })
+  @IsArray({ message: "Buyurtma mahsulotlari array formatda bo'lishi kerak" })
   order_item_info: OrderItems[];
 
   @ApiProperty({ description: 'Total order price', example: 53000, minimum: 0 })
   @IsNotEmpty({ message: 'Jami narx kiritilishi shart' })
-  @IsNumber({}, { message: 'Jami narx raqam bo\'lishi kerak' })
-  @Min(0, { message: 'Jami narx 0 dan kichik bo\'lmasligi kerak' })
+  @IsNumber({}, { message: "Jami narx raqam bo'lishi kerak" })
+  @Min(0, { message: "Jami narx 0 dan kichik bo'lmasligi kerak" })
   total_price: number;
 
   @ApiPropertyOptional({
@@ -93,6 +93,14 @@ export class CreateOrderDto {
   operator_phone?: string;
 
   @ApiPropertyOptional({
+    description: 'Secondary operator phone number (optional)',
+    example: '+998901234568',
+  })
+  @IsOptional()
+  @IsString()
+  secondary_operator_phone?: string;
+
+  @ApiPropertyOptional({
     description: 'District ID for delivery address',
     type: String,
     format: 'uuid',
@@ -104,7 +112,7 @@ export class CreateOrderDto {
 
   @ApiPropertyOptional({
     description: 'Delivery address',
-    example: 'Navoiy ko\'chasi, 15-uy',
+    example: "Navoiy ko'chasi, 15-uy",
   })
   @IsOptional()
   @IsString()

@@ -34,7 +34,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         } else if (typeof message === 'string') {
           error_message = message;
         } else {
-          error_message = 'Ma\'lumotlar noto\'g\'ri kiritildi';
+          error_message = "Ma'lumotlar noto'g'ri kiritildi";
         }
 
         // Agar boshqa validation errors formati bo'lsa
@@ -47,16 +47,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const message = exception.message || '';
 
       // Database errorlarni to'g'ri ko'rsatish
-      if (message.includes('duplicate key') || message.includes('unique constraint')) {
-        error_message = 'Bu ma\'lumot allaqachon mavjud';
+      if (
+        message.includes('duplicate key') ||
+        message.includes('unique constraint')
+      ) {
+        error_message = "Bu ma'lumot allaqachon mavjud";
       } else if (message.includes('foreign key constraint')) {
-        error_message = 'Bog\'langan ma\'lumotlar mavjud, o\'chirish mumkin emas';
+        error_message = "Bog'langan ma'lumotlar mavjud, o'chirish mumkin emas";
       } else if (message.includes('violates not-null constraint')) {
-        error_message = 'Majburiy maydonlar to\'ldirilmagan';
-      } else if (message.includes('connection') || message.includes('timeout')) {
-        error_message = 'Ma\'lumotlar bazasiga ulanishda xatolik';
+        error_message = "Majburiy maydonlar to'ldirilmagan";
+      } else if (
+        message.includes('connection') ||
+        message.includes('timeout')
+      ) {
+        error_message = "Ma'lumotlar bazasiga ulanishda xatolik";
       } else {
-        error_message = message || 'Noma\'lum xatolik yuz berdi';
+        error_message = message || "Noma'lum xatolik yuz berdi";
       }
     }
     const error_response = {
