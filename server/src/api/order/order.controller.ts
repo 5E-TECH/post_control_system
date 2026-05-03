@@ -240,8 +240,9 @@ export class OrderController {
   updateOrderAddress(
     @Param('id') id: string,
     @Body() updateOrderAddressDto: UpdateOrderAddressDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.orderService.updateOrderAddress(id, updateOrderAddressDto);
+    return this.orderService.updateOrderAddress(id, updateOrderAddressDto, user);
   }
 
   @ApiOperation({ summary: 'Receive new orders' })

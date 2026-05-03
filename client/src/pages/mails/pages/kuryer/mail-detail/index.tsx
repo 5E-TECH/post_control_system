@@ -273,7 +273,7 @@ const CourierMailDetail = () => {
                     : "bg-red-500/20"
               }`}
             />
-            <div className="relative flex flex-col items-center justify-center animate-in zoom-in duration-200 px-6">
+            <div className="relative flex flex-col items-center justify-center scan-feedback-anim px-6">
               <div
                 className={`w-40 h-40 sm:w-52 sm:h-52 rounded-full flex items-center justify-center shadow-2xl ${
                   feedback.type === "success"

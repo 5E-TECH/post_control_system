@@ -1498,7 +1498,7 @@ const ExternalOrdersTab = () => {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
           {/* Modal */}
-          <div className="relative bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+          <div className="relative bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full max-w-md p-6">
             {/* Icon */}
             <div className="w-20 h-20 mx-auto rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
               <Loader2 className="w-10 h-10 text-blue-600 dark:text-blue-400 animate-spin" />
@@ -1559,7 +1559,7 @@ const ExternalOrdersTab = () => {
           />
 
           {/* Modal */}
-          <div className="relative bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+          <div className="relative bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full max-w-md p-6">
             {/* Icon */}
             <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
               confirmModal.type === 'not_found'
@@ -1638,7 +1638,7 @@ const ExternalOrdersTab = () => {
           />
 
           {/* Big icon */}
-          <div className="relative flex flex-col items-center justify-center animate-in zoom-in duration-200">
+          <div className="relative flex flex-col items-center justify-center scan-feedback-anim">
             {/* Circle background */}
             <div
               className={`w-40 h-40 sm:w-52 sm:h-52 rounded-full flex items-center justify-center shadow-2xl ${

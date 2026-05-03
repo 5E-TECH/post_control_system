@@ -24,6 +24,7 @@ import {
   Home,
 } from "lucide-react";
 import OrderTracking from "../../../components/order-tracking";
+import { formatPhone } from "../../../../../shared/helpers/formatPhone";
 
 const statusConfig: Record<
   string,
@@ -450,19 +451,22 @@ const OrderDetails = () => {
                       href={`tel:${data?.data?.post?.courier?.phone_number}`}
                       className="text-sm font-medium text-purple-600 dark:text-purple-400 hover:underline"
                     >
-                      {data?.data?.post?.courier?.phone_number}
+                      {formatPhone(data?.data?.post?.courier?.phone_number)}
                     </a>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Order Tracking History */}
-            {id && (currentRole === "superadmin" || currentRole === "admin" || currentRole === "registrator") && (
-              <OrderTracking orderId={id} />
-            )}
           </div>
         </div>
+
+        {/* Order Tracking History — gorizontal timeline, faqat admin/superadmin uchun */}
+        {id && (currentRole === "superadmin" || currentRole === "admin") && (
+          <div className="mt-6">
+            <OrderTracking orderId={id} />
+          </div>
+        )}
       </div>
 
       {/* Rollback Modal */}

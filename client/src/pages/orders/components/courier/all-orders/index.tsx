@@ -910,10 +910,14 @@ const AllOrders = () => {
                 const courierHomeTariff = profile?.tariff_home ?? 0;
                 const courierTariff = isCenter ? courierCenterTariff : courierHomeTariff;
 
-                // Sotishda (faqat markaz): max = uyTarif - markazTarif
-                // Bekor qilishda: max = o'z xizmat haqqi (courierTariff)
+                // Sotishda (faqat markaz): max = uyTarif - markazTarif.
+                // Agar uy va markaz tarifi teng bo'lsa (farq = 0),
+                // kuryer o'z xizmat haqqigacha extra cost yozishi mumkin.
+                // Bekor qilishda: max = o'z xizmat haqqi (courierTariff).
                 const maxExtraCost = isSell
-                  ? Math.max(0, courierHomeTariff - courierTariff)
+                  ? courierHomeTariff - courierTariff > 0
+                    ? courierHomeTariff - courierTariff
+                    : Math.max(0, courierTariff)
                   : courierTariff;
 
                 const parsedExtra = extraCostValue
@@ -960,9 +964,7 @@ const AllOrders = () => {
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                         <span>
                           {isOverLimit
-                            ? isSell
-                              ? `Limit oshib ketdi! Ortiqcha xarajat + yetkazish (${courierTariff.toLocaleString("uz-UZ")}) uy tarifidan (${courierHomeTariff.toLocaleString("uz-UZ")}) oshmasligi kerak. Maks: ${maxExtraCost.toLocaleString("uz-UZ")} so'm`
-                              : `Limit oshib ketdi! Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm (xizmat haqqingiz)`
+                            ? `Limit oshib ketdi! Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm`
                             : `Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm (xizmat haqqingiz)`}
                         </span>
                       </div>
