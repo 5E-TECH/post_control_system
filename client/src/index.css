@@ -586,6 +586,46 @@
 }
 
 
+/* ============ ORDER TRACKING — gorizontal timeline scrollbar ============ */
+/* Loyihada global ::-webkit-scrollbar { display: none } bor, shuning uchun
+   tracking konteyneri uchun scrollbarni majburiy ko'rsatamiz. */
+.order-tracking-scroll {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #a78bfa transparent; /* Firefox: thumb / track */
+}
+.order-tracking-scroll::-webkit-scrollbar {
+  display: block !important;
+  height: 10px;
+  background: transparent;
+}
+.order-tracking-scroll::-webkit-scrollbar-track {
+  background: rgba(139, 92, 246, 0.08);
+  border-radius: 8px;
+  margin: 0 16px;
+}
+.order-tracking-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, #818cf8, #a855f7);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.order-tracking-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, #6366f1, #9333ea);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+.dark .order-tracking-scroll {
+  scrollbar-color: #7c3aed transparent;
+}
+.dark .order-tracking-scroll::-webkit-scrollbar-track {
+  background: rgba(124, 58, 237, 0.15);
+}
+.dark .order-tracking-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
 /* ============ COURIER BULK SCAN ANIMATIONS ============ */
 /* Today-orders uslubidagi katta markaziy ikon — zoom-in + fade */
 @keyframes scan-feedback-zoom {
@@ -596,7 +636,11 @@
   100% { transform: scale(0.95); opacity: 0; }
 }
 
-/* Tailwind v4 uchun `animate-in zoom-in` o'rnida ishlatamiz */
-.animate-in.zoom-in {
+/* Scan feedback overlay'i uchun maxsus klass.
+   Eslatma: avval `.animate-in.zoom-in` ishlatilgan edi, lekin u barcha
+   `animate-in zoom-in` Tailwind klasslariga ham qo'llanib (jumladan modallar)
+   ularni 0.9s da opacity:0 ga olib borardi — modallar darrov yo'qolib,
+   faqat backdrop qolardi. Endi maxsus klass bilan cheklab qo'ydik. */
+.scan-feedback-anim {
   animation: scan-feedback-zoom 0.9s ease-out forwards;
 }

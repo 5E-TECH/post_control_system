@@ -9,6 +9,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../app/store";
 import { useTranslation } from "react-i18next";
 import { buildAdminPath } from "../../../../shared/const";
+import { formatPhone } from "../../../../shared/helpers/formatPhone";
 
 interface IProps {
   customer: {
@@ -139,7 +140,7 @@ const CustomerDetail: FC<IProps> = ({ customer, canEdit: canEditProp }) => {
                 {t("phone")}
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400 transition-colors">
-                {customer.phone_number}
+                {formatPhone(customer.phone_number)}
               </p>
             </div>
           </a>

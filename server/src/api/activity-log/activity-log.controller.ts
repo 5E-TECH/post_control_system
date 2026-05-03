@@ -54,7 +54,7 @@ export class ActivityLogController {
   })
   @ApiParam({ name: 'id', description: 'Entity ID' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get(':type/:id')
   getEntityLogs(
     @Param('type') type: string,

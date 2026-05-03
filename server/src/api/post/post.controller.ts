@@ -202,8 +202,12 @@ export class PostController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Patch(':id')
-  sendPost(@Param('id') id: string, @Body() orderIdsDto: SendPostDto) {
-    return this.postService.sendPost(id, orderIdsDto);
+  sendPost(
+    @Param('id') id: string,
+    @Body() orderIdsDto: SendPostDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.postService.sendPost(id, orderIdsDto, user);
   }
 
   @ApiOperation({
@@ -339,8 +343,9 @@ export class PostController {
   receiveCanceledPost(
     @Param('id') id: string,
     @Body() ordersArrayDto: OrdersArrayDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.postService.receiveCanceledPost(id, ordersArrayDto);
+    return this.postService.receiveCanceledPost(id, ordersArrayDto, user);
   }
 
   @ApiOperation({ summary: 'Approve return requests (admin)' })
@@ -348,8 +353,11 @@ export class PostController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('return-requests/approve')
-  approveReturnRequests(@Body() ordersArrayDto: OrdersArrayDto) {
-    return this.postService.approveReturnRequests(ordersArrayDto);
+  approveReturnRequests(
+    @Body() ordersArrayDto: OrdersArrayDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.postService.approveReturnRequests(ordersArrayDto, user);
   }
 
   @ApiOperation({ summary: 'Reject return requests (admin)' })
@@ -357,7 +365,10 @@ export class PostController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('return-requests/reject')
-  rejectReturnRequests(@Body() ordersArrayDto: OrdersArrayDto) {
-    return this.postService.rejectReturnRequests(ordersArrayDto);
+  rejectReturnRequests(
+    @Body() ordersArrayDto: OrdersArrayDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.postService.rejectReturnRequests(ordersArrayDto, user);
   }
 }

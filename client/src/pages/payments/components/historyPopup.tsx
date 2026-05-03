@@ -68,7 +68,7 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#2A263D] w-full max-w-md max-h-[calc(100vh-80px)] sm:max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-[#2A263D] w-full max-w-md max-h-[calc(100vh-80px)] sm:max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

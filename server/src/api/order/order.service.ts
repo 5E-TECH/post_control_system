@@ -2073,12 +2073,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             'Uyga yetkaziladigan buyurtmalarda sotishda ortiqcha xarajat yozish mumkin emas',
           );
         }
-        // Markazga: ortiqcha xarajat + markaz tarifi <= uy tarifi
+        // Markazga: ortiqcha xarajat + markaz tarifi <= uy tarifi.
+        // Maxsus holat: agar uy va markaz tarifi teng bo'lsa
+        // (kuryerda farq belgilanmagan), kuryer o'z xizmat haqqicha
+        // (markaz tarifi) ortiqcha xarajat yoza oladi — aks holda
+        // bunday kuryerlar umuman extra cost yoza olmasdi.
         const courierHomeTarif = courier.tariff_home;
-        const maxExtraCost = Math.max(0, courierHomeTarif - courierTarif);
+        const diff = courierHomeTarif - courierTarif;
+        const maxExtraCost = diff > 0 ? diff : Math.max(0, courierTarif);
         if (extraCost > maxExtraCost) {
           throw new BadRequestException(
-            `Ortiqcha xarajat + yetkazish tarifi (${courierTarif.toLocaleString('uz-UZ')}) uy tarifidan (${courierHomeTarif.toLocaleString('uz-UZ')}) oshmasligi kerak. Maksimal: ${maxExtraCost.toLocaleString('uz-UZ')} so'm`,
+            `Ortiqcha xarajat maksimal ${maxExtraCost.toLocaleString('uz-UZ')} so'm bo'lishi mumkin (yetkazish tarifi: ${courierTarif.toLocaleString('uz-UZ')}, uy tarifi: ${courierHomeTarif.toLocaleString('uz-UZ')})`,
           );
         }
         await Promise.all([
@@ -2231,14 +2236,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : 0;
 
       if (extraCost > 0) {
-        // Bekor qilishda ham sotuv qoidasi qo'llaniladi:
-        // ortiqcha xarajat + yetkazish tarifi <= kuryerning uy tarifi.
-        // Bu sotish/bekor qilish o'rtasida bir xil formula uchun.
-        const courierHomeTarif = courier.tariff_home ?? 0;
-        const maxExtraCost = Math.max(0, courierHomeTarif - courierTarif);
+        // Bekor qilishda kuryer o'z xizmat haqqigacha (courier_tariff) ortiqcha
+        // xarajat yozishi mumkin — sotuv bilan birga emas, mustaqil qoida.
+        // Sotuvda mantiq boshqa: extra + yetkazish ≤ uy tarifi (markaz → uy farqi).
+        // Bekor qilishda esa kuryer borib qaytdi, vaqt-yoqilg'i sarfladi —
+        // shuning uchun maksimal = o'sha buyurtma uchun belgilangan kuryer tarifi.
+        const maxExtraCost = Math.max(0, courierTarif);
         if (extraCost > maxExtraCost) {
           throw new BadRequestException(
-            `Ortiqcha xarajat + yetkazish tarifi (${courierTarif.toLocaleString('uz-UZ')}) uy tarifidan (${courierHomeTarif.toLocaleString('uz-UZ')}) oshmasligi kerak. Maksimal: ${maxExtraCost.toLocaleString('uz-UZ')} so'm`,
+            `Ortiqcha xarajat o'z xizmat haqqingizdan (${courierTarif.toLocaleString('uz-UZ')} so'm) oshmasligi kerak. Maksimal: ${maxExtraCost.toLocaleString('uz-UZ')} so'm`,
           );
         }
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
@@ -4357,6 +4363,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async updateOrderAddress(
     id: string,
     updateOrderAddressDto: UpdateOrderAddressDto,
+    user?: JwtPayload,
   ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -4472,6 +4479,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         action: 'updated',
         new_value: { district_id: order.district_id, address: order.address },
         description: `Buyurtma manzili yangilandi`,
+        user,
       });
 
       return successRes(order, 200, 'Order address updated');
