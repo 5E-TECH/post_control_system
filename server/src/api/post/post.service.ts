@@ -536,7 +536,11 @@ export class PostService {
     }
   }
 
-  async sendPost(id: string, dto: SendPostDto): Promise<object> {
+  async sendPost(
+    id: string,
+    dto: SendPostDto,
+    user?: JwtPayload,
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -687,7 +691,7 @@ export class PostService {
 
       await queryRunner.commitTransaction();
 
-      // Activity log — har bir buyurtma uchun
+      // Activity log — har bir buyurtma uchun (kim jo'natganini saqlab qoldiramiz)
       for (const order of newOrders) {
         this.activityLog.log({
           entity_type: 'order',
@@ -699,6 +703,12 @@ export class PostService {
             courier: updatedPost?.courier?.name,
           },
           description: `Pochta jo'natildi — kuryer: ${updatedPost?.courier?.name || '-'}`,
+          user,
+          metadata: {
+            post_id: sentPost.id,
+            courier_id: courierId,
+            courier_name: updatedPost?.courier?.name,
+          },
         });
       }
 
@@ -1311,7 +1321,11 @@ export class PostService {
     }
   }
 
-  async receiveCanceledPost(id: string, ordersArrayDto: ReceivePostDto) {
+  async receiveCanceledPost(
+    id: string,
+    ordersArrayDto: ReceivePostDto,
+    user?: JwtPayload,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1393,6 +1407,7 @@ export class PostService {
           action: 'status_change',
           new_value: { status: Order_status.CLOSED },
           description: `Bekor qilingan buyurtma qabul qilindi (CLOSED)`,
+          user,
         });
       }
       for (const oid of remainingOrderIds) {
@@ -1402,6 +1417,7 @@ export class PostService {
           action: 'status_change',
           new_value: { status: Order_status.CANCELLED },
           description: `Buyurtma qabul qilinmadi — kuryerga qaytarildi`,
+          user,
         });
       }
 
@@ -1464,7 +1480,10 @@ export class PostService {
    * Qaytarish so'rovlarini tasdiqlash (admin)
    * Buyurtmalar courier hisobidan olinib pochtaga (NEW post) qaytariladi
    */
-  async approveReturnRequests(ordersArrayDto: { order_ids: string[] }) {
+  async approveReturnRequests(
+    ordersArrayDto: { order_ids: string[] },
+    user?: JwtPayload,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1607,6 +1626,7 @@ export class PostService {
           old_value: { status: Order_status.WAITING, return_requested: true },
           new_value: { status: Order_status.RECEIVED, return_requested: false },
           description: `Qaytarish so'rovi tasdiqlandi — buyurtma pochtaga qaytarildi`,
+          user,
         });
       }
 
@@ -1627,7 +1647,10 @@ export class PostService {
    * Qaytarish so'rovlarini rad etish (admin)
    * Buyurtmalar courier hisobida qoladi, return_requested = false
    */
-  async rejectReturnRequests(ordersArrayDto: { order_ids: string[] }) {
+  async rejectReturnRequests(
+    ordersArrayDto: { order_ids: string[] },
+    user?: JwtPayload,
+  ) {
     try {
       const orderIds = ordersArrayDto.order_ids;
       if (!orderIds || orderIds.length === 0) {
@@ -1650,6 +1673,7 @@ export class PostService {
           action: 'return_rejected',
           new_value: { return_requested: false },
           description: `Qaytarish so'rovi rad etildi — buyurtma kuryerda qoldi`,
+          user,
         });
       }
 

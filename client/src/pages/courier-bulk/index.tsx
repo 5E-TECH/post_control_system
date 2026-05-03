@@ -174,8 +174,7 @@ const CourierBulkPage = () => {
 
   const { data, isLoading, refetch } = getCourierOrders({
     status: "waiting",
-    page: 1,
-    limit: 500,
+    fetchAll: true,
   });
   const allOrders: Order[] = useMemo(() => data?.data?.data || [], [data]);
 
@@ -198,6 +197,8 @@ const CourierBulkPage = () => {
   } | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastScanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Server'ga yuborilgan, lekin javob hali kelmagan tokenlar — qayta yuborishni bloklaydi
+  const scanLockRef = useRef<Set<string>>(new Set());
 
   // Caps Lock holatini kuzatamiz — agar yoqiq bo'lsa, foydalanuvchini
   // ogohlantiramiz (skaner caps yoqiq paytda noto'g'ri yuborishi mumkin,
@@ -319,6 +320,9 @@ const CourierBulkPage = () => {
       }
 
       // Lokalda yo'q — serverdan tekshiramiz
+      // Race condition'dan himoya: ayni token uchun parallel so'rovlarni bloklaymiz
+      if (scanLockRef.current.has(token)) return;
+      scanLockRef.current.add(token);
       try {
         const res = await findOrderByQrToken(token);
         const data = res?.data;
@@ -341,10 +345,26 @@ const CourierBulkPage = () => {
           );
           return;
         }
+        // Order WAITING + sizniki — scanMode'ga qarab darhol qo'shamiz
+        // (lokal listda yo'q sababi pagination/limit cap bo'lishi mumkin)
+        setCancelIds((prev) => {
+          const next = new Set(prev);
+          if (scanMode === "cancel") next.add(data.id);
+          else next.delete(data.id);
+          return next;
+        });
+        setKeepIds((prev) => {
+          const next = new Set(prev);
+          if (scanMode === "keep") next.add(data.id);
+          else next.delete(data.id);
+          return next;
+        });
         showFeedback(
-          "warning",
-          t("feedback_new_found_title"),
-          t("feedback_new_found_subtitle"),
+          scanMode,
+          t(scanMode === "cancel" ? "feedback_cancel" : "feedback_keep", {
+            name: data.customer_name || "—",
+          }),
+          `${formatPrice(data.total_price)} so'm`,
         );
         refetch();
       } catch {
@@ -353,9 +373,11 @@ const CourierBulkPage = () => {
           t("feedback_not_found_title"),
           t("feedback_not_found_subtitle"),
         );
+      } finally {
+        scanLockRef.current.delete(token);
       }
     },
-    [allOrders, scanMode, findOrderByQrToken, refetch, showFeedback, t],
+    [allOrders, scanMode, findOrderByQrToken, refetch, showFeedback, t, translateStatus],
   );
 
   // Global keyboard listener (input/textarea'larda ishlamaydi)
@@ -605,7 +627,7 @@ const CourierBulkPage = () => {
               <div
                 className={`absolute inset-0 transition-opacity duration-200 ${styles.bgOverlay}`}
               />
-              <div className="relative flex flex-col items-center justify-center animate-in zoom-in duration-200">
+              <div className="relative flex flex-col items-center justify-center scan-feedback-anim">
                 <div
                   className={`w-40 h-40 sm:w-52 sm:h-52 rounded-full flex items-center justify-center shadow-2xl ${styles.circleBg} ${styles.circleShadow}`}
                 >
@@ -1000,7 +1022,7 @@ const CourierBulkPage = () => {
         {progress.isProcessing && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <div className="relative bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+            <div className="relative bg-white dark:bg-[#2A263D] rounded-2xl shadow-2xl w-full max-w-md p-6">
               <div
                 className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4 ${
                   progress.type === "cancel"

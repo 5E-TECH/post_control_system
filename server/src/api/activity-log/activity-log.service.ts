@@ -36,6 +36,41 @@ export class ActivityLogService {
         ? params.manager.getRepository(ActivityLogEntity)
         : this.logRepo;
 
+      // JWT'da `name` saqlanmaydi — agar payloadga aniq berilmagan bo'lsa,
+      // user_id bo'yicha DB'dan ismni olib qo'yamiz. Shu orqali kelajakda
+      // har enrichLogs chaqirishda qayta query kerak emas.
+      let resolvedName = (params.user as any)?.name;
+      let resolvedRole =
+        (params.user as any)?.role || params.user?.role || undefined;
+      const userId = params.user?.id || undefined;
+
+      if (userId && (!resolvedName || !resolvedRole)) {
+        try {
+          const queryRunner = params.manager
+            ? params.manager.queryRunner
+            : null;
+          const rows = queryRunner
+            ? await queryRunner.query(
+                `SELECT name, role FROM users WHERE id = $1 LIMIT 1`,
+                [userId],
+              )
+            : await this.dataSource.query(
+                `SELECT name, role FROM users WHERE id = $1 LIMIT 1`,
+                [userId],
+              );
+          if (rows?.[0]) {
+            resolvedName = resolvedName || rows[0].name;
+            resolvedRole = resolvedRole || rows[0].role;
+          }
+        } catch (lookupErr) {
+          // user lookup xatosi log yozilishini to'xtatmasin
+          console.error(
+            'Activity log user lookup error:',
+            (lookupErr as any)?.message,
+          );
+        }
+      }
+
       const log = repo.create({
         entity_type: params.entity_type,
         entity_id: params.entity_id,
@@ -43,9 +78,9 @@ export class ActivityLogService {
         old_value: params.old_value || undefined,
         new_value: params.new_value || undefined,
         description: params.description || undefined,
-        user_id: params.user?.id || undefined,
-        user_name: (params.user as any)?.name || undefined,
-        user_role: (params.user as any)?.role || params.user?.role || undefined,
+        user_id: userId,
+        user_name: resolvedName || undefined,
+        user_role: resolvedRole,
         metadata: params.metadata || undefined,
       } as any);
       await repo.save(log);
@@ -121,17 +156,25 @@ export class ActivityLogService {
 
     const orderIds: string[] = [];
     const postIds: string[] = [];
-    const userIds: string[] = [];
+    const entityUserIds: string[] = [];
     const cashboxIds: string[] = [];
+    // Log mualliflari (user_id) — JWT'da `name` saqlanmaydi, shuning uchun
+    // log yozilayotganda user_name bo'sh qoladi. Bu yerda DB'dan to'ldiramiz.
+    const actorIds: string[] = [];
 
     for (const log of logs) {
       if (log.entity_type === 'order') orderIds.push(log.entity_id);
       else if (log.entity_type === 'post') postIds.push(log.entity_id);
-      else if (log.entity_type === 'user') userIds.push(log.entity_id);
+      else if (log.entity_type === 'user') entityUserIds.push(log.entity_id);
       else if (log.entity_type === 'cashbox') cashboxIds.push(log.entity_id);
+
+      if (log.user_id) actorIds.push(log.user_id);
     }
 
-    const [orders, posts, users, cashboxes] = await Promise.all([
+    // unique
+    const uniqueActorIds = Array.from(new Set(actorIds));
+
+    const [orders, posts, entityUsers, cashboxes, actors] = await Promise.all([
       orderIds.length
         ? this.dataSource.query(
             `SELECT o.id, o.total_price, o.status, o.customer_id, o.user_id AS market_id,
@@ -156,10 +199,10 @@ export class ActivityLogService {
             [postIds],
           )
         : Promise.resolve([]),
-      userIds.length
+      entityUserIds.length
         ? this.dataSource.query(
             `SELECT id, name, phone_number, role FROM users WHERE id = ANY($1)`,
-            [userIds],
+            [entityUserIds],
           )
         : Promise.resolve([]),
       cashboxIds.length
@@ -171,14 +214,23 @@ export class ActivityLogService {
             [cashboxIds],
           )
         : Promise.resolve([]),
+      uniqueActorIds.length
+        ? this.dataSource.query(
+            `SELECT id, name, phone_number, role FROM users WHERE id = ANY($1)`,
+            [uniqueActorIds],
+          )
+        : Promise.resolve([]),
     ]);
 
     const orderMap = new Map<string, any>(orders.map((o: any) => [o.id, o]));
     const postMap = new Map<string, any>(posts.map((p: any) => [p.id, p]));
-    const userMap = new Map<string, any>(users.map((u: any) => [u.id, u]));
+    const entityUserMap = new Map<string, any>(
+      entityUsers.map((u: any) => [u.id, u]),
+    );
     const cashboxMap = new Map<string, any>(
       cashboxes.map((c: any) => [c.id, c]),
     );
+    const actorMap = new Map<string, any>(actors.map((a: any) => [a.id, a]));
 
     return logs.map((log) => {
       let entity_summary: any = null;
@@ -187,11 +239,22 @@ export class ActivityLogService {
       } else if (log.entity_type === 'post') {
         entity_summary = postMap.get(log.entity_id) || null;
       } else if (log.entity_type === 'user') {
-        entity_summary = userMap.get(log.entity_id) || null;
+        entity_summary = entityUserMap.get(log.entity_id) || null;
       } else if (log.entity_type === 'cashbox') {
         entity_summary = cashboxMap.get(log.entity_id) || null;
       }
-      return { ...log, entity_summary };
+
+      // Actor (kim qilgan) ma'lumotlarini DB'dan to'ldirib qaytaramiz —
+      // JWT'da `name` yo'q, shuning uchun log yozilayotganda saqlanmaydi.
+      const actor = log.user_id ? actorMap.get(log.user_id) : null;
+      return {
+        ...log,
+        // user_name bo'sh bo'lsa DB'dan oling (eski loglar uchun ham)
+        user_name: log.user_name || actor?.name || null,
+        user_role: log.user_role || actor?.role || null,
+        user_phone: actor?.phone_number || null,
+        entity_summary,
+      };
     });
   }
 
