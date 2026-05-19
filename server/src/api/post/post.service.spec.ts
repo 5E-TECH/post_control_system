@@ -7,6 +7,7 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { DataSource } from 'typeorm';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
 import { Order_status, Post_status } from 'src/common/enums';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
@@ -90,6 +91,10 @@ describe('PostService — Return Requests', () => {
         { provide: getRepositoryToken(UserEntity), useValue: {} },
         { provide: DataSource, useValue: dataSourceMock },
         { provide: ActivityLogService, useValue: activityLogMock },
+        {
+          provide: LdgShipmentService,
+          useValue: { createShipmentForOrder: jest.fn() },
+        },
       ],
     }).compile();
 

@@ -256,6 +256,22 @@ export class UsersController {
   }
 
   @ApiOperation({
+    summary: 'Link telegram account to current user',
+    description:
+      'Used after phone+password login inside Telegram WebApp to link telegram_id so future visits auto-login.',
+  })
+  @ApiResponse({ status: 200, description: 'Telegram linked' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard)
+  @Post('telegram/link')
+  linkTelegram(
+    @Body() initData: TelegramInitData,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    return this.userService.linkTelegramAccount(initData, currentUser);
+  }
+
+  @ApiOperation({
     summary: 'Refresh access token',
     description: 'Use refresh token cookie to get a new access token',
   })

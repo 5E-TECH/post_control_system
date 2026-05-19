@@ -1,6 +1,6 @@
 // Beepost - Client Routes v3
 import { lazy, memo } from "react";
-import { useRoutes } from "react-router-dom";
+import { Navigate, useRoutes } from "react-router-dom";
 
 const ScanAndOrder = lazy(
   () =>
@@ -120,7 +120,10 @@ const CourierOldMails = lazy(
 );
 const FinancialHistory = lazy(() => import("../pages/payments/pages/financial-history"));
 const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
-const Integrations = lazy(() => import("../pages/integrations"));
+const Integrations = lazy(
+  () => import("../pages/integrations/IntegrationsRoot"),
+);
+const Settings = lazy(() => import("../pages/settings"));
 const MarketOperators = lazy(() => import("../pages/market-operators"));
 const OperatorStats = lazy(
   () => import("../pages/market-operators/pages/operator-stats")
@@ -335,8 +338,19 @@ const AppRouters = () => {
               ],
             },
             {
+              // Eski URL — yangi joyga redirect (eski bookmark/linklar ishlasin)
               path: "integrations",
-              element: <Integrations />,
+              element: <Navigate to="/settings/integrations" replace />,
+            },
+            {
+              path: "settings",
+              element: <Settings />,
+              children: [
+                {
+                  path: "integrations",
+                  element: <Integrations />,
+                },
+              ],
             },
             {
               path: "market-operators",

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { SendPostDto } from './dto/send-post.dto';
@@ -26,9 +27,12 @@ import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { normalizeQrToken } from 'src/infrastructure/lib/qr-token/normalize';
 import { PostDto } from './dto/postId.dto';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
 
 @Injectable()
 export class PostService {
+  private readonly logger = new Logger(PostService.name);
+
   constructor(
     @InjectRepository(PostEntity)
     private readonly postRepo: PostRepository,
@@ -41,7 +45,31 @@ export class PostService {
 
     private readonly dataSource: DataSource,
     private readonly activityLog: ActivityLogService,
+    private readonly ldgShipmentService: LdgShipmentService,
   ) {}
+
+  /**
+   * Pochta jo'natilganda kuryer LDG vakil bo'lsa, har bir buyurtmani LDG'ga
+   * yuboradi (fire-and-forget). Xato bo'lsa shipmentning `last_error` maydonida
+   * saqlanadi va asosiy oqimga ta'sir qilmaydi.
+   *
+   * Bu yer arxitekturaning yagona LDG dispatch nuqtasi: buyurtma yaratish payti
+   * emas, balki operator pochtani LDG vakil-kuryerga biriktirgan vaqt.
+   */
+  private dispatchOrdersToLdg(orderIds: string[]): void {
+    void (async () => {
+      for (const orderId of orderIds) {
+        try {
+          await this.ldgShipmentService.createShipmentForOrder(orderId);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `LDG'ga jo'natish muvaffaqiyatsiz (order=${orderId}): ${msg}`,
+          );
+        }
+      }
+    })();
+  }
 
   async findAll(page: number, limit: number): Promise<object> {
     try {
@@ -710,6 +738,12 @@ export class PostService {
             courier_name: updatedPost?.courier?.name,
           },
         });
+      }
+
+      // LDG dispatch — kuryer external_provider='ldg' bo'lsa, buyurtmalarni LDG'ga
+      // yuboramiz. Aks holda hech narsa qilmaymiz (oddiy ichki kuryer).
+      if (courier.external_provider === 'ldg') {
+        this.dispatchOrdersToLdg(newOrders.map((o) => o.id));
       }
 
       return successRes(

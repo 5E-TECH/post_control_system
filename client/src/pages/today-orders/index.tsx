@@ -29,7 +29,6 @@ import {
   Clock,
   Home,
   Building2,
-  Settings,
   RefreshCw,
   Link2,
   RotateCcw,
@@ -145,9 +144,7 @@ interface BatchProgress {
 
 // Tashqi buyurtmalar komponenti
 const ExternalOrdersTab = () => {
-  const navigate = useNavigate();
   const role = useSelector((state: RootState) => state.roleSlice.role);
-  const isSuperadmin = role === "superadmin";
   const canSeePrice = role === "superadmin" || role === "admin";
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -914,15 +911,6 @@ const ExternalOrdersTab = () => {
             >
               <RefreshCw className={`w-4 h-4 ${integrationsLoading ? 'animate-spin' : ''}`} />
             </button>
-            {isSuperadmin && (
-              <button
-                onClick={() => navigate('/integrations')}
-                className="h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm font-medium flex items-center gap-2 hover:shadow-lg hover:shadow-emerald-500/25 transition-all cursor-pointer flex-shrink-0"
-              >
-                <Settings className="w-4 h-4" />
-                <span className="hidden sm:inline">Boshqarish</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -939,17 +927,8 @@ const ExternalOrdersTab = () => {
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               {integrationSearch
                 ? `"${integrationSearch}" bo'yicha hech qanday market topilmadi`
-                : "Integratsiyalar sahifasidan yangi integratsiya qo'shing"}
+                : "Sozlamalar → Integratsiyalar bo'limidan yangi integratsiya qo'shing"}
             </p>
-            {!integrationSearch && isSuperadmin && (
-              <button
-                onClick={() => navigate('/integrations')}
-                className="h-10 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm font-medium flex items-center gap-2 mx-auto hover:shadow-lg hover:shadow-emerald-500/25 transition-all cursor-pointer"
-              >
-                <Settings className="w-4 h-4" />
-                Integratsiyalarni boshqarish
-              </button>
-            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
