@@ -10,5 +10,6 @@
     "logs": "Logs",
     "region": "Region",
     "financialHistory": "Financial History",
-    "courier_bulk": "Quick action"
+    "courier_bulk": "Quick action",
+    "settings": "Settings"
 }

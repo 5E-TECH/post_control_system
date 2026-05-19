@@ -51,6 +51,14 @@ export default class Application {
     const myLogger = app.get(MyLogger);
     app.useLogger(myLogger);
 
+    // ✅ LDG webhook uchun RAW body (HMAC-SHA256 imzo tekshirish original byte
+    // streamni talab qiladi — JSON.stringify qayta tikkanida boshqa hash chiqadi).
+    // Bu express.json() dan OLDIN turishi shart.
+    app.use(
+      '/api/v1/ldg/webhook',
+      express.raw({ type: 'application/json', limit: '5mb' }),
+    );
+
     // ✅ Body size limit (katta JSON payloadlar uchun - external orders)
     app.use(express.json({ limit: '50mb' }));
     app.use(express.urlencoded({ limit: '50mb', extended: true }));

@@ -22,6 +22,7 @@ import { ExternalProxyModule } from './external-proxy/external-proxy.module';
 import { ExternalIntegrationModule } from './external-integration/external-integration.module';
 import { IntegrationSyncModule } from './integration-sync/integration-sync.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
+import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
     ExternalProxyModule,
     ExternalIntegrationModule,
     IntegrationSyncModule,
+    LdgCargoModule,
   ],
   providers: [OrderGateaway],
 })

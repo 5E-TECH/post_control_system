@@ -30,6 +30,7 @@ import { DistrictEntity } from './district.entity';
 @Index('IDX_USERS_ROLE_STATUS', ['role', 'status'])
 @Index('IDX_USERS_REGION_ID', ['region_id'])
 @Index('IDX_USERS_DISTRICT_ID', ['district_id'])
+@Index('IDX_USERS_EXTERNAL_PROVIDER', ['external_provider'])
 export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar' })
   name: string;
@@ -37,6 +38,11 @@ export class UserEntity extends BaseEntity {
   @Index()
   @Column({ type: 'varchar' })
   phone_number: string;
+
+  // Tashqi yetkazib berish provayderi (kuryer-user uchun): 'ldg' va h.k.
+  // null = oddiy ichki kuryer
+  @Column({ type: 'varchar', nullable: true })
+  external_provider: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   password: string;

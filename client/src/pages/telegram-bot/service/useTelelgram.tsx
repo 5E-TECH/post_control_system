@@ -11,7 +11,12 @@ export const useLoginTelegran = () => {
     onSuccess: () => client.invalidateQueries({ queryKey: [loginTelegram] }),
   });
 
+  const linkTelegram = useMutation({
+    mutationFn: (data: { data: string }) => api.post("user/telegram/link", data),
+  });
+
   return {
-    signinUser
+    signinUser,
+    linkTelegram,
   };
 };

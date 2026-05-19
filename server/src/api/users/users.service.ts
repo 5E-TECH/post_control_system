@@ -1402,6 +1402,60 @@ export class UserService implements OnModuleInit {
     }
   }
 
+  async linkTelegramAccount(
+    initData: TelegramInitData,
+    currentUser: JwtPayload,
+  ) {
+    try {
+      const { data } = initData;
+      const params = new URLSearchParams(data);
+      const userStr = params.get('user');
+      if (!userStr) {
+        throw new BadRequestException('No initData found');
+      }
+      const tgUser = JSON.parse(userStr);
+      const telegramId = Number(tgUser?.id);
+      if (!telegramId) {
+        throw new BadRequestException('Telegram user id missing');
+      }
+
+      const user = await this.userRepo.findOne({
+        where: { id: currentUser.id, is_deleted: false },
+      });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      if (user.role !== Roles.MARKET && user.role !== Roles.OPERATOR) {
+        return successRes(
+          { linked: false },
+          200,
+          'Skipped: only market/operator can be linked',
+        );
+      }
+
+      if (user.telegram_id && Number(user.telegram_id) === telegramId) {
+        return successRes({ linked: true }, 200, 'Already linked');
+      }
+
+      const conflict = await this.userRepo.findOne({
+        where: { telegram_id: telegramId, is_deleted: false },
+      });
+      if (conflict && conflict.id !== user.id) {
+        throw new ConflictException(
+          "Bu Telegram hisobi boshqa foydalanuvchiga bog'langan",
+        );
+      }
+
+      user.telegram_id = telegramId;
+      await this.userRepo.save(user);
+
+      return successRes({ linked: true }, 200, 'Telegram linked successfully');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async loginTelegram(initData: TelegramInitData, req?: Request) {
     try {
       const { data } = initData;
