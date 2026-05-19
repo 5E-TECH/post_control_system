@@ -10,5 +10,6 @@
     "logs": "Логи",
     "region": "Область",
     "financialHistory": "Финансовая история",
-    "courier_bulk": "Быстрое действие"
+    "courier_bulk": "Быстрое действие",
+    "settings": "Настройки"
 }

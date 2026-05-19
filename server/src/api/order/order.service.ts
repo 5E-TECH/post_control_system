@@ -5023,6 +5023,163 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  // ==================== LDG WEBHOOK ENTRY POINTS ====================
+
+  /**
+   * LDG webhook'dan `DELIVERED` statusi (terminal_action='sell') kelganda
+   * chaqiriladi. LDG vakil-kuryer hisobidan mavjud `sellOrder` oqimini ishga
+   * tushiradi — kassa tranzaksiyalari odatdagi kuryer sotuvi kabi yoziladi.
+   *
+   * Idempotent: agar order allaqachon SOLD bo'lsa, hech narsa qilmaydi.
+   * Agar order ON_THE_ROAD/RECEIVED bo'lsa, avval WAITING ga o'tkazadi
+   * (LDG webhook bevosita "yetkazib berildi" deganida `kuryer qabul qildi`
+   * bosqichini bo'lib o'tkazib yuboramiz).
+   */
+  async markDeliveredByLdg(
+    orderId: string,
+    ldgCourierUserId: string,
+  ): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      this.logger.warn(`LDG webhook delivered: order topilmadi (${orderId})`);
+      return;
+    }
+    if (order.status === Order_status.SOLD) {
+      // Idempotent — webhook qayta yuborilgan bo'lishi mumkin
+      return;
+    }
+
+    // ON_THE_ROAD yoki RECEIVED bo'lsa avval WAITING ga o'tkazamiz
+    if (
+      order.status === Order_status.ON_THE_ROAD ||
+      order.status === Order_status.RECEIVED
+    ) {
+      await this.orderRepo.update(
+        {
+          id: orderId,
+          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+        },
+        { status: Order_status.WAITING },
+      );
+    }
+
+    const payload: JwtPayload = {
+      id: ldgCourierUserId,
+      role: Roles.COURIER,
+      status: Status.ACTIVE,
+    };
+
+    await this.sellOrder(payload, orderId, {
+      comment: 'LDG yetkazib berdi',
+      extraCost: 0,
+    });
+  }
+
+  /**
+   * LDG webhook'dan `CANCELLED` statusi (terminal_action='cancel') kelganda
+   * chaqiriladi. LDG vakil-kuryer hisobidan mavjud `cancelOrder` oqimini ishga
+   * tushiradi — order CANCELLED bo'ladi, market guruhiga bildirishnoma yuboriladi.
+   *
+   * Idempotent: order allaqachon CANCELLED/CANCELLED_SENT/CLOSED/SOLD bo'lsa, skip
+   * (terminal holatni qayta o'zgartirmaymiz).
+   */
+  async markCancelledByLdg(
+    orderId: string,
+    ldgCourierUserId: string,
+  ): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      this.logger.warn(`LDG webhook cancelled: order topilmadi (${orderId})`);
+      return;
+    }
+    if (
+      order.status === Order_status.CANCELLED ||
+      order.status === Order_status.CANCELLED_SENT ||
+      order.status === Order_status.CLOSED ||
+      order.status === Order_status.SOLD
+    ) {
+      return; // idempotent
+    }
+
+    const payload: JwtPayload = {
+      id: ldgCourierUserId,
+      role: Roles.COURIER,
+      status: Status.ACTIVE,
+    };
+
+    // skipNotification berilmaydi — market guruhiga "bekor qilindi" xabari ketadi
+    await this.cancelOrder(payload, orderId, {
+      comment: 'LDG bekor qildi',
+      extraCost: 0,
+    });
+  }
+
+  /**
+   * LDG webhook'dan `RETURNED` statusi (terminal_action='return') kelganda
+   * chaqiriladi. Buyurtma jismonan bizga qaytarilgan.
+   *
+   * Avval `cancelOrder` oqimidan o'tkazamiz (market guruhiga bildirishnoma,
+   * tashqi integratsiya sinxron, operator daromadi tozalanadi), so'ng yakuniy
+   * status sifatida CLOSED ga o'rnatamiz — qaytarilgan buyurtma yopildi.
+   *
+   * Idempotent: order allaqachon CLOSED bo'lsa skip. SOLD bo'lsa tegmaymiz
+   * (nizoli holat — qo'lda tekshirilishi kerak). Agar order allaqachon
+   * CANCELLED/CANCELLED_SENT bo'lsa, `cancelOrder` takror chaqirilmaydi —
+   * faqat CLOSED ga o'tkaziladi.
+   */
+  async markReturnedByLdg(
+    orderId: string,
+    ldgCourierUserId: string,
+  ): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      this.logger.warn(`LDG webhook returned: order topilmadi (${orderId})`);
+      return;
+    }
+    if (order.status === Order_status.CLOSED) {
+      return; // idempotent
+    }
+    if (order.status === Order_status.SOLD) {
+      this.logger.warn(
+        `LDG webhook returned: order SOLD holatida (${orderId}), qo'lda tekshiring`,
+      );
+      return;
+    }
+
+    const payload: JwtPayload = {
+      id: ldgCourierUserId,
+      role: Roles.COURIER,
+      status: Status.ACTIVE,
+    };
+
+    // Hali bekor qilinmagan bo'lsa — bekor qilish oqimini o'tkazamiz
+    if (
+      order.status !== Order_status.CANCELLED &&
+      order.status !== Order_status.CANCELLED_SENT
+    ) {
+      await this.cancelOrder(payload, orderId, {
+        comment: 'LDG qaytarib berdi',
+        extraCost: 0,
+      });
+    }
+
+    // Yakuniy status — CLOSED (qaytarilgan buyurtma yopildi)
+    await this.orderRepo.update(
+      { id: orderId },
+      { status: Order_status.CLOSED },
+    );
+
+    this.activityLog.log({
+      entity_type: 'order',
+      entity_id: orderId,
+      action: 'status_change',
+      old_value: { status: Order_status.CANCELLED },
+      new_value: { status: Order_status.CLOSED },
+      description: 'LDG buyurtmani qaytarib berdi (CLOSED)',
+      user: payload,
+    });
+  }
+
   // ==================== BULK OPERATIONS (KURIER UCHUN) ====================
 
   /**

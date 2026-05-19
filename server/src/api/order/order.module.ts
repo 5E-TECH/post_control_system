@@ -54,5 +54,6 @@ import { IntegrationSyncModule } from '../integration-sync/integration-sync.modu
     OrderGateaway,
     MyLogger,
   ],
+  exports: [OrderService],
 })
 export class OrderModule {}
