@@ -16,7 +16,6 @@ const Auth = () => {
   const token = useSelector((state: RootState) => state.authSlice.token);
   const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -28,7 +27,6 @@ const Auth = () => {
       .get("user/profile") // 🔑 backendda token tekshirish
       .then((res) => {
         setValid(true); // token to‘g‘ri bo‘lsa
-        setUserRole(res.data.data.role);
         dispatch(setRole(res.data.data.role));
         dispatch(setId(res.data.data.id));
         dispatch(setName(res.data.data.name));
@@ -84,9 +82,12 @@ const Auth = () => {
       </div>
     );
 
-  if (valid && (userRole === "market" || userRole === "operator")) {
-    return <Navigate replace to={buildAdminPath("authtelegram")} />;
-  }
+  // E'TIBOR: market/operator uchun avval `authtelegram` ga avtomatik redirect bor edi.
+  // Bu noto'g'ri edi — chunki browser/telefon orqali kirganda ham ularni majburan
+  // buyurtma yaratish sahifasiga olib borardi. `authtelegram` faqat Telegram WebApp
+  // ichida ochilishi kerak — bu allaqachon `/admin/bot` → telegram-bot komponenti
+  // orqali boshqariladi (initData tekshiriladi). Bu yerda hech kim majburan
+  // yo'naltirilmaydi — markets va operators ham hammasiday platformaga kiradi.
 
   return valid ? (
     <Outlet />
