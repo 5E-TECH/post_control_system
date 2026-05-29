@@ -23,6 +23,7 @@ export interface LdgHealth {
     delivered: number;
     with_error: number;
     pending: number;
+    mismatch: number;
   };
   webhooks: {
     total: number;
@@ -57,6 +58,8 @@ export interface LdgShipmentRow {
   ldg_status_changed_at: number | null;
   send_attempts: number;
   last_error: string | null;
+  mismatch_at: number | null;
+  mismatch_reason: string | null;
   created_at: number;
   order_status: string | null;
   order_total_price: number | null;
@@ -125,6 +128,7 @@ export const useLdgAdmin = () => {
           .get("ldg/admin/webhook-logs", { params })
           .then((res) => unwrap<Paginated<LdgWebhookLog>>(res.data)),
       enabled,
+      refetchInterval: 30000,
     });
 
   const getShipments = (
@@ -138,6 +142,7 @@ export const useLdgAdmin = () => {
           .get("ldg/admin/shipments", { params })
           .then((res) => unwrap<Paginated<LdgShipmentRow>>(res.data)),
       enabled,
+      refetchInterval: 30000,
     });
 
   const testConnection = useMutation({
@@ -200,6 +205,18 @@ export const useLdgAdmin = () => {
     },
   });
 
+  // Mismatch'ni "hal qilindi" deb belgilash (admin qo'lda tekshirib chiqqach)
+  const resolveMismatch = useMutation({
+    mutationFn: (orderId: string) =>
+      api
+        .post(`ldg/admin/shipments/${orderId}/resolve-mismatch`)
+        .then((res) => unwrap<ActionResult>(res.data)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [SHIPMENTS_KEY] });
+      client.invalidateQueries({ queryKey: [HEALTH_KEY] });
+    },
+  });
+
   return {
     getHealth,
     getWebhookLogs,
@@ -209,5 +226,6 @@ export const useLdgAdmin = () => {
     reprocessWebhook,
     syncOne,
     reconcileAll,
+    resolveMismatch,
   };
 };

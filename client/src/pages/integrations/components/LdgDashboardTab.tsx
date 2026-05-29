@@ -198,7 +198,7 @@ export const LdgDashboardTab = () => {
       </div>
 
       {/* Statistika */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <Statistic
             title={
@@ -233,6 +233,31 @@ export const LdgDashboardTab = () => {
               color: health.shipments.with_error > 0 ? "#dc2626" : undefined,
             }}
           />
+        </Card>
+        <Card
+          className={
+            health.shipments.mismatch > 0
+              ? "!border-red-500 !border-2 !bg-red-50 dark:!bg-red-900/10"
+              : ""
+          }
+        >
+          <Statistic
+            title={
+              <span className="flex items-center gap-1.5 font-semibold">
+                ⚠️ Mismatch
+              </span>
+            }
+            value={health.shipments.mismatch}
+            valueStyle={{
+              color: health.shipments.mismatch > 0 ? "#dc2626" : undefined,
+              fontWeight: health.shipments.mismatch > 0 ? "bold" : undefined,
+            }}
+          />
+          {health.shipments.mismatch > 0 && (
+            <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+              LDG ↔ status to'qnashishi — tekshirish kerak!
+            </div>
+          )}
         </Card>
       </div>
 

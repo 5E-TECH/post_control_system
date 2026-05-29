@@ -9,7 +9,13 @@ import {
   Popconfirm,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { RotateCcw, RefreshCw, DownloadCloud } from "lucide-react";
+import {
+  RotateCcw,
+  RefreshCw,
+  DownloadCloud,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
 import {
   useLdgAdmin,
   type LdgShipmentRow,
@@ -45,10 +51,11 @@ const ldgStatusLabel = (status: string | null): string => {
 };
 
 export const LdgShipmentsTab = () => {
-  const { getShipments, redispatch, syncOne } = useLdgAdmin();
+  const { getShipments, redispatch, syncOne, resolveMismatch } = useLdgAdmin();
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
   const limit = 20;
 
   const { data, isLoading, isFetching, refetch } = getShipments({
@@ -83,6 +90,22 @@ export const LdgShipmentsTab = () => {
       message.error("LDG'dan tekshirishda xatolik");
     } finally {
       setSyncingId(null);
+    }
+  };
+
+  const handleResolveMismatch = async (orderId: string) => {
+    setResolvingId(orderId);
+    try {
+      const result = await resolveMismatch.mutateAsync(orderId);
+      if (result.success) {
+        message.success(result.message);
+      } else {
+        message.warning(result.message);
+      }
+    } catch {
+      message.error("Mismatch'ni hal qilishda xatolik");
+    } finally {
+      setResolvingId(null);
     }
   };
 
@@ -138,27 +161,59 @@ export const LdgShipmentsTab = () => {
       key: "send_attempts",
     },
     {
-      title: "Xato",
-      dataIndex: "last_error",
-      key: "last_error",
-      render: (v: string | null) =>
-        v ? (
-          <Tooltip title={v}>
-            <span className="text-red-500 text-xs line-clamp-2 max-w-[220px] inline-block">
-              {v}
-            </span>
-          </Tooltip>
-        ) : (
-          "—"
-        ),
+      title: "Xato / Mismatch",
+      key: "error_or_mismatch",
+      render: (_: unknown, row) => {
+        if (row.mismatch_at && row.mismatch_reason) {
+          return (
+            <Tooltip title={row.mismatch_reason}>
+              <Tag
+                color="volcano"
+                icon={<AlertTriangle className="w-3 h-3 inline mr-1" />}
+              >
+                <span className="text-xs">MISMATCH</span>
+              </Tag>
+            </Tooltip>
+          );
+        }
+        if (row.last_error) {
+          return (
+            <Tooltip title={row.last_error}>
+              <span className="text-red-500 text-xs line-clamp-2 max-w-[220px] inline-block">
+                {row.last_error}
+              </span>
+            </Tooltip>
+          );
+        }
+        return "—";
+      },
     },
     {
       title: "Amal",
       key: "action",
       fixed: "right",
-      width: 230,
+      width: 260,
       render: (_: unknown, row) => (
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
+          {row.mismatch_at && (
+            <Popconfirm
+              title="Mismatch'ni hal qilindi deb belgilashmi?"
+              description="Faqat qo'lda tekshirib, kassa va status mosligini ta'minlaganingizdan keyin bosing."
+              okText="Ha, hal qilindi"
+              cancelText="Yo'q"
+              onConfirm={() => handleResolveMismatch(row.order_id)}
+            >
+              <Button
+                size="small"
+                type="primary"
+                danger
+                icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                loading={resolveMismatch.isPending && resolvingId === row.order_id}
+              >
+                Hal qilindi
+              </Button>
+            </Popconfirm>
+          )}
           {row.ldg_order_id ? (
             <Tooltip title="LDG'dan joriy statusni tortib olib, order holatini yangilaydi">
               <Button
@@ -206,6 +261,15 @@ export const LdgShipmentsTab = () => {
             { label: "Yuborilmagan", value: "pending" },
             { label: "Xatoli", value: "error" },
             { label: "Yetkazilgan", value: "delivered" },
+            {
+              label: (
+                <span className="flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Mismatch
+                </span>
+              ),
+              value: "mismatch",
+            },
           ]}
         />
         <Button

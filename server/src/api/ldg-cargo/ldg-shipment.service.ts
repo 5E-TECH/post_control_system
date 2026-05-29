@@ -216,6 +216,13 @@ export class LdgShipmentService {
     return this.shipmentRepo.save(shipment);
   }
 
+  /**
+   * Shipment'ni umumiy saqlash — mismatch belgilari va h.k. uchun.
+   */
+  async saveShipment(shipment: LdgShipmentEntity): Promise<LdgShipmentEntity> {
+    return this.shipmentRepo.save(shipment);
+  }
+
   // ===== HELPERS =====
 
   private applyLdgResponse(

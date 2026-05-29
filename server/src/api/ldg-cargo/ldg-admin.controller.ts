@@ -90,4 +90,12 @@ export class LdgAdminController {
   async reconcile() {
     return this.adminService.reconcileActiveShipments();
   }
+
+  @ApiOperation({
+    summary: 'Mismatch\'ni "hal qilindi" deb belgilash (admin tekshirib chiqqach)',
+  })
+  @Post('shipments/:orderId/resolve-mismatch')
+  async resolveMismatch(@Param('orderId') orderId: string) {
+    return this.adminService.resolveMismatch(orderId);
+  }
 }

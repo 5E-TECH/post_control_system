@@ -74,6 +74,21 @@ export class LdgShipmentEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   last_error: string | null;
 
+  // LDG terminal status va bizning order status nomos kelgan vaqti.
+  // Masalan: LDG `CANCELLED` yuboradi-yu, bizda allaqachon `SOLD` — bu
+  // real biznes mismatch (pul market'ga to'langan, lekin LDG yetkazmagan).
+  // Admin panel "Mismatch" filtri shu maydon orqali topadi.
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformer,
+  })
+  mismatch_at: number | null;
+
+  // Mismatch sababi (qaysi LDG status, bizda qaysi status edi).
+  @Column({ type: 'text', nullable: true })
+  mismatch_reason: string | null;
+
   // ===== RELATIONS =====
 
   @ManyToOne(() => OrderEntity, { onDelete: 'CASCADE' })

@@ -122,8 +122,13 @@ export class LdgAdminService {
       .createQueryBuilder('s')
       .where('s.ldg_order_id IS NULL')
       .getCount();
+    // LDG ↔ Beepost status to'qnashishi (real biznes muammosi)
+    const mismatch = await this.shipmentRepo
+      .createQueryBuilder('s')
+      .where('s.mismatch_at IS NOT NULL')
+      .getCount();
 
-    return { total, delivered, with_error: withError, pending };
+    return { total, delivered, with_error: withError, pending, mismatch };
   }
 
   async getWebhookStats() {
@@ -192,7 +197,7 @@ export class LdgAdminService {
   async getShipments(query: {
     page?: number;
     limit?: number;
-    filter?: 'all' | 'error' | 'delivered' | 'pending';
+    filter?: 'all' | 'error' | 'delivered' | 'pending' | 'mismatch';
   }): Promise<PaginatedResult<Record<string, unknown>>> {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
@@ -219,6 +224,12 @@ export class LdgAdminService {
       qb.andWhere('UPPER(s.ldg_status) = :st', { st: 'DELIVERED' });
     } else if (query.filter === 'pending') {
       qb.andWhere('s.ldg_order_id IS NULL');
+    } else if (query.filter === 'mismatch') {
+      // Mismatch'larni avval — eng yangi mismatch tepada
+      qb.andWhere('s.mismatch_at IS NOT NULL').orderBy(
+        's.mismatch_at',
+        'DESC',
+      );
     }
 
     const [rows, total] = await qb.getManyAndCount();
@@ -232,6 +243,8 @@ export class LdgAdminService {
       ldg_status_changed_at: s.ldg_status_changed_at,
       send_attempts: s.send_attempts,
       last_error: s.last_error,
+      mismatch_at: s.mismatch_at,
+      mismatch_reason: s.mismatch_reason,
       created_at: s.created_at,
       order_status: s.order?.status ?? null,
       order_total_price: s.order?.total_price ?? null,
@@ -246,6 +259,26 @@ export class LdgAdminService {
       limit,
       totalPages: Math.ceil(total / limit) || 1,
     };
+  }
+
+  /**
+   * Mismatch'ni "hal qilindi" deb belgilash — admin qo'lda tekshirib chiqqach.
+   * Mismatch maydonlarini tozalaydi (audit uchun activity_log saqlanadi).
+   */
+  async resolveMismatch(orderId: string): Promise<{ success: boolean; message: string }> {
+    const shipment = await this.shipmentRepo.findOne({
+      where: { order_id: orderId },
+    });
+    if (!shipment) {
+      return { success: false, message: 'Shipment topilmadi' };
+    }
+    if (!shipment.mismatch_at) {
+      return { success: false, message: 'Bu shipmentda mismatch yo\'q' };
+    }
+    shipment.mismatch_at = null;
+    shipment.mismatch_reason = null;
+    await this.shipmentRepo.save(shipment);
+    return { success: true, message: 'Mismatch hal qilindi deb belgilandi' };
   }
 
   /**

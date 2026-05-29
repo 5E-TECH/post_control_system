@@ -67,6 +67,18 @@ import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance
 import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 
+/**
+ * LDG webhook terminal handler natijasi:
+ *  - 'applied'  — biznes oqim bajarildi (sotildi/bekor qilindi/qaytarildi)
+ *  - 'skipped'  — idempotent: order allaqachon kerakli holatda yoki topilmadi
+ *  - 'mismatch' — LDG holati bizning order holati bilan to'qnashadi (qo'lda
+ *                 tekshirilishi kerak — masalan, biz SOLD, LDG CANCELLED)
+ */
+export type LdgTerminalResult =
+  | { kind: 'applied' }
+  | { kind: 'skipped'; reason: string }
+  | { kind: 'mismatch'; reason: string };
+
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   // In-memory cache for top markets/couriers (30 kunlik aggregation og'ir bo'lgani uchun)
@@ -5038,15 +5050,31 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async markDeliveredByLdg(
     orderId: string,
     ldgCourierUserId: string,
-  ): Promise<void> {
+  ): Promise<LdgTerminalResult> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       this.logger.warn(`LDG webhook delivered: order topilmadi (${orderId})`);
-      return;
+      return { kind: 'skipped', reason: 'order_not_found' };
     }
-    if (order.status === Order_status.SOLD) {
-      // Idempotent — webhook qayta yuborilgan bo'lishi mumkin
-      return;
+    // Idempotent — webhook qayta yuborilgan yoki avval qo'lda sotilgan
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      return { kind: 'skipped', reason: `already ${order.status}` };
+    }
+    // MISMATCH: LDG yetkazdi, lekin bizda buyurtma bekor qilingan/yopilgan
+    // (kuryer yoki operator allaqachon "bekor qildi" deb belgilagan, ammo
+    // LDG haqiqatda yetkazgan ekan — yoki status sinxron emas).
+    if (
+      order.status === Order_status.CANCELLED ||
+      order.status === Order_status.CANCELLED_SENT ||
+      order.status === Order_status.CLOSED
+    ) {
+      const reason = `LDG: yetkazildi, lekin bizda status=${order.status} (qo'lda tekshiring)`;
+      this.logger.error(`LDG MISMATCH delivered: order=${orderId} — ${reason}`);
+      return { kind: 'mismatch', reason };
     }
 
     // ON_THE_ROAD yoki RECEIVED bo'lsa avval WAITING ga o'tkazamiz
@@ -5069,10 +5097,35 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       status: Status.ACTIVE,
     };
 
-    await this.sellOrder(payload, orderId, {
-      comment: 'LDG yetkazib berdi',
-      extraCost: 0,
-    });
+    try {
+      await this.sellOrder(payload, orderId, {
+        comment: 'LDG yetkazib berdi',
+        extraCost: 0,
+      });
+      return { kind: 'applied' };
+    } catch (err) {
+      // sellOrder `where: status=WAITING` filtrida fail bo'lsa — race condition
+      // (manual sell yoki cancel oraliqda bajarildi). Yangi statusni o'qib mismatch
+      // yoki skipped sifatida qaytaramiz.
+      const fresh = await this.orderRepo.findOne({ where: { id: orderId } });
+      if (
+        fresh?.status === Order_status.SOLD ||
+        fresh?.status === Order_status.PAID ||
+        fresh?.status === Order_status.PARTLY_PAID
+      ) {
+        return { kind: 'skipped', reason: `race: now ${fresh.status}` };
+      }
+      if (
+        fresh?.status === Order_status.CANCELLED ||
+        fresh?.status === Order_status.CANCELLED_SENT ||
+        fresh?.status === Order_status.CLOSED
+      ) {
+        const reason = `LDG: yetkazildi (sell race), lekin bizda status=${fresh.status}`;
+        this.logger.error(`LDG MISMATCH delivered (race): order=${orderId} — ${reason}`);
+        return { kind: 'mismatch', reason };
+      }
+      throw err;
+    }
   }
 
   /**
@@ -5086,19 +5139,29 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async markCancelledByLdg(
     orderId: string,
     ldgCourierUserId: string,
-  ): Promise<void> {
+  ): Promise<LdgTerminalResult> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       this.logger.warn(`LDG webhook cancelled: order topilmadi (${orderId})`);
-      return;
+      return { kind: 'skipped', reason: 'order_not_found' };
     }
     if (
       order.status === Order_status.CANCELLED ||
       order.status === Order_status.CANCELLED_SENT ||
-      order.status === Order_status.CLOSED ||
-      order.status === Order_status.SOLD
+      order.status === Order_status.CLOSED
     ) {
-      return; // idempotent
+      return { kind: 'skipped', reason: `already ${order.status}` };
+    }
+    // MISMATCH: LDG bekor qildi, lekin bizda allaqachon sotilgan/to'langan.
+    // Bu real biznes muammosi: pul market'ga to'langan, lekin LDG yetkazmagan.
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      const reason = `LDG: bekor qildi, lekin bizda status=${order.status} (pul to'langan! qo'lda tekshiring)`;
+      this.logger.error(`LDG MISMATCH cancelled: order=${orderId} — ${reason}`);
+      return { kind: 'mismatch', reason };
     }
 
     const payload: JwtPayload = {
@@ -5112,6 +5175,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       comment: 'LDG bekor qildi',
       extraCost: 0,
     });
+    return { kind: 'applied' };
   }
 
   /**
@@ -5130,20 +5194,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async markReturnedByLdg(
     orderId: string,
     ldgCourierUserId: string,
-  ): Promise<void> {
+  ): Promise<LdgTerminalResult> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       this.logger.warn(`LDG webhook returned: order topilmadi (${orderId})`);
-      return;
+      return { kind: 'skipped', reason: 'order_not_found' };
     }
     if (order.status === Order_status.CLOSED) {
-      return; // idempotent
+      return { kind: 'skipped', reason: 'already CLOSED' };
     }
-    if (order.status === Order_status.SOLD) {
-      this.logger.warn(
-        `LDG webhook returned: order SOLD holatida (${orderId}), qo'lda tekshiring`,
-      );
-      return;
+    // MISMATCH: LDG paketni bizga qaytardi, lekin bizda allaqachon sotilgan/to'langan
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      const reason = `LDG: qaytarib berdi, lekin bizda status=${order.status} (pul to'langan! qo'lda tekshiring)`;
+      this.logger.error(`LDG MISMATCH returned: order=${orderId} — ${reason}`);
+      return { kind: 'mismatch', reason };
     }
 
     const payload: JwtPayload = {
@@ -5178,6 +5246,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       description: 'LDG buyurtmani qaytarib berdi (CLOSED)',
       user: payload,
     });
+    return { kind: 'applied' };
   }
 
   // ==================== BULK OPERATIONS (KURIER UCHUN) ====================
