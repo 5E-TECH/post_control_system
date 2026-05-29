@@ -12,6 +12,12 @@ export default defineConfig({
     // allowedHosts: ["latanya-unusable-andera.ngrok-free.dev"],
     headers: {
       "ngrok-skip-browser-warning": "any-value",
-    }
+    },
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+    },
   },
 });

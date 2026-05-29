@@ -76,6 +76,7 @@ LDG `package.status_changed` event keladi → quyidagicha xaritalanadi:
 |---|---|---|
 | `created` / `NEW` | `ON_THE_ROAD` | biz LDG'ga jo'natdik, ular hali qabul qilmadi |
 | `RECEIVED` | `WAITING` | LDG buyurtmani alohida qabul qildi |
+| `8` ("Filialda") | `WAITING` | paket LDG filialiga yetdi (oraliq holat) |
 | `IN_TRANSIT` / `OUT_FOR_DELIVERY` | `WAITING` | LDG yo'lda, qabul qilingan holicha kutadi |
 | `DELIVERED` | `SOLD` | yetkazildi → `sellOrder` (kassaga pul tushadi) |
 | `CANCELLED` | `CANCELLED` | LDG bekor qildi → `cancelOrder` oqimi |

@@ -40,6 +40,11 @@ const CreateCourier = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Super kuryer rejimi (bir nechta viloyatga xizmat qiladi)
+  const [isSuper, setIsSuper] = useState(false);
+  const [servesAll, setServesAll] = useState(false);
+  const [selectedRegionIds, setSelectedRegionIds] = useState<string[]>([]);
+
   const { getRegions } = useRegion();
   const { data } = getRegions();
   const regions =
@@ -93,7 +98,11 @@ const CreateCourier = () => {
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.region_id) {
+    if (isSuper) {
+      if (!servesAll && selectedRegionIds.length === 0) {
+        newErrors.region_id = "Kamida bitta viloyat tanlang yoki 'Barcha viloyatlar'ni yoqing";
+      }
+    } else if (!formData.region_id) {
       newErrors.region_id = t("selectLocation");
     }
 
@@ -128,14 +137,24 @@ const CreateCourier = () => {
 
     setIsLoading(true);
 
-    const newCourier = {
-      region_id: formData.region_id,
+    const newCourier: Record<string, unknown> = {
       name: formData.name,
       phone_number: formData.phone_number.split(" ").join(""),
       password: formData.password,
       tariff_home: Number(formData.tariff_home.replace(/,/g, "")),
       tariff_center: Number(formData.tariff_center.replace(/,/g, "")),
     };
+
+    if (isSuper) {
+      newCourier.is_super_courier = true;
+      newCourier.serves_all_regions = servesAll;
+      // Phase 1: flat tarif — per-region tarifsiz (region tarifi keyin qo'shiladi)
+      newCourier.regions = servesAll
+        ? []
+        : selectedRegionIds.map((region_id) => ({ region_id }));
+    } else {
+      newCourier.region_id = formData.region_id;
+    }
 
     createUser.mutate(newCourier, {
       onSuccess: () => {
@@ -167,63 +186,150 @@ const CreateCourier = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-        {/* Region */}
-        <div>
-          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-            Viloyat <span className="text-red-500">*</span>
-          </label>
-          <div className="relative" ref={regionDropdownRef}>
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
-            <button
-              type="button"
-              onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
-              className={`w-full h-10 sm:h-11 pl-10 pr-10 text-sm sm:text-base rounded-lg sm:rounded-xl border ${
-                errors.region_id
-                  ? "border-red-300 dark:border-red-700"
-                  : "border-gray-200 dark:border-gray-700"
-              } bg-white dark:bg-[#312D4B] text-left flex items-center justify-between cursor-pointer hover:border-amber-300 dark:hover:border-amber-600 transition-colors`}
-            >
-              <span
-                className={
-                  selectedRegion
-                    ? "text-gray-800 dark:text-white"
-                    : "text-gray-400"
-                }
-              >
-                {selectedRegion?.label || t("selectLocation")}
+        {/* Super kuryer rejimi */}
+        <div className="rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-900/10 p-3 space-y-3">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div>
+              <span className="text-sm font-medium text-gray-800 dark:text-white">
+                Super kuryer
               </span>
-              <ChevronDown
-                className={`w-4 h-4 text-gray-400 transition-transform ${regionDropdownOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-            {regionDropdownOpen && (
-              <div className="absolute z-20 w-full mt-1 bg-white dark:bg-[#312D4B] rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg max-h-48 overflow-y-auto">
-                {regions.map((region: any) => (
-                  <div
-                    key={region.value}
-                    onClick={() => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        region_id: region.value,
-                      }));
-                      setRegionDropdownOpen(false);
-                    }}
-                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${
-                      formData.region_id === region.value
-                        ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
-                        : "hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    {region.label}
-                  </div>
-                ))}
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Bir nechta viloyatga xizmat qiladi
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={isSuper}
+              onChange={(e) => setIsSuper(e.target.checked)}
+              className="w-5 h-5 accent-amber-500"
+            />
+          </label>
+
+          {isSuper && (
+            <label className="flex items-center justify-between cursor-pointer pt-2 border-t border-amber-200/60 dark:border-amber-800/40">
+              <div>
+                <span className="text-sm font-medium text-gray-800 dark:text-white">
+                  Barcha viloyatlar
+                </span>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Istalgan viloyat pochtasini ola oladi
+                </p>
               </div>
-            )}
-          </div>
-          {errors.region_id && (
-            <p className="text-red-500 text-xs mt-1">{errors.region_id}</p>
+              <input
+                type="checkbox"
+                checked={servesAll}
+                onChange={(e) => setServesAll(e.target.checked)}
+                className="w-5 h-5 accent-amber-500"
+              />
+            </label>
           )}
         </div>
+
+        {/* Region — oddiy kuryer uchun bitta viloyat */}
+        {!isSuper && (
+          <div>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Viloyat <span className="text-red-500">*</span>
+            </label>
+            <div className="relative" ref={regionDropdownRef}>
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
+              <button
+                type="button"
+                onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+                className={`w-full h-10 sm:h-11 pl-10 pr-10 text-sm sm:text-base rounded-lg sm:rounded-xl border ${
+                  errors.region_id
+                    ? "border-red-300 dark:border-red-700"
+                    : "border-gray-200 dark:border-gray-700"
+                } bg-white dark:bg-[#312D4B] text-left flex items-center justify-between cursor-pointer hover:border-amber-300 dark:hover:border-amber-600 transition-colors`}
+              >
+                <span
+                  className={
+                    selectedRegion
+                      ? "text-gray-800 dark:text-white"
+                      : "text-gray-400"
+                  }
+                >
+                  {selectedRegion?.label || t("selectLocation")}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-gray-400 transition-transform ${regionDropdownOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {regionDropdownOpen && (
+                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-[#312D4B] rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg max-h-48 overflow-y-auto">
+                  {regions.map((region: any) => (
+                    <div
+                      key={region.value}
+                      onClick={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          region_id: region.value,
+                        }));
+                        setRegionDropdownOpen(false);
+                      }}
+                      className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${
+                        formData.region_id === region.value
+                          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
+                          : "hover:bg-amber-50 dark:hover:bg-amber-900/20 text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      {region.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {errors.region_id && (
+              <p className="text-red-500 text-xs mt-1">{errors.region_id}</p>
+            )}
+          </div>
+        )}
+
+        {/* Multi-region — super kuryer uchun (Barcha viloyatlar yoqilmaganda) */}
+        {isSuper && !servesAll && (
+          <div>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Viloyatlar <span className="text-red-500">*</span>
+              <span className="text-gray-400 font-normal ml-1">
+                ({selectedRegionIds.length} tanlandi)
+              </span>
+            </label>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto p-1">
+              {regions.map((region: any) => {
+                const checked = selectedRegionIds.includes(region.value);
+                return (
+                  <label
+                    key={region.value}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                      checked
+                        ? "bg-amber-100 dark:bg-amber-900/30"
+                        : "hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setSelectedRegionIds((prev) =>
+                          prev.includes(region.value)
+                            ? prev.filter((r) => r !== region.value)
+                            : [...prev, region.value],
+                        )
+                      }
+                      className="w-4 h-4 accent-amber-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {region.label}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {errors.region_id && (
+              <p className="text-red-500 text-xs mt-1">{errors.region_id}</p>
+            )}
+          </div>
+        )}
 
         {/* Name */}
         <div>

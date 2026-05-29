@@ -8,7 +8,7 @@ import line from "../../shared/assets/login/Mask.svg";
 
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { setToken } from "../../shared/lib/features/login/authSlice";
+import { setToken, setTelegramSession } from "../../shared/lib/features/login/authSlice";
 import type { ILogin } from "../../shared/types/typesLogin";
 import { useLogin } from "../../shared/api/hooks/useLogin";
 
@@ -72,6 +72,7 @@ const Login: FC = () => {
     signinUser.mutate(values, {
       onSuccess: (res) => {
         dispatch(setToken(res?.data?.data));
+        dispatch(setTelegramSession(false));
         if (res?.data?.data?.refresh_token_expires_at) {
           localStorage.setItem("refresh_token_expires_at", String(res.data.data.refresh_token_expires_at));
         }

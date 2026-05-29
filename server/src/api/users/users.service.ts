@@ -19,8 +19,12 @@ import {
 } from 'src/common/enums';
 import config from 'src/config';
 import { UserEntity } from 'src/core/entity/users.entity';
-import { CreateCourierDto } from './dto/create-courier.dto';
+import {
+  CreateCourierDto,
+  CourierRegionInputDto,
+} from './dto/create-courier.dto';
 import { UpdateCourierDto } from './dto/update-courier.dto';
+import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { SignInUserDto } from './dto/signInUserDto';
@@ -32,7 +36,14 @@ import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
-import { DataSource, DeepPartial, ILike, In, Not } from 'typeorm';
+import {
+  DataSource,
+  DeepPartial,
+  EntityManager,
+  ILike,
+  In,
+  Not,
+} from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
@@ -225,6 +236,29 @@ export class UserService implements OnModuleInit {
     }
   }
 
+  /**
+   * Super kuryerning biriktirilgan viloyatlarini to'liq almashtiradi
+   * (eski qatorlarni o'chirib, yangilarini yozadi). Per-region tarif null
+   * bo'lsa — kuryerning umumiy flat tarifiga fallback (sendPost'da hal qilinadi).
+   */
+  private async syncCourierRegions(
+    manager: EntityManager,
+    courierId: string,
+    regions: CourierRegionInputDto[],
+  ): Promise<void> {
+    await manager.delete(CourierRegionEntity, { courier_id: courierId });
+    if (!regions.length) return;
+    const rows = regions.map((r) =>
+      manager.create(CourierRegionEntity, {
+        courier_id: courierId,
+        region_id: r.region_id,
+        tariff_home: r.tariff_home ?? null,
+        tariff_center: r.tariff_center ?? null,
+      }),
+    );
+    await manager.save(rows);
+  }
+
   async createCourier(createCourierDto: CreateCourierDto): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -237,6 +271,9 @@ export class UserService implements OnModuleInit {
         region_id,
         tariff_center,
         tariff_home,
+        is_super_courier,
+        serves_all_regions,
+        regions,
       } = createCourierDto;
 
       const existUser = await queryRunner.manager.findOne(UserEntity, {
@@ -247,11 +284,19 @@ export class UserService implements OnModuleInit {
           `User with ${phone_number} number already exists`,
         );
       }
-      const isExistRegion = await queryRunner.manager.findOne(RegionEntity, {
-        where: { id: region_id },
-      });
-      if (!isExistRegion) {
-        throw new NotFoundException('Region not found');
+
+      // Oddiy kuryer uchun region_id majburiy; super kuryer uchun ixtiyoriy
+      // (u viloyatlarni `regions` yoki `serves_all_regions` orqali oladi).
+      if (!is_super_courier && !region_id) {
+        throw new BadRequestException('region_id majburiy (oddiy kuryer uchun)');
+      }
+      if (region_id) {
+        const isExistRegion = await queryRunner.manager.findOne(RegionEntity, {
+          where: { id: region_id },
+        });
+        if (!isExistRegion) {
+          throw new NotFoundException('Region not found');
+        }
       }
 
       const hashedPassword = await this.bcrypt.encrypt(password);
@@ -259,12 +304,19 @@ export class UserService implements OnModuleInit {
         name,
         phone_number,
         password: hashedPassword,
-        region_id,
+        region_id: region_id ?? null,
         tariff_center,
         tariff_home,
         role: Roles.COURIER,
+        is_super_courier: !!is_super_courier,
+        serves_all_regions: !!serves_all_regions,
       } as DeepPartial<UserEntity>);
       await queryRunner.manager.save(courier);
+
+      // Super kuryer bo'lsa, biriktirilgan viloyatlarni yozamiz
+      if (is_super_courier && regions?.length) {
+        await this.syncCourierRegions(queryRunner.manager, courier.id, regions);
+      }
 
       const cashbox = queryRunner.manager.create(CashEntity, {
         cashbox_type: Cashbox_type.FOR_COURIER,
@@ -1000,7 +1052,7 @@ export class UserService implements OnModuleInit {
     updateCourierDto: UpdateCourierDto,
   ): Promise<object> {
     try {
-      const { password, ...otherFields } = updateCourierDto;
+      const { password, regions, ...otherFields } = updateCourierDto;
 
       const courier = await this.userRepo.findOne({
         where: { id, role: Roles.COURIER },
@@ -1046,6 +1098,11 @@ export class UserService implements OnModuleInit {
         ...(hashedPassword && { password: hashedPassword }),
       });
       await this.userRepo.save(courier);
+
+      // `regions` berilgan bo'lsa — super kuryer viloyatlarini to'liq almashtiramiz
+      if (regions) {
+        await this.syncCourierRegions(this.dataSource.manager, id, regions);
+      }
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
       this.activityLog.log({

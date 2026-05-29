@@ -85,6 +85,49 @@ export class LdgApiService {
   }
 
   /**
+   * LDG GET /statuses — yengil "ping" so'rovi. Ulanishni tekshirish uchun
+   * ishlatiladi (ma'lumot yaratmaydi). `is_active` false bo'lsa ham ishlaydi —
+   * chunki sozlamani yoqishdan oldin test qilish kerak.
+   */
+  async getStatuses(): Promise<unknown> {
+    return this.request<unknown>('GET', '/statuses', undefined, {}, {
+      skipActiveCheck: true,
+    });
+  }
+
+  /**
+   * Ulanishni tekshiradi: config to'liqligini va LDG bilan real ulanishni.
+   * Hech qanday ma'lumot yaratmaydi. Natija UI'da ko'rsatiladi.
+   */
+  async testConnection(): Promise<{
+    success: boolean;
+    message: string;
+    status_count?: number;
+  }> {
+    const config = await this.getConfig();
+    if (!config.api_key || !config.tenant_domain) {
+      return {
+        success: false,
+        message: 'API kalit yoki tenant domen sozlanmagan',
+      };
+    }
+    try {
+      const data = await this.getStatuses();
+      const count = Array.isArray(data) ? data.length : undefined;
+      return {
+        success: true,
+        message: count
+          ? `Ulanish muvaffaqiyatli (${count} ta status topildi)`
+          : 'Ulanish muvaffaqiyatli',
+        status_count: count,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, message: msg };
+    }
+  }
+
+  /**
    * Universal so'rov yuboruvchi — auth headerlarni qo'shadi, envelope ni unwrap qiladi,
    * xatolarni izchil HttpException ga aylantiradi.
    */
@@ -93,10 +136,11 @@ export class LdgApiService {
     path: string,
     body?: unknown,
     extraConfig: AxiosRequestConfig = {},
+    options: { skipActiveCheck?: boolean } = {},
   ): Promise<T> {
     const config = await this.getConfig();
 
-    if (!config.is_active) {
+    if (!options.skipActiveCheck && !config.is_active) {
       throw new ServiceUnavailableException('LDG integratsiyasi faol emas');
     }
     if (!config.api_key || !config.tenant_domain) {
