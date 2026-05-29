@@ -10,7 +10,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { DataSource, In, IsNull, Not } from 'typeorm';
+import { DataSource, In, IsNull, Not, Repository } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
@@ -28,6 +28,7 @@ import { normalizeQrToken } from 'src/infrastructure/lib/qr-token/normalize';
 import { PostDto } from './dto/postId.dto';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
+import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 
 @Injectable()
 export class PostService {
@@ -42,6 +43,9 @@ export class PostService {
 
     @InjectRepository(UserEntity)
     private readonly userRepo: UserRepository,
+
+    @InjectRepository(CourierRegionEntity)
+    private readonly courierRegionRepo: Repository<CourierRegionEntity>,
 
     private readonly dataSource: DataSource,
     private readonly activityLog: ActivityLogService,
@@ -308,22 +312,56 @@ export class PostService {
       if (!post) {
         throw new NotFoundException();
       }
+      // Oddiy (regional) kuryerlar — mavjud xatti-harakat: post regioni bo'yicha.
+      // Super kuryerlarni bu ro'yxatdan chiqaramiz (ular alohida qaytariladi).
       const couriers = await this.userRepo.find({
         where: {
           region_id: post.region_id,
           status: Status.ACTIVE,
+          is_super_courier: false,
         },
       });
-      if (couriers.length === 0) {
+
+      // Super kuryerlar: barcha viloyatlarga xizmat qiladiganlar (LDG kabi)
+      // YOKI shu viloyatga aniq biriktirilganlar.
+      const superCouriersMap = new Map<string, UserEntity>();
+      const allRegionSupers = await this.userRepo.find({
+        where: {
+          is_super_courier: true,
+          serves_all_regions: true,
+          status: Status.ACTIVE,
+        },
+      });
+      for (const c of allRegionSupers) superCouriersMap.set(c.id, c);
+
+      const attached = await this.courierRegionRepo.find({
+        where: { region_id: post.region_id },
+        relations: ['courier'],
+      });
+      for (const a of attached) {
+        const c = a.courier;
+        if (c && c.status === Status.ACTIVE && c.is_super_courier) {
+          superCouriersMap.set(c.id, c);
+        }
+      }
+      const superCouriers = Array.from(superCouriersMap.values());
+
+      if (couriers.length === 0 && superCouriers.length === 0) {
         throw new NotFoundException(
           'There are not any active couriers for this region',
         );
       }
-      const moreThanOneCourier: boolean = couriers.length === 1 ? false : true;
+
+      // Super kuryer mavjud bo'lsa, hech qachon avtomatik jo'natilmaydi —
+      // operator aniq tanlashi shart (xato dispatch oldini olish).
+      const moreThanOneCourier: boolean =
+        superCouriers.length > 0 ? true : couriers.length !== 1;
+
       return successRes(
         {
           moreThanOneCourier,
           couriers,
+          superCouriers,
         },
         200,
         'Couriers for this post',
@@ -664,11 +702,35 @@ export class PostService {
       sentPost = await queryRunner.manager.save(sentPost);
 
       /**
+       * Super kuryer: order'ga to'g'ri kuryer tarifini SNAPSHOT qilamiz.
+       * Region tarifi bo'lsa (courier_regions) — shuni, yo'q bo'lsa kuryerning
+       * umumiy flat tarifiga (users.tariff_*) fallback. Sotish/qisman/bekor
+       * oqimlari `order.courier_tariff` ni ustun ko'radi — shuning uchun bu
+       * snapshot multi-region tarifni to'g'ri qo'llaydi (moliyaviy yadro o'zgarmaydi).
+       */
+      let superTariffHome: number | null = null;
+      let superTariffCenter: number | null = null;
+      if (courier.is_super_courier) {
+        const cr = await queryRunner.manager.findOne(CourierRegionEntity, {
+          where: { courier_id: courierId, region_id: originalPost.region_id },
+        });
+        superTariffHome = cr?.tariff_home ?? courier.tariff_home ?? null;
+        superTariffCenter = cr?.tariff_center ?? courier.tariff_center ?? null;
+      }
+
+      /**
        * 6️⃣ Tanlangan orderlarni yangi sentPost ga ko'chirish va ON_THE_ROAD qilish
        */
       for (const order of newOrders) {
         order.post_id = sentPost.id;
         order.status = Order_status.ON_THE_ROAD;
+        if (courier.is_super_courier) {
+          const t =
+            order.where_deliver === Where_deliver.CENTER
+              ? superTariffCenter
+              : superTariffHome;
+          if (t != null) order.courier_tariff = t;
+        }
         await queryRunner.manager.save(order);
       }
 
@@ -1630,6 +1692,14 @@ export class PostService {
               return_requested: false,
               post_id: newPost.id,
             },
+          );
+
+          // LDG buyurtma bo'lsa — eski (qaytarilgan) shipment ma'lumotini
+          // tozalaymiz: reconcile stale statusni qo'llamasin va keyingi dispatch
+          // toza holatdan yangi LDG buyurtmasi yaratsin.
+          await this.ldgShipmentService.resetForRedelivery(
+            order.id,
+            queryRunner.manager,
           );
 
           totalAdded += Number(order.total_price) || 0;

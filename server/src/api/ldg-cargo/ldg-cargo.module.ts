@@ -12,8 +12,10 @@ import { LdgApiService } from './ldg-api.service';
 import { LdgShipmentService } from './ldg-shipment.service';
 import { LdgWebhookService } from './ldg-webhook.service';
 import { LdgConfigService } from './ldg-config.service';
+import { LdgAdminService } from './ldg-admin.service';
 import { LdgWebhookController } from './ldg-webhook.controller';
 import { LdgConfigController } from './ldg-config.controller';
+import { LdgAdminController } from './ldg-admin.controller';
 import { OrderModule } from '../order/order.module';
 
 @Module({
@@ -33,12 +35,13 @@ import { OrderModule } from '../order/order.module';
     }),
     forwardRef(() => OrderModule),
   ],
-  controllers: [LdgWebhookController, LdgConfigController],
+  controllers: [LdgWebhookController, LdgConfigController, LdgAdminController],
   providers: [
     LdgApiService,
     LdgShipmentService,
     LdgWebhookService,
     LdgConfigService,
+    LdgAdminService,
   ],
   exports: [LdgShipmentService, LdgConfigService],
 })

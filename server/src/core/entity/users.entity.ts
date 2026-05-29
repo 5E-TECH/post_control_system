@@ -23,6 +23,7 @@ import { CustomerMarketEntity } from './customer-market.entity';
 import { ProductEntity } from './product.entity';
 import { OrderEntity } from './order.entity';
 import { DistrictEntity } from './district.entity';
+import { CourierRegionEntity } from './courier-region.entity';
 
 @Entity('users')
 @Index('IDX_USERS_ROLE', ['role'])
@@ -58,6 +59,16 @@ export class UserEntity extends BaseEntity {
 
   @Column({ type: 'int', nullable: true })
   tariff_center: number;
+
+  // Super kuryer: bir nechta viloyatga xizmat qiladi (courier_regions jadvali orqali).
+  // Oddiy kuryerlar uchun false (default) — mavjud xatti-harakat o'zgarmaydi.
+  @Column({ type: 'boolean', default: false })
+  is_super_courier: boolean;
+
+  // Super kuryer barcha viloyatlarga xizmat qiladi (LDG kabi). True bo'lsa,
+  // courier_regions qatorlaridan qat'i nazar, har bir region pochtasida chiqadi.
+  @Column({ type: 'boolean', default: false })
+  serves_all_regions: boolean;
 
   @Column({ type: 'enum', enum: Status, default: Status.ACTIVE })
   status: Status;
@@ -140,6 +151,10 @@ export class UserEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'region_id' })
   region: RegionEntity;
+
+  // 1-N Super courier → biriktirilgan viloyatlar (multi-region)
+  @OneToMany(() => CourierRegionEntity, (cr) => cr.courier)
+  courierRegions: CourierRegionEntity[];
 
   // 1-N Courier (User) → Posts
   @OneToMany(() => PostEntity, (post) => post.courier)

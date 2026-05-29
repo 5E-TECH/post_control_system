@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "antd";
 import CustomerInfo from "../../orders/components/customer-info";
 import OrderItems from "../../orders/components/order-items";
@@ -12,6 +12,11 @@ import {
   setProductInfo,
 } from "../../../shared/lib/features/customer_and_market-id";
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
+
+const getTelegramWebApp = (): any => {
+  if (typeof window === "undefined") return null;
+  return (window as any).Telegram?.WebApp ?? null;
+};
 
 const CreateOrderBot = () => {
   const { createOrderBot } = useOrder();
@@ -27,6 +32,10 @@ const CreateOrderBot = () => {
   const dispatch = useDispatch();
   const { handleSuccess, handleApiError } = useApiNotification();
   const [success, setSuccess] = useState(false);
+  const submitRef = useRef<() => void>(() => {});
+
+  const tg = getTelegramWebApp();
+  const isInsideTelegram = !!tg?.initData;
 
   const canSubmit =
     !!customerData?.name &&
@@ -74,6 +83,79 @@ const CreateOrderBot = () => {
     });
   };
 
+  // submitRef'ni har doim eng so'nggi handleSubmit'ga ulab turamiz —
+  // shunda Telegram MainButton onClick eski state'ni o'qimaydi.
+  submitRef.current = handleSubmit;
+
+  // Telegram MainButton: ekran pastida doim ko'rinib turuvchi native tugma.
+  useEffect(() => {
+    if (!isInsideTelegram) return;
+
+    const mainButton = tg.MainButton;
+    if (!mainButton) return;
+
+    const onClick = () => submitRef.current();
+    mainButton.setText("Buyurtmani qo'shish");
+    mainButton.onClick(onClick);
+    mainButton.show();
+
+    return () => {
+      mainButton.offClick(onClick);
+      mainButton.hide();
+    };
+  }, [isInsideTelegram, tg]);
+
+  // MainButton holatini canSubmit/loading/success bilan sinxronlash.
+  useEffect(() => {
+    if (!isInsideTelegram) return;
+    const mainButton = tg?.MainButton;
+    if (!mainButton) return;
+
+    if (success) {
+      mainButton.setText("Buyurtma qo'shildi");
+      mainButton.hideProgress?.();
+      mainButton.disable();
+      return;
+    }
+
+    if (createOrderBot.isPending) {
+      mainButton.setText("Yuborilmoqda...");
+      mainButton.showProgress?.(false);
+      mainButton.disable();
+      return;
+    }
+
+    mainButton.hideProgress?.();
+    mainButton.setText("Buyurtmani qo'shish");
+    if (canSubmit) {
+      mainButton.enable();
+    } else {
+      mainButton.disable();
+    }
+  }, [canSubmit, createOrderBot.isPending, success, isInsideTelegram, tg]);
+
+  // BackButton: Telegram'ning yuqori chap "←" tugmasi bosilganda WebApp yopiladi.
+  useEffect(() => {
+    if (!isInsideTelegram) return;
+    const backButton = tg?.BackButton;
+    if (!backButton) return;
+
+    const onBack = () => {
+      try {
+        tg.close();
+      } catch {
+        /* ignore */
+      }
+    };
+    backButton.onClick(onBack);
+    backButton.show();
+
+    return () => {
+      backButton.offClick(onBack);
+      backButton.hide();
+    };
+  }, [isInsideTelegram, tg]);
+
   return (
     <div className="bg-white">
       <div className="flex flex-col gap-4.5 w-full">
@@ -86,16 +168,20 @@ const CreateOrderBot = () => {
         <ProductInfo />
       </div>
 
-      <div className="p-5 text-center mb-5 w-full">
-        <Button
-          onClick={handleSubmit}
-          loading={createOrderBot.isPending}
-          disabled={createOrderBot.isPending}
-          className="!w-full !h-[45px] !text-[16px] !font-bold !text-white !bg-[#9069fe]"
-        >
-          {success ? "Buyurtma qo'shildi" : "Buyurtmani qo'shish"}
-        </Button>
-      </div>
+      {/* Telegram tashqarisida (oddiy brauzer testi uchun) HTML tugmasi ko'rinadi.
+          Telegram ichida MainButton ishlatiladi, bu tugma yashiriladi. */}
+      {!isInsideTelegram && (
+        <div className="p-5 text-center mb-5 w-full">
+          <Button
+            onClick={handleSubmit}
+            loading={createOrderBot.isPending}
+            disabled={createOrderBot.isPending}
+            className="!w-full !h-[45px] !text-[16px] !font-bold !text-white !bg-[#9069fe]"
+          >
+            {success ? "Buyurtma qo'shildi" : "Buyurtmani qo'shish"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

@@ -12,6 +12,7 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { CustomerMarketEntity } from 'src/core/entity/customer-market.entity';
 import { OperatorEarningEntity } from 'src/core/entity/operator-earning.entity';
 import { OperatorPaymentEntity } from 'src/core/entity/operator-payment.entity';
+import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { OperatorPaymentEntity } from 'src/core/entity/operator-payment.entity';
       CustomerMarketEntity,
       OperatorEarningEntity,
       OperatorPaymentEntity,
+      CourierRegionEntity,
     ]),
   ],
   controllers: [UsersController],

@@ -28,6 +28,12 @@ export class LdgShipmentEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   order_id: string;
 
+  // Oxirgi jo'natish urinishidagi post ID. Buyurtma qaytarilib qayta
+  // jo'natilganda yangi post bilan keladi — post_id farqi "yangi urinish"
+  // belgisi (qayta dispatch uchun).
+  @Column({ type: 'uuid', nullable: true })
+  post_id: string | null;
+
   // LDG ichki integer ID (POST /orders javobining data.order_id)
   @Column({ type: 'int', nullable: true })
   ldg_order_id: number | null;

@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Printer, Trash2, ArrowLeft, Search, Package, Home, MapPin, Phone, User, Store, Calendar, Send, Loader2, CheckCircle, XCircle, RefreshCw, ChevronDown, Globe, FileText, AlertTriangle, Repeat } from "lucide-react";
+import { Check, Printer, Trash2, ArrowLeft, Search, Package, Home, MapPin, Phone, User, Store, Calendar, Send, Loader2, CheckCircle, XCircle, RefreshCw, ChevronDown, Globe, FileText, AlertTriangle, Repeat, Truck } from "lucide-react";
 
 // Skeleton Loading Component
 const SkeletonCard = () => (
@@ -281,6 +281,7 @@ const MailDetail = () => {
 
   const [isShow, setIsShow] = useState(false);
   const [couriers, setCouriers] = useState<any[]>([]);
+  const [superCouriers, setSuperCouriers] = useState<any[]>([]);
   const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
 
 
@@ -298,6 +299,7 @@ const MailDetail = () => {
       onSuccess: (res) => {
         if (res?.data?.moreThanOneCourier) {
           setCouriers(res?.data?.couriers || []);
+          setSuperCouriers(res?.data?.superCouriers || []);
           setIsShow(true);
         } else {
           const courierId = res?.data?.couriers?.[0]?.id;
@@ -1038,6 +1040,65 @@ const MailDetail = () => {
                   </div>
                 </div>
               ))}
+
+              {superCouriers.length > 0 && (
+                <div className="pt-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-px flex-1 bg-amber-200 dark:bg-amber-800" />
+                    <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                      Tashqi / Super kuryer
+                    </span>
+                    <div className="h-px flex-1 bg-amber-200 dark:bg-amber-800" />
+                  </div>
+                  {superCouriers.map((courier: any) => (
+                    <div
+                      key={courier?.id}
+                      onClick={() => handleSelectedCourier(courier?.id)}
+                      className={`p-3 sm:p-4 rounded-xl border-2 cursor-pointer transition-all mb-2 ${
+                        selectedCourierId === courier?.id
+                          ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20"
+                          : "border-amber-200 dark:border-amber-800/60 hover:border-amber-400"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            selectedCourierId === courier?.id
+                              ? "bg-amber-500"
+                              : "bg-amber-100 dark:bg-amber-900/40"
+                          }`}>
+                            <Truck className={`w-5 h-5 ${
+                              selectedCourierId === courier?.id
+                                ? "text-white"
+                                : "text-amber-600 dark:text-amber-400"
+                            }`} />
+                          </div>
+                          <div>
+                            <h2 className="font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                              {courier?.name}
+                              {courier?.external_provider === "ldg" && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-white">
+                                  LDG
+                                </span>
+                              )}
+                            </h2>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              {courier?.phone_number || "Telefon raqami yo'q"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {selectedCourierId === courier?.id && (
+                          <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <button
                 disabled={isPending}

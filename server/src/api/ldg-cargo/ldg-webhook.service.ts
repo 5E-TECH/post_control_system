@@ -3,16 +3,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { LdgWebhookLogEntity } from 'src/core/entity/ldg-webhook-log.entity';
 import { LdgConfigEntity } from 'src/core/entity/ldg-config.entity';
+import { LdgShipmentEntity } from 'src/core/entity/ldg-shipment.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { LdgShipmentService } from './ldg-shipment.service';
 import {
   LdgPackageEventData,
   LdgWebhookEnvelope,
 } from './dto/ldg-webhook.dto';
-import { mapLdgStatus } from './utils/ldg-status.mapper';
+import { mapLdgStatus, ldgStatusLabel } from './utils/ldg-status.mapper';
 import { verifyLdgSignature } from './utils/ldg-signature.util';
 import { Order_status } from 'src/common/enums';
 import { OrderService } from '../order/order.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 export interface ProcessWebhookArgs {
   rawBody: string;
@@ -43,6 +45,7 @@ export class LdgWebhookService {
     private readonly shipmentService: LdgShipmentService,
     @Inject(forwardRef(() => OrderService))
     private readonly orderService: OrderService,
+    private readonly activityLog: ActivityLogService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -161,6 +164,62 @@ export class LdgWebhookService {
   }
 
   /**
+   * Saqlangan webhook log'ni qayta ishlash (admin paneldan qo'lda qayta urinish).
+   *
+   * Imzo tekshirilmaydi — chunki log birinchi kelganda allaqachon tekshirilgan
+   * va `raw_payload` saqlangan. Bu skip/failed bo'lib qolgan webhook'larni
+   * (masalan, shipment vaqtincha topilmagan yoki terminal oqim xato bergan)
+   * qo'lda qayta ishga tushirish uchun ishlatiladi.
+   */
+  async reprocessFromLog(deliveryId: string): Promise<ProcessWebhookResult> {
+    const log = await this.logRepo.findOne({ where: { delivery_id: deliveryId } });
+    if (!log) {
+      return { http_status: 404, message: 'Webhook log topilmadi' };
+    }
+
+    const envelope = log.raw_payload as unknown as LdgWebhookEnvelope<LdgPackageEventData>;
+    if (!envelope || !envelope.type) {
+      return { http_status: 400, message: 'Saqlangan payload nuqsonli' };
+    }
+
+    const eventType = log.event_type || envelope.type || 'unknown';
+
+    try {
+      let resultStatus: 'success' | 'skipped' = 'skipped';
+      if (eventType === 'webhook.test') {
+        resultStatus = 'success';
+      } else if (
+        eventType.startsWith('package.') ||
+        eventType.startsWith('order.')
+      ) {
+        const handled = await this.handlePackageEvent(envelope);
+        resultStatus = handled ? 'success' : 'skipped';
+      }
+
+      log.status = resultStatus;
+      log.error_message = null;
+      log.processed_at = Date.now();
+      await this.logRepo.save(log);
+
+      return {
+        http_status: 200,
+        message:
+          resultStatus === 'success'
+            ? 'Qayta ishlandi (success)'
+            : 'Qayta ishlandi, lekin amal bajarilmadi (skipped) — shipment yoki status mosligini tekshiring',
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.status = 'failed';
+      log.error_message = msg;
+      log.processed_at = Date.now();
+      await this.logRepo.save(log);
+      this.logger.error(`LDG webhook qayta ishlovda xato (${deliveryId}): ${msg}`);
+      return { http_status: 200, message: `Qayta ishlashda xato: ${msg}` };
+    }
+  }
+
+  /**
    * package.* yoki order.* turidagi eventni ishlash:
    *  - shipmentni topish (LDG order_id, tracking, external_order_id bo'yicha)
    *  - status mapping
@@ -173,7 +232,10 @@ export class LdgWebhookService {
     envelope: LdgWebhookEnvelope<LdgPackageEventData>,
   ): Promise<boolean> {
     const data = envelope.data ?? {};
-    const ldgOrderId = data.order_id ?? data.package_id ?? undefined;
+    // LDG paket ID'sini har xil nomlar bilan yuborishi mumkin: order_id (POST javobi),
+    // id (REST GET), yoki package_id. Birinchi mavjudini olamiz.
+    const ldgOrderId =
+      data.order_id ?? data.id ?? data.package_id ?? undefined;
     const tracking = data.tracking_number;
     const externalId = data.external_order_id;
 
@@ -196,30 +258,77 @@ export class LdgWebhookService {
       return false;
     }
 
-    const mapping = mapLdgStatus(newStatusCode);
-    if (!mapping) {
-      this.logger.warn(`LDG webhook: noma'lum status code=${newStatusCode}`);
-      return false;
-    }
-
-    // Shipmentning oxirgi ko'rilgan statusini yangilaymiz
     const changedAt = data.changed_at ? new Date(data.changed_at) : new Date();
-    await this.shipmentService.updateShipmentStatus(
+    const result = await this.applyStatusFromCode(
       shipment,
       newStatusCode,
       changedAt,
     );
+    return result !== 'unknown_status';
+  }
+
+  /**
+   * LDG status code'ni shipment va order'ga qo'llaydigan YAGONA markaz.
+   *
+   * Ham webhook (push), ham reconcile poller (pull) shu metodni chaqiradi —
+   * shuning uchun status o'tkazish mantiqi bitta joyda, izchil bo'ladi.
+   *
+   * Qaytadi:
+   *   - 'applied'        — status o'zgardi va qo'llandi
+   *   - 'unchanged'      — LDG status avvalgidek (qayta yozish shart emas)
+   *   - 'unknown_status' — mapper taniydigan kod emas (status o'zgartirilmaydi)
+   */
+  async applyStatusFromCode(
+    shipment: LdgShipmentEntity,
+    statusCode: string,
+    changedAt: Date,
+  ): Promise<'applied' | 'unchanged' | 'unknown_status'> {
+    // LDG "Filialda" statusining code'i raqamli ("8") — JSON'da string yoki number
+    // bo'lib kelishi mumkin, shuning uchun stringga keltiramiz (crash oldini olish).
+    const code = String(statusCode);
+
+    const mapping = mapLdgStatus(code);
+    if (!mapping) {
+      this.logger.warn(`LDG status mapping: noma'lum kod=${code}`);
+      return 'unknown_status';
+    }
+
+    // Idempotentlik: LDG status o'zgarmagan bo'lsa, qayta ishlamaymiz.
+    const normalizedNew = code.trim().toUpperCase();
+    const normalizedOld = (shipment.ldg_status ?? '').trim().toUpperCase();
+    if (normalizedNew === normalizedOld) {
+      return 'unchanged';
+    }
+
+    // Shipmentning oxirgi ko'rilgan statusini yangilaymiz
+    await this.shipmentService.updateShipmentStatus(shipment, code, changedAt);
+
+    const config = await this.configRepo.findOne({ where: {} });
+
+    // Har bir LDG status o'zgarishini order tarixiga (Tarix/tracking) yozamiz —
+    // oraliq statuslar (Tranzit, Yetkazilmoqda, Filialda) ham ko'rinadi.
+    // Terminal statuslar uchun sell/cancel oqimlari o'z biznes log'ini alohida yozadi.
+    this.activityLog.log({
+      entity_type: 'order',
+      entity_id: shipment.order_id,
+      action: 'status_change',
+      new_value: { status: mapping.order_status, ldg_status: code },
+      description: `LDG: ${ldgStatusLabel(code)}`,
+      user: config?.ldg_courier_user_id
+        ? { id: config.ldg_courier_user_id }
+        : null,
+      metadata: { source: 'ldg', ldg_status: code },
+    });
 
     // Terminal statuslar uchun maxsus oqimlar (kassa, status flow)
     if (mapping.terminal_action) {
-      const config = await this.configRepo.findOne({ where: {} });
       if (!config?.ldg_courier_user_id) {
         this.logger.warn(
-          `LDG webhook: ldg_courier_user_id sozlanmagan, terminal oqim o'tkazib yuborildi (order=${shipment.order_id})`,
+          `LDG status: ldg_courier_user_id sozlanmagan, terminal oqim o'tkazib yuborildi (order=${shipment.order_id})`,
         );
         // Hech bo'lmaganda statusni qo'yib qo'yamiz
         await this.applyOrderStatus(shipment.order_id, mapping.order_status);
-        return true;
+        return 'applied';
       }
 
       try {
@@ -242,17 +351,16 @@ export class LdgWebhookService {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.error(
-          `LDG webhook '${mapping.terminal_action}' oqimi muvaffaqiyatsiz (order=${shipment.order_id}): ${msg}`,
+          `LDG '${mapping.terminal_action}' oqimi muvaffaqiyatsiz (order=${shipment.order_id}): ${msg}`,
         );
-        // Asosiy oqimni buzmaymiz — webhook 200 qaytaradi va log saqlanadi.
-        // Operator keyinchalik qo'lda tuzatishi mumkin.
+        // Asosiy oqimni buzmaymiz — log saqlanadi, operator qo'lda tuzatishi mumkin.
       }
-      return true;
+      return 'applied';
     }
 
     // Oraliq statuslar (NEW, RECEIVED, IN_TRANSIT, OUT_FOR_DELIVERY) — faqat status yangilash
     await this.applyOrderStatus(shipment.order_id, mapping.order_status);
-    return true;
+    return 'applied';
   }
 
   private async applyOrderStatus(

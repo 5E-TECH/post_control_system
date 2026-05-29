@@ -5,6 +5,7 @@ interface IState {
   user: any;
   default_tariff: string | null;
   marketData: any;
+  isTelegramSession: boolean;
 }
 
 const initialState: IState = {
@@ -14,6 +15,7 @@ const initialState: IState = {
   marketData: localStorage.getItem("marketData")
     ? JSON.parse(localStorage.getItem("marketData")!)
     : null,
+  isTelegramSession: localStorage.getItem("is-telegram-session") === "true",
 };
 
 export const authSlice = createSlice({
@@ -31,8 +33,10 @@ export const authSlice = createSlice({
     },
     removeToken: (state) => {
       state.token = null;
+      state.isTelegramSession = false;
       localStorage.removeItem("x-auth-token");
       localStorage.removeItem("refresh_token_expires_at");
+      localStorage.removeItem("is-telegram-session");
     },
     setUser: (state, action: PayloadAction<any>) => {
       state.user = action.payload;
@@ -45,9 +49,23 @@ export const authSlice = createSlice({
       localStorage.setItem("marketData", JSON.stringify(action.payload));
       state.marketData = action.payload;
     },
+    setTelegramSession: (state, action: PayloadAction<boolean>) => {
+      state.isTelegramSession = action.payload;
+      if (action.payload) {
+        localStorage.setItem("is-telegram-session", "true");
+      } else {
+        localStorage.removeItem("is-telegram-session");
+      }
+    },
   },
 });
 
-export const { setToken, removeToken, setUser, setTarif, setUserData } =
-  authSlice.actions;
+export const {
+  setToken,
+  removeToken,
+  setUser,
+  setTarif,
+  setUserData,
+  setTelegramSession,
+} = authSlice.actions;
 export default authSlice.reducer;
