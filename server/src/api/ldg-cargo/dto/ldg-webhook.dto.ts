@@ -38,8 +38,10 @@ export interface LdgWebhookEnvelope<TData = Record<string, unknown>> {
  * yuborishi mumkin. Biz qaysisi mavjud bo'lsa, shuni ishlatamiz.
  */
 export interface LdgPackageEventData {
-  // LDG ichki order ID — POST /orders javobidan olingan order_id bilan bir xil
+  // LDG ichki order ID — POST /orders javobida `order_id`, REST GET javobida `id`.
+  // LDG webhook'i ikkalasidan birini yuborishi mumkin, shuning uchun ikkalasi ham bor.
   order_id?: number;
+  id?: number;
   package_id?: number;
   external_order_id?: string;
   tracking_number?: string;

@@ -14,6 +14,9 @@ import Suspensee from "../../shared/ui/Suspensee";
 const Auth = () => {
   const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.authSlice.token);
+  const isTelegramSession = useSelector(
+    (state: RootState) => state.authSlice.isTelegramSession
+  );
   const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
 
@@ -82,12 +85,11 @@ const Auth = () => {
       </div>
     );
 
-  // E'TIBOR: market/operator uchun avval `authtelegram` ga avtomatik redirect bor edi.
-  // Bu noto'g'ri edi — chunki browser/telefon orqali kirganda ham ularni majburan
-  // buyurtma yaratish sahifasiga olib borardi. `authtelegram` faqat Telegram WebApp
-  // ichida ochilishi kerak — bu allaqachon `/admin/bot` → telegram-bot komponenti
-  // orqali boshqariladi (initData tekshiriladi). Bu yerda hech kim majburan
-  // yo'naltirilmaydi — markets va operators ham hammasiday platformaga kiradi.
+  // Telegram WebApp session: foydalanuvchi faqat buyurtma yaratish sahifasini
+  // ko'rishi mumkin. URL'ni qo'lda o'zgartirib boshqa sahifalarga kirib bo'lmaydi.
+  if (valid && isTelegramSession) {
+    return <Navigate replace to={buildAdminPath("authtelegram")} />;
+  }
 
   return valid ? (
     <Outlet />

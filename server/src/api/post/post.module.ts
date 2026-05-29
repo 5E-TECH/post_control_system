@@ -5,11 +5,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PostEntity } from 'src/core/entity/post.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { LdgCargoModule } from '../ldg-cargo/ldg-cargo.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PostEntity, OrderEntity, UserEntity]),
+    TypeOrmModule.forFeature([
+      PostEntity,
+      OrderEntity,
+      UserEntity,
+      CourierRegionEntity,
+    ]),
     LdgCargoModule,
   ],
   controllers: [PostController],

@@ -6,9 +6,11 @@ import { Order_status, Post_status } from 'src/common/enums';
  * LDG GET /statuses dan kelgan statuslar:
  *   created (id:8), NEW (id:1), RECEIVED (id:2), IN_TRANSIT (id:3),
  *   OUT_FOR_DELIVERY (id:4), DELIVERED (id:5, terminal),
- *   RETURNED (id:6, terminal), CANCELLED (id:7, terminal)
+ *   RETURNED (id:6, terminal), CANCELLED (id:7, terminal),
+ *   "8" (id:9, "Filialda" — paket LDG filialida, oraliq holat)
  *
  * E'tibor: LDG `created` ni kichik harf bilan, qolganlarini UPPERCASE bilan yuboradi.
+ * "Filialda" statusining CODE'i raqamli string ("8") — id (9) bilan adashtirmang.
  * Shuning uchun normalizatsiya qilamiz.
  *
  * Status mantiqi (biz ↔ LDG):
@@ -81,6 +83,14 @@ const MAPPING: Record<string, LdgStatusMapping> = {
     is_terminal: false,
     terminal_action: null,
   },
+  // LDG "Filialda" (paket LDG filialiga yetdi) — CODE raqamli string "8".
+  // Boshqa oraliq statuslar kabi bizda WAITING bo'lib turadi.
+  '8': {
+    order_status: Order_status.WAITING,
+    post_status: Post_status.SENT,
+    is_terminal: false,
+    terminal_action: null,
+  },
   DELIVERED: {
     order_status: Order_status.SOLD,
     post_status: null,
@@ -108,4 +118,22 @@ const MAPPING: Record<string, LdgStatusMapping> = {
 export function mapLdgStatus(ldgStatusCode: string): LdgStatusMapping | null {
   const code = normalizeLdgStatusCode(ldgStatusCode);
   return MAPPING[code] ?? null;
+}
+
+/** LDG status code -> o'qishga qulay o'zbekcha nom (order tarixi uchun). */
+const LDG_STATUS_LABELS: Record<string, string> = {
+  CREATED: 'Yaratildi',
+  NEW: 'Yangi',
+  RECEIVED: 'Qabul qilindi',
+  '8': 'Filialda',
+  IN_TRANSIT: 'Tranzit',
+  OUT_FOR_DELIVERY: 'Yetkazilmoqda',
+  DELIVERED: 'Yetkazildi',
+  RETURNED: 'Qaytarildi',
+  CANCELLED: 'Bekor qilindi',
+};
+
+export function ldgStatusLabel(ldgStatusCode: string): string {
+  const code = normalizeLdgStatusCode(ldgStatusCode);
+  return LDG_STATUS_LABELS[code] ?? ldgStatusCode;
 }

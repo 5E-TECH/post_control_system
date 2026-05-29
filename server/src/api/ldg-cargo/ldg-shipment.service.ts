@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { LdgShipmentEntity } from 'src/core/entity/ldg-shipment.entity';
 import { LdgConfigEntity } from 'src/core/entity/ldg-config.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
@@ -61,8 +61,11 @@ export class LdgShipmentService {
    * Order uchun LDG ga shipment yaratadi (POST /orders).
    * Shu vaqtda LdgShipmentEntity ham yaratiladi/yangilanadi.
    *
-   * Idempotent: agar shipment allaqachon mavjud bo'lsa va ldg_order_id bor bo'lsa,
-   * qayta yuborilmaydi (return existing).
+   * Idempotentlik post bo'yicha: agar shipment allaqachon shu POST uchun
+   * muvaffaqiyatli yuborilgan bo'lsa (ldg_order_id bor va post_id bir xil),
+   * qayta yuborilmaydi. Lekin buyurtma qaytarilib YANGI post bilan qayta
+   * jo'natilsa (post_id farq qiladi), bu yangi urinish — LDG'ga qaytadan
+   * dispatch qilamiz (yangi idempotency-key bilan).
    */
   async createShipmentForOrder(orderId: string): Promise<LdgShipmentEntity> {
     const order = await this.orderRepo.findOne({
@@ -77,14 +80,34 @@ export class LdgShipmentService {
       where: { order_id: orderId },
     });
 
-    // Agar allaqachon LDG ga muvaffaqiyatli yuborilgan bo'lsa, qaytaramiz
-    if (shipment?.ldg_order_id) {
+    // Bir xil post uchun allaqachon yuborilgan bo'lsa — idempotent (qaytaramiz).
+    // (post_id null bo'lgan eski yozuvlar uchun ham eski xatti-harakat saqlanadi.)
+    if (
+      shipment?.ldg_order_id &&
+      shipment.post_id &&
+      order.post_id &&
+      shipment.post_id === order.post_id
+    ) {
+      return shipment;
+    }
+    // Eski yozuv (post_id yo'q) bo'lsa-yu, lekin order ham post_id'siz bo'lsa —
+    // avvalgi idempotent xatti-harakat (takror dispatch'ni bloklash).
+    if (shipment?.ldg_order_id && !shipment.post_id && !order.post_id) {
       return shipment;
     }
 
     if (!shipment) {
       shipment = this.shipmentRepo.create({ order_id: orderId });
     }
+
+    // Qayta dispatch (yangi urinish) — eski LDG ma'lumotini tozalaymiz, aks holda
+    // jo'natish muvaffaqiyatsiz bo'lsa stale ldg_order_id qolib, reconcile uni
+    // noto'g'ri ishlatishi mumkin.
+    shipment.post_id = order.post_id ?? null;
+    shipment.ldg_order_id = null;
+    shipment.tracking_number = null;
+    shipment.ldg_status = null;
+    shipment.ldg_status_changed_at = null;
 
     const config = await this.configRepo.findOne({ where: {} });
     if (!config) {
@@ -94,13 +117,18 @@ export class LdgShipmentService {
     const body = await this.buildCreateOrderBody(order, config);
 
     try {
-      const response = await this.api.createOrder(body, order.id);
+      // Idempotency-key urinishga xos: order + post. Qayta topshirish (yangi post)
+      // LDG'da yangi buyurtma yaratadi; bir xil urinish takrori esa idempotent.
+      const idempotencyKey = order.post_id
+        ? `${order.id}:${order.post_id}`
+        : order.id;
+      const response = await this.api.createOrder(body, idempotencyKey);
       this.applyLdgResponse(shipment, response);
       shipment.last_error = null;
       shipment.send_attempts = (shipment.send_attempts ?? 0) + 1;
       await this.shipmentRepo.save(shipment);
       this.logger.log(
-        `LDG shipment yaratildi: order=${order.id} ldg_order_id=${response.order_id} tracking=${response.tracking_number}`,
+        `LDG shipment yaratildi: order=${order.id} post=${order.post_id} ldg_order_id=${response.order_id} tracking=${response.tracking_number}`,
       );
       return shipment;
     } catch (err) {
@@ -113,6 +141,34 @@ export class LdgShipmentService {
       );
       throw err;
     }
+  }
+
+  /**
+   * Buyurtma qaytarilib qayta jo'natish pipeline'iga kirganda eski LDG
+   * shipment ma'lumotini tozalaydi (ldg_order_id, tracking, status). Shu orqali:
+   *  - reconcile poller ESKI (qaytarilgan) LDG buyurtmasini kuzatib, order
+   *    statusini noto'g'ri o'zgartirib yubormaydi;
+   *  - keyingi dispatch toza holatdan yangi LDG buyurtmasi yaratadi.
+   *
+   * Tranzaksiya ichidan chaqirilsa `manager` beriladi.
+   */
+  async resetForRedelivery(
+    orderId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const repo = manager
+      ? manager.getRepository(LdgShipmentEntity)
+      : this.shipmentRepo;
+    await repo.update(
+      { order_id: orderId },
+      {
+        ldg_order_id: null,
+        tracking_number: null,
+        ldg_status: null,
+        ldg_status_changed_at: null,
+        last_error: null,
+      },
+    );
   }
 
   /**

@@ -1,7 +1,11 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { useLoginTelegran } from "./service/useTelelgram";
 import { useDispatch } from "react-redux";
-import { removeToken, setToken } from "../../shared/lib/features/login/authSlice";
+import {
+  removeToken,
+  setToken,
+  setTelegramSession,
+} from "../../shared/lib/features/login/authSlice";
 import { useNavigate } from "react-router-dom";
 import Suspensee from "../../shared/ui/Suspensee";
 import { buildAdminPath } from "../../shared/const";
@@ -68,6 +72,7 @@ const TelegramBot = () => {
               return;
             }
             dispatch(setToken({ access_token: accessToken }));
+            dispatch(setTelegramSession(true));
             setState({ status: "ready" });
             navigate(buildAdminPath("authtelegram"), { replace: true });
           },
@@ -125,6 +130,7 @@ const TelegramBot = () => {
             return;
           }
           dispatch(setToken(res.data.data));
+          dispatch(setTelegramSession(true));
           if (res?.data?.data?.refresh_token_expires_at) {
             localStorage.setItem(
               "refresh_token_expires_at",

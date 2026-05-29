@@ -96,8 +96,10 @@ export class LdgConfigService {
         );
       }
 
-      // Asosiy bog'lash
+      // Asosiy bog'lash — LDG vakili super kuryer: barcha viloyatlarga xizmat qiladi
       target.external_provider = 'ldg';
+      target.is_super_courier = true;
+      target.serves_all_regions = true;
       await queryRunner.manager.save(target);
 
       // Kassasi yo'q bo'lsa yaratamiz
@@ -175,6 +177,9 @@ export class LdgConfigService {
         role: Roles.COURIER,
         status: Status.ACTIVE,
         external_provider: 'ldg',
+        // LDG vakili super kuryer: istalgan viloyat buyurtmasini ola oladi
+        is_super_courier: true,
+        serves_all_regions: true,
         tariff_home: args.tariff_home,
         tariff_center: args.tariff_center,
       };
