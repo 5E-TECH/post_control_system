@@ -53,8 +53,17 @@ const WaitingOrders = () => {
   const { getCourierOrders, sellOrder, cancelOrder, partlySellOrder } =
     useOrder();
   const search = useSelector((state: RootState) => state.setUserFilter.search);
+  const districtId = useSelector(
+    (state: RootState) => state.setUserFilter.district_id,
+  );
+  const marketId = useSelector(
+    (state: RootState) => state.setUserFilter.marketId,
+  );
+  const whereDeliver = useSelector(
+    (state: RootState) => state.setUserFilter.where_deliver,
+  );
   const { from, to } = useSelector(
-    (state: RootState) => state.dateFilterReducer
+    (state: RootState) => state.dateFilterReducer,
   );
   const { data, isLoading } = getCourierOrders({
     status: "waiting",
@@ -63,6 +72,9 @@ const WaitingOrders = () => {
     limit,
     startDate: from,
     endDate: to,
+    district_id: districtId,
+    marketId,
+    where_deliver: whereDeliver,
   });
   const total = data?.data?.total || 0;
   const orders = data?.data?.data || [];
@@ -88,10 +100,10 @@ const WaitingOrders = () => {
   };
 
   useEffect(() => {
-    if (search) {
+    if (search || districtId || marketId || whereDeliver) {
       setParam("page", 1);
     }
-  }, [search]);
+  }, [search, districtId, marketId, whereDeliver]);
 
   const onFinish: FormProps<FieldType>["onFinish"] = (values) => {
     const item = order.current;
@@ -128,7 +140,7 @@ const WaitingOrders = () => {
             onError: (err: any) => {
               handleApiError(err, "Buyurtma qisman sotilishda xatolik");
             },
-          }
+          },
         );
       } else {
         // extraCost ni qo'lda qo'shish (Form.Item ichida emas)
@@ -145,7 +157,7 @@ const WaitingOrders = () => {
             },
             onError: (err: any) =>
               handleApiError(err, "Buyurtmani sotishda xatolik"),
-          }
+          },
         );
       }
     } else {
@@ -173,7 +185,7 @@ const WaitingOrders = () => {
             },
             onError: (err: any) =>
               handleApiError(err, "Buyurtmani qisman bekor qilishda xatolik"),
-          }
+          },
         );
       } else {
         // extraCost ni qo'lda qo'shish (Form.Item ichida emas)
@@ -190,7 +202,7 @@ const WaitingOrders = () => {
             },
             onError: (err: any) =>
               handleApiError(err, "Buyurtmani bekor qilishda xatolik"),
-          }
+          },
         );
       }
     }
@@ -198,7 +210,7 @@ const WaitingOrders = () => {
 
   const handleSellOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    item: any
+    item: any,
   ) => {
     e.stopPropagation();
     order.current = item;
@@ -211,7 +223,7 @@ const WaitingOrders = () => {
 
   const handleCancelOrder = (
     e: MouseEvent<HTMLButtonElement | HTMLElement>,
-    item: any
+    item: any,
   ) => {
     e.stopPropagation();
     order.current = item;
@@ -277,7 +289,7 @@ const WaitingOrders = () => {
           return { ...item, quantity: item.quantity + 1 };
         }
         return item;
-      })
+      }),
     );
   };
 
@@ -372,7 +384,9 @@ const WaitingOrders = () => {
               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                 <span className="truncate max-w-[100px]">
-                  {item?.district?.name || item?.customer?.district?.name || "-"}
+                  {item?.district?.name ||
+                    item?.customer?.district?.name ||
+                    "-"}
                 </span>
               </div>
               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
@@ -434,7 +448,7 @@ const WaitingOrders = () => {
       {/* Desktop Table View */}
       <div className="hidden lg:block bg-white dark:bg-[#2A263D] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
         <table className="w-full table-fixed">
-          <thead>
+          <thead className="sticky top-0 z-20">
             <tr className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">
               <th className="px-3 py-3 text-left text-sm font-semibold w-[50px]">
                 #
@@ -495,13 +509,13 @@ const WaitingOrders = () => {
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">
                   <span className="truncate block">
-                    {item?.district?.name || item?.customer?.district?.name || "-"}
+                    {item?.district?.name ||
+                      item?.customer?.district?.name ||
+                      "-"}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">
-                  <span className="truncate block">
-                    {item?.market?.name}
-                  </span>
+                  <span className="truncate block">{item?.market?.name}</span>
                 </td>
                 <td className="px-3 py-3">
                   <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
@@ -592,14 +606,21 @@ const WaitingOrders = () => {
                   </h3>
                   <div className="flex items-center gap-1 text-white/80 text-sm">
                     <Phone className="w-3.5 h-3.5" />
-                    <span>{formatPhone(order.current?.customer?.phone_number) || "—"}</span>
+                    <span>
+                      {formatPhone(order.current?.customer?.phone_number) ||
+                        "—"}
+                    </span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/20">
                 <div className="flex items-center gap-1 text-white/80 text-sm">
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>{order.current?.district?.name || order.current?.customer?.district?.name || "—"}</span>
+                  <span>
+                    {order.current?.district?.name ||
+                      order.current?.customer?.district?.name ||
+                      "—"}
+                  </span>
                 </div>
                 <div className="text-right">
                   <p className="text-white/70 text-xs">Jami summa</p>
@@ -693,7 +714,7 @@ const WaitingOrders = () => {
                             item.quantity <= 0 ||
                             orderItemInfo.reduce(
                               (sum, i) => sum + i.quantity,
-                              0
+                              0,
                             ) <= 1
                           }
                           className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
@@ -706,7 +727,9 @@ const WaitingOrders = () => {
                         <button
                           type="button"
                           onClick={() => handlePlus(index)}
-                          disabled={item.quantity >= (item.maxQuantity ?? Infinity)}
+                          disabled={
+                            item.quantity >= (item.maxQuantity ?? Infinity)
+                          }
                           className="w-9 h-9 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center disabled:opacity-30 active:scale-95 transition-transform"
                         >
                           <Plus className="w-4 h-4" />
@@ -728,7 +751,7 @@ const WaitingOrders = () => {
                       onChange={(e) => {
                         const raw = e.target.value.replace(/\D/g, "");
                         const formatted = new Intl.NumberFormat("uz-UZ").format(
-                          Number(raw || 0)
+                          Number(raw || 0),
                         );
                         setTotalPrice(formatted);
                       }}
@@ -753,11 +776,14 @@ const WaitingOrders = () => {
                 // Uyga yetkazish + sotish = ortiqcha xarajat yozish mumkin emas
                 if (!isCenter && isSell) return null;
 
-                const courierCenterTariff = currentOrder?.courier_tariff != null && isCenter
-                  ? currentOrder.courier_tariff
-                  : (profile?.tariff_center ?? 0);
+                const courierCenterTariff =
+                  currentOrder?.courier_tariff != null && isCenter
+                    ? currentOrder.courier_tariff
+                    : (profile?.tariff_center ?? 0);
                 const courierHomeTariff = profile?.tariff_home ?? 0;
-                const courierTariff = isCenter ? courierCenterTariff : courierHomeTariff;
+                const courierTariff = isCenter
+                  ? courierCenterTariff
+                  : courierHomeTariff;
 
                 // Sotishda (faqat markaz): max = uyTarif - markazTarif.
                 // Agar uy va markaz tarifi teng bo'lsa (farq = 0),
@@ -772,7 +798,8 @@ const WaitingOrders = () => {
                 const parsedExtra = extraCostValue
                   ? Number(extraCostValue.replace(/[^\d]/g, ""))
                   : 0;
-                const isOverLimit = parsedExtra > maxExtraCost && maxExtraCost > 0;
+                const isOverLimit =
+                  parsedExtra > maxExtraCost && maxExtraCost > 0;
 
                 return (
                   <div className="mb-4">
@@ -790,9 +817,14 @@ const WaitingOrders = () => {
                         value={extraCostValue}
                         onChange={(e) => {
                           const raw = e.target.value.replace(/\D/g, "");
-                          const formatted = raw ? new Intl.NumberFormat("uz-UZ").format(Number(raw)) : "";
+                          const formatted = raw
+                            ? new Intl.NumberFormat("uz-UZ").format(Number(raw))
+                            : "";
                           setExtraCostValue(formatted);
-                          form.setFieldValue("extraCost", raw ? Number(raw) : undefined);
+                          form.setFieldValue(
+                            "extraCost",
+                            raw ? Number(raw) : undefined,
+                          );
                         }}
                         className={`w-full h-14 px-4 pr-16 rounded-xl text-lg font-semibold bg-white dark:bg-[#312D4B] border text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent ${
                           isOverLimit
@@ -805,11 +837,13 @@ const WaitingOrders = () => {
                       </span>
                     </div>
                     {maxExtraCost > 0 && (
-                      <div className={`mt-2 flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${
-                        isOverLimit
-                          ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                          : "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
-                      }`}>
+                      <div
+                        className={`mt-2 flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${
+                          isOverLimit
+                            ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                            : "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
                         <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                         <span>
                           {isOverLimit
@@ -826,12 +860,24 @@ const WaitingOrders = () => {
               <div className="mb-2">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    <svg
+                      className="w-4 h-4 text-purple-600 dark:text-purple-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                      />
                     </svg>
                   </div>
                   Izoh
-                  <span className="text-xs text-gray-400 font-normal">(ixtiyoriy)</span>
+                  <span className="text-xs text-gray-400 font-normal">
+                    (ixtiyoriy)
+                  </span>
                 </label>
                 <Form.Item name="comment" className="mb-0">
                   <Input.TextArea
@@ -858,20 +904,20 @@ const WaitingOrders = () => {
               } ${getIsPending() ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {getIsPending() ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : urlType.current === "sell" ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5" />
-                    Sotish
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="w-5 h-5" />
-                    Bekor qilish
-                  </>
-                )}
-              </button>
-            </div>
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : urlType.current === "sell" ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5" />
+                  Sotish
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5" />
+                  Bekor qilish
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </Popup>
     </div>

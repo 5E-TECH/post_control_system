@@ -50,8 +50,16 @@ export const useOrder = () => {
     api.get(`order/by-token/courier/${token}`).then((res) => res.data);
 
   const rollbackOrder = useMutation({
-    mutationFn: ({ id, target_status }: { id: string; target_status: string }) =>
-      api.post(`order/rollback/${id}`, { target_status }).then((res) => res.data),
+    mutationFn: ({
+      id,
+      target_status,
+    }: {
+      id: string;
+      target_status: string;
+    }) =>
+      api
+        .post(`order/rollback/${id}`, { target_status })
+        .then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
@@ -62,14 +70,14 @@ export const useOrder = () => {
   });
 
   const receiveOrderByScanerById = useMutation({
-    mutationFn: ({ id, data }: { id: string, data: any }) =>
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.post(`order/receive/${id}`, data).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
   const joinPostRefusalProduct = useMutation({
     mutationFn: (data: { order_ids: string[] }) =>
-      api.post('post/cancel', data).then((res) => res.data),
+      api.post("post/cancel", data).then((res) => res.data),
     onSuccess: () => client.invalidateQueries({ queryKey: [order] }),
   });
 
@@ -131,9 +139,18 @@ export const useOrder = () => {
       queryFn: () =>
         api.get("order/courier/orders", { params }).then((res) => {
           const orders = res.data;
-          return orders
+          return orders;
         }),
+    });
 
+  // Kuryer tab sonlari (badge): { waiting, all, cancelled }
+  const getCourierOrderCounts = (enabled = true) =>
+    useQuery({
+      queryKey: [order, "courier-counts"],
+      queryFn: () =>
+        api.get("order/courier/orders/counts").then((res) => res.data),
+      enabled,
+      refetchInterval: 30000,
     });
 
   const deleteOrders = useMutation({
@@ -202,6 +219,7 @@ export const useOrder = () => {
     getOrders,
     getOrderByMarket,
     getCourierOrders,
+    getCourierOrderCounts,
     getMarketsByMyNewOrders,
     getMarketNewOrders,
     getOrdersByToken,
@@ -221,7 +239,8 @@ export const useOrder = () => {
     getOrderActivityLog: (orderId: string, enabled: boolean = true) =>
       useQuery({
         queryKey: [order, "activity-log", orderId],
-        queryFn: () => api.get(`activity-log/order/${orderId}`).then((res) => res.data),
+        queryFn: () =>
+          api.get(`activity-log/order/${orderId}`).then((res) => res.data),
         enabled,
       }),
   };

@@ -53,8 +53,17 @@ const CancelledOrders = () => {
 
   const { mutate: cancelPost, isPending } = usePost().canceledPost();
   const search = useSelector((state: RootState) => state.setUserFilter.search);
+  const districtId = useSelector(
+    (state: RootState) => state.setUserFilter.district_id,
+  );
+  const marketId = useSelector(
+    (state: RootState) => state.setUserFilter.marketId,
+  );
+  const whereDeliver = useSelector(
+    (state: RootState) => state.setUserFilter.where_deliver,
+  );
   const { from, to } = useSelector(
-    (state: RootState) => state.dateFilterReducer
+    (state: RootState) => state.dateFilterReducer,
   );
 
   const { data, refetch, isLoading } = getCourierOrders({
@@ -64,15 +73,18 @@ const CancelledOrders = () => {
     limit,
     startDate: from,
     endDate: to,
+    district_id: districtId,
+    marketId,
+    where_deliver: whereDeliver,
   });
   const total = data?.data?.total || 0;
   const orders = data?.data?.data || [];
 
   useEffect(() => {
-    if (search) {
+    if (search || districtId || marketId || whereDeliver) {
       setParam("page", 1);
     }
-  }, [search]);
+  }, [search, districtId, marketId, whereDeliver]);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { handleSuccess, handleApiError } = useApiNotification();
@@ -96,7 +108,7 @@ const CancelledOrders = () => {
       onError: (error: any) =>
         handleApiError(
           error,
-          "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi"
+          "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi",
         ),
     });
   };
@@ -248,7 +260,11 @@ const CancelledOrders = () => {
                     {/* District */}
                     <div className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
                       <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{item?.district?.name || item?.customer?.district?.name || "-"}</span>
+                      <span>
+                        {item?.district?.name ||
+                          item?.customer?.district?.name ||
+                          "-"}
+                      </span>
                     </div>
 
                     {/* Market */}
@@ -273,7 +289,9 @@ const CancelledOrders = () => {
                         <Truck className="w-3 h-3" />
                       )}
                       <span>
-                        {item?.where_deliver === "address" ? "Uyga" : "Markazga"}
+                        {item?.where_deliver === "address"
+                          ? "Uyga"
+                          : "Markazga"}
                       </span>
                     </div>
                   </div>
@@ -300,7 +318,7 @@ const CancelledOrders = () => {
       {/* Desktop Table */}
       <div className="hidden lg:block bg-white dark:bg-[#2A263D] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
         <table className="w-full table-fixed">
-          <thead>
+          <thead className="sticky top-0 z-20">
             <tr className="bg-gradient-to-r from-red-500 to-rose-600 text-white text-sm">
               <th className="py-4 px-3 text-left font-medium w-[4%]">
                 <input
@@ -311,18 +329,30 @@ const CancelledOrders = () => {
                 />
               </th>
               <th className="py-4 px-3 text-left font-medium w-[4%]">#</th>
-              <th className="py-4 px-3 text-left font-medium w-[14%]">{t("mijoz")}</th>
-              <th className="py-4 px-3 text-left font-medium w-[13%]">{t("phone")}</th>
+              <th className="py-4 px-3 text-left font-medium w-[14%]">
+                {t("mijoz")}
+              </th>
+              <th className="py-4 px-3 text-left font-medium w-[13%]">
+                {t("phone")}
+              </th>
               <th className="py-4 px-3 text-left font-medium w-[13%]">
                 {t("detail.address")}
               </th>
-              <th className="py-4 px-3 text-left font-medium w-[12%]">{t("market")}</th>
-              <th className="py-4 px-3 text-left font-medium w-[10%]">{t("status")}</th>
-              <th className="py-4 px-3 text-left font-medium w-[12%]">{t("price")}</th>
+              <th className="py-4 px-3 text-left font-medium w-[12%]">
+                {t("market")}
+              </th>
+              <th className="py-4 px-3 text-left font-medium w-[10%]">
+                {t("status")}
+              </th>
+              <th className="py-4 px-3 text-left font-medium w-[12%]">
+                {t("price")}
+              </th>
               <th className="py-4 px-3 text-left font-medium w-[8%]">
                 {t("delivery")}
               </th>
-              <th className="py-4 px-3 text-left font-medium w-[10%]">{t("sana")}</th>
+              <th className="py-4 px-3 text-left font-medium w-[10%]">
+                {t("sana")}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -369,7 +399,9 @@ const CancelledOrders = () => {
                   </td>
                   <td className="py-3 px-3 text-sm text-gray-600 dark:text-gray-300">
                     <span className="truncate block">
-                      {item?.district?.name || item?.customer?.district?.name || "-"}
+                      {item?.district?.name ||
+                        item?.customer?.district?.name ||
+                        "-"}
                     </span>
                   </td>
                   <td className="py-3 px-3 text-sm text-gray-600 dark:text-gray-300">
@@ -426,29 +458,51 @@ const CancelledOrders = () => {
         />
       </div>
 
-      {/* Send to Post Button */}
-      <div className="pb-4 px-1">
-        <button
-          onClick={() => setOpenPopup(true)}
-          disabled={isPending || selectedIds.length === 0}
-          className={`w-full lg:w-auto lg:min-w-[200px] lg:ml-auto lg:flex h-12 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${
-            isPending || selectedIds.length === 0
-              ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-              : "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25 hover:shadow-xl active:scale-[0.98]"
-          }`}
-        >
-          {isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Yuborilmoqda...
-            </>
-          ) : (
-            <>
-              <Send className="w-4 h-4" />
-              {selectedIds.length} ta buyurtmani pochtaga yuborish
-            </>
-          )}
-        </button>
+      {/* Sticky "pochtaga yuborish" paneli — doim ko'rinib turadi (aylantirilsa ham).
+          Mobilda 2 qator (info + to'liq kenglikdagi tugma), desktopda 1 qator. */}
+      <div className="sticky bottom-0 z-20 mt-2 pb-2 pt-3 bg-gradient-to-t from-white via-white/95 to-transparent dark:from-[#1E1B2E] dark:via-[#1E1B2E]/95">
+        <div className="rounded-xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 shadow-lg px-3 sm:px-4 py-2.5 sm:py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          {/* Tanlangan soni + hammasini tanlash (mobil: yoyilgan, desktop: chapda guruh) */}
+          <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-4">
+            <span className="text-sm text-gray-700 dark:text-gray-200 whitespace-nowrap">
+              <span className="font-bold text-red-600 dark:text-red-400">
+                {selectedIds.length}
+              </span>{" "}
+              ta tanlangan
+            </span>
+            <button
+              onClick={toggleSelectAll}
+              className="text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 whitespace-nowrap"
+            >
+              {selectedIds.length === orders.length
+                ? "Tanlovni bekor qilish"
+                : "Hammasini tanlash"}
+            </button>
+          </div>
+
+          {/* Yuborish — mobilda to'liq kenglik, desktopda o'ng tomonda */}
+          <button
+            onClick={() => setOpenPopup(true)}
+            disabled={isPending || selectedIds.length === 0}
+            className={`w-full sm:w-auto sm:min-w-[200px] h-11 px-5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all flex-shrink-0 ${
+              isPending || selectedIds.length === 0
+                ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                : "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25 hover:shadow-xl active:scale-[0.98]"
+            }`}
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Yuborilmoqda...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Pochtaga yuborish
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Confirm Popup */}
