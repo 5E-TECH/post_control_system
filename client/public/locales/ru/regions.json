@@ -57,5 +57,7 @@
   "revenue": "Выручка",
   "sum": "сум",
   "couriers": "Курьеры",
-  "clickForDetails": "Нажмите для просмотра"
+  "clickForDetails": "Нажмите для просмотра",
+  "unassigned": "Не назначен",
+  "unassignedHint": "Курьер не назначен (новая почта)"
 }

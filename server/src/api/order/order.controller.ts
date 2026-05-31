@@ -242,7 +242,11 @@ export class OrderController {
     @Body() updateOrderAddressDto: UpdateOrderAddressDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.orderService.updateOrderAddress(id, updateOrderAddressDto, user);
+    return this.orderService.updateOrderAddress(
+      id,
+      updateOrderAddressDto,
+      user,
+    );
   }
 
   @ApiOperation({ summary: 'Receive new orders' })
@@ -339,6 +343,9 @@ export class OrderController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
     @Query('fetchAll') fetchAll: string,
+    @Query('district_id') district_id: string,
+    @Query('marketId') marketId: string,
+    @Query('where_deliver') where_deliver: string,
   ) {
     return this.orderService.allCouriersOrders(user, {
       status,
@@ -348,7 +355,19 @@ export class OrderController {
       startDate,
       endDate,
       fetchAll,
+      district_id,
+      marketId,
+      where_deliver,
     });
+  }
+
+  @ApiOperation({ summary: 'Kuryer buyurtmalari tab sonlari (badge)' })
+  @ApiResponse({ status: 200, description: 'waiting / all / cancelled counts' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Get('courier/orders/counts')
+  getCourierOrdersCounts(@CurrentUser() user: JwtPayload) {
+    return this.orderService.allCouriersOrdersCounts(user);
   }
 
   @ApiOperation({ summary: 'Sell order' })

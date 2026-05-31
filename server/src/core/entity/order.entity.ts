@@ -29,6 +29,8 @@ import {
 // Dashboard statistika uchun indexlar
 @Index('IDX_ORDER_SOLD_AT', ['sold_at'])
 @Index('IDX_ORDER_STATUS_SOLD', ['status', 'sold_at'])
+@Index('IDX_ORDER_CANCELLED_AT', ['cancelled_at'])
+@Index('IDX_ORDER_STATUS_CANCELLED', ['status', 'cancelled_at'])
 @Index('IDX_ORDER_USER_CREATED', ['user_id', 'created_at'])
 @Index('IDX_ORDER_USER_SOLD', ['user_id', 'sold_at'])
 @Index('IDX_ORDER_DISTRICT_ID', ['district_id'])
@@ -100,6 +102,16 @@ export class OrderEntity extends BaseEntity {
     transformer: bigintTransformerNullable,
   })
   sold_at: number | null;
+
+  // Buyurtma bekor qilingan vaqt (statistikani harakat sanasi bo'yicha sanash
+  // uchun — xuddi sold_at kabi). Bekor qilinganda yoziladi, qayta sotilsa yoki
+  // kutishga qaytarilsa tozalanadi (null).
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  cancelled_at: number | null;
 
   // Sotilgan paytdagi tariflar (tarix uchun saqlanadi)
   @Column({

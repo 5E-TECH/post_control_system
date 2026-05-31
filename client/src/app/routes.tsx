@@ -131,6 +131,7 @@ const OperatorStats = lazy(
 const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
 const OperatorOrders = lazy(() => import("../pages/operator-orders"));
 const CourierBulk = lazy(() => import("../pages/courier-bulk"));
+const MyRegion = lazy(() => import("../pages/my-region"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -309,6 +310,7 @@ const AppRouters = () => {
               ],
             },
             { path: "cash-box", element: <CashDetailMarketCourier /> },
+            { path: "my-region", element: <MyRegion /> },
             { path: "roles-permissions", element: <RolesPermissions /> },
             {
               path: "profile",

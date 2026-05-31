@@ -799,7 +799,15 @@ export class UserService implements OnModuleInit {
               { ...baseFilter, phone_number: ILike(`%${search}%`) },
             ]
           : baseFilter,
-        select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+        select: [
+          'id',
+          'name',
+          'phone_number',
+          'status',
+          'created_at',
+          'is_super_courier',
+          'serves_all_regions',
+        ],
         relations: ['cashbox', 'region'],
         order: { created_at: 'DESC' },
       });

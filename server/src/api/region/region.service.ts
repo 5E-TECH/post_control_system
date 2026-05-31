@@ -25,6 +25,34 @@ import {
   toUzbekistanTimestamp,
 } from 'src/common/utils/date.util';
 
+// ===== Statistika status guruhlari =====
+// Buyurtmalar 3 ta o'zaro kesishmaydigan guruhga bo'linadi. CREATED va NEW
+// (hali yo'lga chiqmagan/yangi) statistikaga UMUMAN kirmaydi — jamiga ham,
+// foizga ham hisoblanmaydi.
+
+// Yetkazilgan: buyurtma to'lov holatiga qarab SOLD/PAID/PARTLY_PAID bo'lib qoladi
+// (qarz/qisman to'lov) — uchalasi ham muvaffaqiyatli yetkazilgan hisoblanadi.
+const SOLD_STATUSES = [
+  Order_status.SOLD,
+  Order_status.PAID,
+  Order_status.PARTLY_PAID,
+];
+
+// Bekor qilingan: bekor + bekor(jo'natilgan) + yopilgan (CLOSED ham bekor deb hisoblanadi).
+const CANCELLED_STATUSES = [
+  Order_status.CANCELLED,
+  Order_status.CANCELLED_SENT,
+  Order_status.CLOSED,
+];
+
+// Kutilmoqda: qabul qilingan → yo'lda → kutilmoqda oralig'idagi faol holatlar.
+// Joriy holat sifatida hisoblanadi (sanaga bog'liq emas). CREATED/NEW kirmaydi.
+const PENDING_STATUSES = [
+  Order_status.RECEIVED,
+  Order_status.ON_THE_ROAD,
+  Order_status.WAITING,
+];
+
 @Injectable()
 export class RegionService implements OnModuleInit {
   constructor(
@@ -205,7 +233,7 @@ export class RegionService implements OnModuleInit {
       const { startDate: filterStartDate, endDate: filterEndDate } = filter;
 
       // "Barchasi" uchun date filter yo'q
-      const hasDateFilter = filterStartDate && filterEndDate;
+      const hasDateFilter = !!(filterStartDate && filterEndDate);
       let startDate: string | null = null;
       let endDate: string | null = null;
 
@@ -226,116 +254,54 @@ export class RegionService implements OnModuleInit {
           // Viloyat tumanlarini olish
           const districtIds = region.assignedDistricts.map((d) => d.id);
 
-          // Ushbu viloyat kuryerlarini olish
-          const couriers = await this.userRepository.find({
-            where: {
-              region_id: region.id,
-              role: Roles.COURIER,
-              status: Status.ACTIVE,
-              is_deleted: false,
-            },
-            select: ['id', 'name', 'phone_number'],
-          });
-
-          // Viloyat pochtalarini olish
+          // Viloyat pochtalarini olish (kuryer id'lari bilan — kuryer sonini
+          // to'g'ri hisoblash uchun)
           const posts = await this.postRepository.find({
             where: { region_id: region.id },
-            select: ['id'],
+            select: ['id', 'courier_id'],
           });
           const postIds = posts.map((p) => p.id);
 
-          // Buyurtmalar statistikasi
-          let totalOrders = 0;
-          let deliveredOrders = 0;
-          let cancelledOrders = 0;
-          let pendingOrders = 0;
-          let totalRevenue = 0;
+          // Viloyatga biriktirilgan (uy) kuryerlar
+          const homeCouriers = await this.userRepository.find({
+            where: {
+              region_id: region.id,
+              role: Roles.COURIER,
+              is_deleted: false,
+            },
+            select: ['id'],
+          });
 
-          if (postIds.length > 0) {
-            // Jami buyurtmalar
-            const ordersQuery = this.orderRepository
-              .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', { postIds })
-              .andWhere('order.deleted_at IS NULL');
-
-            if (hasDateFilter) {
-              ordersQuery
-                .andWhere('order.created_at >= :startDate', { startDate })
-                .andWhere('order.created_at <= :endDate', { endDate });
-            }
-
-            totalOrders = await ordersQuery.getCount();
-
-            // Yetkazilgan buyurtmalar
-            const deliveredQuery = this.orderRepository
-              .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', { postIds })
-              .andWhere('order.status = :status', { status: Order_status.SOLD })
-              .andWhere('order.deleted_at IS NULL');
-
-            if (hasDateFilter) {
-              deliveredQuery
-                .andWhere('order.created_at >= :startDate', { startDate })
-                .andWhere('order.created_at <= :endDate', { endDate });
-            }
-
-            deliveredOrders = await deliveredQuery.getCount();
-
-            // Bekor qilingan buyurtmalar
-            const cancelledQuery = this.orderRepository
-              .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', { postIds })
-              .andWhere('order.status IN (:...statuses)', {
-                statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
-              })
-              .andWhere('order.deleted_at IS NULL');
-
-            if (hasDateFilter) {
-              cancelledQuery
-                .andWhere('order.created_at >= :startDate', { startDate })
-                .andWhere('order.created_at <= :endDate', { endDate });
-            }
-
-            cancelledOrders = await cancelledQuery.getCount();
-
-            // Kutilayotgan buyurtmalar
-            pendingOrders = totalOrders - deliveredOrders - cancelledOrders;
-
-            // Jami tushum (yetkazilgan buyurtmalardan)
-            const revenueQuery = this.orderRepository
-              .createQueryBuilder('order')
-              .select('SUM(order.total_price)', 'revenue')
-              .where('order.post_id IN (:...postIds)', { postIds })
-              .andWhere('order.status = :status', { status: Order_status.SOLD })
-              .andWhere('order.deleted_at IS NULL');
-
-            if (hasDateFilter) {
-              revenueQuery
-                .andWhere('order.created_at >= :startDate', { startDate })
-                .andWhere('order.created_at <= :endDate', { endDate });
-            }
-
-            const revenueResult = await revenueQuery.getRawOne();
-            totalRevenue = Number(revenueResult?.revenue || 0);
+          // Kuryerlar soni = uy kuryerlari ∪ region postlarida HAQIQATAN ishtirok
+          // etgan boshqa kuryerlar (super/LDG yoki boshqa regiondan biriktirilgan).
+          // Shu orqali super kuryer xizmat qilgan viloyatda ham sanaladi (oldin
+          // faqat region_id bo'yicha sanalib, super/LDG kuryerlar tushib qolardi).
+          const courierIdSet = new Set<string>(homeCouriers.map((c) => c.id));
+          for (const p of posts) {
+            if (p.courier_id) courierIdSet.add(p.courier_id);
           }
+          const couriersCount = courierIdSet.size;
 
-          const successRate =
-            totalOrders > 0
-              ? Math.round((deliveredOrders / totalOrders) * 100)
-              : 0;
+          // Buyurtmalar statistikasi (harakat modeli — sold_at/cancelled_at)
+          const s = await this.getStatsByPostIds(
+            postIds,
+            hasDateFilter,
+            startDate,
+            endDate,
+          );
 
           return {
             id: region.id,
             name: region.name,
             satoCode: region.sato_code,
             districtsCount: region.assignedDistricts.length,
-            couriersCount: couriers.length,
-            totalOrders,
-            deliveredOrders,
-            cancelledOrders,
-            pendingOrders,
-            totalRevenue,
-            successRate,
+            couriersCount,
+            totalOrders: s.totalOrders,
+            deliveredOrders: s.deliveredOrders,
+            cancelledOrders: s.cancelledOrders,
+            pendingOrders: s.pendingOrders,
+            totalRevenue: s.totalRevenue,
+            successRate: s.successRate,
           };
         }),
       );
@@ -364,6 +330,296 @@ export class RegionService implements OnModuleInit {
   }
 
   /**
+   * Berilgan post id'lar to'plami bo'yicha buyurtma statistikasini hisoblaydi.
+   * Kuryer kesimi va "biriktirilmagan" (kuryer yo'q) kesimi uchun ishlatiladi.
+   *
+   * HARAKAT MODELI: davr filtri harakat sanasi bo'yicha qo'llanadi —
+   *   Yetkazilgan/Tushum → sold_at, Bekor → cancelled_at. Shuning uchun bir necha
+   *   kun oldin yaratilgan buyurtma bugun sotilsa/bekor qilinsa, bugungi davrga
+   *   tushadi. Kutilmoqda — joriy holat (sanaga bog'liq emas).
+   *   Jami = Yetkazilgan + Bekor, Foiz = Yetkazilgan / Jami.
+   */
+  private async getStatsByPostIds(
+    postIds: string[],
+    hasDateFilter: boolean,
+    startDate: string | null,
+    endDate: string | null,
+  ): Promise<{
+    totalOrders: number;
+    deliveredOrders: number;
+    cancelledOrders: number;
+    pendingOrders: number;
+    totalRevenue: number;
+    successRate: number;
+  }> {
+    if (postIds.length === 0) {
+      return {
+        totalOrders: 0,
+        deliveredOrders: 0,
+        cancelledOrders: 0,
+        pendingOrders: 0,
+        totalRevenue: 0,
+        successRate: 0,
+      };
+    }
+
+    // dateCol berilsa — o'sha ustun (sold_at / cancelled_at) bo'yicha davr filtri.
+    // null bo'lsa — sanadan qat'i nazar (joriy holat, masalan kutilmoqda).
+    const scoped = (dateCol: 'sold_at' | 'cancelled_at' | null) => {
+      const qb = this.orderRepository
+        .createQueryBuilder('order')
+        .where('order.post_id IN (:...postIds)', { postIds })
+        .andWhere('order.deleted_at IS NULL');
+      if (hasDateFilter && dateCol) {
+        qb.andWhere(`order.${dateCol} >= :startDate`, { startDate }).andWhere(
+          `order.${dateCol} <= :endDate`,
+          { endDate },
+        );
+      }
+      return qb;
+    };
+
+    const deliveredOrders = await scoped('sold_at')
+      .andWhere('order.status IN (:...soldStatuses)', {
+        soldStatuses: SOLD_STATUSES,
+      })
+      .getCount();
+
+    const cancelledOrders = await scoped('cancelled_at')
+      .andWhere('order.status IN (:...cancelledStatuses)', {
+        cancelledStatuses: CANCELLED_STATUSES,
+      })
+      .getCount();
+
+    const revenueResult = await scoped('sold_at')
+      .select('SUM(order.total_price)', 'revenue')
+      .andWhere('order.status IN (:...soldStatuses)', {
+        soldStatuses: SOLD_STATUSES,
+      })
+      .getRawOne();
+    const totalRevenue = Number(revenueResult?.revenue || 0);
+
+    // Kutilmoqda — joriy holat (RECEIVED/ON_THE_ROAD/WAITING), sanaga bog'liq emas
+    const pendingOrders = await scoped(null)
+      .andWhere('order.status IN (:...pendingStatuses)', {
+        pendingStatuses: PENDING_STATUSES,
+      })
+      .getCount();
+
+    const totalOrders = deliveredOrders + cancelledOrders;
+
+    return {
+      totalOrders,
+      deliveredOrders,
+      cancelledOrders,
+      pendingOrders,
+      totalRevenue,
+      successRate:
+        totalOrders > 0 ? Math.round((deliveredOrders / totalOrders) * 100) : 0,
+    };
+  }
+
+  /**
+   * Bitta tuman bo'yicha buyurtma statistikasi (district_id kesimida — region
+   * miqyosida, ya'ni shu tumandagi barcha kuryerlar buyurtmalari). Kuryerning
+   * "Mening viloyatim" tab'i va admin tuman ko'rinishi shu mantiqdan foydalanadi.
+   */
+  private async getStatsByDistrictId(
+    districtId: string,
+    hasDateFilter: boolean,
+    startDate: string | null,
+    endDate: string | null,
+  ): Promise<{
+    totalOrders: number;
+    deliveredOrders: number;
+    cancelledOrders: number;
+    pendingOrders: number;
+    totalRevenue: number;
+    successRate: number;
+  }> {
+    // HARAKAT MODELI (getStatsByPostIds bilan bir xil): yetkazilgan/tushum →
+    // sold_at, bekor → cancelled_at, kutilmoqda → joriy holat.
+    const scoped = (dateCol: 'sold_at' | 'cancelled_at' | null) => {
+      const qb = this.orderRepository
+        .createQueryBuilder('order')
+        .where('order.district_id = :districtId', { districtId })
+        .andWhere('order.deleted_at IS NULL');
+      if (hasDateFilter && dateCol) {
+        qb.andWhere(`order.${dateCol} >= :startDate`, { startDate }).andWhere(
+          `order.${dateCol} <= :endDate`,
+          { endDate },
+        );
+      }
+      return qb;
+    };
+
+    const deliveredOrders = await scoped('sold_at')
+      .andWhere('order.status IN (:...soldStatuses)', {
+        soldStatuses: SOLD_STATUSES,
+      })
+      .getCount();
+
+    const cancelledOrders = await scoped('cancelled_at')
+      .andWhere('order.status IN (:...cancelledStatuses)', {
+        cancelledStatuses: CANCELLED_STATUSES,
+      })
+      .getCount();
+
+    const revenueResult = await scoped('sold_at')
+      .select('SUM(order.total_price)', 'revenue')
+      .andWhere('order.status IN (:...soldStatuses)', {
+        soldStatuses: SOLD_STATUSES,
+      })
+      .getRawOne();
+    const totalRevenue = Number(revenueResult?.revenue || 0);
+
+    const pendingOrders = await scoped(null)
+      .andWhere('order.status IN (:...pendingStatuses)', {
+        pendingStatuses: PENDING_STATUSES,
+      })
+      .getCount();
+
+    const totalOrders = deliveredOrders + cancelledOrders;
+
+    return {
+      totalOrders,
+      deliveredOrders,
+      cancelledOrders,
+      pendingOrders,
+      totalRevenue,
+      successRate:
+        totalOrders > 0 ? Math.round((deliveredOrders / totalOrders) * 100) : 0,
+    };
+  }
+
+  /**
+   * Kuryer o'z viloyati tumanlari statistikasi ("Mening viloyatim" tab'i).
+   * Kuryerning region_id'si bo'yicha shu viloyat tumanlarini va har biriga
+   * tegishli statistikani qaytaradi (region miqyosida, district_id kesimida).
+   */
+  async getCourierOwnRegionDistrictStats(
+    userId: string,
+    filter: { startDate?: string; endDate?: string },
+  ) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+        select: ['id', 'name', 'region_id'],
+      });
+      if (!user) {
+        throw new NotFoundException('Foydalanuvchi topilmadi');
+      }
+      if (!user.region_id) {
+        return successRes(
+          { region: null, summary: null, districts: [] },
+          200,
+          'Foydalanuvchiga viloyat biriktirilmagan',
+        );
+      }
+
+      const region = await this.regionRepository.findOne({
+        where: { id: user.region_id },
+        relations: ['assignedDistricts'],
+      });
+      if (!region) {
+        return successRes(
+          { region: null, summary: null, districts: [] },
+          200,
+          'Viloyat topilmadi',
+        );
+      }
+
+      const { startDate: filterStartDate, endDate: filterEndDate } = filter;
+      const hasDateFilter = !!(filterStartDate && filterEndDate);
+      const startDate = hasDateFilter
+        ? String(toUzbekistanTimestamp(filterStartDate!, false))
+        : null;
+      const endDate = hasDateFilter
+        ? String(toUzbekistanTimestamp(filterEndDate!, true))
+        : null;
+
+      const districts = await Promise.all(
+        region.assignedDistricts.map(async (d) => {
+          const s = await this.getStatsByDistrictId(
+            d.id,
+            hasDateFilter,
+            startDate,
+            endDate,
+          );
+          return { id: d.id, name: d.name, satoCode: d.sato_code, ...s };
+        }),
+      );
+      districts.sort((a, b) => b.totalOrders - a.totalOrders);
+
+      const summary = districts.reduce(
+        (acc, d) => {
+          acc.totalOrders += d.totalOrders;
+          acc.deliveredOrders += d.deliveredOrders;
+          acc.cancelledOrders += d.cancelledOrders;
+          acc.pendingOrders += d.pendingOrders;
+          acc.totalRevenue += d.totalRevenue;
+          return acc;
+        },
+        {
+          totalOrders: 0,
+          deliveredOrders: 0,
+          cancelledOrders: 0,
+          pendingOrders: 0,
+          totalRevenue: 0,
+        },
+      );
+      const successRate =
+        summary.totalOrders > 0
+          ? Math.round((summary.deliveredOrders / summary.totalOrders) * 100)
+          : 0;
+
+      return successRes(
+        {
+          region: {
+            id: region.id,
+            name: region.name,
+            satoCode: region.sato_code,
+          },
+          summary: {
+            ...summary,
+            successRate,
+            districtsCount: districts.length,
+          },
+          districts,
+        },
+        200,
+        'Viloyat tumanlari statistikasi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Kuryer o'z viloyatiga biriktirilgan tumanlar ro'yxati (filtr dropdown uchun).
+   * Faqat kuryerning region_id'siga `assigned_region` orqali bog'langan tumanlar.
+   */
+  async getMyDistricts(userId: string) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+        select: ['id', 'region_id'],
+      });
+      if (!user?.region_id) {
+        return successRes([], 200, 'Foydalanuvchiga viloyat biriktirilmagan');
+      }
+      const districts = await this.districtRepository.find({
+        where: { assigned_region: user.region_id },
+        select: ['id', 'name', 'sato_code'],
+        order: { name: 'ASC' },
+      });
+      return successRes(districts, 200, 'Viloyat tumanlari');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
    * Bitta viloyat batafsil statistikasi
    */
   async getRegionDetailedStats(
@@ -374,7 +630,7 @@ export class RegionService implements OnModuleInit {
       const { startDate: filterStartDate, endDate: filterEndDate } = filter;
 
       // "Barchasi" uchun date filter yo'q
-      const hasDateFilter = filterStartDate && filterEndDate;
+      const hasDateFilter = !!(filterStartDate && filterEndDate);
       let startDate: string | null = null;
       let endDate: string | null = null;
 
@@ -416,8 +672,19 @@ export class RegionService implements OnModuleInit {
         }
       }
 
-      // Viloyat kuryerlari va ularning statistikasi
-      const couriers = await this.userRepository.find({
+      // Viloyat pochtalarini olish (kuryer bo'yicha taqsimlash uchun)
+      const posts = await this.postRepository.find({
+        where: { region_id: regionId },
+        select: ['id', 'courier_id'],
+      });
+      const postIds = posts.map((p) => p.id);
+
+      // Kuryerlar ro'yxati = viloyatga biriktirilgan kuryerlar (postsiz bo'lsa
+      // ham ko'rinsin) + viloyat postlarida HAQIQATAN ishtirok etgan boshqa
+      // kuryerlar (super/LDG kuryer, boshqa regiondan biriktirilgan yoki
+      // keyinchalik o'chirilgan). Shu orqali har bir buyurtma o'z egasiga
+      // taqsimlanadi va kuryerlar yig'indisi viloyat jamiga teng bo'ladi.
+      const regionCouriers = await this.userRepository.find({
         where: {
           region_id: regionId,
           role: Roles.COURIER,
@@ -425,274 +692,96 @@ export class RegionService implements OnModuleInit {
         },
         select: ['id', 'name', 'phone_number', 'status'],
       });
+      const regionCourierIds = new Set(regionCouriers.map((c) => c.id));
 
-      // Viloyat pochtalarini olish
-      const posts = await this.postRepository.find({
-        where: { region_id: regionId },
-        select: ['id', 'courier_id'],
-      });
-      const postIds = posts.map((p) => p.id);
+      const extraCourierIds = [
+        ...new Set(
+          posts
+            .map((p) => p.courier_id)
+            .filter((id): id is string => !!id && !regionCourierIds.has(id)),
+        ),
+      ];
+      const extraCouriers = extraCourierIds.length
+        ? await this.userRepository.find({
+            where: { id: In(extraCourierIds) },
+            select: ['id', 'name', 'phone_number', 'status'],
+          })
+        : [];
+
+      const allCouriers = [...regionCouriers, ...extraCouriers];
 
       // Kuryer statistikalari
       const courierStats = await Promise.all(
-        couriers.map(async (courier) => {
+        allCouriers.map(async (courier) => {
           const courierPostIds = posts
             .filter((p) => p.courier_id === courier.id)
             .map((p) => p.id);
-
-          let totalOrders = 0;
-          let deliveredOrders = 0;
-          let cancelledOrders = 0;
-          let totalRevenue = 0;
-
-          if (courierPostIds.length > 0) {
-            const totalQuery = this.orderRepository
-              .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', {
-                postIds: courierPostIds,
-              })
-              .andWhere('order.deleted_at IS NULL');
-
-            if (hasDateFilter) {
-              totalQuery
-                .andWhere('order.created_at >= :startDate', { startDate })
-                .andWhere('order.created_at <= :endDate', { endDate });
-            }
-
-            totalOrders = await totalQuery.getCount();
-
-            const deliveredQuery = this.orderRepository
-              .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', {
-                postIds: courierPostIds,
-              })
-              .andWhere('order.status = :status', { status: Order_status.SOLD })
-              .andWhere('order.deleted_at IS NULL');
-
-            if (hasDateFilter) {
-              deliveredQuery
-                .andWhere('order.created_at >= :startDate', { startDate })
-                .andWhere('order.created_at <= :endDate', { endDate });
-            }
-
-            deliveredOrders = await deliveredQuery.getCount();
-
-            const cancelledQuery = this.orderRepository
-              .createQueryBuilder('order')
-              .where('order.post_id IN (:...postIds)', {
-                postIds: courierPostIds,
-              })
-              .andWhere('order.status IN (:...statuses)', {
-                statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
-              })
-              .andWhere('order.deleted_at IS NULL');
-
-            if (hasDateFilter) {
-              cancelledQuery
-                .andWhere('order.created_at >= :startDate', { startDate })
-                .andWhere('order.created_at <= :endDate', { endDate });
-            }
-
-            cancelledOrders = await cancelledQuery.getCount();
-
-            const revenueQuery = this.orderRepository
-              .createQueryBuilder('order')
-              .select('SUM(order.total_price)', 'revenue')
-              .where('order.post_id IN (:...postIds)', {
-                postIds: courierPostIds,
-              })
-              .andWhere('order.status = :status', { status: Order_status.SOLD })
-              .andWhere('order.deleted_at IS NULL');
-
-            if (hasDateFilter) {
-              revenueQuery
-                .andWhere('order.created_at >= :startDate', { startDate })
-                .andWhere('order.created_at <= :endDate', { endDate });
-            }
-
-            const revenueResult = await revenueQuery.getRawOne();
-            totalRevenue = Number(revenueResult?.revenue || 0);
-          }
-
+          const s = await this.getStatsByPostIds(
+            courierPostIds,
+            hasDateFilter,
+            startDate,
+            endDate,
+          );
           return {
             id: courier.id,
             name: courier.name,
             phoneNumber: courier.phone_number,
-            status: courier.status,
-            totalOrders,
-            deliveredOrders,
-            cancelledOrders,
-            totalRevenue,
-            successRate:
-              totalOrders > 0
-                ? Math.round((deliveredOrders / totalOrders) * 100)
-                : 0,
+            status: courier.status as string,
+            isUnassigned: false,
+            ...s,
           };
         }),
       );
 
-      // Tuman statistikalari
+      // "Biriktirilmagan" — kuryer biriktirilmagan (courier_id NULL) postlardagi
+      // buyurtmalar (masalan hali jo'natilmagan NEW pochta). Bu qator qatorlar
+      // yig'indisini viloyat jamiga tenglashtiradi.
+      const unassignedPostIds = posts
+        .filter((p) => !p.courier_id)
+        .map((p) => p.id);
+      const unassignedStats = await this.getStatsByPostIds(
+        unassignedPostIds,
+        hasDateFilter,
+        startDate,
+        endDate,
+      );
+      if (unassignedStats.totalOrders > 0) {
+        courierStats.push({
+          id: 'unassigned',
+          name: 'Biriktirilmagan',
+          phoneNumber: '',
+          status: '',
+          isUnassigned: true,
+          ...unassignedStats,
+        });
+      }
+
+      // Tuman statistikalari (harakat modeli — sold_at/cancelled_at)
       const districtStats = await Promise.all(
         region.assignedDistricts.map(async (district) => {
-          let totalOrders = 0;
-          let deliveredOrders = 0;
-          let cancelledOrders = 0;
-          let totalRevenue = 0;
-
-          // Tumandagi buyurtmalar
-          const districtTotalQuery = this.orderRepository
-            .createQueryBuilder('order')
-            .where('order.district_id = :districtId', {
-              districtId: district.id,
-            })
-            .andWhere('order.deleted_at IS NULL');
-
-          if (hasDateFilter) {
-            districtTotalQuery
-              .andWhere('order.created_at >= :startDate', { startDate })
-              .andWhere('order.created_at <= :endDate', { endDate });
-          }
-
-          totalOrders = await districtTotalQuery.getCount();
-
-          const districtDeliveredQuery = this.orderRepository
-            .createQueryBuilder('order')
-            .where('order.district_id = :districtId', {
-              districtId: district.id,
-            })
-            .andWhere('order.status = :status', { status: Order_status.SOLD })
-            .andWhere('order.deleted_at IS NULL');
-
-          if (hasDateFilter) {
-            districtDeliveredQuery
-              .andWhere('order.created_at >= :startDate', { startDate })
-              .andWhere('order.created_at <= :endDate', { endDate });
-          }
-
-          deliveredOrders = await districtDeliveredQuery.getCount();
-
-          const districtCancelledQuery = this.orderRepository
-            .createQueryBuilder('order')
-            .where('order.district_id = :districtId', {
-              districtId: district.id,
-            })
-            .andWhere('order.status IN (:...statuses)', {
-              statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
-            })
-            .andWhere('order.deleted_at IS NULL');
-
-          if (hasDateFilter) {
-            districtCancelledQuery
-              .andWhere('order.created_at >= :startDate', { startDate })
-              .andWhere('order.created_at <= :endDate', { endDate });
-          }
-
-          cancelledOrders = await districtCancelledQuery.getCount();
-
-          const districtRevenueQuery = this.orderRepository
-            .createQueryBuilder('order')
-            .select('SUM(order.total_price)', 'revenue')
-            .where('order.district_id = :districtId', {
-              districtId: district.id,
-            })
-            .andWhere('order.status = :status', { status: Order_status.SOLD })
-            .andWhere('order.deleted_at IS NULL');
-
-          if (hasDateFilter) {
-            districtRevenueQuery
-              .andWhere('order.created_at >= :startDate', { startDate })
-              .andWhere('order.created_at <= :endDate', { endDate });
-          }
-
-          const revenueResult = await districtRevenueQuery.getRawOne();
-          totalRevenue = Number(revenueResult?.revenue || 0);
-
+          const s = await this.getStatsByDistrictId(
+            district.id,
+            hasDateFilter,
+            startDate,
+            endDate,
+          );
           return {
             id: district.id,
             name: district.name,
             satoCode: district.sato_code,
             couriers: districtCourierMap.get(district.id) || [],
-            totalOrders,
-            deliveredOrders,
-            cancelledOrders,
-            totalRevenue,
-            successRate:
-              totalOrders > 0
-                ? Math.round((deliveredOrders / totalOrders) * 100)
-                : 0,
+            ...s,
           };
         }),
       );
 
-      // Umumiy statistika
-      let totalOrders = 0;
-      let deliveredOrders = 0;
-      let cancelledOrders = 0;
-      let pendingOrders = 0;
-      let totalRevenue = 0;
-
-      if (postIds.length > 0) {
-        const overallTotalQuery = this.orderRepository
-          .createQueryBuilder('order')
-          .where('order.post_id IN (:...postIds)', { postIds })
-          .andWhere('order.deleted_at IS NULL');
-
-        if (hasDateFilter) {
-          overallTotalQuery
-            .andWhere('order.created_at >= :startDate', { startDate })
-            .andWhere('order.created_at <= :endDate', { endDate });
-        }
-
-        totalOrders = await overallTotalQuery.getCount();
-
-        const overallDeliveredQuery = this.orderRepository
-          .createQueryBuilder('order')
-          .where('order.post_id IN (:...postIds)', { postIds })
-          .andWhere('order.status = :status', { status: Order_status.SOLD })
-          .andWhere('order.deleted_at IS NULL');
-
-        if (hasDateFilter) {
-          overallDeliveredQuery
-            .andWhere('order.created_at >= :startDate', { startDate })
-            .andWhere('order.created_at <= :endDate', { endDate });
-        }
-
-        deliveredOrders = await overallDeliveredQuery.getCount();
-
-        const overallCancelledQuery = this.orderRepository
-          .createQueryBuilder('order')
-          .where('order.post_id IN (:...postIds)', { postIds })
-          .andWhere('order.status IN (:...statuses)', {
-            statuses: [Order_status.CANCELLED, Order_status.CANCELLED_SENT],
-          })
-          .andWhere('order.deleted_at IS NULL');
-
-        if (hasDateFilter) {
-          overallCancelledQuery
-            .andWhere('order.created_at >= :startDate', { startDate })
-            .andWhere('order.created_at <= :endDate', { endDate });
-        }
-
-        cancelledOrders = await overallCancelledQuery.getCount();
-
-        pendingOrders = totalOrders - deliveredOrders - cancelledOrders;
-
-        const overallRevenueQuery = this.orderRepository
-          .createQueryBuilder('order')
-          .select('SUM(order.total_price)', 'revenue')
-          .where('order.post_id IN (:...postIds)', { postIds })
-          .andWhere('order.status = :status', { status: Order_status.SOLD })
-          .andWhere('order.deleted_at IS NULL');
-
-        if (hasDateFilter) {
-          overallRevenueQuery
-            .andWhere('order.created_at >= :startDate', { startDate })
-            .andWhere('order.created_at <= :endDate', { endDate });
-        }
-
-        const revenueResult = await overallRevenueQuery.getRawOne();
-        totalRevenue = Number(revenueResult?.revenue || 0);
-      }
+      // Umumiy statistika (harakat modeli — sold_at/cancelled_at)
+      const overall = await this.getStatsByPostIds(
+        postIds,
+        hasDateFilter,
+        startDate,
+        endDate,
+      );
 
       return successRes(
         {
@@ -709,18 +798,18 @@ export class RegionService implements OnModuleInit {
               : null,
           },
           summary: {
-            totalOrders,
-            deliveredOrders,
-            cancelledOrders,
-            pendingOrders,
-            totalRevenue,
-            successRate:
-              totalOrders > 0
-                ? Math.round((deliveredOrders / totalOrders) * 100)
-                : 0,
-            totalCouriers: couriers.length,
-            activeCouriers: couriers.filter((c) => c.status === Status.ACTIVE)
-              .length,
+            totalOrders: overall.totalOrders,
+            deliveredOrders: overall.deliveredOrders,
+            cancelledOrders: overall.cancelledOrders,
+            pendingOrders: overall.pendingOrders,
+            totalRevenue: overall.totalRevenue,
+            successRate: overall.successRate,
+            // Uy kuryerlari + region postlarida ishtirok etgan super/LDG kuryerlar
+            // (jadvalda ko'rinadigan qatorlar bilan bir xil — xarita soni bilan mos).
+            totalCouriers: allCouriers.length,
+            activeCouriers: allCouriers.filter(
+              (c) => c.status === Status.ACTIVE,
+            ).length,
             totalDistricts: region.assignedDistricts.length,
           },
           couriers: courierStats.sort(
@@ -732,6 +821,131 @@ export class RegionService implements OnModuleInit {
         },
         200,
         'Viloyat batafsil statistikasi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Bitta kuryerning (ayniqsa super kuryer) statistikasini U XIZMAT QILGAN
+   * viloyatlar bo'yicha bo'lib qaytaradi. Region modali viloyat-markazli bo'lsa,
+   * bu kuryer-markazli: super kuryer qaysi viloyatda qancha ishlaganini
+   * bitta joyda ko'rsatadi.
+   */
+  async getCourierRegionBreakdown(
+    courierId: string,
+    filter: { startDate?: string; endDate?: string },
+  ) {
+    try {
+      const courier = await this.userRepository.findOne({
+        where: { id: courierId },
+        select: [
+          'id',
+          'name',
+          'phone_number',
+          'is_super_courier',
+          'serves_all_regions',
+          'region_id',
+        ],
+      });
+      if (!courier) {
+        throw new NotFoundException('Kuryer topilmadi');
+      }
+
+      const { startDate: filterStartDate, endDate: filterEndDate } = filter;
+      const hasDateFilter = !!(filterStartDate && filterEndDate);
+      const startDate = hasDateFilter
+        ? String(toUzbekistanTimestamp(filterStartDate!, false))
+        : null;
+      const endDate = hasDateFilter
+        ? String(toUzbekistanTimestamp(filterEndDate!, true))
+        : null;
+
+      // Kuryerning barcha postlari (viloyat bilan)
+      const posts = await this.postRepository.find({
+        where: { courier_id: courierId },
+        select: ['id', 'region_id'],
+      });
+
+      // Viloyat bo'yicha guruhlash
+      const postIdsByRegion = new Map<string, string[]>();
+      for (const p of posts) {
+        if (!p.region_id) continue;
+        const arr = postIdsByRegion.get(p.region_id) ?? [];
+        arr.push(p.id);
+        postIdsByRegion.set(p.region_id, arr);
+      }
+
+      const regionIds = [...postIdsByRegion.keys()];
+      const regions = regionIds.length
+        ? await this.regionRepository.find({
+            where: { id: In(regionIds) },
+            select: ['id', 'name', 'sato_code'],
+          })
+        : [];
+      const regionMap = new Map(regions.map((r) => [r.id, r]));
+
+      const regionStats = await Promise.all(
+        regionIds.map(async (regionId) => {
+          const s = await this.getStatsByPostIds(
+            postIdsByRegion.get(regionId)!,
+            hasDateFilter,
+            startDate,
+            endDate,
+          );
+          return {
+            regionId,
+            regionName: regionMap.get(regionId)?.name ?? '—',
+            satoCode: regionMap.get(regionId)?.sato_code ?? null,
+            ...s,
+          };
+        }),
+      );
+
+      regionStats.sort((a, b) => b.totalOrders - a.totalOrders);
+
+      // Barcha viloyatlar bo'yicha umumiy yig'indi
+      const summary = regionStats.reduce(
+        (acc, r) => {
+          acc.totalOrders += r.totalOrders;
+          acc.deliveredOrders += r.deliveredOrders;
+          acc.cancelledOrders += r.cancelledOrders;
+          acc.pendingOrders += r.pendingOrders;
+          acc.totalRevenue += r.totalRevenue;
+          return acc;
+        },
+        {
+          totalOrders: 0,
+          deliveredOrders: 0,
+          cancelledOrders: 0,
+          pendingOrders: 0,
+          totalRevenue: 0,
+        },
+      );
+      const successRate =
+        summary.totalOrders > 0
+          ? Math.round((summary.deliveredOrders / summary.totalOrders) * 100)
+          : 0;
+
+      return successRes(
+        {
+          courier: {
+            id: courier.id,
+            name: courier.name,
+            phone_number: courier.phone_number,
+            is_super_courier: courier.is_super_courier,
+            serves_all_regions: courier.serves_all_regions,
+          },
+          summary: {
+            ...summary,
+            successRate,
+            regionsCount: regionStats.length,
+          },
+          regions: regionStats,
+        },
+        200,
+        "Kuryer viloyatlar bo'yicha statistikasi",
       );
     } catch (error) {
       return catchError(error);
