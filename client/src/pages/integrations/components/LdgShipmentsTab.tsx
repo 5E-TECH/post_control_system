@@ -50,12 +50,27 @@ const ldgStatusLabel = (status: string | null): string => {
   return LDG_STATUS_LABELS[status.toUpperCase()] ?? status;
 };
 
+// "Hammasini qayta jo'natish"da bir guruhdagi buyurtmalar soni (10 tadan).
+const REDISPATCH_BATCH_SIZE = 10;
+
 export const LdgShipmentsTab = () => {
-  const { getShipments, redispatch, syncOne, resolveMismatch } = useLdgAdmin();
+  const {
+    getShipments,
+    redispatch,
+    getRetryCandidates,
+    redispatchBatch,
+    syncOne,
+    resolveMismatch,
+  } = useLdgAdmin();
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const limit = 20;
 
   const { data, isLoading, isFetching, refetch } = getShipments({
@@ -74,6 +89,50 @@ export const LdgShipmentsTab = () => {
       }
     } catch {
       message.error("Qayta jo'natishda xatolik");
+    }
+  };
+
+  // Yuborilmagan/xatoli barcha jo'natmalarni bitta bosishda qayta jo'natish.
+  // Tashqaridan bitta amal ko'rinadi, lekin ichida 10 tadan ketma-ket yuboriladi
+  // (LDG rate-limitiga urilmaslik uchun) va progress ko'rsatiladi.
+  const handleRedispatchAll = async () => {
+    setBulkRunning(true);
+    try {
+      const ids = await getRetryCandidates();
+      if (!ids.length) {
+        message.info("Qayta jo'natiladigan jo'natma yo'q");
+        return;
+      }
+      setBulkProgress({ done: 0, total: ids.length });
+      let success = 0;
+      let failed = 0;
+      for (let i = 0; i < ids.length; i += REDISPATCH_BATCH_SIZE) {
+        const chunk = ids.slice(i, i + REDISPATCH_BATCH_SIZE);
+        try {
+          const res = await redispatchBatch.mutateAsync(chunk);
+          success += res.success;
+          failed += res.failed;
+        } catch {
+          failed += chunk.length;
+        }
+        setBulkProgress({
+          done: Math.min(i + REDISPATCH_BATCH_SIZE, ids.length),
+          total: ids.length,
+        });
+      }
+      if (failed > 0) {
+        message.warning(
+          `Tugadi: ${success} ta jo'natildi, ${failed} ta xato (keyinroq avtomatik qayta uriniladi)`,
+        );
+      } else {
+        message.success(`Tugadi: ${success} ta jo'natma LDG'ga jo'natildi`);
+      }
+      refetch();
+    } catch {
+      message.error("Ommaviy qayta jo'natishda xatolik");
+    } finally {
+      setBulkRunning(false);
+      setBulkProgress(null);
     }
   };
 
@@ -272,13 +331,32 @@ export const LdgShipmentsTab = () => {
             },
           ]}
         />
-        <Button
-          icon={<RefreshCw className="w-4 h-4" />}
-          loading={isFetching}
-          onClick={() => refetch()}
-        >
-          Yangilash
-        </Button>
+        <div className="flex items-center gap-2">
+          <Popconfirm
+            title="Hammasini qayta jo'natish"
+            description="Barcha yuborilmagan/xatoli jo'natmalar LDG'ga 10 tadan qayta jo'natiladi. Davom etilsinmi?"
+            okText="Ha, jo'nat"
+            cancelText="Yo'q"
+            onConfirm={handleRedispatchAll}
+          >
+            <Button
+              type="primary"
+              icon={<RotateCcw className="w-4 h-4" />}
+              loading={bulkRunning}
+            >
+              {bulkProgress
+                ? `Jo'natilmoqda ${bulkProgress.done}/${bulkProgress.total}`
+                : "Hammasini qayta jo'natish"}
+            </Button>
+          </Popconfirm>
+          <Button
+            icon={<RefreshCw className="w-4 h-4" />}
+            loading={isFetching}
+            onClick={() => refetch()}
+          >
+            Yangilash
+          </Button>
+        </div>
       </div>
 
       <Table<LdgShipmentRow>

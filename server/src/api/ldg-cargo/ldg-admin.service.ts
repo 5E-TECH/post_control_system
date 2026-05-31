@@ -15,6 +15,18 @@ const WEBHOOK_LOG_RETENTION_DAYS = 30;
 // Reconcile (pull) bir o'tishda nechta shipmentni tekshirishi
 const RECONCILE_BATCH_LIMIT = 100;
 
+// Ommaviy/auto qayta jo'natishda har bir so'rov orasidagi pauza (ms) —
+// LDG rate-limitiga (429) urilmaslik uchun.
+const REDISPATCH_DELAY_MS = 350;
+
+// Auto-retry cron bir o'tishda nechta yuborilmagan shipmentni qayta jo'natadi.
+const AUTO_RETRY_BATCH_LIMIT = 30;
+
+// Auto-retry shu urinishlar soniga yetgach to'xtaydi — doimiy "buzuq" buyurtmalarni
+// (masalan SOATO kodi yo'q → har safar 422) cheksiz qayta urinmaslik uchun.
+// Bu limitdan oshganlar faqat qo'lda "Hammasini qayta jo'natish" orqali yuboriladi.
+const AUTO_RETRY_MAX_ATTEMPTS = 8;
+
 // LDG'da terminal (yakuniy) statuslar — bularni qayta so'rashning hojati yo'q
 const TERMINAL_LDG_STATUSES = ['DELIVERED', 'CANCELLED', 'RETURNED'];
 
@@ -298,10 +310,122 @@ export class LdgAdminService {
   }
 
   /**
+   * Hali LDG'ga muvaffaqiyatli yuborilmagan (yuborilmagan + xatoli) barcha
+   * shipmentlarning order_id ro'yxati. Frontend "Hammasini qayta jo'natish"
+   * tugmasi shu ro'yxatni olib, 10 tadan bo'lib redispatchBatch'ga yuboradi.
+   */
+  async getRetryCandidates(): Promise<string[]> {
+    const rows = await this.shipmentRepo
+      .createQueryBuilder('s')
+      .select('s.order_id', 'order_id')
+      .where('s.ldg_order_id IS NULL')
+      .orderBy('s.created_at', 'ASC')
+      .getRawMany<{ order_id: string }>();
+    return rows.map((r) => r.order_id);
+  }
+
+  /**
+   * Bir guruh (odatda 10 ta) buyurtmani ketma-ket, orasida pauza bilan qayta
+   * jo'natadi. Pauza + LdgApiService'dagi 429 retry birgalikda LDG rate-limitini
+   * keltirib chiqarmaslikni ta'minlaydi. Hech qachon throw qilmaydi — har bir
+   * order natijasi alohida qaytariladi.
+   */
+  async redispatchBatch(orderIds: string[]): Promise<{
+    total: number;
+    success: number;
+    failed: number;
+    results: Array<{ order_id: string; success: boolean; message: string }>;
+  }> {
+    const ids = Array.isArray(orderIds) ? orderIds : [];
+    const results: Array<{
+      order_id: string;
+      success: boolean;
+      message: string;
+    }> = [];
+    let success = 0;
+    let failed = 0;
+
+    for (const orderId of ids) {
+      const r = await this.redispatch(orderId);
+      if (r.success) success++;
+      else failed++;
+      results.push({ order_id: orderId, success: r.success, message: r.message });
+      await this.sleep(REDISPATCH_DELAY_MS);
+    }
+
+    return { total: ids.length, success, failed, results };
+  }
+
+  /**
    * Saqlangan webhook log'ni qayta ishlash (skip/failed bo'lib qolganlar uchun).
    */
   async reprocessWebhook(deliveryId: string) {
     return this.webhookService.reprocessFromLog(deliveryId);
+  }
+
+  // ===== AUTO-RETRY (yuborilmaganlarni tizimning o'zi tuzatadi) =====
+
+  /**
+   * Hali yuborilmagan (ldg_order_id yo'q) va urinishlari limitdan oshmagan
+   * shipmentlarni avtomatik qayta jo'natadi. Throttled (orasida pauza) — LDG
+   * rate-limitini qayta keltirib chiqarmaydi. Vaqtinchalik xatolar (429,
+   * tarmoq) shu yo'l bilan operator aralashuvisiz o'zi tuzaladi.
+   */
+  async autoRetryUnsentShipments(): Promise<{
+    retried: number;
+    success: number;
+    failed: number;
+  }> {
+    const config = await this.configRepo.findOne({ where: {} });
+    if (!config?.is_active) {
+      return { retried: 0, success: 0, failed: 0 };
+    }
+
+    const shipments = await this.shipmentRepo
+      .createQueryBuilder('s')
+      .where('s.ldg_order_id IS NULL')
+      .andWhere('s.send_attempts < :max', { max: AUTO_RETRY_MAX_ATTEMPTS })
+      .orderBy('s.send_attempts', 'ASC')
+      .addOrderBy('s.created_at', 'ASC')
+      .take(AUTO_RETRY_BATCH_LIMIT)
+      .getMany();
+
+    let success = 0;
+    let failed = 0;
+
+    for (const shipment of shipments) {
+      const r = await this.redispatch(shipment.order_id);
+      if (r.success) success++;
+      else failed++;
+      await this.sleep(REDISPATCH_DELAY_MS);
+    }
+
+    if (shipments.length > 0) {
+      this.logger.log(
+        `LDG auto-retry: ${shipments.length} ta yuborilmagan qayta urinildi, ${success} yuborildi, ${failed} xato`,
+      );
+    }
+
+    return { retried: shipments.length, success, failed };
+  }
+
+  /**
+   * Auto-retry cron — har 2 daqiqada yuborilmagan shipmentlarni qayta jo'natishga
+   * urinadi. Bu "sistemaning o'zi tuzatishi" qatlami: 429 yoki tarmoq uzilishi
+   * tufayli o'tmaganlar operator aralashuvisiz LDG'ga yetib boradi.
+   */
+  @Cron('30 */2 * * * *', { timeZone: 'Asia/Tashkent' })
+  async autoRetryCron(): Promise<void> {
+    try {
+      await this.autoRetryUnsentShipments();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`LDG auto-retry cron xatosi: ${msg}`);
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // ===== RECONCILE (PULL) — webhook'ga qo'shimcha ishonchlilik qatlami =====

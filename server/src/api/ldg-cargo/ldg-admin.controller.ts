@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
@@ -73,6 +74,22 @@ export class LdgAdminController {
   @Post('shipments/:orderId/redispatch')
   async redispatch(@Param('orderId') orderId: string) {
     return this.adminService.redispatch(orderId);
+  }
+
+  @ApiOperation({
+    summary: 'Yuborilmagan/xatoli barcha shipmentlarning order_id ro\'yxati',
+  })
+  @Get('shipments/retry-candidates')
+  async retryCandidates() {
+    return this.adminService.getRetryCandidates();
+  }
+
+  @ApiOperation({
+    summary: 'Bir guruh (10 ta) buyurtmani ketma-ket qayta jo\'natish',
+  })
+  @Post('shipments/redispatch-batch')
+  async redispatchBatch(@Body() body: { orderIds: string[] }) {
+    return this.adminService.redispatchBatch(body?.orderIds ?? []);
   }
 
   @ApiOperation({

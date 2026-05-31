@@ -30,6 +30,10 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 
+// Pochta LDG'ga jo'natilganda buyurtmalar orasidagi pauza (ms).
+// LDG rate-limitidan (429) oshib ketmaslik uchun ketma-ket so'rovlarni sekinlatamiz.
+const LDG_DISPATCH_DELAY_MS = 400;
+
 @Injectable()
 export class PostService {
   private readonly logger = new Logger(PostService.name);
@@ -71,6 +75,12 @@ export class PostService {
             `LDG'ga jo'natish muvaffaqiyatsiz (order=${orderId}): ${msg}`,
           );
         }
+        // LDG rate-limit (429 "Too Many Attempts")ni keltirib chiqarmaslik uchun
+        // har bir so'rov orasida kichik pauza — ketma-ket "bombardimon" qilmaymiz.
+        // Baribir muvaffaqiyatsiz bo'lganlarni LDG auto-retry cron'i keyin tuzatadi.
+        await new Promise((resolve) =>
+          setTimeout(resolve, LDG_DISPATCH_DELAY_MS),
+        );
       }
     })();
   }

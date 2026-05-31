@@ -163,6 +163,32 @@ export const useLdgAdmin = () => {
     },
   });
 
+  // Yuborilmagan/xatoli barcha order_id'lar (imperativ — tugma bosilganda chaqiriladi)
+  const getRetryCandidates = async (): Promise<string[]> =>
+    api
+      .get("ldg/admin/shipments/retry-candidates")
+      .then((res) => unwrap<string[]>(res.data));
+
+  // Bir guruh (10 ta) buyurtmani ketma-ket qayta jo'natish.
+  // Frontend butun ro'yxatni 10 tadan bo'lib shu mutatsiyani ketma-ket chaqiradi.
+  const redispatchBatch = useMutation({
+    mutationFn: (orderIds: string[]) =>
+      api
+        .post("ldg/admin/shipments/redispatch-batch", { orderIds })
+        .then((res) =>
+          unwrap<{
+            total: number;
+            success: number;
+            failed: number;
+            results: Array<{
+              order_id: string;
+              success: boolean;
+              message: string;
+            }>;
+          }>(res.data),
+        ),
+  });
+
   const reprocessWebhook = useMutation({
     mutationFn: (deliveryId: string) =>
       api
@@ -223,6 +249,8 @@ export const useLdgAdmin = () => {
     getShipments,
     testConnection,
     redispatch,
+    getRetryCandidates,
+    redispatchBatch,
     reprocessWebhook,
     syncOne,
     reconcileAll,
