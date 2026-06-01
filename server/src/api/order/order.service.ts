@@ -215,7 +215,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (query.search) {
         qb.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
           { search: `%${query.search}%` },
         );
       }
@@ -726,7 +726,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (search) {
         query.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -779,7 +779,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (search) {
         query.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -808,7 +808,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: JwtPayload) {
     try {
       const newOrder = await this.orderRepo.findOne({
         where: { id },
@@ -870,17 +870,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      return successRes(
-        {
-          ...newOrder,
-          max_courier_tariff_home,
-          max_courier_tariff_center,
-          assigned_courier_tariff_home,
-          assigned_courier_tariff_center,
-        },
-        200,
-        'Order by id',
-      );
+      // Tariflar maxfiy — rolga qarab tozalanadi (UI'da yashirish yetarli emas,
+      // tarmoq javobida ham bo'lmasin):
+      //  - market_tariff  → admin/superadmin/market ko'radi
+      //  - courier_tariff (va kurier tarif yordamchi maydonlari) →
+      //    admin/superadmin/courier ko'radi
+      const role = user?.role;
+      const isAdminLike = role === Roles.ADMIN || role === Roles.SUPERADMIN;
+      const canSeeMarketTariff = isAdminLike || role === Roles.MARKET;
+      const canSeeCourierTariff = isAdminLike || role === Roles.COURIER;
+
+      const payload: Record<string, any> = {
+        ...newOrder,
+        max_courier_tariff_home,
+        max_courier_tariff_center,
+        assigned_courier_tariff_home,
+        assigned_courier_tariff_center,
+      };
+
+      if (!canSeeMarketTariff) {
+        delete payload.market_tariff;
+      }
+      if (!canSeeCourierTariff) {
+        delete payload.courier_tariff;
+        delete payload.max_courier_tariff_home;
+        delete payload.max_courier_tariff_center;
+        delete payload.assigned_courier_tariff_home;
+        delete payload.assigned_courier_tariff_center;
+      }
+
+      return successRes(payload, 200, 'Order by id');
     } catch (error) {
       return catchError(error);
     }
@@ -1368,7 +1387,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (search) {
         qb.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -1840,7 +1859,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // search filter
       if (query.search) {
         qb.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST(o.order_number AS TEXT) ILIKE :search)',
           { search: `%${query.search}%` },
         );
       }
@@ -4382,7 +4401,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         if (filters.search) {
           qb.andWhere(
-            '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+            '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
             { search: `%${filters.search}%` },
           );
         }

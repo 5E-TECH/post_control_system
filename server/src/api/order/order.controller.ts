@@ -187,8 +187,8 @@ export class OrderController {
     Roles.OPERATOR,
   )
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.orderService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.orderService.findOne(id, user);
   }
 
   @ApiOperation({ summary: 'Get order by QR code' })

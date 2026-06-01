@@ -35,7 +35,20 @@ import {
 @Index('IDX_ORDER_USER_SOLD', ['user_id', 'sold_at'])
 @Index('IDX_ORDER_DISTRICT_ID', ['district_id'])
 @Index('IDX_ORDER_OPERATOR_ID', ['operator_id'])
+@Index('IDX_ORDER_NUMBER', ['order_number'], { unique: true })
 export class OrderEntity extends BaseEntity {
+  // O'qiladigan global buyurtma raqami (#100042). UUID `id` qoladi — bu faqat
+  // ko'rsatish/qidiruv/chek uchun qulay, ketma-ket raqam. DB sequence orqali
+  // avtomatik to'ladi (migration: `order_number_seq`, 100000 dan boshlanadi),
+  // shuning uchun barcha insert yo'llari (operator, bot, tashqi) avtomatik
+  // raqam oladi — kodda alohida o'rnatish shart emas.
+  @Column({
+    type: 'bigint',
+    default: () => "nextval('order_number_seq')",
+    transformer: bigintTransformer,
+  })
+  order_number: number;
+
   @Column({ type: 'uuid' })
   user_id: string;
 

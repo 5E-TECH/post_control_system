@@ -172,10 +172,12 @@ const OrderCard = ({
       onClick={onClick}
       className="bg-white dark:bg-[#2A2640] rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 active:scale-[0.98] transition-transform cursor-pointer"
     >
-      {/* Header: Status + Index */}
+      {/* Header: Status + Order number */}
       <div className="flex items-center justify-between mb-3">
         <StatusBadge status={item?.status} />
-        <span className="text-xs text-gray-400">#{index + 1}</span>
+        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-300">
+          {item?.order_number != null ? `#${item.order_number}` : `#${index + 1}`}
+        </span>
       </div>
 
       {/* Customer info - full width */}
@@ -510,9 +512,16 @@ const OrderView = () => {
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                           <User className="w-4 h-4 text-white" />
                         </div>
-                        <span className="font-medium text-gray-800 dark:text-white truncate" title={item?.customer?.name}>
-                          {item?.customer?.name}
-                        </span>
+                        <div className="min-w-0">
+                          <span className="font-medium text-gray-800 dark:text-white truncate block" title={item?.customer?.name}>
+                            {item?.customer?.name}
+                          </span>
+                          {item?.order_number != null && (
+                            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                              #{item.order_number}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
