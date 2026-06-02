@@ -849,12 +849,68 @@ export class UserService implements OnModuleInit {
       const { id } = user;
       const myProfile = await this.userRepo.findOne({
         where: { id },
-        relations: ['region', 'market'],
+        relations: ['region', 'market', 'salary'],
       });
       return successRes(myProfile, 200, 'Profile info');
     } catch (error) {
       return catchError(error);
     }
+  }
+
+  /**
+   * Maosh sozlamasi (oylik / qoldiq / to'lov kuni) o'zgarishini audit-logga yozadi.
+   * Faqat haqiqatan o'zgargan maydonlar yoziladi. Hech narsa o'zgarmasa — log yozilmaydi.
+   */
+  private logSalaryChange(
+    userId: string,
+    userName: string,
+    before: {
+      salary_amount?: number;
+      have_to_pay?: number;
+      payment_day?: number;
+    } | null,
+    after: {
+      salary_amount?: number;
+      have_to_pay?: number;
+      payment_day?: number;
+    },
+    actor?: JwtPayload,
+  ): void {
+    const labels: Record<string, string> = {
+      salary_amount: 'Oylik maosh',
+      have_to_pay: "To'lanmagan qoldiq",
+      payment_day: "To'lov kuni",
+    };
+    const fmt = (field: string, val: any) =>
+      field === 'payment_day'
+        ? `${val ?? '—'}-kun`
+        : `${Number(val ?? 0).toLocaleString()} so'm`;
+
+    const oldValue: Record<string, any> = {};
+    const newValue: Record<string, any> = {};
+    const parts: string[] = [];
+
+    for (const field of ['salary_amount', 'have_to_pay', 'payment_day']) {
+      const newVal = (after as any)[field];
+      if (newVal === undefined) continue;
+      const oldVal = before ? (before as any)[field] ?? null : null;
+      if (oldVal === newVal) continue;
+      oldValue[field] = oldVal;
+      newValue[field] = newVal;
+      parts.push(`${labels[field]}: ${fmt(field, oldVal)} → ${fmt(field, newVal)}`);
+    }
+
+    if (parts.length === 0) return;
+
+    this.activityLog.log({
+      entity_type: 'user_salary',
+      entity_id: userId,
+      action: 'salary_updated',
+      old_value: oldValue,
+      new_value: newValue,
+      description: `Maosh sozlamasi o'zgardi (${userName}): ${parts.join(', ')}`,
+      user: actor,
+    });
   }
 
   async updateAdmin(
@@ -931,6 +987,13 @@ export class UserService implements OnModuleInit {
       ) {
         const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
         let salary = await salaryRepo.findOne({ where: { user_id: id } });
+        const beforeSalary = salary
+          ? {
+              salary_amount: salary.salary_amount,
+              have_to_pay: salary.have_to_pay,
+              payment_day: salary.payment_day,
+            }
+          : null;
         if (salary) {
           if (newSalary !== undefined) salary.salary_amount = newSalary;
           if (newPaymentDay !== undefined) salary.payment_day = newPaymentDay;
@@ -945,6 +1008,19 @@ export class UserService implements OnModuleInit {
             payment_day: newPaymentDay || new Date().getDate(),
           });
           await salaryRepo.save(salary);
+        }
+        if (salary) {
+          this.logSalaryChange(
+            id,
+            user.name,
+            beforeSalary,
+            {
+              salary_amount: salary.salary_amount,
+              have_to_pay: salary.have_to_pay,
+              payment_day: salary.payment_day,
+            },
+            currentUser,
+          );
         }
       }
 
@@ -1033,6 +1109,13 @@ export class UserService implements OnModuleInit {
       ) {
         const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
         let salary = await salaryRepo.findOne({ where: { user_id: id } });
+        const beforeSalary = salary
+          ? {
+              salary_amount: salary.salary_amount,
+              have_to_pay: salary.have_to_pay,
+              payment_day: salary.payment_day,
+            }
+          : null;
         if (salary) {
           if (newSalary !== undefined) salary.salary_amount = newSalary;
           if (newPaymentDay !== undefined) salary.payment_day = newPaymentDay;
@@ -1046,6 +1129,19 @@ export class UserService implements OnModuleInit {
             payment_day: newPaymentDay || new Date().getDate(),
           });
           await salaryRepo.save(salary);
+        }
+        if (salary) {
+          this.logSalaryChange(
+            id,
+            registrator.name,
+            beforeSalary,
+            {
+              salary_amount: salary.salary_amount,
+              have_to_pay: salary.have_to_pay,
+              payment_day: salary.payment_day,
+            },
+            currentUser,
+          );
         }
       }
 
@@ -1946,12 +2042,22 @@ export class UserService implements OnModuleInit {
           .getRepository(UserSalaryEntity)
           .findOne({ where: { user_id: id } });
         if (salary) {
+          const beforeSalary = {
+            salary_amount: salary.salary_amount,
+            have_to_pay: salary.have_to_pay,
+            payment_day: salary.payment_day,
+          };
           if (dto.salary !== undefined) salary.salary_amount = dto.salary;
           if (dto.payment_day !== undefined)
             salary.payment_day = dto.payment_day;
           if (dto.have_to_pay !== undefined)
             salary.have_to_pay = dto.have_to_pay;
           await this.dataSource.getRepository(UserSalaryEntity).save(salary);
+          this.logSalaryChange(id, logist.name, beforeSalary, {
+            salary_amount: salary.salary_amount,
+            have_to_pay: salary.have_to_pay,
+            payment_day: salary.payment_day,
+          });
         }
       }
 

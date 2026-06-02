@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
+import { SalaryHistory } from "../../components/SalaryHistory";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
 import {
   BanknoteArrowDown,
@@ -956,6 +957,9 @@ const MainDetail = () => {
                   <><Wallet className="w-5 h-5" /> Maosh to'lash</>
                 )}
               </button>
+
+              {/* Oldingi maosh to'lovlari tarixi */}
+              <SalaryHistory userId={salaryUser?.id} enabled={!!salaryUser?.id} />
             </div>
           )}
         </div>

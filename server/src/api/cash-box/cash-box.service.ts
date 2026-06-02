@@ -1514,6 +1514,106 @@ export class CashBoxService
     }
   }
 
+  /**
+   * Ishchining maosh to'lovlari tarixi.
+   * `cashbox_history` dagi SALARY yozuvlaridan o'qiydi (source_user_id = ishchi).
+   * Admin (har qanday ishchi uchun) va ishchining o'zi (my-history) ishlatadi.
+   */
+  async salaryHistory(
+    userId: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    try {
+      const staff = await this.userRepo.findOne({
+        where: { id: userId },
+        relations: ['salary'],
+      });
+      if (!staff) {
+        throw new NotFoundException('User not found');
+      }
+
+      const page = filters?.page && filters.page > 0 ? filters.page : 1;
+      const limit = getSafeLimit(filters?.limit);
+      const skip = (page - 1) * limit;
+
+      let fromTs: number | null = null;
+      let toTs: number | null = null;
+      if (filters?.fromDate) {
+        fromTs = toUzbekistanTimestamp(filters.fromDate, false);
+      }
+      if (filters?.toDate) {
+        toTs = toUzbekistanTimestamp(filters.toDate, true);
+      }
+
+      const qb = this.cashboxHistoryRepo
+        .createQueryBuilder('h')
+        .leftJoinAndSelect('h.createdByUser', 'createdByUser')
+        .where('h.source_type = :st', { st: Source_type.SALARY })
+        .andWhere('h.source_user_id = :uid', { uid: userId })
+        .orderBy('h.created_at', 'DESC')
+        .skip(skip)
+        .take(limit);
+
+      if (fromTs !== null) {
+        qb.andWhere('h.created_at >= :fromTs', { fromTs });
+      }
+      if (toTs !== null) {
+        qb.andWhere('h.created_at <= :toTs', { toTs });
+      }
+
+      const [items, total] = await qb.getManyAndCount();
+
+      // Jami to'langan summa (sana filtridan mustaqil — umumiy)
+      const totalPaidRaw = await this.cashboxHistoryRepo
+        .createQueryBuilder('h')
+        .select('COALESCE(SUM(h.amount), 0)', 'sum')
+        .where('h.source_type = :st', { st: Source_type.SALARY })
+        .andWhere('h.source_user_id = :uid', { uid: userId })
+        .getRawOne();
+
+      const history = items.map((h) => ({
+        id: h.id,
+        created_at: h.created_at,
+        amount: h.amount,
+        payment_method: h.payment_method,
+        comment: h.comment,
+        paid_by: h.createdByUser
+          ? { id: h.createdByUser.id, name: h.createdByUser.name }
+          : null,
+      }));
+
+      return successRes(
+        {
+          user: { id: staff.id, name: staff.name, role: staff.role },
+          salary: staff.salary
+            ? {
+                salary_amount: staff.salary.salary_amount,
+                have_to_pay: staff.salary.have_to_pay,
+                payment_day: staff.salary.payment_day,
+              }
+            : null,
+          totalPaid: Number(totalPaidRaw?.sum ?? 0),
+          history,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+        200,
+        'Salary payment history',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   // ==================== EXCEL EXPORT METHODS ====================
 
   /**

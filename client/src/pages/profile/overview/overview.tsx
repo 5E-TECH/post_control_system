@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { AvatarDisplay } from "../../../shared/components/AvatarSelector";
 import AvatarSelectorModal from "../../../shared/components/AvatarSelector";
+import { SalaryHistory } from "../../payments/components/SalaryHistory";
 
 const Overview = () => {
   const dispatch = useDispatch();
@@ -328,6 +329,9 @@ const Overview = () => {
                   {salaryProgress.daysRemaining} kun qoldi
                 </p>
               </div>
+
+              {/* O'zimning maosh to'lovlarim tarixi */}
+              <SalaryHistory mine />
             </div>
           </div>
         )}

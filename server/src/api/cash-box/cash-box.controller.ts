@@ -395,6 +395,54 @@ export class CasheBoxController {
     return this.cashBoxService.paySalary(user, salaryDto);
   }
 
+  @ApiOperation({ summary: 'Get my own salary payment history' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String })
+  @ApiQuery({ name: 'toDate', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Own salary payment history' })
+  @UseGuards(JwtGuard)
+  @Get('salary/my-history')
+  mySalaryHistory(
+    @CurrentUser() user: JwtPayload,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.salaryHistory(user.id, {
+      fromDate,
+      toDate,
+      page,
+      limit,
+    });
+  }
+
+  @ApiOperation({ summary: 'Get salary payment history of a staff member' })
+  @ApiParam({ name: 'userId', description: 'Staff user ID' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String })
+  @ApiQuery({ name: 'toDate', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Salary payment history' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('salary/history/:userId')
+  salaryHistory(
+    @Param('userId') userId: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.salaryHistory(userId, {
+      fromDate,
+      toDate,
+      page,
+      limit,
+    });
+  }
+
   // ==================== SHIFT (SMENA) ENDPOINTS ====================
 
   @ApiOperation({ summary: 'Get current open shift' })

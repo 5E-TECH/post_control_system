@@ -145,8 +145,38 @@ export const useCashBox = () => {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: [cashbox] });
       client.invalidateQueries({ queryKey: ["user"] });
+      client.invalidateQueries({ queryKey: ["salary-history"] });
     },
   });
+
+  // Admin: tanlangan ishchining maosh to'lovlari tarixi
+  const getSalaryHistory = (
+    userId: string | undefined,
+    params?: { fromDate?: string; toDate?: string; page?: number; limit?: number },
+    bool: boolean = true,
+  ) =>
+    useQuery({
+      queryKey: ["salary-history", userId, params],
+      queryFn: () =>
+        api
+          .get(`cashbox/salary/history/${userId}`, { params })
+          .then((res) => res.data),
+      enabled: bool && !!userId,
+    });
+
+  // Ishchi: o'zining maosh to'lovlari tarixi
+  const getMySalaryHistory = (
+    params?: { fromDate?: string; toDate?: string; page?: number; limit?: number },
+    bool: boolean = true,
+  ) =>
+    useQuery({
+      queryKey: ["salary-history", "my", params],
+      queryFn: () =>
+        api
+          .get("cashbox/salary/my-history", { params })
+          .then((res) => res.data),
+      enabled: bool,
+    });
 
   return {
     getCashBoxById,
@@ -159,6 +189,8 @@ export const useCashBox = () => {
     cashboxSpand,
     cashboxFill,
     paySalary,
+    getSalaryHistory,
+    getMySalaryHistory,
     // Financial balance hooks
     getFinancialBalanceHistory,
     getFinancialBalanceAnalytics,
