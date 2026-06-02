@@ -123,9 +123,23 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
               </div>
               <div className="text-right">
                 <p className="text-xs text-white/60">{t("afterBalance")}</p>
-                <p className="text-sm font-semibold text-white">
-                  {info?.balance_after?.toLocaleString()} UZS
-                </p>
+                {info?.balance_after_cash != null &&
+                info?.balance_after_card != null ? (
+                  <div className="mt-0.5 space-y-0.5">
+                    <p className="text-xs font-semibold text-white whitespace-nowrap">
+                      {t("afterBalanceCash")}:{" "}
+                      {Number(info.balance_after_cash).toLocaleString()}
+                    </p>
+                    <p className="text-xs font-semibold text-white whitespace-nowrap">
+                      {t("afterBalanceCard")}:{" "}
+                      {Number(info.balance_after_card).toLocaleString()}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-white">
+                    {info?.balance_after?.toLocaleString()} UZS
+                  </p>
+                )}
               </div>
             </div>
           </div>

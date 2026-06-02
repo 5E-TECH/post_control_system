@@ -4,7 +4,10 @@ import { Column, Entity, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { CashEntity } from './cash-box.entity';
 import { UserEntity } from './users.entity';
 import { OrderEntity } from './order.entity';
-import { bigintTransformerNonNull as bigintTransformer } from 'src/common/database/bigint.transformer';
+import {
+  bigintTransformerNonNull as bigintTransformer,
+  bigintTransformer as bigintTransformerNullable,
+} from 'src/common/database/bigint.transformer';
 
 @Entity('cashbox_history')
 @Index('IDX_CASHBOX_HISTORY_CASHBOX_ID', ['cashbox_id'])
@@ -35,6 +38,23 @@ export class CashboxHistoryEntity extends BaseEntity {
 
   @Column({ type: 'bigint', transformer: bigintTransformer })
   balance_after: number;
+
+  // Amaldan keyingi NAQD balans — faqat MAIN kassa yozuvlarida to'ldiriladi.
+  // Kuryer/market kassalari va eski yozuvlar uchun `null` (ajratim yuritilmaydi).
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  balance_after_cash: number | null;
+
+  // Amaldan keyingi KARTA balans — faqat MAIN kassa yozuvlarida to'ldiriladi.
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  balance_after_card: number | null;
 
   @Column({ type: 'enum', enum: PaymentMethod, nullable: true })
   payment_method: PaymentMethod | null;

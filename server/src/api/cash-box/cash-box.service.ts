@@ -440,6 +440,8 @@ export class CashBoxService
           source_user_id: courier_id, // Store courier ID for tracking
           amount,
           balance_after: mainCashbox.balance,
+          balance_after_cash: mainCashbox.balance_cash,
+          balance_after_card: mainCashbox.balance_card,
           comment,
           created_by: user.id,
           payment_date,
@@ -491,6 +493,8 @@ export class CashBoxService
             source_user_id: market_id, // Store market ID for tracking
             amount,
             balance_after: mainCashbox.balance,
+            balance_after_cash: mainCashbox.balance_cash,
+            balance_after_card: mainCashbox.balance_card,
             comment,
             created_by: user.id,
             payment_date,
@@ -661,6 +665,8 @@ export class CashBoxService
           source_user_id: market_id, // Store market ID for tracking
           amount,
           balance_after: mainCashbox.balance,
+          balance_after_cash: mainCashbox.balance_cash,
+          balance_after_card: mainCashbox.balance_card,
           comment,
           created_by: user.id,
           payment_date,
@@ -1284,6 +1290,8 @@ export class CashBoxService
       const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
         amount: updateCashboxDto.amount,
         balance_after: mainCashbox.balance,
+        balance_after_cash: mainCashbox.balance_cash,
+        balance_after_card: mainCashbox.balance_card,
         cashbox_id: mainCashbox.id,
         comment: updateCashboxDto.comment,
         operation_type: Operation_type.EXPENSE,
@@ -1354,6 +1362,8 @@ export class CashBoxService
       const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
         amount: updateCashboxDto.amount,
         balance_after: mainCashbox.balance,
+        balance_after_cash: mainCashbox.balance_cash,
+        balance_after_card: mainCashbox.balance_card,
         cashbox_id: mainCashbox.id,
         comment: updateCashboxDto.comment,
         operation_type: Operation_type.INCOME,
@@ -1456,6 +1466,8 @@ export class CashBoxService
       const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
         amount,
         balance_after: mainCashbox.balance,
+        balance_after_cash: mainCashbox.balance_cash,
+        balance_after_card: mainCashbox.balance_card,
         cashbox_id: mainCashbox.id,
         comment:
           salaryDto?.comment || `${staff?.name || 'Hodim'} ga maosh to'landi`,
