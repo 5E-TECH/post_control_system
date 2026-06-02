@@ -5,7 +5,6 @@ import {
   MailOpen,
   Apple,
   UserRound,
-  FileText,
   MapPinned,
   Scale,
   CreditCard,
@@ -34,7 +33,6 @@ const Sidebar = () => {
     { to: "/payments", icon: <CreditCard />, label: t("payments") },
     { to: "/m-balance", icon: <Scale />, label: t("balance") },
     { to: "/regions", icon: <MapPinned />, label: t("region") },
-    { to: "/logs", icon: <FileText />, label: t("logs") },
     { to: "/settings", icon: <Settings />, label: t("settings") },
   ];
 

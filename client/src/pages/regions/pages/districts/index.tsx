@@ -258,7 +258,7 @@ const Districts = () => {
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="p-5">
+      <div>
         {/* Merge toolbar - faqat superadmin uchun */}
         {isSuperAdmin && (
           <div className="mb-4 flex items-center gap-3">

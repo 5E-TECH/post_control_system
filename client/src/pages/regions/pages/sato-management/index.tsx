@@ -1126,14 +1126,14 @@ const SatoManagement = () => {
   );
 
   return (
-    <div className="flex h-[calc(100vh-120px)]">
+    <div className="flex h-[calc(100vh-200px)]">
       {/* Left panel - SATO management */}
       <div className={`flex-1 p-4 overflow-auto transition-all duration-300 ${sidePanelOpen ? 'mr-0' : ''}`}>
         <div className="mb-4">
-          <h1 className="text-xl font-bold text-gray-800 mb-1">
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white mb-1">
             SATO kodlarini boshqarish
           </h1>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
             Viloyat va tumanlarning SATO kodlarini avtomatik yoki qo'lda qo'shish
           </p>
         </div>
