@@ -4242,12 +4242,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             // Hech qanday order (soft-deleted ham) qolmagan — postni o'chirish xavfsiz
             await queryRunner.manager.delete(PostEntity, { id: postId });
           } else if (remainingOrdersCount === 0) {
-            // Aktiv order yo'q, lekin soft-deleted'lar bor — post audit uchun saqlanadi
-            await queryRunner.manager.update(
-              PostEntity,
-              { id: postId },
-              { order_quantity: 0, post_total_price: 0 },
-            );
+            if (post.status === Post_status.NEW) {
+              // Jo'natilmagan (NEW) pochtada aktiv buyurtma qolmadi — bu shunchaki
+              // yig'ish "savati", uni saqlashning audit qiymati yo'q (buyurtma
+              // auditi order qatori + activity_log'da turadi). O'CHIRAMIZ;
+              // soft-deleted buyurtmalar FK (onDelete: SET NULL) orqali ajraladi.
+              // Aks holda 0-buyurtmali bo'sh NEW pochta ro'yxatda qolib ketardi.
+              await queryRunner.manager.delete(PostEntity, { id: postId });
+            } else {
+              // Jo'natilgan/qabul qilingan/bekor pochta — soft-deleted'lar bor,
+              // audit uchun saqlanadi, faqat 0 ga tushiriladi.
+              await queryRunner.manager.update(
+                PostEntity,
+                { id: postId },
+                { order_quantity: 0, post_total_price: 0 },
+              );
+            }
           } else {
             // Qolgan orderlarning umumiy summasini hisoblash
             const remainingOrders = await queryRunner.manager.find(

@@ -915,29 +915,23 @@ export class PostService {
        * 7️⃣ Original postni yangilash.
        * Yuborilgan orderlar chiqib ketdi — qolganlarni qayta hisoblaymiz.
        *
-       * MUHIM: aktiv (soft-delete bo'lmagan) orderlar bo'yicha hisoblaymiz,
-       * lekin postni o'chirishda HAR QANDAY (soft-deleted'lar bilan) order qolmaganini
-       * tekshiramiz — aks holda soft-deleted orderlar yetim qoladi (audit uziladi).
+       * MUHIM: originalPost bu yerda DOIM NEW (yuqorida tekshirilgan) — ya'ni
+       * hali hech qayerga jo'natilmagan yig'ish "savati". Agar undan aktiv
+       * buyurtma qolmasa, uni saqlashning audit qiymati yo'q (buyurtma auditi
+       * order qatori + activity_log'da turadi). Shu sababli bo'sh qolgan NEW
+       * postni O'CHIRAMIZ — soft-deleted buyurtmalar bo'lsa ham. Ular FK
+       * (onDelete: SET NULL) orqali ajraladi, audit ma'lumotlari saqlanadi.
+       *
+       * Bu — "jo'natilgandan keyin 0-buyurtmali bo'sh pochta yana qolib
+       * ketishi" muammosining oldini oladi (avval soft-deleted'lar tufayli
+       * post o'chmasdan cheksiz takrorlanardi).
        */
       const remainingOrders = await queryRunner.manager.find(OrderEntity, {
         where: { post_id: id },
       });
-      const totalIncludingDeleted = await queryRunner.manager.count(
-        OrderEntity,
-        {
-          where: { post_id: id },
-          withDeleted: true,
-        },
-      );
 
-      if (totalIncludingDeleted === 0) {
+      if (remainingOrders.length === 0) {
         await queryRunner.manager.delete(PostEntity, { id });
-      } else if (remainingOrders.length === 0) {
-        // Aktiv order yo'q, lekin soft-deleted'lar bor — postni o'chirmaymiz, faqat
-        // 0 ga tushirib qoldiramiz (post tarix uchun saqlanadi).
-        originalPost.order_quantity = 0;
-        originalPost.post_total_price = 0;
-        await queryRunner.manager.save(originalPost);
       } else {
         const remainingTotal = remainingOrders.reduce(
           (s, o) => s + (Number(o.total_price) || 0),
@@ -981,6 +975,8 @@ export class PostService {
 
       // LDG dispatch — kuryer external_provider='ldg' bo'lsa, buyurtmalarni LDG'ga
       // yuboramiz. Aks holda hech narsa qilmaymiz (oddiy ichki kuryer).
+      // Operator qaysi buyurtmani LDG kuryeriga, qaysini boshqa kuryerga
+      // jo'natishni o'zi tanlaydi — tuman bo'yicha avtomatik filtr yo'q.
       if (courier.external_provider === 'ldg') {
         this.dispatchOrdersToLdg(newOrders.map((o) => o.id));
       }
