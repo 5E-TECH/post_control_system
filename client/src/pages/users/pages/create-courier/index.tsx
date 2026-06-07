@@ -118,9 +118,7 @@ const CreateCourier = () => {
     setRegionTariffs((prev) => ({
       ...prev,
       [regionId]: {
-        home: "",
-        center: "",
-        ...prev[regionId],
+        ...(prev[regionId] ?? { home: "", center: "" }),
         [field]: formatted,
       },
     }));
