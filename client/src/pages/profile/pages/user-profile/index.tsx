@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { setUserData } from "../../../../shared/lib/features/login/authSlice";
+import CourierRegionBreakdown from "./CourierRegionBreakdown";
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -872,6 +873,12 @@ const UserProfile = () => {
             </div>
           );
         })()}
+
+        {/* Super kuryer — viloyatlar bo'yicha statistika */}
+        {user?.role === "courier" &&
+          (user?.is_super_courier || user?.serves_all_regions) && (
+            <CourierRegionBreakdown courierId={user.id} />
+          )}
       </div>
 
       {/* Modal */}

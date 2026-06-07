@@ -108,6 +108,8 @@ export class PrinterService {
               ? `<b>${phoneListHtml[0]}</b>`
               : `<b>${phoneListHtml[0]}</b> <b class="logist-phone">${phoneListHtml[1]}</b>`;
         const createdTime = this.formatDateStr(order.created_at);
+        const orderNumber =
+          order.order_number != null ? `#${order.order_number}` : '';
         const whereDeliver =
           order.where_deliver === Where_deliver.ADDRESS
             ? 'UYGACHA'
@@ -154,7 +156,10 @@ export class PrinterService {
                     </svg>
                     <span class="brand-text">BEEPOST</span>
                   </div>
-                  ${qrDataUrl ? `<img class="qr" src="${qrDataUrl}"/>` : ''}
+                  <div class="qr-row">
+                    ${orderNumber ? `<span class="order-no-v">${orderNumber}</span>` : ''}
+                    ${qrDataUrl ? `<img class="qr" src="${qrDataUrl}"/>` : ''}
+                  </div>
                   <div class="date-text">${createdTime}</div>
                 </div>
                 <div class="right-panel">
@@ -261,6 +266,8 @@ export class PrinterService {
   .logo-svg{width:12px;height:9px;flex-shrink:0}
   .brand-text{font-size:9px;font-weight:bold;letter-spacing:0.3px}
   .qr{width:17mm;height:17mm;display:block}
+  .qr-row{display:flex;align-items:center;justify-content:center;gap:1px}
+  .order-no-v{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;font-weight:bold;letter-spacing:0.4px;line-height:1;white-space:nowrap}
   .date-text{font-size:9px;font-weight:bold;margin-top:auto}
 
   .right-panel{
@@ -484,6 +491,8 @@ ${pages.join('\n')}
         ? this.formatPhoneNumber(order.operator_phone)
         : '';
       const createdTime = this.formatDateStr(order.created_at);
+      const orderNumber =
+        order.order_number != null ? `#${order.order_number}` : '';
       const whereDeliver =
         order.where_deliver === Where_deliver.ADDRESS ? 'UYGACHA' : 'MARKAZGA';
       const qrCode = order.qr_code_token ?? '';
@@ -620,9 +629,11 @@ ${pages.join('\n')}
       });
       leftY += logoH + 5;
 
-      // QR Code
+      // QR Code — asl o'lcham (20mm). Buyurtma raqami QR chap yonida vertikal,
+      // sana esa avvalgidek QR ostida — shu sabab vertikal joy band bo'lmaydi.
       const qrSize = 20 * MM;
-      const qrX = M + (LEFT_W - qrSize) / 2;
+      const qrX = M + (LEFT_W - qrSize) / 2 + 2; // raqam uchun chapdan joy
+      const qrTop = leftY;
       if (qrCode) {
         try {
           const qrBuffer = await QRCode.toBuffer(qrCode, {
@@ -630,12 +641,26 @@ ${pages.join('\n')}
             margin: 0,
             errorCorrectionLevel: 'L',
           });
-          doc.image(qrBuffer, qrX, leftY, { width: qrSize, height: qrSize });
+          doc.image(qrBuffer, qrX, qrTop, { width: qrSize, height: qrSize });
         } catch {}
       }
+
+      // Buyurtma raqami — QR chapida vertikal (pastdan yuqoriga o'qiladi)
+      if (orderNumber) {
+        doc.save();
+        doc.font('Sans-Bold').fontSize(9);
+        const tw = doc.widthOfString(orderNumber);
+        const th = doc.currentLineHeight();
+        const cx = M + (qrX - M) / 2; // chap chiziqcha markazi
+        const cy = qrTop + qrSize / 2; // QR bo'yi markazi
+        doc.rotate(-90, { origin: [cx, cy] });
+        doc.text(orderNumber, cx - tw / 2, cy - th / 2, { lineBreak: false });
+        doc.restore();
+      }
+
       leftY += qrSize + 5;
 
-      // Sana — QR ostida, markazda
+      // Sana — QR ostida, markazda (avvalgidek)
       doc.font('Sans-Bold').fontSize(9);
       doc.text(createdTime, M, leftY, {
         width: LEFT_W,

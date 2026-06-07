@@ -266,7 +266,7 @@ export class CashBoxService
 
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: whereCondition,
-        relations: ['createdByUser'],
+        relations: ['createdByUser', 'sourceUser'],
         order: { created_at: 'DESC' },
       });
 
@@ -339,7 +339,7 @@ export class CashBoxService
 
       const cashboxHistory = await this.cashboxHistoryRepo.find({
         where: whereCondition,
-        relations: ['createdByUser'],
+        relations: ['createdByUser', 'sourceUser'],
         order: { created_at: 'DESC' },
       });
 
@@ -411,6 +411,10 @@ export class CashBoxService
           operation_type: Operation_type.EXPENSE,
           cashbox_id: courierCashbox.id,
           source_type: Source_type.COURIER_PAYMENT,
+          // Click_to_market bo'lsa — pul to'g'ridan-to'g'ri qaysi marketga
+          // ketganini kuryer tarixida ko'rsatish uchun source_user_id = market_id.
+          source_user_id:
+            payment_method === PaymentMethod.CLICK_TO_MARKET ? market_id : null,
           amount,
           balance_after: courierCashbox.balance,
           comment,
@@ -440,6 +444,8 @@ export class CashBoxService
           source_user_id: courier_id, // Store courier ID for tracking
           amount,
           balance_after: mainCashbox.balance,
+          balance_after_cash: mainCashbox.balance_cash,
+          balance_after_card: mainCashbox.balance_card,
           comment,
           created_by: user.id,
           payment_date,
@@ -491,6 +497,8 @@ export class CashBoxService
             source_user_id: market_id, // Store market ID for tracking
             amount,
             balance_after: mainCashbox.balance,
+            balance_after_cash: mainCashbox.balance_cash,
+            balance_after_card: mainCashbox.balance_card,
             comment,
             created_by: user.id,
             payment_date,
@@ -508,6 +516,9 @@ export class CashBoxService
             operation_type: Operation_type.EXPENSE,
             cashbox_id: market_cashbox.id,
             source_type: Source_type.MARKET_PAYMENT,
+            // Pul qaysi kuryerdan (click orqali) tushganini market
+            // tarixida ko'rsatish uchun source_user_id = courier_id.
+            source_user_id: courier_id,
             amount,
             balance_after: market_cashbox.balance,
             comment,
@@ -661,6 +672,8 @@ export class CashBoxService
           source_user_id: market_id, // Store market ID for tracking
           amount,
           balance_after: mainCashbox.balance,
+          balance_after_cash: mainCashbox.balance_cash,
+          balance_after_card: mainCashbox.balance_card,
           comment,
           created_by: user.id,
           payment_date,
@@ -1284,6 +1297,8 @@ export class CashBoxService
       const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
         amount: updateCashboxDto.amount,
         balance_after: mainCashbox.balance,
+        balance_after_cash: mainCashbox.balance_cash,
+        balance_after_card: mainCashbox.balance_card,
         cashbox_id: mainCashbox.id,
         comment: updateCashboxDto.comment,
         operation_type: Operation_type.EXPENSE,
@@ -1354,6 +1369,8 @@ export class CashBoxService
       const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
         amount: updateCashboxDto.amount,
         balance_after: mainCashbox.balance,
+        balance_after_cash: mainCashbox.balance_cash,
+        balance_after_card: mainCashbox.balance_card,
         cashbox_id: mainCashbox.id,
         comment: updateCashboxDto.comment,
         operation_type: Operation_type.INCOME,
@@ -1456,6 +1473,8 @@ export class CashBoxService
       const cashboxHistory = queryRunner.manager.create(CashboxHistoryEntity, {
         amount,
         balance_after: mainCashbox.balance,
+        balance_after_cash: mainCashbox.balance_cash,
+        balance_after_card: mainCashbox.balance_card,
         cashbox_id: mainCashbox.id,
         comment:
           salaryDto?.comment || `${staff?.name || 'Hodim'} ga maosh to'landi`,
@@ -1499,6 +1518,106 @@ export class CashBoxService
       return catchError(error);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  /**
+   * Ishchining maosh to'lovlari tarixi.
+   * `cashbox_history` dagi SALARY yozuvlaridan o'qiydi (source_user_id = ishchi).
+   * Admin (har qanday ishchi uchun) va ishchining o'zi (my-history) ishlatadi.
+   */
+  async salaryHistory(
+    userId: string,
+    filters?: {
+      page?: number;
+      limit?: number;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    try {
+      const staff = await this.userRepo.findOne({
+        where: { id: userId },
+        relations: ['salary'],
+      });
+      if (!staff) {
+        throw new NotFoundException('User not found');
+      }
+
+      const page = filters?.page && filters.page > 0 ? filters.page : 1;
+      const limit = getSafeLimit(filters?.limit);
+      const skip = (page - 1) * limit;
+
+      let fromTs: number | null = null;
+      let toTs: number | null = null;
+      if (filters?.fromDate) {
+        fromTs = toUzbekistanTimestamp(filters.fromDate, false);
+      }
+      if (filters?.toDate) {
+        toTs = toUzbekistanTimestamp(filters.toDate, true);
+      }
+
+      const qb = this.cashboxHistoryRepo
+        .createQueryBuilder('h')
+        .leftJoinAndSelect('h.createdByUser', 'createdByUser')
+        .where('h.source_type = :st', { st: Source_type.SALARY })
+        .andWhere('h.source_user_id = :uid', { uid: userId })
+        .orderBy('h.created_at', 'DESC')
+        .skip(skip)
+        .take(limit);
+
+      if (fromTs !== null) {
+        qb.andWhere('h.created_at >= :fromTs', { fromTs });
+      }
+      if (toTs !== null) {
+        qb.andWhere('h.created_at <= :toTs', { toTs });
+      }
+
+      const [items, total] = await qb.getManyAndCount();
+
+      // Jami to'langan summa (sana filtridan mustaqil — umumiy)
+      const totalPaidRaw = await this.cashboxHistoryRepo
+        .createQueryBuilder('h')
+        .select('COALESCE(SUM(h.amount), 0)', 'sum')
+        .where('h.source_type = :st', { st: Source_type.SALARY })
+        .andWhere('h.source_user_id = :uid', { uid: userId })
+        .getRawOne();
+
+      const history = items.map((h) => ({
+        id: h.id,
+        created_at: h.created_at,
+        amount: h.amount,
+        payment_method: h.payment_method,
+        comment: h.comment,
+        paid_by: h.createdByUser
+          ? { id: h.createdByUser.id, name: h.createdByUser.name }
+          : null,
+      }));
+
+      return successRes(
+        {
+          user: { id: staff.id, name: staff.name, role: staff.role },
+          salary: staff.salary
+            ? {
+                salary_amount: staff.salary.salary_amount,
+                have_to_pay: staff.salary.have_to_pay,
+                payment_day: staff.salary.payment_day,
+              }
+            : null,
+          totalPaid: Number(totalPaidRaw?.sum ?? 0),
+          history,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+        200,
+        'Salary payment history',
+      );
+    } catch (error) {
+      return catchError(error);
     }
   }
 
@@ -1571,6 +1690,401 @@ export class CashBoxService
     } catch (error) {
       throw error;
     }
+  }
+
+  /**
+   * Bitta kuryer yoki market kassasi tarixini Excel'ga eksport qiladi.
+   * - Sana berilmasa (allHistory) — butun tarix.
+   * - sourceTypes berilsa (masalan oldi-berdi) — faqat shu turlar.
+   * Kuryer/market kassasi yagona balansli (naqd/karta ajratimsiz),
+   * shuning uchun asosiy kassadan farqli, sodda bitta jadval quriladi.
+   */
+  async exportUserCashboxToExcel(
+    id: string,
+    query: {
+      fromDate?: string;
+      toDate?: string;
+      sourceTypes?: string;
+      allHistory?: boolean;
+    },
+  ): Promise<{ buffer: Buffer; fileName: string }> {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const cashbox = await this.cashboxRepo.findOne({
+      where: { user_id: id },
+      relations: ['user'],
+    });
+    if (!cashbox) {
+      throw new NotFoundException('Cashbox not found');
+    }
+
+    const whereCondition: any = { cashbox_id: cashbox.id };
+
+    // Sana oralig'i (allHistory bo'lmaganda)
+    let periodLabel = 'Umumiy tarix';
+    if (!query.allHistory) {
+      let startDate = query.fromDate;
+      let endDate = query.toDate;
+      if (!startDate || !endDate) {
+        const { start, end } = getUzbekistanDayRange();
+        startDate = String(start);
+        endDate = String(end);
+        periodLabel = 'Bugungi kun';
+      } else {
+        const start = toUzbekistanTimestamp(startDate, false);
+        const end = toUzbekistanTimestamp(endDate, true);
+        periodLabel =
+          query.fromDate === query.toDate
+            ? `${query.fromDate}`
+            : `${query.fromDate} — ${query.toDate}`;
+        startDate = String(start);
+        endDate = String(end);
+      }
+      whereCondition.created_at = Between(Number(startDate), Number(endDate));
+    }
+
+    // source_type filter (oldi-berdi va h.k.)
+    const sourceTypeList = query.sourceTypes
+      ? query.sourceTypes.split(',').filter(Boolean)
+      : [];
+    if (sourceTypeList.length) {
+      whereCondition.source_type = In(sourceTypeList);
+    }
+
+    const cashboxHistory = await this.cashboxHistoryRepo.find({
+      where: whereCondition,
+      relations: ['createdByUser', 'sourceUser', 'order'],
+      order: { created_at: 'ASC' },
+    });
+
+    let income = 0;
+    let outcome = 0;
+    for (const h of cashboxHistory) {
+      if (h.operation_type === Operation_type.INCOME) income += h.amount ?? 0;
+      else outcome += h.amount ?? 0;
+    }
+
+    // Oldi-berdi tab'ini aniqlash (faqat to'lov turlari tanlangan bo'lsa)
+    const isPaymentsOnly =
+      sourceTypeList.length > 0 &&
+      sourceTypeList.every(
+        (t) =>
+          t === Source_type.COURIER_PAYMENT ||
+          t === Source_type.MARKET_PAYMENT,
+      );
+
+    const roleLabel = cashbox.user?.role === Roles.MARKET ? 'Market' : 'Kuryer';
+    const filterLabel = isPaymentsOnly ? 'Oldi-berdi' : 'Barcha tarix';
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Kassa tarixi');
+    this.buildUserCashboxSheet(worksheet, {
+      userName: user.name || cashbox.user?.name || 'Nomalum',
+      roleLabel,
+      periodLabel,
+      filterLabel,
+      currentBalance: cashbox.balance ?? 0,
+      income,
+      outcome,
+      cashboxHistory,
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const safeName = (user.name || roleLabel).replace(/[^\p{L}\p{N}_-]+/gu, '_');
+    const periodPart = query.allHistory
+      ? 'umumiy'
+      : query.fromDate && query.toDate
+        ? query.fromDate === query.toDate
+          ? query.fromDate
+          : `${query.fromDate}_${query.toDate}`
+        : 'bugun';
+    const fileName = `kassa-${safeName}-${periodPart}.xlsx`;
+
+    return { buffer: buffer as any, fileName };
+  }
+
+  /** source_type uchun o'zbekcha yorliq (frontend bilan mos) */
+  private getSourceTypeLabelUz(sourceType: string): string {
+    const labels: Record<string, string> = {
+      [Source_type.COURIER_PAYMENT]: "Kuryer to'lovi",
+      [Source_type.MARKET_PAYMENT]: "Market to'lovi",
+      [Source_type.MANUAL_EXPENSE]: "Qo'lda chiqim",
+      [Source_type.MANUAL_INCOME]: "Qo'lda kirim",
+      [Source_type.CORRECTION]: 'Tuzatish',
+      [Source_type.SALARY]: 'Maosh',
+      [Source_type.SELL]: 'Sotuv',
+      [Source_type.CANCEL]: 'Bekor qilish',
+      [Source_type.EXTRA_COST]: "Qo'shimcha xarajat",
+      [Source_type.BILLS]: "To'lovlar",
+    };
+    return labels[sourceType] || sourceType;
+  }
+
+  /** to'lov usuli uchun o'zbekcha yorliq */
+  private getPaymentMethodLabelUz(method: string | null): string {
+    switch (method) {
+      case PaymentMethod.CASH:
+        return 'Naqd';
+      case PaymentMethod.CLICK:
+        return 'Karta (Click)';
+      case PaymentMethod.CLICK_TO_MARKET:
+        return 'Karta (Marketga)';
+      default:
+        return '-';
+    }
+  }
+
+  /** bigint ms timestamp'ni UZB (UTC+5) bo'yicha o'qiladigan ko'rinishga aylantiradi */
+  private formatUzDateTime(ts: number | string): string {
+    const d = new Date(Number(ts) + 5 * 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(
+      d.getUTCDate(),
+    )} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+  }
+
+  /**
+   * Kuryer/market kassasi tarixini bitta jadval ko'rinishida quradi.
+   */
+  private buildUserCashboxSheet(
+    worksheet: ExcelJS.Worksheet,
+    data: {
+      userName: string;
+      roleLabel: string;
+      periodLabel: string;
+      filterLabel: string;
+      currentBalance: number;
+      income: number;
+      outcome: number;
+      cashboxHistory: CashboxHistoryEntity[];
+    },
+  ) {
+    const NUM_FMT = '#,##0';
+    const COLS = 9; // A..I
+    const lastColLetter = 'I';
+    const border = {
+      top: { style: 'thin' as const, color: { argb: 'FFB0B0B0' } },
+      left: { style: 'thin' as const, color: { argb: 'FFB0B0B0' } },
+      bottom: { style: 'thin' as const, color: { argb: 'FFB0B0B0' } },
+      right: { style: 'thin' as const, color: { argb: 'FFB0B0B0' } },
+    };
+
+    // Ustun kengliklari
+    const widths = [6, 18, 12, 18, 16, 16, 16, 18, 30];
+    widths.forEach((w, i) => (worksheet.getColumn(i + 1).width = w));
+
+    // ===== ROW 1: Sarlavha =====
+    worksheet.mergeCells(`A1:${lastColLetter}1`);
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `${data.userName} — ${data.roleLabel} kassasi`;
+    titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF6D28D9' },
+    };
+    worksheet.getRow(1).height = 26;
+
+    // ===== ROW 2: Davr va filtr =====
+    worksheet.mergeCells(`A2:${lastColLetter}2`);
+    const subCell = worksheet.getCell('A2');
+    subCell.value = `Davr: ${data.periodLabel}    |    Ko'rinish: ${data.filterLabel}`;
+    subCell.font = { bold: true, size: 11, color: { argb: 'FF4B5563' } };
+    subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    subCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFEDE9FE' },
+    };
+    worksheet.getRow(2).height = 20;
+
+    // ===== ROW 3: Xulosa (Jami kirim / chiqim / sof / joriy balans) =====
+    const summary: Array<[string, string, number, string]> = [
+      ['A3', 'B3', data.income, 'FFDCFCE7'],
+      ['C3', 'D3', data.outcome, 'FFFEE2E2'],
+      ['E3', 'F3', data.income - data.outcome, 'FFFEF9C3'],
+      ['G3', 'H3', data.currentBalance, 'FFDBEAFE'],
+    ];
+    const summaryTitles = [
+      'Jami kirim',
+      'Jami chiqim',
+      'Sof oʻzgarish',
+      'Joriy balans',
+    ];
+    summary.forEach(([labelCell, valCell, value, bg], idx) => {
+      const lc = worksheet.getCell(labelCell);
+      lc.value = summaryTitles[idx];
+      lc.font = { bold: true, size: 10 };
+      lc.alignment = { horizontal: 'left', vertical: 'middle' };
+      lc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      lc.border = border;
+
+      const vc = worksheet.getCell(valCell);
+      vc.value = value;
+      vc.numFmt = NUM_FMT;
+      vc.font = { bold: true, size: 10 };
+      vc.alignment = { horizontal: 'right', vertical: 'middle' };
+      vc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      vc.border = border;
+    });
+    // I3 bo'sh — chegara
+    worksheet.getCell('I3').border = border;
+    worksheet.getRow(3).height = 20;
+
+    // ===== ROW 5: Jadval sarlavhasi =====
+    const headerRowIdx = 5;
+    const headers = [
+      '№',
+      'Sana / vaqt',
+      'Amaliyot',
+      'Turi',
+      'Summa (soʻm)',
+      "To'lov usuli",
+      'Balans (keyin)',
+      'Buyurtma №',
+      'Izoh',
+    ];
+    const headerRow = worksheet.getRow(headerRowIdx);
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF7C3AED' },
+      };
+      cell.border = border;
+    });
+    headerRow.height = 22;
+
+    // ===== DATA ROWS =====
+    let rowIdx = headerRowIdx + 1;
+    data.cashboxHistory.forEach((tx, i) => {
+      const isIncome = tx.operation_type === Operation_type.INCOME;
+      const row = worksheet.getRow(rowIdx);
+
+      // Turi — click_to_market o'tkazmasida pul kimga/kimdan ketganini ham qo'shamiz
+      let typeLabel = this.getSourceTypeLabelUz(tx.source_type);
+      if (
+        tx.payment_method === PaymentMethod.CLICK_TO_MARKET &&
+        tx.sourceUser?.name
+      ) {
+        typeLabel = `${typeLabel} ${isIncome ? '←' : '→'} ${tx.sourceUser.name}`;
+      }
+
+      const values: Array<string | number> = [
+        i + 1,
+        this.formatUzDateTime(tx.created_at),
+        isIncome ? 'Kirim' : 'Chiqim',
+        typeLabel,
+        tx.amount ?? 0,
+        this.getPaymentMethodLabelUz(tx.payment_method),
+        tx.balance_after ?? 0,
+        tx.order?.order_number ? `#${tx.order.order_number}` : '-',
+        tx.comment || '-',
+      ];
+      values.forEach((v, c) => {
+        const cell = row.getCell(c + 1);
+        cell.value = v;
+        cell.font = { size: 10 };
+        cell.border = border;
+        if (c === 4 || c === 6) {
+          // Summa va Balans — raqam, o'ngga
+          cell.numFmt = NUM_FMT;
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        } else if (c === 0 || c === 2 || c === 5 || c === 7) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else {
+          cell.alignment = {
+            horizontal: 'left',
+            vertical: 'middle',
+            wrapText: c === 8,
+          };
+        }
+      });
+      // Amaliyot ustuni rangi
+      const opCell = row.getCell(3);
+      opCell.font = {
+        size: 10,
+        bold: true,
+        color: { argb: isIncome ? 'FF16A34A' : 'FFDC2626' },
+      };
+      // zebra
+      if (i % 2 === 1) {
+        for (let c = 1; c <= COLS; c++) {
+          if (c === 3) continue;
+          row.getCell(c).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF5F3FF' },
+          };
+        }
+      }
+      rowIdx++;
+    });
+
+    // Bo'sh tarix holati
+    if (data.cashboxHistory.length === 0) {
+      worksheet.mergeCells(`A${rowIdx}:${lastColLetter}${rowIdx}`);
+      const emptyCell = worksheet.getCell(`A${rowIdx}`);
+      emptyCell.value = 'Tanlangan davr uchun maʼlumot topilmadi';
+      emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      emptyCell.font = { italic: true, color: { argb: 'FF9CA3AF' } };
+      emptyCell.border = border;
+      rowIdx++;
+    }
+
+    // ===== JAMI qatori =====
+    const totalRow = worksheet.getRow(rowIdx);
+    totalRow.getCell(1).value = 'JAMI';
+    worksheet.mergeCells(`A${rowIdx}:D${rowIdx}`);
+    const totalLabel = worksheet.getCell(`A${rowIdx}`);
+    totalLabel.font = { bold: true, size: 11 };
+    totalLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+
+    const incomeMinusOutcome = data.income - data.outcome;
+    const totalAmountCell = totalRow.getCell(5);
+    totalAmountCell.value = incomeMinusOutcome;
+    totalAmountCell.numFmt = NUM_FMT;
+    totalAmountCell.font = {
+      bold: true,
+      size: 11,
+      color: {
+        argb: incomeMinusOutcome >= 0 ? 'FF16A34A' : 'FFDC2626',
+      },
+    };
+    totalAmountCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+    const totalBalanceCell = totalRow.getCell(7);
+    totalBalanceCell.value = data.currentBalance;
+    totalBalanceCell.numFmt = NUM_FMT;
+    totalBalanceCell.font = { bold: true, size: 11 };
+    totalBalanceCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+    for (let c = 1; c <= COLS; c++) {
+      const cell = totalRow.getCell(c);
+      cell.border = border;
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5E7EB' },
+      };
+    }
+    totalRow.height = 22;
+
+    // Yuqori qatorni muzlatish (sarlavha doim ko'rinadi)
+    worksheet.views = [{ state: 'frozen', ySplit: headerRowIdx }];
   }
 
   /**

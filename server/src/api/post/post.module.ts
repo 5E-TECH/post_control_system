@@ -6,6 +6,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
+import { RegionEntity } from 'src/core/entity/region.entity';
 import { LdgCargoModule } from '../ldg-cargo/ldg-cargo.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { LdgCargoModule } from '../ldg-cargo/ldg-cargo.module';
       OrderEntity,
       UserEntity,
       CourierRegionEntity,
+      RegionEntity,
     ]),
     LdgCargoModule,
   ],

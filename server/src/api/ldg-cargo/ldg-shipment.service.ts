@@ -36,28 +36,6 @@ export class LdgShipmentService {
   ) {}
 
   /**
-   * Tekshiradi: bu order LDG orqali yetkazib berilishi kerakmi?
-   * - Sozlamada faol bo'lishi shart
-   * - Order district_id bo'lishi shart
-   * - Order district sato_code enabled_district_sato_codes ichida bo'lishi shart
-   */
-  async shouldDeliverViaLdg(order: OrderEntity): Promise<boolean> {
-    const config = await this.configRepo.findOne({ where: {} });
-    if (!config || !config.is_active) return false;
-    if (!order.district_id) return false;
-
-    const district = await this.districtRepo.findOne({
-      where: { id: order.district_id },
-    });
-    if (!district || !district.sato_code) return false;
-
-    const districtSato = Number(district.sato_code);
-    if (!Number.isFinite(districtSato)) return false;
-
-    return config.enabled_district_sato_codes.includes(districtSato);
-  }
-
-  /**
    * Order uchun LDG ga shipment yaratadi (POST /orders).
    * Shu vaqtda LdgShipmentEntity ham yaratiladi/yangilanadi.
    *
@@ -213,6 +191,13 @@ export class LdgShipmentService {
     shipment.ldg_status_changed_at = changedAt
       ? changedAt.getTime()
       : Date.now();
+    return this.shipmentRepo.save(shipment);
+  }
+
+  /**
+   * Shipment'ni umumiy saqlash — mismatch belgilari va h.k. uchun.
+   */
+  async saveShipment(shipment: LdgShipmentEntity): Promise<LdgShipmentEntity> {
     return this.shipmentRepo.save(shipment);
   }
 

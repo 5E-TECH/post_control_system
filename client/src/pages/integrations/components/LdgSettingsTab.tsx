@@ -13,7 +13,6 @@ import {
   Divider,
   Tooltip,
   Modal,
-  TreeSelect,
 } from "antd";
 import {
   ShieldCheck,
@@ -121,9 +120,6 @@ export const LdgSettingsTab = () => {
     region_id?: string;
   }>();
 
-  // LDG ga jo'natiladigan tumanlar — sato_code (string) ko'rinishida
-  const [enabledSatoCodes, setEnabledSatoCodes] = useState<string[]>([]);
-
   useEffect(() => {
     const config = unwrap(data);
     if (!config) return;
@@ -147,9 +143,6 @@ export const LdgSettingsTab = () => {
         | "sender"
         | "third_party",
     });
-    setEnabledSatoCodes(
-      (config.enabled_district_sato_codes ?? []).map((n) => String(n)),
-    );
   }, [data, form]);
 
   const config = unwrap(data);
@@ -161,11 +154,6 @@ export const LdgSettingsTab = () => {
     if (!cleaned.api_key) delete cleaned.api_key;
     if (!cleaned.webhook_secret) delete cleaned.webhook_secret;
     if (!cleaned.webhook_secret_previous) delete cleaned.webhook_secret_previous;
-
-    // SOATO kodlarini number'ga aylantiramiz (TreeSelect string saqlaydi)
-    cleaned.enabled_district_sato_codes = enabledSatoCodes
-      .map((s) => Number(s))
-      .filter((n) => Number.isFinite(n));
 
     try {
       await updateConfig.mutateAsync(cleaned);
@@ -200,39 +188,6 @@ export const LdgSettingsTab = () => {
   const senderRegionDistricts = senderRegion
     ? districts.filter((d) => d.region_id === senderRegion.id)
     : [];
-
-  // TreeSelect uchun viloyat → tumanlar daraxti
-  // Faqat sato_code bor regionlarni ko'rsatamiz, sato_code yo'q tumanlarni esa
-  // disabled qilib ko'rsatamiz (LDG'ga yuborib bo'lmaydi)
-  const regionDistrictTree = regions.map((r) => {
-    const children = districts
-      .filter((d) => d.region_id === r.id)
-      .map((d) => ({
-        title: d.sato_code
-          ? d.name
-          : `${d.name} (SOATO yo'q)`,
-        value: d.sato_code ?? `__no_sato__${d.id}`,
-        disabled: !d.sato_code,
-        key: d.id,
-      }));
-    return {
-      title: r.sato_code ? r.name : `${r.name} (SOATO yo'q)`,
-      value: `region_${r.id}`,
-      selectable: false,
-      checkable: false,
-      disabled: !r.sato_code,
-      key: `region_${r.id}`,
-      children,
-    };
-  });
-
-  // Tanlangan SOATO'lar ichidan bizning DB'da topilmaganlari
-  const knownSatoCodes = new Set(
-    districts.filter((d) => d.sato_code).map((d) => String(d.sato_code)),
-  );
-  const orphanSatoCodes = enabledSatoCodes.filter(
-    (s) => !knownSatoCodes.has(s),
-  );
 
   const handleBind = async () => {
     if (!selectedCourierId) {
@@ -713,59 +668,6 @@ export const LdgSettingsTab = () => {
               />
             </Form.Item>
           </div>
-        </Card>
-
-        {/* ENABLED DISTRICTS */}
-        <Card
-          title={
-            <span className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" /> LDG orqali yetkaziladigan tumanlar
-            </span>
-          }
-          className="mb-4"
-          extra={
-            <span className="text-xs text-gray-500">
-              Tanlangan: {enabledSatoCodes.length} ta tuman
-            </span>
-          }
-        >
-          <TreeSelect
-            treeData={regionDistrictTree}
-            value={enabledSatoCodes}
-            onChange={(vals: string[]) => setEnabledSatoCodes(vals)}
-            treeCheckable
-            showSearch
-            treeNodeFilterProp="title"
-            placeholder="Viloyat va tumanlarni tanlang..."
-            style={{ width: "100%" }}
-            maxTagCount="responsive"
-            allowClear
-            treeDefaultExpandAll={false}
-            showCheckedStrategy={TreeSelect.SHOW_CHILD}
-          />
-          <div className="text-xs text-gray-500 mt-2">
-            Tanlangan tumanlarga buyurtma yaratilganda, sistema avtomatik LDG'ga
-            jo'natadi. Boshqa tumanlar oddiy ichki kuryerlar tomonidan
-            yetkazib beriladi. SOATO kodi yo'q tumanlar tanlanmaydi —{" "}
-            <b>Hududlar</b> sahifasida SOATO biriktiring.
-          </div>
-
-          {orphanSatoCodes.length > 0 && (
-            <div className="mt-3 p-2 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 text-xs">
-              <div className="font-medium text-orange-700 dark:text-orange-300 mb-1">
-                ⚠ Bizning DB'da topilmagan SOATO kodlar:
-              </div>
-              <div className="font-mono text-orange-600 dark:text-orange-300">
-                {orphanSatoCodes.join(", ")}
-              </div>
-              <div className="text-orange-600 dark:text-orange-400 mt-1">
-                Bu kodlar konfiguratsiyada saqlangan, lekin tizim tumanlariga
-                mos kelmaydi. Saqlasangiz qoladi; ro'yxatdan olib tashlash uchun
-                tanlovni qayta belgilang yoki Hududlar sahifasida tegishli
-                tumanga SOATO kod biriktiring.
-              </div>
-            </div>
-          )}
         </Card>
 
         <Divider />

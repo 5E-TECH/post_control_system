@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
@@ -76,6 +77,22 @@ export class LdgAdminController {
   }
 
   @ApiOperation({
+    summary: 'Yuborilmagan/xatoli barcha shipmentlarning order_id ro\'yxati',
+  })
+  @Get('shipments/retry-candidates')
+  async retryCandidates() {
+    return this.adminService.getRetryCandidates();
+  }
+
+  @ApiOperation({
+    summary: 'Bir guruh (10 ta) buyurtmani ketma-ket qayta jo\'natish',
+  })
+  @Post('shipments/redispatch-batch')
+  async redispatchBatch(@Body() body: { orderIds: string[] }) {
+    return this.adminService.redispatchBatch(body?.orderIds ?? []);
+  }
+
+  @ApiOperation({
     summary: 'Bitta shipment statusini LDG\'dan tortib olib yangilash',
   })
   @Post('shipments/:orderId/sync')
@@ -89,5 +106,13 @@ export class LdgAdminController {
   @Post('reconcile')
   async reconcile() {
     return this.adminService.reconcileActiveShipments();
+  }
+
+  @ApiOperation({
+    summary: 'Mismatch\'ni "hal qilindi" deb belgilash (admin tekshirib chiqqach)',
+  })
+  @Post('shipments/:orderId/resolve-mismatch')
+  async resolveMismatch(@Param('orderId') orderId: string) {
+    return this.adminService.resolveMismatch(orderId);
   }
 }

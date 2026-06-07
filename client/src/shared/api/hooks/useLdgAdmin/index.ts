@@ -14,7 +14,6 @@ export interface LdgHealth {
     tenant_domain_set: boolean;
     courier_set: boolean;
     sender_complete: boolean;
-    enabled_districts_count: number;
     is_active: boolean;
     is_sandbox: boolean;
   };
@@ -23,6 +22,7 @@ export interface LdgHealth {
     delivered: number;
     with_error: number;
     pending: number;
+    mismatch: number;
   };
   webhooks: {
     total: number;
@@ -55,13 +55,21 @@ export interface LdgShipmentRow {
   tracking_number: string | null;
   ldg_status: string | null;
   ldg_status_changed_at: number | null;
+  ldg_created_at: number | null;
+  last_synced_at: number | null;
   send_attempts: number;
   last_error: string | null;
+  mismatch_at: number | null;
+  mismatch_reason: string | null;
   created_at: number;
+  order_number: number | null;
   order_status: string | null;
   order_total_price: number | null;
   customer_name: string | null;
   customer_phone: string | null;
+  district_name: string | null;
+  region_name: string | null;
+  market_name: string | null;
 }
 
 export interface Paginated<T> {
@@ -125,6 +133,7 @@ export const useLdgAdmin = () => {
           .get("ldg/admin/webhook-logs", { params })
           .then((res) => unwrap<Paginated<LdgWebhookLog>>(res.data)),
       enabled,
+      refetchInterval: 30000,
     });
 
   const getShipments = (
@@ -138,6 +147,7 @@ export const useLdgAdmin = () => {
           .get("ldg/admin/shipments", { params })
           .then((res) => unwrap<Paginated<LdgShipmentRow>>(res.data)),
       enabled,
+      refetchInterval: 30000,
     });
 
   const testConnection = useMutation({
@@ -156,6 +166,32 @@ export const useLdgAdmin = () => {
       client.invalidateQueries({ queryKey: [SHIPMENTS_KEY] });
       client.invalidateQueries({ queryKey: [HEALTH_KEY] });
     },
+  });
+
+  // Yuborilmagan/xatoli barcha order_id'lar (imperativ — tugma bosilganda chaqiriladi)
+  const getRetryCandidates = async (): Promise<string[]> =>
+    api
+      .get("ldg/admin/shipments/retry-candidates")
+      .then((res) => unwrap<string[]>(res.data));
+
+  // Bir guruh (10 ta) buyurtmani ketma-ket qayta jo'natish.
+  // Frontend butun ro'yxatni 10 tadan bo'lib shu mutatsiyani ketma-ket chaqiradi.
+  const redispatchBatch = useMutation({
+    mutationFn: (orderIds: string[]) =>
+      api
+        .post("ldg/admin/shipments/redispatch-batch", { orderIds })
+        .then((res) =>
+          unwrap<{
+            total: number;
+            success: number;
+            failed: number;
+            results: Array<{
+              order_id: string;
+              success: boolean;
+              message: string;
+            }>;
+          }>(res.data),
+        ),
   });
 
   const reprocessWebhook = useMutation({
@@ -200,14 +236,29 @@ export const useLdgAdmin = () => {
     },
   });
 
+  // Mismatch'ni "hal qilindi" deb belgilash (admin qo'lda tekshirib chiqqach)
+  const resolveMismatch = useMutation({
+    mutationFn: (orderId: string) =>
+      api
+        .post(`ldg/admin/shipments/${orderId}/resolve-mismatch`)
+        .then((res) => unwrap<ActionResult>(res.data)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [SHIPMENTS_KEY] });
+      client.invalidateQueries({ queryKey: [HEALTH_KEY] });
+    },
+  });
+
   return {
     getHealth,
     getWebhookLogs,
     getShipments,
     testConnection,
     redispatch,
+    getRetryCandidates,
+    redispatchBatch,
     reprocessWebhook,
     syncOne,
     reconcileAll,
+    resolveMismatch,
   };
 };

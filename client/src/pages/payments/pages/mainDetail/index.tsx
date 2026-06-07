@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
+import { SalaryHistory } from "../../components/SalaryHistory";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
 import {
   BanknoteArrowDown,
@@ -956,6 +957,9 @@ const MainDetail = () => {
                   <><Wallet className="w-5 h-5" /> Maosh to'lash</>
                 )}
               </button>
+
+              {/* Oldingi maosh to'lovlari tarixi */}
+              <SalaryHistory userId={salaryUser?.id} enabled={!!salaryUser?.id} />
             </div>
           )}
         </div>
@@ -1026,8 +1030,18 @@ const MainDetail = () => {
                         <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
                           item.id === select ? "bg-white/20" : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                         }`}>
-                          {item?.region?.name || "—"}
+                          {item?.serves_all_regions
+                            ? "Barcha viloyatlar"
+                            : item?.region?.name ||
+                              (item?.is_super_courier ? "Super kuryer" : "—")}
                         </span>
+                        {item?.is_super_courier && !item?.serves_all_regions && (
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+                            item.id === select ? "bg-white/20" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                          }`}>
+                            Super
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className={`text-right ${item.id === select ? "" : ""}`}>

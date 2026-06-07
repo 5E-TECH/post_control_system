@@ -1,6 +1,7 @@
 // Beepost - Client Routes v3
 import { lazy, memo } from "react";
 import { Navigate, useRoutes } from "react-router-dom";
+import RequireRole from "../shared/components/require-role";
 
 const ScanAndOrder = lazy(
   () =>
@@ -131,6 +132,7 @@ const OperatorStats = lazy(
 const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
 const OperatorOrders = lazy(() => import("../pages/operator-orders"));
 const CourierBulk = lazy(() => import("../pages/courier-bulk"));
+const MyRegion = lazy(() => import("../pages/my-region"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -299,7 +301,8 @@ const AppRouters = () => {
             },
             { path: "send-message", element: <SendMessage /> },
             { path: "m-balance", element: <FinancialHistory /> },
-            { path: "logs", element: <LogsPage /> },
+            // Logs endi Settings ichida — eski URL redirect
+            { path: "logs", element: <Navigate to="/settings/logs" replace /> },
             {
               path: "payments",
               element: <Payments />,
@@ -309,7 +312,12 @@ const AppRouters = () => {
               ],
             },
             { path: "cash-box", element: <CashDetailMarketCourier /> },
-            { path: "roles-permissions", element: <RolesPermissions /> },
+            { path: "my-region", element: <MyRegion /> },
+            // Rollar endi Settings ichida — eski URL redirect
+            {
+              path: "roles-permissions",
+              element: <Navigate to="/settings/roles-permissions" replace />,
+            },
             {
               path: "profile",
               element: <Profile />,
@@ -323,17 +331,20 @@ const AppRouters = () => {
               path: "regions",
               element: <Regions />,
               children: [
+                // Config sub-sahifalar endi Settings ichida — eski URL redirect
                 {
                   path: "districts",
-                  element: <Districts />,
+                  element: <Navigate to="/settings/districts" replace />,
                 },
                 {
                   path: "sato-management",
-                  element: <SatoManagement />,
+                  element: <Navigate to="/settings/sato-management" replace />,
                 },
                 {
                   path: "logist-assignment",
-                  element: <LogistAssignment />,
+                  element: (
+                    <Navigate to="/settings/logist-assignment" replace />
+                  ),
                 },
               ],
             },
@@ -348,7 +359,51 @@ const AppRouters = () => {
               children: [
                 {
                   path: "integrations",
-                  element: <Integrations />,
+                  element: (
+                    <RequireRole roles={["admin", "superadmin"]}>
+                      <Integrations />
+                    </RequireRole>
+                  ),
+                },
+                {
+                  path: "logist-assignment",
+                  element: (
+                    <RequireRole roles={["admin", "superadmin"]}>
+                      <LogistAssignment />
+                    </RequireRole>
+                  ),
+                },
+                {
+                  path: "districts",
+                  element: (
+                    <RequireRole roles={["superadmin"]}>
+                      <Districts />
+                    </RequireRole>
+                  ),
+                },
+                {
+                  path: "sato-management",
+                  element: (
+                    <RequireRole roles={["superadmin"]}>
+                      <SatoManagement />
+                    </RequireRole>
+                  ),
+                },
+                {
+                  path: "roles-permissions",
+                  element: (
+                    <RequireRole roles={["superadmin"]}>
+                      <RolesPermissions />
+                    </RequireRole>
+                  ),
+                },
+                {
+                  path: "logs",
+                  element: (
+                    <RequireRole roles={["admin", "superadmin"]}>
+                      <LogsPage />
+                    </RequireRole>
+                  ),
                 },
               ],
             },

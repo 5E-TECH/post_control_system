@@ -57,5 +57,7 @@
   "revenue": "Revenue",
   "sum": "UZS",
   "couriers": "Couriers",
-  "clickForDetails": "Click for details"
+  "clickForDetails": "Click for details",
+  "unassigned": "Unassigned",
+  "unassignedHint": "No courier assigned (NEW post)"
 }

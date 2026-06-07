@@ -44,6 +44,11 @@ const CreateCourier = () => {
   const [isSuper, setIsSuper] = useState(false);
   const [servesAll, setServesAll] = useState(false);
   const [selectedRegionIds, setSelectedRegionIds] = useState<string[]>([]);
+  // Har bir viloyat uchun alohida tarif (ixtiyoriy). Bo'sh bo'lsa umumiy
+  // (flat) tarif ishlatiladi (backend fallback).
+  const [regionTariffs, setRegionTariffs] = useState<
+    Record<string, { home: string; center: string }>
+  >({});
 
   const { getRegions } = useRegion();
   const { data } = getRegions();
@@ -54,7 +59,7 @@ const CreateCourier = () => {
     })) || [];
 
   const selectedRegion = regions.find(
-    (r: any) => r.value === formData.region_id
+    (r: any) => r.value === formData.region_id,
   );
 
   useEffect(() => {
@@ -81,7 +86,7 @@ const CreateCourier = () => {
     if (val.length > 0) {
       formatted += val
         .replace(/(\d{2})(\d{0,3})(\d{0,2})(\d{0,2}).*/, (_, a, b, c, d) =>
-          [a, b, c, d].filter(Boolean).join(" ")
+          [a, b, c, d].filter(Boolean).join(" "),
         )
         .trim();
     }
@@ -95,12 +100,37 @@ const CreateCourier = () => {
     setFormData((prev) => ({ ...prev, [field]: formatted }));
   };
 
+  const toggleRegion = (regionId: string) => {
+    setSelectedRegionIds((prev) =>
+      prev.includes(regionId)
+        ? prev.filter((r) => r !== regionId)
+        : [...prev, regionId],
+    );
+  };
+
+  const handleRegionTariff = (
+    regionId: string,
+    field: "home" | "center",
+    value: string,
+  ) => {
+    const onlyNums = value.replace(/\D/g, "");
+    const formatted = onlyNums.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    setRegionTariffs((prev) => ({
+      ...prev,
+      [regionId]: {
+        ...(prev[regionId] ?? { home: "", center: "" }),
+        [field]: formatted,
+      },
+    }));
+  };
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
     if (isSuper) {
       if (!servesAll && selectedRegionIds.length === 0) {
-        newErrors.region_id = "Kamida bitta viloyat tanlang yoki 'Barcha viloyatlar'ni yoqing";
+        newErrors.region_id =
+          "Kamida bitta viloyat tanlang yoki 'Barcha viloyatlar'ni yoqing";
       }
     } else if (!formData.region_id) {
       newErrors.region_id = t("selectLocation");
@@ -148,10 +178,25 @@ const CreateCourier = () => {
     if (isSuper) {
       newCourier.is_super_courier = true;
       newCourier.serves_all_regions = servesAll;
-      // Phase 1: flat tarif — per-region tarifsiz (region tarifi keyin qo'shiladi)
+      // Har viloyat uchun ixtiyoriy tarif. Bo'sh qoldirilsa backend umumiy
+      // (flat) tarifga fallback qiladi. "Barcha viloyatlar"da region ro'yxati
+      // bo'lmagani uchun faqat flat tarif ishlatiladi.
       newCourier.regions = servesAll
         ? []
-        : selectedRegionIds.map((region_id) => ({ region_id }));
+        : selectedRegionIds.map((region_id) => {
+            const tr = regionTariffs[region_id];
+            const home = tr?.home
+              ? Number(tr.home.replace(/,/g, ""))
+              : undefined;
+            const center = tr?.center
+              ? Number(tr.center.replace(/,/g, ""))
+              : undefined;
+            return {
+              region_id,
+              ...(home ? { tariff_home: home } : {}),
+              ...(center ? { tariff_center: center } : {}),
+            };
+          });
     } else {
       newCourier.region_id = formData.region_id;
     }
@@ -294,34 +339,78 @@ const CreateCourier = () => {
                 ({selectedRegionIds.length} tanlandi)
               </span>
             </label>
-            <div className="rounded-xl border border-gray-200 dark:border-gray-700 max-h-48 overflow-y-auto p-1">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">
+              Har viloyat uchun alohida tarif (ixtiyoriy). Bo'sh qoldirilsa
+              umumiy tarif ishlatiladi.
+            </p>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto p-1 space-y-1">
               {regions.map((region: any) => {
                 const checked = selectedRegionIds.includes(region.value);
+                const tr = regionTariffs[region.value] || {
+                  home: "",
+                  center: "",
+                };
                 return (
-                  <label
+                  <div
                     key={region.value}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                      checked
-                        ? "bg-amber-100 dark:bg-amber-900/30"
-                        : "hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                    className={`rounded-lg transition-colors ${
+                      checked ? "bg-amber-100/60 dark:bg-amber-900/20" : ""
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() =>
-                        setSelectedRegionIds((prev) =>
-                          prev.includes(region.value)
-                            ? prev.filter((r) => r !== region.value)
-                            : [...prev, region.value],
-                        )
-                      }
-                      className="w-4 h-4 accent-amber-500"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {region.label}
-                    </span>
-                  </label>
+                    <label
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                        checked
+                          ? ""
+                          : "hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleRegion(region.value)}
+                        className="w-4 h-4 accent-amber-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        {region.label}
+                      </span>
+                    </label>
+                    {checked && (
+                      <div className="grid grid-cols-2 gap-2 px-3 pb-2.5 pt-0.5">
+                        <div className="relative">
+                          <Home className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                          <input
+                            type="text"
+                            value={tr.home}
+                            onChange={(e) =>
+                              handleRegionTariff(
+                                region.value,
+                                "home",
+                                e.target.value,
+                              )
+                            }
+                            placeholder={`Uyga: ${formData.tariff_home || "umumiy"}`}
+                            className="w-full h-9 pl-8 pr-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                          />
+                        </div>
+                        <div className="relative">
+                          <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                          <input
+                            type="text"
+                            value={tr.center}
+                            onChange={(e) =>
+                              handleRegionTariff(
+                                region.value,
+                                "center",
+                                e.target.value,
+                              )
+                            }
+                            placeholder={`Markazga: ${formData.tariff_center || "umumiy"}`}
+                            className="w-full h-9 pl-8 pr-2 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#312D4B] text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

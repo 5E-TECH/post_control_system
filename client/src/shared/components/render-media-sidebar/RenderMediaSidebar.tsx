@@ -42,37 +42,37 @@ const Navbar = ({ role }: { role: string }) => {
               to={buildAdminPath()}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House className="w-5 h-5" />
+              <House className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("orders")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag className="w-5 h-5" />
+              <ShoppingBag className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("all-users")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <UserRound className="w-5 h-5" />
+              <UserRound className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("payments")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <CreditCard className="w-5 h-5" />
+              <CreditCard className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("m-balance")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Scale className="w-5 h-5" />
+              <Scale className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("logs")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <FileText className="w-5 h-5" />
+              <FileText className="w-6 h-6" />
             </NavLink>
             </div>
           </div>
@@ -85,31 +85,31 @@ const Navbar = ({ role }: { role: string }) => {
               to={buildAdminPath()}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House className="w-5 h-5" />
+              <House className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("orders")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag className="w-5 h-5" />
+              <ShoppingBag className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("all-users")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <UserRound className="w-5 h-5" />
+              <UserRound className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("payments")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <CreditCard className="w-5 h-5" />
+              <CreditCard className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("m-balance")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Scale className="w-5 h-5" />
+              <Scale className="w-6 h-6" />
             </NavLink>
             </div>
           </div>
@@ -122,31 +122,31 @@ const Navbar = ({ role }: { role: string }) => {
               to={buildAdminPath()}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House className="w-5 h-5" />
+              <House className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("orders")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag className="w-5 h-5" />
+              <ShoppingBag className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("order/markets/new-orders")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Calendar1 className="w-5 h-5" />
+              <Calendar1 className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("mails")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <MailOpen className="w-5 h-5" />
+              <MailOpen className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("products")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Apple className="w-5 h-5" />
+              <Apple className="w-6 h-6" />
             </NavLink>
             </div>
           </div>
@@ -159,13 +159,13 @@ const Navbar = ({ role }: { role: string }) => {
               to={buildAdminPath()}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House className="w-5 h-5" />
+              <House className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("courier-orders/orders")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag className="w-5 h-5" />
+              <ShoppingBag className="w-6 h-6" />
             </NavLink>
 
             {/* QR Scanner - Markazda va yuqoriga chiqib turadi */}
@@ -173,20 +173,20 @@ const Navbar = ({ role }: { role: string }) => {
               to={buildAdminPath("scan")}
               className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] text-white shadow-lg shadow-purple-500/40 -mt-8 border-4 border-[#1e1e2d]"
             >
-              <QrCode className="w-6 h-6" />
+              <QrCode className="w-7 h-7" />
             </NavLink>
 
             <NavLink
               to={buildAdminPath("courier-mails")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <MailOpen className="w-5 h-5" />
+              <MailOpen className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("cash-box")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <CreditCard className="w-5 h-5" />
+              <CreditCard className="w-6 h-6" />
             </NavLink>
             </div>
           </div>
@@ -199,31 +199,31 @@ const Navbar = ({ role }: { role: string }) => {
               to={buildAdminPath()}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House className="w-5 h-5" />
+              <House className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("orders")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag className="w-5 h-5" />
+              <ShoppingBag className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("order/markets/new-orders")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Calendar1 className="w-5 h-5" />
+              <Calendar1 className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("products")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <Apple className="w-5 h-5" />
+              <Apple className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("cash-box")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <CreditCard className="w-5 h-5" />
+              <CreditCard className="w-6 h-6" />
             </NavLink>
             </div>
           </div>
@@ -236,25 +236,25 @@ const Navbar = ({ role }: { role: string }) => {
               to={buildAdminPath()}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <House className="w-5 h-5" />
+              <House className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("orders")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <ShoppingBag className="w-5 h-5" />
+              <ShoppingBag className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("mails")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <MailOpen className="w-5 h-5" />
+              <MailOpen className="w-6 h-6" />
             </NavLink>
             <NavLink
               to={buildAdminPath("regions")}
               className={({ isActive }) => getNavItemClass(isActive)}
             >
-              <MapPin className="w-5 h-5" />
+              <MapPin className="w-6 h-6" />
             </NavLink>
             </div>
           </div>

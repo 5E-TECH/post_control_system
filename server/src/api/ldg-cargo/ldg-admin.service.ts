@@ -15,6 +15,18 @@ const WEBHOOK_LOG_RETENTION_DAYS = 30;
 // Reconcile (pull) bir o'tishda nechta shipmentni tekshirishi
 const RECONCILE_BATCH_LIMIT = 100;
 
+// Ommaviy/auto qayta jo'natishda har bir so'rov orasidagi pauza (ms) —
+// LDG rate-limitiga (429) urilmaslik uchun.
+const REDISPATCH_DELAY_MS = 350;
+
+// Auto-retry cron bir o'tishda nechta yuborilmagan shipmentni qayta jo'natadi.
+const AUTO_RETRY_BATCH_LIMIT = 30;
+
+// Auto-retry shu urinishlar soniga yetgach to'xtaydi — doimiy "buzuq" buyurtmalarni
+// (masalan SOATO kodi yo'q → har safar 422) cheksiz qayta urinmaslik uchun.
+// Bu limitdan oshganlar faqat qo'lda "Hammasini qayta jo'natish" orqali yuboriladi.
+const AUTO_RETRY_MAX_ATTEMPTS = 8;
+
 // LDG'da terminal (yakuniy) statuslar — bularni qayta so'rashning hojati yo'q
 const TERMINAL_LDG_STATUSES = ['DELIVERED', 'CANCELLED', 'RETURNED'];
 
@@ -78,7 +90,6 @@ export class LdgAdminService {
       tenant_domain_set: !!config?.tenant_domain,
       courier_set: courierExists,
       sender_complete: senderComplete,
-      enabled_districts_count: config?.enabled_district_sato_codes?.length ?? 0,
       is_active: !!config?.is_active,
       is_sandbox: !!config?.is_sandbox,
     };
@@ -88,8 +99,7 @@ export class LdgAdminService {
       checklist.webhook_secret_set &&
       checklist.tenant_domain_set &&
       checklist.courier_set &&
-      checklist.sender_complete &&
-      checklist.enabled_districts_count > 0;
+      checklist.sender_complete;
 
     const [shipmentStats, webhookStats] = await Promise.all([
       this.getShipmentStats(),
@@ -122,8 +132,13 @@ export class LdgAdminService {
       .createQueryBuilder('s')
       .where('s.ldg_order_id IS NULL')
       .getCount();
+    // LDG ↔ Beepost status to'qnashishi (real biznes muammosi)
+    const mismatch = await this.shipmentRepo
+      .createQueryBuilder('s')
+      .where('s.mismatch_at IS NOT NULL')
+      .getCount();
 
-    return { total, delivered, with_error: withError, pending };
+    return { total, delivered, with_error: withError, pending, mismatch };
   }
 
   async getWebhookStats() {
@@ -192,7 +207,7 @@ export class LdgAdminService {
   async getShipments(query: {
     page?: number;
     limit?: number;
-    filter?: 'all' | 'error' | 'delivered' | 'pending';
+    filter?: 'all' | 'error' | 'delivered' | 'pending' | 'mismatch';
   }): Promise<PaginatedResult<Record<string, unknown>>> {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
@@ -201,13 +216,23 @@ export class LdgAdminService {
       .createQueryBuilder('s')
       .leftJoin('s.order', 'o')
       .leftJoin('o.customer', 'c')
+      .leftJoin('o.district', 'd')
+      .leftJoin('d.region', 'r')
+      .leftJoin('o.market', 'm')
       .addSelect([
         'o.id',
+        'o.order_number',
         'o.status',
         'o.total_price',
         'c.id',
         'c.name',
         'c.phone_number',
+        'd.id',
+        'd.name',
+        'r.id',
+        'r.name',
+        'm.id',
+        'm.name',
       ])
       .orderBy('s.created_at', 'DESC')
       .skip((page - 1) * limit)
@@ -219,6 +244,12 @@ export class LdgAdminService {
       qb.andWhere('UPPER(s.ldg_status) = :st', { st: 'DELIVERED' });
     } else if (query.filter === 'pending') {
       qb.andWhere('s.ldg_order_id IS NULL');
+    } else if (query.filter === 'mismatch') {
+      // Mismatch'larni avval — eng yangi mismatch tepada
+      qb.andWhere('s.mismatch_at IS NOT NULL').orderBy(
+        's.mismatch_at',
+        'DESC',
+      );
     }
 
     const [rows, total] = await qb.getManyAndCount();
@@ -230,13 +261,21 @@ export class LdgAdminService {
       tracking_number: s.tracking_number,
       ldg_status: s.ldg_status,
       ldg_status_changed_at: s.ldg_status_changed_at,
+      ldg_created_at: s.ldg_created_at,
+      last_synced_at: s.last_synced_at,
       send_attempts: s.send_attempts,
       last_error: s.last_error,
+      mismatch_at: s.mismatch_at,
+      mismatch_reason: s.mismatch_reason,
       created_at: s.created_at,
+      order_number: s.order?.order_number ?? null,
       order_status: s.order?.status ?? null,
       order_total_price: s.order?.total_price ?? null,
       customer_name: s.order?.customer?.name ?? null,
       customer_phone: s.order?.customer?.phone_number ?? null,
+      district_name: s.order?.district?.name ?? null,
+      region_name: s.order?.district?.region?.name ?? null,
+      market_name: s.order?.market?.name ?? null,
     }));
 
     return {
@@ -246,6 +285,26 @@ export class LdgAdminService {
       limit,
       totalPages: Math.ceil(total / limit) || 1,
     };
+  }
+
+  /**
+   * Mismatch'ni "hal qilindi" deb belgilash — admin qo'lda tekshirib chiqqach.
+   * Mismatch maydonlarini tozalaydi (audit uchun activity_log saqlanadi).
+   */
+  async resolveMismatch(orderId: string): Promise<{ success: boolean; message: string }> {
+    const shipment = await this.shipmentRepo.findOne({
+      where: { order_id: orderId },
+    });
+    if (!shipment) {
+      return { success: false, message: 'Shipment topilmadi' };
+    }
+    if (!shipment.mismatch_at) {
+      return { success: false, message: 'Bu shipmentda mismatch yo\'q' };
+    }
+    shipment.mismatch_at = null;
+    shipment.mismatch_reason = null;
+    await this.shipmentRepo.save(shipment);
+    return { success: true, message: 'Mismatch hal qilindi deb belgilandi' };
   }
 
   /**
@@ -265,10 +324,122 @@ export class LdgAdminService {
   }
 
   /**
+   * Hali LDG'ga muvaffaqiyatli yuborilmagan (yuborilmagan + xatoli) barcha
+   * shipmentlarning order_id ro'yxati. Frontend "Hammasini qayta jo'natish"
+   * tugmasi shu ro'yxatni olib, 10 tadan bo'lib redispatchBatch'ga yuboradi.
+   */
+  async getRetryCandidates(): Promise<string[]> {
+    const rows = await this.shipmentRepo
+      .createQueryBuilder('s')
+      .select('s.order_id', 'order_id')
+      .where('s.ldg_order_id IS NULL')
+      .orderBy('s.created_at', 'ASC')
+      .getRawMany<{ order_id: string }>();
+    return rows.map((r) => r.order_id);
+  }
+
+  /**
+   * Bir guruh (odatda 10 ta) buyurtmani ketma-ket, orasida pauza bilan qayta
+   * jo'natadi. Pauza + LdgApiService'dagi 429 retry birgalikda LDG rate-limitini
+   * keltirib chiqarmaslikni ta'minlaydi. Hech qachon throw qilmaydi — har bir
+   * order natijasi alohida qaytariladi.
+   */
+  async redispatchBatch(orderIds: string[]): Promise<{
+    total: number;
+    success: number;
+    failed: number;
+    results: Array<{ order_id: string; success: boolean; message: string }>;
+  }> {
+    const ids = Array.isArray(orderIds) ? orderIds : [];
+    const results: Array<{
+      order_id: string;
+      success: boolean;
+      message: string;
+    }> = [];
+    let success = 0;
+    let failed = 0;
+
+    for (const orderId of ids) {
+      const r = await this.redispatch(orderId);
+      if (r.success) success++;
+      else failed++;
+      results.push({ order_id: orderId, success: r.success, message: r.message });
+      await this.sleep(REDISPATCH_DELAY_MS);
+    }
+
+    return { total: ids.length, success, failed, results };
+  }
+
+  /**
    * Saqlangan webhook log'ni qayta ishlash (skip/failed bo'lib qolganlar uchun).
    */
   async reprocessWebhook(deliveryId: string) {
     return this.webhookService.reprocessFromLog(deliveryId);
+  }
+
+  // ===== AUTO-RETRY (yuborilmaganlarni tizimning o'zi tuzatadi) =====
+
+  /**
+   * Hali yuborilmagan (ldg_order_id yo'q) va urinishlari limitdan oshmagan
+   * shipmentlarni avtomatik qayta jo'natadi. Throttled (orasida pauza) — LDG
+   * rate-limitini qayta keltirib chiqarmaydi. Vaqtinchalik xatolar (429,
+   * tarmoq) shu yo'l bilan operator aralashuvisiz o'zi tuzaladi.
+   */
+  async autoRetryUnsentShipments(): Promise<{
+    retried: number;
+    success: number;
+    failed: number;
+  }> {
+    const config = await this.configRepo.findOne({ where: {} });
+    if (!config?.is_active) {
+      return { retried: 0, success: 0, failed: 0 };
+    }
+
+    const shipments = await this.shipmentRepo
+      .createQueryBuilder('s')
+      .where('s.ldg_order_id IS NULL')
+      .andWhere('s.send_attempts < :max', { max: AUTO_RETRY_MAX_ATTEMPTS })
+      .orderBy('s.send_attempts', 'ASC')
+      .addOrderBy('s.created_at', 'ASC')
+      .take(AUTO_RETRY_BATCH_LIMIT)
+      .getMany();
+
+    let success = 0;
+    let failed = 0;
+
+    for (const shipment of shipments) {
+      const r = await this.redispatch(shipment.order_id);
+      if (r.success) success++;
+      else failed++;
+      await this.sleep(REDISPATCH_DELAY_MS);
+    }
+
+    if (shipments.length > 0) {
+      this.logger.log(
+        `LDG auto-retry: ${shipments.length} ta yuborilmagan qayta urinildi, ${success} yuborildi, ${failed} xato`,
+      );
+    }
+
+    return { retried: shipments.length, success, failed };
+  }
+
+  /**
+   * Auto-retry cron — har 2 daqiqada yuborilmagan shipmentlarni qayta jo'natishga
+   * urinadi. Bu "sistemaning o'zi tuzatishi" qatlami: 429 yoki tarmoq uzilishi
+   * tufayli o'tmaganlar operator aralashuvisiz LDG'ga yetib boradi.
+   */
+  @Cron('30 */2 * * * *', { timeZone: 'Asia/Tashkent' })
+  async autoRetryCron(): Promise<void> {
+    try {
+      await this.autoRetryUnsentShipments();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`LDG auto-retry cron xatosi: ${msg}`);
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // ===== RECONCILE (PULL) — webhook'ga qo'shimcha ishonchlilik qatlami =====
@@ -336,6 +507,8 @@ export class LdgAdminService {
       return { checked: 0, applied: 0, unchanged: 0, errors: 0 };
     }
 
+    // Eng eski tekshirilgan (last_synced_at) birinchi — shu orqali barcha faol
+    // shipmentlar navbatma-navbat qamrab olinadi, hech biri "qolib ketmaydi".
     const shipments = await this.shipmentRepo
       .createQueryBuilder('s')
       .where('s.ldg_order_id IS NOT NULL')
@@ -343,7 +516,7 @@ export class LdgAdminService {
         '(s.ldg_status IS NULL OR UPPER(s.ldg_status) NOT IN (:...terminal))',
         { terminal: TERMINAL_LDG_STATUSES },
       )
-      .orderBy('s.ldg_status_changed_at', 'ASC', 'NULLS FIRST')
+      .orderBy('s.last_synced_at', 'ASC', 'NULLS FIRST')
       .take(RECONCILE_BATCH_LIMIT)
       .getMany();
 
@@ -366,12 +539,19 @@ export class LdgAdminService {
         );
         if (result === 'applied') applied++;
         else if (result === 'unchanged') unchanged++;
+        else if (result === 'error') errors++;
       } catch (err) {
         errors++;
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(
           `LDG reconcile xatosi (order=${shipment.order_id}): ${msg}`,
         );
+      } finally {
+        // Status o'zgargan-o'zgarmaganidan qat'i nazar "tekshirildi" deb
+        // belgilaymiz — shunda keyingi reconcile boshqa shipmentlarga o'tadi.
+        await this.shipmentRepo
+          .update(shipment.id, { last_synced_at: Date.now() })
+          .catch(() => undefined);
       }
     }
 

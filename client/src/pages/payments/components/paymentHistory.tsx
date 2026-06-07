@@ -252,7 +252,11 @@ const CashboxHistoryComponent: React.FC<Props> = ({
                           {item?.payment_method && (
                             <span className="flex items-center gap-1 text-[10px] text-gray-400">
                               {getPaymentMethodIcon(item?.payment_method)}
-                              {item?.payment_method === "cash" ? "Naqd" : "Click"}
+                              {item?.payment_method === "cash"
+                                ? "Naqd"
+                                : item?.payment_method === "click_to_market"
+                                ? "Click (Market)"
+                                : "Click"}
                             </span>
                           )}
                         </div>

@@ -43,10 +43,23 @@ export const usePost = () => {
       gcTime: 1000 * 60 * 15,   // 15 daqiqa cache
     });
 
+  // Eski pochtalar filtri uchun (admin): viloyat↔kuryer juftliklari.
+  const getOldPostsFilterOptions = (enabled = true) =>
+    useQuery({
+      queryKey: [post, "old-filter-options"],
+      queryFn: () =>
+        api.get("post/old/filter-options").then((res) => res.data),
+      enabled,
+      staleTime: 1000 * 60 * 5,
+    });
+
   const getOldPostsCourier = (params: any) =>
     useQuery({
-      queryKey: [post, params],
-      queryFn: () => api.get("post/courier/old-posts", params).then((res) => res.data),
+      queryKey: [post, "courier-old", params],
+      queryFn: () =>
+        api
+          .get("post/courier/old-posts", { params })
+          .then((res) => res.data),
     });
 
   const getRejectedPostsCourier = () =>
@@ -166,6 +179,7 @@ export const usePost = () => {
     getPostById,
     sendAndGetCouriersByPostId,
     getOldPostsCourier,
+    getOldPostsFilterOptions,
     getRejectedPostsCourier,
     getRejectedPostsByPostId,
     sendPost,

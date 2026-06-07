@@ -19,6 +19,8 @@ import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 
 @ApiTags('Regions')
 @ApiBearerAuth()
@@ -124,6 +126,54 @@ export class RegionController {
       startDate,
       endDate,
     });
+  }
+
+  /**
+   * Bitta kuryerning (super kuryer) statistikasi viloyatlar bo'yicha
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN, Roles.LOGIST)
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @Get('courier/:courierId/stats')
+  getCourierRegionBreakdown(
+    @Param('courierId') courierId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.regionService.getCourierRegionBreakdown(courierId, {
+      startDate,
+      endDate,
+    });
+  }
+
+  /**
+   * Kuryer o'z viloyati tumanlari statistikasi ("Mening viloyatim" tab'i)
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @Get('my/district-stats')
+  getMyDistrictStats(
+    @CurrentUser() user: JwtPayload,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.regionService.getCourierOwnRegionDistrictStats(user.id, {
+      startDate,
+      endDate,
+    });
+  }
+
+  /**
+   * Kuryer o'z viloyatiga biriktirilgan tumanlar ro'yxati (filtr uchun)
+   */
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Get('my/districts')
+  getMyDistricts(@CurrentUser() user: JwtPayload) {
+    return this.regionService.getMyDistricts(user.id);
   }
 
   // ==================== MAIN COURIER ASSIGNMENT ====================

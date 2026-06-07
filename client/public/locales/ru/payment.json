@@ -46,6 +46,8 @@
   "to'lovTarixi": "История платежей",
   "umumiyMa'lumot": "Общая информация",
   "afterBalance": "Баланс после операции",
+  "afterBalanceCash": "Наличные",
+  "afterBalanceCard": "Карта",
   "foydalanuvchi": "Пользователь",
   "ism": "Имя",
   "phone": "Номер телефона",

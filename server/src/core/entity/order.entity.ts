@@ -16,6 +16,7 @@ import { DistrictEntity } from './district.entity';
 import {
   bigintTransformer as bigintTransformerNullable,
   bigintTransformerNonNull as bigintTransformer,
+  bigintTransformerDefault,
 } from 'src/common/database/bigint.transformer';
 
 @Entity('order')
@@ -29,11 +30,26 @@ import {
 // Dashboard statistika uchun indexlar
 @Index('IDX_ORDER_SOLD_AT', ['sold_at'])
 @Index('IDX_ORDER_STATUS_SOLD', ['status', 'sold_at'])
+@Index('IDX_ORDER_CANCELLED_AT', ['cancelled_at'])
+@Index('IDX_ORDER_STATUS_CANCELLED', ['status', 'cancelled_at'])
 @Index('IDX_ORDER_USER_CREATED', ['user_id', 'created_at'])
 @Index('IDX_ORDER_USER_SOLD', ['user_id', 'sold_at'])
 @Index('IDX_ORDER_DISTRICT_ID', ['district_id'])
 @Index('IDX_ORDER_OPERATOR_ID', ['operator_id'])
+@Index('IDX_ORDER_NUMBER', ['order_number'], { unique: true })
 export class OrderEntity extends BaseEntity {
+  // O'qiladigan global buyurtma raqami (#100042). UUID `id` qoladi — bu faqat
+  // ko'rsatish/qidiruv/chek uchun qulay, ketma-ket raqam. DB sequence orqali
+  // avtomatik to'ladi (migration: `order_number_seq`, 100000 dan boshlanadi),
+  // shuning uchun barcha insert yo'llari (operator, bot, tashqi) avtomatik
+  // raqam oladi — kodda alohida o'rnatish shart emas.
+  @Column({
+    type: 'bigint',
+    default: () => "nextval('order_number_seq')",
+    transformer: bigintTransformerDefault,
+  })
+  order_number: number;
+
   @Column({ type: 'uuid' })
   user_id: string;
 
@@ -100,6 +116,16 @@ export class OrderEntity extends BaseEntity {
     transformer: bigintTransformerNullable,
   })
   sold_at: number | null;
+
+  // Buyurtma bekor qilingan vaqt (statistikani harakat sanasi bo'yicha sanash
+  // uchun — xuddi sold_at kabi). Bekor qilinganda yoziladi, qayta sotilsa yoki
+  // kutishga qaytarilsa tozalanadi (null).
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  cancelled_at: number | null;
 
   // Sotilgan paytdagi tariflar (tarix uchun saqlanadi)
   @Column({

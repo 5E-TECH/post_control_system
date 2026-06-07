@@ -8,15 +8,32 @@ import {
   Search,
   Calendar,
   ChevronDown,
+  MapPin,
+  Store,
+  Truck,
 } from "lucide-react";
 import dayjs from "dayjs";
-import { DatePicker } from "antd";
-import { useDispatch } from "react-redux";
+import { DatePicker, Select } from "antd";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 import { setDateRange } from "../../../../shared/lib/features/datafilterSlice";
 import { setUserFilter } from "../../../../shared/lib/features/user-filters";
 import { buildAdminPath } from "../../../../shared/const";
+import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
+import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
+import { useOrder } from "../../../../shared/api/hooks/useOrder";
 
 const { RangePicker } = DatePicker;
+
+// Tab badge soni — katta sonlarni qisqartiradi (mobil UI buzilmasligi uchun):
+// 0–999 → o'zicha, 1000+ → "1.2k", 10k+ → "15k", 1M+ → "2M". Maksimal ~4 belgi.
+const formatBadgeCount = (n: number): string => {
+  if (!n || n < 0) return "0";
+  if (n < 1000) return String(n);
+  if (n < 10000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`; // 1k, 1.5k, 9.9k
+  if (n < 1_000_000) return `${Math.floor(n / 1000)}k`; // 10k–999k
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`; // 1.2M
+};
 
 const CourierOrders = () => {
   const { t } = useTranslation("orderList");
@@ -46,6 +63,45 @@ const CourierOrders = () => {
     return () => clearTimeout(timer);
   }, [searchQuery, dispatch]);
 
+  // ===== Qo'shimcha filtrlar (tuman / market / yetkazish turi) =====
+  const districtId = useSelector((s: RootState) => s.setUserFilter.district_id);
+  const marketId = useSelector((s: RootState) => s.setUserFilter.marketId);
+  const whereDeliver = useSelector(
+    (s: RootState) => s.setUserFilter.where_deliver,
+  );
+
+  const { getMyDistricts } = useRegion();
+  const { getMarkets } = useMarket();
+  const { getCourierOrderCounts } = useOrder();
+  const { data: districtsData } = getMyDistricts();
+  const { data: marketsData } = getMarkets(true, { limit: 0 });
+  const { data: countsData } = getCourierOrderCounts();
+  const counts = countsData?.data || { waiting: 0, all: 0, cancelled: 0 };
+
+  const districtOptions =
+    districtsData?.data?.map((d: any) => ({ value: d.id, label: d.name })) ||
+    [];
+  const marketOptions =
+    marketsData?.data?.data?.map((m: any) => ({
+      value: m.id,
+      label: m.name,
+    })) || [];
+  const deliverOptions = [
+    { value: "center", label: "Markazga" },
+    { value: "address", label: "Uyga" },
+  ];
+
+  // Sahifaga kirilganda/chiqilganda filtrlarni tozalaymiz (toza boshlash uchun)
+  useEffect(() => {
+    const clear = () => {
+      dispatch(setUserFilter({ name: "district_id", value: null }));
+      dispatch(setUserFilter({ name: "marketId", value: null }));
+      dispatch(setUserFilter({ name: "where_deliver", value: null }));
+    };
+    clear();
+    return clear;
+  }, [dispatch]);
+
   const tabs = [
     {
       to: buildAdminPath("courier-orders/orders"),
@@ -54,6 +110,8 @@ const CourierOrders = () => {
       icon: Clock,
       color: "amber",
       end: true,
+      count: counts.waiting,
+      desc: "Ustingizda ishlashingiz kerak bo'lgan buyurtmalar — soting yoki bekor qiling.",
     },
     {
       to: buildAdminPath("courier-orders/orders/all"),
@@ -61,6 +119,8 @@ const CourierOrders = () => {
       shortLabel: "Hammasi",
       icon: ClipboardList,
       color: "blue",
+      count: counts.all,
+      desc: "Barcha buyurtmalar — qidirish va ko'rib chiqish uchun.",
     },
     {
       to: buildAdminPath("courier-orders/orders/cancelled"),
@@ -68,8 +128,17 @@ const CourierOrders = () => {
       shortLabel: "Bekor",
       icon: XCircle,
       color: "red",
+      count: counts.cancelled,
+      desc: "Bekor qilingan buyurtmalarni tanlab, pochtaga qaytaring.",
     },
   ];
+
+  // Faol tab izohi (pathname bo'yicha)
+  const activeTab = location.pathname.endsWith("/all")
+    ? tabs[1]
+    : location.pathname.endsWith("/cancelled")
+      ? tabs[2]
+      : tabs[0];
 
   const getTabColors = (color: string, isActive: boolean) => {
     const colors: Record<string, { active: string; inactive: string }> = {
@@ -98,7 +167,8 @@ const CourierOrders = () => {
   const getIconBgColors = (color: string, isActive: boolean) => {
     if (isActive) return "bg-white/20";
     const colors: Record<string, string> = {
-      amber: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+      amber:
+        "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
       blue: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
       red: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
     };
@@ -229,6 +299,73 @@ const CourierOrders = () => {
           </div>
         </div>
 
+        {/* Qo'shimcha filtrlar: Tuman / Market / Yetkazish turi */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <Select
+            showSearch
+            allowClear
+            size="large"
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              (option?.label ?? "")
+                .toString()
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }
+            value={districtId || undefined}
+            onChange={(v) =>
+              dispatch(setUserFilter({ name: "district_id", value: v ?? null }))
+            }
+            options={districtOptions}
+            placeholder={
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="w-4 h-4" /> Tuman
+              </span>
+            }
+            className="w-full"
+          />
+          <Select
+            showSearch
+            allowClear
+            size="large"
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              (option?.label ?? "")
+                .toString()
+                .toLowerCase()
+                .includes(input.toLowerCase())
+            }
+            value={marketId || undefined}
+            onChange={(v) =>
+              dispatch(setUserFilter({ name: "marketId", value: v ?? null }))
+            }
+            options={marketOptions}
+            placeholder={
+              <span className="inline-flex items-center gap-1.5">
+                <Store className="w-4 h-4" /> Market
+              </span>
+            }
+            className="w-full"
+          />
+          <Select
+            allowClear
+            size="large"
+            value={whereDeliver || undefined}
+            onChange={(v) =>
+              dispatch(
+                setUserFilter({ name: "where_deliver", value: v ?? null }),
+              )
+            }
+            options={deliverOptions}
+            placeholder={
+              <span className="inline-flex items-center gap-1.5">
+                <Truck className="w-4 h-4" /> Yetkazish turi
+              </span>
+            }
+            className="w-full"
+          />
+        </div>
+
         {/* Navigation Tabs */}
         <div className="grid grid-cols-3 gap-2 mb-4">
           {tabs.map((tab) => {
@@ -241,7 +378,7 @@ const CourierOrders = () => {
                 className={({ isActive }) =>
                   `flex items-center justify-center gap-2 py-2.5 lg:py-3 rounded-xl font-medium transition-all cursor-pointer ${getTabColors(
                     tab.color,
-                    isActive
+                    isActive,
                   )}`
                 }
               >
@@ -250,7 +387,7 @@ const CourierOrders = () => {
                     <div
                       className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${getIconBgColors(
                         tab.color,
-                        isActive
+                        isActive,
                       )}`}
                     >
                       <Icon className="w-4 h-4" />
@@ -258,12 +395,29 @@ const CourierOrders = () => {
                     <span className="text-sm hidden lg:inline">
                       {tab.label}
                     </span>
+                    {tab.count > 0 && (
+                      <span
+                        title={String(tab.count)}
+                        className={`min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 tabular-nums whitespace-nowrap ${
+                          isActive
+                            ? "bg-white/25 text-white"
+                            : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                        }`}
+                      >
+                        {formatBadgeCount(tab.count)}
+                      </span>
+                    )}
                   </>
                 )}
               </NavLink>
             );
           })}
         </div>
+
+        {/* Faol tab izohi */}
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-4 -mt-1 px-1">
+          {activeTab.desc}
+        </p>
 
         {/* Content */}
         <Outlet />

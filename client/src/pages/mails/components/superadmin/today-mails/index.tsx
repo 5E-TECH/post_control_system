@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost, post } from "../../../../../shared/api/hooks/usePost";
 import { useTranslation } from "react-i18next";
-import { MapPin, Package, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { MapPin, Package, ChevronRight, Loader2, Sparkles, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../../../shared/api";
 import { useSelector } from "react-redux";
@@ -28,6 +28,7 @@ const TodayMails = () => {
   }, [queryClient]);
 
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,16 +69,37 @@ const TodayMails = () => {
     );
   }
 
-  // Calculate totals
-  const totalOrders = posts.reduce((sum: number, p: any) => sum + (Number(p.order_quantity) || 0), 0);
-  const totalPrice = posts.reduce((sum: number, p: any) => sum + (Number(p.post_total_price) || 0), 0);
+  // Viloyat nomi bo'yicha qidiruv (client-side — barcha postlar bir martada
+  // yuklanadi, shuning uchun darhol filtrlaymiz).
+  const query = search.trim().toLowerCase();
+  const filteredPosts = query
+    ? posts.filter((p: any) =>
+        (p?.region?.name || "").toLowerCase().includes(query),
+      )
+    : posts;
+
+  // Calculate totals (qidiruv natijasi bo'yicha)
+  const totalOrders = filteredPosts.reduce((sum: number, p: any) => sum + (Number(p.order_quantity) || 0), 0);
+  const totalPrice = filteredPosts.reduce((sum: number, p: any) => sum + (Number(p.post_total_price) || 0), 0);
 
   return (
     <div className="h-full overflow-y-auto">
+      {/* Qidiruv */}
+      <div className="relative w-full sm:max-w-md mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Viloyat nomi bo'yicha qidirish..."
+          className="w-full h-11 pl-10 pr-4 rounded-xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white placeholder-gray-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-colors text-sm"
+        />
+      </div>
+
       {/* Stats - simplified */}
       <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-6 text-sm">
         <span className="text-gray-600 dark:text-gray-300">
-          <span className="font-bold text-gray-800 dark:text-white">{posts.length}</span> viloyat
+          <span className="font-bold text-gray-800 dark:text-white">{filteredPosts.length}</span> viloyat
         </span>
         <span className="text-gray-600 dark:text-gray-300">
           <span className="font-bold text-gray-800 dark:text-white">{totalOrders}</span> buyurtma
@@ -89,9 +111,19 @@ const TodayMails = () => {
         )}
       </div>
 
-      {/* Posts Grid */}
+      {filteredPosts.length === 0 ? (
+        <div className="flex justify-center items-center py-16">
+          <div className="text-center">
+            <Search className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              "{search}" bo'yicha viloyat topilmadi
+            </p>
+          </div>
+        </div>
+      ) : (
+      /* Posts Grid */
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {posts.map((post: any) => (
+        {filteredPosts.map((post: any) => (
           <div
             key={post?.id}
             onMouseEnter={() => prefetchPost(post?.id)}
@@ -136,6 +168,7 @@ const TodayMails = () => {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 };

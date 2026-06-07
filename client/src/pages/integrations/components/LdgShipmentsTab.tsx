@@ -9,7 +9,13 @@ import {
   Popconfirm,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { RotateCcw, RefreshCw, DownloadCloud } from "lucide-react";
+import {
+  RotateCcw,
+  RefreshCw,
+  DownloadCloud,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
 import {
   useLdgAdmin,
   type LdgShipmentRow,
@@ -44,11 +50,27 @@ const ldgStatusLabel = (status: string | null): string => {
   return LDG_STATUS_LABELS[status.toUpperCase()] ?? status;
 };
 
+// "Hammasini qayta jo'natish"da bir guruhdagi buyurtmalar soni (10 tadan).
+const REDISPATCH_BATCH_SIZE = 10;
+
 export const LdgShipmentsTab = () => {
-  const { getShipments, redispatch, syncOne } = useLdgAdmin();
+  const {
+    getShipments,
+    redispatch,
+    getRetryCandidates,
+    redispatchBatch,
+    syncOne,
+    resolveMismatch,
+  } = useLdgAdmin();
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const limit = 20;
 
   const { data, isLoading, isFetching, refetch } = getShipments({
@@ -70,6 +92,50 @@ export const LdgShipmentsTab = () => {
     }
   };
 
+  // Yuborilmagan/xatoli barcha jo'natmalarni bitta bosishda qayta jo'natish.
+  // Tashqaridan bitta amal ko'rinadi, lekin ichida 10 tadan ketma-ket yuboriladi
+  // (LDG rate-limitiga urilmaslik uchun) va progress ko'rsatiladi.
+  const handleRedispatchAll = async () => {
+    setBulkRunning(true);
+    try {
+      const ids = await getRetryCandidates();
+      if (!ids.length) {
+        message.info("Qayta jo'natiladigan jo'natma yo'q");
+        return;
+      }
+      setBulkProgress({ done: 0, total: ids.length });
+      let success = 0;
+      let failed = 0;
+      for (let i = 0; i < ids.length; i += REDISPATCH_BATCH_SIZE) {
+        const chunk = ids.slice(i, i + REDISPATCH_BATCH_SIZE);
+        try {
+          const res = await redispatchBatch.mutateAsync(chunk);
+          success += res.success;
+          failed += res.failed;
+        } catch {
+          failed += chunk.length;
+        }
+        setBulkProgress({
+          done: Math.min(i + REDISPATCH_BATCH_SIZE, ids.length),
+          total: ids.length,
+        });
+      }
+      if (failed > 0) {
+        message.warning(
+          `Tugadi: ${success} ta jo'natildi, ${failed} ta xato (keyinroq avtomatik qayta uriniladi)`,
+        );
+      } else {
+        message.success(`Tugadi: ${success} ta jo'natma LDG'ga jo'natildi`);
+      }
+      refetch();
+    } catch {
+      message.error("Ommaviy qayta jo'natishda xatolik");
+    } finally {
+      setBulkRunning(false);
+      setBulkProgress(null);
+    }
+  };
+
   const handleSync = async (orderId: string) => {
     setSyncingId(orderId);
     try {
@@ -86,7 +152,31 @@ export const LdgShipmentsTab = () => {
     }
   };
 
+  const handleResolveMismatch = async (orderId: string) => {
+    setResolvingId(orderId);
+    try {
+      const result = await resolveMismatch.mutateAsync(orderId);
+      if (result.success) {
+        message.success(result.message);
+      } else {
+        message.warning(result.message);
+      }
+    } catch {
+      message.error("Mismatch'ni hal qilishda xatolik");
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
   const columns: ColumnsType<LdgShipmentRow> = [
+    {
+      title: "№",
+      dataIndex: "order_number",
+      key: "order_number",
+      width: 80,
+      render: (v: number | null) =>
+        v != null ? <span className="font-semibold">#{v}</span> : "—",
+    },
     {
       title: "Mijoz",
       dataIndex: "customer_name",
@@ -97,6 +187,29 @@ export const LdgShipmentsTab = () => {
           <div className="text-xs text-gray-400">{row.customer_phone ?? ""}</div>
         </div>
       ),
+    },
+    {
+      title: "Viloyat / Tuman",
+      key: "region_district",
+      render: (_: unknown, row) => {
+        const parts = [row.region_name, row.district_name].filter(Boolean);
+        return parts.length ? (
+          <div>
+            <div>{row.region_name ?? "—"}</div>
+            {row.district_name && (
+              <div className="text-xs text-gray-400">{row.district_name}</div>
+            )}
+          </div>
+        ) : (
+          "—"
+        );
+      },
+    },
+    {
+      title: "Market",
+      dataIndex: "market_name",
+      key: "market_name",
+      render: (v: string | null) => v ?? "—",
     },
     {
       title: "Summa",
@@ -138,27 +251,72 @@ export const LdgShipmentsTab = () => {
       key: "send_attempts",
     },
     {
-      title: "Xato",
-      dataIndex: "last_error",
-      key: "last_error",
-      render: (v: string | null) =>
+      title: "Oxirgi tekshiruv",
+      dataIndex: "last_synced_at",
+      key: "last_synced_at",
+      render: (v: number | null) =>
         v ? (
-          <Tooltip title={v}>
-            <span className="text-red-500 text-xs line-clamp-2 max-w-[220px] inline-block">
-              {v}
-            </span>
-          </Tooltip>
+          <span className="text-xs text-gray-500">
+            {new Date(Number(v)).toLocaleString("uz-UZ")}
+          </span>
         ) : (
-          "—"
+          <span className="text-xs text-gray-400">—</span>
         ),
+    },
+    {
+      title: "Xato / Mismatch",
+      key: "error_or_mismatch",
+      render: (_: unknown, row) => {
+        if (row.mismatch_at && row.mismatch_reason) {
+          return (
+            <Tooltip title={row.mismatch_reason}>
+              <Tag
+                color="volcano"
+                icon={<AlertTriangle className="w-3 h-3 inline mr-1" />}
+              >
+                <span className="text-xs">MISMATCH</span>
+              </Tag>
+            </Tooltip>
+          );
+        }
+        if (row.last_error) {
+          return (
+            <Tooltip title={row.last_error}>
+              <span className="text-red-500 text-xs line-clamp-2 max-w-[220px] inline-block">
+                {row.last_error}
+              </span>
+            </Tooltip>
+          );
+        }
+        return "—";
+      },
     },
     {
       title: "Amal",
       key: "action",
       fixed: "right",
-      width: 230,
+      width: 260,
       render: (_: unknown, row) => (
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
+          {row.mismatch_at && (
+            <Popconfirm
+              title="Mismatch'ni hal qilindi deb belgilashmi?"
+              description="Faqat qo'lda tekshirib, kassa va status mosligini ta'minlaganingizdan keyin bosing."
+              okText="Ha, hal qilindi"
+              cancelText="Yo'q"
+              onConfirm={() => handleResolveMismatch(row.order_id)}
+            >
+              <Button
+                size="small"
+                type="primary"
+                danger
+                icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                loading={resolveMismatch.isPending && resolvingId === row.order_id}
+              >
+                Hal qilindi
+              </Button>
+            </Popconfirm>
+          )}
           {row.ldg_order_id ? (
             <Tooltip title="LDG'dan joriy statusni tortib olib, order holatini yangilaydi">
               <Button
@@ -206,15 +364,43 @@ export const LdgShipmentsTab = () => {
             { label: "Yuborilmagan", value: "pending" },
             { label: "Xatoli", value: "error" },
             { label: "Yetkazilgan", value: "delivered" },
+            {
+              label: (
+                <span className="flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Mismatch
+                </span>
+              ),
+              value: "mismatch",
+            },
           ]}
         />
-        <Button
-          icon={<RefreshCw className="w-4 h-4" />}
-          loading={isFetching}
-          onClick={() => refetch()}
-        >
-          Yangilash
-        </Button>
+        <div className="flex items-center gap-2">
+          <Popconfirm
+            title="Hammasini qayta jo'natish"
+            description="Barcha yuborilmagan/xatoli jo'natmalar LDG'ga 10 tadan qayta jo'natiladi. Davom etilsinmi?"
+            okText="Ha, jo'nat"
+            cancelText="Yo'q"
+            onConfirm={handleRedispatchAll}
+          >
+            <Button
+              type="primary"
+              icon={<RotateCcw className="w-4 h-4" />}
+              loading={bulkRunning}
+            >
+              {bulkProgress
+                ? `Jo'natilmoqda ${bulkProgress.done}/${bulkProgress.total}`
+                : "Hammasini qayta jo'natish"}
+            </Button>
+          </Popconfirm>
+          <Button
+            icon={<RefreshCw className="w-4 h-4" />}
+            loading={isFetching}
+            onClick={() => refetch()}
+          >
+            Yangilash
+          </Button>
+        </div>
       </div>
 
       <Table<LdgShipmentRow>
@@ -222,7 +408,7 @@ export const LdgShipmentsTab = () => {
         loading={isLoading}
         columns={columns}
         dataSource={data?.data ?? []}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1500 }}
         size="small"
         pagination={{
           current: page,

@@ -91,6 +91,7 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
   const tTotalOrders = t("totalOrders");
   const tDelivered = t("delivered");
   const tCancelled = t("cancelled");
+  const tPending = t("pending");
   const tSuccessRate = t("successRate");
   const tRevenue = t("revenue");
   const tSum = t("sum");
@@ -187,6 +188,10 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
                   <span style="font-weight: 600; color: #f87171;">${point.cancelledOrders?.toLocaleString() || 0}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; gap: 16px;">
+                  <span style="color: ${labelColor};">${tPending}:</span>
+                  <span style="font-weight: 600; color: #fbbf24;">${point.pendingOrders?.toLocaleString() || 0}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; gap: 16px;">
                   <span style="color: ${labelColor};">${tSuccessRate}:</span>
                   <span style="font-weight: 600; color: ${point.successRate >= 70 ? '#34d399' : point.successRate >= 50 ? '#fbbf24' : '#f87171'};">${point.successRate || 0}%</span>
                 </div>
@@ -250,7 +255,7 @@ const StatisticsMap: React.FC<StatisticsMapProps> = ({
         },
       ],
     });
-  }, [regions, onRegionClick, isDarkMode, isLogist, tTotalOrders, tDelivered, tCancelled, tSuccessRate, tRevenue, tSum, tCouriers, tClickForDetails]);
+  }, [regions, onRegionClick, isDarkMode, isLogist, tTotalOrders, tDelivered, tCancelled, tPending, tSuccessRate, tRevenue, tSum, tCouriers, tClickForDetails]);
 
   // Summary kartalar
   const summaryCards = useMemo(() => {

@@ -1,5 +1,4 @@
 import {
-  IsArray,
   IsBoolean,
   IsInt,
   IsNumber,
@@ -120,18 +119,6 @@ export class UpdateLdgConfigDto {
   @IsOptional()
   @IsString()
   default_payer_type?: 'receiver' | 'sender' | 'third_party';
-
-  // ===== ENABLED DISTRICTS =====
-
-  @ApiProperty({
-    required: false,
-    description: 'Qaysi tumanlar LDG orqali yetkaziladi (SOATO kodlar)',
-    type: [Number],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsInt({ each: true })
-  enabled_district_sato_codes?: number[];
 
   // ===== LDG KURYER =====
 
