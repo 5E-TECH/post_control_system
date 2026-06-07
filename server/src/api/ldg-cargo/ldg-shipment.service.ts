@@ -102,6 +102,17 @@ export class LdgShipmentService {
         : order.id;
       const response = await this.api.createOrder(body, idempotencyKey);
       this.applyLdgResponse(shipment, response);
+      // LDG "success" qaytardi-yu, lekin javobdan order_id chiqmasa — bu parsing
+      // nomuvofiqligi. Jimgina null saqlab, keyin dublikat yaratib yurmaslik
+      // uchun aniq xato beramiz (idempotency-key tufayli qayta urinish dublikat
+      // yaratmaydi — LDG ayni buyurtmani qaytaradi).
+      if (shipment.ldg_order_id == null) {
+        throw new Error(
+          `LDG javobida order_id topilmadi (javob shakli kutilmagan): ${JSON.stringify(
+            response,
+          ).slice(0, 300)}`,
+        );
+      }
       shipment.last_error = null;
       shipment.send_attempts = (shipment.send_attempts ?? 0) + 1;
       await this.shipmentRepo.save(shipment);
@@ -207,12 +218,31 @@ export class LdgShipmentService {
     shipment: LdgShipmentEntity,
     response: LdgCreateOrderResponseDto,
   ): void {
-    shipment.ldg_order_id = response.order_id;
-    shipment.tracking_number = response.tracking_number;
-    shipment.ldg_status = response.status?.code ?? null;
-    const createdAtMs = response.created_at
-      ? Date.parse(response.created_at)
-      : NaN;
+    // Himoyaviy parsing — LDG javobi kutilgan tekis shaklda ham, ichki
+    // (data.order / data.package) shaklda ham kelishi mumkin. Bir qat'iy
+    // maydonga tayanmaymiz.
+    const r = response as unknown as Record<string, any>;
+    const orderIdRaw =
+      r.order_id ?? r.id ?? r.package_id ?? r.order?.id ?? r.package?.id;
+    const tracking =
+      r.tracking_number ??
+      r.tracking ??
+      r.order?.tracking_number ??
+      r.package?.tracking_number;
+    const statusCode =
+      r.status?.code ??
+      r.order?.status?.code ??
+      (typeof r.status === 'string' ? r.status : null);
+    const createdRaw = r.created_at ?? r.order?.created_at;
+
+    shipment.ldg_order_id =
+      orderIdRaw != null && /^\d+$/.test(String(orderIdRaw))
+        ? Number(orderIdRaw)
+        : null;
+    shipment.tracking_number =
+      typeof tracking === 'string' && tracking ? tracking : null;
+    shipment.ldg_status = statusCode ?? null;
+    const createdAtMs = createdRaw ? Date.parse(createdRaw) : NaN;
     shipment.ldg_created_at = Number.isFinite(createdAtMs)
       ? createdAtMs
       : Date.now();
