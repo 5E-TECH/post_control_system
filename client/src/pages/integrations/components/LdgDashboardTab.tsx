@@ -155,11 +155,6 @@ export const LdgDashboardTab = () => {
           <ChecklistItem ok={c.courier_set} label="LDG vakil-kuryer biriktirilgan" />
           <ChecklistItem ok={c.sender_complete} label="Yuboruvchi (sender) to'liq" />
           <ChecklistItem
-            ok={c.enabled_districts_count > 0}
-            label="Yetkaziladigan tumanlar tanlangan"
-            hint={`${c.enabled_districts_count} ta`}
-          />
-          <ChecklistItem
             ok={c.is_active}
             label="Integratsiya faol"
             hint={c.is_active ? undefined : "oxirida yoqing"}

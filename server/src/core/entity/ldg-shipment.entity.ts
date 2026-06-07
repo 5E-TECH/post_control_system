@@ -24,6 +24,7 @@ import { bigintTransformerNonNull as bigintTransformer } from 'src/common/databa
 @Index('IDX_LDG_SHIPMENT_LDG_ORDER_ID', ['ldg_order_id'])
 @Index('IDX_LDG_SHIPMENT_TRACKING', ['tracking_number'])
 @Index('IDX_LDG_SHIPMENT_STATUS', ['ldg_status'])
+@Index('IDX_LDG_SHIPMENT_LAST_SYNCED', ['last_synced_at'])
 export class LdgShipmentEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   order_id: string;
@@ -88,6 +89,17 @@ export class LdgShipmentEntity extends BaseEntity {
   // Mismatch sababi (qaysi LDG status, bizda qaysi status edi).
   @Column({ type: 'text', nullable: true })
   mismatch_reason: string | null;
+
+  // Reconcile poller bu shipmentni LDG bilan oxirgi marta solishtirgan vaqt.
+  // Status o'zgarmasa ham yangilanadi — shu orqali reconcile barcha faol
+  // shipmentlarni navbatma-navbat (eng eski tekshirilgani birinchi) qamrab
+  // oladi va hech biri "qolib ketmaydi" (100 ta limit tuzog'ini hal qiladi).
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformer,
+  })
+  last_synced_at: number | null;
 
   // ===== RELATIONS =====
 

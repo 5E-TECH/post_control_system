@@ -1,8 +1,9 @@
 import { memo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
-import { Select, DatePicker } from "antd";
+import { Select, DatePicker, message } from "antd";
 import TextArea from "antd/es/input/TextArea";
+import { BASE_URL } from "../../../../shared/const";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
@@ -28,6 +29,7 @@ import {
   Magnet,
   LockOpen,
   AlertCircle,
+  Download,
 } from "lucide-react";
 import Popup from "../../../../shared/ui/Popup";
 
@@ -58,6 +60,7 @@ const CashDetail = () => {
   }, []);
 
   const [search, setSearch] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const params: any = {
     fromDate: form.from,
@@ -66,6 +69,55 @@ const CashDetail = () => {
   if (historyTab === "payments") {
     params.sourceTypes = "courier_payment,market_payment";
   }
+
+  // Excel export — joriy sana oralig'i va tab (Barcha tarix / Oldi-berdi)ni hurmat qiladi.
+  // Sana tanlanmasa — butun tarix eksport qilinadi.
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+
+      const exportParams = new URLSearchParams();
+      if (form.from) exportParams.append("fromDate", form.from);
+      if (form.to) exportParams.append("toDate", form.to);
+      if (historyTab === "payments") {
+        exportParams.append("sourceTypes", "courier_payment,market_payment");
+      }
+
+      const response = await fetch(
+        `${BASE_URL}cashbox/user/${id}/export?${exportParams.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const userName = data?.data?.cashbox?.user?.name || "kassa";
+      const periodPart =
+        form.from && form.to
+          ? form.from === form.to
+            ? form.from
+            : `${form.from}-${form.to}`
+          : "umumiy";
+      a.href = url;
+      a.download = `kassa-${userName}-${periodPart}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      message.success(t("messages.exportSuccess") || "Excel fayl yuklandi!");
+    } catch (error) {
+      message.error(t("messages.exportError") || "Excel yuklab olishda xatolik!");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -506,29 +558,50 @@ const CashDetail = () => {
             </div>
           </div>
 
-          {/* History Tabs */}
-          <div className="flex gap-2 mb-4">
+          {/* History Tabs + Excel export */}
+          <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setHistoryTab("all")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                  historyTab === "all"
+                    ? "bg-purple-600 text-white shadow-lg shadow-purple-500/30"
+                    : "bg-white dark:bg-[#2A263D] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#312D4B]"
+                }`}
+              >
+                <List size={16} />
+                Barcha tarix
+              </button>
+              <button
+                onClick={() => setHistoryTab("payments")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                  historyTab === "payments"
+                    ? "bg-purple-600 text-white shadow-lg shadow-purple-500/30"
+                    : "bg-white dark:bg-[#2A263D] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#312D4B]"
+                }`}
+              >
+                <ArrowLeftRight size={16} />
+                Oldi-berdi
+              </button>
+            </div>
+
+            {/* Excel export — joriy tab va sana oralig'ini eksport qiladi */}
             <button
-              onClick={() => setHistoryTab("all")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                historyTab === "all"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-500/30"
-                  : "bg-white dark:bg-[#2A263D] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#312D4B]"
-              }`}
+              onClick={handleExportExcel}
+              disabled={isExporting}
+              title={
+                form.from
+                  ? `${historyTab === "payments" ? "Oldi-berdi" : "Barcha tarix"} — ${form.from}${form.to && form.to !== form.from ? ` — ${form.to}` : ""}`
+                  : `${historyTab === "payments" ? "Oldi-berdi" : "Barcha tarix"} — butun tarix`
+              }
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <List size={16} />
-              Barcha tarix
-            </button>
-            <button
-              onClick={() => setHistoryTab("payments")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                historyTab === "payments"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-500/30"
-                  : "bg-white dark:bg-[#2A263D] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#312D4B]"
-              }`}
-            >
-              <ArrowLeftRight size={16} />
-              Oldi-berdi
+              {isExporting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Download size={16} />
+              )}
+              Excel
             </button>
           </div>
 

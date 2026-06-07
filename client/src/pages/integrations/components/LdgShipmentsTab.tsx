@@ -170,6 +170,14 @@ export const LdgShipmentsTab = () => {
 
   const columns: ColumnsType<LdgShipmentRow> = [
     {
+      title: "№",
+      dataIndex: "order_number",
+      key: "order_number",
+      width: 80,
+      render: (v: number | null) =>
+        v != null ? <span className="font-semibold">#{v}</span> : "—",
+    },
+    {
       title: "Mijoz",
       dataIndex: "customer_name",
       key: "customer_name",
@@ -179,6 +187,29 @@ export const LdgShipmentsTab = () => {
           <div className="text-xs text-gray-400">{row.customer_phone ?? ""}</div>
         </div>
       ),
+    },
+    {
+      title: "Viloyat / Tuman",
+      key: "region_district",
+      render: (_: unknown, row) => {
+        const parts = [row.region_name, row.district_name].filter(Boolean);
+        return parts.length ? (
+          <div>
+            <div>{row.region_name ?? "—"}</div>
+            {row.district_name && (
+              <div className="text-xs text-gray-400">{row.district_name}</div>
+            )}
+          </div>
+        ) : (
+          "—"
+        );
+      },
+    },
+    {
+      title: "Market",
+      dataIndex: "market_name",
+      key: "market_name",
+      render: (v: string | null) => v ?? "—",
     },
     {
       title: "Summa",
@@ -218,6 +249,19 @@ export const LdgShipmentsTab = () => {
       title: "Urinish",
       dataIndex: "send_attempts",
       key: "send_attempts",
+    },
+    {
+      title: "Oxirgi tekshiruv",
+      dataIndex: "last_synced_at",
+      key: "last_synced_at",
+      render: (v: number | null) =>
+        v ? (
+          <span className="text-xs text-gray-500">
+            {new Date(Number(v)).toLocaleString("uz-UZ")}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">—</span>
+        ),
     },
     {
       title: "Xato / Mismatch",
@@ -364,7 +408,7 @@ export const LdgShipmentsTab = () => {
         loading={isLoading}
         columns={columns}
         dataSource={data?.data ?? []}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1500 }}
         size="small"
         pagination={{
           current: page,

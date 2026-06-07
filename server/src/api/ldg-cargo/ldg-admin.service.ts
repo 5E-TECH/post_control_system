@@ -90,7 +90,6 @@ export class LdgAdminService {
       tenant_domain_set: !!config?.tenant_domain,
       courier_set: courierExists,
       sender_complete: senderComplete,
-      enabled_districts_count: config?.enabled_district_sato_codes?.length ?? 0,
       is_active: !!config?.is_active,
       is_sandbox: !!config?.is_sandbox,
     };
@@ -100,8 +99,7 @@ export class LdgAdminService {
       checklist.webhook_secret_set &&
       checklist.tenant_domain_set &&
       checklist.courier_set &&
-      checklist.sender_complete &&
-      checklist.enabled_districts_count > 0;
+      checklist.sender_complete;
 
     const [shipmentStats, webhookStats] = await Promise.all([
       this.getShipmentStats(),
@@ -218,13 +216,23 @@ export class LdgAdminService {
       .createQueryBuilder('s')
       .leftJoin('s.order', 'o')
       .leftJoin('o.customer', 'c')
+      .leftJoin('o.district', 'd')
+      .leftJoin('d.region', 'r')
+      .leftJoin('o.market', 'm')
       .addSelect([
         'o.id',
+        'o.order_number',
         'o.status',
         'o.total_price',
         'c.id',
         'c.name',
         'c.phone_number',
+        'd.id',
+        'd.name',
+        'r.id',
+        'r.name',
+        'm.id',
+        'm.name',
       ])
       .orderBy('s.created_at', 'DESC')
       .skip((page - 1) * limit)
@@ -253,15 +261,21 @@ export class LdgAdminService {
       tracking_number: s.tracking_number,
       ldg_status: s.ldg_status,
       ldg_status_changed_at: s.ldg_status_changed_at,
+      ldg_created_at: s.ldg_created_at,
+      last_synced_at: s.last_synced_at,
       send_attempts: s.send_attempts,
       last_error: s.last_error,
       mismatch_at: s.mismatch_at,
       mismatch_reason: s.mismatch_reason,
       created_at: s.created_at,
+      order_number: s.order?.order_number ?? null,
       order_status: s.order?.status ?? null,
       order_total_price: s.order?.total_price ?? null,
       customer_name: s.order?.customer?.name ?? null,
       customer_phone: s.order?.customer?.phone_number ?? null,
+      district_name: s.order?.district?.name ?? null,
+      region_name: s.order?.district?.region?.name ?? null,
+      market_name: s.order?.market?.name ?? null,
     }));
 
     return {
@@ -493,6 +507,8 @@ export class LdgAdminService {
       return { checked: 0, applied: 0, unchanged: 0, errors: 0 };
     }
 
+    // Eng eski tekshirilgan (last_synced_at) birinchi — shu orqali barcha faol
+    // shipmentlar navbatma-navbat qamrab olinadi, hech biri "qolib ketmaydi".
     const shipments = await this.shipmentRepo
       .createQueryBuilder('s')
       .where('s.ldg_order_id IS NOT NULL')
@@ -500,7 +516,7 @@ export class LdgAdminService {
         '(s.ldg_status IS NULL OR UPPER(s.ldg_status) NOT IN (:...terminal))',
         { terminal: TERMINAL_LDG_STATUSES },
       )
-      .orderBy('s.ldg_status_changed_at', 'ASC', 'NULLS FIRST')
+      .orderBy('s.last_synced_at', 'ASC', 'NULLS FIRST')
       .take(RECONCILE_BATCH_LIMIT)
       .getMany();
 
@@ -523,12 +539,19 @@ export class LdgAdminService {
         );
         if (result === 'applied') applied++;
         else if (result === 'unchanged') unchanged++;
+        else if (result === 'error') errors++;
       } catch (err) {
         errors++;
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(
           `LDG reconcile xatosi (order=${shipment.order_id}): ${msg}`,
         );
+      } finally {
+        // Status o'zgargan-o'zgarmaganidan qat'i nazar "tekshirildi" deb
+        // belgilaymiz — shunda keyingi reconcile boshqa shipmentlarga o'tadi.
+        await this.shipmentRepo
+          .update(shipment.id, { last_synced_at: Date.now() })
+          .catch(() => undefined);
       }
     }
 

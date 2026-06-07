@@ -1,15 +1,17 @@
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost, post } from "../../../../../shared/api/hooks/usePost";
 import { useTranslation } from "react-i18next";
 import { DatePicker, Pagination, Select, type PaginationProps } from "antd";
 import dayjs from "dayjs";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
-import { ChevronRight, Loader2, Clock, CheckCircle, XCircle, Calendar, Archive, User, MapPin, Filter, X } from "lucide-react";
+import { ChevronRight, Loader2, Clock, CheckCircle, XCircle, Calendar, Archive, User, MapPin, Filter, X, Printer } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../../../shared/api";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
+import { generateCourierReceipt } from "../../../../../shared/helpers/generate-courier-receipt";
+import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
 interface FilterRegion {
   id: string;
@@ -47,6 +49,36 @@ const OldMails = () => {
   const canSeePrice = role === "superadmin" || role === "admin";
   const { getAllPosts, getOldPostsFilterOptions } = usePost();
   const { getParam, setParam, removeParam } = useParamsHook();
+  const { handleSuccess, handleApiError } = useApiNotification();
+
+  // Eski pochtadan kuryer chekini (QR kodli) qayta chiqarish. Pochta
+  // jo'natilganda generatsiya bo'lgan chekni istalgan vaqtda qayta hosil
+  // qiladi — barcha ma'lumot ro'yxat javobida bor (qr_code_token, kuryer,
+  // viloyat, buyurtma soni, sana). Karta bosilishi (navigatsiya) bilan
+  // to'qnashmasligi uchun stopPropagation.
+  const handleReprintReceipt = useCallback(
+    async (e: MouseEvent<HTMLButtonElement>, post: any) => {
+      e.stopPropagation();
+      if (!post?.qr_code_token) {
+        handleApiError(null, "Bu pochtada QR kod topilmadi");
+        return;
+      }
+      try {
+        await generateCourierReceipt({
+          qrCodeToken: post.qr_code_token,
+          courierName: post?.courier?.name || "",
+          regionName: post?.region?.name || "",
+          courierPhone: post?.courier?.phone_number || "",
+          orderCount: post?.order_quantity,
+          date: post?.created_at,
+        });
+        handleSuccess("Chek tayyor");
+      } catch (err) {
+        handleApiError(err, "Chek yaratishda xatolik yuz berdi");
+      }
+    },
+    [handleSuccess, handleApiError],
+  );
 
   const regionId = getParam("region_id") || undefined;
   const courierId = getParam("courier_id") || undefined;
@@ -380,6 +412,17 @@ const OldMails = () => {
                     </div>
                   )}
                 </div>
+
+                {["sent", "received"].includes(post?.status?.toLowerCase()) &&
+                  post?.qr_code_token && (
+                    <button
+                      onClick={(e) => handleReprintReceipt(e, post)}
+                      className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-colors"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Chekni qayta chiqarish
+                    </button>
+                  )}
               </div>
             );
           })}

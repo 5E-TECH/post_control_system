@@ -14,7 +14,6 @@ export interface LdgHealth {
     tenant_domain_set: boolean;
     courier_set: boolean;
     sender_complete: boolean;
-    enabled_districts_count: number;
     is_active: boolean;
     is_sandbox: boolean;
   };
@@ -56,15 +55,21 @@ export interface LdgShipmentRow {
   tracking_number: string | null;
   ldg_status: string | null;
   ldg_status_changed_at: number | null;
+  ldg_created_at: number | null;
+  last_synced_at: number | null;
   send_attempts: number;
   last_error: string | null;
   mismatch_at: number | null;
   mismatch_reason: string | null;
   created_at: number;
+  order_number: number | null;
   order_status: string | null;
   order_total_price: number | null;
   customer_name: string | null;
   customer_phone: string | null;
+  district_name: string | null;
+  region_name: string | null;
+  market_name: string | null;
 }
 
 export interface Paginated<T> {

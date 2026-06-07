@@ -2943,6 +2943,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         user,
       });
       await this.orderBotService.syncStatusButton(order.id);
+
+      // Tashqi integratsiya bilan sinxronlash (async, kurierga halaqit bermaydi).
+      // PAID/PARTLY_PAID → 'paid', aks holda 'sold' (sellOrder bilan bir xil mantiq).
+      const partlySyncAction = [
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ].includes(order.status)
+        ? 'paid'
+        : 'sold';
+      this.integrationSyncService.queueStatusSync(
+        order.id,
+        partlySyncAction,
+        Order_status.WAITING,
+        order.status,
+      );
+
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
       await queryRunner.rollbackTransaction();

@@ -31,6 +31,33 @@ export const bigintTransformer: ValueTransformer = {
 };
 
 /**
+ * DB-DEFAULT (masalan `nextval('..._seq')`) li bigint ustunlar uchun.
+ *
+ * MUHIM: `to` qiymatni o'zgartirmaydi — `undefined` o'zgarmay qoladi. Shu sabab
+ * TypeORM ustunni INSERT'dan tashlab, DB DEFAULT (sequence) ni ishlatadi.
+ * `bigintTransformerNonNull` ni bu yerda ishlatib bo'lmaydi: u `undefined` ni
+ * `0` ga aylantirib, har bir qatorga `order_number = 0` yozadi va unique
+ * constraint'ni buzadi.
+ */
+export const bigintTransformerDefault: ValueTransformer = {
+  to: (value: number | bigint | null | undefined) => value,
+  from: (value: string | number | null | undefined): number | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') return value;
+    const n = Number(value);
+    if (!Number.isFinite(n)) {
+      throw new Error(`bigintTransformer: invalid value "${value}"`);
+    }
+    if (n > Number.MAX_SAFE_INTEGER || n < Number.MIN_SAFE_INTEGER) {
+      throw new Error(
+        `bigintTransformer: value "${value}" exceeds JS safe integer range`,
+      );
+    }
+    return n;
+  },
+};
+
+/**
  * Default qiymatli ustunlar uchun (NOT NULL) — `null` o'rniga `0` qaytaradi.
  * Faqat `default: 0` belgilangan ustunlar uchun ishlating.
  */

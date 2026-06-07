@@ -16,6 +16,7 @@ import { DistrictEntity } from './district.entity';
 import {
   bigintTransformer as bigintTransformerNullable,
   bigintTransformerNonNull as bigintTransformer,
+  bigintTransformerDefault,
 } from 'src/common/database/bigint.transformer';
 
 @Entity('order')
@@ -45,7 +46,7 @@ export class OrderEntity extends BaseEntity {
   @Column({
     type: 'bigint',
     default: () => "nextval('order_number_seq')",
-    transformer: bigintTransformer,
+    transformer: bigintTransformerDefault,
   })
   order_number: number;
 

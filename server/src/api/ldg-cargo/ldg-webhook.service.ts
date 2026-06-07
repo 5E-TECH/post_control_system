@@ -127,7 +127,8 @@ export class LdgWebhookService {
       eventTypeHeader || envelope.type || 'unknown';
 
     try {
-      let resultStatus: 'success' | 'skipped' | 'mismatch' = 'skipped';
+      let resultStatus: 'success' | 'skipped' | 'mismatch' | 'failed' =
+        'skipped';
       let errorMsg: string | null = null;
 
       if (eventType === 'webhook.test') {
@@ -186,7 +187,8 @@ export class LdgWebhookService {
     const eventType = log.event_type || envelope.type || 'unknown';
 
     try {
-      let resultStatus: 'success' | 'skipped' | 'mismatch' = 'skipped';
+      let resultStatus: 'success' | 'skipped' | 'mismatch' | 'failed' =
+        'skipped';
       let errorMsg: string | null = null;
       if (eventType === 'webhook.test') {
         resultStatus = 'success';
@@ -211,7 +213,9 @@ export class LdgWebhookService {
             ? 'Qayta ishlandi (success)'
             : resultStatus === 'mismatch'
               ? 'MISMATCH — LDG status bilan bizning status to\'qnashadi (qo\'lda tekshiring)'
-              : 'Qayta ishlandi, lekin amal bajarilmadi (skipped) — shipment yoki status mosligini tekshiring',
+              : resultStatus === 'failed'
+                ? `Xato — biznes oqim bajarilmadi: ${errorMsg ?? 'noma\'lum'} (reconcile qayta uradi)`
+                : 'Qayta ishlandi, lekin amal bajarilmadi (skipped) — shipment yoki status mosligini tekshiring',
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -235,7 +239,10 @@ export class LdgWebhookService {
    */
   private async handlePackageEvent(
     envelope: LdgWebhookEnvelope<LdgPackageEventData>,
-  ): Promise<{ status: 'success' | 'skipped' | 'mismatch'; message?: string }> {
+  ): Promise<{
+    status: 'success' | 'skipped' | 'mismatch' | 'failed';
+    message?: string;
+  }> {
     const data = envelope.data ?? {};
     // LDG paket ID'sini har xil nomlar bilan yuborishi mumkin: order_id (POST javobi),
     // id (REST GET), yoki package_id. Birinchi mavjudini olamiz.
@@ -282,6 +289,12 @@ export class LdgWebhookService {
         };
       case 'unknown_status':
         return { status: 'skipped', message: `noma'lum LDG status: ${newStatusCode}` };
+      case 'error':
+        // Biznes oqim xato berdi — reconcile keyinroq qayta uradi.
+        return {
+          status: 'failed',
+          message: shipment.last_error ?? 'LDG status qo\'llashda xato',
+        };
     }
   }
 
@@ -302,7 +315,9 @@ export class LdgWebhookService {
     shipment: LdgShipmentEntity,
     statusCode: string,
     changedAt: Date,
-  ): Promise<'applied' | 'unchanged' | 'skipped' | 'mismatch' | 'unknown_status'> {
+  ): Promise<
+    'applied' | 'unchanged' | 'skipped' | 'mismatch' | 'unknown_status' | 'error'
+  > {
     // LDG "Filialda" statusining code'i raqamli ("8") — JSON'da string yoki number
     // bo'lib kelishi mumkin, shuning uchun stringga keltiramiz (crash oldini olish).
     const code = String(statusCode);
@@ -310,6 +325,10 @@ export class LdgWebhookService {
     const mapping = mapLdgStatus(code);
     if (!mapping) {
       this.logger.warn(`LDG status mapping: noma'lum kod=${code}`);
+      // #4: noma'lum statusni shipmentda ko'rinadigan qilamiz (monitoring uchun).
+      // ldg_status'ni O'ZGARTIRMAYMIZ — keyin to'g'ri status kelsa qo'llanadi.
+      shipment.last_error = `Noma'lum LDG status kodi: ${code}`;
+      await this.shipmentService.saveShipment(shipment);
       return 'unknown_status';
     }
 
@@ -320,20 +339,26 @@ export class LdgWebhookService {
       return 'unchanged';
     }
 
-    // Shipmentning oxirgi ko'rilgan statusini yangilaymiz
-    await this.shipmentService.updateShipmentStatus(shipment, code, changedAt);
-
     const config = await this.configRepo.findOne({ where: {} });
 
+    // MUHIM TARTIB: avval biznes oqim (kassa/status flow) bajariladi, FAQAT
+    // muvaffaqiyatdan keyin shipment.ldg_status yoziladi. Aks holda oqim xato
+    // bersa-yu status terminal sifatida yozilsa, idempotentlik + reconcile'ning
+    // terminal filtri buyurtmani abadiy "qotirib" qo'yardi (eski bug).
+
     // Terminal statuslar uchun maxsus oqimlar (kassa, status flow).
-    // Bu yerda biznes mantiq markaslari chaqiriladi — ular result qaytaradi.
     if (mapping.terminal_action) {
       if (!config?.ldg_courier_user_id) {
         this.logger.warn(
           `LDG status: ldg_courier_user_id sozlanmagan, terminal oqim o'tkazib yuborildi (order=${shipment.order_id})`,
         );
-        // Hech bo'lmaganda statusni qo'yib qo'yamiz
-        await this.applyOrderStatus(shipment.order_id, mapping.order_status);
+        // Hech bo'lmaganda order statusini qo'yamiz; xato bo'lsa status yozilmaydi.
+        try {
+          await this.applyOrderStatus(shipment.order_id, mapping.order_status);
+        } catch (err) {
+          return this.recordApplyError(shipment, mapping.terminal_action, err);
+        }
+        await this.persistShipmentStatus(shipment, code, changedAt);
         this.logIntermediateStatus(shipment.order_id, mapping.order_status, code, config);
         return 'applied';
       }
@@ -357,15 +382,14 @@ export class LdgWebhookService {
           );
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.logger.error(
-          `LDG '${mapping.terminal_action}' oqimi muvaffaqiyatsiz (order=${shipment.order_id}): ${msg}`,
-        );
-        return 'applied'; // log saqlanadi, asosiy oqim buzilmaydi
+        // Oqim xato berdi — STATUS YOZILMAYDI. shipment.ldg_status eski holatda
+        // qoladi → reconcile poller keyinroq qayta uradi (eventual consistency).
+        return this.recordApplyError(shipment, mapping.terminal_action, err);
       }
 
       if (result.kind === 'mismatch') {
-        // Real biznes muammosi — ldg_shipment'ga belgilab qo'yamiz, admin tekshirsin
+        // Real biznes muammosi — LDG statusni yozamiz va mismatch belgilaymiz.
+        await this.persistShipmentStatus(shipment, code, changedAt);
         await this.markShipmentMismatch(shipment, code, result.reason);
         this.activityLog.log({
           entity_type: 'order',
@@ -382,18 +406,61 @@ export class LdgWebhookService {
       }
 
       if (result.kind === 'skipped') {
+        // Bizda allaqachon terminal — LDG statusni baribir yozib qo'yamiz (audit).
+        await this.persistShipmentStatus(shipment, code, changedAt);
         return 'skipped';
       }
 
-      // applied — biznes oqim bajarildi, activity_log uning ichida yoziladi
-      // (sellOrder/cancelOrder o'z logini yozadi)
+      // applied — biznes oqim bajarildi (sellOrder/cancelOrder o'z logini yozadi)
+      await this.persistShipmentStatus(shipment, code, changedAt);
       return 'applied';
     }
 
-    // Oraliq statuslar (NEW, RECEIVED, IN_TRANSIT, OUT_FOR_DELIVERY) — faqat status yangilash
-    await this.applyOrderStatus(shipment.order_id, mapping.order_status);
+    // Oraliq statuslar (NEW, RECEIVED, IN_TRANSIT, OUT_FOR_DELIVERY) — faqat order
+    // statusini yangilash. Xato bo'lsa status yozilmaydi → reconcile qayta uradi.
+    try {
+      await this.applyOrderStatus(shipment.order_id, mapping.order_status);
+    } catch (err) {
+      return this.recordApplyError(shipment, code, err);
+    }
+    await this.persistShipmentStatus(shipment, code, changedAt);
     this.logIntermediateStatus(shipment.order_id, mapping.order_status, code, config);
     return 'applied';
+  }
+
+  /**
+   * Shipmentning oxirgi ko'rilgan LDG statusini muvaffaqiyatdan KEYIN yozadi
+   * va avvalgi xatoni tozalaydi (oqim endi tiklandi).
+   */
+  private async persistShipmentStatus(
+    shipment: LdgShipmentEntity,
+    code: string,
+    changedAt: Date,
+  ): Promise<void> {
+    shipment.last_error = null;
+    await this.shipmentService.updateShipmentStatus(shipment, code, changedAt);
+  }
+
+  /**
+   * Biznes oqim xato bergan holat: shipment.ldg_status O'ZGARTIRILMAYDI (toki
+   * reconcile qayta urinsin), faqat last_error yozilib monitoring'da ko'rinadi.
+   */
+  private async recordApplyError(
+    shipment: LdgShipmentEntity,
+    context: string,
+    err: unknown,
+  ): Promise<'error'> {
+    const msg = err instanceof Error ? err.message : String(err);
+    this.logger.error(
+      `LDG '${context}' oqimi muvaffaqiyatsiz (order=${shipment.order_id}): ${msg}`,
+    );
+    shipment.last_error = `LDG '${context}': ${msg}`;
+    try {
+      await this.shipmentService.saveShipment(shipment);
+    } catch {
+      // last_error yozib bo'lmasa ham asosiy oqim buzilmasin
+    }
+    return 'error';
   }
 
   /**

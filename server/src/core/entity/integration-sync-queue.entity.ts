@@ -15,6 +15,7 @@ export type SyncStatus = 'pending' | 'processing' | 'success' | 'failed';
 @Index('IDX_SYNC_QUEUE_ORDER', ['order_id'])
 @Index('IDX_SYNC_QUEUE_NEXT_RETRY', ['next_retry_at'])
 @Index('IDX_SYNC_QUEUE_STATUS_RETRY', ['status', 'next_retry_at'])
+@Index('IDX_SYNC_QUEUE_STATUS_PROCESSING', ['status', 'processing_started_at'])
 export class IntegrationSyncQueueEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   order_id: string;
@@ -69,6 +70,12 @@ export class IntegrationSyncQueueEntity extends BaseEntity {
   // Muvaffaqiyatli sync vaqti (milliseconds)
   @Column({ type: 'bigint', nullable: true })
   synced_at: number | null;
+
+  // Job 'processing' holatiga o'tkazilgan vaqt (milliseconds).
+  // Server qayta ishga tushsa/crash bo'lsa 'processing'da qotib qolgan
+  // joblarni aniqlash va qayta tiklash uchun ishlatiladi (stale recovery).
+  @Column({ type: 'bigint', nullable: true })
+  processing_started_at: number | null;
 
   // Tashqi buyurtma ID si (external_id from order)
   @Column({ type: 'varchar', nullable: true })
