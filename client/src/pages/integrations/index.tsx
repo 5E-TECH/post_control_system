@@ -20,6 +20,8 @@ import {
   Clock,
   CheckCheck,
   Archive,
+  User,
+  MapPin,
 } from "lucide-react";
 import { Modal, Form, Input, Select, Switch, message, Popconfirm, Tabs, Badge, Tooltip } from "antd";
 import {
@@ -375,7 +377,7 @@ const IntegrationsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] p-4 sm:p-6">
+    <div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
@@ -954,7 +956,38 @@ const IntegrationsPage = () => {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      {(job.order?.customer ||
+                        job.order?.region ||
+                        job.order?.district ||
+                        job.order?.market) && (
+                        <div className="flex items-center gap-x-2 gap-y-0.5 mb-1 text-xs text-gray-600 dark:text-gray-300 flex-wrap">
+                          {job.order?.customer && (
+                            <span className="inline-flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {job.order.customer.name}
+                              {job.order.customer.phone_number
+                                ? ` · ${job.order.customer.phone_number}`
+                                : ""}
+                            </span>
+                          )}
+                          {(job.order?.region || job.order?.district) && (
+                            <span className="inline-flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {[job.order?.region?.name, job.order?.district?.name]
+                                .filter(Boolean)
+                                .join(", ")}
+                            </span>
+                          )}
+                          {job.order?.market && (
+                            <span className="inline-flex items-center gap-1">
+                              <Store className="w-3 h-3" />
+                              {job.order.market.name}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2 flex-wrap">
                         <span>{job.integration?.name}</span>
                         <span>•</span>
                         <span>
@@ -1309,10 +1342,15 @@ const SyncJobItem = ({
     <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="font-medium text-gray-800 dark:text-white">
               #{job.external_order_id}
             </span>
+            {job.order?.order_number ? (
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                (№{job.order.order_number})
+              </span>
+            ) : null}
             <span className={`text-xs px-2 py-0.5 rounded ${statusColors[job.status]}`}>
               {job.status === "success" ? "✓" : job.status}
             </span>
@@ -1321,7 +1359,39 @@ const SyncJobItem = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          {/* Mijoz / viloyat / market — qaysi buyurtma kimniki ekanini ko'rsatadi */}
+          {(job.order?.customer ||
+            job.order?.region ||
+            job.order?.district ||
+            job.order?.market) && (
+            <div className="flex items-center gap-x-2 gap-y-0.5 mb-1 text-xs text-gray-600 dark:text-gray-300 flex-wrap">
+              {job.order?.customer && (
+                <span className="inline-flex items-center gap-1">
+                  <User className="w-3 h-3" />
+                  {job.order.customer.name}
+                  {job.order.customer.phone_number
+                    ? ` · ${job.order.customer.phone_number}`
+                    : ""}
+                </span>
+              )}
+              {(job.order?.region || job.order?.district) && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {[job.order?.region?.name, job.order?.district?.name]
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
+              )}
+              {job.order?.market && (
+                <span className="inline-flex items-center gap-1">
+                  <Store className="w-3 h-3" />
+                  {job.order.market.name}
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
             <span>{job.integration?.name}</span>
             <span>•</span>
             <span>→ {job.external_status}</span>

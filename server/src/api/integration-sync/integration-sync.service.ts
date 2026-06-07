@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, LessThanOrEqual } from 'typeorm';
+import { Repository, In, DataSource, SelectQueryBuilder } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { Cron } from '@nestjs/schedule';
 import { firstValueFrom } from 'rxjs';
@@ -26,6 +26,15 @@ const RETRY_DELAYS = [
   15 * 60 * 1000, // 15 daqiqa
 ];
 
+// Bir sikLda nechta job olinadi
+const BATCH_SIZE = 10;
+
+// 'processing' holatida shuncha vaqtdan ortiq qotib qolgan job — "stale" deb
+// hisoblanadi va qayta tiklanadi (server qayta ishga tushgan/crash bo'lgan).
+// Bitta batch'ning eng yomon holatda davom etishidan (10 job × 15s timeout)
+// xavfsiz kattaroq qilib olamiz — toki haqiqatda yo'ldagi job tiklanmasin.
+const STALE_PROCESSING_MS = 10 * 60 * 1000; // 10 daqiqa
+
 @Injectable()
 export class IntegrationSyncService {
   private readonly logger = new Logger(IntegrationSyncService.name);
@@ -40,6 +49,7 @@ export class IntegrationSyncService {
     private readonly orderRepo: Repository<OrderEntity>,
     private readonly httpService: HttpService,
     private readonly externalIntegrationService: ExternalIntegrationService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -58,14 +68,28 @@ export class IntegrationSyncService {
         where: { id: orderId },
       });
 
-      if (!order || !order.external_id) {
-        // Tashqi buyurtma emas, sync qilish shart emas
+      if (!order) {
+        this.logger.warn(`Sync skip: order topilmadi (orderId=${orderId})`);
+        return;
+      }
+      if (!order.external_id) {
+        // Tashqi buyurtma emas (external_id yo'q) — sync qilinmaydi.
+        // Tashqi buyurtma bo'lishi kerak bo'lsa-yu external_id yozilmagan bo'lsa,
+        // bu sababli sync jimgina o'tib ketmasligi uchun aniq log qoldiramiz.
+        if (order.operator?.startsWith('external_')) {
+          this.logger.warn(
+            `Sync skip: external_id yo'q, lekin operator tashqi (orderId=${orderId}, operator=${order.operator})`,
+          );
+        }
         return;
       }
 
       // Operator dan integration slug ni olish (external_adosh → adosh)
       const integrationSlug = order.operator?.replace('external_', '');
       if (!integrationSlug) {
+        this.logger.warn(
+          `Sync skip: operator yo'q yoki noto'g'ri (orderId=${orderId}, external_id=${order.external_id})`,
+        );
         return;
       }
 
@@ -150,7 +174,15 @@ export class IntegrationSyncService {
   }
 
   /**
-   * Queue ni processing qilish
+   * Queue ni processing qilish.
+   *
+   * Ishonchlilik kafolatlari:
+   *  1) reclaimStaleProcessing — server qayta ishga tushgan/crash bo'lgan paytda
+   *     'processing'da qotib qolgan joblarni qayta tiklaydi (aks holda ular
+   *     abadiy yo'qoladi va buyurtma statusi tashqi saytga yetib bormaydi).
+   *  2) claimJobs — joblarni DB darajasida ATOMIK olib, darrov 'processing'ga
+   *     o'tkazadi (FOR UPDATE SKIP LOCKED). Bu bir nechta instans bir vaqtda
+   *     ishlaganda ham bitta job ikki marta yuborilmasligini kafolatlaydi.
    */
   async processQueue(): Promise<void> {
     if (this.isProcessing) {
@@ -160,24 +192,13 @@ export class IntegrationSyncService {
     this.isProcessing = true;
 
     try {
-      const now = Date.now();
+      // 1) Qotib qolgan 'processing' joblarni tiklash
+      await this.reclaimStaleProcessing();
 
-      // Pending yoki retry vaqti kelgan joblarni olish
-      const jobs = await this.syncQueueRepo.find({
-        where: [
-          { status: 'pending' },
-          {
-            status: 'failed',
-            next_retry_at: LessThanOrEqual(now),
-          },
-        ],
-        relations: ['integration'],
-        order: { created_at: 'ASC' },
-        take: 10, // Bir vaqtda 10 tagacha
-      });
+      // 2) Navbatdan atomik ravishda batch olish
+      const jobs = await this.claimJobs(BATCH_SIZE);
 
       if (jobs.length === 0) {
-        this.isProcessing = false;
         return;
       }
 
@@ -197,6 +218,97 @@ export class IntegrationSyncService {
   }
 
   /**
+   * 'processing' holatida juda uzoq qotib qolgan joblarni qayta tiklaydi.
+   * Bunday joblar — server processJob o'rtasida qayta ishga tushgan/crash
+   * bo'lgan paytda paydo bo'ladi. Urinish limiti tugamaganlarini 'pending'ga,
+   * tugaganlarini 'failed'ga qaytaramiz.
+   */
+  private async reclaimStaleProcessing(): Promise<void> {
+    const now = Date.now();
+    const cutoff = now - STALE_PROCESSING_MS;
+
+    const result = await this.syncQueueRepo
+      .createQueryBuilder()
+      .update(IntegrationSyncQueueEntity)
+      .set({
+        status: () =>
+          `CASE WHEN attempts >= max_attempts THEN 'failed' ELSE 'pending' END`,
+        next_retry_at: () => 'NULL',
+        processing_started_at: () => 'NULL',
+        last_error: () =>
+          `COALESCE(last_error, 'Stale: server qayta ishga tushgan/crash paytida qotib qoldi')`,
+        updated_at: () => String(now),
+      })
+      .where('status = :status', { status: 'processing' })
+      .andWhere(
+        '(processing_started_at IS NULL OR processing_started_at < :cutoff)',
+        { cutoff },
+      )
+      .execute();
+
+    if (result.affected && result.affected > 0) {
+      this.logger.warn(
+        `♻️ ${result.affected} ta qotib qolgan 'processing' job tiklandi`,
+      );
+    }
+  }
+
+  /**
+   * Navbatdan ishlov berish uchun joblarni ATOMIK ravishda "egallab oladi":
+   * tanlangan joblarni darrov 'processing'ga o'tkazadi va attempts'ni oshiradi.
+   * FOR UPDATE SKIP LOCKED tufayli bir nechta instans bir-biriga xalaqit bermaydi.
+   */
+  private async claimJobs(
+    limit: number,
+  ): Promise<IntegrationSyncQueueEntity[]> {
+    const now = Date.now();
+
+    return this.dataSource.transaction(async (manager) => {
+      // 1) Bo'sh joblarni qatorlarini lock bilan tanlash (boshqa instans
+      //    egallaganlarini o'tkazib yuboradi). Relation join qilinmaydi —
+      //    PostgreSQL outer join'da FOR UPDATE'ni rad etadi.
+      const candidates = await manager
+        .createQueryBuilder(IntegrationSyncQueueEntity, 's')
+        .setLock('pessimistic_write')
+        .setOnLocked('skip_locked')
+        .where('s.status = :pending', { pending: 'pending' })
+        .orWhere(
+          '(s.status = :failed AND s.next_retry_at IS NOT NULL AND s.next_retry_at <= :now)',
+          { failed: 'failed', now },
+        )
+        .orderBy('s.created_at', 'ASC')
+        .take(limit)
+        .getMany();
+
+      if (candidates.length === 0) {
+        return [];
+      }
+
+      const ids = candidates.map((c) => c.id);
+
+      // 2) Atomik ravishda 'processing'ga o'tkazish + attempts oshirish
+      await manager
+        .createQueryBuilder()
+        .update(IntegrationSyncQueueEntity)
+        .set({
+          status: () => `'processing'`,
+          attempts: () => 'attempts + 1',
+          processing_started_at: () => String(now),
+          updated_at: () => String(now),
+        })
+        .whereInIds(ids)
+        .execute();
+
+      // 3) integration relation bilan qayta o'qish (endi joblar bizniki)
+      return manager.find(IntegrationSyncQueueEntity, {
+        where: { id: In(ids) },
+        relations: ['integration'],
+        order: { created_at: 'ASC' },
+      });
+    });
+  }
+
+  /**
    * Bitta job ni process qilish
    */
   private async processJob(job: IntegrationSyncQueueEntity): Promise<void> {
@@ -205,14 +317,15 @@ export class IntegrationSyncService {
     if (!integration || !integration.is_active) {
       job.status = 'failed';
       job.last_error = 'Integration topilmadi yoki faol emas';
+      job.processing_started_at = null;
       await this.syncQueueRepo.save(job);
       return;
     }
 
-    // Job ni processing holatiga o'tkazish
-    job.status = 'processing';
-    job.attempts += 1;
-    await this.syncQueueRepo.save(job);
+    // ESLATMA: job allaqachon claimJobs() ichida ATOMIK ravishda 'processing'ga
+    // o'tkazilgan va attempts oshirilgan. Bu yerda qaytadan o'zgartirmaymiz —
+    // shu tariqa multi-instans xavfsizligi va attempts'ning to'g'ri sanalishi
+    // saqlanadi.
 
     try {
       // Token olish
@@ -266,6 +379,7 @@ export class IntegrationSyncService {
       job.synced_at = Date.now();
       job.last_response = response.data;
       job.last_error = null;
+      job.processing_started_at = null;
       await this.syncQueueRepo.save(job);
 
       this.logger.log(
@@ -279,6 +393,7 @@ export class IntegrationSyncService {
 
       job.last_error = errorMessage;
       job.last_response = axiosError.response?.data as Record<string, any>;
+      job.processing_started_at = null;
 
       // 401 bo'lsa token ni yangilash kerak
       if (axiosError.response?.status === 401) {
@@ -307,14 +422,90 @@ export class IntegrationSyncService {
   }
 
   /**
+   * Monitoring uchun umumiy query — sync job bilan birga buyurtmaning
+   * mijozi, viloyati (district→region) va marketini ham olib keladi.
+   * Maxfiy maydonlar tushib qolishi uchun faqat kerakli ustunlar tanlanadi.
+   */
+  private baseSyncQuery(): SelectQueryBuilder<IntegrationSyncQueueEntity> {
+    return this.syncQueueRepo
+      .createQueryBuilder('sync')
+      .leftJoin('sync.integration', 'integration')
+      .leftJoin('sync.order', 'order')
+      .leftJoin('order.customer', 'customer')
+      .leftJoin('order.district', 'district')
+      .leftJoin('district.region', 'region')
+      .leftJoin('order.market', 'market')
+      .addSelect([
+        'integration.id',
+        'integration.name',
+        'integration.slug',
+        'order.id',
+        'order.external_id',
+        'order.order_number',
+        'order.status',
+        'order.total_price',
+        'customer.id',
+        'customer.name',
+        'customer.phone_number',
+        'district.id',
+        'district.name',
+        'region.id',
+        'region.name',
+        'market.id',
+        'market.name',
+      ]);
+  }
+
+  /**
+   * Entity'ni frontend uchun qulay, tekis (flat) shaklga keltiradi —
+   * mijoz/viloyat/market ma'lumotlari order ichida birga keladi.
+   */
+  private mapSyncJob(s: IntegrationSyncQueueEntity): Record<string, unknown> {
+    const order = s.order;
+    const district = order?.district;
+    return {
+      ...s,
+      integration: s.integration
+        ? {
+            id: s.integration.id,
+            name: s.integration.name,
+            slug: s.integration.slug,
+          }
+        : null,
+      order: order
+        ? {
+            id: order.id,
+            external_id: order.external_id,
+            order_number: order.order_number ?? null,
+            status: order.status,
+            total_price: order.total_price ?? null,
+            customer: order.customer
+              ? {
+                  id: order.customer.id,
+                  name: order.customer.name,
+                  phone_number: order.customer.phone_number,
+                }
+              : null,
+            district: district
+              ? { id: district.id, name: district.name }
+              : null,
+            region: district?.region
+              ? { id: district.region.id, name: district.region.name }
+              : null,
+            market: order.market
+              ? { id: order.market.id, name: order.market.name }
+              : null,
+          }
+        : null,
+    };
+  }
+
+  /**
    * Failed sync joblarni olish (admin panel uchun)
    */
   async getFailedSyncs(integrationId?: string) {
     try {
-      const queryBuilder = this.syncQueueRepo
-        .createQueryBuilder('sync')
-        .leftJoinAndSelect('sync.integration', 'integration')
-        .leftJoinAndSelect('sync.order', 'order')
+      const queryBuilder = this.baseSyncQuery()
         .where('sync.status = :status', { status: 'failed' })
         .andWhere('sync.attempts >= sync.max_attempts')
         .orderBy('sync.created_at', 'DESC');
@@ -326,7 +517,7 @@ export class IntegrationSyncService {
       }
 
       const data = await queryBuilder.getMany();
-      return successRes(data);
+      return successRes(data.map((s) => this.mapSyncJob(s)));
     } catch (error) {
       return catchError(error);
     }
@@ -342,11 +533,7 @@ export class IntegrationSyncService {
     integrationId?: string,
   ) {
     try {
-      const queryBuilder = this.syncQueueRepo
-        .createQueryBuilder('sync')
-        .leftJoinAndSelect('sync.integration', 'integration')
-        .leftJoinAndSelect('sync.order', 'order')
-        .orderBy('sync.created_at', 'DESC');
+      const queryBuilder = this.baseSyncQuery().orderBy('sync.created_at', 'DESC');
 
       if (status) {
         queryBuilder.andWhere('sync.status = :status', { status });
@@ -359,13 +546,13 @@ export class IntegrationSyncService {
       }
 
       const total = await queryBuilder.getCount();
-      const data = await queryBuilder
+      const rows = await queryBuilder
         .skip((page - 1) * limit)
         .take(limit)
         .getMany();
 
       return successRes({
-        data,
+        data: rows.map((s) => this.mapSyncJob(s)),
         pagination: {
           page,
           limit,
@@ -383,12 +570,11 @@ export class IntegrationSyncService {
    */
   async getSyncsByOrder(orderId: string) {
     try {
-      const data = await this.syncQueueRepo.find({
-        where: { order_id: orderId },
-        relations: ['integration'],
-        order: { created_at: 'DESC' },
-      });
-      return successRes(data);
+      const rows = await this.baseSyncQuery()
+        .where('sync.order_id = :orderId', { orderId })
+        .orderBy('sync.created_at', 'DESC')
+        .getMany();
+      return successRes(rows.map((s) => this.mapSyncJob(s)));
     } catch (error) {
       return catchError(error);
     }
@@ -399,10 +585,7 @@ export class IntegrationSyncService {
    */
   async getSuccessfulSyncs(integrationId?: string, limit: number = 50) {
     try {
-      const queryBuilder = this.syncQueueRepo
-        .createQueryBuilder('sync')
-        .leftJoinAndSelect('sync.integration', 'integration')
-        .leftJoinAndSelect('sync.order', 'order')
+      const queryBuilder = this.baseSyncQuery()
         .where('sync.status = :status', { status: 'success' })
         .orderBy('sync.synced_at', 'DESC')
         .take(limit);
@@ -413,8 +596,8 @@ export class IntegrationSyncService {
         });
       }
 
-      const data = await queryBuilder.getMany();
-      return successRes(data);
+      const rows = await queryBuilder.getMany();
+      return successRes(rows.map((s) => this.mapSyncJob(s)));
     } catch (error) {
       return catchError(error);
     }
@@ -425,12 +608,13 @@ export class IntegrationSyncService {
    */
   async getPendingSyncs() {
     try {
-      const data = await this.syncQueueRepo.find({
-        where: [{ status: 'pending' }, { status: 'processing' }],
-        relations: ['integration', 'order'],
-        order: { created_at: 'ASC' },
-      });
-      return successRes(data);
+      const rows = await this.baseSyncQuery()
+        .where('sync.status IN (:...statuses)', {
+          statuses: ['pending', 'processing'],
+        })
+        .orderBy('sync.created_at', 'ASC')
+        .getMany();
+      return successRes(rows.map((s) => this.mapSyncJob(s)));
     } catch (error) {
       return catchError(error);
     }

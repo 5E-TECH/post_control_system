@@ -45,8 +45,22 @@ export class PostController {
     Roles.LOGIST,
   )
   @Get()
-  findAll(@Query('page') page: number = 1, @Query('limit') limit: number = 8) {
-    return this.postService.findAll(Number(page), Number(limit));
+  findAll(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 8,
+    @Query('region_id') region_id?: string,
+    @Query('courier_id') courier_id?: string,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.postService.findAll(Number(page), Number(limit), {
+      region_id,
+      courier_id,
+      status,
+      startDate,
+      endDate,
+    });
   }
 
   @ApiOperation({ summary: 'List new posts' })
@@ -84,12 +98,16 @@ export class PostController {
   courierOldPosts(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 8,
-    @CurrentUser() user: JwtPayload,
+    @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @CurrentUser() user?: JwtPayload,
   ) {
     return this.postService.oldPostsForCourier(
       Number(page),
       Number(limit),
-      user,
+      user!,
+      { status, startDate, endDate },
     );
   }
 
@@ -109,6 +127,17 @@ export class PostController {
   @Get('return-requests/list')
   getReturnRequests() {
     return this.postService.getReturnRequests();
+  }
+
+  @ApiOperation({
+    summary: 'Old posts filter options — region/courier pairs (admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Distinct region/courier pairs' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST)
+  @Get('old/filter-options')
+  oldPostsFilterOptions() {
+    return this.postService.oldPostsFilterOptions();
   }
 
   @ApiOperation({ summary: 'Get post by id' })

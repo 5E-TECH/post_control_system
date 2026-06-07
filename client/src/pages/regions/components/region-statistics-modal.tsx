@@ -17,8 +17,10 @@ interface CourierStat {
   totalOrders: number;
   deliveredOrders: number;
   cancelledOrders: number;
+  pendingOrders: number;
   totalRevenue: number;
   successRate: number;
+  isUnassigned?: boolean;
 }
 
 interface DistrictCourier {
@@ -35,6 +37,7 @@ interface DistrictStat {
   totalOrders: number;
   deliveredOrders: number;
   cancelledOrders: number;
+  pendingOrders: number;
   totalRevenue: number;
   successRate: number;
 }
@@ -238,6 +241,7 @@ const RegionStatisticsModal: React.FC<RegionStatisticsModalProps> = ({
                           <th className="pb-3 font-medium text-center">{t("totalOrders")}</th>
                           <th className="pb-3 font-medium text-center">{t("delivered")}</th>
                           <th className="pb-3 font-medium text-center">{t("cancelled")}</th>
+                          <th className="pb-3 font-medium text-center">{t("pending")}</th>
                           <th className="pb-3 font-medium text-center">{t("successRate")}</th>
                           {!isLogist && <th className="pb-3 font-medium text-right">{t("revenue")}</th>}
                         </tr>
@@ -247,23 +251,36 @@ const RegionStatisticsModal: React.FC<RegionStatisticsModalProps> = ({
                           <tr key={courier.id} className="hover:bg-white dark:hover:bg-[#3A3650] transition-colors">
                             <td className="py-3">
                               <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-sm ${idx === 0 ? "bg-amber-500" : idx === 1 ? "bg-gray-400" : idx === 2 ? "bg-amber-700" : "bg-indigo-500"}`}>
-                                  {idx + 1}
-                                </div>
+                                {courier.isUnassigned ? (
+                                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-300 dark:bg-gray-600">
+                                    <Clock className="w-4 h-4 text-white" />
+                                  </div>
+                                ) : (
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium text-sm ${idx === 0 ? "bg-amber-500" : idx === 1 ? "bg-gray-400" : idx === 2 ? "bg-amber-700" : "bg-indigo-500"}`}>
+                                    {idx + 1}
+                                  </div>
+                                )}
                                 <div>
                                   <div className="flex items-center gap-1.5">
-                                    <p className="font-medium text-gray-800 dark:text-white text-sm">{courier.name}</p>
-                                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full font-medium leading-none">{t("mainCourier")}</span>
+                                    <p className="font-medium text-gray-800 dark:text-white text-sm">{courier.isUnassigned ? t("unassigned") : courier.name}</p>
+                                    {!courier.isUnassigned && (
+                                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full font-medium leading-none">{t("mainCourier")}</span>
+                                    )}
                                   </div>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                    <Phone className="w-3 h-3" />{courier.phoneNumber}
-                                  </p>
+                                  {courier.isUnassigned ? (
+                                    <p className="text-xs text-gray-400 dark:text-gray-500">{t("unassignedHint")}</p>
+                                  ) : (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                      <Phone className="w-3 h-3" />{courier.phoneNumber}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </td>
                             <td className="py-3 text-center"><span className="font-medium text-gray-800 dark:text-white">{courier.totalOrders}</span></td>
                             <td className="py-3 text-center"><span className="text-emerald-600 dark:text-emerald-400 font-medium">{courier.deliveredOrders}</span></td>
                             <td className="py-3 text-center"><span className="text-red-600 dark:text-red-400 font-medium">{courier.cancelledOrders}</span></td>
+                            <td className="py-3 text-center"><span className="text-amber-600 dark:text-amber-400 font-medium">{courier.pendingOrders}</span></td>
                             <td className="py-3 text-center">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${courier.successRate >= 70 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : courier.successRate >= 50 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
                                 {courier.successRate}%
@@ -315,6 +332,17 @@ const RegionStatisticsModal: React.FC<RegionStatisticsModalProps> = ({
                               <div className="flex items-center gap-2 text-sm">
                                 <span className="font-medium text-gray-800 dark:text-white">{district.totalOrders}</span>
                                 <span className="text-gray-400 text-xs">{t("orders")}</span>
+                                <span className="hidden sm:inline-flex items-center gap-1.5 text-xs">
+                                  <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400" title={t("delivered")}>
+                                    <CheckCircle className="w-3 h-3" />{district.deliveredOrders}
+                                  </span>
+                                  <span className="inline-flex items-center gap-0.5 text-red-600 dark:text-red-400" title={t("cancelled")}>
+                                    <XCircle className="w-3 h-3" />{district.cancelledOrders}
+                                  </span>
+                                  <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400" title={t("pending")}>
+                                    <Clock className="w-3 h-3" />{district.pendingOrders}
+                                  </span>
+                                </span>
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${district.successRate >= 70 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : district.successRate >= 50 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
                                   {district.successRate}%
                                 </span>

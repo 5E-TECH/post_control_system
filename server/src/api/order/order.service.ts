@@ -67,6 +67,18 @@ import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance
 import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 
+/**
+ * LDG webhook terminal handler natijasi:
+ *  - 'applied'  — biznes oqim bajarildi (sotildi/bekor qilindi/qaytarildi)
+ *  - 'skipped'  — idempotent: order allaqachon kerakli holatda yoki topilmadi
+ *  - 'mismatch' — LDG holati bizning order holati bilan to'qnashadi (qo'lda
+ *                 tekshirilishi kerak — masalan, biz SOLD, LDG CANCELLED)
+ */
+export type LdgTerminalResult =
+  | { kind: 'applied' }
+  | { kind: 'skipped'; reason: string }
+  | { kind: 'mismatch'; reason: string };
+
 @Injectable()
 export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   // In-memory cache for top markets/couriers (30 kunlik aggregation og'ir bo'lgani uchun)
@@ -203,7 +215,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (query.search) {
         qb.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
           { search: `%${query.search}%` },
         );
       }
@@ -714,7 +726,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (search) {
         query.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -767,7 +779,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (search) {
         query.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -796,7 +808,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: JwtPayload) {
     try {
       const newOrder = await this.orderRepo.findOne({
         where: { id },
@@ -858,17 +870,36 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      return successRes(
-        {
-          ...newOrder,
-          max_courier_tariff_home,
-          max_courier_tariff_center,
-          assigned_courier_tariff_home,
-          assigned_courier_tariff_center,
-        },
-        200,
-        'Order by id',
-      );
+      // Tariflar maxfiy — rolga qarab tozalanadi (UI'da yashirish yetarli emas,
+      // tarmoq javobida ham bo'lmasin):
+      //  - market_tariff  → admin/superadmin/market ko'radi
+      //  - courier_tariff (va kurier tarif yordamchi maydonlari) →
+      //    admin/superadmin/courier ko'radi
+      const role = user?.role;
+      const isAdminLike = role === Roles.ADMIN || role === Roles.SUPERADMIN;
+      const canSeeMarketTariff = isAdminLike || role === Roles.MARKET;
+      const canSeeCourierTariff = isAdminLike || role === Roles.COURIER;
+
+      const payload: Record<string, any> = {
+        ...newOrder,
+        max_courier_tariff_home,
+        max_courier_tariff_center,
+        assigned_courier_tariff_home,
+        assigned_courier_tariff_center,
+      };
+
+      if (!canSeeMarketTariff) {
+        delete payload.market_tariff;
+      }
+      if (!canSeeCourierTariff) {
+        delete payload.courier_tariff;
+        delete payload.max_courier_tariff_home;
+        delete payload.max_courier_tariff_center;
+        delete payload.assigned_courier_tariff_home;
+        delete payload.assigned_courier_tariff_center;
+      }
+
+      return successRes(payload, 200, 'Order by id');
     } catch (error) {
       return catchError(error);
     }
@@ -1356,7 +1387,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (search) {
         qb.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
           { search: `%${search}%` },
         );
       }
@@ -1710,6 +1741,58 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  /**
+   * Kuryer buyurtmalari tab'lari uchun sonlar (badge):
+   *  - waiting: kutilayotgan (WAITING)
+   *  - cancelled: bekor qilingan (CANCELLED)
+   *  - all: "Hammasi" tabidagi kabi (CREATED/NEW/RECEIVED'dan tashqari)
+   * Kuryerning o'z postlari ichida sanaladi.
+   */
+  async allCouriersOrdersCounts(user: JwtPayload) {
+    try {
+      const allMyPosts = await this.postRepo.find({
+        where: { courier_id: user.id },
+        select: ['id'],
+      });
+      const allPostIds = allMyPosts.map((p) => p.id);
+      if (!allPostIds.length) {
+        return successRes(
+          { waiting: 0, all: 0, cancelled: 0 },
+          200,
+          'No posts',
+        );
+      }
+      const base = () =>
+        this.orderRepo
+          .createQueryBuilder('o')
+          .where('o.post_id IN (:...postIds)', { postIds: allPostIds });
+
+      const waiting = await base()
+        .andWhere('o.status = :s', { s: Order_status.WAITING })
+        .getCount();
+      const cancelled = await base()
+        .andWhere('o.status = :s', { s: Order_status.CANCELLED })
+        .getCount();
+      const all = await base()
+        .andWhere('o.status NOT IN (:...excluded)', {
+          excluded: [
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.RECEIVED,
+          ],
+        })
+        .getCount();
+
+      return successRes(
+        { waiting, all, cancelled },
+        200,
+        'Courier order counts',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async allCouriersOrders(
     user: JwtPayload,
     query: {
@@ -1720,6 +1803,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       startDate?: string;
       endDate?: string;
       fetchAll?: boolean | string;
+      district_id?: string;
+      marketId?: string;
+      where_deliver?: string;
     },
   ) {
     try {
@@ -1773,9 +1859,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // search filter
       if (query.search) {
         qb.andWhere(
-          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+          '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST(o.order_number AS TEXT) ILIKE :search)',
           { search: `%${query.search}%` },
         );
+      }
+
+      // Tuman filtri (kuryer uchun)
+      if (query.district_id) {
+        qb.andWhere('o.district_id = :districtId', {
+          districtId: query.district_id,
+        });
+      }
+
+      // Market filtri (o.user_id — buyurtmani yaratgan market)
+      if (query.marketId) {
+        qb.andWhere('o.user_id = :marketId', { marketId: query.marketId });
+      }
+
+      // Yetkazish turi (uyga / markazga)
+      if (query.where_deliver) {
+        qb.andWhere('o.where_deliver = :whereDeliver', {
+          whereDeliver: query.where_deliver,
+        });
       }
 
       // ✅ Sana filter
@@ -2022,6 +2127,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         paid_amount: paidAfter,
         comment: finalComment,
         sold_at: Date.now(),
+        cancelled_at: null,
         return_requested: false,
         // Sotilgan paytdagi tariflarni saqlash (tarix uchun)
         market_tariff: marketTarif,
@@ -2299,6 +2405,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         status: Order_status.CANCELLED,
         comment: finalComment,
         return_requested: false,
+        cancelled_at: Date.now(),
       });
       await queryRunner.manager.save(order);
 
@@ -2649,6 +2756,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         comment: finalComment,
         product_quantity: totalNewQty,
         sold_at: order.sold_at ?? Date.now(),
+        cancelled_at: null,
         return_requested: false,
         // Sotilgan paytdagi tariflarni saqlash (tarix uchun)
         market_tariff: order.market_tariff ?? marketTarif,
@@ -2754,6 +2862,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             to_be_paid: 0,
             where_deliver: order.where_deliver,
             status: Order_status.CANCELLED,
+            cancelled_at: Date.now(),
             qr_code_token: generateCustomToken(),
             parent_order_id: id,
             product_quantity: cancelledQty,
@@ -2834,6 +2943,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         user,
       });
       await this.orderBotService.syncStatusButton(order.id);
+
+      // Tashqi integratsiya bilan sinxronlash (async, kurierga halaqit bermaydi).
+      // PAID/PARTLY_PAID → 'paid', aks holda 'sold' (sellOrder bilan bir xil mantiq).
+      const partlySyncAction = [
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+      ].includes(order.status)
+        ? 'paid'
+        : 'sold';
+      this.integrationSyncService.queueStatusSync(
+        order.id,
+        partlySyncAction,
+        Order_status.WAITING,
+        order.status,
+      );
+
       return successRes({}, 200, 'Order qisman sotildi');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -3178,8 +3303,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       if (targetStatus === RollbackTarget.WAITING) {
         order.status = Order_status.WAITING;
+        order.cancelled_at = null;
       } else if (targetStatus === RollbackTarget.CANCELLED) {
         order.status = Order_status.CANCELLED;
+        order.cancelled_at = Date.now();
       } else if (targetStatus === RollbackTarget.CANCELLED_SENT) {
         // Buyurtmani cancelled pochtaga qo'shish
         if (!order.post?.courier_id) {
@@ -3224,6 +3351,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         order.canceled_post_id = canceledPost.id;
         order.status = Order_status.CANCELLED_SENT;
+        order.cancelled_at = Date.now();
       }
 
       await queryRunner.manager.save(order);
@@ -3310,7 +3438,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           'acceptedCount',
         )
         .addSelect(
-          `COUNT(CASE WHEN o.updated_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
           'cancelled',
         )
         .addSelect(
@@ -3867,8 +3995,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // Statistikani olish (profit alohida hisoblanadi)
       const statsResult = await this.orderRepo
         .createQueryBuilder('o')
+        // Jami = harakat (davrda sotilgan YOKI bekor qilingan) — harakat modeli
         .select(
-          `COUNT(CASE WHEN o.updated_at BETWEEN :start AND :end THEN 1 END)`,
+          `COUNT(CASE WHEN (o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses)) OR (o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus) THEN 1 END)`,
           'totalOrders',
         )
         .addSelect(
@@ -3876,7 +4005,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           'soldOrders',
         )
         .addSelect(
-          `COUNT(CASE WHEN o.updated_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
           'canceledOrders',
         )
         // Saqlangan tariflar bo'yicha profit (yangi buyurtmalar uchun)
@@ -3953,23 +4082,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         Order_status.PARTLY_PAID,
       ];
 
-      // Bitta optimallashtirilgan query - barcha statistikani olish
+      // Harakat modeli: sotildi/bekor/foyda harakat sanasi (sold_at/cancelled_at)
+      // bo'yicha sanaladi — bir necha kun oldin yaratilib BUGUN sotilgan/bekor
+      // qilingan buyurtma bugungi statistikaga tushadi. Jami = sotildi + bekor.
       const statsResult = await this.orderRepo
         .createQueryBuilder('o')
         .select(
-          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end THEN 1 END)`,
+          `COUNT(CASE WHEN (o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses)) OR (o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus) THEN 1 END)`,
           'totalOrders',
         )
         .addSelect(
-          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end AND o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) THEN 1 END)`,
+          `COUNT(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) THEN 1 END)`,
           'soldOrders',
         )
         .addSelect(
-          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end AND o.updated_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
           'canceledOrders',
         )
         .addSelect(
-          `SUM(CASE WHEN o.created_at BETWEEN :start AND :end AND o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) THEN o.to_be_paid ELSE 0 END)`,
+          `SUM(CASE WHEN o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses) THEN o.to_be_paid ELSE 0 END)`,
           'profit',
         )
         .where('o.user_id = :marketId', { marketId: effectiveMarketId })
@@ -4127,12 +4258,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             // Hech qanday order (soft-deleted ham) qolmagan — postni o'chirish xavfsiz
             await queryRunner.manager.delete(PostEntity, { id: postId });
           } else if (remainingOrdersCount === 0) {
-            // Aktiv order yo'q, lekin soft-deleted'lar bor — post audit uchun saqlanadi
-            await queryRunner.manager.update(
-              PostEntity,
-              { id: postId },
-              { order_quantity: 0, post_total_price: 0 },
-            );
+            if (post.status === Post_status.NEW) {
+              // Jo'natilmagan (NEW) pochtada aktiv buyurtma qolmadi — bu shunchaki
+              // yig'ish "savati", uni saqlashning audit qiymati yo'q (buyurtma
+              // auditi order qatori + activity_log'da turadi). O'CHIRAMIZ;
+              // soft-deleted buyurtmalar FK (onDelete: SET NULL) orqali ajraladi.
+              // Aks holda 0-buyurtmali bo'sh NEW pochta ro'yxatda qolib ketardi.
+              await queryRunner.manager.delete(PostEntity, { id: postId });
+            } else {
+              // Jo'natilgan/qabul qilingan/bekor pochta — soft-deleted'lar bor,
+              // audit uchun saqlanadi, faqat 0 ga tushiriladi.
+              await queryRunner.manager.update(
+                PostEntity,
+                { id: postId },
+                { order_quantity: 0, post_total_price: 0 },
+              );
+            }
           } else {
             // Qolgan orderlarning umumiy summasini hisoblash
             const remainingOrders = await queryRunner.manager.find(
@@ -4286,7 +4427,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         if (filters.search) {
           qb.andWhere(
-            '(customer.name ILIKE :search OR customer.phone_number ILIKE :search)',
+            '(customer.name ILIKE :search OR customer.phone_number ILIKE :search OR CAST("order".order_number AS TEXT) ILIKE :search)',
             { search: `%${filters.search}%` },
           );
         }
@@ -5038,15 +5179,31 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async markDeliveredByLdg(
     orderId: string,
     ldgCourierUserId: string,
-  ): Promise<void> {
+  ): Promise<LdgTerminalResult> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       this.logger.warn(`LDG webhook delivered: order topilmadi (${orderId})`);
-      return;
+      return { kind: 'skipped', reason: 'order_not_found' };
     }
-    if (order.status === Order_status.SOLD) {
-      // Idempotent — webhook qayta yuborilgan bo'lishi mumkin
-      return;
+    // Idempotent — webhook qayta yuborilgan yoki avval qo'lda sotilgan
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      return { kind: 'skipped', reason: `already ${order.status}` };
+    }
+    // MISMATCH: LDG yetkazdi, lekin bizda buyurtma bekor qilingan/yopilgan
+    // (kuryer yoki operator allaqachon "bekor qildi" deb belgilagan, ammo
+    // LDG haqiqatda yetkazgan ekan — yoki status sinxron emas).
+    if (
+      order.status === Order_status.CANCELLED ||
+      order.status === Order_status.CANCELLED_SENT ||
+      order.status === Order_status.CLOSED
+    ) {
+      const reason = `LDG: yetkazildi, lekin bizda status=${order.status} (qo'lda tekshiring)`;
+      this.logger.error(`LDG MISMATCH delivered: order=${orderId} — ${reason}`);
+      return { kind: 'mismatch', reason };
     }
 
     // ON_THE_ROAD yoki RECEIVED bo'lsa avval WAITING ga o'tkazamiz
@@ -5069,10 +5226,37 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       status: Status.ACTIVE,
     };
 
-    await this.sellOrder(payload, orderId, {
-      comment: 'LDG yetkazib berdi',
-      extraCost: 0,
-    });
+    try {
+      await this.sellOrder(payload, orderId, {
+        comment: 'LDG yetkazib berdi',
+        extraCost: 0,
+      });
+      return { kind: 'applied' };
+    } catch (err) {
+      // sellOrder `where: status=WAITING` filtrida fail bo'lsa — race condition
+      // (manual sell yoki cancel oraliqda bajarildi). Yangi statusni o'qib mismatch
+      // yoki skipped sifatida qaytaramiz.
+      const fresh = await this.orderRepo.findOne({ where: { id: orderId } });
+      if (
+        fresh?.status === Order_status.SOLD ||
+        fresh?.status === Order_status.PAID ||
+        fresh?.status === Order_status.PARTLY_PAID
+      ) {
+        return { kind: 'skipped', reason: `race: now ${fresh.status}` };
+      }
+      if (
+        fresh?.status === Order_status.CANCELLED ||
+        fresh?.status === Order_status.CANCELLED_SENT ||
+        fresh?.status === Order_status.CLOSED
+      ) {
+        const reason = `LDG: yetkazildi (sell race), lekin bizda status=${fresh.status}`;
+        this.logger.error(
+          `LDG MISMATCH delivered (race): order=${orderId} — ${reason}`,
+        );
+        return { kind: 'mismatch', reason };
+      }
+      throw err;
+    }
   }
 
   /**
@@ -5086,19 +5270,29 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async markCancelledByLdg(
     orderId: string,
     ldgCourierUserId: string,
-  ): Promise<void> {
+  ): Promise<LdgTerminalResult> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       this.logger.warn(`LDG webhook cancelled: order topilmadi (${orderId})`);
-      return;
+      return { kind: 'skipped', reason: 'order_not_found' };
     }
     if (
       order.status === Order_status.CANCELLED ||
       order.status === Order_status.CANCELLED_SENT ||
-      order.status === Order_status.CLOSED ||
-      order.status === Order_status.SOLD
+      order.status === Order_status.CLOSED
     ) {
-      return; // idempotent
+      return { kind: 'skipped', reason: `already ${order.status}` };
+    }
+    // MISMATCH: LDG bekor qildi, lekin bizda allaqachon sotilgan/to'langan.
+    // Bu real biznes muammosi: pul market'ga to'langan, lekin LDG yetkazmagan.
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      const reason = `LDG: bekor qildi, lekin bizda status=${order.status} (pul to'langan! qo'lda tekshiring)`;
+      this.logger.error(`LDG MISMATCH cancelled: order=${orderId} — ${reason}`);
+      return { kind: 'mismatch', reason };
     }
 
     const payload: JwtPayload = {
@@ -5112,6 +5306,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       comment: 'LDG bekor qildi',
       extraCost: 0,
     });
+    return { kind: 'applied' };
   }
 
   /**
@@ -5130,20 +5325,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async markReturnedByLdg(
     orderId: string,
     ldgCourierUserId: string,
-  ): Promise<void> {
+  ): Promise<LdgTerminalResult> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       this.logger.warn(`LDG webhook returned: order topilmadi (${orderId})`);
-      return;
+      return { kind: 'skipped', reason: 'order_not_found' };
     }
     if (order.status === Order_status.CLOSED) {
-      return; // idempotent
+      return { kind: 'skipped', reason: 'already CLOSED' };
     }
-    if (order.status === Order_status.SOLD) {
-      this.logger.warn(
-        `LDG webhook returned: order SOLD holatida (${orderId}), qo'lda tekshiring`,
-      );
-      return;
+    // MISMATCH: LDG paketni bizga qaytardi, lekin bizda allaqachon sotilgan/to'langan
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      const reason = `LDG: qaytarib berdi, lekin bizda status=${order.status} (pul to'langan! qo'lda tekshiring)`;
+      this.logger.error(`LDG MISMATCH returned: order=${orderId} — ${reason}`);
+      return { kind: 'mismatch', reason };
     }
 
     const payload: JwtPayload = {
@@ -5178,6 +5377,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       description: 'LDG buyurtmani qaytarib berdi (CLOSED)',
       user: payload,
     });
+    return { kind: 'applied' };
   }
 
   // ==================== BULK OPERATIONS (KURIER UCHUN) ====================

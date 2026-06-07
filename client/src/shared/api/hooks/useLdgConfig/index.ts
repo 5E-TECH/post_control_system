@@ -21,7 +21,6 @@ export interface LdgConfigSafe {
   default_height: number;
   default_seats: number;
   default_payer_type: string;
-  enabled_district_sato_codes: number[];
   ldg_courier_user_id: string | null;
   // Sezgir maydonlar — qiymat o'rniga sozlanganlik flagi
   api_key_set: boolean;
@@ -50,7 +49,6 @@ export interface UpdateLdgConfigDto {
   default_width?: number;
   default_height?: number;
   default_payer_type?: "receiver" | "sender" | "third_party";
-  enabled_district_sato_codes?: number[];
   ldg_courier_user_id?: string;
 }
 

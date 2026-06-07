@@ -93,6 +93,54 @@ export const useRegion = () => {
       refetchOnWindowFocus: false,
     });
 
+  // Bitta kuryerning (super kuryer) viloyatlar bo'yicha statistikasi
+  const getCourierRegionBreakdown = (
+    courierId?: string,
+    startDate?: string,
+    endDate?: string,
+    enabled = true
+  ) =>
+    useQuery({
+      queryKey: [region, "courier-breakdown", courierId, startDate, endDate],
+      queryFn: () =>
+        api
+          .get(`region/courier/${courierId}/stats`, {
+            params: { startDate, endDate },
+          })
+          .then((res) => res.data),
+      enabled: enabled && !!courierId,
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+    });
+
+  // Kuryer o'z viloyati tumanlari statistikasi ("Mening viloyatim")
+  const getMyRegionDistrictStats = (
+    startDate?: string,
+    endDate?: string,
+    enabled = true
+  ) =>
+    useQuery({
+      queryKey: [region, "my-district-stats", startDate, endDate],
+      queryFn: () =>
+        api
+          .get("region/my/district-stats", { params: { startDate, endDate } })
+          .then((res) => res.data),
+      enabled,
+      staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+    });
+
+  // Kuryer o'z viloyatiga biriktirilgan tumanlar (filtr dropdown uchun)
+  const getMyDistricts = (enabled = true) =>
+    useQuery({
+      queryKey: [region, "my-districts"],
+      queryFn: () =>
+        api.get("region/my/districts").then((res) => res.data),
+      enabled,
+      staleTime: 1000 * 60 * 60,
+      refetchOnWindowFocus: false,
+    });
+
   // Logist bilan ishlash
   const getRegionsWithLogist = (enabled = true) =>
     useQuery({
@@ -139,6 +187,9 @@ export const useRegion = () => {
     updateRegionName,
     getAllRegionsStats,
     getRegionDetailedStats,
+    getCourierRegionBreakdown,
+    getMyRegionDistrictStats,
+    getMyDistricts,
     getRegionsWithLogist,
     assignMainCourier,
     assignLogist,

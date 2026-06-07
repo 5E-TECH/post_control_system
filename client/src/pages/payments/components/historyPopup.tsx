@@ -40,6 +40,24 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
   const info = data?.data;
   const isIncome = info?.operation_type === "income";
 
+  // Market/kuryer (counterpart) nomi faqat admin va superadminga ko'rinadi
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+  const canSeeCounterpart = isAdmin && !!info?.sourceUser?.name;
+
+  // Click orqali to'g'ridan-to'g'ri market/kuryer o'tkazmasi uchun aniq yorliq
+  const isClickToMarket = info?.payment_method === "click_to_market";
+  const counterpartRole = info?.sourceUser?.role;
+  let directionLabel = isIncome ? "Qayerdan" : "Qayerga";
+  if (canSeeCounterpart && isClickToMarket && counterpartRole === "market") {
+    directionLabel = "Marketga o'tkazildi (Click)";
+  } else if (
+    canSeeCounterpart &&
+    isClickToMarket &&
+    counterpartRole === "courier"
+  ) {
+    directionLabel = "Kuryerdan tushdi (Click)";
+  }
+
   const formatPhone = (phone: string) => {
     if (!phone) return "";
     // Remove any existing + sign first, then format
@@ -123,9 +141,23 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
               </div>
               <div className="text-right">
                 <p className="text-xs text-white/60">{t("afterBalance")}</p>
-                <p className="text-sm font-semibold text-white">
-                  {info?.balance_after?.toLocaleString()} UZS
-                </p>
+                {info?.balance_after_cash != null &&
+                info?.balance_after_card != null ? (
+                  <div className="mt-0.5 space-y-0.5">
+                    <p className="text-xs font-semibold text-white whitespace-nowrap">
+                      {t("afterBalanceCash")}:{" "}
+                      {Number(info.balance_after_cash).toLocaleString()}
+                    </p>
+                    <p className="text-xs font-semibold text-white whitespace-nowrap">
+                      {t("afterBalanceCard")}:{" "}
+                      {Number(info.balance_after_card).toLocaleString()}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-white">
+                    {info?.balance_after?.toLocaleString()} UZS
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -193,20 +225,20 @@ const HistoryPopup: FC<IProps> = ({ id, onClose }) => {
                         ? "text-blue-600 dark:text-blue-400"
                         : "text-orange-600 dark:text-orange-400"
                     }`}>
-                      {isIncome ? "Qayerdan" : "Qayerga"}
+                      {directionLabel}
                     </p>
                     <p className="text-sm font-bold text-gray-800 dark:text-white truncate">
-                      {/* sourceUser - kuryer/market to'lovlari uchun */}
-                      {info?.sourceUser?.name ||
-                       info?.cashbox?.user?.name ||
-                       "Asosiy kassa"}
+                      {/* Counterpart (kuryer/market) nomi — faqat admin/superadmin uchun */}
+                      {canSeeCounterpart
+                        ? info?.sourceUser?.name
+                        : info?.cashbox?.user?.name || "Asosiy kassa"}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {info?.sourceUser?.role === "courier" && "Kuryer"}
-                      {info?.sourceUser?.role === "market" && "Do'kon"}
-                      {!info?.sourceUser && info?.cashbox?.cashbox_type === "main" && "Pochta kassasi"}
-                      {!info?.sourceUser && info?.cashbox?.cashbox_type === "for_courier" && "Kuryer kassasi"}
-                      {!info?.sourceUser && info?.cashbox?.cashbox_type === "for_market" && "Do'kon kassasi"}
+                      {canSeeCounterpart && counterpartRole === "courier" && "Kuryer"}
+                      {canSeeCounterpart && counterpartRole === "market" && "Do'kon"}
+                      {!canSeeCounterpart && info?.cashbox?.cashbox_type === "main" && "Pochta kassasi"}
+                      {!canSeeCounterpart && info?.cashbox?.cashbox_type === "for_courier" && "Kuryer kassasi"}
+                      {!canSeeCounterpart && info?.cashbox?.cashbox_type === "for_market" && "Do'kon kassasi"}
                     </p>
                   </div>
                 </div>

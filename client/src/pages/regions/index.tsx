@@ -12,6 +12,16 @@ import { Settings, MapPin, Calendar, HeadphonesIcon } from "lucide-react";
 
 const { RangePicker } = DatePicker;
 
+// Mahalliy (O'zbekiston) kalendar sanasini YYYY-MM-DD ko'rinishida qaytaradi.
+// MUHIM: `Date.toISOString()` ishlatib BO'LMAYDI — u sanani UTC'ga o'tkazadi va
+// UTC+5 da yarim tun bir kun oldinga siljib, "Bugun" kechagi kunni ko'rsatardi.
+// Backend bu sanani UZB sanasi deb qabul qiladi, shuning uchun mahalliy
+// komponentlarni to'g'ridan-to'g'ri formatlaymiz.
+const fmtLocalDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+
 const Regions = () => {
   const { t } = useTranslation(["regions"]);
   const navigate = useNavigate();
@@ -27,7 +37,7 @@ const Regions = () => {
     "today" | "week" | "month" | "all" | "custom"
   >("today");
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = fmtLocalDate(new Date());
   const [customStartDate, setCustomStartDate] = useState(today);
   const [customEndDate, setCustomEndDate] = useState(today);
 
@@ -38,23 +48,23 @@ const Regions = () => {
     switch (dateRange) {
       case "today":
         return {
-          startDate: todayDate.toISOString().split("T")[0],
-          endDate: todayDate.toISOString().split("T")[0],
+          startDate: fmtLocalDate(todayDate),
+          endDate: fmtLocalDate(todayDate),
         };
       case "week": {
         const weekAgo = new Date(todayDate);
         weekAgo.setDate(weekAgo.getDate() - 7);
         return {
-          startDate: weekAgo.toISOString().split("T")[0],
-          endDate: todayDate.toISOString().split("T")[0],
+          startDate: fmtLocalDate(weekAgo),
+          endDate: fmtLocalDate(todayDate),
         };
       }
       case "month": {
         const monthAgo = new Date(todayDate);
         monthAgo.setMonth(monthAgo.getMonth() - 1);
         return {
-          startDate: monthAgo.toISOString().split("T")[0],
-          endDate: todayDate.toISOString().split("T")[0],
+          startDate: fmtLocalDate(monthAgo),
+          endDate: fmtLocalDate(todayDate),
         };
       }
       case "all":
@@ -66,8 +76,8 @@ const Regions = () => {
         };
       default:
         return {
-          startDate: todayDate.toISOString().split("T")[0],
-          endDate: todayDate.toISOString().split("T")[0],
+          startDate: fmtLocalDate(todayDate),
+          endDate: fmtLocalDate(todayDate),
         };
     }
   }, [dateRange, customStartDate, customEndDate]);

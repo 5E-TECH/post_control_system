@@ -57,5 +57,7 @@
   "revenue": "Tushum",
   "sum": "so'm",
   "couriers": "Kuryerlar",
-  "clickForDetails": "Batafsil ko'rish uchun bosing"
+  "clickForDetails": "Batafsil ko'rish uchun bosing",
+  "unassigned": "Biriktirilmagan",
+  "unassignedHint": "Kuryer biriktirilmagan (NEW pochta)"
 }

@@ -132,6 +132,67 @@ export class CasheBoxController {
     });
   }
 
+  @ApiOperation({
+    summary: 'Export a courier/market cashbox history to Excel',
+  })
+  @ApiParam({ name: 'id', description: 'Courier/Market user ID' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD). Bo‘sh bo‘lsa — butun tarix',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD). Bo‘sh bo‘lsa — butun tarix',
+  })
+  @ApiQuery({
+    name: 'sourceTypes',
+    required: false,
+    type: String,
+    description:
+      "Vergul bilan ajratilgan source_type lar (masalan oldi-berdi uchun: courier_payment,market_payment)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Excel file downloaded',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('user/:id/export')
+  async exportUserCashbox(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('sourceTypes') sourceTypes?: string,
+  ) {
+    const { buffer, fileName } =
+      await this.cashBoxService.exportUserCashboxToExcel(id, {
+        fromDate,
+        toDate,
+        sourceTypes,
+        allHistory: !fromDate && !toDate,
+      });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=${encodeURIComponent(fileName)}`,
+    );
+    res.send(buffer);
+  }
+
   @ApiOperation({ summary: 'Get my cashbox (courier/market)' })
   @ApiQuery({
     name: 'fromDate',
@@ -393,6 +454,54 @@ export class CasheBoxController {
   @Post('salary')
   paySalary(@CurrentUser() user: JwtPayload, @Body() salaryDto: SalaryDto) {
     return this.cashBoxService.paySalary(user, salaryDto);
+  }
+
+  @ApiOperation({ summary: 'Get my own salary payment history' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String })
+  @ApiQuery({ name: 'toDate', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Own salary payment history' })
+  @UseGuards(JwtGuard)
+  @Get('salary/my-history')
+  mySalaryHistory(
+    @CurrentUser() user: JwtPayload,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.salaryHistory(user.id, {
+      fromDate,
+      toDate,
+      page,
+      limit,
+    });
+  }
+
+  @ApiOperation({ summary: 'Get salary payment history of a staff member' })
+  @ApiParam({ name: 'userId', description: 'Staff user ID' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String })
+  @ApiQuery({ name: 'toDate', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Salary payment history' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('salary/history/:userId')
+  salaryHistory(
+    @Param('userId') userId: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.salaryHistory(userId, {
+      fromDate,
+      toDate,
+      page,
+      limit,
+    });
   }
 
   // ==================== SHIFT (SMENA) ENDPOINTS ====================

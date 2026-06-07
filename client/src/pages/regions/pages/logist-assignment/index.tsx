@@ -5,7 +5,6 @@ import { useRegion } from "../../../../shared/api/hooks/useRegion/useRegion";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import {
-  ArrowLeft,
   HeadphonesIcon,
   MapPin,
   Check,
@@ -133,16 +132,10 @@ const LogistAssignment = () => {
   }
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div>
+      <div>
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#352F4A] transition-all cursor-pointer"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg">
             <HeadphonesIcon className="w-5 h-5 text-white" />
           </div>

@@ -10,7 +10,7 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { DataSource, In, IsNull, Not, Repository } from 'typeorm';
+import { Between, DataSource, In, IsNull, Not, Repository } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
@@ -29,6 +29,33 @@ import { PostDto } from './dto/postId.dto';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
+import { RegionEntity } from 'src/core/entity/region.entity';
+import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
+
+// Eski pochtalar (old posts) ro'yxatiga beriladigan filtrlar.
+export interface OldPostsFilter {
+  region_id?: string;
+  courier_id?: string;
+  status?: string;
+  startDate?: string; // YYYY-MM-DD (UZB)
+  endDate?: string; // YYYY-MM-DD (UZB)
+}
+
+// YYYY-MM-DD oralig'ini created_at (epoch ms) bo'yicha TypeORM Between'ga
+// aylantiradi. Faqat bittasi berilsa — o'sha kunning boshi..oxiri olinadi.
+function buildCreatedAtRange(startDate?: string, endDate?: string) {
+  if (!startDate && !endDate) return undefined;
+  const from = startDate || endDate!;
+  const to = endDate || startDate!;
+  return Between(
+    toUzbekistanTimestamp(from, false),
+    toUzbekistanTimestamp(to, true),
+  );
+}
+
+// Pochta LDG'ga jo'natilganda buyurtmalar orasidagi pauza (ms).
+// LDG rate-limitidan (429) oshib ketmaslik uchun ketma-ket so'rovlarni sekinlatamiz.
+const LDG_DISPATCH_DELAY_MS = 400;
 
 @Injectable()
 export class PostService {
@@ -46,6 +73,9 @@ export class PostService {
 
     @InjectRepository(CourierRegionEntity)
     private readonly courierRegionRepo: Repository<CourierRegionEntity>,
+
+    @InjectRepository(RegionEntity)
+    private readonly regionRepo: Repository<RegionEntity>,
 
     private readonly dataSource: DataSource,
     private readonly activityLog: ActivityLogService,
@@ -71,19 +101,42 @@ export class PostService {
             `LDG'ga jo'natish muvaffaqiyatsiz (order=${orderId}): ${msg}`,
           );
         }
+        // LDG rate-limit (429 "Too Many Attempts")ni keltirib chiqarmaslik uchun
+        // har bir so'rov orasida kichik pauza — ketma-ket "bombardimon" qilmaymiz.
+        // Baribir muvaffaqiyatsiz bo'lganlarni LDG auto-retry cron'i keyin tuzatadi.
+        await new Promise((resolve) =>
+          setTimeout(resolve, LDG_DISPATCH_DELAY_MS),
+        );
       }
     })();
   }
 
-  async findAll(page: number, limit: number): Promise<object> {
+  async findAll(
+    page: number,
+    limit: number,
+    filter: OldPostsFilter = {},
+  ): Promise<object> {
     try {
       // Sahifani to'g'rilab olamiz
       const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
       const skip = (page - 1) * take;
 
+      // Filtrlar: viloyat / kuryer / status / sana oralig'i.
+      // Status berilsa o'shani, aks holda NEW'dan boshqa barcha statuslar.
+      const where: Record<string, any> = {
+        status:
+          filter.status && filter.status !== 'all'
+            ? (filter.status as Post_status)
+            : Not(Post_status.NEW),
+      };
+      if (filter.region_id) where.region_id = filter.region_id;
+      if (filter.courier_id) where.courier_id = filter.courier_id;
+      const createdAt = buildCreatedAtRange(filter.startDate, filter.endDate);
+      if (createdAt) where.created_at = createdAt;
+
       // 🔎 Umumiy ma'lumotlar
       const [data, total] = await this.postRepo.findAndCount({
-        where: { status: Not(Post_status.NEW) },
+        where,
         relations: ['region', 'courier'],
         order: { created_at: 'DESC' },
         skip,
@@ -103,6 +156,120 @@ export class PostService {
         },
         200,
         'All posts (paginated)',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Eski pochtalar filtri uchun (admin) viloyat↔kuryer dropdownlarini o'zaro
+   * cheklash ma'lumotlari. Manba — biriktirish (assignment), pochta tarixi
+   * emas:
+   *  - oddiy kuryer → o'z viloyati (users.region_id);
+   *  - super kuryer → unga biriktirilgan viloyatlar (courier_regions);
+   *  - super kuryer serves_all_regions → barcha viloyatlar.
+   * Shuning uchun super kuryer tanlanganda unga tegishli BARCHA viloyatlar
+   * chiqadi (3 ta biriktirilgan bo'lsa 3, hammasiga bo'lsa hammasi).
+   *
+   * `couriers` — eski pochtasi bor kuryerlar (filtr uchun mazmunli ro'yxat),
+   * har biri o'zining biriktirilgan viloyatlari bilan.
+   * `regions` — barcha viloyatlar (nom lookup + serves_all uchun).
+   * `postRegionIds` — eski pochtasi bor viloyatlar (hech narsa tanlanmaganda
+   * asosiy ro'yxat).
+   */
+  async oldPostsFilterOptions(): Promise<object> {
+    try {
+      // 1️⃣ Eski (NEW emas) pochtalarda haqiqatan ishtirok etgan kuryer/viloyat
+      const postRows = await this.postRepo
+        .createQueryBuilder('post')
+        .select('post.region_id', 'region_id')
+        .addSelect('post.courier_id', 'courier_id')
+        .where('post.status != :newStatus', { newStatus: Post_status.NEW })
+        .groupBy('post.region_id')
+        .addGroupBy('post.courier_id')
+        .getRawMany();
+
+      const postRegionIds = [
+        ...new Set(postRows.map((r) => r.region_id).filter(Boolean)),
+      ];
+      const postCourierIds = [
+        ...new Set(postRows.map((r) => r.courier_id).filter(Boolean)),
+      ];
+
+      // Kuryer → u haqiqatan eski pochta tashigan viloyatlar (assignmentdan
+      // tashqari, mosligini kafolatlash uchun union qilamiz).
+      const courierPostRegions = new Map<string, Set<string>>();
+      for (const r of postRows) {
+        if (!r.courier_id || !r.region_id) continue;
+        const s = courierPostRegions.get(r.courier_id) || new Set<string>();
+        s.add(r.region_id);
+        courierPostRegions.set(r.courier_id, s);
+      }
+
+      // 2️⃣ Barcha viloyatlar (nom lookup + serves_all kuryer uchun)
+      const regionRows = await this.regionRepo.find({
+        select: ['id', 'name'],
+        order: { name: 'ASC' },
+      });
+      const regions = regionRows.map((r) => ({ id: r.id, name: r.name }));
+
+      // 3️⃣ Eski pochtasi bor kuryerlar
+      const couriersList = postCourierIds.length
+        ? await this.userRepo.find({
+            where: { id: In(postCourierIds) },
+            select: [
+              'id',
+              'name',
+              'region_id',
+              'is_super_courier',
+              'serves_all_regions',
+            ],
+          })
+        : [];
+
+      // 4️⃣ Super kuryerlarning biriktirilgan viloyatlari (courier_regions)
+      const superCourierIds = couriersList
+        .filter((c) => c.is_super_courier && !c.serves_all_regions)
+        .map((c) => c.id);
+      const attachedRows = superCourierIds.length
+        ? await this.courierRegionRepo.find({
+            where: { courier_id: In(superCourierIds) },
+            select: ['courier_id', 'region_id'],
+          })
+        : [];
+      const attachedMap = new Map<string, string[]>();
+      for (const a of attachedRows) {
+        const arr = attachedMap.get(a.courier_id) || [];
+        arr.push(a.region_id);
+        attachedMap.set(a.courier_id, arr);
+      }
+
+      // 5️⃣ Har bir kuryer uchun viloyatlar ro'yxati: biriktirish ∪ haqiqiy
+      // pochta viloyatlari (serves_all bo'lsa — bo'sh, frontend "hammasi" deydi)
+      const couriers = couriersList.map((c) => {
+        const regionSet = new Set<string>();
+        if (!c.serves_all_regions) {
+          if (c.is_super_courier) {
+            (attachedMap.get(c.id) || []).forEach((rid) => regionSet.add(rid));
+          } else if (c.region_id) {
+            regionSet.add(c.region_id);
+          }
+          // Haqiqatan tashigan viloyatlarni ham qo'shamiz
+          courierPostRegions.get(c.id)?.forEach((rid) => regionSet.add(rid));
+        }
+        return {
+          id: c.id,
+          name: c.name,
+          serves_all: c.serves_all_regions,
+          region_ids: Array.from(regionSet),
+        };
+      });
+
+      return successRes(
+        { regions, couriers, postRegionIds },
+        200,
+        'Old posts filter options',
       );
     } catch (error) {
       return catchError(error);
@@ -234,16 +401,26 @@ export class PostService {
     page: number,
     limit: number,
     user: JwtPayload,
+    filter: OldPostsFilter = {},
   ): Promise<object> {
     try {
       const take = limit > 100 ? 100 : limit; // limit maksimal 100 ta
       const skip = (page - 1) * take;
 
+      // Kuryer uchun: status (pochta turi — qabul qilingan / bekor qilingan)
+      // berilsa o'shani, aks holda SENT/NEW'dan boshqa barcha statuslar.
+      const where: Record<string, any> = {
+        status:
+          filter.status && filter.status !== 'all'
+            ? (filter.status as Post_status)
+            : Not(In([Post_status.SENT, Post_status.NEW])),
+        courier_id: user.id,
+      };
+      const createdAt = buildCreatedAtRange(filter.startDate, filter.endDate);
+      if (createdAt) where.created_at = createdAt;
+
       const [data, total] = await this.postRepo.findAndCount({
-        where: {
-          status: Not(In([Post_status.SENT, Post_status.NEW])),
-          courier_id: user.id,
-        },
+        where,
         relations: ['region'],
         order: { created_at: 'DESC' },
         skip,
@@ -738,29 +915,23 @@ export class PostService {
        * 7️⃣ Original postni yangilash.
        * Yuborilgan orderlar chiqib ketdi — qolganlarni qayta hisoblaymiz.
        *
-       * MUHIM: aktiv (soft-delete bo'lmagan) orderlar bo'yicha hisoblaymiz,
-       * lekin postni o'chirishda HAR QANDAY (soft-deleted'lar bilan) order qolmaganini
-       * tekshiramiz — aks holda soft-deleted orderlar yetim qoladi (audit uziladi).
+       * MUHIM: originalPost bu yerda DOIM NEW (yuqorida tekshirilgan) — ya'ni
+       * hali hech qayerga jo'natilmagan yig'ish "savati". Agar undan aktiv
+       * buyurtma qolmasa, uni saqlashning audit qiymati yo'q (buyurtma auditi
+       * order qatori + activity_log'da turadi). Shu sababli bo'sh qolgan NEW
+       * postni O'CHIRAMIZ — soft-deleted buyurtmalar bo'lsa ham. Ular FK
+       * (onDelete: SET NULL) orqali ajraladi, audit ma'lumotlari saqlanadi.
+       *
+       * Bu — "jo'natilgandan keyin 0-buyurtmali bo'sh pochta yana qolib
+       * ketishi" muammosining oldini oladi (avval soft-deleted'lar tufayli
+       * post o'chmasdan cheksiz takrorlanardi).
        */
       const remainingOrders = await queryRunner.manager.find(OrderEntity, {
         where: { post_id: id },
       });
-      const totalIncludingDeleted = await queryRunner.manager.count(
-        OrderEntity,
-        {
-          where: { post_id: id },
-          withDeleted: true,
-        },
-      );
 
-      if (totalIncludingDeleted === 0) {
+      if (remainingOrders.length === 0) {
         await queryRunner.manager.delete(PostEntity, { id });
-      } else if (remainingOrders.length === 0) {
-        // Aktiv order yo'q, lekin soft-deleted'lar bor — postni o'chirmaymiz, faqat
-        // 0 ga tushirib qoldiramiz (post tarix uchun saqlanadi).
-        originalPost.order_quantity = 0;
-        originalPost.post_total_price = 0;
-        await queryRunner.manager.save(originalPost);
       } else {
         const remainingTotal = remainingOrders.reduce(
           (s, o) => s + (Number(o.total_price) || 0),
@@ -804,6 +975,8 @@ export class PostService {
 
       // LDG dispatch — kuryer external_provider='ldg' bo'lsa, buyurtmalarni LDG'ga
       // yuboramiz. Aks holda hech narsa qilmaymiz (oddiy ichki kuryer).
+      // Operator qaysi buyurtmani LDG kuryeriga, qaysini boshqa kuryerga
+      // jo'natishni o'zi tanlaydi — tuman bo'yicha avtomatik filtr yo'q.
       if (courier.external_provider === 'ldg') {
         this.dispatchOrdersToLdg(newOrders.map((o) => o.id));
       }

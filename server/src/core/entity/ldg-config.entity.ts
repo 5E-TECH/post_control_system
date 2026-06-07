@@ -91,10 +91,12 @@ export class LdgConfigEntity extends BaseEntity {
   @Column({ type: 'varchar', default: 'receiver' })
   default_payer_type: string;
 
-  // ===== ENABLED DISTRICTS =====
+  // ===== ENABLED DISTRICTS (DEPRECATED) =====
 
-  // Qaysi tumanlar LDG orqali ketadi (SOATO kodlari ro'yxati)
-  // bo'sh massiv = hech qaysisi
+  // ESKIRGAN — endi ishlatilmaydi. LDG'ga routing tuman bo'yicha avtomatik
+  // emas, operatorning qo'lda kuryer tanlashiga qarab ishlaydi. Ustun DB'da
+  // dormant qoldirilgan (data yo'qotmaslik uchun); keyinchalik alohida
+  // migration bilan o'chirsa bo'ladi. Hech qaysi kod o'qimaydi/yozmaydi.
   @Column({ type: 'jsonb', default: [] })
   enabled_district_sato_codes: number[];
 

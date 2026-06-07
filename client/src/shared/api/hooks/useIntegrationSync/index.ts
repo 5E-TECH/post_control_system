@@ -49,6 +49,26 @@ export interface SyncJob {
   order?: {
     id: string;
     external_id: string;
+    order_number?: number | null;
+    status?: string;
+    total_price?: number | string | null;
+    customer?: {
+      id: string;
+      name: string;
+      phone_number: string;
+    } | null;
+    district?: {
+      id: string;
+      name: string;
+    } | null;
+    region?: {
+      id: string;
+      name: string;
+    } | null;
+    market?: {
+      id: string;
+      name: string;
+    } | null;
   };
 }
 

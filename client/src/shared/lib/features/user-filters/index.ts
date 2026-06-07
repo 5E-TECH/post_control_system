@@ -6,6 +6,10 @@ export interface IUserFilter {
   search: string | null;
   page: number | null;
   limit: number | null;
+  // Kuryer buyurtmalari filtri uchun
+  district_id: string | null;
+  marketId: string | null;
+  where_deliver: string | null;
 }
 
 const initialState: IUserFilter = {
@@ -14,6 +18,9 @@ const initialState: IUserFilter = {
   search: null,
   page: null,
   limit: null,
+  district_id: null,
+  marketId: null,
+  where_deliver: null,
 };
 
 const userFilterSlice = createSlice({
@@ -25,7 +32,7 @@ const userFilterSlice = createSlice({
       action: PayloadAction<{
         name: keyof IUserFilter;
         value: string | number | null;
-      }>
+      }>,
     ) {
       state[action.payload.name] = action.payload.value as any;
     },

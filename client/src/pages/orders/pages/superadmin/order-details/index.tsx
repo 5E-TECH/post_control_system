@@ -24,6 +24,7 @@ import {
   Home,
 } from "lucide-react";
 import OrderTracking from "../../../components/order-tracking";
+import OrderMeta from "../../../components/order-meta";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
 
 const statusConfig: Record<
@@ -284,9 +285,16 @@ const OrderDetails = () => {
                 <Store className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white capitalize">
-                  {data?.data?.market?.name}
-                </h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl font-bold text-gray-800 dark:text-white capitalize">
+                    {data?.data?.market?.name}
+                  </h1>
+                  {data?.data?.order_number != null && (
+                    <span className="px-2.5 py-1 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-sm font-bold">
+                      #{data.data.order_number}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {t("detail.title")}
                 </p>
@@ -404,6 +412,9 @@ const OrderDetails = () => {
 
           {/* Right Column - Customer & Shipping Info */}
           <div className="space-y-6">
+            {/* Order Meta — sanalar, operator, ID, logistika */}
+            <OrderMeta order={data?.data} role={currentRole} />
+
             {/* Customer Details */}
             <CustomerDetail customer={data?.data?.customer} canEdit={canEditDetails} />
 
