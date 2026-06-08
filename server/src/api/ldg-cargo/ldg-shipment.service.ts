@@ -146,7 +146,14 @@ export class LdgShipmentService {
       return shipment;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      shipment.send_attempts = (shipment.send_attempts ?? 0) + 1;
+
+      // Rate-limit (429 "Too Many Attempts") VAQTINCHALIK xato — send_attempts'ni
+      // oshirmaymiz, aks holda flood paytida 8 ta urinish "yeyilib", auto-retry
+      // buyurtmani butunlay tashlab ketadi. Global yozish navbati buni kamaytiradi,
+      // lekin baribir limitga sanamaymiz.
+      if (!this.isRateLimitError(msg)) {
+        shipment.send_attempts = (shipment.send_attempts ?? 0) + 1;
+      }
 
       // LDG "already exists" (tracking_code/barcode/external_order_id band) —
       // buyurtma LDG'da ALLAQACHON yaratilgan. Bu hard-failure EMAS: qayta
@@ -183,6 +190,20 @@ export class LdgShipmentService {
       m.includes('already_exists') ||
       m.includes('uniqueviolation') ||
       m.includes('unique constraint')
+    );
+  }
+
+  /**
+   * LDG javobi rate-limit (429) ekanini aniqlaydi — vaqtinchalik xato, qayta
+   * urinsa o'tadi. send_attempts cap'iga sanamaslik uchun ishlatiladi.
+   */
+  private isRateLimitError(msg: string): boolean {
+    const m = msg.toLowerCase();
+    return (
+      m.includes('429') ||
+      m.includes('too many') ||
+      m.includes('rate limit') ||
+      m.includes('rate-limit')
     );
   }
 
