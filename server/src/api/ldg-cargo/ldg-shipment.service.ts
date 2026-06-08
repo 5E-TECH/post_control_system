@@ -122,14 +122,44 @@ export class LdgShipmentService {
       return shipment;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      shipment.last_error = msg;
       shipment.send_attempts = (shipment.send_attempts ?? 0) + 1;
+
+      // LDG "already exists" (tracking_code/barcode/external_order_id band) —
+      // buyurtma LDG'da ALLAQACHON yaratilgan. Bu hard-failure EMAS: qayta
+      // jo'natishga urinmaymiz (aks holda har safar shu dublikat xatosi chiqadi).
+      // LDG'ning package.created webhook'i ldg_order_id'ni avtomatik bog'laydi.
+      if (this.isAlreadyExistsError(msg)) {
+        shipment.last_error = `LDG'da allaqachon mavjud — webhook orqali bog'lanadi (${msg.slice(0, 160)})`;
+        await this.shipmentRepo.save(shipment);
+        this.logger.warn(
+          `LDG shipment allaqachon mavjud (qayta yaratilmaydi): order=${order.id} - ${msg}`,
+        );
+        return shipment;
+      }
+
+      shipment.last_error = msg;
       await this.shipmentRepo.save(shipment);
       this.logger.error(
         `LDG shipment yaratish muvaffaqiyatsiz: order=${order.id} - ${msg}`,
       );
       throw err;
     }
+  }
+
+  /**
+   * LDG javobidagi xato "allaqachon mavjud" (unique/duplicate) ekanini aniqlaydi.
+   * LDG buni har xil so'z bilan yuborishi mumkin, shuning uchun keng tekshiramiz.
+   */
+  private isAlreadyExistsError(msg: string): boolean {
+    const m = msg.toLowerCase();
+    return (
+      m.includes('already exists') ||
+      m.includes('duplicate') ||
+      m.includes('tracking_code') ||
+      m.includes('already_exists') ||
+      m.includes('uniqueviolation') ||
+      m.includes('unique constraint')
+    );
   }
 
   /**
@@ -188,6 +218,38 @@ export class LdgShipmentService {
       if (found) return found;
     }
     return null;
+  }
+
+  /**
+   * Webhook bizga LDG package id (va tracking) ni beradi — shipmentda ular
+   * yo'q bo'lsa, BACKFILL qilamiz. Bu LDG'da allaqachon yaratilgan, lekin
+   * bizda ldg_order_id'siz qolgan buyurtmalarni avtomatik bog'laydi → qayta
+   * jo'natish (va "tracking_code already exists" dublikat xatosi) shart emas.
+   *
+   * Shipment webhookda external_order_id (bizning order UUID) yoki tracking
+   * bo'yicha topilgan bo'lishi mumkin, ammo ldg_order_id'si hali bo'sh.
+   */
+  async backfillLdgRef(
+    shipment: LdgShipmentEntity,
+    ref: { ldg_order_id?: number; tracking_number?: string },
+  ): Promise<void> {
+    let changed = false;
+    if (ref.ldg_order_id != null && shipment.ldg_order_id == null) {
+      shipment.ldg_order_id = ref.ldg_order_id;
+      changed = true;
+    }
+    if (ref.tracking_number && !shipment.tracking_number) {
+      shipment.tracking_number = ref.tracking_number;
+      changed = true;
+    }
+    if (changed) {
+      // Endi LDG bilan bog'landi — eski "yuborilmadi" xatosini tozalaymiz.
+      shipment.last_error = null;
+      await this.shipmentRepo.save(shipment);
+      this.logger.log(
+        `LDG backfill: order=${shipment.order_id} ldg_order_id=${shipment.ldg_order_id} tracking=${shipment.tracking_number}`,
+      );
+    }
   }
 
   /**

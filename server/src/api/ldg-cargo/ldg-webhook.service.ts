@@ -265,6 +265,15 @@ export class LdgWebhookService {
       return { status: 'skipped', message: msg };
     }
 
+    // Backfill: webhook bizga LDG package id (va tracking) ni olib keladi.
+    // Shipment external_order_id (bizning UUID) bo'yicha topilgan-u, ldg_order_id'si
+    // bo'sh bo'lsa — shu yerda bog'laymiz. Bu qayta jo'natishni (va dublikat
+    // "tracking_code already exists" xatosini) keraksiz qiladi.
+    await this.shipmentService.backfillLdgRef(shipment, {
+      ldg_order_id: ref.ldg_order_id,
+      tracking_number: ref.tracking_number,
+    });
+
     const newStatusCode = ref.status_code;
     if (!newStatusCode) {
       this.logger.warn(
