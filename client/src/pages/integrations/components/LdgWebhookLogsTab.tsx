@@ -1,20 +1,22 @@
 import { useState } from "react";
-import {
-  Table,
-  Tag,
-  Button,
-  Segmented,
-  Modal,
-  Tooltip,
-  message,
-  Popconfirm,
-} from "antd";
+import { Table, Tag, Button, Modal, Tooltip, message, Popconfirm } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { RotateCcw, RefreshCw, Code2, Trash2 } from "lucide-react";
+import {
+  RotateCcw,
+  RefreshCw,
+  Code2,
+  Trash2,
+  Layers,
+  CheckCircle2,
+  MinusCircle,
+  ShieldAlert,
+  XCircle,
+} from "lucide-react";
 import {
   useLdgAdmin,
   type LdgWebhookLog,
 } from "../../../shared/api/hooks/useLdgAdmin";
+import { FilterPills } from "./FilterPills";
 
 const statusColor = (status: string): string => {
   switch (status) {
@@ -32,7 +34,10 @@ const statusColor = (status: string): string => {
 };
 
 export const LdgWebhookLogsTab = () => {
-  const { getWebhookLogs, reprocessWebhook, deleteWebhookLog } = useLdgAdmin();
+  const { getWebhookLogs, reprocessWebhook, deleteWebhookLog, getHealth } =
+    useLdgAdmin();
+  const { data: health } = getHealth(true);
+  const w = health?.webhooks;
   const [status, setStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [payloadView, setPayloadView] = useState<LdgWebhookLog | null>(null);
@@ -158,18 +163,47 @@ export const LdgWebhookLogsTab = () => {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <Segmented
+        <FilterPills
           value={status}
           onChange={(v) => {
-            setStatus(v as string);
+            setStatus(v);
             setPage(1);
           }}
           options={[
-            { label: "Barchasi", value: "all" },
-            { label: "Success", value: "success" },
-            { label: "Skipped", value: "skipped" },
-            { label: "Invalid signature", value: "invalid_signature" },
-            { label: "Failed", value: "failed" },
+            {
+              value: "all",
+              label: "Barchasi",
+              icon: <Layers className="w-3.5 h-3.5" />,
+              count: w?.total,
+            },
+            {
+              value: "success",
+              label: "Success",
+              icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+              count: w?.success,
+              activeClass: "bg-green-600 text-white border-green-600",
+            },
+            {
+              value: "skipped",
+              label: "Skipped",
+              icon: <MinusCircle className="w-3.5 h-3.5" />,
+              count: w?.skipped,
+              activeClass: "bg-orange-500 text-white border-orange-500",
+            },
+            {
+              value: "invalid_signature",
+              label: "Invalid signature",
+              icon: <ShieldAlert className="w-3.5 h-3.5" />,
+              count: w?.invalid_signature,
+              activeClass: "bg-pink-600 text-white border-pink-600",
+            },
+            {
+              value: "failed",
+              label: "Failed",
+              icon: <XCircle className="w-3.5 h-3.5" />,
+              count: w?.failed,
+              activeClass: "bg-red-600 text-white border-red-600",
+            },
           ]}
         />
         <Button

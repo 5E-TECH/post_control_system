@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  Table,
-  Tag,
-  Button,
-  Segmented,
-  Tooltip,
-  message,
-  Popconfirm,
-} from "antd";
+import { Table, Tag, Button, Tooltip, message, Popconfirm } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   RotateCcw,
@@ -15,11 +7,16 @@ import {
   DownloadCloud,
   AlertTriangle,
   CheckCircle2,
+  PackageX,
+  PackageCheck,
+  Layers,
+  XCircle,
 } from "lucide-react";
 import {
   useLdgAdmin,
   type LdgShipmentRow,
 } from "../../../shared/api/hooks/useLdgAdmin";
+import { FilterPills } from "./FilterPills";
 
 const ldgStatusColor = (status: string | null): string => {
   if (!status) return "default";
@@ -58,7 +55,10 @@ export const LdgShipmentsTab = () => {
     resolveMismatch,
     getBulkStatus,
     startBulk,
+    getHealth,
   } = useLdgAdmin();
+  const { data: health } = getHealth(true);
+  const s = health?.shipments;
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -323,25 +323,46 @@ export const LdgShipmentsTab = () => {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <Segmented
+        <FilterPills
           value={filter}
           onChange={(v) => {
-            setFilter(v as string);
+            setFilter(v);
             setPage(1);
           }}
           options={[
-            { label: "Barchasi", value: "all" },
-            { label: "Yuborilmagan", value: "pending" },
-            { label: "Xatoli", value: "error" },
-            { label: "Yetkazilgan", value: "delivered" },
             {
-              label: (
-                <span className="flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Mismatch
-                </span>
-              ),
+              value: "all",
+              label: "Barchasi",
+              icon: <Layers className="w-3.5 h-3.5" />,
+              count: s?.total,
+            },
+            {
+              value: "pending",
+              label: "Yuborilmagan",
+              icon: <PackageX className="w-3.5 h-3.5" />,
+              count: s?.pending,
+              activeClass: "bg-blue-600 text-white border-blue-600",
+            },
+            {
+              value: "error",
+              label: "Xatoli",
+              icon: <XCircle className="w-3.5 h-3.5" />,
+              count: s?.with_error,
+              activeClass: "bg-red-600 text-white border-red-600",
+            },
+            {
+              value: "delivered",
+              label: "Yetkazilgan",
+              icon: <PackageCheck className="w-3.5 h-3.5" />,
+              count: s?.delivered,
+              activeClass: "bg-green-600 text-white border-green-600",
+            },
+            {
               value: "mismatch",
+              label: "Mismatch",
+              icon: <AlertTriangle className="w-3.5 h-3.5" />,
+              count: s?.mismatch,
+              activeClass: "bg-orange-500 text-white border-orange-500",
             },
           ]}
         />
