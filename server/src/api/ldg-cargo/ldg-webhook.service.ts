@@ -243,33 +243,46 @@ export class LdgWebhookService {
     status: 'success' | 'skipped' | 'mismatch' | 'failed';
     message?: string;
   }> {
-    const data = envelope.data ?? {};
-    // LDG paket ID'sini har xil nomlar bilan yuborishi mumkin: order_id (POST javobi),
-    // id (REST GET), yoki package_id. Birinchi mavjudini olamiz.
-    const ldgOrderId =
-      data.order_id ?? data.id ?? data.package_id ?? undefined;
-    const tracking = data.tracking_number;
-    const externalId = data.external_order_id;
+    const data = (envelope.data ?? {}) as Record<string, unknown>;
+    // LDG paket identifikatorlarini `data` ichidan CHUQUR qidirib topamiz —
+    // LDG ularni har xil joylashtirishi mumkin (data.order_id, data.package.id,
+    // data.order.tracking_number va h.k.). Bitta qat'iy joyga tayanmaymiz.
+    const ref = this.extractPackageRef(data);
 
     const shipment = await this.shipmentService.findShipmentByLdgRef({
-      ldg_order_id: ldgOrderId,
-      tracking_number: tracking,
-      external_order_id: externalId,
+      ldg_order_id: ref.ldg_order_id,
+      tracking_number: ref.tracking_number,
+      external_order_id: ref.external_order_id,
     });
 
     if (!shipment) {
-      const msg = `Shipment topilmadi (ldg_order_id=${ldgOrderId} tracking=${tracking} ext=${externalId})`;
-      this.logger.warn(`LDG webhook: ${msg}`);
+      // Topilmasa — haqiqiy payload strukturasini ham yozamiz, toki LDG
+      // qaysi maydonlarni yuborayotgani aniq ko'rinsin (debug + tuzatish uchun).
+      const msg = `Shipment topilmadi (ldg_order_id=${ref.ldg_order_id} tracking=${ref.tracking_number} ext=${ref.external_order_id})`;
+      this.logger.warn(
+        `LDG webhook: ${msg} | data=${JSON.stringify(data).slice(0, 500)}`,
+      );
       return { status: 'skipped', message: msg };
     }
 
-    const newStatusCode = data.status?.code;
+    // Backfill: webhook bizga LDG package id (va tracking) ni olib keladi.
+    // Shipment external_order_id (bizning UUID) bo'yicha topilgan-u, ldg_order_id'si
+    // bo'sh bo'lsa — shu yerda bog'laymiz. Bu qayta jo'natishni (va dublikat
+    // "tracking_code already exists" xatosini) keraksiz qiladi.
+    await this.shipmentService.backfillLdgRef(shipment, {
+      ldg_order_id: ref.ldg_order_id,
+      tracking_number: ref.tracking_number,
+    });
+
+    const newStatusCode = ref.status_code;
     if (!newStatusCode) {
-      this.logger.warn(`LDG webhook: status.code yo'q, event=${envelope.type}`);
+      this.logger.warn(
+        `LDG webhook: status.code yo'q, event=${envelope.type} | data=${JSON.stringify(data).slice(0, 300)}`,
+      );
       return { status: 'skipped', message: 'status.code yo\'q' };
     }
 
-    const changedAt = data.changed_at ? new Date(data.changed_at) : new Date();
+    const changedAt = ref.changed_at ? new Date(ref.changed_at) : new Date();
     const result = await this.applyStatusFromCode(
       shipment,
       newStatusCode,
@@ -296,6 +309,80 @@ export class LdgWebhookService {
           message: shipment.last_error ?? 'LDG status qo\'llashda xato',
         };
     }
+  }
+
+  /**
+   * Webhook `data` ichidan paket identifikatorlarini CHUQUR (rekursiv) qidirib
+   * topadi. LDG har xil eventlarda maydonlarni har xil joylashtirishi mumkin
+   * (masalan data.package.order_id yoki data.order.tracking_number) — shuning
+   * uchun kalit nomi bo'yicha rekursiv qidiramiz. tenant/client envelope
+   * darajasida (data dan tashqarida), shu sabab ularning id'siga tegmaymiz.
+   */
+  private extractPackageRef(data: Record<string, unknown>): {
+    ldg_order_id?: number;
+    tracking_number?: string;
+    external_order_id?: string;
+    status_code?: string;
+    changed_at?: string;
+  } {
+    const isNum = (v: unknown) =>
+      typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(v));
+    const isStr = (v: unknown) => typeof v === 'string' && v.length > 0;
+
+    // ID: avval order_id, keyin package_id, oxirgi chora — id.
+    const orderIdRaw =
+      this.findByKey(data, 'order_id', isNum) ??
+      this.findByKey(data, 'package_id', isNum) ??
+      this.findByKey(data, 'id', isNum);
+
+    // Status obyekt ({code,name}) yoki oddiy string bo'lib kelishi mumkin.
+    const statusObj = this.findByKey(
+      data,
+      'status',
+      (v) => !!v && typeof v === 'object' && 'code' in (v as object),
+    ) as { code?: string } | undefined;
+    const statusStr = this.findByKey(data, 'status', isStr) as
+      | string
+      | undefined;
+    const statusCodeDirect = this.findByKey(data, 'status_code', isStr) as
+      | string
+      | undefined;
+
+    return {
+      ldg_order_id: orderIdRaw != null ? Number(orderIdRaw) : undefined,
+      tracking_number: this.findByKey(data, 'tracking_number', isStr) as
+        | string
+        | undefined,
+      external_order_id: this.findByKey(data, 'external_order_id', isStr) as
+        | string
+        | undefined,
+      status_code: statusObj?.code ?? statusStr ?? statusCodeDirect,
+      changed_at: this.findByKey(data, 'changed_at', isStr) as
+        | string
+        | undefined,
+    };
+  }
+
+  /**
+   * Obyekt ichidan (rekursiv, BFS — eng yuza moslik birinchi) berilgan kalit
+   * nomiga va predikatga mos birinchi qiymatni qaytaradi.
+   */
+  private findByKey(
+    root: unknown,
+    key: string,
+    predicate: (v: unknown) => boolean,
+  ): unknown {
+    if (!root || typeof root !== 'object') return undefined;
+    const queue: unknown[] = [root];
+    while (queue.length) {
+      const cur = queue.shift();
+      if (!cur || typeof cur !== 'object') continue;
+      for (const [k, v] of Object.entries(cur as Record<string, unknown>)) {
+        if (k === key && predicate(v)) return v;
+        if (v && typeof v === 'object') queue.push(v);
+      }
+    }
+    return undefined;
   }
 
   /**

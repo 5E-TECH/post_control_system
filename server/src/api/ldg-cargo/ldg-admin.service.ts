@@ -9,8 +9,18 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { LdgApiService } from './ldg-api.service';
 import { LdgShipmentService } from './ldg-shipment.service';
 import { LdgWebhookService } from './ldg-webhook.service';
+import { Order_status } from 'src/common/enums';
 
 const WEBHOOK_LOG_RETENTION_DAYS = 30;
+
+// Faqat shu (faol) statusdagi buyurtmalar LDG'ga (qayta) jo'natiladi.
+// Yakunlangan (SOLD/CANCELLED/...) buyurtmalar jo'natilmaydi — mismatch oldini olish.
+const LDG_DISPATCHABLE_STATUSES: Order_status[] = [
+  Order_status.NEW,
+  Order_status.RECEIVED,
+  Order_status.ON_THE_ROAD,
+  Order_status.WAITING,
+];
 
 // Reconcile (pull) bir o'tishda nechta shipmentni tekshirishi
 const RECONCILE_BATCH_LIMIT = 100;
@@ -128,9 +138,15 @@ export class LdgAdminService {
       .createQueryBuilder('s')
       .where('s.last_error IS NOT NULL')
       .getCount();
+    // Pending = LDG'ga jo'natilishi KUTILAYOTGAN (faol) buyurtmalar. Yakunlangan
+    // (SOLD/CANCELLED/...) buyurtmalar endi jo'natilmaydi, shu sabab hisobga olinmaydi.
     const pending = await this.shipmentRepo
       .createQueryBuilder('s')
+      .leftJoin('s.order', 'o')
       .where('s.ldg_order_id IS NULL')
+      .andWhere('o.status IN (:...active)', {
+        active: LDG_DISPATCHABLE_STATUSES,
+      })
       .getCount();
     // LDG ↔ Beepost status to'qnashishi (real biznes muammosi)
     const mismatch = await this.shipmentRepo
@@ -331,8 +347,13 @@ export class LdgAdminService {
   async getRetryCandidates(): Promise<string[]> {
     const rows = await this.shipmentRepo
       .createQueryBuilder('s')
+      .leftJoin('s.order', 'o')
       .select('s.order_id', 'order_id')
       .where('s.ldg_order_id IS NULL')
+      // Faqat faol buyurtmalar — yakunlanganlarni LDG'ga jo'natmaymiz.
+      .andWhere('o.status IN (:...active)', {
+        active: LDG_DISPATCHABLE_STATUSES,
+      })
       .orderBy('s.created_at', 'ASC')
       .getRawMany<{ order_id: string }>();
     return rows.map((r) => r.order_id);
@@ -397,8 +418,13 @@ export class LdgAdminService {
 
     const shipments = await this.shipmentRepo
       .createQueryBuilder('s')
+      .leftJoin('s.order', 'o')
       .where('s.ldg_order_id IS NULL')
       .andWhere('s.send_attempts < :max', { max: AUTO_RETRY_MAX_ATTEMPTS })
+      // Faqat faol buyurtmalar — yakunlanganlarni avtomatik qayta jo'natmaymiz.
+      .andWhere('o.status IN (:...active)', {
+        active: LDG_DISPATCHABLE_STATUSES,
+      })
       .orderBy('s.send_attempts', 'ASC')
       .addOrderBy('s.created_at', 'ASC')
       .take(AUTO_RETRY_BATCH_LIMIT)

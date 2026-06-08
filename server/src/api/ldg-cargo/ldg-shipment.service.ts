@@ -12,10 +12,24 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { LdgApiService } from './ldg-api.service';
+import { Order_status } from 'src/common/enums';
 import {
   LdgCreateOrderRequestDto,
   LdgCreateOrderResponseDto,
 } from './dto/ldg-create-order.dto';
+
+// Yakunlangan (terminal) order statuslari — bularni LDG'ga JO'NATMAYMIZ.
+// Faqat faol (NEW/RECEIVED/ON_THE_ROAD/WAITING) buyurtmalar LDG'ga ketadi:
+// yakunlangan buyurtma LDG'da qayta yaratilsa, LDG o'z statusini qaytarib
+// bizning yakuniy status bilan keraksiz "mismatch" chiqaradi.
+const LDG_SKIP_ORDER_STATUSES: Order_status[] = [
+  Order_status.SOLD,
+  Order_status.PAID,
+  Order_status.PARTLY_PAID,
+  Order_status.CANCELLED,
+  Order_status.CANCELLED_SENT,
+  Order_status.CLOSED,
+];
 
 @Injectable()
 export class LdgShipmentService {
@@ -74,6 +88,16 @@ export class LdgShipmentService {
       return shipment;
     }
 
+    // YAKUNLANGAN buyurtmalarni LDG'ga jo'natmaymiz (mismatch oldini olish).
+    // Allaqachon yuborilgan bo'lsa — mavjud shipmentni qaytaramiz (idempotent),
+    // aks holda aniq xabar bilan to'xtatamiz.
+    if (LDG_SKIP_ORDER_STATUSES.includes(order.status)) {
+      if (shipment) return shipment;
+      throw new BadRequestException(
+        `Buyurtma yakunlangan (status=${order.status}) — LDG'ga jo'natilmaydi`,
+      );
+    }
+
     if (!shipment) {
       shipment = this.shipmentRepo.create({ order_id: orderId });
     }
@@ -102,6 +126,17 @@ export class LdgShipmentService {
         : order.id;
       const response = await this.api.createOrder(body, idempotencyKey);
       this.applyLdgResponse(shipment, response);
+      // LDG "success" qaytardi-yu, lekin javobdan order_id chiqmasa — bu parsing
+      // nomuvofiqligi. Jimgina null saqlab, keyin dublikat yaratib yurmaslik
+      // uchun aniq xato beramiz (idempotency-key tufayli qayta urinish dublikat
+      // yaratmaydi — LDG ayni buyurtmani qaytaradi).
+      if (shipment.ldg_order_id == null) {
+        throw new Error(
+          `LDG javobida order_id topilmadi (javob shakli kutilmagan): ${JSON.stringify(
+            response,
+          ).slice(0, 300)}`,
+        );
+      }
       shipment.last_error = null;
       shipment.send_attempts = (shipment.send_attempts ?? 0) + 1;
       await this.shipmentRepo.save(shipment);
@@ -111,14 +146,65 @@ export class LdgShipmentService {
       return shipment;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+
+      // Rate-limit (429 "Too Many Attempts") VAQTINCHALIK xato — send_attempts'ni
+      // oshirmaymiz, aks holda flood paytida 8 ta urinish "yeyilib", auto-retry
+      // buyurtmani butunlay tashlab ketadi. Global yozish navbati buni kamaytiradi,
+      // lekin baribir limitga sanamaymiz.
+      if (!this.isRateLimitError(msg)) {
+        shipment.send_attempts = (shipment.send_attempts ?? 0) + 1;
+      }
+
+      // LDG "already exists" (tracking_code/barcode/external_order_id band) —
+      // buyurtma LDG'da ALLAQACHON yaratilgan. Bu hard-failure EMAS: qayta
+      // jo'natishga urinmaymiz (aks holda har safar shu dublikat xatosi chiqadi).
+      // LDG'ning package.created webhook'i ldg_order_id'ni avtomatik bog'laydi.
+      if (this.isAlreadyExistsError(msg)) {
+        shipment.last_error = `LDG'da allaqachon mavjud — webhook orqali bog'lanadi (${msg.slice(0, 160)})`;
+        await this.shipmentRepo.save(shipment);
+        this.logger.warn(
+          `LDG shipment allaqachon mavjud (qayta yaratilmaydi): order=${order.id} - ${msg}`,
+        );
+        return shipment;
+      }
+
       shipment.last_error = msg;
-      shipment.send_attempts = (shipment.send_attempts ?? 0) + 1;
       await this.shipmentRepo.save(shipment);
       this.logger.error(
         `LDG shipment yaratish muvaffaqiyatsiz: order=${order.id} - ${msg}`,
       );
       throw err;
     }
+  }
+
+  /**
+   * LDG javobidagi xato "allaqachon mavjud" (unique/duplicate) ekanini aniqlaydi.
+   * LDG buni har xil so'z bilan yuborishi mumkin, shuning uchun keng tekshiramiz.
+   */
+  private isAlreadyExistsError(msg: string): boolean {
+    const m = msg.toLowerCase();
+    return (
+      m.includes('already exists') ||
+      m.includes('duplicate') ||
+      m.includes('tracking_code') ||
+      m.includes('already_exists') ||
+      m.includes('uniqueviolation') ||
+      m.includes('unique constraint')
+    );
+  }
+
+  /**
+   * LDG javobi rate-limit (429) ekanini aniqlaydi — vaqtinchalik xato, qayta
+   * urinsa o'tadi. send_attempts cap'iga sanamaslik uchun ishlatiladi.
+   */
+  private isRateLimitError(msg: string): boolean {
+    const m = msg.toLowerCase();
+    return (
+      m.includes('429') ||
+      m.includes('too many') ||
+      m.includes('rate limit') ||
+      m.includes('rate-limit')
+    );
   }
 
   /**
@@ -180,6 +266,38 @@ export class LdgShipmentService {
   }
 
   /**
+   * Webhook bizga LDG package id (va tracking) ni beradi — shipmentda ular
+   * yo'q bo'lsa, BACKFILL qilamiz. Bu LDG'da allaqachon yaratilgan, lekin
+   * bizda ldg_order_id'siz qolgan buyurtmalarni avtomatik bog'laydi → qayta
+   * jo'natish (va "tracking_code already exists" dublikat xatosi) shart emas.
+   *
+   * Shipment webhookda external_order_id (bizning order UUID) yoki tracking
+   * bo'yicha topilgan bo'lishi mumkin, ammo ldg_order_id'si hali bo'sh.
+   */
+  async backfillLdgRef(
+    shipment: LdgShipmentEntity,
+    ref: { ldg_order_id?: number; tracking_number?: string },
+  ): Promise<void> {
+    let changed = false;
+    if (ref.ldg_order_id != null && shipment.ldg_order_id == null) {
+      shipment.ldg_order_id = ref.ldg_order_id;
+      changed = true;
+    }
+    if (ref.tracking_number && !shipment.tracking_number) {
+      shipment.tracking_number = ref.tracking_number;
+      changed = true;
+    }
+    if (changed) {
+      // Endi LDG bilan bog'landi — eski "yuborilmadi" xatosini tozalaymiz.
+      shipment.last_error = null;
+      await this.shipmentRepo.save(shipment);
+      this.logger.log(
+        `LDG backfill: order=${shipment.order_id} ldg_order_id=${shipment.ldg_order_id} tracking=${shipment.tracking_number}`,
+      );
+    }
+  }
+
+  /**
    * Webhook ishlovi paytida shipmentning oxirgi LDG statusini yozib qo'yamiz.
    */
   async updateShipmentStatus(
@@ -207,12 +325,31 @@ export class LdgShipmentService {
     shipment: LdgShipmentEntity,
     response: LdgCreateOrderResponseDto,
   ): void {
-    shipment.ldg_order_id = response.order_id;
-    shipment.tracking_number = response.tracking_number;
-    shipment.ldg_status = response.status?.code ?? null;
-    const createdAtMs = response.created_at
-      ? Date.parse(response.created_at)
-      : NaN;
+    // Himoyaviy parsing — LDG javobi kutilgan tekis shaklda ham, ichki
+    // (data.order / data.package) shaklda ham kelishi mumkin. Bir qat'iy
+    // maydonga tayanmaymiz.
+    const r = response as unknown as Record<string, any>;
+    const orderIdRaw =
+      r.order_id ?? r.id ?? r.package_id ?? r.order?.id ?? r.package?.id;
+    const tracking =
+      r.tracking_number ??
+      r.tracking ??
+      r.order?.tracking_number ??
+      r.package?.tracking_number;
+    const statusCode =
+      r.status?.code ??
+      r.order?.status?.code ??
+      (typeof r.status === 'string' ? r.status : null);
+    const createdRaw = r.created_at ?? r.order?.created_at;
+
+    shipment.ldg_order_id =
+      orderIdRaw != null && /^\d+$/.test(String(orderIdRaw))
+        ? Number(orderIdRaw)
+        : null;
+    shipment.tracking_number =
+      typeof tracking === 'string' && tracking ? tracking : null;
+    shipment.ldg_status = statusCode ?? null;
+    const createdAtMs = createdRaw ? Date.parse(createdRaw) : NaN;
     shipment.ldg_created_at = Number.isFinite(createdAtMs)
       ? createdAtMs
       : Date.now();

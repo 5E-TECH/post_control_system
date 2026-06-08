@@ -34,15 +34,40 @@ const RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
 // Backoff'ning yuqori chegarasi — bitta so'rovni juda uzoq bloklamaslik uchun.
 const MAX_BACKOFF_MS = 8000;
 
+// LDG'ga YOZISH (createOrder/cancelOrder) so'rovlari orasidagi minimal pauza.
+// Barcha dispatch oqimlari (manual "Hammasini qayta jo'natish", auto-retry cron,
+// pochta dispatch) BITTA navbatdan o'tadi — shu sabab nechta oqim ishlamasin,
+// LDG hech qachon to'lib ketmaydi (429 "Too Many Attempts" oldini oladi).
+const LDG_WRITE_GAP_MS = 1000;
+
 @Injectable()
 export class LdgApiService {
   private readonly logger = new Logger(LdgApiService.name);
+
+  // Barcha yozish so'rovlarini ketma-ket (serialized) o'tkazuvchi navbat.
+  private writeQueue: Promise<unknown> = Promise.resolve();
 
   constructor(
     @InjectRepository(LdgConfigEntity)
     private readonly configRepo: Repository<LdgConfigEntity>,
     private readonly http: HttpService,
   ) {}
+
+  /**
+   * Yozish so'rovini global navbatga qo'yadi: bir vaqtda faqat bitta so'rov
+   * ketadi va har biridan keyin LDG_WRITE_GAP_MS pauza bo'ladi. Bu LDG
+   * rate-limitini (429) keltirib chiqarmaslikni KAFOLATLAYDI — qancha oqim
+   * parallel chaqirmasin.
+   */
+  private enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.writeQueue.then(task, task);
+    // Navbat zanjirini xato bo'lsa ham uzmaymiz; har so'rovdan keyin pauza.
+    this.writeQueue = run.then(
+      () => this.sleep(LDG_WRITE_GAP_MS),
+      () => this.sleep(LDG_WRITE_GAP_MS),
+    );
+    return run;
+  }
 
   /**
    * LDG sozlamalarini olib keladi. Hech bo'lmaganda bir qator turishi shart
@@ -70,9 +95,12 @@ export class LdgApiService {
     body: LdgCreateOrderRequestDto,
     idempotencyKey: string,
   ): Promise<LdgCreateOrderResponseDto> {
-    return this.request<LdgCreateOrderResponseDto>('POST', '/orders', body, {
-      headers: { 'Idempotency-Key': idempotencyKey },
-    });
+    // Global navbat orqali — bir vaqtda bitta, oraliq pauza bilan (429 oldini olish).
+    return this.enqueueWrite(() =>
+      this.request<LdgCreateOrderResponseDto>('POST', '/orders', body, {
+        headers: { 'Idempotency-Key': idempotencyKey },
+      }),
+    );
   }
 
   /**
@@ -89,7 +117,9 @@ export class LdgApiService {
    * LDG ga POST /orders/{id}/cancel so'rovi.
    */
   async cancelOrder(ldgOrderId: number): Promise<void> {
-    await this.request<unknown>('POST', `/orders/${ldgOrderId}/cancel`);
+    await this.enqueueWrite(() =>
+      this.request<unknown>('POST', `/orders/${ldgOrderId}/cancel`),
+    );
   }
 
   /**
