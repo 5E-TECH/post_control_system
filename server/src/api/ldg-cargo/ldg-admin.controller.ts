@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -114,5 +116,51 @@ export class LdgAdminController {
   @Post('shipments/:orderId/resolve-mismatch')
   async resolveMismatch(@Param('orderId') orderId: string) {
     return this.adminService.resolveMismatch(orderId);
+  }
+
+  // ===== BULK REDISPATCH (server tomonida, persistent) =====
+
+  @ApiOperation({ summary: 'Barcha faol yuborilmaganlarni qayta jo\'natishni boshlash' })
+  @Post('bulk-redispatch/start')
+  async bulkRedispatchStart() {
+    return this.adminService.startBulkRedispatch();
+  }
+
+  @ApiOperation({ summary: 'Bulk jo\'natishni qo\'lda to\'xtatish' })
+  @Post('bulk-redispatch/stop')
+  async bulkRedispatchStop() {
+    return this.adminService.stopBulkRedispatch();
+  }
+
+  @ApiOperation({ summary: 'Bulk jo\'natish holati (progress poll)' })
+  @Get('bulk-redispatch/status')
+  async bulkRedispatchStatus() {
+    return this.adminService.getBulkRedispatchStatus();
+  }
+
+  // ===== AVTOMATIKA BOSHQARUVI =====
+
+  @ApiOperation({ summary: 'Fon jarayonlari holati (webhook/reconcile/auto-retry/bulk)' })
+  @Get('automations')
+  async automations() {
+    return this.adminService.getAutomations();
+  }
+
+  @ApiOperation({ summary: 'Fon jarayonini yoqish/o\'chirish' })
+  @Patch('automations')
+  async setAutomation(
+    @Body()
+    body: {
+      key: 'webhook_enabled' | 'reconcile_enabled' | 'auto_retry_enabled';
+      value: boolean;
+    },
+  ) {
+    return this.adminService.setAutomation(body.key, body.value);
+  }
+
+  @ApiOperation({ summary: 'Webhook log\'ni o\'chirish' })
+  @Delete('webhook-logs/:deliveryId')
+  async deleteWebhookLog(@Param('deliveryId') deliveryId: string) {
+    return this.adminService.deleteWebhookLog(deliveryId);
   }
 }

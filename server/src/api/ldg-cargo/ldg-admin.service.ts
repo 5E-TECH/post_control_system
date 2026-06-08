@@ -48,9 +48,36 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
+/** Bulk redispatch jobning server tomonidagi (persistent) holati. */
+export interface BulkRedispatchState {
+  running: boolean;
+  total: number;
+  done: number;
+  success: number;
+  failed: number;
+  started_at: number | null;
+  finished_at: number | null;
+  stop_requested: boolean;
+  last_error: string | null;
+}
+
 @Injectable()
 export class LdgAdminService {
   private readonly logger = new Logger(LdgAdminService.name);
+
+  // Bulk redispatch — SERVER tomonida ishlaydigan, frontend refresh/navigatsiyadan
+  // omon qoladigan job. Faqat qo'lda to'xtatilguncha (yoki tugaguncha) ishlaydi.
+  private bulkJob: BulkRedispatchState = {
+    running: false,
+    total: 0,
+    done: 0,
+    success: 0,
+    failed: 0,
+    started_at: null,
+    finished_at: null,
+    stop_requested: false,
+    last_error: null,
+  };
 
   constructor(
     @InjectRepository(LdgConfigEntity)
@@ -391,6 +418,156 @@ export class LdgAdminService {
     return { total: ids.length, success, failed, results };
   }
 
+  // ===== BULK REDISPATCH (server tomonida, persistent) =====
+
+  /** Jorий bulk job holatini qaytaradi (frontend progress widget shu orqali poll qiladi). */
+  getBulkRedispatchStatus(): BulkRedispatchState {
+    return { ...this.bulkJob };
+  }
+
+  /**
+   * Barcha yuborilmagan (faol) buyurtmalarni qayta jo'natishni BOSHLAYDI.
+   * Job server tomonida ishlaydi — frontend yopilsa/refresh bo'lsa ham davom etadi,
+   * faqat qo'lda to'xtatilguncha. So'rovlar global yozish navbati orqali (1s oraliq)
+   * ketadi, shuning uchun LDG rate-limiti ham buzilmaydi.
+   */
+  async startBulkRedispatch(): Promise<{
+    started: boolean;
+    message: string;
+    status: BulkRedispatchState;
+  }> {
+    if (this.bulkJob.running) {
+      return {
+        started: false,
+        message: 'Bulk jo\'natish allaqachon ishlamoqda',
+        status: this.getBulkRedispatchStatus(),
+      };
+    }
+    const ids = await this.getRetryCandidates();
+    if (ids.length === 0) {
+      return {
+        started: false,
+        message: 'Qayta jo\'natiladigan faol buyurtma yo\'q',
+        status: this.getBulkRedispatchStatus(),
+      };
+    }
+    this.bulkJob = {
+      running: true,
+      total: ids.length,
+      done: 0,
+      success: 0,
+      failed: 0,
+      started_at: Date.now(),
+      finished_at: null,
+      stop_requested: false,
+      last_error: null,
+    };
+    // Fire-and-forget — server tomonida davom etadi.
+    void this.runBulkRedispatch(ids);
+    return {
+      started: true,
+      message: `${ids.length} ta buyurtma jo'natilmoqda`,
+      status: this.getBulkRedispatchStatus(),
+    };
+  }
+
+  /** Ishlayotgan bulk jobни to'xtatish so'rovi (joriy so'rov tugagach to'xtaydi). */
+  stopBulkRedispatch(): { stopped: boolean; message: string } {
+    if (!this.bulkJob.running) {
+      return { stopped: false, message: 'Bulk jo\'natish ishlamayapti' };
+    }
+    this.bulkJob.stop_requested = true;
+    this.logger.warn('LDG bulk redispatch: to\'xtatish so\'raldi (qo\'lda)');
+    return { stopped: true, message: 'To\'xtatilmoqda...' };
+  }
+
+  /** Bulk job ichki sikli — ketma-ket, throttle (global yozish navbati) bilan. */
+  private async runBulkRedispatch(ids: string[]): Promise<void> {
+    try {
+      for (const orderId of ids) {
+        if (this.bulkJob.stop_requested) {
+          this.logger.warn(
+            `LDG bulk redispatch to'xtatildi: ${this.bulkJob.done}/${this.bulkJob.total}`,
+          );
+          break;
+        }
+        try {
+          const r = await this.redispatch(orderId);
+          if (r.success) this.bulkJob.success++;
+          else this.bulkJob.failed++;
+        } catch (err) {
+          this.bulkJob.failed++;
+          this.bulkJob.last_error =
+            err instanceof Error ? err.message : String(err);
+        }
+        this.bulkJob.done++;
+      }
+    } finally {
+      this.bulkJob.running = false;
+      this.bulkJob.finished_at = Date.now();
+      this.logger.log(
+        `LDG bulk redispatch tugadi: ${this.bulkJob.success} jo'natildi, ${this.bulkJob.failed} xato (${this.bulkJob.done}/${this.bulkJob.total})`,
+      );
+    }
+  }
+
+  // ===== AVTOMATIKA BOSHQARUVI (fon jarayonlari yoqish/o'chirish) =====
+
+  /** Barcha fon jarayonlarining holati (Boshqaruv jadvali uchun). */
+  async getAutomations() {
+    const config = await this.configRepo.findOne({ where: {} });
+    const [pendingActive] = await Promise.all([
+      this.shipmentRepo
+        .createQueryBuilder('s')
+        .leftJoin('s.order', 'o')
+        .where('s.ldg_order_id IS NULL')
+        .andWhere('o.status IN (:...active)', {
+          active: LDG_DISPATCHABLE_STATUSES,
+        })
+        .getCount(),
+    ]);
+    return {
+      is_active: config?.is_active ?? false,
+      webhook_enabled: config?.webhook_enabled ?? true,
+      reconcile_enabled: config?.reconcile_enabled ?? true,
+      auto_retry_enabled: config?.auto_retry_enabled ?? true,
+      pending_active: pendingActive,
+      bulk_redispatch: this.getBulkRedispatchStatus(),
+    };
+  }
+
+  /** Bitta fon jarayonini yoqish/o'chirish. */
+  async setAutomation(
+    key: 'webhook_enabled' | 'reconcile_enabled' | 'auto_retry_enabled',
+    value: boolean,
+  ): Promise<{ success: boolean; message: string }> {
+    const allowed = ['webhook_enabled', 'reconcile_enabled', 'auto_retry_enabled'];
+    if (!allowed.includes(key)) {
+      return { success: false, message: 'Noma\'lum sozlama' };
+    }
+    const config = await this.configRepo.findOne({ where: {} });
+    if (!config) {
+      return { success: false, message: 'LDG sozlamasi topilmadi' };
+    }
+    config[key] = value;
+    await this.configRepo.save(config);
+    return {
+      success: true,
+      message: `${key} = ${value ? 'yoqildi' : 'o\'chirildi'}`,
+    };
+  }
+
+  /** Webhook log'ni o'chirish (eski/keraksizlarni tozalash). */
+  async deleteWebhookLog(
+    deliveryId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const r = await this.logRepo.delete({ delivery_id: deliveryId });
+    if (!r.affected) {
+      return { success: false, message: 'Webhook log topilmadi' };
+    }
+    return { success: true, message: 'Webhook log o\'chirildi' };
+  }
+
   /**
    * Saqlangan webhook log'ni qayta ishlash (skip/failed bo'lib qolganlar uchun).
    */
@@ -412,7 +589,7 @@ export class LdgAdminService {
     failed: number;
   }> {
     const config = await this.configRepo.findOne({ where: {} });
-    if (!config?.is_active) {
+    if (!config?.is_active || !config?.auto_retry_enabled) {
       return { retried: 0, success: 0, failed: 0 };
     }
 
@@ -529,7 +706,7 @@ export class LdgAdminService {
     errors: number;
   }> {
     const config = await this.configRepo.findOne({ where: {} });
-    if (!config?.is_active) {
+    if (!config?.is_active || !config?.reconcile_enabled) {
       return { checked: 0, applied: 0, unchanged: 0, errors: 0 };
     }
 
