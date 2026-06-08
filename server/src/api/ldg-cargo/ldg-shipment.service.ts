@@ -12,10 +12,24 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { LdgApiService } from './ldg-api.service';
+import { Order_status } from 'src/common/enums';
 import {
   LdgCreateOrderRequestDto,
   LdgCreateOrderResponseDto,
 } from './dto/ldg-create-order.dto';
+
+// Yakunlangan (terminal) order statuslari — bularni LDG'ga JO'NATMAYMIZ.
+// Faqat faol (NEW/RECEIVED/ON_THE_ROAD/WAITING) buyurtmalar LDG'ga ketadi:
+// yakunlangan buyurtma LDG'da qayta yaratilsa, LDG o'z statusini qaytarib
+// bizning yakuniy status bilan keraksiz "mismatch" chiqaradi.
+const LDG_SKIP_ORDER_STATUSES: Order_status[] = [
+  Order_status.SOLD,
+  Order_status.PAID,
+  Order_status.PARTLY_PAID,
+  Order_status.CANCELLED,
+  Order_status.CANCELLED_SENT,
+  Order_status.CLOSED,
+];
 
 @Injectable()
 export class LdgShipmentService {
@@ -72,6 +86,16 @@ export class LdgShipmentService {
     // avvalgi idempotent xatti-harakat (takror dispatch'ni bloklash).
     if (shipment?.ldg_order_id && !shipment.post_id && !order.post_id) {
       return shipment;
+    }
+
+    // YAKUNLANGAN buyurtmalarni LDG'ga jo'natmaymiz (mismatch oldini olish).
+    // Allaqachon yuborilgan bo'lsa — mavjud shipmentni qaytaramiz (idempotent),
+    // aks holda aniq xabar bilan to'xtatamiz.
+    if (LDG_SKIP_ORDER_STATUSES.includes(order.status)) {
+      if (shipment) return shipment;
+      throw new BadRequestException(
+        `Buyurtma yakunlangan (status=${order.status}) — LDG'ga jo'natilmaydi`,
+      );
     }
 
     if (!shipment) {
