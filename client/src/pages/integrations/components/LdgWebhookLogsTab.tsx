@@ -72,8 +72,9 @@ export const LdgWebhookLogsTab = () => {
       title: "Vaqt",
       dataIndex: "received_at",
       key: "received_at",
+      width: 160,
       render: (v: number) => (
-        <span className="text-xs">
+        <span className="text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
           {new Date(v).toLocaleString("uz-UZ")}
         </span>
       ),
@@ -82,18 +83,27 @@ export const LdgWebhookLogsTab = () => {
       title: "Event",
       dataIndex: "event_type",
       key: "event_type",
-      render: (v: string) => <span className="font-mono text-xs">{v}</span>,
+      width: 170,
+      ellipsis: true,
+      render: (v: string) => (
+        <span className="font-mono text-xs text-gray-700 dark:text-gray-200">
+          {v}
+        </span>
+      ),
     },
     {
       title: "Status",
       dataIndex: "status",
       key: "status",
+      width: 140,
       render: (v: string) => <Tag color={statusColor(v)}>{v}</Tag>,
     },
     {
       title: "Imzo",
       dataIndex: "signature_valid",
       key: "signature_valid",
+      width: 90,
+      align: "center",
       render: (v: boolean) =>
         v ? <Tag color="green">valid</Tag> : <Tag color="red">invalid</Tag>,
     },
@@ -104,27 +114,29 @@ export const LdgWebhookLogsTab = () => {
       render: (v: string | null) =>
         v ? (
           <Tooltip title={v}>
-            <span className="text-red-500 text-xs line-clamp-2 max-w-[220px] inline-block">
+            <span className="text-red-500 text-xs line-clamp-2 inline-block">
               {v}
             </span>
           </Tooltip>
         ) : (
-          "—"
+          <span className="text-gray-400">—</span>
         ),
     },
     {
       title: "Amal",
       key: "action",
       fixed: "right",
+      width: 130,
+      align: "center",
       render: (_: unknown, row) => (
-        <div className="flex gap-1.5">
-          <Button
-            size="small"
-            icon={<Code2 className="w-3.5 h-3.5" />}
-            onClick={() => setPayloadView(row)}
-          >
-            Payload
-          </Button>
+        <div className="flex items-center justify-center gap-1.5">
+          <Tooltip title="Payload (JSON) ko'rish">
+            <Button
+              size="small"
+              icon={<Code2 className="w-3.5 h-3.5" />}
+              onClick={() => setPayloadView(row)}
+            />
+          </Tooltip>
           <Popconfirm
             title="Qayta ishlash"
             description="Bu webhookni saqlangan payload asosida qayta ishlashni xohlaysizmi?"
@@ -132,13 +144,13 @@ export const LdgWebhookLogsTab = () => {
             cancelText="Yo'q"
             onConfirm={() => handleReprocess(row.delivery_id)}
           >
-            <Button
-              size="small"
-              icon={<RotateCcw className="w-3.5 h-3.5" />}
-              loading={reprocessWebhook.isPending}
-            >
-              Qayta ishlash
-            </Button>
+            <Tooltip title="Qayta ishlash">
+              <Button
+                size="small"
+                icon={<RotateCcw className="w-3.5 h-3.5" />}
+                loading={reprocessWebhook.isPending}
+              />
+            </Tooltip>
           </Popconfirm>
           <Popconfirm
             title="O'chirish"
@@ -148,12 +160,14 @@ export const LdgWebhookLogsTab = () => {
             okButtonProps={{ danger: true }}
             onConfirm={() => handleDelete(row.delivery_id)}
           >
-            <Button
-              size="small"
-              danger
-              icon={<Trash2 className="w-3.5 h-3.5" />}
-              loading={deleteWebhookLog.isPending}
-            />
+            <Tooltip title="O'chirish">
+              <Button
+                size="small"
+                danger
+                icon={<Trash2 className="w-3.5 h-3.5" />}
+                loading={deleteWebhookLog.isPending}
+              />
+            </Tooltip>
           </Popconfirm>
         </div>
       ),
@@ -215,21 +229,25 @@ export const LdgWebhookLogsTab = () => {
         </Button>
       </div>
 
-      <Table<LdgWebhookLog>
-        rowKey="delivery_id"
-        loading={isLoading}
-        columns={columns}
-        dataSource={data?.data ?? []}
-        scroll={{ x: 900 }}
-        size="small"
-        pagination={{
-          current: page,
-          pageSize: limit,
-          total: data?.total ?? 0,
-          showSizeChanger: false,
-          onChange: (p) => setPage(p),
-        }}
-      />
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <Table<LdgWebhookLog>
+          rowKey="delivery_id"
+          loading={isLoading}
+          columns={columns}
+          dataSource={data?.data ?? []}
+          scroll={{ x: 800 }}
+          size="small"
+          tableLayout="fixed"
+          pagination={{
+            current: page,
+            pageSize: limit,
+            total: data?.total ?? 0,
+            showSizeChanger: false,
+            onChange: (p) => setPage(p),
+            className: "px-3",
+          }}
+        />
+      </div>
 
       <Modal
         title={

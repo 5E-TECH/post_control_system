@@ -143,35 +143,50 @@ export const LdgShipmentsTab = () => {
       title: "№",
       dataIndex: "order_number",
       key: "order_number",
-      width: 80,
+      width: 90,
+      fixed: "left",
       render: (v: number | null) =>
-        v != null ? <span className="font-semibold">#{v}</span> : "—",
+        v != null ? (
+          <span className="font-semibold text-violet-600 dark:text-violet-400">
+            #{v}
+          </span>
+        ) : (
+          <span className="text-gray-400">—</span>
+        ),
     },
     {
       title: "Mijoz",
-      dataIndex: "customer_name",
-      key: "customer_name",
+      key: "customer",
+      width: 180,
       render: (_: unknown, row) => (
-        <div>
-          <div className="font-medium">{row.customer_name ?? "—"}</div>
-          <div className="text-xs text-gray-400">{row.customer_phone ?? ""}</div>
+        <div className="leading-tight">
+          <div className="font-medium text-gray-800 dark:text-gray-100 truncate">
+            {row.customer_name ?? "—"}
+          </div>
+          {row.customer_phone && (
+            <div className="text-xs text-gray-400">{row.customer_phone}</div>
+          )}
         </div>
       ),
     },
     {
-      title: "Viloyat / Tuman",
+      title: "Manzil",
       key: "region_district",
+      width: 170,
       render: (_: unknown, row) => {
-        const parts = [row.region_name, row.district_name].filter(Boolean);
-        return parts.length ? (
-          <div>
-            <div>{row.region_name ?? "—"}</div>
+        if (!row.region_name && !row.district_name)
+          return <span className="text-gray-400">—</span>;
+        return (
+          <div className="leading-tight">
+            <div className="text-gray-700 dark:text-gray-200 truncate">
+              {row.region_name ?? "—"}
+            </div>
             {row.district_name && (
-              <div className="text-xs text-gray-400">{row.district_name}</div>
+              <div className="text-xs text-gray-400 truncate">
+                {row.district_name}
+              </div>
             )}
           </div>
-        ) : (
-          "—"
         );
       },
     },
@@ -179,63 +194,87 @@ export const LdgShipmentsTab = () => {
       title: "Market",
       dataIndex: "market_name",
       key: "market_name",
-      render: (v: string | null) => v ?? "—",
+      width: 120,
+      ellipsis: true,
+      render: (v: string | null) => v ?? <span className="text-gray-400">—</span>,
     },
     {
       title: "Summa",
       dataIndex: "order_total_price",
       key: "order_total_price",
+      width: 120,
+      align: "right",
       render: (v: number | null) =>
-        v != null ? `${v.toLocaleString("uz-UZ")} so'm` : "—",
+        v != null ? (
+          <span className="font-medium whitespace-nowrap">
+            {Number(v).toLocaleString("uz-UZ")} so'm
+          </span>
+        ) : (
+          <span className="text-gray-400">—</span>
+        ),
     },
     {
-      title: "Order holati",
-      dataIndex: "order_status",
-      key: "order_status",
-      render: (v: string | null) => <Tag>{v ?? "—"}</Tag>,
-    },
-    {
-      title: "LDG status",
-      dataIndex: "ldg_status",
-      key: "ldg_status",
-      render: (v: string | null) => (
-        <Tag color={ldgStatusColor(v)}>{ldgStatusLabel(v)}</Tag>
+      title: "Holat",
+      key: "status",
+      width: 150,
+      render: (_: unknown, row) => (
+        <div className="flex flex-col items-start gap-1">
+          <Tag className="m-0">{row.order_status ?? "—"}</Tag>
+          <Tag color={ldgStatusColor(row.ldg_status)} className="m-0">
+            {ldgStatusLabel(row.ldg_status)}
+          </Tag>
+        </div>
       ),
     },
     {
-      title: "Tracking",
-      dataIndex: "tracking_number",
-      key: "tracking_number",
-      render: (v: string | null) =>
-        v ? <span className="font-mono text-xs">{v}</span> : "—",
-    },
-    {
-      title: "LDG ID",
-      dataIndex: "ldg_order_id",
-      key: "ldg_order_id",
-      render: (v: number | null) => v ?? <Tag color="orange">yuborilmagan</Tag>,
+      title: "LDG paket",
+      key: "ldg",
+      width: 160,
+      render: (_: unknown, row) =>
+        row.ldg_order_id ? (
+          <div className="leading-tight">
+            <div className="text-xs">
+              <span className="text-gray-400">ID:</span>{" "}
+              <span className="font-semibold">{row.ldg_order_id}</span>
+            </div>
+            {row.tracking_number && (
+              <div
+                className="font-mono text-[11px] text-gray-500 truncate"
+                title={row.tracking_number}
+              >
+                {row.tracking_number}
+              </div>
+            )}
+          </div>
+        ) : (
+          <Tag color="gold">yuborilmagan</Tag>
+        ),
     },
     {
       title: "Urinish",
-      dataIndex: "send_attempts",
-      key: "send_attempts",
-    },
-    {
-      title: "Oxirgi tekshiruv",
-      dataIndex: "last_synced_at",
-      key: "last_synced_at",
-      render: (v: number | null) =>
-        v ? (
-          <span className="text-xs text-gray-500">
-            {new Date(Number(v)).toLocaleString("uz-UZ")}
+      key: "attempts",
+      width: 100,
+      align: "center",
+      render: (_: unknown, row) => (
+        <Tooltip
+          title={
+            row.last_synced_at
+              ? `Oxirgi tekshiruv: ${new Date(
+                  Number(row.last_synced_at),
+                ).toLocaleString("uz-UZ")}`
+              : "Hali tekshirilmagan"
+          }
+        >
+          <span className="inline-flex min-w-[28px] items-center justify-center rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-sm font-medium">
+            {row.send_attempts}
           </span>
-        ) : (
-          <span className="text-xs text-gray-400">—</span>
-        ),
+        </Tooltip>
+      ),
     },
     {
       title: "Xato / Mismatch",
       key: "error_or_mismatch",
+      width: 220,
       render: (_: unknown, row) => {
         if (row.mismatch_at && row.mismatch_reason) {
           return (
@@ -252,51 +291,52 @@ export const LdgShipmentsTab = () => {
         if (row.last_error) {
           return (
             <Tooltip title={row.last_error}>
-              <span className="text-red-500 text-xs line-clamp-2 max-w-[220px] inline-block">
+              <span className="text-red-500 text-xs line-clamp-2 inline-block">
                 {row.last_error}
               </span>
             </Tooltip>
           );
         }
-        return "—";
+        return <span className="text-gray-400">—</span>;
       },
     },
     {
       title: "Amal",
       key: "action",
       fixed: "right",
-      width: 260,
+      width: 110,
+      align: "center",
       render: (_: unknown, row) => (
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex items-center justify-center gap-1.5">
           {row.mismatch_at && (
             <Popconfirm
-              title="Mismatch'ni hal qilindi deb belgilashmi?"
-              description="Faqat qo'lda tekshirib, kassa va status mosligini ta'minlaganingizdan keyin bosing."
+              title="Mismatch hal qilindimi?"
+              description="Faqat qo'lda tekshirib, kassa va status mosligini ta'minlagach bosing."
               okText="Ha, hal qilindi"
               cancelText="Yo'q"
               onConfirm={() => handleResolveMismatch(row.order_id)}
             >
-              <Button
-                size="small"
-                type="primary"
-                danger
-                icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-                loading={resolveMismatch.isPending && resolvingId === row.order_id}
-              >
-                Hal qilindi
-              </Button>
+              <Tooltip title="Mismatch — hal qilindi deb belgilash">
+                <Button
+                  size="small"
+                  type="primary"
+                  danger
+                  icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                  loading={
+                    resolveMismatch.isPending && resolvingId === row.order_id
+                  }
+                />
+              </Tooltip>
             </Popconfirm>
           )}
           {row.ldg_order_id ? (
-            <Tooltip title="LDG'dan joriy statusni tortib olib, order holatini yangilaydi">
+            <Tooltip title="LDG'dan joriy statusni tortib olish">
               <Button
                 size="small"
                 icon={<DownloadCloud className="w-3.5 h-3.5" />}
                 loading={syncOne.isPending && syncingId === row.order_id}
                 onClick={() => handleSync(row.order_id)}
-              >
-                LDG'dan tekshirish
-              </Button>
+              />
             </Tooltip>
           ) : (
             <Popconfirm
@@ -306,13 +346,13 @@ export const LdgShipmentsTab = () => {
               cancelText="Yo'q"
               onConfirm={() => handleRedispatch(row.order_id)}
             >
-              <Button
-                size="small"
-                icon={<RotateCcw className="w-3.5 h-3.5" />}
-                loading={redispatch.isPending}
-              >
-                Qayta jo'natish
-              </Button>
+              <Tooltip title="LDG'ga qayta jo'natish">
+                <Button
+                  size="small"
+                  icon={<RotateCcw className="w-3.5 h-3.5" />}
+                  loading={redispatch.isPending}
+                />
+              </Tooltip>
             </Popconfirm>
           )}
         </div>
@@ -396,21 +436,25 @@ export const LdgShipmentsTab = () => {
         </div>
       </div>
 
-      <Table<LdgShipmentRow>
-        rowKey="id"
-        loading={isLoading}
-        columns={columns}
-        dataSource={data?.data ?? []}
-        scroll={{ x: 1500 }}
-        size="small"
-        pagination={{
-          current: page,
-          pageSize: limit,
-          total: data?.total ?? 0,
-          showSizeChanger: false,
-          onChange: (p) => setPage(p),
-        }}
-      />
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <Table<LdgShipmentRow>
+          rowKey="id"
+          loading={isLoading}
+          columns={columns}
+          dataSource={data?.data ?? []}
+          scroll={{ x: 1420 }}
+          size="small"
+          tableLayout="fixed"
+          pagination={{
+            current: page,
+            pageSize: limit,
+            total: data?.total ?? 0,
+            showSizeChanger: false,
+            onChange: (p) => setPage(p),
+            className: "px-3",
+          }}
+        />
+      </div>
     </div>
   );
 };
