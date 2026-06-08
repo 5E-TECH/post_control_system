@@ -4,6 +4,8 @@ import { api } from "../..";
 const HEALTH_KEY = "ldg-admin-health";
 const LOGS_KEY = "ldg-admin-webhook-logs";
 const SHIPMENTS_KEY = "ldg-admin-shipments";
+const BULK_KEY = "ldg-admin-bulk-status";
+const AUTO_KEY = "ldg-admin-automations";
 
 export interface LdgHealth {
   ready: boolean;
@@ -90,6 +92,27 @@ export interface ActionResult {
   success?: boolean;
   message: string;
   http_status?: number;
+}
+
+export interface BulkRedispatchState {
+  running: boolean;
+  total: number;
+  done: number;
+  success: number;
+  failed: number;
+  started_at: number | null;
+  finished_at: number | null;
+  stop_requested: boolean;
+  last_error: string | null;
+}
+
+export interface LdgAutomations {
+  is_active: boolean;
+  webhook_enabled: boolean;
+  reconcile_enabled: boolean;
+  auto_retry_enabled: boolean;
+  pending_active: number;
+  bulk_redispatch: BulkRedispatchState;
 }
 
 // Backend ba'zan {data:...} envelope bilan, ba'zan to'g'ridan-to'g'ri qaytaradi
@@ -248,6 +271,79 @@ export const useLdgAdmin = () => {
     },
   });
 
+  // ===== BULK REDISPATCH (persistent, server tomonida) =====
+
+  // Holatni poll qiladi — job ishlayotganda 1.5s da bir, aks holda kamroq.
+  const getBulkStatus = (enabled = true, fast = false) =>
+    useQuery<BulkRedispatchState>({
+      queryKey: [BULK_KEY],
+      queryFn: () =>
+        api
+          .get("ldg/admin/bulk-redispatch/status")
+          .then((res) => unwrap<BulkRedispatchState>(res.data)),
+      enabled,
+      refetchInterval: fast ? 1500 : 5000,
+    });
+
+  const startBulk = useMutation({
+    mutationFn: () =>
+      api
+        .post("ldg/admin/bulk-redispatch/start")
+        .then((res) => unwrap<{ started: boolean; message: string; status: BulkRedispatchState }>(res.data)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [BULK_KEY] });
+      client.invalidateQueries({ queryKey: [AUTO_KEY] });
+    },
+  });
+
+  const stopBulk = useMutation({
+    mutationFn: () =>
+      api
+        .post("ldg/admin/bulk-redispatch/stop")
+        .then((res) => unwrap<{ stopped: boolean; message: string }>(res.data)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [BULK_KEY] });
+    },
+  });
+
+  // ===== AVTOMATIKA (fon jarayonlari) =====
+
+  const getAutomations = (enabled = true) =>
+    useQuery<LdgAutomations>({
+      queryKey: [AUTO_KEY],
+      queryFn: () =>
+        api
+          .get("ldg/admin/automations")
+          .then((res) => unwrap<LdgAutomations>(res.data)),
+      enabled,
+      refetchInterval: 10000,
+    });
+
+  const setAutomation = useMutation({
+    mutationFn: (body: {
+      key: "webhook_enabled" | "reconcile_enabled" | "auto_retry_enabled";
+      value: boolean;
+    }) =>
+      api
+        .patch("ldg/admin/automations", body)
+        .then((res) => unwrap<ActionResult>(res.data)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [AUTO_KEY] });
+      client.invalidateQueries({ queryKey: [HEALTH_KEY] });
+    },
+  });
+
+  const deleteWebhookLog = useMutation({
+    mutationFn: (deliveryId: string) =>
+      api
+        .delete(`ldg/admin/webhook-logs/${deliveryId}`)
+        .then((res) => unwrap<ActionResult>(res.data)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [LOGS_KEY] });
+      client.invalidateQueries({ queryKey: [HEALTH_KEY] });
+    },
+  });
+
   return {
     getHealth,
     getWebhookLogs,
@@ -260,5 +356,11 @@ export const useLdgAdmin = () => {
     syncOne,
     reconcileAll,
     resolveMismatch,
+    getBulkStatus,
+    startBulk,
+    stopBulk,
+    getAutomations,
+    setAutomation,
+    deleteWebhookLog,
   };
 };

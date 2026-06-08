@@ -4,11 +4,13 @@ import {
   Settings as SettingsIcon,
   Truck,
   Webhook,
+  SlidersHorizontal,
 } from "lucide-react";
 import { LdgDashboardTab } from "./LdgDashboardTab";
 import { LdgSettingsTab } from "./LdgSettingsTab";
 import { LdgShipmentsTab } from "./LdgShipmentsTab";
 import { LdgWebhookLogsTab } from "./LdgWebhookLogsTab";
+import { LdgControlTab } from "./LdgControlTab";
 
 /**
  * LDG Cargo boshqaruv paneli — 4 ta ichki tab:
@@ -61,6 +63,16 @@ export const LdgCargoTab = () => {
             </span>
           ),
           children: <LdgWebhookLogsTab />,
+        },
+        {
+          key: "control",
+          label: (
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4" />
+              Boshqaruv
+            </span>
+          ),
+          children: <LdgControlTab />,
         },
       ]}
     />

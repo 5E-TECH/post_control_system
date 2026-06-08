@@ -10,7 +10,7 @@ import {
   Popconfirm,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { RotateCcw, RefreshCw, Code2 } from "lucide-react";
+import { RotateCcw, RefreshCw, Code2, Trash2 } from "lucide-react";
 import {
   useLdgAdmin,
   type LdgWebhookLog,
@@ -32,7 +32,7 @@ const statusColor = (status: string): string => {
 };
 
 export const LdgWebhookLogsTab = () => {
-  const { getWebhookLogs, reprocessWebhook } = useLdgAdmin();
+  const { getWebhookLogs, reprocessWebhook, deleteWebhookLog } = useLdgAdmin();
   const [status, setStatus] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [payloadView, setPayloadView] = useState<LdgWebhookLog | null>(null);
@@ -50,6 +50,15 @@ export const LdgWebhookLogsTab = () => {
       message.info(result.message);
     } catch {
       message.error("Qayta ishlashda xatolik");
+    }
+  };
+
+  const handleDelete = async (deliveryId: string) => {
+    try {
+      const result = await deleteWebhookLog.mutateAsync(deliveryId);
+      result.success ? message.success(result.message) : message.warning(result.message);
+    } catch {
+      message.error("O'chirishda xatolik");
     }
   };
 
@@ -125,6 +134,21 @@ export const LdgWebhookLogsTab = () => {
             >
               Qayta ishlash
             </Button>
+          </Popconfirm>
+          <Popconfirm
+            title="O'chirish"
+            description="Bu webhook log yozuvini o'chirishni xohlaysizmi?"
+            okText="Ha, o'chir"
+            cancelText="Yo'q"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete(row.delivery_id)}
+          >
+            <Button
+              size="small"
+              danger
+              icon={<Trash2 className="w-3.5 h-3.5" />}
+              loading={deleteWebhookLog.isPending}
+            />
           </Popconfirm>
         </div>
       ),

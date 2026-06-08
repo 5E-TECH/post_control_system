@@ -50,27 +50,19 @@ const ldgStatusLabel = (status: string | null): string => {
   return LDG_STATUS_LABELS[status.toUpperCase()] ?? status;
 };
 
-// "Hammasini qayta jo'natish"da bir guruhdagi buyurtmalar soni (10 tadan).
-const REDISPATCH_BATCH_SIZE = 10;
-
 export const LdgShipmentsTab = () => {
   const {
     getShipments,
     redispatch,
-    getRetryCandidates,
-    redispatchBatch,
     syncOne,
     resolveMismatch,
+    getBulkStatus,
+    startBulk,
   } = useLdgAdmin();
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
-  const [bulkRunning, setBulkRunning] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState<{
-    done: number;
-    total: number;
-  } | null>(null);
   const limit = 20;
 
   const { data, isLoading, isFetching, refetch } = getShipments({
@@ -78,6 +70,10 @@ export const LdgShipmentsTab = () => {
     limit,
     filter,
   });
+
+  // Server tomonidagi bulk-job holati (progress widget ham shu bilan ishlaydi).
+  const { data: bulkStatus } = getBulkStatus(true, true);
+  const bulkRunning = !!bulkStatus?.running;
 
   const handleRedispatch = async (orderId: string) => {
     try {
@@ -92,47 +88,21 @@ export const LdgShipmentsTab = () => {
     }
   };
 
-  // Yuborilmagan/xatoli barcha jo'natmalarni bitta bosishda qayta jo'natish.
-  // Tashqaridan bitta amal ko'rinadi, lekin ichida 10 tadan ketma-ket yuboriladi
-  // (LDG rate-limitiga urilmaslik uchun) va progress ko'rsatiladi.
+  // Yuborilmagan/xatoli barcha (faol) jo'natmalarni qayta jo'natishni boshlaydi.
+  // Jarayon SERVER tomonida ishlaydi — sahifa yopilsa/refresh bo'lsa ham davom
+  // etadi. Progress global widget'da ko'rinadi va u yerdan to'xtatish mumkin.
   const handleRedispatchAll = async () => {
-    setBulkRunning(true);
     try {
-      const ids = await getRetryCandidates();
-      if (!ids.length) {
-        message.info("Qayta jo'natiladigan jo'natma yo'q");
-        return;
-      }
-      setBulkProgress({ done: 0, total: ids.length });
-      let success = 0;
-      let failed = 0;
-      for (let i = 0; i < ids.length; i += REDISPATCH_BATCH_SIZE) {
-        const chunk = ids.slice(i, i + REDISPATCH_BATCH_SIZE);
-        try {
-          const res = await redispatchBatch.mutateAsync(chunk);
-          success += res.success;
-          failed += res.failed;
-        } catch {
-          failed += chunk.length;
-        }
-        setBulkProgress({
-          done: Math.min(i + REDISPATCH_BATCH_SIZE, ids.length),
-          total: ids.length,
-        });
-      }
-      if (failed > 0) {
-        message.warning(
-          `Tugadi: ${success} ta jo'natildi, ${failed} ta xato (keyinroq avtomatik qayta uriniladi)`,
-        );
+      const r = await startBulk.mutateAsync();
+      // Global progress panelini ochamiz (qaysi sahifada bo'lishidan qat'i nazar).
+      window.dispatchEvent(new Event("ldg-bulk-open"));
+      if (r.started) {
+        message.success(r.message);
       } else {
-        message.success(`Tugadi: ${success} ta jo'natma LDG'ga jo'natildi`);
+        message.info(r.message);
       }
-      refetch();
     } catch {
-      message.error("Ommaviy qayta jo'natishda xatolik");
-    } finally {
-      setBulkRunning(false);
-      setBulkProgress(null);
+      message.error("Ommaviy qayta jo'natishni boshlashda xatolik");
     }
   };
 
@@ -378,18 +348,20 @@ export const LdgShipmentsTab = () => {
         <div className="flex items-center gap-2">
           <Popconfirm
             title="Hammasini qayta jo'natish"
-            description="Barcha yuborilmagan/xatoli jo'natmalar LDG'ga 10 tadan qayta jo'natiladi. Davom etilsinmi?"
-            okText="Ha, jo'nat"
+            description="Barcha yuborilmagan (faol) buyurtmalar LDG'ga jo'natiladi. Jarayon server tomonida ishlaydi — sahifani yopsangiz ham davom etadi. Davom etilsinmi?"
+            okText="Ha, boshla"
             cancelText="Yo'q"
             onConfirm={handleRedispatchAll}
+            disabled={bulkRunning}
           >
             <Button
               type="primary"
               icon={<RotateCcw className="w-4 h-4" />}
-              loading={bulkRunning}
+              loading={startBulk.isPending}
+              disabled={bulkRunning}
             >
-              {bulkProgress
-                ? `Jo'natilmoqda ${bulkProgress.done}/${bulkProgress.total}`
+              {bulkRunning
+                ? `Jo'natilmoqda ${bulkStatus?.done ?? 0}/${bulkStatus?.total ?? 0}`
                 : "Hammasini qayta jo'natish"}
             </Button>
           </Popconfirm>
