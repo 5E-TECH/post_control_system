@@ -1,4 +1,4 @@
-// redeploy trigger — 2026-05-20 LDG integratsiya + market routing fix
+// redeploy trigger — 2026-06-08 LDG monitoring (mijoz/viloyat/market) + build fix
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
