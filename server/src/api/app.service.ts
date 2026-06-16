@@ -118,9 +118,13 @@ export default class Application {
       .addBearerAuth()
       .build();
 
-    const documentFactory = () =>
-      SwaggerModule.createDocument(app, config_swagger);
-    SwaggerModule.setup(api, app, documentFactory());
+    // Swagger faqat production'dan tashqarida ochiladi. Productionда API
+    // hujjati va sxema oshkor qilinmasligi uchun NODE_ENV=production bo'lishi shart.
+    if (process.env.NODE_ENV !== 'production') {
+      const documentFactory = () =>
+        SwaggerModule.createDocument(app, config_swagger);
+      SwaggerModule.setup(api, app, documentFactory());
+    }
 
     // Start
     await app.listen(config.PORT);
