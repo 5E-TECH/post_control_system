@@ -182,11 +182,18 @@ const CashDetail = () => {
   const { handleApiError, handleSuccess } = useApiNotification();
 
   const performPayment = () => {
+    // Summani jo'natishdan oldin tekshiramiz: NaN/bo'sh/0/manfiy bo'lsa
+    // serverga noto'g'ri qiymat ketmasin (server ham @Min(1) bilan rad etadi).
+    const amount = Number(form.summa);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      message.error("To'lov summasi noto'g'ri kiritildi");
+      return;
+    }
     const cardId =
       form.payment === "click" ? form.card_id || defaultCardId : undefined;
     const dataCourier = {
       courier_id: id,
-      amount: Number(form.summa),
+      amount,
       payment_method: form.payment,
       payment_date: new Date().toISOString(),
       comment: form.comment,
@@ -195,7 +202,7 @@ const CashDetail = () => {
     };
     const dataMarket = {
       market_id: id,
-      amount: Number(form.summa),
+      amount,
       payment_method: form.payment,
       payment_date: new Date().toISOString(),
       comment: form.comment,
