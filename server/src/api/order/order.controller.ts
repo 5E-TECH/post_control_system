@@ -257,10 +257,11 @@ export class OrderController {
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
   @Post('receive')
   receiveNewOrders(
+    @CurrentUser() user: JwtPayload,
     @Body() ordersArray: OrdersArrayDto,
     @Query('search') search?: string,
   ) {
-    return this.orderService.receiveNewOrders(ordersArray, search);
+    return this.orderService.receiveNewOrders(ordersArray, search, user);
   }
 
   @ApiOperation({ summary: 'Check if external order is duplicate' })

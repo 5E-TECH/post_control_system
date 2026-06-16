@@ -232,7 +232,7 @@ export class ProductController {
   @ApiParam({ name: 'id', description: 'Product ID' })
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.productService.remove(id);
+  async remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.productService.remove(id, user);
   }
 }

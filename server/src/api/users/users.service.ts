@@ -76,6 +76,7 @@ import { TelegramInitData } from './dto/initData.dto';
 import { Cron } from '@nestjs/schedule';
 import { Logger, OnModuleInit } from '@nestjs/common';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { roleUz } from 'src/common/utils/status-label.util';
 
 @Injectable()
 export class UserService implements OnModuleInit {
@@ -131,7 +132,10 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async createAdmin(createAdminDto: CreateAdminDto): Promise<object> {
+  async createAdmin(
+    createAdminDto: CreateAdminDto,
+    actor?: JwtPayload,
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -171,6 +175,7 @@ export class UserService implements OnModuleInit {
         action: 'created',
         new_value: { name: admin.name, role: admin.role },
         description: `Admin yaratildi: ${admin.name}`,
+        user: actor,
       });
       return successRes(admin, 201, 'New Admin created');
     } catch (error) {
@@ -181,7 +186,10 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async createRegistrator(createAdminDto: CreateAdminDto): Promise<object> {
+  async createRegistrator(
+    createAdminDto: CreateAdminDto,
+    actor?: JwtPayload,
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -226,6 +234,7 @@ export class UserService implements OnModuleInit {
         action: 'created',
         new_value: { name: user.name, role: user.role },
         description: `Registrator yaratildi: ${user.name}`,
+        user: actor,
       });
       return successRes(user, 201, 'New Admin created');
     } catch (error) {
@@ -259,7 +268,10 @@ export class UserService implements OnModuleInit {
     await manager.save(rows);
   }
 
-  async createCourier(createCourierDto: CreateCourierDto): Promise<object> {
+  async createCourier(
+    createCourierDto: CreateCourierDto,
+    actor?: JwtPayload,
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -331,6 +343,7 @@ export class UserService implements OnModuleInit {
         action: 'created',
         new_value: { name: courier.name, role: Roles.COURIER },
         description: `Kuryer yaratildi: ${courier.name}`,
+        user: actor,
       });
       return successRes(courier, 201, `New courier created`);
     } catch (error) {
@@ -341,7 +354,10 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async createMarket(createMarketDto: CreateMarketDto): Promise<object> {
+  async createMarket(
+    createMarketDto: CreateMarketDto,
+    actor?: JwtPayload,
+  ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -389,6 +405,7 @@ export class UserService implements OnModuleInit {
         action: 'created',
         new_value: { name: newMarket.name, role: Roles.MARKET },
         description: `Market yaratildi: ${newMarket.name}`,
+        user: actor,
       });
       return successRes(newMarket, 201, 'New market created');
     } catch (error) {
@@ -965,6 +982,10 @@ export class UserService implements OnModuleInit {
         hashedPassword = await this.bcrypt.encrypt(password);
       }
 
+      // Sezgir o'zgarishlarni aniqlash uchun eski holatni saqlaymiz.
+      const beforeStatus = user.status;
+      const beforeRole = user.role;
+
       // salary va payment_day ni alohida olamiz
       const {
         salary: newSalary,
@@ -1030,12 +1051,13 @@ export class UserService implements OnModuleInit {
       });
 
       const { password: _, ...safeUser } = updatedUser;
-      this.activityLog.log({
-        entity_type: 'user',
-        entity_id: id,
-        action: 'updated',
-        new_value: { name: updatedUser.name, role: updatedUser.role },
-        description: `Admin yangilandi: ${updatedUser.name}`,
+      this.logUserMutation({
+        user: updatedUser,
+        beforeStatus,
+        beforeRole,
+        passwordChanged: !!password,
+        roleLabel: 'Admin',
+        actor: currentUser,
       });
       return successRes(safeUser, 200, 'User updated');
     } catch (error) {
@@ -1056,6 +1078,8 @@ export class UserService implements OnModuleInit {
       if (!registrator) {
         throw new NotFoundException('Registrator not found');
       }
+      const beforeStatus = registrator.status;
+      const beforeRole = registrator.role;
       // Rolni faqat superadmin o'zgartira oladi
       if (otherFields.role) {
         if (!currentUser || currentUser.role !== Roles.SUPERADMIN) {
@@ -1145,6 +1169,14 @@ export class UserService implements OnModuleInit {
         }
       }
 
+      this.logUserMutation({
+        user: registrator,
+        beforeStatus,
+        beforeRole,
+        passwordChanged: !!password,
+        roleLabel: 'Registrator',
+        actor: currentUser,
+      });
       return successRes({}, 200, 'Registrator updated');
     } catch (error) {
       return catchError(error);
@@ -1154,6 +1186,7 @@ export class UserService implements OnModuleInit {
   async updateCourier(
     id: string,
     updateCourierDto: UpdateCourierDto,
+    actor?: JwtPayload,
   ): Promise<object> {
     try {
       const { password, regions, ...otherFields } = updateCourierDto;
@@ -1164,6 +1197,7 @@ export class UserService implements OnModuleInit {
       if (!courier) {
         throw new NotFoundException('User not found');
       }
+      const beforeStatus = courier.status;
 
       // Update qilganda telefon nomer databasada bor yoki yo'qligini tekshirish
       if (otherFields.phone_number) {
@@ -1209,11 +1243,12 @@ export class UserService implements OnModuleInit {
       }
 
       const updatedUser = await this.userRepo.findOne({ where: { id } });
-      this.activityLog.log({
-        entity_type: 'user',
-        entity_id: id,
-        action: 'updated',
-        description: `Kuryer yangilandi: ${updatedUser?.name}`,
+      this.logUserMutation({
+        user: updatedUser ?? courier,
+        beforeStatus,
+        passwordChanged: !!password,
+        roleLabel: 'Kuryer',
+        actor,
       });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
@@ -1224,6 +1259,7 @@ export class UserService implements OnModuleInit {
   async updateMarket(
     id: string,
     updateMarketDto: UpdateMarketDto,
+    actor?: JwtPayload,
   ): Promise<object> {
     try {
       const { password, ...otherFields } = updateMarketDto;
@@ -1233,6 +1269,7 @@ export class UserService implements OnModuleInit {
       if (!market) {
         throw new NotFoundException('Market not found');
       }
+      const beforeStatus = market.status;
 
       if (otherFields.phone_number) {
         const isExistPhoneNumber = await this.userRepo.findOne({
@@ -1261,11 +1298,12 @@ export class UserService implements OnModuleInit {
 
       const updatedMarket = await this.userRepo.save(market);
 
-      this.activityLog.log({
-        entity_type: 'user',
-        entity_id: market.id,
-        action: 'updated',
-        description: `Market yangilandi: ${updatedMarket.name}`,
+      this.logUserMutation({
+        user: updatedMarket,
+        beforeStatus,
+        passwordChanged: !!password,
+        roleLabel: 'Market',
+        actor,
       });
       return successRes(updatedMarket, 200, 'Market updated');
     } catch (error) {
@@ -1472,13 +1510,30 @@ export class UserService implements OnModuleInit {
       const updatedUser = await this.userRepo.findOne({
         where: { id: user.id },
       });
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: user.id,
+        action: 'updated',
+        new_value: {
+          name: updatedUser?.name,
+          ...(otherFields.phone_number
+            ? { phone_number: otherFields.phone_number }
+            : {}),
+          ...(password ? { password_changed: true } : {}),
+        },
+        description: `${updatedUser?.name || 'Foydalanuvchi'} o'z profilini yangiladi${
+          password ? ' (parol o\'zgartirildi)' : ''
+        }`,
+        user,
+      });
       return successRes(updatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async remove(id: string): Promise<object> {
+  async remove(id: string, actor?: JwtPayload): Promise<object> {
     try {
       const user = await this.userRepo.findOne({ where: { id } });
       if (!user) {
@@ -1493,7 +1548,8 @@ export class UserService implements OnModuleInit {
         entity_id: id,
         action: 'deleted',
         old_value: { name: user.name, role: user.role },
-        description: `Foydalanuvchi o'chirildi: ${user.name} (${user.role})`,
+        description: `Foydalanuvchi o'chirildi: ${user.name} (${roleUz(user.role)})`,
+        user: actor,
       });
       return successRes({}, 200, 'User deleted');
     } catch (error) {
@@ -1509,6 +1565,83 @@ export class UserService implements OnModuleInit {
     return { user_agent: userAgent, ip };
   }
 
+  // Muvaffaqiyatsiz login urinishini loglaydi. Maxfiylik: telefon TO'LIQ
+  // saqlanmaydi (faqat oxirgi 4 raqam), tavsif umumiy — telefon mavjudligi
+  // oshkor qilinmaydi. Noma'lum telefon uchun entity_id = NIL sentinel.
+  private logFailedLogin(
+    reason: 'unknown_phone' | 'blocked' | 'wrong_password',
+    phone: string,
+    req?: Request,
+    userId?: string,
+  ): void {
+    const last4 = (phone || '').slice(-4);
+    this.activityLog.log({
+      entity_type: 'user',
+      entity_id: userId || '00000000-0000-0000-0000-000000000000',
+      action: 'login_failed',
+      description: 'Tizimga kirishda xatolik',
+      metadata: {
+        ...this.extractLoginMetadata(req),
+        reason,
+        phone_masked: last4 ? `***${last4}` : undefined,
+        source: 'web',
+      },
+    });
+  }
+
+  // Foydalanuvchi yangilanishini loglaydi va sezgir o'zgarishlarni alohida
+  // action sifatida ajratadi (bloklash, blokdan chiqarish, rol o'zgarishi,
+  // parol o'zgarishi). Parol HECH QACHON saqlanmaydi — faqat flag.
+  private logUserMutation(params: {
+    user: { id: string; name: string; role: string; status: string };
+    beforeStatus?: string;
+    beforeRole?: string;
+    passwordChanged?: boolean;
+    roleLabel: string;
+    actor?: JwtPayload;
+  }): void {
+    const { user, beforeStatus, beforeRole, passwordChanged, roleLabel, actor } =
+      params;
+    const statusChanged =
+      beforeStatus !== undefined && beforeStatus !== user.status;
+    const roleChanged = beforeRole !== undefined && beforeRole !== user.role;
+
+    let action = 'updated';
+    let description = `${roleLabel} yangilandi: ${user.name}`;
+    if (statusChanged) {
+      const blocked = user.status === Status.INACTIVE;
+      action = blocked ? 'blocked' : 'unblocked';
+      description = blocked
+        ? `${roleLabel} bloklandi: ${user.name}`
+        : `${roleLabel} blokdan chiqarildi: ${user.name}`;
+    } else if (roleChanged) {
+      action = 'role_changed';
+      description = `${user.name} roli o'zgardi: ${roleUz(beforeRole)} → ${roleUz(
+        user.role,
+      )}`;
+    } else if (passwordChanged) {
+      description = `${roleLabel} yangilandi: ${user.name} (parol o'zgartirildi)`;
+    }
+
+    this.activityLog.log({
+      entity_type: 'user',
+      entity_id: user.id,
+      action,
+      old_value: {
+        ...(statusChanged ? { status: beforeStatus } : {}),
+        ...(roleChanged ? { role: beforeRole } : {}),
+      },
+      new_value: {
+        name: user.name,
+        role: user.role,
+        ...(statusChanged ? { status: user.status } : {}),
+        ...(passwordChanged ? { password_changed: true } : {}),
+      },
+      description,
+      user: actor,
+    });
+  }
+
   async signInUser(
     signInDto: SignInUserDto,
     res: Response,
@@ -1521,9 +1654,11 @@ export class UserService implements OnModuleInit {
         where: { phone_number, role: Not(Roles.CUSTOMER) },
       });
       if (!user) {
+        this.logFailedLogin('unknown_phone', phone_number, req);
         throw new BadRequestException('Phone number or password incorrect');
       }
       if (user.status === Status.INACTIVE) {
+        this.logFailedLogin('blocked', phone_number, req, user.id);
         throw new BadRequestException('You have been blocked by superadmin');
       }
       const IsMatchPassword = await this.bcrypt.compare(
@@ -1531,6 +1666,7 @@ export class UserService implements OnModuleInit {
         user?.password,
       );
       if (!IsMatchPassword) {
+        this.logFailedLogin('wrong_password', phone_number, req, user.id);
         throw new BadRequestException('Phone number or password incorrect');
       }
       const { id, role, status } = user;
@@ -1910,7 +2046,7 @@ export class UserService implements OnModuleInit {
 
   // ==================== LOGIST CRUD ====================
 
-  async createLogist(dto: CreateLogistDto): Promise<object> {
+  async createLogist(dto: CreateLogistDto, actor?: JwtPayload): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1952,6 +2088,15 @@ export class UserService implements OnModuleInit {
       await queryRunner.manager.save(userSalary);
 
       await queryRunner.commitTransaction();
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: user.id,
+        action: 'created',
+        new_value: { name: user.name, role: Roles.LOGIST, salary },
+        description: `Logist yaratildi: ${user.name}`,
+        user: actor,
+      });
       return successRes(user, 201, 'Yangi logist yaratildi');
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1996,7 +2141,11 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async updateLogist(id: string, dto: UpdateLogistDto): Promise<object> {
+  async updateLogist(
+    id: string,
+    dto: UpdateLogistDto,
+    actor?: JwtPayload,
+  ): Promise<object> {
     try {
       const { password, ...otherFields } = dto;
       const logist = await this.userRepo.findOne({
@@ -2031,6 +2180,23 @@ export class UserService implements OnModuleInit {
         ...(hashedPassword && { password: hashedPassword }),
       });
       await this.userRepo.save(logist);
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: logist.id,
+        action: 'updated',
+        new_value: {
+          name: logist.name,
+          ...(otherFields.phone_number
+            ? { phone_number: otherFields.phone_number }
+            : {}),
+          ...(password ? { password_changed: true } : {}),
+        },
+        description: `Logist yangilandi: ${logist.name}${
+          password ? ' (parol o\'zgartirildi)' : ''
+        }`,
+        user: actor,
+      });
 
       // Salary yangilash
       if (
@@ -2067,7 +2233,7 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async deleteLogist(id: string): Promise<object> {
+  async deleteLogist(id: string, actor?: JwtPayload): Promise<object> {
     try {
       const logist = await this.userRepo.findOne({
         where: { id, role: Roles.LOGIST },
@@ -2090,6 +2256,7 @@ export class UserService implements OnModuleInit {
         action: 'deleted',
         old_value: { name: logist.name, role: Roles.LOGIST },
         description: `Logist o'chirildi: ${logist.name}`,
+        user: actor,
       });
       return successRes({}, 200, "Logist o'chirildi");
     } catch (error) {
@@ -2309,6 +2476,21 @@ export class UserService implements OnModuleInit {
       }
 
       await this.userRepo.save(operator);
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: operator.id,
+        action: 'commission_changed',
+        new_value: {
+          name: operator.name,
+          commission_type: operator.commission_type,
+          commission_value: operator.commission_value,
+          show_earnings: operator.show_earnings,
+        },
+        description: `Operator komissiyasi o'zgardi: ${operator.name}`,
+        user: market,
+      });
+
       return successRes(
         {
           id: operator.id,
@@ -2411,6 +2593,19 @@ export class UserService implements OnModuleInit {
         note: dto.note ?? null,
       });
       await paymentRepo.save(payment);
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'salary_paid',
+        new_value: {
+          amount: dto.amount,
+          staff_name: operator.name,
+          comment: dto.note ?? undefined,
+        },
+        description: `Operatorga to'lov: ${operator.name} — ${dto.amount} so'm`,
+        user: market,
+      });
 
       return successRes(payment, 201, "To'lov amalga oshirildi");
     } catch (error) {

@@ -15,6 +15,8 @@ import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateDistrictDto } from './dto/create-district.dto';
 import { UpdateDistrictNameDto } from './dto/update-name.dto';
 import { UpdateDistrictSatoCodeDto } from './dto/update-sato-code.dto';
@@ -43,8 +45,11 @@ export class DistrictController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Post()
-  create(@Body() createDistrictDto: CreateDistrictDto) {
-    return this.districtService.create(createDistrictDto);
+  create(
+    @Body() createDistrictDto: CreateDistrictDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.districtService.create(createDistrictDto, user);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
@@ -66,8 +71,9 @@ export class DistrictController {
   update(
     @Param('id') id: string,
     @Body() updateDistrictDto: UpdateDistrictDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.districtService.update(id, updateDistrictDto);
+    return this.districtService.update(id, updateDistrictDto, user);
   }
 
   @UseGuards(JwtGuard, RolesGuard)
@@ -76,8 +82,9 @@ export class DistrictController {
   updateName(
     @Param('id') id: string,
     @Body() updateDto: UpdateDistrictNameDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.districtService.updateName(id, updateDto);
+    return this.districtService.updateName(id, updateDto, user);
   }
 
   @Get('sato/:satoCode')
@@ -124,8 +131,11 @@ export class DistrictController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Post('merge')
-  mergeDistricts(@Body() dto: MergeDistrictsDto) {
-    return this.districtService.mergeDistricts(dto);
+  mergeDistricts(
+    @Body() dto: MergeDistrictsDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.districtService.mergeDistricts(dto, user);
   }
 
   /**
@@ -134,8 +144,8 @@ export class DistrictController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Delete(':id')
-  deleteDistrict(@Param('id') id: string) {
-    return this.districtService.deleteDistrict(id);
+  deleteDistrict(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.districtService.deleteDistrict(id, user);
   }
 
   /**

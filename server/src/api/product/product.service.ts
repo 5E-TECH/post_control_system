@@ -23,6 +23,7 @@ import { BotService } from '../bots/notify-bot/bot.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { getSafeLimit } from 'src/common/constants/pagination';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @Injectable()
 export class ProductService {
@@ -40,6 +41,7 @@ export class ProductService {
     private readonly telegramRepo: TelegramRepository,
 
     private readonly botService: BotService,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   private buildImageUrl(filename: string): string {
@@ -126,6 +128,15 @@ export class ProductService {
         telegramGroup?.group_id ?? null,
         `🆕 New product added: <b>${product.name}</b>`,
       );
+
+      this.activityLog.log({
+        entity_type: 'product',
+        entity_id: product.id,
+        action: 'created',
+        new_value: { name: product.name },
+        description: `Mahsulot yaratildi: ${product.name}`,
+        user: currentUser,
+      });
 
       return successRes(product, 201, 'New product added');
     } catch (error) {
@@ -338,8 +349,19 @@ export class ProductService {
       }
 
       // ✅ Update qilamiz
+      const oldName = product.name;
       const updated = this.productRepo.merge(product, updateProductDto);
       await this.productRepo.save(updated);
+
+      this.activityLog.log({
+        entity_type: 'product',
+        entity_id: updated.id,
+        action: 'updated',
+        old_value: { name: oldName },
+        new_value: { name: updated.name },
+        description: `Mahsulot yangilandi: ${updated.name}`,
+        user: currentUser,
+      });
 
       // ✅ To‘liq URL yasaymiz
       if (updated.image_url) {
@@ -409,8 +431,19 @@ export class ProductService {
       }
 
       // ✅ Update qilamiz
+      const oldName = product.name;
       const updated = this.productRepo.merge(product, updateProductDto);
       await this.productRepo.save(updated);
+
+      this.activityLog.log({
+        entity_type: 'product',
+        entity_id: updated.id,
+        action: 'updated',
+        old_value: { name: oldName },
+        new_value: { name: updated.name },
+        description: `Mahsulot yangilandi: ${updated.name}`,
+        user: currentUser,
+      });
 
       // ✅ To‘liq URL yasaymiz
       if (updated.image_url) {
@@ -423,7 +456,7 @@ export class ProductService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, actor?: JwtPayload) {
     try {
       const product = await this.productRepo.findOne({
         where: { id, isDeleted: false },
@@ -431,6 +464,7 @@ export class ProductService {
       if (!product) {
         throw new NotFoundException(`Product not found by id: ${id}`);
       }
+      const originalName = product.name;
 
       // 🟡 Faylni o‘chirish
       if (product.image_url) {
@@ -455,6 +489,15 @@ export class ProductService {
       product.isDeleted = true;
       product.name = `${product.name + Date.now()}_deleted`;
       await this.productRepo.save(product);
+
+      this.activityLog.log({
+        entity_type: 'product',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { name: originalName },
+        description: `Mahsulot o'chirildi: ${originalName}`,
+        user: actor,
+      });
 
       return successRes({}, 200, 'Product deleted');
     } catch (error) {
