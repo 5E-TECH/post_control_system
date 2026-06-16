@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
   IsNotEmpty,
@@ -42,4 +42,12 @@ export class SalaryDto {
   @IsOptional()
   @IsString()
   comment?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Kartali (click) maoshda qaysi virtual kartadan. Bo‘sh — default.',
+  })
+  @IsOptional()
+  @IsUUID()
+  card_id?: string;
 }

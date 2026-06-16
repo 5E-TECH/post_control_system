@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { UserEntity } from './users.entity';
 import { CashboxHistoryEntity } from './cashbox-history.entity';
+import { CashboxCardEntity } from './cashbox-card.entity';
 import { bigintTransformerNonNull as bigintTransformer } from 'src/common/database/bigint.transformer';
 
 @Entity('cash_box')
@@ -40,4 +41,8 @@ export class CashEntity extends BaseEntity {
   // 1-N Cashbox → CashboxHistory
   @OneToMany(() => CashboxHistoryEntity, (history) => history.cashbox)
   histories: CashboxHistoryEntity[];
+
+  // 1-N Cashbox → Virtual kartalar (faqat MAIN kassada ishlatiladi)
+  @OneToMany(() => CashboxCardEntity, (card) => card.cashbox)
+  cards: CashboxCardEntity[];
 }

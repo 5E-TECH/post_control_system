@@ -44,4 +44,13 @@ export class PaymentsToMarketDto {
   @IsOptional()
   @IsString()
   comment?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Kartali (click) to‘lovda qaysi virtual kartadan. Bo‘sh bo‘lsa default karta.',
+  })
+  @IsOptional()
+  @IsUUID()
+  card_id?: string;
 }

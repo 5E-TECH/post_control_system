@@ -52,4 +52,13 @@ export class CreatePaymentsFromCourierDto {
   @IsOptional()
   @IsString()
   market_id: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Click usulida qaysi virtual kartaga. Bo‘sh bo‘lsa default karta. Click_to_market doim default karta orqali o‘tadi.',
+  })
+  @IsOptional()
+  @IsUUID()
+  card_id?: string;
 }

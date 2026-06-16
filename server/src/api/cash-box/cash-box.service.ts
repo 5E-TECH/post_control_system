@@ -14,11 +14,13 @@ import {
   Between,
   DataSource,
   DeepPartial,
+  EntityManager,
   In,
   IsNull,
   Repository,
 } from 'typeorm';
 import {
+  CardMovementType,
   Cashbox_type,
   FinancialSource_type,
   Operation_type,
@@ -27,6 +29,8 @@ import {
   Roles,
   Source_type,
 } from 'src/common/enums';
+import { CashboxCardEntity } from 'src/core/entity/cashbox-card.entity';
+import { CashboxCardMovementEntity } from 'src/core/entity/cashbox-card-movement.entity';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
 import { successRes } from 'src/infrastructure/lib/response';
@@ -35,6 +39,12 @@ import { CashboxHistoryEntity } from 'src/core/entity/cashbox-history.entity';
 import { CashboxHistoryRepository } from 'src/core/repository/cashbox-history.repository';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
+import {
+  CreateCardDto,
+  RenameCardDto,
+  TransferCardDto,
+  ConvertCardDto,
+} from './dto/card.dto';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { UserEntity } from 'src/core/entity/users.entity';
@@ -63,6 +73,12 @@ export class CashBoxService
 
     @InjectRepository(CashboxHistoryEntity)
     private readonly cashboxHistoryRepo: CashboxHistoryRepository,
+
+    @InjectRepository(CashboxCardEntity)
+    private readonly cashboxCardRepo: Repository<CashboxCardEntity>,
+
+    @InjectRepository(CashboxCardMovementEntity)
+    private readonly cardMovementRepo: Repository<CashboxCardMovementEntity>,
 
     @InjectRepository(OrderEntity)
     private readonly orderRepo: OrderRepository,
@@ -106,6 +122,690 @@ export class CashBoxService
         });
         await this.cashboxRepo.save(cashe);
       }
+
+      // Asosiy kassada himoyalangan "Asosiy karta" mavjudligini ta'minlash.
+      // Migratsiya mavjud kassalar uchun buni qiladi; bu yer esa YANGI (bo'sh)
+      // DB holatini qoplaydi (kassa runtime'da yuqorida yaratilganda).
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (mainCashbox) {
+        const defaultCard = await this.cashboxCardRepo.findOne({
+          where: { cashbox_id: mainCashbox.id, is_default: true },
+        });
+        if (!defaultCard) {
+          await this.cashboxCardRepo.save(
+            this.cashboxCardRepo.create({
+              name: 'Asosiy karta',
+              balance: mainCashbox.balance_card ?? 0,
+              cashbox_id: mainCashbox.id,
+              is_default: true,
+              is_active: true,
+              sort_order: 0,
+            }),
+          );
+        }
+      }
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== VIRTUAL KARTA HELPER'LARI ====================
+
+  /**
+   * MAIN kassaning himoyalangan default ("Asosiy karta") kartasini qaytaradi.
+   * "O'tib ketuvchi" (click_to_market) va default-fallback holatlarida ishlatiladi.
+   */
+  private async getDefaultCard(
+    manager: EntityManager,
+    cashboxId: string,
+  ): Promise<CashboxCardEntity> {
+    const card = await manager.findOne(CashboxCardEntity, {
+      where: { cashbox_id: cashboxId, is_default: true },
+    });
+    if (!card) {
+      throw new NotFoundException(
+        "Asosiy karta topilmadi. Migratsiya bajarilganini tekshiring.",
+      );
+    }
+    return card;
+  }
+
+  /**
+   * Kartali operatsiya uchun qaysi kartaga yozilishini aniqlaydi:
+   *   - CASH                → null (karta yo'q)
+   *   - CLICK_TO_MARKET     → default karta (o'tib ketuvchi to'lov)
+   *   - CLICK               → tanlangan karta (tekshiriladi) yoki default (fallback)
+   */
+  private async resolveCardForOp(
+    manager: EntityManager,
+    mainCashbox: CashEntity,
+    paymentMethod: PaymentMethod | null | undefined,
+    providedCardId?: string | null,
+  ): Promise<string | null> {
+    if (!paymentMethod || paymentMethod === PaymentMethod.CASH) return null;
+
+    if (paymentMethod === PaymentMethod.CLICK_TO_MARKET) {
+      const def = await this.getDefaultCard(manager, mainCashbox.id);
+      return def.id;
+    }
+
+    // CLICK
+    if (providedCardId) {
+      const card = await manager.findOne(CashboxCardEntity, {
+        where: { id: providedCardId },
+      });
+      if (!card || card.cashbox_id !== mainCashbox.id) {
+        throw new BadRequestException(
+          "Karta topilmadi yoki ushbu kassaga tegishli emas",
+        );
+      }
+      if (!card.is_active && !card.is_default) {
+        throw new BadRequestException(
+          `"${card.name}" kartasi arxivlangan — operatsiya uchun faol karta tanlang`,
+        );
+      }
+      return card.id;
+    }
+
+    const def = await this.getDefaultCard(manager, mainCashbox.id);
+    return def.id;
+  }
+
+  /**
+   * Virtual karta balansini VA MAIN kassaning `balance_card` ini BIRGA o'zgartiradi.
+   * INVARIANT (SUM(card.balance) === balance_card) shu YAGONA nuqta orqali saqlanadi.
+   *
+   * Kartani `pessimistic_write` lock bilan oladi (poyga/race'dan himoya). Chiqimda
+   * (delta < 0) shu kartaning yetarli mablag'ini tekshiradi. `mainCashbox.balance_card`
+   * xotirada yangilanadi — uni saqlash chaqiruvchi metod zimmasida (balance/balance_cash
+   * bilan birga bitta save'da).
+   */
+  private async applyCardDelta(
+    manager: EntityManager,
+    mainCashbox: CashEntity,
+    cardId: string,
+    delta: number,
+  ): Promise<CashboxCardEntity> {
+    const card = await manager.findOne(CashboxCardEntity, {
+      where: { id: cardId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!card) throw new NotFoundException('Virtual karta topilmadi');
+    if (card.cashbox_id !== mainCashbox.id) {
+      throw new BadRequestException('Karta ushbu kassaga tegishli emas');
+    }
+    if (delta < 0 && card.balance + delta < 0) {
+      throw new BadRequestException(
+        `"${card.name}" kartasida yetarli mablag' yo'q! Mavjud: ${card.balance.toLocaleString()} so'm, So'ralgan: ${Math.abs(delta).toLocaleString()} so'm`,
+      );
+    }
+    card.balance += delta;
+    await manager.save(card);
+    mainCashbox.balance_card += delta;
+    return card;
+  }
+
+  // ==================== VIRTUAL KARTA CRUD ====================
+
+  /** MAIN kassaning barcha kartalari (balanslari bilan). */
+  async listCards(includeInactive = false) {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      const where: Record<string, unknown> = { cashbox_id: mainCashbox.id };
+      if (!includeInactive) where.is_active = true;
+
+      const cards = await this.cashboxCardRepo.find({
+        where,
+        order: { is_default: 'DESC', sort_order: 'ASC', created_at: 'ASC' },
+      });
+
+      const totalCard = cards.reduce((s, c) => s + (c.balance ?? 0), 0);
+
+      return successRes(
+        {
+          cards,
+          balance_card: mainCashbox.balance_card,
+          balance_cash: mainCashbox.balance_cash,
+          balance: mainCashbox.balance,
+          // Invariant nazorati uchun: kartalar yig'indisi balance_card ga teng bo'lishi kerak
+          totalCard,
+          inSync: totalCard === mainCashbox.balance_card,
+        },
+        200,
+        'Cards',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /** Yangi virtual karta yaratish (balans 0 bilan). */
+  async createCard(user: JwtPayload, dto: CreateCardDto) {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      const name = dto.name?.trim();
+      if (!name) throw new BadRequestException('Karta nomi majburiy');
+
+      const exists = await this.cashboxCardRepo.findOne({
+        where: { cashbox_id: mainCashbox.id, name },
+      });
+      if (exists) {
+        throw new BadRequestException('Bunday nomli karta allaqachon mavjud');
+      }
+
+      const card = await this.cashboxCardRepo.save(
+        this.cashboxCardRepo.create({
+          name,
+          balance: 0,
+          cashbox_id: mainCashbox.id,
+          is_default: false,
+          is_active: true,
+          sort_order: dto.sort_order ?? 0,
+        }),
+      );
+
+      this.activityLog.log({
+        entity_type: 'cashbox_card',
+        entity_id: card.id,
+        action: 'card_created',
+        new_value: { name },
+        description: `Yangi karta yaratildi: ${name}`,
+        user,
+      });
+      return successRes({ card }, 201, 'Karta yaratildi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /** Karta nomini o'zgartirish (default kartani O'ZGARTIRIB BO'LMAYDI). */
+  async renameCard(user: JwtPayload, id: string, dto: RenameCardDto) {
+    try {
+      const card = await this.cashboxCardRepo.findOne({ where: { id } });
+      if (!card) throw new NotFoundException('Karta topilmadi');
+      if (card.is_default) {
+        throw new BadRequestException(
+          "Asosiy kartaning nomini o'zgartirib bo'lmaydi",
+        );
+      }
+      const name = dto.name?.trim();
+      if (!name) throw new BadRequestException('Karta nomi majburiy');
+
+      const dup = await this.cashboxCardRepo.findOne({
+        where: { cashbox_id: card.cashbox_id, name },
+      });
+      if (dup && dup.id !== id) {
+        throw new BadRequestException('Bunday nomli karta allaqachon mavjud');
+      }
+
+      const oldName = card.name;
+      card.name = name;
+      await this.cashboxCardRepo.save(card);
+
+      this.activityLog.log({
+        entity_type: 'cashbox_card',
+        entity_id: card.id,
+        action: 'card_renamed',
+        old_value: { name: oldName },
+        new_value: { name },
+        description: `Karta nomi o'zgartirildi: "${oldName}" → "${name}"`,
+        user,
+      });
+      return successRes({ card }, 200, "Karta nomi o'zgartirildi");
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Kartani arxivlash/qayta faollashtirish.
+   * Default kartani arxivlab bo'lmaydi; arxivlash uchun balans 0 bo'lishi shart.
+   */
+  async setCardActive(user: JwtPayload, id: string, isActive: boolean) {
+    try {
+      const card = await this.cashboxCardRepo.findOne({ where: { id } });
+      if (!card) throw new NotFoundException('Karta topilmadi');
+
+      if (!isActive) {
+        if (card.is_default) {
+          throw new BadRequestException("Asosiy kartani arxivlab bo'lmaydi");
+        }
+        if (card.balance !== 0) {
+          throw new BadRequestException(
+            `Kartani arxivlashdan oldin balansini (${card.balance.toLocaleString()} so'm) boshqa kartaga yoki naqdga o'tkazing`,
+          );
+        }
+      }
+
+      card.is_active = isActive;
+      await this.cashboxCardRepo.save(card);
+
+      this.activityLog.log({
+        entity_type: 'cashbox_card',
+        entity_id: card.id,
+        action: isActive ? 'card_activated' : 'card_deactivated',
+        new_value: { is_active: isActive },
+        description: `"${card.name}" kartasi ${isActive ? 'faollashtirildi' : 'arxivlandi'}`,
+        user,
+      });
+      return successRes(
+        { card },
+        200,
+        isActive ? 'Karta faollashtirildi' : 'Karta arxivlandi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // ==================== ICHKI KO'CHIRMA / KONVERTATSIYA ====================
+  // ❗ MUHIM: ko'chirma/konvertatsiya kassaning umumiy `balance` ini
+  // O'ZGARTIRMAYDI — shu sababli ular `FinancialBalanceHistoryEntity` yozMAYDI
+  // (yozsa moliyaviy taroziда fantom delta paydo bo'lardi) va `cashbox_history`
+  // ga ham yozilmaydi (kirim/chiqim yig'indilarini buzmaslik uchun).
+
+  /** Bir kartadan boshqasiga pul o'tkazish (balance_card o'zgarmaydi). */
+  async transferBetweenCards(user: JwtPayload, dto: TransferCardDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      await this.requireOpenShift();
+      const { from_card_id, to_card_id, amount, comment } = dto;
+      if (!amount || amount <= 0) {
+        throw new BadRequestException("Miqdor 0 dan katta bo'lishi kerak");
+      }
+      if (!comment || !comment.trim()) {
+        throw new BadRequestException("O'tkazma uchun izoh (sabab) majburiy");
+      }
+      if (from_card_id === to_card_id) {
+        throw new BadRequestException(
+          "Manba va maqsad karta bir xil bo'lmasligi kerak",
+        );
+      }
+
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      // applyCardDelta: from -= amount (yetarlilikni tekshiradi), to += amount.
+      // balance_card sof o'zgarishi = 0 (invariant saqlanadi).
+      const fromCard = await this.applyCardDelta(
+        queryRunner.manager,
+        mainCashbox,
+        from_card_id,
+        -amount,
+      );
+      const toCard = await this.applyCardDelta(
+        queryRunner.manager,
+        mainCashbox,
+        to_card_id,
+        amount,
+      );
+      await queryRunner.manager.save(mainCashbox);
+
+      const movement = queryRunner.manager.create(CashboxCardMovementEntity, {
+        type: CardMovementType.CARD_TO_CARD,
+        cashbox_id: mainCashbox.id,
+        from_card_id,
+        to_card_id,
+        amount,
+        balance_after_from: fromCard.balance,
+        balance_after_to: toCard.balance,
+        comment: comment ?? null,
+        created_by: user.id,
+      });
+      await queryRunner.manager.save(movement);
+
+      await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'cashbox_card',
+        entity_id: from_card_id,
+        action: 'card_transfer',
+        new_value: {
+          amount,
+          from: fromCard.name,
+          to: toCard.name,
+        },
+        description: `Kartalararo o'tkazma: "${fromCard.name}" → "${toCard.name}" — ${amount.toLocaleString()} so'm`,
+        user,
+      });
+      return successRes({ movement }, 201, "O'tkazma bajarildi");
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /** Karta↔Naqd konvertatsiya (balance o'zgarmaydi, faqat cash/card ajratimi). */
+  async convertCard(user: JwtPayload, dto: ConvertCardDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      await this.requireOpenShift();
+      const { type, card_id, amount, comment } = dto;
+      if (!amount || amount <= 0) {
+        throw new BadRequestException("Miqdor 0 dan katta bo'lishi kerak");
+      }
+      if (!comment || !comment.trim()) {
+        throw new BadRequestException(
+          'Konvertatsiya uchun izoh (sabab) majburiy',
+        );
+      }
+      if (
+        type !== CardMovementType.CARD_TO_CASH &&
+        type !== CardMovementType.CASH_TO_CARD
+      ) {
+        throw new BadRequestException(
+          "Konvertatsiya turi faqat karta→naqd yoki naqd→karta bo'lishi mumkin",
+        );
+      }
+
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      let card: CashboxCardEntity;
+      if (type === CardMovementType.CARD_TO_CASH) {
+        // Kartadan naqdga: card -= amount (+ balance_card -= amount), balance_cash += amount
+        card = await this.applyCardDelta(
+          queryRunner.manager,
+          mainCashbox,
+          card_id,
+          -amount,
+        );
+        mainCashbox.balance_cash += amount;
+      } else {
+        // Naqddan kartaga: balance_cash -= amount (tekshirib), card += amount
+        if (mainCashbox.balance_cash < amount) {
+          throw new BadRequestException(
+            `Naqd kassada yetarli mablag' yo'q! Mavjud: ${mainCashbox.balance_cash.toLocaleString()} so'm, So'ralgan: ${amount.toLocaleString()} so'm`,
+          );
+        }
+        mainCashbox.balance_cash -= amount;
+        card = await this.applyCardDelta(
+          queryRunner.manager,
+          mainCashbox,
+          card_id,
+          amount,
+        );
+      }
+      // balance (umumiy) o'zgarmaydi — faqat naqd/karta ajratimi siljiydi
+      await queryRunner.manager.save(mainCashbox);
+
+      const isToCash = type === CardMovementType.CARD_TO_CASH;
+      const movement = queryRunner.manager.create(CashboxCardMovementEntity, {
+        type,
+        cashbox_id: mainCashbox.id,
+        from_card_id: isToCash ? card_id : null,
+        to_card_id: isToCash ? null : card_id,
+        amount,
+        balance_after_from: isToCash ? card.balance : null,
+        balance_after_to: isToCash ? null : card.balance,
+        comment: comment ?? null,
+        created_by: user.id,
+      });
+      await queryRunner.manager.save(movement);
+
+      await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'cashbox_card',
+        entity_id: card_id,
+        action: 'card_convert',
+        new_value: { type, amount, card: card.name },
+        description: isToCash
+          ? `"${card.name}" kartasidan naqdga: ${amount.toLocaleString()} so'm`
+          : `Naqddan "${card.name}" kartasiga: ${amount.toLocaleString()} so'm`,
+        user,
+      });
+      return successRes({ movement }, 201, 'Konvertatsiya bajarildi');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /** Kartalar bo'yicha ichki ko'chirma/konvertatsiya tarixi. */
+  async listCardMovements(filters?: {
+    cardId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      const page = Math.max(1, Number(filters?.page) || 1);
+      const limit = getSafeLimit(Number(filters?.limit) || 20);
+
+      const qb = this.cardMovementRepo
+        .createQueryBuilder('m')
+        .leftJoinAndSelect('m.fromCard', 'fromCard')
+        .leftJoinAndSelect('m.toCard', 'toCard')
+        .leftJoinAndSelect('m.createdByUser', 'createdByUser')
+        .where('m.cashbox_id = :cashboxId', { cashboxId: mainCashbox.id });
+
+      if (filters?.cardId) {
+        qb.andWhere(
+          '(m.from_card_id = :cardId OR m.to_card_id = :cardId)',
+          { cardId: filters.cardId },
+        );
+      }
+
+      const [movements, total] = await qb
+        .orderBy('m.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return successRes(
+        {
+          movements,
+          pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        },
+        200,
+        'Card movements',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Bitta virtual kartaning TO'LIQ hisobvarag'i (bank-vipiska kabi):
+   * real kirim/chiqim (cashbox_history.card_id) + ichki o'tkazma/konvertatsiya
+   * (cashbox_card_movement) birlashtiriladi, running balans hisoblanadi va
+   * kategoriyalar bo'yicha yig'indi beriladi. Har bir satr KIM qilganini
+   * ko'rsatadi (javobgarlik). Bu YIG'INDILAR kassa kirim/chiqimiga ta'sir
+   * qilmaydi — faqat shu karta ichidagi ko'rinish.
+   */
+  async getCardLedger(
+    cardId: string,
+    filters?: {
+      fromDate?: string;
+      toDate?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    try {
+      const mainCashbox = await this.cashboxRepo.findOne({
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      const card = await this.cashboxCardRepo.findOne({
+        where: { id: cardId },
+      });
+      if (!card || card.cashbox_id !== mainCashbox.id) {
+        throw new NotFoundException('Karta topilmadi');
+      }
+
+      // 1) Real kirim/chiqim (shu kartaga tegishli)
+      const histories = await this.cashboxHistoryRepo.find({
+        where: { card_id: cardId },
+        relations: ['createdByUser', 'sourceUser'],
+      });
+      // 2) Ichki o'tkazma/konvertatsiya (shu karta ishtirok etgan)
+      const movements = await this.cardMovementRepo.find({
+        where: [{ from_card_id: cardId }, { to_card_id: cardId }],
+        relations: ['fromCard', 'toCard', 'createdByUser'],
+      });
+
+      type LedgerRow = {
+        id: string;
+        kind:
+          | 'income'
+          | 'expense'
+          | 'transfer_in'
+          | 'transfer_out'
+          | 'convert_in'
+          | 'convert_out';
+        amount: number;
+        delta: number;
+        created_at: number;
+        created_by_name: string | null;
+        counterparty: string | null;
+        comment: string | null;
+        source_type?: string;
+        payment_method?: string | null;
+        balance_after?: number;
+      };
+
+      const rows: LedgerRow[] = [];
+      for (const h of histories) {
+        const isIncome = h.operation_type === Operation_type.INCOME;
+        const amt = h.amount ?? 0;
+        rows.push({
+          id: h.id,
+          kind: isIncome ? 'income' : 'expense',
+          amount: amt,
+          delta: isIncome ? amt : -amt,
+          created_at: h.created_at,
+          created_by_name: h.createdByUser?.name ?? null,
+          counterparty: h.sourceUser?.name ?? null,
+          comment: h.comment ?? null,
+          source_type: h.source_type,
+          payment_method: h.payment_method,
+        });
+      }
+      for (const m of movements) {
+        const base = {
+          id: m.id,
+          amount: m.amount,
+          created_at: m.created_at,
+          created_by_name: m.createdByUser?.name ?? null,
+          comment: m.comment ?? null,
+        };
+        if (m.type === CardMovementType.CARD_TO_CARD) {
+          if (m.to_card_id === cardId) {
+            rows.push({
+              ...base,
+              kind: 'transfer_in',
+              delta: m.amount,
+              counterparty: m.fromCard?.name ?? null,
+            });
+          } else {
+            rows.push({
+              ...base,
+              kind: 'transfer_out',
+              delta: -m.amount,
+              counterparty: m.toCard?.name ?? null,
+            });
+          }
+        } else if (m.type === CardMovementType.CASH_TO_CARD) {
+          rows.push({
+            ...base,
+            kind: 'convert_in',
+            delta: m.amount,
+            counterparty: 'Naqd',
+          });
+        } else if (m.type === CardMovementType.CARD_TO_CASH) {
+          rows.push({
+            ...base,
+            kind: 'convert_out',
+            delta: -m.amount,
+            counterparty: 'Naqd',
+          });
+        }
+      }
+
+      // To'liq tarix bo'yicha (sanadan qat'i nazar) running balansni hisoblash —
+      // yakuni card.balance ga teng bo'lishi kerak.
+      rows.sort((a, b) => a.created_at - b.created_at);
+      let running = 0;
+      for (const r of rows) {
+        running += r.delta;
+        r.balance_after = running;
+      }
+
+      // Ko'rsatish uchun sana filtri (ixtiyoriy)
+      let display = rows;
+      if (filters?.fromDate && filters?.toDate) {
+        const startN = Number(toUzbekistanTimestamp(filters.fromDate, false));
+        const endN = Number(toUzbekistanTimestamp(filters.toDate, true));
+        display = rows.filter(
+          (r) => r.created_at >= startN && r.created_at <= endN,
+        );
+      }
+
+      const sumBy = (pred: (r: LedgerRow) => boolean) =>
+        display.filter(pred).reduce((s, r) => s + r.amount, 0);
+      const summary = {
+        real_income: sumBy((r) => r.kind === 'income'),
+        real_expense: sumBy((r) => r.kind === 'expense'),
+        transfer_in: sumBy((r) => r.kind === 'transfer_in'),
+        transfer_out: sumBy((r) => r.kind === 'transfer_out'),
+        convert_in: sumBy((r) => r.kind === 'convert_in'),
+        convert_out: sumBy((r) => r.kind === 'convert_out'),
+        current_balance: card.balance,
+      };
+
+      // Eng yangisi birinchi + pagination
+      const sortedDesc = [...display].sort(
+        (a, b) => b.created_at - a.created_at,
+      );
+      const page = Math.max(1, Number(filters?.page) || 1);
+      const limit = getSafeLimit(Number(filters?.limit) || 50);
+      const total = sortedDesc.length;
+      const paged = sortedDesc.slice((page - 1) * limit, page * limit);
+
+      return successRes(
+        {
+          card,
+          rows: paged,
+          summary,
+          pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+          },
+        },
+        200,
+        'Card ledger',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -150,7 +850,25 @@ export class CashBoxService
           cashbox_id: mainCashbox.id,
           created_at: Between(Number(startDate), Number(endDate)), // bigint timestamp
         },
-        relations: ['createdByUser', 'sourceUser'],
+        relations: ['createdByUser', 'sourceUser', 'card'],
+        order: { created_at: 'DESC' },
+      });
+
+      // Virtual kartalar (faol) — CashboxCard breakdown va tanlovi uchun
+      const cards = await this.cashboxCardRepo.find({
+        where: { cashbox_id: mainCashbox.id, is_active: true },
+        order: { is_default: 'DESC', sort_order: 'ASC', created_at: 'ASC' },
+      });
+
+      // Ichki ko'chirma/konvertatsiya — umumiy tarixда NEYTRAL satr sifatida
+      // ko'rsatish uchun (kirim/chiqimga SANALMAYDI; alohida maydon, shu sabab
+      // Excel/yig'indi yo'llari buzilmaydi).
+      const movements = await this.cardMovementRepo.find({
+        where: {
+          cashbox_id: mainCashbox.id,
+          created_at: Between(Number(startDate), Number(endDate)),
+        },
+        relations: ['fromCard', 'toCard', 'createdByUser'],
         order: { created_at: 'DESC' },
       });
 
@@ -166,7 +884,14 @@ export class CashBoxService
       }
 
       return successRes(
-        { cashbox: mainCashbox, cashboxHistory, income, outcome },
+        {
+          cashbox: mainCashbox,
+          cashboxHistory,
+          cards,
+          movements,
+          income,
+          outcome,
+        },
         200,
         'Main cashbox details',
       );
@@ -427,11 +1152,24 @@ export class CashBoxService
       await transaction.manager.save(courierCashboxHistory);
 
       mainCashbox.balance += amount;
-      // Naqd yoki karta balansini yangilash
+      // Naqd yoki karta balansini yangilash. Karta bo'lsa — tanlangan virtual
+      // kartaga (CLICK) yoki default kartaga (CLICK_TO_MARKET o'tib ketuvchi).
+      let incomeCardId: string | null = null;
       if (payment_method === PaymentMethod.CASH) {
         mainCashbox.balance_cash += amount;
       } else {
-        mainCashbox.balance_card += amount;
+        incomeCardId = await this.resolveCardForOp(
+          transaction.manager,
+          mainCashbox,
+          payment_method,
+          createPaymentsFromCourierDto.card_id,
+        );
+        await this.applyCardDelta(
+          transaction.manager,
+          mainCashbox,
+          incomeCardId as string,
+          amount,
+        );
       }
       await transaction.manager.save(mainCashbox);
 
@@ -450,6 +1188,7 @@ export class CashBoxService
           created_by: user.id,
           payment_date,
           payment_method,
+          card_id: incomeCardId,
         },
       );
       await transaction.manager.save(mainCashboxHistory);
@@ -484,8 +1223,13 @@ export class CashBoxService
           .getMany();
 
         mainCashbox.balance -= amount;
-        // CLICK_TO_MARKET da kartadan chiqim
-        mainCashbox.balance_card -= amount;
+        // CLICK_TO_MARKET — pul o'sha (default) kartadan chiqib ketadi.
+        await this.applyCardDelta(
+          transaction.manager,
+          mainCashbox,
+          incomeCardId as string,
+          -amount,
+        );
         await transaction.manager.save(mainCashbox);
 
         const mainCashboxHistoryMarket = transaction.manager.create(
@@ -503,6 +1247,7 @@ export class CashBoxService
             created_by: user.id,
             payment_date,
             payment_method,
+            card_id: incomeCardId,
           },
         );
         await transaction.manager.save(mainCashboxHistoryMarket);
@@ -573,6 +1318,10 @@ export class CashBoxService
       }
 
       await transaction.commitTransaction();
+      const courier = await this.userRepo.findOne({
+        where: { id: createPaymentsFromCourierDto.courier_id },
+        select: ['id', 'name'],
+      });
       this.activityLog.log({
         entity_type: 'cashbox',
         entity_id: createPaymentsFromCourierDto.courier_id,
@@ -580,8 +1329,13 @@ export class CashBoxService
         new_value: {
           amount: createPaymentsFromCourierDto.amount,
           payment_method: createPaymentsFromCourierDto.payment_method,
+          counterparty_name: courier?.name,
         },
-        description: `Kuryerdan ${createPaymentsFromCourierDto.amount} so'm qabul qilindi (${createPaymentsFromCourierDto.payment_method})`,
+        description: `${courier?.name || 'Kuryer'}dan ${
+          createPaymentsFromCourierDto.amount
+        } so'm qabul qilindi (${this.getPaymentMethodLabelUz(
+          createPaymentsFromCourierDto.payment_method,
+        )})`,
         user,
       });
       return successRes({}, 201, "To'lov qabul qilindi !!! ");
@@ -622,17 +1376,20 @@ export class CashBoxService
       if (!marketCashbox)
         throw new NotFoundException('Market cashbox not found');
 
-      // Naqd yoki karta balansini tekshirish
+      // Kartali to'lov uchun virtual kartani aniqlash (CASH bo'lsa null)
+      const marketCardId = await this.resolveCardForOp(
+        queryRunner.manager,
+        mainCashbox,
+        payment_method,
+        paymentToMarketDto.card_id,
+      );
+
+      // Naqd balansini tekshirish (karta yetarliligi quyida applyCardDelta
+      // ichida pessimistic lock bilan, tanlangan karta bo'yicha tekshiriladi)
       if (payment_method === PaymentMethod.CASH) {
         if (mainCashbox.balance_cash < amount) {
           throw new BadRequestException(
             `Naqd kassada yetarli mablag' yo'q! Mavjud: ${mainCashbox.balance_cash.toLocaleString()} so'm, So'ralgan: ${amount.toLocaleString()} so'm`,
-          );
-        }
-      } else {
-        if (mainCashbox.balance_card < amount) {
-          throw new BadRequestException(
-            `Karta/Click balansida yetarli mablag' yo'q! Mavjud: ${mainCashbox.balance_card.toLocaleString()} so'm, So'ralgan: ${amount.toLocaleString()} so'm`,
           );
         }
       }
@@ -656,11 +1413,16 @@ export class CashBoxService
 
       // ✅ Main cashboxdan pul ayirish
       mainCashbox.balance -= amount;
-      // Naqd yoki karta balansini yangilash
+      // Naqd yoki tanlangan virtual kartadan ayirish
       if (payment_method === PaymentMethod.CASH) {
         mainCashbox.balance_cash -= amount;
       } else {
-        mainCashbox.balance_card -= amount;
+        await this.applyCardDelta(
+          queryRunner.manager,
+          mainCashbox,
+          marketCardId as string,
+          -amount,
+        );
       }
       await queryRunner.manager.save(mainCashbox);
 
@@ -670,6 +1432,7 @@ export class CashBoxService
           cashbox_id: mainCashbox.id,
           source_type: Source_type.MARKET_PAYMENT,
           source_user_id: market_id, // Store market ID for tracking
+          card_id: marketCardId,
           amount,
           balance_after: mainCashbox.balance,
           balance_after_cash: mainCashbox.balance_cash,
@@ -724,8 +1487,14 @@ export class CashBoxService
         entity_type: 'cashbox',
         entity_id: market_id,
         action: 'market_payment',
-        new_value: { amount, payment_method },
-        description: `Marketga ${amount} so'm to'landi (${payment_method})`,
+        new_value: {
+          amount,
+          payment_method,
+          counterparty_name: market.name,
+        },
+        description: `${market.name || 'Market'}ga ${amount} so'm to'landi (${this.getPaymentMethodLabelUz(
+          payment_method,
+        )})`,
         user,
       });
       return successRes({}, 200, `Marketga ${amount} so'm to'landi`);
@@ -1274,7 +2043,15 @@ export class CashBoxService
         throw new NotFoundException('Main cashbox not found');
       }
 
-      // Naqd yoki karta balansini tekshirish
+      // Kartali chiqim uchun virtual kartani aniqlash (CASH bo'lsa null)
+      const spendCardId = await this.resolveCardForOp(
+        queryRunner.manager,
+        mainCashbox,
+        updateCashboxDto.type,
+        updateCashboxDto.card_id,
+      );
+
+      // Naqd yoki tanlangan karta balansini tekshirib ayirish
       if (updateCashboxDto.type === PaymentMethod.CASH) {
         if (mainCashbox.balance_cash < updateCashboxDto.amount) {
           throw new BadRequestException(
@@ -1283,12 +2060,12 @@ export class CashBoxService
         }
         mainCashbox.balance_cash -= updateCashboxDto.amount;
       } else {
-        if (mainCashbox.balance_card < updateCashboxDto.amount) {
-          throw new BadRequestException(
-            `Karta/Click balansida yetarli mablag' yo'q! Mavjud: ${mainCashbox.balance_card.toLocaleString()} so'm, So'ralgan: ${updateCashboxDto.amount.toLocaleString()} so'm`,
-          );
-        }
-        mainCashbox.balance_card -= updateCashboxDto.amount;
+        await this.applyCardDelta(
+          queryRunner.manager,
+          mainCashbox,
+          spendCardId as string,
+          -updateCashboxDto.amount,
+        );
       }
 
       mainCashbox.balance -= updateCashboxDto.amount;
@@ -1305,6 +2082,7 @@ export class CashBoxService
         created_by: user.id,
         payment_method: updateCashboxDto.type,
         source_type: Source_type.MANUAL_EXPENSE,
+        card_id: spendCardId,
       });
       await queryRunner.manager.save(cashboxHistory);
 
@@ -1357,12 +2135,25 @@ export class CashBoxService
       if (!mainCashbox) {
         throw new NotFoundException('Main cashbox not found');
       }
+      // Kartali kirim uchun virtual kartani aniqlash (CASH bo'lsa null)
+      const fillCardId = await this.resolveCardForOp(
+        queryRunner.manager,
+        mainCashbox,
+        updateCashboxDto.type,
+        updateCashboxDto.card_id,
+      );
+
       mainCashbox.balance += updateCashboxDto.amount;
-      // Naqd yoki karta balansini yangilash
+      // Naqd yoki tanlangan virtual kartaga qo'shish
       if (updateCashboxDto.type === PaymentMethod.CASH) {
         mainCashbox.balance_cash += updateCashboxDto.amount;
       } else {
-        mainCashbox.balance_card += updateCashboxDto.amount;
+        await this.applyCardDelta(
+          queryRunner.manager,
+          mainCashbox,
+          fillCardId as string,
+          updateCashboxDto.amount,
+        );
       }
       await queryRunner.manager.save(mainCashbox);
 
@@ -1377,6 +2168,7 @@ export class CashBoxService
         created_by: user.id,
         payment_method: updateCashboxDto.type,
         source_type: Source_type.MANUAL_INCOME,
+        card_id: fillCardId,
       });
       await queryRunner.manager.save(cashboxHistory);
 
@@ -1437,17 +2229,20 @@ export class CashBoxService
         throw new NotFoundException('Main cashbox not found');
       }
 
-      // Naqd yoki karta balansini tekshirish
+      // Kartali maosh uchun virtual kartani aniqlash (CASH bo'lsa null)
+      const salaryCardId = await this.resolveCardForOp(
+        queryRunner.manager,
+        mainCashbox,
+        salaryDto.type,
+        salaryDto.card_id,
+      );
+
+      // Naqd balansini tekshirish (karta yetarliligi quyida applyCardDelta
+      // ichida pessimistic lock bilan, tanlangan karta bo'yicha tekshiriladi)
       if (salaryDto.type === PaymentMethod.CASH) {
         if (mainCashbox.balance_cash < amount) {
           throw new BadRequestException(
             `Naqd kassada yetarli mablag' yo'q! Mavjud: ${mainCashbox.balance_cash.toLocaleString()} so'm, So'ralgan: ${amount.toLocaleString()} so'm`,
-          );
-        }
-      } else {
-        if (mainCashbox.balance_card < amount) {
-          throw new BadRequestException(
-            `Karta/Click balansida yetarli mablag' yo'q! Mavjud: ${mainCashbox.balance_card.toLocaleString()} so'm, So'ralgan: ${amount.toLocaleString()} so'm`,
           );
         }
       }
@@ -1462,11 +2257,16 @@ export class CashBoxService
       await queryRunner.manager.save(salary);
 
       mainCashbox.balance -= amount;
-      // Naqd yoki karta balansini yangilash
+      // Naqd yoki tanlangan virtual kartadan ayirish
       if (salaryDto.type === PaymentMethod.CASH) {
         mainCashbox.balance_cash -= amount;
       } else {
-        mainCashbox.balance_card -= amount;
+        await this.applyCardDelta(
+          queryRunner.manager,
+          mainCashbox,
+          salaryCardId as string,
+          -amount,
+        );
       }
       await queryRunner.manager.save(mainCashbox);
 
@@ -1483,6 +2283,7 @@ export class CashBoxService
         operation_type: Operation_type.EXPENSE,
         source_type: Source_type.SALARY,
         source_user_id: user_id,
+        card_id: salaryCardId,
       });
       await queryRunner.manager.save(cashboxHistory);
 
@@ -2815,11 +3616,23 @@ export class CashBoxService
         }
       }
 
-      // Calculate closing balances
-      const closingBalanceCash =
-        openShift.opening_balance_cash + totalIncomeCash - totalExpenseCash;
-      const closingBalanceCard =
-        openShift.opening_balance_card + totalIncomeCard - totalExpenseCard;
+      // Yopilish balanslari — JONLI kassadan olinadi (haqiqat manbai).
+      // Kartalararo emas, balki KARTA↔NAQD konvertatsiyalari naqd/karta
+      // ajratimini kirim/chiqimsiz o'zgartirishi mumkin; shu sababli tarixdan
+      // qayta hisoblash (opening + income − expense) emas, jonli balansdan
+      // olamiz — bu har doim to'g'ri va kelajakdagi yangi harakat turlariga
+      // bog'lanib qolmaymiz.
+      const closingBalanceCash = mainCashbox.balance_cash;
+      const closingBalanceCard = mainCashbox.balance_card;
+
+      // Rekonsiliatsiya: closing − (opening + income − expense) = sof konvertatsiya.
+      // Operatorga "nega closing ≠ opening+kirim−chiqim" ni tushuntiradi.
+      const netConversionCash =
+        closingBalanceCash -
+        (openShift.opening_balance_cash + totalIncomeCash - totalExpenseCash);
+      const netConversionCard =
+        closingBalanceCard -
+        (openShift.opening_balance_card + totalIncomeCard - totalExpenseCard);
 
       // Update shift
       openShift.closed_by = user.id;
@@ -2859,6 +3672,11 @@ export class CashBoxService
             cash: closingBalanceCash,
             card: closingBalanceCard,
             total: closingBalanceCash + closingBalanceCard,
+          },
+          // Sof karta↔naqd konvertatsiya (kirim/chiqimsiz ajratim siljishi)
+          conversion: {
+            cash: netConversionCash,
+            card: netConversionCard,
           },
         },
         transactions: shiftHistories,
