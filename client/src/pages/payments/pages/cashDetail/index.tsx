@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { debounce } from "../../../../shared/helpers/DebounceFunc";
 import type { AxiosError } from "axios";
 import CustomCalendar from "../../../../shared/components/customDate";
+import { SELECT_CLS, SELECT_POPUP_CLS } from "../../../../shared/ui/select-styles";
 import {
   ChevronLeft,
   Loader2,
@@ -35,6 +36,10 @@ import Popup from "../../../../shared/ui/Popup";
 
 const { RangePicker } = DatePicker;
 
+// Yozuvning birinchi harfini katta qiladi (tarjima kichik harfli bo'lsa ham).
+// i18n kesh/yuklanishiga bog'liq emas — har doim katta harf bilan boshlanadi.
+const cap = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : "");
+
 const CashDetail = () => {
   const { t } = useTranslation("payment");
   const { id } = useParams();
@@ -47,6 +52,7 @@ const CashDetail = () => {
     summa: "",
     market: "",
     comment: "",
+    card_id: "",
   });
   const [historyTab, setHistoryTab] = useState<"all" | "payments">("all");
 
@@ -142,9 +148,18 @@ const CashDetail = () => {
 
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
-  const { getCashBoxById, createPaymentMarket, createPaymentCourier, getCurrentShift, openShift } =
+  const { getCashBoxById, createPaymentMarket, createPaymentCourier, getCurrentShift, openShift, getCards } =
     useCashBox();
   const { getMarkets } = useMarket();
+
+  // Asosiy kassa virtual kartalari (kartali to'lovda tanlash uchun)
+  const { data: cardsData } = getCards();
+  const activeCards: any[] = (cardsData?.data?.cards || []).filter(
+    (c: any) => c.is_active !== false,
+  );
+  const defaultCardId =
+    (activeCards.find((c: any) => c.is_default) || activeCards[0])?.id ||
+    undefined;
 
   const { data: shiftData, refetch: refetchShift } = getCurrentShift();
   const hasOpenShift = !!shiftData?.data?.shift;
@@ -167,6 +182,8 @@ const CashDetail = () => {
   const { handleApiError, handleSuccess } = useApiNotification();
 
   const performPayment = () => {
+    const cardId =
+      form.payment === "click" ? form.card_id || defaultCardId : undefined;
     const dataCourier = {
       courier_id: id,
       amount: Number(form.summa),
@@ -174,6 +191,7 @@ const CashDetail = () => {
       payment_date: new Date().toISOString(),
       comment: form.comment,
       market_id: form.market || null,
+      card_id: cardId,
     };
     const dataMarket = {
       market_id: id,
@@ -181,6 +199,7 @@ const CashDetail = () => {
       payment_method: form.payment,
       payment_date: new Date().toISOString(),
       comment: form.comment,
+      card_id: cardId,
     };
     if (data?.data?.cashbox?.user?.role === "market") {
       createPaymentMarket.mutate(dataMarket, {
@@ -193,6 +212,7 @@ const CashDetail = () => {
             summa: "",
             market: "",
             comment: "",
+            card_id: "",
           });
           refetch();
         },
@@ -218,6 +238,7 @@ const CashDetail = () => {
             summa: "",
             market: "",
             comment: "",
+            card_id: "",
           });
           refetch();
         },
@@ -269,7 +290,7 @@ const CashDetail = () => {
   const isMarket = data?.data?.cashbox?.user?.role === "market";
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
+    <div className="min-h-full bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
       <div className="max-w-screen-2xl mx-auto flex gap-8 lg:gap-16 max-lg:flex-col">
         {/* Left Section - Card & Payment Form */}
         <div className="lg:max-w-[520px] w-full">
@@ -320,7 +341,7 @@ const CashDetail = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-white">
-                      {isMarket ? t("to'lash") : t("qabulQilish")}
+                      {cap(isMarket ? t("to'lash") : t("qabulQilish"))}
                     </h3>
                     <p className="text-xs text-white/70">
                       {isMarket ? "Marketga to'lov" : "Kuryerdan qabul qilish"}
@@ -334,7 +355,7 @@ const CashDetail = () => {
                 {/* Amount Input */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    {t("summa")} <span className={isMarket ? "text-blue-500" : "text-emerald-500"}>*</span>
+                    {cap(t("summa"))} <span className={isMarket ? "text-blue-500" : "text-emerald-500"}>*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -375,34 +396,71 @@ const CashDetail = () => {
                   </div>
                 </div>
 
-                {/* Payment Type */}
+                {/* Payment Type — bitta bosishli tugmalar (qulay) */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    {t("paymentType")} <span className={isMarket ? "text-blue-500" : "text-emerald-500"}>*</span>
+                    {cap(t("paymentType"))}{" "}
+                    <span className={isMarket ? "text-blue-500" : "text-emerald-500"}>
+                      *
+                    </span>
                   </label>
-                  <Select
-                    value={form.payment || undefined}
-                    onChange={(value) =>
-                      setForm((prev) => ({ ...prev, payment: value }))
-                    }
-                    placeholder={t("paymentType")}
-                    className="w-full !h-12 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selector]:!border-2 [&_.ant-select-selector]:!border-gray-200 dark:[&_.ant-select-selector]:!border-gray-700 [&_.ant-select-selector]:!bg-gray-50 dark:[&_.ant-select-selector]:!bg-[#312D4B]"
-                    size="large"
-                    options={[
-                      { value: "cash", label: `💵 ${t("cash")}` },
-                      { value: "click", label: `💳 ${t("click")}` },
+                  <div className={`grid ${isMarket ? "grid-cols-2" : "grid-cols-3"} gap-2`}>
+                    {[
+                      { value: "cash", icon: "💵", label: t("cash") },
+                      { value: "click", icon: "💳", label: t("click") },
                       ...(!isMarket
-                        ? [{ value: "click_to_market", label: `🏪 ${t("click_to_market")}` }]
+                        ? [
+                            {
+                              value: "click_to_market",
+                              icon: "🏪",
+                              label: t("click_to_market"),
+                            },
+                          ]
                         : []),
-                    ]}
-                  />
+                    ].map((opt) => {
+                      const active = form.payment === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              payment: opt.value,
+                              card_id:
+                                opt.value === "click"
+                                  ? prev.card_id || defaultCardId || ""
+                                  : "",
+                              market:
+                                opt.value === "click_to_market"
+                                  ? prev.market
+                                  : "",
+                            }))
+                          }
+                          className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-xl border-2 transition-all cursor-pointer ${
+                            active
+                              ? isMarket
+                                ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                                : "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300"
+                              : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
+                          }`}
+                        >
+                          <span className="text-2xl leading-none">{opt.icon}</span>
+                          <span className="text-xs font-semibold text-center leading-tight">
+                            {cap(opt.label)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Market Select (for click_to_market) */}
+                {/* Market Select (do'konga o'tkazma uchun) */}
                 {form.payment === "click_to_market" && (
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      {t("marketniTanlang")} <span className="text-emerald-500">*</span>
+                      {cap(t("marketniTanlang"))}{" "}
+                      <span className="text-emerald-500">*</span>
                     </label>
                     <Select
                       showSearch
@@ -412,8 +470,9 @@ const CashDetail = () => {
                       onChange={(value) =>
                         setForm((prev) => ({ ...prev, market: value }))
                       }
-                      placeholder={t("marketniTanlang")}
-                      className="w-full !h-12 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selector]:!border-2 [&_.ant-select-selector]:!border-gray-200 dark:[&_.ant-select-selector]:!border-gray-700 [&_.ant-select-selector]:!bg-gray-50 dark:[&_.ant-select-selector]:!bg-[#312D4B]"
+                      placeholder={cap(t("marketniTanlang"))}
+                      className={SELECT_CLS}
+                      popupClassName={SELECT_POPUP_CLS}
                       size="large"
                       options={
                         marketData?.data?.data?.map((item: any) => ({
@@ -425,10 +484,38 @@ const CashDetail = () => {
                   </div>
                 )}
 
+                {/* Karta tanlash (faqat O'tkazma usulida) */}
+                {form.payment === "click" && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      {cap(t("karta") || "Karta")}{" "}
+                      <span className={isMarket ? "text-blue-500" : "text-emerald-500"}>
+                        *
+                      </span>
+                    </label>
+                    <Select
+                      value={form.card_id || defaultCardId}
+                      onChange={(value) =>
+                        setForm((prev) => ({ ...prev, card_id: value }))
+                      }
+                      placeholder={cap(t("karta") || "Kartani tanlang")}
+                      className={SELECT_CLS}
+                      popupClassName={SELECT_POPUP_CLS}
+                      size="large"
+                      options={activeCards.map((c: any) => ({
+                        value: c.id,
+                        label: `${c.is_default ? "★ " : ""}${c.name} — ${Number(
+                          c.balance || 0,
+                        ).toLocaleString("uz-UZ")} UZS`,
+                      }))}
+                    />
+                  </div>
+                )}
+
                 {/* Comment */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    {t("comment")}
+                    {cap(t("comment"))}
                   </label>
                   <TextArea
                     name="comment"
@@ -465,7 +552,7 @@ const CashDetail = () => {
                   ) : (
                     <>
                       <Send size={18} />
-                      <span>{isMarket ? t("to'lash") : t("qabulQilish")}</span>
+                      <span>{cap(isMarket ? t("to'lash") : t("qabulQilish"))}</span>
                     </>
                   )}
                 </button>

@@ -10,6 +10,7 @@ import {
   Calendar,
   ArrowUpRight,
   ArrowDownLeft,
+  ArrowLeftRight,
   Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -19,12 +20,24 @@ type Props = {
   income: number;
   outcome: number;
   cashboxHistory: any[];
+  movements?: any[];
+};
+
+const movementLabel = (m: any) => {
+  if (m?.type === "card_to_card")
+    return `O'tkazma: ${m?.fromCard?.name || "?"} → ${m?.toCard?.name || "?"}`;
+  if (m?.type === "cash_to_card")
+    return `Naqddan kartaga: ${m?.toCard?.name || "?"}`;
+  if (m?.type === "card_to_cash")
+    return `Kartadan naqdga: ${m?.fromCard?.name || "?"}`;
+  return "Ko'chirma";
 };
 
 const CashboxHistoryComponent: React.FC<Props> = ({
   income,
   outcome,
   cashboxHistory,
+  movements = [],
 }) => {
   const { t } = useTranslation("payment");
   const [showHistory, setShowHistory] = useState(false);
@@ -176,7 +189,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-900/30">
               <Sparkles size={14} className="text-purple-500" />
               <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-                {cashboxHistory?.length || 0} ta
+                {(cashboxHistory?.length || 0) + (movements?.length || 0)} ta
               </span>
             </div>
           </div>
@@ -184,7 +197,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
 
         {/* History Items */}
         <div className="max-h-[520px] overflow-y-auto">
-          {cashboxHistory?.length === 0 ? (
+          {(cashboxHistory?.length || 0) + (movements?.length || 0) === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
                 <Clock size={32} className="opacity-50" />
@@ -194,8 +207,76 @@ const CashboxHistoryComponent: React.FC<Props> = ({
             </div>
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {cashboxHistory?.map((item: any, inx: number) => {
+              {[
+                ...(cashboxHistory || []).map((h: any) => ({
+                  ...h,
+                  __movement: false,
+                })),
+                ...(movements || []).map((m: any) => ({
+                  ...m,
+                  __movement: true,
+                })),
+              ]
+                .sort(
+                  (a: any, b: any) =>
+                    Number(b?.created_at) - Number(a?.created_at),
+                )
+                .map((item: any, inx: number) => {
                 const dateInfo = formatDate(Number(item?.created_at));
+
+                // Ichki ko'chirma/konvertatsiya — NEYTRAL satr (kirim/chiqimga sanalmaydi)
+                if (item.__movement) {
+                  return (
+                    <div
+                      key={`mv-${item.id}`}
+                      className="px-5 py-4 flex items-center justify-between gap-4 bg-slate-50/40 dark:bg-slate-900/10"
+                    >
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-slate-100 to-gray-100 dark:from-slate-800/60 dark:to-gray-800/60">
+                          <ArrowLeftRight
+                            size={20}
+                            className="text-slate-500 dark:text-slate-300"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-gray-700 dark:text-gray-200 truncate text-sm">
+                            {movementLabel(item)}
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium">
+                              Ichki harakat
+                            </span>
+                            <span className="text-[10px] text-gray-400 truncate">
+                              {item?.createdByUser?.name || ""}
+                              {item?.comment ? ` · ${item.comment}` : ""}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-semibold text-sm text-slate-500 dark:text-slate-400">
+                          {(item?.amount ?? 0).toLocaleString("uz-UZ")}
+                          <span className="text-xs font-normal ml-0.5">
+                            so'm
+                          </span>
+                        </p>
+                        <div className="flex items-center gap-1.5 justify-end mt-0.5">
+                          <Calendar
+                            size={10}
+                            className="text-gray-300 dark:text-gray-600"
+                          />
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                            {dateInfo.primary}
+                          </span>
+                          <span className="text-[10px] text-gray-300 dark:text-gray-600">
+                            {dateInfo.secondary}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 const roleBadge = getRoleBadge(item?.createdByUser?.role);
                 const isIncome = item?.operation_type !== "expense";
 

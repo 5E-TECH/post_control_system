@@ -68,7 +68,7 @@ const CashDetailMarketCourier = () => {
   const raw = Number(data?.data?.myCashbox?.balance || 0);
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
+    <div className="min-h-full bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
       <div className="max-w-screen-2xl mx-auto flex gap-8 lg:gap-16 max-lg:flex-col">
         {/* Left Section - Card */}
         <div className="lg:max-w-[520px] w-full">

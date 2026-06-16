@@ -12,6 +12,7 @@ type Props = {
   show: boolean;
   setShow: React.Dispatch<React.SetStateAction<boolean>>;
   isMainCashbox?: boolean; // Faqat asosiy kassa uchun Naqd/Karta ko'rsatiladi
+  onCardsClick?: () => void; // "Kartalar" qutisi bosilganda (kartalar boshqaruvi)
 };
 
 export const CashboxCard = ({
@@ -22,6 +23,7 @@ export const CashboxCard = ({
   show,
   setShow,
   isMainCashbox = false,
+  onCardsClick,
 }: Props) => {
   const { t } = useTranslation("payment");
 
@@ -110,14 +112,21 @@ export const CashboxCard = ({
                 </p>
               </div>
 
-              {/* Karta/Click */}
-              <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10">
+              {/* Karta/Click (O'tkazma) — bosilsa kartalar boshqaruvi ochiladi */}
+              <div
+                onClick={onCardsClick}
+                className={`flex-1 bg-white/10 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10 transition-all ${
+                  onCardsClick
+                    ? "cursor-pointer hover:bg-white/20 hover:border-white/30"
+                    : ""
+                }`}
+              >
                 <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
                   <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
                     <CreditCard size={16} className="text-yellow-400 sm:w-[18px] sm:h-[18px]" />
                   </div>
                   <span className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wide">
-                    {t("click") || "Karta"}
+                    {t("kartalar") || "Kartalar"}
                   </span>
                 </div>
                 <p className="text-base sm:text-xl font-bold">
@@ -135,6 +144,7 @@ export const CashboxCard = ({
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>
