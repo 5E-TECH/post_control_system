@@ -11,7 +11,7 @@ const ChooseMail: FC<Props> = ({ role }) => {
   const { t } = useTranslation("mails");
 
   const links =
-    role === "superadmin"
+    role === "superadmin" || role === "admin"
       ? [
           { to: "/mails", label: t("todayMails"), icon: Package, color: "emerald" },
           { to: "/mails/return-requests", label: "Qaytarish", icon: RotateCcw, color: "amber" },

@@ -69,7 +69,7 @@ const DashboardLayout = () => {
 
       {/* Dashboard container */}
       <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pl-4 pb-8 max-[650px]:pb-24">
-        <main ref={mainRef} className="w-full h-full bg-[#fff] dark:bg-[#312d48] rounded-4xl overflow-y-auto">
+        <main ref={mainRef} className="w-full h-full bg-[#fff] dark:bg-[#312d48] rounded-4xl overflow-y-auto [&>*]:min-h-full">
           <Suspense fallback={<Suspensee />}>
             <Outlet />
           </Suspense>

@@ -123,7 +123,7 @@ export class PostController {
   @ApiOperation({ summary: 'Get return-requested orders (admin)' })
   @ApiResponse({ status: 200, description: 'Return requested orders list' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('return-requests/list')
   getReturnRequests() {
     return this.postService.getReturnRequests();
@@ -380,7 +380,7 @@ export class PostController {
   @ApiOperation({ summary: 'Approve return requests (admin)' })
   @ApiResponse({ status: 200, description: 'Return requests approved' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('return-requests/approve')
   approveReturnRequests(
     @Body() ordersArrayDto: OrdersArrayDto,
@@ -392,7 +392,7 @@ export class PostController {
   @ApiOperation({ summary: 'Reject return requests (admin)' })
   @ApiResponse({ status: 200, description: 'Return requests rejected' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('return-requests/reject')
   rejectReturnRequests(
     @Body() ordersArrayDto: OrdersArrayDto,
