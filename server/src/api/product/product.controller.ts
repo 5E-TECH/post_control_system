@@ -230,6 +230,7 @@ export class ProductController {
 
   @ApiOperation({ summary: 'Delete product by id' })
   @ApiParam({ name: 'id', description: 'Product ID' })
+  @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.MARKET)
   @Delete(':id')
   async remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
