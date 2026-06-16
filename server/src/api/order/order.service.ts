@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -11,7 +12,7 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { DataSource, In, IsNull } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull } from 'typeorm';
 import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { OrderItemRepository } from 'src/core/repository/order-item.repository';
 import {
@@ -36,6 +37,7 @@ import { BulkOrderActionDto } from './dto/bulk-order-action.dto';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { generateComment } from 'src/common/utils/generate-comment';
+import { orderStatusUz } from 'src/common/utils/status-label.util';
 import { PartlySoldDto } from './dto/partly-sold.dto';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
@@ -432,12 +434,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         entity_id: newOrder.id,
         action: 'created',
         new_value: {
+          order_number: newOrder.order_number,
           status: Order_status.NEW,
           total_price,
           customer_id,
           market_id,
         },
-        description: `Buyurtma yaratildi — ${total_price} so'm`,
+        description: `Buyurtma #${newOrder.order_number} yaratildi — ${total_price} so'm`,
         user,
       });
 
@@ -617,11 +620,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         entity_id: order.id,
         action: 'created',
         new_value: {
+          order_number: order.order_number,
           status: Order_status.NEW,
           total_price: order.total_price,
           source: 'telegram_bot',
         },
-        description: `Buyurtma Telegram bot orqali yaratildi — ${order.total_price} so'm`,
+        description: `Buyurtma #${order.order_number} Telegram bot orqali yaratildi — ${order.total_price} so'm`,
         user,
       });
 
@@ -827,6 +831,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Order not found');
       }
 
+      // Kurier faqat o'ziga biriktirilgan buyurtma detalini ko'ra oladi.
+      // Admin/operator/registrator uchun cheklov yo'q.
+      if (
+        user?.role === Roles.COURIER &&
+        newOrder.post?.courier_id !== user.id
+      ) {
+        throw new ForbiddenException('Bu buyurtma sizga tegishli emas');
+      }
+
       // Kurier tariflarini hisoblash
       let max_courier_tariff_home = 0;
       let max_courier_tariff_center = 0;
@@ -943,6 +956,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!editingOrder) {
         throw new NotFoundException('Order not found');
       }
+
+      // Tahrirdan OLDINGI holat — tracking/audit logda "eski → yangi" ko'rsatish uchun.
+      const beforeEdit = {
+        where_deliver: editingOrder.where_deliver,
+        total_price: editingOrder.total_price,
+        comment: editingOrder.comment,
+        address: editingOrder.address,
+        district_id: editingOrder.district_id,
+        market_tariff: editingOrder.market_tariff,
+        courier_tariff: editingOrder.courier_tariff,
+      };
 
       // Market uchun qo'shimcha tekshiruvlar
       if (user?.role === Roles.MARKET) {
@@ -1242,12 +1266,38 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         await queryRunner.manager.save(editingOrder);
 
         await queryRunner.commitTransaction();
+        // Tracking/audit uchun "eski → yangi" diff: faqat haqiqatan o'zgargan maydonlar.
+        const afterEdit = {
+          where_deliver: editingOrder.where_deliver,
+          total_price: editingOrder.total_price,
+          comment: editingOrder.comment,
+          address: editingOrder.address,
+          district_id: editingOrder.district_id,
+          market_tariff: editingOrder.market_tariff,
+          courier_tariff: editingOrder.courier_tariff,
+        };
+        const oldChanged: Record<string, any> = {};
+        const newChanged: Record<string, any> = { order_number: editingOrder.order_number };
+        for (const key of Object.keys(afterEdit)) {
+          if (
+            JSON.stringify((beforeEdit as any)[key]) !==
+            JSON.stringify((afterEdit as any)[key])
+          ) {
+            oldChanged[key] = (beforeEdit as any)[key];
+            newChanged[key] = (afterEdit as any)[key];
+          }
+        }
+        // Mahsulotlar o'zgartirilgan bo'lsa — alohida belgilaymiz.
+        if (updateOrderDto.order_item_info !== undefined) {
+          newChanged.items_changed = true;
+        }
         this.activityLog.log({
           entity_type: 'order',
           entity_id: id,
           action: 'updated',
-          new_value: updateOrderDto as any,
-          description: `Buyurtma tahrirlandi`,
+          old_value: oldChanged,
+          new_value: newChanged,
+          description: `Buyurtma #${editingOrder.order_number} tahrirlandi`,
           user,
         });
         return successRes(editingOrder, 200, 'Order updated');
@@ -1347,10 +1397,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           entity_id: id,
           action: 'updated',
           new_value: {
+            order_number: editingOrder.order_number,
             market_tariff: editingOrder.market_tariff,
             courier_tariff: editingOrder.courier_tariff,
           },
-          description: `Buyurtma tarifi yangilandi`,
+          description: `Buyurtma #${editingOrder.order_number} tarifi yangilandi`,
           user,
         });
         return successRes(editingOrder, 200, 'Order tariff updated');
@@ -1368,6 +1419,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async receiveNewOrders(
     ordersArray: OrdersArrayDto,
     search?: string,
+    user?: JwtPayload,
   ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -1498,6 +1550,26 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+
+      // Har bir buyurtma uchun NEW -> RECEIVED o'tishini loglaymiz, shunda
+      // buyurtma tarixida pochtaga biriktirilgani ko'rinadi (avval umuman loglanmasdi).
+      for (const o of newOrders) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: o.id,
+          action: 'status_change',
+          old_value: { status: Order_status.NEW },
+          new_value: {
+            order_number: o.order_number,
+            status: Order_status.RECEIVED,
+            post_id: o.post_id,
+          },
+          description: `Buyurtma #${o.order_number} qabul qilindi (pochtaga biriktirildi)`,
+          user,
+          metadata: { source: 'bulk_receive' },
+        });
+      }
+
       await Promise.all(
         newOrders.map((o) => this.orderBotService.syncStatusButton(o.id)),
       );
@@ -1542,10 +1614,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           action: 'status_change',
           old_value: { status: Order_status.CANCELLED_SENT },
           new_value: {
+            order_number: order.order_number,
             status: Order_status.CLOSED,
             total_price: order.total_price,
           },
-          description: `QR skaner orqali qabul qilindi va yopildi — ${order.total_price} so'm`,
+          description: `Buyurtma #${order.order_number} QR skaner orqali qabul qilindi va yopildi — ${order.total_price} so'm`,
           user,
           metadata: { source: 'scanner' },
         });
@@ -1606,12 +1679,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         action: 'status_change',
         old_value: { status: Order_status.NEW },
         new_value: {
+          order_number: order.order_number,
           status: Order_status.RECEIVED,
           total_price: order.total_price,
           post_id: newPost.id,
           region_id: newPost.region_id,
         },
-        description: `QR skaner orqali qabul qilindi — ${order.total_price} so'm`,
+        description: `Buyurtma #${order.order_number} QR skaner orqali qabul qilindi — ${order.total_price} so'm`,
         user,
         metadata: { source: 'scanner' },
       });
@@ -1923,6 +1997,43 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  /**
+   * Buyurtma chaqiruvchi kuryerga tegishliligini tekshiradi.
+   * Egalik zanjiri: order.post_id -> post.courier_id === user.id.
+   * Faqat biriktirilgan kurier sotuv/bekor/partly amallarini bajara oladi
+   * (istisno yo'q — boshqa kurier, hatto admin ham begona buyurtmaga teginolmaydi).
+   * `manager` ochiq tranzaksiya/lock ichida ishlash uchun beriladi.
+   */
+  private async assertCourierOwnsOrder(
+    manager: EntityManager,
+    order: OrderEntity,
+    user: JwtPayload,
+  ): Promise<void> {
+    const post = order.post_id
+      ? await manager.findOne(PostEntity, {
+          where: { id: order.post_id },
+          select: ['id', 'courier_id'],
+        })
+      : null;
+
+    // Normal holat: buyurtma posti aynan chaqiruvchi kuryerga biriktirilgan.
+    if (post && post.courier_id === user.id) return;
+
+    // LDG istisno: LDG webhook'lari virtual vakil-kuryer (external_provider='ldg')
+    // nomidan sotuv/bekor qiladi. Odatda post.courier_id ham aynan shu LDG kuryer
+    // bo'ladi (yuqoridagi tekshiruvdan o'tadi). Lekin LDG kuryer qayta bog'langan
+    // (rebind) holatda eski buyurtmalar mos kelmasligi mumkin — shuning uchun
+    // chaqiruvchi LDG vakil-kuryer bo'lsa egalik tekshiruvini o'tkazib yuboramiz.
+    // Bu so'rov faqat mos kelmagan holatda bajariladi (normal oqimga ta'sir yo'q).
+    const actor = await manager.findOne(UserEntity, {
+      where: { id: user.id },
+      select: ['id', 'external_provider'],
+    });
+    if (actor?.external_provider === 'ldg') return;
+
+    throw new ForbiddenException('Bu buyurtma sizga tegishli emas');
+  }
+
   async sellOrder(user: JwtPayload, id: string, sellDto: SellCancelOrderDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -1963,6 +2074,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!order)
         throw new NotFoundException('Order not found or not in waiting status');
+
+      // Egalik tekshiruvi: faqat buyurtma biriktirilgan kurier sotishi mumkin
+      await this.assertCourierOwnsOrder(queryRunner.manager, order, user);
 
       const marketId = order.user_id;
       const [market, marketCashbox, courier, courierCashbox] =
@@ -2233,7 +2347,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             source_type: FinancialSource_type.SELL_PROFIT,
             order_id: order.id,
             related_user_id: marketId,
-            comment: `Buyurtma #${order.id.slice(0, 8)} — pochta foydasi: ${sellProfit} so'm`,
+            comment: `Buyurtma #${order.order_number} — pochta foydasi: ${sellProfit} so'm`,
             created_by: user.id,
           }),
         );
@@ -2248,11 +2362,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         action: 'sold',
         old_value: { status: Order_status.WAITING },
         new_value: {
+          order_number: order.order_number,
           status: order.status,
           total_price: order.total_price,
           paid_amount: order.paid_amount,
         },
-        description: `Buyurtma sotildi — ${order.total_price} so'm (${order.status})`,
+        description: `Buyurtma #${order.order_number} sotildi — ${order.total_price} so'm (${orderStatusUz(order.status)})`,
         user,
       });
 
@@ -2307,6 +2422,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!order) {
         throw new NotFoundException('Order not found');
       }
+
+      // Egalik tekshiruvi: faqat buyurtma biriktirilgan kurier bekor qila oladi
+      await this.assertCourierOwnsOrder(queryRunner.manager, order, currentUser);
 
       const marketId = order.user_id;
       const [market, courier] = await Promise.all([
@@ -2468,8 +2586,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         entity_id: order.id,
         action: 'cancelled',
         old_value: { status: Order_status.WAITING },
-        new_value: { status: Order_status.CANCELLED, comment: order.comment },
-        description: `Buyurtma bekor qilindi — ${order.total_price} so'm`,
+        new_value: {
+          order_number: order.order_number,
+          status: Order_status.CANCELLED,
+          comment: order.comment,
+          extra_cost: extraCost || undefined,
+        },
+        description: `Buyurtma #${order.order_number} bekor qilindi — ${order.total_price} so'm${
+          extraCost ? ` (qo'shimcha xarajat: ${extraCost} so'm)` : ''
+        }`,
         user: currentUser,
       });
 
@@ -2543,6 +2668,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       if (!order)
         throw new NotFoundException('Order not found or not in Waiting status');
+
+      // Egalik tekshiruvi: faqat buyurtma biriktirilgan kurier qisman sota oladi
+      await this.assertCourierOwnsOrder(queryRunner.manager, order, user);
 
       const customer = await queryRunner.manager.findOne(UserEntity, {
         where: { id: order.customer_id },
@@ -2935,11 +3063,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         action: 'partly_sold',
         old_value: { status: Order_status.WAITING },
         new_value: {
+          order_number: order.order_number,
           status: order.status,
           total_price: order.total_price,
           paid_amount: order.paid_amount,
         },
-        description: `Buyurtma qisman sotildi — ${order.total_price} so'm (${order.status})`,
+        description: `Buyurtma #${order.order_number} qisman sotildi — ${order.total_price} so'm (${orderStatusUz(order.status)})`,
         user,
       });
       await this.orderBotService.syncStatusButton(order.id);
@@ -2990,6 +3119,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         relations: ['market', 'post'],
       });
       if (!order) throw new NotFoundException('Order not found');
+
+      // Egalik tekshiruvi: kurier faqat o'ziga biriktirilgan buyurtmani
+      // qaytara oladi. SUPERADMIN uchun cheklov yo'q.
+      if (
+        user.role === Roles.COURIER &&
+        order.post?.courier_id !== user.id
+      ) {
+        throw new ForbiddenException('Bu buyurtma sizga tegishli emas');
+      }
 
       if (
         user.role === Roles.COURIER &&
@@ -3377,7 +3515,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             source_type: FinancialSource_type.CORRECTION,
             order_id: order.id,
             related_user_id: market.id,
-            comment: `[ROLLBACK] Buyurtma #${order.id.slice(0, 8)} — pochta foydasi qaytarildi`,
+            comment: `[ROLLBACK] Buyurtma #${order.order_number} — pochta foydasi qaytarildi`,
             created_by: user.id,
           }),
         );
@@ -3392,8 +3530,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         entity_id: order.id,
         action: 'rollback',
         old_value: { status: previousStatus },
-        new_value: { status: order.status },
-        description: `Buyurtma rollback: ${previousStatus} → ${order.status}`,
+        new_value: { order_number: order.order_number, status: order.status },
+        description: `Buyurtma #${order.order_number} orqaga qaytarildi: ${orderStatusUz(
+          previousStatus,
+        )} → ${orderStatusUz(order.status)}`,
         user,
       });
 
@@ -4216,11 +4356,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         entity_id: id,
         action: 'deleted',
         old_value: {
+          order_number: order.order_number,
           status: order.status,
           total_price: order.total_price,
           customer_id: order.customer_id,
         },
-        description: `Buyurtma o'chirildi — ${order.total_price} so'm (${order.status})`,
+        description: `Buyurtma #${order.order_number} o'chirildi — ${order.total_price} so'm (${orderStatusUz(order.status)})`,
         user,
       });
 
@@ -4618,8 +4759,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         entity_type: 'order',
         entity_id: order.id,
         action: 'updated',
-        new_value: { district_id: order.district_id, address: order.address },
-        description: `Buyurtma manzili yangilandi`,
+        new_value: {
+          order_number: order.order_number,
+          district_id: order.district_id,
+          address: order.address,
+        },
+        description: `Buyurtma #${order.order_number} manzili yangilandi`,
         user,
       });
 
@@ -5131,6 +5276,26 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.commitTransaction();
 
+      // Tashqi integratsiya orqali yaratilgan har bir buyurtmani loglaymiz —
+      // ilgari bu oqim umuman audit jurnaliga yozilmasdi.
+      for (const o of createdOrders) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: o.id,
+          action: 'created',
+          new_value: {
+            order_number: o.order_number,
+            status: o.status,
+            total_price: o.total_price,
+            source: integration.name,
+            external_id: o.external_id,
+          },
+          description: `Buyurtma #${o.order_number} "${integration.name}" integratsiyasidan qabul qilindi — ${o.total_price} so'm`,
+          user,
+          metadata: { source: 'external_integration', integration: integration.name },
+        });
+      }
+
       const skippedMsg =
         skippedOrders.length > 0
           ? `, ${skippedOrders.length} ta dublikat o'tkazib yuborildi`
@@ -5176,6 +5341,33 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
    * (LDG webhook bevosita "yetkazib berildi" deganida `kuryer qabul qildi`
    * bosqichini bo'lib o'tkazib yuboramiz).
    */
+  /**
+   * LDG bilan status nomuvofiqligini audit jurnaliga yozadi.
+   * Ilgari bunday hodisalar faqat logger.error'ga tushardi (queryalab bo'lmaydi).
+   * Bu moliyaviy yaxlitlik uchun eng muhim hodisalar (LDG yetkazgan/bekor qilgan,
+   * lekin bizda pul allaqachon harakatlangan).
+   */
+  private logLdgMismatch(
+    order: { id: string; order_number?: number; status: string },
+    terminalAction: string,
+    reason: string,
+  ): void {
+    this.activityLog.log({
+      entity_type: 'order',
+      entity_id: order.id,
+      action: 'ldg_mismatch',
+      old_value: { status: order.status },
+      new_value: {
+        order_number: order.order_number,
+        ldg_action: terminalAction,
+      },
+      description: `⚠️ LDG nomuvofiqligi — Buyurtma #${order.order_number}: LDG "${terminalAction}", bizda "${orderStatusUz(
+        order.status,
+      )}". ${reason}`,
+      metadata: { source: 'ldg', terminal_action: terminalAction },
+    });
+  }
+
   async markDeliveredByLdg(
     orderId: string,
     ldgCourierUserId: string,
@@ -5203,6 +5395,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     ) {
       const reason = `LDG: yetkazildi, lekin bizda status=${order.status} (qo'lda tekshiring)`;
       this.logger.error(`LDG MISMATCH delivered: order=${orderId} — ${reason}`);
+      this.logLdgMismatch(order, 'delivered', reason);
       return { kind: 'mismatch', reason };
     }
 
@@ -5253,6 +5446,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         this.logger.error(
           `LDG MISMATCH delivered (race): order=${orderId} — ${reason}`,
         );
+        this.logLdgMismatch(fresh, 'delivered', reason);
         return { kind: 'mismatch', reason };
       }
       throw err;
@@ -5292,6 +5486,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     ) {
       const reason = `LDG: bekor qildi, lekin bizda status=${order.status} (pul to'langan! qo'lda tekshiring)`;
       this.logger.error(`LDG MISMATCH cancelled: order=${orderId} — ${reason}`);
+      this.logLdgMismatch(order, 'cancelled', reason);
       return { kind: 'mismatch', reason };
     }
 
@@ -5342,6 +5537,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     ) {
       const reason = `LDG: qaytarib berdi, lekin bizda status=${order.status} (pul to'langan! qo'lda tekshiring)`;
       this.logger.error(`LDG MISMATCH returned: order=${orderId} — ${reason}`);
+      this.logLdgMismatch(order, 'returned', reason);
       return { kind: 'mismatch', reason };
     }
 
@@ -5373,9 +5569,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       entity_id: orderId,
       action: 'status_change',
       old_value: { status: Order_status.CANCELLED },
-      new_value: { status: Order_status.CLOSED },
-      description: 'LDG buyurtmani qaytarib berdi (CLOSED)',
+      new_value: { order_number: order.order_number, status: Order_status.CLOSED },
+      description: `Buyurtma #${order.order_number} — LDG qaytarib berdi (Yopilgan)`,
       user: payload,
+      metadata: { source: 'ldg' },
     });
     return { kind: 'applied' };
   }

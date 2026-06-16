@@ -134,6 +134,11 @@ export class LdgWebhookService {
       if (eventType === 'webhook.test') {
         // Test webhook — hech narsa qilmaymiz, faqat log
         resultStatus = 'success';
+      } else if (config.webhook_enabled === false) {
+        // Admin webhook qabulini o'chirib qo'ygan — faqat log, status o'zgartirilmaydi.
+        this.logger.warn('LDG webhook o\'chirilgan (webhook_enabled=false) — skip');
+        resultStatus = 'skipped';
+        errorMsg = 'webhook qabul qilish o\'chirilgan';
       } else if (eventType.startsWith('package.') || eventType.startsWith('order.')) {
         const outcome = await this.handlePackageEvent(envelope);
         resultStatus = outcome.status;

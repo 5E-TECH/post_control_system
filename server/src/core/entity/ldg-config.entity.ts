@@ -19,6 +19,21 @@ export class LdgConfigEntity extends BaseEntity {
   @Column({ type: 'boolean', default: true })
   is_sandbox: boolean;
 
+  // ===== AVTOMATIKA (fon jarayonlari) yoqilgan/o'chirilgan =====
+  // Admin "Boshqaruv" jadvalidan har bir fon jarayonini to'xtatishi mumkin.
+
+  // Webhook qabul qilish va qo'llash (false bo'lsa kelgan webhook faqat log qilinadi)
+  @Column({ type: 'boolean', default: true })
+  webhook_enabled: boolean;
+
+  // Reconcile poller (har 5 daqiqa LDG bilan tenglashtirish)
+  @Column({ type: 'boolean', default: true })
+  reconcile_enabled: boolean;
+
+  // Auto-retry (har 2 daqiqa yuborilmaganlarni qayta jo'natish)
+  @Column({ type: 'boolean', default: true })
+  auto_retry_enabled: boolean;
+
   @Column({ type: 'varchar', default: 'https://api.fcargo.uz/api/client/v1' })
   api_base_url: string;
 

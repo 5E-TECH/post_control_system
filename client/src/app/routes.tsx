@@ -63,6 +63,7 @@ const OrderDetail = lazy(
   () => import("../pages/orders/pages/superadmin/orderDetail")
 );
 const CashDetail = lazy(() => import("../pages/payments/pages/cashDetail"));
+const CardDetail = lazy(() => import("../pages/payments/pages/cardDetail"));
 const CashDetailMarketCourier = lazy(
   () => import("../pages/payments/pages/courier-market-cashDetail")
 );
@@ -257,7 +258,11 @@ const AppRouters = () => {
                 },
                 {
                   path: "return-requests",
-                  element: <ReturnRequests />,
+                  element: (
+                    <RequireRole roles={["superadmin", "admin"]}>
+                      <ReturnRequests />
+                    </RequireRole>
+                  ),
                 },
                 {
                   path: "refused",
@@ -309,6 +314,7 @@ const AppRouters = () => {
               children: [
                 { path: `cash-detail/:id`, element: <CashDetail /> },
                 { path: "main-cashbox", element: <MainDetail /> },
+                { path: "card-detail/:id", element: <CardDetail /> },
               ],
             },
             { path: "cash-box", element: <CashDetailMarketCourier /> },

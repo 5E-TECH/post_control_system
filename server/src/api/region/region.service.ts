@@ -24,6 +24,8 @@ import {
   getUzbekistanDayRange,
   toUzbekistanTimestamp,
 } from 'src/common/utils/date.util';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 
 // ===== Statistika status guruhlari =====
 // Buyurtmalar 3 ta o'zaro kesishmaydigan guruhga bo'linadi. CREATED va NEW
@@ -67,6 +69,7 @@ export class RegionService implements OnModuleInit {
     private districtRepository: Repository<DistrictEntity>,
     @InjectRepository(DistrictCourierEntity)
     private districtCourierRepository: Repository<DistrictCourierEntity>,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   async onModuleInit() {
@@ -209,15 +212,26 @@ export class RegionService implements OnModuleInit {
   /**
    * Viloyat nomini yangilash
    */
-  async updateName(id: string, dto: UpdateRegionNameDto) {
+  async updateName(id: string, dto: UpdateRegionNameDto, actor?: JwtPayload) {
     try {
       const region = await this.regionRepository.findOne({ where: { id } });
       if (!region) {
         throw new NotFoundException('Region topilmadi');
       }
 
+      const oldName = region.name;
       region.name = dto.name;
       await this.regionRepository.save(region);
+
+      this.activityLog.log({
+        entity_type: 'region',
+        entity_id: region.id,
+        action: 'updated',
+        old_value: { name: oldName },
+        new_value: { name: dto.name },
+        description: `Region nomi o'zgardi: ${oldName} → ${dto.name}`,
+        user: actor,
+      });
 
       return successRes(region, 200, 'Viloyat nomi yangilandi');
     } catch (error) {
@@ -957,7 +971,11 @@ export class RegionService implements OnModuleInit {
   /**
    * Viloyatga asosiy kuryer biriktirish (yoki olib tashlash)
    */
-  async assignMainCourier(regionId: string, courierId: string | null) {
+  async assignMainCourier(
+    regionId: string,
+    courierId: string | null,
+    actor?: JwtPayload,
+  ) {
     try {
       const region = await this.regionRepository.findOne({
         where: { id: regionId },
@@ -966,6 +984,7 @@ export class RegionService implements OnModuleInit {
         throw new NotFoundException('Viloyat topilmadi');
       }
 
+      let courierName: string | undefined;
       if (courierId) {
         const courier = await this.userRepository.findOne({
           where: { id: courierId, role: Roles.COURIER, is_deleted: false },
@@ -973,10 +992,22 @@ export class RegionService implements OnModuleInit {
         if (!courier) {
           throw new NotFoundException('Kuryer topilmadi');
         }
+        courierName = courier.name;
       }
 
       region.main_courier_id = courierId as any;
       await this.regionRepository.save(region);
+
+      this.activityLog.log({
+        entity_type: 'region',
+        entity_id: region.id,
+        action: 'assigned',
+        new_value: { name: region.name, main_courier: courierName ?? null },
+        description: courierId
+          ? `"${region.name}" regioniga asosiy kuryer biriktirildi: ${courierName}`
+          : `"${region.name}" regionidan asosiy kuryer olib tashlandi`,
+        user: actor,
+      });
 
       return successRes(
         region,
@@ -995,7 +1026,11 @@ export class RegionService implements OnModuleInit {
   /**
    * Regionga logist biriktirish
    */
-  async assignLogist(regionId: string, logistId: string | null) {
+  async assignLogist(
+    regionId: string,
+    logistId: string | null,
+    actor?: JwtPayload,
+  ) {
     try {
       const region = await this.regionRepository.findOne({
         where: { id: regionId },
@@ -1004,6 +1039,7 @@ export class RegionService implements OnModuleInit {
         throw new NotFoundException('Viloyat topilmadi');
       }
 
+      let logistName: string | undefined;
       if (logistId) {
         const logist = await this.userRepository.findOne({
           where: { id: logistId, role: Roles.LOGIST, is_deleted: false },
@@ -1011,10 +1047,22 @@ export class RegionService implements OnModuleInit {
         if (!logist) {
           throw new NotFoundException('Logist topilmadi');
         }
+        logistName = logist.name;
       }
 
       region.logist_id = logistId as any;
       await this.regionRepository.save(region);
+
+      this.activityLog.log({
+        entity_type: 'region',
+        entity_id: region.id,
+        action: 'assigned',
+        new_value: { name: region.name, logist: logistName ?? null },
+        description: logistId
+          ? `"${region.name}" regioniga logist biriktirildi: ${logistName}`
+          : `"${region.name}" regionidan logist olib tashlandi`,
+        user: actor,
+      });
 
       return successRes(
         region,
@@ -1029,7 +1077,11 @@ export class RegionService implements OnModuleInit {
   /**
    * Bir nechta regionga bitta logistni biriktirish (bulk)
    */
-  async bulkAssignLogist(logistId: string, regionIds: string[]) {
+  async bulkAssignLogist(
+    logistId: string,
+    regionIds: string[],
+    actor?: JwtPayload,
+  ) {
     try {
       const logist = await this.userRepository.findOne({
         where: { id: logistId, role: Roles.LOGIST, is_deleted: false },
@@ -1053,6 +1105,23 @@ export class RegionService implements OnModuleInit {
           .where('id IN (:...regionIds)', { regionIds })
           .execute();
       }
+
+      // Tanlangan regionlar nomlarini olib tavsifga qo'shamiz
+      const assignedRegions = regionIds.length
+        ? await this.regionRepository.find({ where: { id: In(regionIds) } })
+        : [];
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: logistId,
+        action: 'assigned',
+        new_value: {
+          name: logist.name,
+          regions: assignedRegions.map((r) => r.name),
+          region_count: regionIds.length,
+        },
+        description: `Logist "${logist.name}" ${regionIds.length} ta regionga biriktirildi (eski biriktirishlar almashtirildi)`,
+        user: actor,
+      });
 
       return successRes(
         {},

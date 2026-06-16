@@ -38,6 +38,14 @@ import {
   Activity,
   Code2,
   Hash,
+  Settings,
+  ShieldAlert,
+  KeyRound,
+  Power,
+  Plug,
+  MapPin,
+  Box,
+  GitMerge,
 } from "lucide-react";
 
 const { RangePicker } = DatePicker;
@@ -81,6 +89,7 @@ const ACTION_CONFIG: Record<string, ActionCfg> = {
   return_approved: { icon: CheckCircle, tone: "green", label: "Qaytarish tasdiqlandi", category: "order" },
   return_rejected: { icon: XCircle, tone: "red", label: "Qaytarish rad etildi", category: "order" },
   reassigned: { icon: Send, tone: "purple", label: "Qayta biriktirildi", category: "order" },
+  ldg_mismatch: { icon: AlertTriangle, tone: "red", label: "LDG nomuvofiqligi", category: "order" },
   deleted: { icon: Trash2, tone: "rose", label: "O'chirildi", category: "order" },
   // Cashbox
   courier_payment: { icon: TrendingUp, tone: "emerald", label: "Kuryerdan to'lov", category: "cashbox" },
@@ -91,6 +100,29 @@ const ACTION_CONFIG: Record<string, ActionCfg> = {
   // Shift
   opened: { icon: LockOpen, tone: "green", label: "Smena ochildi", category: "shift" },
   closed: { icon: LockKeyhole, tone: "gray", label: "Smena yopildi", category: "shift" },
+  // User xavfsizlik
+  login_failed: { icon: ShieldAlert, tone: "red", label: "Kirish urinishi (xato)", category: "login" },
+  blocked: { icon: LockKeyhole, tone: "rose", label: "Bloklandi", category: "user" },
+  unblocked: { icon: LockOpen, tone: "green", label: "Blokdan chiqarildi", category: "user" },
+  role_changed: { icon: User, tone: "amber", label: "Rol o'zgardi", category: "user" },
+  password_changed: { icon: KeyRound, tone: "amber", label: "Parol o'zgardi", category: "user" },
+  salary_paid: { icon: Coins, tone: "amber", label: "Maosh to'landi", category: "cashbox" },
+  commission_changed: { icon: FileText, tone: "indigo", label: "Komissiya o'zgardi", category: "user" },
+  // LDG
+  dispatched: { icon: Truck, tone: "blue", label: "LDG'ga yuborildi", category: "order" },
+  redispatch: { icon: RotateCcw, tone: "amber", label: "LDG qayta yuborildi", category: "order" },
+  redispatch_bulk: { icon: RotateCcw, tone: "amber", label: "LDG ommaviy qayta yuborish", category: "order" },
+  mismatch_resolved: { icon: CheckCircle, tone: "green", label: "Nomuvofiqlik hal qilindi", category: "order" },
+  automation_changed: { icon: Power, tone: "indigo", label: "Avtomatika o'zgardi", category: "other" },
+  config_changed: { icon: Settings, tone: "indigo", label: "Sozlama o'zgardi", category: "other" },
+  courier_bound: { icon: Truck, tone: "purple", label: "Kuryer biriktirildi", category: "other" },
+  webhook_deleted: { icon: Trash2, tone: "rose", label: "Webhook log o'chirildi", category: "other" },
+  webhook_reprocessed: { icon: RotateCcw, tone: "amber", label: "Webhook qayta ishlandi", category: "other" },
+  // Sozlamalar / katalog
+  merged: { icon: GitMerge, tone: "orange", label: "Birlashtirildi", category: "other" },
+  assigned: { icon: Send, tone: "purple", label: "Tayinlandi", category: "other" },
+  sync_retry: { icon: RotateCcw, tone: "amber", label: "Sinxron qayta urinish", category: "other" },
+  sync_deleted: { icon: Trash2, tone: "rose", label: "Sinxron o'chirildi", category: "other" },
 };
 
 const DEFAULT_ACTION: ActionCfg = { icon: Clock, tone: "gray", label: "Harakat", category: "other" };
@@ -112,18 +144,40 @@ const TONE_CLASSES: Record<ActionCfg["tone"], { soft: string; text: string; soli
 // ============================================================================
 // STATUS & ENTITY LABELS
 // ============================================================================
+// MUHIM: kalitlar bazada saqlanadigan ANIQ enum qiymatlari bo'lishi shart
+// (server/src/common/enums/index.ts -> Order_status). Ba'zilarida probel/qavs bor:
+// 'on the road', 'cancelled (sent)'. Aks holda xom inglizcha kod ko'rinadi.
 const STATUS_LABEL: Record<string, string> = {
+  created: "Yaratildi",
   new: "Yangi",
   received: "Qabul qilindi",
-  on_the_road: "Yo'lda",
+  "on the road": "Yo'lda",
   waiting: "Kutilmoqda",
   sold: "Sotildi",
   cancelled: "Bekor qilingan",
   paid: "To'langan",
   partly_paid: "Qisman to'langan",
-  cancelled_sent: "Bekor yuborilgan",
+  "cancelled (sent)": "Bekor (yuborilgan)",
   closed: "Yopilgan",
-  partly_sold: "Qisman sotilgan",
+  // Eski/normalizatsiyalangan loglar uchun ehtiyot variantlar:
+  on_the_road: "Yo'lda",
+  cancelled_sent: "Bekor (yuborilgan)",
+};
+
+// Pochta statuslari (server/src/common/enums/index.ts -> Post_status)
+const POST_STATUS_LABEL: Record<string, string> = {
+  new: "Yangi",
+  sent: "Jo'natildi",
+  received: "Qabul qilindi",
+  canceled: "Bekor qilingan",
+  canceled_received: "Bekor qabul qilindi",
+};
+
+// Kassa turlari (Cashbox_type)
+const CASHBOX_TYPE_LABEL: Record<string, string> = {
+  main: "Asosiy kassa",
+  couriers: "Kuryerlar kassasi",
+  markets: "Marketlar kassasi",
 };
 
 const ENTITY_LABEL: Record<string, string> = {
@@ -132,6 +186,11 @@ const ENTITY_LABEL: Record<string, string> = {
   user: "Foydalanuvchi",
   cashbox: "Kassa",
   shift: "Smena",
+  region: "Region",
+  district: "Tuman",
+  product: "Mahsulot",
+  integration: "Integratsiya",
+  ldg_config: "LDG sozlamasi",
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -155,12 +214,12 @@ const ROLE_BADGE: Record<string, string> = {
   logist: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
 };
 
+// To'lov usullari — PaymentMethod (cash/click/click_to_market) + Manual_payment_methods (cash/card)
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   cash: "Naqd",
   card: "Karta",
-  transfer: "O'tkazma",
-  click: "Click",
-  payme: "Payme",
+  click: "Karta (Click)",
+  click_to_market: "Karta (Marketga)",
 };
 
 // ============================================================================
@@ -231,6 +290,24 @@ const formatPrice = (n?: number | string | null) => {
 const shortId = (id?: string) => (id ? id.slice(0, 8) : "");
 
 const statusPill = (s?: string) => STATUS_LABEL[String(s)] || s || "—";
+const postStatusPill = (s?: string) => POST_STATUS_LABEL[String(s)] || s || "—";
+
+// Buyurtma logi uchun inson o'qiy oladigan identifikator: #100042 (order_number).
+// order_number bo'lmasa (eski log / boshqa entity) UUID fragmentiga qaytadi.
+const orderRef = (log: LogRow) => {
+  const num = log.entity_summary?.order_number;
+  return num != null ? `#${num}` : shortId(log.entity_id);
+};
+
+// Pochtada raqam yo'q — region + kuryer + sana asosida o'qiladigan yorliq.
+const postRef = (s?: any) => {
+  if (!s) return null;
+  const parts: string[] = [];
+  if (s.region_name) parts.push(s.region_name);
+  if (s.courier_name) parts.push(s.courier_name);
+  if (s.post_date) parts.push(formatDate(s.post_date));
+  return parts.length ? parts.join(" · ") : null;
+};
 
 // ============================================================================
 // LOG CARD RENDERER
@@ -281,6 +358,11 @@ const FIELD_LABEL: Record<string, string> = {
   amount: "Miqdor",
   payment_method: "To'lov turi",
   staff_name: "Xodim",
+  counterparty_name: "Kontragent",
+  order_number: "Buyurtma raqami",
+  district_name: "Tuman",
+  ldg_tracking: "LDG kuzatuv",
+  extra_cost: "Qo'shimcha xarajat",
   type: "Tur",
   source: "Manba",
   opening_balance_cash: "Ochilish naqd",
@@ -299,11 +381,62 @@ const FIELD_LABEL: Record<string, string> = {
   user_agent: "Qurilma",
   ip: "IP manzil",
   post_token: "Pochta kodi",
+  external_id: "Tashqi ID",
+  integration: "Integratsiya",
+  ldg_action: "LDG amali",
+  terminal_action: "LDG amali",
+  password_changed: "Parol o'zgartirildi",
+  phone_masked: "Telefon (maskirovka)",
+  reason: "Sabab",
+  salary: "Maosh",
+  commission_type: "Komissiya turi",
+  commission_value: "Komissiya qiymati",
+  show_earnings: "Daromad ko'rinadi",
+  ldg_order_id: "LDG buyurtma ID",
+  masked_fields: "O'zgargan maxfiy maydonlar",
+  delivery_id: "Webhook ID",
+  mismatch_reason: "Nomuvofiqlik sababi",
+  webhook_enabled: "Webhook",
+  reconcile_enabled: "Reconcile",
+  auto_retry_enabled: "Avto qayta urinish",
+};
+
+// Login xatosi sababini o'qiladigan qiladi.
+const LOGIN_FAIL_REASON: Record<string, string> = {
+  unknown_phone: "Noma'lum telefon",
+  blocked: "Bloklangan akkaunt",
+  wrong_password: "Noto'g'ri parol",
+};
+
+// Buyurtma harakatining manbasi (metadata.source) — qisqa o'zbekcha yorliq.
+const SOURCE_LABEL: Record<string, string> = {
+  scanner: "QR skaner",
+  ldg: "LDG",
+  bulk_receive: "Ommaviy qabul",
+  external_integration: "Tashqi integratsiya",
+  telegram_bot: "Telegram bot",
 };
 
 const WHERE_DELIVER_LABEL: Record<string, string> = {
   center: "Markazga",
   address: "Uygacha",
+};
+
+// Server *_id yoniga *_name qo'shadi. Ism bo'lsa, xom UUID qatorini yashiramiz.
+const ID_NAME_SIBLING: Record<string, string> = {
+  customer_id: "customer_name",
+  courier_id: "courier_name",
+  market_id: "market_name",
+  operator_id: "operator_name",
+  staff_id: "staff_name",
+  district_id: "district_name",
+  region_id: "region_name",
+};
+
+// Berilgan field xom *_id bo'lib, yonida ism bo'lsa — true (ya'ni yashiriladi).
+const isRedundantIdField = (key: string, data: Record<string, any>) => {
+  const sib = ID_NAME_SIBLING[key];
+  return !!(sib && data[sib]);
 };
 
 // Field qiymatini insonga moslab chiqaradi
@@ -346,6 +479,11 @@ const formatFieldValue = (key: string, value: any): React.ReactNode => {
     return <span>{PAYMENT_METHOD_LABEL[String(value)] || String(value)}</span>;
   }
 
+  // Login xatosi sababi
+  if (key === "reason") {
+    return <span>{LOGIN_FAIL_REASON[String(value)] || String(value)}</span>;
+  }
+
   // Yetkazib berish
   if (key === "where_deliver") {
     return <span>{WHERE_DELIVER_LABEL[String(value)] || String(value)}</span>;
@@ -379,7 +517,10 @@ const formatFieldValue = (key: string, value: any): React.ReactNode => {
 
 // Bitta obyektdagi field'larni jadval qator sifatida chiqaradi
 const RenderFields: React.FC<{ data: Record<string, any> }> = ({ data }) => {
-  const entries = Object.entries(data).filter(([_, v]) => v !== null && v !== undefined && v !== "");
+  const entries = Object.entries(data).filter(
+    ([k, v]) =>
+      v !== null && v !== undefined && v !== "" && !isRedundantIdField(k, data),
+  );
   if (entries.length === 0) return <span className="text-xs text-gray-400">Bo'sh</span>;
   return (
     <div className="grid grid-cols-1 gap-1.5">
@@ -401,7 +542,11 @@ const DiffFields: React.FC<{ oldData: Record<string, any>; newData: Record<strin
   newData,
 }) => {
   const allKeys = Array.from(new Set([...Object.keys(oldData), ...Object.keys(newData)])).filter(
-    (k) => oldData[k] !== null && oldData[k] !== undefined || newData[k] !== null && newData[k] !== undefined,
+    (k) =>
+      ((oldData[k] !== null && oldData[k] !== undefined) ||
+        (newData[k] !== null && newData[k] !== undefined)) &&
+      !isRedundantIdField(k, oldData) &&
+      !isRedundantIdField(k, newData),
   );
   if (allKeys.length === 0) return null;
   return (
@@ -443,8 +588,15 @@ const EntitySummary: React.FC<{ log: LogRow }> = ({ log }) => {
   if (log.entity_type === "order") {
     return (
       <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/40 space-y-1.5">
-        <div className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400 font-semibold">
-          Buyurtma ma'lumoti
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-400 font-semibold">
+            Buyurtma ma'lumoti
+          </div>
+          {s.order_number != null && (
+            <span className="text-xs font-bold text-blue-700 dark:text-blue-300">
+              #{s.order_number}
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-1 gap-1 text-xs">
           {s.customer_name && (
@@ -470,6 +622,25 @@ const EntitySummary: React.FC<{ log: LogRow }> = ({ log }) => {
               </span>
             </div>
           )}
+          {(s.district_name || s.region_name) && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">Manzil:</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">
+                {[s.region_name, s.district_name].filter(Boolean).join(", ")}
+              </span>
+            </div>
+          )}
+          {s.ldg_tracking && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 min-w-[80px]">LDG kuzatuv:</span>
+              <span className="font-mono text-gray-700 dark:text-gray-300">
+                {s.ldg_tracking}
+                {s.ldg_status && (
+                  <span className="ml-2 text-gray-500">({s.ldg_status})</span>
+                )}
+              </span>
+            </div>
+          )}
           {s.status && (
             <div className="flex gap-2">
               <span className="text-gray-500 min-w-[80px]">Hozirgi holat:</span>
@@ -484,8 +655,15 @@ const EntitySummary: React.FC<{ log: LogRow }> = ({ log }) => {
   if (log.entity_type === "post") {
     return (
       <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-900/40 space-y-1.5">
-        <div className="text-[10px] uppercase tracking-wide text-purple-600 dark:text-purple-400 font-semibold">
-          Pochta ma'lumoti
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[10px] uppercase tracking-wide text-purple-600 dark:text-purple-400 font-semibold">
+            Pochta ma'lumoti
+          </div>
+          {postRef(s) && (
+            <span className="text-[11px] font-medium text-purple-700 dark:text-purple-300 truncate max-w-[60%]">
+              {postRef(s)}
+            </span>
+          )}
         </div>
         <div className="grid grid-cols-1 gap-1 text-xs">
           {s.region_name && (
@@ -515,7 +693,9 @@ const EntitySummary: React.FC<{ log: LogRow }> = ({ log }) => {
           {s.status && (
             <div className="flex gap-2">
               <span className="text-gray-500 min-w-[80px]">Holat:</span>
-              <span className="text-gray-700 dark:text-gray-300">{s.status}</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+                {postStatusPill(s.status)}
+              </span>
             </div>
           )}
           {s.qr_code_token && (
@@ -576,9 +756,36 @@ const EntitySummary: React.FC<{ log: LogRow }> = ({ log }) => {
           {s.cashbox_type && (
             <div className="flex gap-2">
               <span className="text-gray-500 min-w-[80px]">Turi:</span>
-              <span className="text-gray-700 dark:text-gray-300">{s.cashbox_type}</span>
+              <span className="text-gray-700 dark:text-gray-300">
+                {CASHBOX_TYPE_LABEL[String(s.cashbox_type)] || s.cashbox_type}
+              </span>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Nomli config/katalog entity'lari (region/district/product/integration)
+  if (
+    ["region", "district", "product", "integration"].includes(log.entity_type) &&
+    s.name
+  ) {
+    const iconMap: Record<string, any> = {
+      region: MapPin,
+      district: MapPin,
+      product: Box,
+      integration: Plug,
+    };
+    const Icon = iconMap[log.entity_type] || FileText;
+    return (
+      <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 space-y-1.5">
+        <div className="text-[10px] uppercase tracking-wide text-slate-600 dark:text-slate-400 font-semibold">
+          {ENTITY_LABEL[log.entity_type] || log.entity_type}
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <Icon className="w-3.5 h-3.5 text-slate-400" />
+          <span className="font-medium text-gray-800 dark:text-gray-200">{s.name}</span>
         </div>
       </div>
     );
@@ -687,6 +894,12 @@ const describeLog = (log: LogRow): { title: string; extras: React.ReactNode } =>
         <div className="flex flex-wrap items-center gap-2 mt-2">
           <StatusTransition from={fromStatus} to={toStatus} />
           {amount != null && <AmountPill amount={amount} />}
+          {log.metadata?.source && SOURCE_LABEL[log.metadata.source] && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+              <Globe className="w-3 h-3" />
+              {SOURCE_LABEL[log.metadata.source]}
+            </span>
+          )}
           {/* Bog'liq entity — mijoz va market nomi kartochkada ham ko'rinadi */}
           {s?.customer_name && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400">
@@ -756,10 +969,10 @@ const describeLog = (log: LogRow): { title: string; extras: React.ReactNode } =>
               {PAYMENT_METHOD_LABEL[nv.payment_method] || nv.payment_method}
             </span>
           )}
-          {nv.staff_name && (
+          {(nv.counterparty_name || nv.staff_name) && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
-              <Briefcase className="w-3 h-3" />
-              {nv.staff_name}
+              {log.action === "salary" ? <Briefcase className="w-3 h-3" /> : <User className="w-3 h-3" />}
+              {nv.counterparty_name || nv.staff_name}
             </span>
           )}
           {nv.comment && (
@@ -873,7 +1086,11 @@ const LogCard: React.FC<{
             {log.entity_id && (
               <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 font-mono">
                 <Hash className="w-3 h-3" />
-                {shortId(log.entity_id)}
+                {log.entity_type === "order"
+                  ? orderRef(log)
+                  : log.entity_type === "post"
+                    ? postRef(log.entity_summary) || shortId(log.entity_id)
+                    : shortId(log.entity_id)}
               </span>
             )}
             {canOpenTimeline && (
@@ -967,6 +1184,15 @@ const TimelineDrawer: React.FC<{
 
   const logs: LogRow[] = (data?.data?.logs || []).slice().reverse(); // oldest first for timeline
 
+  // Sarlavhada xom UUID o'rniga o'qiladigan identifikator (#100042 / region·kuryer).
+  const summary = logs[0]?.entity_summary;
+  const headerRef =
+    entityType === "order" && summary?.order_number != null
+      ? `#${summary.order_number}`
+      : entityType === "post"
+        ? postRef(summary) || entityId
+        : entityId;
+
   return (
     <Drawer
       open={open}
@@ -979,7 +1205,7 @@ const TimelineDrawer: React.FC<{
             <div className="font-bold text-gray-800 dark:text-white">
               {ENTITY_LABEL[entityType || ""] || entityType} tarixi
             </div>
-            <div className="text-xs text-gray-400 font-mono">{entityId}</div>
+            <div className="text-xs text-gray-400 font-mono">{headerRef}</div>
           </div>
         </div>
       }

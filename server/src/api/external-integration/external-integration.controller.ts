@@ -15,6 +15,8 @@ import { CreateIntegrationDto, UpdateIntegrationDto } from './dto';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Roles } from 'src/common/enums';
 
 @ApiTags('External Integration')
@@ -55,22 +57,26 @@ export class ExternalIntegrationController {
   @Post()
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @ApiOperation({ summary: 'Yangi integratsiya yaratish' })
-  create(@Body() dto: CreateIntegrationDto) {
-    return this.service.create(dto);
+  create(@Body() dto: CreateIntegrationDto, @CurrentUser() user: JwtPayload) {
+    return this.service.create(dto, user);
   }
 
   @Patch(':id')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @ApiOperation({ summary: 'Integratsiyani yangilash' })
-  update(@Param('id') id: string, @Body() dto: UpdateIntegrationDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateIntegrationDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.update(id, dto, user);
   }
 
   @Delete(':id')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @ApiOperation({ summary: "Integratsiyani o'chirish" })
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.service.remove(id, user);
   }
 
   @Post(':id/test')

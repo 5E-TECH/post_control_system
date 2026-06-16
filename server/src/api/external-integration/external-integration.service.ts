@@ -18,12 +18,23 @@ import {
 import { IntegrationSyncHistoryEntity } from 'src/core/entity/integration-sync-history.entity';
 import { CreateIntegrationDto, UpdateIntegrationDto } from './dto';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 
 // Token cache interfeysi
 interface TokenCache {
   token: string;
   expiresAt: number;
 }
+
+// Audit logga HECH QACHON xom yozilmaydigan maxfiy maydonlar
+const INTEGRATION_SECRET_FIELDS = new Set([
+  'api_key',
+  'api_secret',
+  'password',
+  'username',
+  'auth_url',
+]);
 
 @Injectable()
 export class ExternalIntegrationService {
@@ -36,7 +47,27 @@ export class ExternalIntegrationService {
     @InjectRepository(IntegrationSyncHistoryEntity)
     private readonly historyRepo: Repository<IntegrationSyncHistoryEntity>,
     private readonly httpService: HttpService,
+    private readonly activityLog: ActivityLogService,
   ) {}
+
+  // dto'dan maxfiy bo'lmagan o'zgargan maydonlarni ajratadi; maxfiylarni
+  // faqat nom sifatida masked_fields ga qo'shadi (qiymatsiz).
+  private splitSecrets(dto: Record<string, any>): {
+    safe: Record<string, any>;
+    maskedFields: string[];
+  } {
+    const safe: Record<string, any> = {};
+    const maskedFields: string[] = [];
+    for (const key of Object.keys(dto)) {
+      if (dto[key] === undefined) continue;
+      if (INTEGRATION_SECRET_FIELDS.has(key)) {
+        maskedFields.push(key);
+        continue;
+      }
+      safe[key] = dto[key];
+    }
+    return { safe, maskedFields };
+  }
 
   // Barcha integratsiyalarni olish
   async findAll() {
@@ -102,7 +133,7 @@ export class ExternalIntegrationService {
   }
 
   // Yangi integratsiya yaratish
-  async create(dto: CreateIntegrationDto) {
+  async create(dto: CreateIntegrationDto, actor?: JwtPayload) {
     try {
       // Slug unique tekshirish
       const exists = await this.repo.findOne({ where: { slug: dto.slug } });
@@ -138,6 +169,22 @@ export class ExternalIntegrationService {
 
       await this.repo.save(integration);
 
+      const { maskedFields } = this.splitSecrets(dto);
+      this.activityLog.log({
+        entity_type: 'integration',
+        entity_id: integration.id,
+        action: 'created',
+        new_value: {
+          name: integration.name,
+          slug: integration.slug,
+          ...(maskedFields.length ? { masked_fields: maskedFields } : {}),
+        },
+        description: `Integratsiya yaratildi: ${integration.name}${
+          maskedFields.length ? ` (maxfiy: ${maskedFields.join(', ')})` : ''
+        }`,
+        user: actor,
+      });
+
       // Market bilan qaytarish
       const result = await this.repo.findOne({
         where: { id: integration.id },
@@ -151,7 +198,7 @@ export class ExternalIntegrationService {
   }
 
   // Integratsiyani yangilash
-  async update(id: string, dto: UpdateIntegrationDto) {
+  async update(id: string, dto: UpdateIntegrationDto, actor?: JwtPayload) {
     try {
       const integration = await this.repo.findOne({ where: { id } });
 
@@ -193,6 +240,22 @@ export class ExternalIntegrationService {
 
       await this.repo.update(id, dto);
 
+      const { safe, maskedFields } = this.splitSecrets(dto);
+      this.activityLog.log({
+        entity_type: 'integration',
+        entity_id: id,
+        action: 'config_changed',
+        new_value: {
+          name: integration.name,
+          ...safe,
+          ...(maskedFields.length ? { masked_fields: maskedFields } : {}),
+        },
+        description: `Integratsiya o'zgartirildi: ${integration.name}${
+          maskedFields.length ? ` (maxfiy: ${maskedFields.join(', ')})` : ''
+        }`,
+        user: actor,
+      });
+
       const result = await this.repo.findOne({
         where: { id },
         relations: ['market'],
@@ -205,7 +268,7 @@ export class ExternalIntegrationService {
   }
 
   // Integratsiyani o'chirish
-  async remove(id: string) {
+  async remove(id: string, actor?: JwtPayload) {
     try {
       const integration = await this.repo.findOne({ where: { id } });
 
@@ -214,6 +277,15 @@ export class ExternalIntegrationService {
       }
 
       await this.repo.delete(id);
+
+      this.activityLog.log({
+        entity_type: 'integration',
+        entity_id: id,
+        action: 'deleted',
+        old_value: { name: integration.name, slug: integration.slug },
+        description: `Integratsiya o'chirildi: ${integration.name}`,
+        user: actor,
+      });
 
       return successRes(null, 200, "Integratsiya muvaffaqiyatli o'chirildi");
     } catch (error) {

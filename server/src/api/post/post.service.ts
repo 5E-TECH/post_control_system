@@ -1500,14 +1500,20 @@ export class PostService {
         throw new BadRequestException('No orders provided');
       }
 
-      // 2️⃣ Faqat CANCELLED holatdagi orderlarni topish
-      const orders = await queryRunner.manager.find(OrderEntity, {
-        where: { id: In(order_ids), status: Order_status.CANCELLED },
-      });
+      // 2️⃣ Faqat CANCELLED holatdagi VA shu kuryerga biriktirilgan orderlarni topish.
+      //    Egalik post.courier_id orqali tekshiriladi — kuryer faqat o'zining
+      //    bekor qilingan buyurtmalarini qaytarish-postiga yig'a oladi (IDOR oldini olish).
+      const orders = await queryRunner.manager
+        .createQueryBuilder(OrderEntity, 'o')
+        .innerJoin('o.post', 'p')
+        .where('o.id IN (:...ids)', { ids: order_ids })
+        .andWhere('o.status = :st', { st: Order_status.CANCELLED })
+        .andWhere('p.courier_id = :uid', { uid: user.id })
+        .getMany();
 
       if (orders.length !== order_ids.length) {
         throw new BadRequestException(
-          'Some orders not found or not in Canceled status',
+          'Some orders not found, not in Canceled status, or not assigned to you',
         );
       }
 

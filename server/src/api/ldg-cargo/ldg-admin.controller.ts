@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -12,6 +14,8 @@ import { LdgAdminService } from './ldg-admin.service';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Roles } from 'src/common/enums';
 
 @ApiTags('LDG Cargo Admin')
@@ -52,8 +56,11 @@ export class LdgAdminController {
 
   @ApiOperation({ summary: 'Webhook log\'ni qayta ishlash (skip/failed uchun)' })
   @Post('webhook-logs/:deliveryId/reprocess')
-  async reprocessWebhook(@Param('deliveryId') deliveryId: string) {
-    return this.adminService.reprocessWebhook(deliveryId);
+  async reprocessWebhook(
+    @Param('deliveryId') deliveryId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.adminService.reprocessWebhook(deliveryId, user);
   }
 
   @ApiOperation({ summary: 'Jo\'natmalar (shipments) ro\'yxati' })
@@ -72,8 +79,11 @@ export class LdgAdminController {
 
   @ApiOperation({ summary: 'Shipmentni qayta LDG\'ga jo\'natish' })
   @Post('shipments/:orderId/redispatch')
-  async redispatch(@Param('orderId') orderId: string) {
-    return this.adminService.redispatch(orderId);
+  async redispatch(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.adminService.redispatch(orderId, user);
   }
 
   @ApiOperation({
@@ -88,8 +98,11 @@ export class LdgAdminController {
     summary: 'Bir guruh (10 ta) buyurtmani ketma-ket qayta jo\'natish',
   })
   @Post('shipments/redispatch-batch')
-  async redispatchBatch(@Body() body: { orderIds: string[] }) {
-    return this.adminService.redispatchBatch(body?.orderIds ?? []);
+  async redispatchBatch(
+    @Body() body: { orderIds: string[] },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.adminService.redispatchBatch(body?.orderIds ?? [], user);
   }
 
   @ApiOperation({
@@ -112,7 +125,60 @@ export class LdgAdminController {
     summary: 'Mismatch\'ni "hal qilindi" deb belgilash (admin tekshirib chiqqach)',
   })
   @Post('shipments/:orderId/resolve-mismatch')
-  async resolveMismatch(@Param('orderId') orderId: string) {
-    return this.adminService.resolveMismatch(orderId);
+  async resolveMismatch(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.adminService.resolveMismatch(orderId, user);
+  }
+
+  // ===== BULK REDISPATCH (server tomonida, persistent) =====
+
+  @ApiOperation({ summary: 'Barcha faol yuborilmaganlarni qayta jo\'natishni boshlash' })
+  @Post('bulk-redispatch/start')
+  async bulkRedispatchStart(@CurrentUser() user: JwtPayload) {
+    return this.adminService.startBulkRedispatch(user);
+  }
+
+  @ApiOperation({ summary: 'Bulk jo\'natishni qo\'lda to\'xtatish' })
+  @Post('bulk-redispatch/stop')
+  async bulkRedispatchStop() {
+    return this.adminService.stopBulkRedispatch();
+  }
+
+  @ApiOperation({ summary: 'Bulk jo\'natish holati (progress poll)' })
+  @Get('bulk-redispatch/status')
+  async bulkRedispatchStatus() {
+    return this.adminService.getBulkRedispatchStatus();
+  }
+
+  // ===== AVTOMATIKA BOSHQARUVI =====
+
+  @ApiOperation({ summary: 'Fon jarayonlari holati (webhook/reconcile/auto-retry/bulk)' })
+  @Get('automations')
+  async automations() {
+    return this.adminService.getAutomations();
+  }
+
+  @ApiOperation({ summary: 'Fon jarayonini yoqish/o\'chirish' })
+  @Patch('automations')
+  async setAutomation(
+    @Body()
+    body: {
+      key: 'webhook_enabled' | 'reconcile_enabled' | 'auto_retry_enabled';
+      value: boolean;
+    },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.adminService.setAutomation(body.key, body.value, user);
+  }
+
+  @ApiOperation({ summary: 'Webhook log\'ni o\'chirish' })
+  @Delete('webhook-logs/:deliveryId')
+  async deleteWebhookLog(
+    @Param('deliveryId') deliveryId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.adminService.deleteWebhookLog(deliveryId, user);
   }
 }

@@ -1,13 +1,5 @@
 import { useState } from "react";
-import {
-  Table,
-  Tag,
-  Button,
-  Segmented,
-  Tooltip,
-  message,
-  Popconfirm,
-} from "antd";
+import { Table, Tag, Button, Tooltip, message, Popconfirm } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import {
   RotateCcw,
@@ -15,11 +7,16 @@ import {
   DownloadCloud,
   AlertTriangle,
   CheckCircle2,
+  PackageX,
+  PackageCheck,
+  Layers,
+  XCircle,
 } from "lucide-react";
 import {
   useLdgAdmin,
   type LdgShipmentRow,
 } from "../../../shared/api/hooks/useLdgAdmin";
+import { FilterPills } from "./FilterPills";
 
 const ldgStatusColor = (status: string | null): string => {
   if (!status) return "default";
@@ -50,27 +47,22 @@ const ldgStatusLabel = (status: string | null): string => {
   return LDG_STATUS_LABELS[status.toUpperCase()] ?? status;
 };
 
-// "Hammasini qayta jo'natish"da bir guruhdagi buyurtmalar soni (10 tadan).
-const REDISPATCH_BATCH_SIZE = 10;
-
 export const LdgShipmentsTab = () => {
   const {
     getShipments,
     redispatch,
-    getRetryCandidates,
-    redispatchBatch,
     syncOne,
     resolveMismatch,
+    getBulkStatus,
+    startBulk,
+    getHealth,
   } = useLdgAdmin();
+  const { data: health } = getHealth(true);
+  const s = health?.shipments;
   const [filter, setFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
-  const [bulkRunning, setBulkRunning] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState<{
-    done: number;
-    total: number;
-  } | null>(null);
   const limit = 20;
 
   const { data, isLoading, isFetching, refetch } = getShipments({
@@ -78,6 +70,10 @@ export const LdgShipmentsTab = () => {
     limit,
     filter,
   });
+
+  // Server tomonidagi bulk-job holati (progress widget ham shu bilan ishlaydi).
+  const { data: bulkStatus } = getBulkStatus(true, true);
+  const bulkRunning = !!bulkStatus?.running;
 
   const handleRedispatch = async (orderId: string) => {
     try {
@@ -92,47 +88,21 @@ export const LdgShipmentsTab = () => {
     }
   };
 
-  // Yuborilmagan/xatoli barcha jo'natmalarni bitta bosishda qayta jo'natish.
-  // Tashqaridan bitta amal ko'rinadi, lekin ichida 10 tadan ketma-ket yuboriladi
-  // (LDG rate-limitiga urilmaslik uchun) va progress ko'rsatiladi.
+  // Yuborilmagan/xatoli barcha (faol) jo'natmalarni qayta jo'natishni boshlaydi.
+  // Jarayon SERVER tomonida ishlaydi — sahifa yopilsa/refresh bo'lsa ham davom
+  // etadi. Progress global widget'da ko'rinadi va u yerdan to'xtatish mumkin.
   const handleRedispatchAll = async () => {
-    setBulkRunning(true);
     try {
-      const ids = await getRetryCandidates();
-      if (!ids.length) {
-        message.info("Qayta jo'natiladigan jo'natma yo'q");
-        return;
-      }
-      setBulkProgress({ done: 0, total: ids.length });
-      let success = 0;
-      let failed = 0;
-      for (let i = 0; i < ids.length; i += REDISPATCH_BATCH_SIZE) {
-        const chunk = ids.slice(i, i + REDISPATCH_BATCH_SIZE);
-        try {
-          const res = await redispatchBatch.mutateAsync(chunk);
-          success += res.success;
-          failed += res.failed;
-        } catch {
-          failed += chunk.length;
-        }
-        setBulkProgress({
-          done: Math.min(i + REDISPATCH_BATCH_SIZE, ids.length),
-          total: ids.length,
-        });
-      }
-      if (failed > 0) {
-        message.warning(
-          `Tugadi: ${success} ta jo'natildi, ${failed} ta xato (keyinroq avtomatik qayta uriniladi)`,
-        );
+      const r = await startBulk.mutateAsync();
+      // Global progress panelini ochamiz (qaysi sahifada bo'lishidan qat'i nazar).
+      window.dispatchEvent(new Event("ldg-bulk-open"));
+      if (r.started) {
+        message.success(r.message);
       } else {
-        message.success(`Tugadi: ${success} ta jo'natma LDG'ga jo'natildi`);
+        message.info(r.message);
       }
-      refetch();
     } catch {
-      message.error("Ommaviy qayta jo'natishda xatolik");
-    } finally {
-      setBulkRunning(false);
-      setBulkProgress(null);
+      message.error("Ommaviy qayta jo'natishni boshlashda xatolik");
     }
   };
 
@@ -173,35 +143,50 @@ export const LdgShipmentsTab = () => {
       title: "№",
       dataIndex: "order_number",
       key: "order_number",
-      width: 80,
+      width: 90,
+      fixed: "left",
       render: (v: number | null) =>
-        v != null ? <span className="font-semibold">#{v}</span> : "—",
+        v != null ? (
+          <span className="font-semibold text-violet-600 dark:text-violet-400">
+            #{v}
+          </span>
+        ) : (
+          <span className="text-gray-400">—</span>
+        ),
     },
     {
       title: "Mijoz",
-      dataIndex: "customer_name",
-      key: "customer_name",
+      key: "customer",
+      width: 180,
       render: (_: unknown, row) => (
-        <div>
-          <div className="font-medium">{row.customer_name ?? "—"}</div>
-          <div className="text-xs text-gray-400">{row.customer_phone ?? ""}</div>
+        <div className="leading-tight">
+          <div className="font-medium text-gray-800 dark:text-gray-100 truncate">
+            {row.customer_name ?? "—"}
+          </div>
+          {row.customer_phone && (
+            <div className="text-xs text-gray-400">{row.customer_phone}</div>
+          )}
         </div>
       ),
     },
     {
-      title: "Viloyat / Tuman",
+      title: "Manzil",
       key: "region_district",
+      width: 170,
       render: (_: unknown, row) => {
-        const parts = [row.region_name, row.district_name].filter(Boolean);
-        return parts.length ? (
-          <div>
-            <div>{row.region_name ?? "—"}</div>
+        if (!row.region_name && !row.district_name)
+          return <span className="text-gray-400">—</span>;
+        return (
+          <div className="leading-tight">
+            <div className="text-gray-700 dark:text-gray-200 truncate">
+              {row.region_name ?? "—"}
+            </div>
             {row.district_name && (
-              <div className="text-xs text-gray-400">{row.district_name}</div>
+              <div className="text-xs text-gray-400 truncate">
+                {row.district_name}
+              </div>
             )}
           </div>
-        ) : (
-          "—"
         );
       },
     },
@@ -209,63 +194,87 @@ export const LdgShipmentsTab = () => {
       title: "Market",
       dataIndex: "market_name",
       key: "market_name",
-      render: (v: string | null) => v ?? "—",
+      width: 120,
+      ellipsis: true,
+      render: (v: string | null) => v ?? <span className="text-gray-400">—</span>,
     },
     {
       title: "Summa",
       dataIndex: "order_total_price",
       key: "order_total_price",
+      width: 120,
+      align: "right",
       render: (v: number | null) =>
-        v != null ? `${v.toLocaleString("uz-UZ")} so'm` : "—",
+        v != null ? (
+          <span className="font-medium whitespace-nowrap">
+            {Number(v).toLocaleString("uz-UZ")} so'm
+          </span>
+        ) : (
+          <span className="text-gray-400">—</span>
+        ),
     },
     {
-      title: "Order holati",
-      dataIndex: "order_status",
-      key: "order_status",
-      render: (v: string | null) => <Tag>{v ?? "—"}</Tag>,
-    },
-    {
-      title: "LDG status",
-      dataIndex: "ldg_status",
-      key: "ldg_status",
-      render: (v: string | null) => (
-        <Tag color={ldgStatusColor(v)}>{ldgStatusLabel(v)}</Tag>
+      title: "Holat",
+      key: "status",
+      width: 150,
+      render: (_: unknown, row) => (
+        <div className="flex flex-col items-start gap-1">
+          <Tag className="m-0">{row.order_status ?? "—"}</Tag>
+          <Tag color={ldgStatusColor(row.ldg_status)} className="m-0">
+            {ldgStatusLabel(row.ldg_status)}
+          </Tag>
+        </div>
       ),
     },
     {
-      title: "Tracking",
-      dataIndex: "tracking_number",
-      key: "tracking_number",
-      render: (v: string | null) =>
-        v ? <span className="font-mono text-xs">{v}</span> : "—",
-    },
-    {
-      title: "LDG ID",
-      dataIndex: "ldg_order_id",
-      key: "ldg_order_id",
-      render: (v: number | null) => v ?? <Tag color="orange">yuborilmagan</Tag>,
+      title: "LDG paket",
+      key: "ldg",
+      width: 160,
+      render: (_: unknown, row) =>
+        row.ldg_order_id ? (
+          <div className="leading-tight">
+            <div className="text-xs">
+              <span className="text-gray-400">ID:</span>{" "}
+              <span className="font-semibold">{row.ldg_order_id}</span>
+            </div>
+            {row.tracking_number && (
+              <div
+                className="font-mono text-[11px] text-gray-500 truncate"
+                title={row.tracking_number}
+              >
+                {row.tracking_number}
+              </div>
+            )}
+          </div>
+        ) : (
+          <Tag color="gold">yuborilmagan</Tag>
+        ),
     },
     {
       title: "Urinish",
-      dataIndex: "send_attempts",
-      key: "send_attempts",
-    },
-    {
-      title: "Oxirgi tekshiruv",
-      dataIndex: "last_synced_at",
-      key: "last_synced_at",
-      render: (v: number | null) =>
-        v ? (
-          <span className="text-xs text-gray-500">
-            {new Date(Number(v)).toLocaleString("uz-UZ")}
+      key: "attempts",
+      width: 100,
+      align: "center",
+      render: (_: unknown, row) => (
+        <Tooltip
+          title={
+            row.last_synced_at
+              ? `Oxirgi tekshiruv: ${new Date(
+                  Number(row.last_synced_at),
+                ).toLocaleString("uz-UZ")}`
+              : "Hali tekshirilmagan"
+          }
+        >
+          <span className="inline-flex min-w-[28px] items-center justify-center rounded-md bg-gray-100 dark:bg-gray-700 px-2 py-0.5 text-sm font-medium">
+            {row.send_attempts}
           </span>
-        ) : (
-          <span className="text-xs text-gray-400">—</span>
-        ),
+        </Tooltip>
+      ),
     },
     {
       title: "Xato / Mismatch",
       key: "error_or_mismatch",
+      width: 220,
       render: (_: unknown, row) => {
         if (row.mismatch_at && row.mismatch_reason) {
           return (
@@ -282,51 +291,52 @@ export const LdgShipmentsTab = () => {
         if (row.last_error) {
           return (
             <Tooltip title={row.last_error}>
-              <span className="text-red-500 text-xs line-clamp-2 max-w-[220px] inline-block">
+              <span className="text-red-500 text-xs line-clamp-2 inline-block">
                 {row.last_error}
               </span>
             </Tooltip>
           );
         }
-        return "—";
+        return <span className="text-gray-400">—</span>;
       },
     },
     {
       title: "Amal",
       key: "action",
       fixed: "right",
-      width: 260,
+      width: 110,
+      align: "center",
       render: (_: unknown, row) => (
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex items-center justify-center gap-1.5">
           {row.mismatch_at && (
             <Popconfirm
-              title="Mismatch'ni hal qilindi deb belgilashmi?"
-              description="Faqat qo'lda tekshirib, kassa va status mosligini ta'minlaganingizdan keyin bosing."
+              title="Mismatch hal qilindimi?"
+              description="Faqat qo'lda tekshirib, kassa va status mosligini ta'minlagach bosing."
               okText="Ha, hal qilindi"
               cancelText="Yo'q"
               onConfirm={() => handleResolveMismatch(row.order_id)}
             >
-              <Button
-                size="small"
-                type="primary"
-                danger
-                icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-                loading={resolveMismatch.isPending && resolvingId === row.order_id}
-              >
-                Hal qilindi
-              </Button>
+              <Tooltip title="Mismatch — hal qilindi deb belgilash">
+                <Button
+                  size="small"
+                  type="primary"
+                  danger
+                  icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                  loading={
+                    resolveMismatch.isPending && resolvingId === row.order_id
+                  }
+                />
+              </Tooltip>
             </Popconfirm>
           )}
           {row.ldg_order_id ? (
-            <Tooltip title="LDG'dan joriy statusni tortib olib, order holatini yangilaydi">
+            <Tooltip title="LDG'dan joriy statusni tortib olish">
               <Button
                 size="small"
                 icon={<DownloadCloud className="w-3.5 h-3.5" />}
                 loading={syncOne.isPending && syncingId === row.order_id}
                 onClick={() => handleSync(row.order_id)}
-              >
-                LDG'dan tekshirish
-              </Button>
+              />
             </Tooltip>
           ) : (
             <Popconfirm
@@ -336,13 +346,13 @@ export const LdgShipmentsTab = () => {
               cancelText="Yo'q"
               onConfirm={() => handleRedispatch(row.order_id)}
             >
-              <Button
-                size="small"
-                icon={<RotateCcw className="w-3.5 h-3.5" />}
-                loading={redispatch.isPending}
-              >
-                Qayta jo'natish
-              </Button>
+              <Tooltip title="LDG'ga qayta jo'natish">
+                <Button
+                  size="small"
+                  icon={<RotateCcw className="w-3.5 h-3.5" />}
+                  loading={redispatch.isPending}
+                />
+              </Tooltip>
             </Popconfirm>
           )}
         </div>
@@ -353,43 +363,66 @@ export const LdgShipmentsTab = () => {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <Segmented
+        <FilterPills
           value={filter}
           onChange={(v) => {
-            setFilter(v as string);
+            setFilter(v);
             setPage(1);
           }}
           options={[
-            { label: "Barchasi", value: "all" },
-            { label: "Yuborilmagan", value: "pending" },
-            { label: "Xatoli", value: "error" },
-            { label: "Yetkazilgan", value: "delivered" },
             {
-              label: (
-                <span className="flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Mismatch
-                </span>
-              ),
+              value: "all",
+              label: "Barchasi",
+              icon: <Layers className="w-3.5 h-3.5" />,
+              count: s?.total,
+            },
+            {
+              value: "pending",
+              label: "Yuborilmagan",
+              icon: <PackageX className="w-3.5 h-3.5" />,
+              count: s?.pending,
+              activeClass: "bg-blue-600 text-white border-blue-600",
+            },
+            {
+              value: "error",
+              label: "Xatoli",
+              icon: <XCircle className="w-3.5 h-3.5" />,
+              count: s?.with_error,
+              activeClass: "bg-red-600 text-white border-red-600",
+            },
+            {
+              value: "delivered",
+              label: "Yetkazilgan",
+              icon: <PackageCheck className="w-3.5 h-3.5" />,
+              count: s?.delivered,
+              activeClass: "bg-green-600 text-white border-green-600",
+            },
+            {
               value: "mismatch",
+              label: "Mismatch",
+              icon: <AlertTriangle className="w-3.5 h-3.5" />,
+              count: s?.mismatch,
+              activeClass: "bg-orange-500 text-white border-orange-500",
             },
           ]}
         />
         <div className="flex items-center gap-2">
           <Popconfirm
             title="Hammasini qayta jo'natish"
-            description="Barcha yuborilmagan/xatoli jo'natmalar LDG'ga 10 tadan qayta jo'natiladi. Davom etilsinmi?"
-            okText="Ha, jo'nat"
+            description="Barcha yuborilmagan (faol) buyurtmalar LDG'ga jo'natiladi. Jarayon server tomonida ishlaydi — sahifani yopsangiz ham davom etadi. Davom etilsinmi?"
+            okText="Ha, boshla"
             cancelText="Yo'q"
             onConfirm={handleRedispatchAll}
+            disabled={bulkRunning}
           >
             <Button
               type="primary"
               icon={<RotateCcw className="w-4 h-4" />}
-              loading={bulkRunning}
+              loading={startBulk.isPending}
+              disabled={bulkRunning}
             >
-              {bulkProgress
-                ? `Jo'natilmoqda ${bulkProgress.done}/${bulkProgress.total}`
+              {bulkRunning
+                ? `Jo'natilmoqda ${bulkStatus?.done ?? 0}/${bulkStatus?.total ?? 0}`
                 : "Hammasini qayta jo'natish"}
             </Button>
           </Popconfirm>
@@ -403,21 +436,25 @@ export const LdgShipmentsTab = () => {
         </div>
       </div>
 
-      <Table<LdgShipmentRow>
-        rowKey="id"
-        loading={isLoading}
-        columns={columns}
-        dataSource={data?.data ?? []}
-        scroll={{ x: 1500 }}
-        size="small"
-        pagination={{
-          current: page,
-          pageSize: limit,
-          total: data?.total ?? 0,
-          showSizeChanger: false,
-          onChange: (p) => setPage(p),
-        }}
-      />
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <Table<LdgShipmentRow>
+          rowKey="id"
+          loading={isLoading}
+          columns={columns}
+          dataSource={data?.data ?? []}
+          scroll={{ x: 1420 }}
+          size="small"
+          tableLayout="fixed"
+          pagination={{
+            current: page,
+            pageSize: limit,
+            total: data?.total ?? 0,
+            showSizeChanger: false,
+            onChange: (p) => setPage(p),
+            className: "px-3",
+          }}
+        />
+      </div>
     </div>
   );
 };

@@ -4,11 +4,14 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -44,9 +47,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
       }
     } else if (exception instanceof Error) {
+      // Kutilmagan server xatosi — to'liq tafsilot (stack) faqat server
+      // logiga yoziladi, mijozga hech qachon xom matn qaytarilmaydi.
+      this.logger.error(exception.message, exception.stack);
+
       const message = exception.message || '';
 
-      // Database errorlarni to'g'ri ko'rsatish
+      // Database errorlarni foydalanuvchiga tushunarli ko'rsatish
       if (
         message.includes('duplicate key') ||
         message.includes('unique constraint')
@@ -62,7 +69,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ) {
         error_message = "Ma'lumotlar bazasiga ulanishda xatolik";
       } else {
-        error_message = message || "Noma'lum xatolik yuz berdi";
+        // Xom xatolik matni (ichki/DB tafsilotlari) mijozga sizmasligi uchun
+        // umumiy xabar qaytaramiz.
+        error_message = "Ichki server xatosi yuz berdi";
       }
     }
     const error_response = {

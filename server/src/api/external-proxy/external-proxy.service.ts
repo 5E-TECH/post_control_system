@@ -75,9 +75,8 @@ export class ExternalProxyService {
         searchUrl = `${apiUrl}/qrorder/find`;
       }
 
-      console.log('🔍 QR Search URL:', searchUrl);
-      console.log('🔍 QR Code:', qrCode);
-      console.log('🔍 Token preview:', token.substring(0, 30) + '...');
+      // Eslatma: ilgari bu yerda QR kod va token preview console'ga chiqarilardi —
+      // bu maxfiy ma'lumot (token/PII) stdout'ga sizib chiqishi sabab olib tashlandi.
 
       // So'rov yuborish
       const response = await firstValueFrom(

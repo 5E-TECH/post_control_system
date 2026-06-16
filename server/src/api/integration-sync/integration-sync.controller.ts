@@ -12,6 +12,8 @@ import { IntegrationSyncService } from './integration-sync.service';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Roles } from 'src/common/enums';
 
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -116,8 +118,11 @@ export class IntegrationSyncController {
    */
   @Post('retry-all-failed')
   @AcceptRoles(Roles.SUPERADMIN)
-  async retryAllFailed(@Query('integration_id') integrationId?: string) {
-    return this.syncService.retryAllFailedSyncs(integrationId);
+  async retryAllFailed(
+    @CurrentUser() user: JwtPayload,
+    @Query('integration_id') integrationId?: string,
+  ) {
+    return this.syncService.retryAllFailedSyncs(integrationId, user);
   }
 
   /**
@@ -125,8 +130,8 @@ export class IntegrationSyncController {
    */
   @Delete(':id')
   @AcceptRoles(Roles.SUPERADMIN)
-  async deleteSync(@Param('id') id: string) {
-    return this.syncService.deleteSyncJob(id);
+  async deleteSync(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.syncService.deleteSyncJob(id, user);
   }
 
   /**

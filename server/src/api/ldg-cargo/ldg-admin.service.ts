@@ -9,6 +9,8 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { LdgApiService } from './ldg-api.service';
 import { LdgShipmentService } from './ldg-shipment.service';
 import { LdgWebhookService } from './ldg-webhook.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Order_status } from 'src/common/enums';
 
 const WEBHOOK_LOG_RETENTION_DAYS = 30;
@@ -48,9 +50,36 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
+/** Bulk redispatch jobning server tomonidagi (persistent) holati. */
+export interface BulkRedispatchState {
+  running: boolean;
+  total: number;
+  done: number;
+  success: number;
+  failed: number;
+  started_at: number | null;
+  finished_at: number | null;
+  stop_requested: boolean;
+  last_error: string | null;
+}
+
 @Injectable()
 export class LdgAdminService {
   private readonly logger = new Logger(LdgAdminService.name);
+
+  // Bulk redispatch — SERVER tomonida ishlaydigan, frontend refresh/navigatsiyadan
+  // omon qoladigan job. Faqat qo'lda to'xtatilguncha (yoki tugaguncha) ishlaydi.
+  private bulkJob: BulkRedispatchState = {
+    running: false,
+    total: 0,
+    done: 0,
+    success: 0,
+    failed: 0,
+    started_at: null,
+    finished_at: null,
+    stop_requested: false,
+    last_error: null,
+  };
 
   constructor(
     @InjectRepository(LdgConfigEntity)
@@ -64,6 +93,7 @@ export class LdgAdminService {
     private readonly apiService: LdgApiService,
     private readonly shipmentService: LdgShipmentService,
     private readonly webhookService: LdgWebhookService,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   /**
@@ -307,7 +337,20 @@ export class LdgAdminService {
    * Mismatch'ni "hal qilindi" deb belgilash — admin qo'lda tekshirib chiqqach.
    * Mismatch maydonlarini tozalaydi (audit uchun activity_log saqlanadi).
    */
-  async resolveMismatch(orderId: string): Promise<{ success: boolean; message: string }> {
+  /** LDG meta-amallari uchun audit anchor — singleton config'ning uuid id'si. */
+  private async ldgConfigId(): Promise<string | null> {
+    const c = await this.configRepo.findOne({
+      where: {},
+      select: ['id'],
+      order: { created_at: 'ASC' },
+    });
+    return c?.id ?? null;
+  }
+
+  async resolveMismatch(
+    orderId: string,
+    user?: JwtPayload,
+  ): Promise<{ success: boolean; message: string }> {
     const shipment = await this.shipmentRepo.findOne({
       where: { order_id: orderId },
     });
@@ -317,18 +360,36 @@ export class LdgAdminService {
     if (!shipment.mismatch_at) {
       return { success: false, message: 'Bu shipmentda mismatch yo\'q' };
     }
+    const prevReason = shipment.mismatch_reason;
     shipment.mismatch_at = null;
     shipment.mismatch_reason = null;
     await this.shipmentRepo.save(shipment);
+    // entity_type 'order' — enrichLogs order_number'ni avtomatik qo'shadi.
+    this.activityLog.log({
+      entity_type: 'order',
+      entity_id: orderId,
+      action: 'mismatch_resolved',
+      old_value: { mismatch_reason: prevReason },
+      description: `LDG nomuvofiqligi admin tomonidan hal qilindi`,
+      user,
+      metadata: { source: 'ldg' },
+    });
     return { success: true, message: 'Mismatch hal qilindi deb belgilandi' };
   }
 
   /**
    * Xatoli (yoki hali yuborilmagan) shipmentni qayta LDG'ga jo'natish.
    */
-  async redispatch(orderId: string): Promise<{ success: boolean; message: string }> {
+  async redispatch(
+    orderId: string,
+    user?: JwtPayload,
+  ): Promise<{ success: boolean; message: string }> {
     try {
-      const shipment = await this.shipmentService.createShipmentForOrder(orderId);
+      // actor uzatamiz — dispatch logi adminga tegishli ekanini ko'rsatadi.
+      const shipment = await this.shipmentService.createShipmentForOrder(
+        orderId,
+        user,
+      );
       return {
         success: true,
         message: `Qayta jo'natildi: ldg_order_id=${shipment.ldg_order_id ?? '-'}`,
@@ -365,7 +426,10 @@ export class LdgAdminService {
    * keltirib chiqarmaslikni ta'minlaydi. Hech qachon throw qilmaydi — har bir
    * order natijasi alohida qaytariladi.
    */
-  async redispatchBatch(orderIds: string[]): Promise<{
+  async redispatchBatch(
+    orderIds: string[],
+    user?: JwtPayload,
+  ): Promise<{
     total: number;
     success: number;
     failed: number;
@@ -381,7 +445,7 @@ export class LdgAdminService {
     let failed = 0;
 
     for (const orderId of ids) {
-      const r = await this.redispatch(orderId);
+      const r = await this.redispatch(orderId, user);
       if (r.success) success++;
       else failed++;
       results.push({ order_id: orderId, success: r.success, message: r.message });
@@ -391,11 +455,223 @@ export class LdgAdminService {
     return { total: ids.length, success, failed, results };
   }
 
+  // ===== BULK REDISPATCH (server tomonida, persistent) =====
+
+  /** Jorий bulk job holatini qaytaradi (frontend progress widget shu orqali poll qiladi). */
+  getBulkRedispatchStatus(): BulkRedispatchState {
+    return { ...this.bulkJob };
+  }
+
+  /**
+   * Barcha yuborilmagan (faol) buyurtmalarni qayta jo'natishni BOSHLAYDI.
+   * Job server tomonida ishlaydi — frontend yopilsa/refresh bo'lsa ham davom etadi,
+   * faqat qo'lda to'xtatilguncha. So'rovlar global yozish navbati orqali (1s oraliq)
+   * ketadi, shuning uchun LDG rate-limiti ham buzilmaydi.
+   */
+  // Bulk jobni boshlagan admin (per-order dispatch loglariga ulanadi).
+  private bulkActor?: JwtPayload;
+
+  async startBulkRedispatch(user?: JwtPayload): Promise<{
+    started: boolean;
+    message: string;
+    status: BulkRedispatchState;
+  }> {
+    if (this.bulkJob.running) {
+      return {
+        started: false,
+        message: 'Bulk jo\'natish allaqachon ishlamoqda',
+        status: this.getBulkRedispatchStatus(),
+      };
+    }
+    const ids = await this.getRetryCandidates();
+    if (ids.length === 0) {
+      return {
+        started: false,
+        message: 'Qayta jo\'natiladigan faol buyurtma yo\'q',
+        status: this.getBulkRedispatchStatus(),
+      };
+    }
+    this.bulkJob = {
+      running: true,
+      total: ids.length,
+      done: 0,
+      success: 0,
+      failed: 0,
+      started_at: Date.now(),
+      finished_at: null,
+      stop_requested: false,
+      last_error: null,
+    };
+    this.bulkActor = user;
+    // Bulk boshlanishini admin nomi bilan loglaymiz (har bir dispatch alohida ham loglanadi).
+    const configId = await this.ldgConfigId();
+    if (configId) {
+      this.activityLog.log({
+        entity_type: 'ldg_config',
+        entity_id: configId,
+        action: 'redispatch_bulk',
+        new_value: { total: ids.length },
+        description: `LDG ommaviy qayta jo'natish boshlandi (${ids.length} ta buyurtma)`,
+        user,
+        metadata: { source: 'ldg' },
+      });
+    }
+    // Fire-and-forget — server tomonida davom etadi.
+    void this.runBulkRedispatch(ids);
+    return {
+      started: true,
+      message: `${ids.length} ta buyurtma jo'natilmoqda`,
+      status: this.getBulkRedispatchStatus(),
+    };
+  }
+
+  /** Ishlayotgan bulk jobни to'xtatish so'rovi (joriy so'rov tugagach to'xtaydi). */
+  stopBulkRedispatch(): { stopped: boolean; message: string } {
+    if (!this.bulkJob.running) {
+      return { stopped: false, message: 'Bulk jo\'natish ishlamayapti' };
+    }
+    this.bulkJob.stop_requested = true;
+    this.logger.warn('LDG bulk redispatch: to\'xtatish so\'raldi (qo\'lda)');
+    return { stopped: true, message: 'To\'xtatilmoqda...' };
+  }
+
+  /** Bulk job ichki sikli — ketma-ket, throttle (global yozish navbati) bilan. */
+  private async runBulkRedispatch(ids: string[]): Promise<void> {
+    try {
+      for (const orderId of ids) {
+        if (this.bulkJob.stop_requested) {
+          this.logger.warn(
+            `LDG bulk redispatch to'xtatildi: ${this.bulkJob.done}/${this.bulkJob.total}`,
+          );
+          break;
+        }
+        try {
+          const r = await this.redispatch(orderId, this.bulkActor);
+          if (r.success) this.bulkJob.success++;
+          else this.bulkJob.failed++;
+        } catch (err) {
+          this.bulkJob.failed++;
+          this.bulkJob.last_error =
+            err instanceof Error ? err.message : String(err);
+        }
+        this.bulkJob.done++;
+      }
+    } finally {
+      this.bulkJob.running = false;
+      this.bulkJob.finished_at = Date.now();
+      this.logger.log(
+        `LDG bulk redispatch tugadi: ${this.bulkJob.success} jo'natildi, ${this.bulkJob.failed} xato (${this.bulkJob.done}/${this.bulkJob.total})`,
+      );
+    }
+  }
+
+  // ===== AVTOMATIKA BOSHQARUVI (fon jarayonlari yoqish/o'chirish) =====
+
+  /** Barcha fon jarayonlarining holati (Boshqaruv jadvali uchun). */
+  async getAutomations() {
+    const config = await this.configRepo.findOne({ where: {} });
+    const [pendingActive] = await Promise.all([
+      this.shipmentRepo
+        .createQueryBuilder('s')
+        .leftJoin('s.order', 'o')
+        .where('s.ldg_order_id IS NULL')
+        .andWhere('o.status IN (:...active)', {
+          active: LDG_DISPATCHABLE_STATUSES,
+        })
+        .getCount(),
+    ]);
+    return {
+      is_active: config?.is_active ?? false,
+      webhook_enabled: config?.webhook_enabled ?? true,
+      reconcile_enabled: config?.reconcile_enabled ?? true,
+      auto_retry_enabled: config?.auto_retry_enabled ?? true,
+      pending_active: pendingActive,
+      bulk_redispatch: this.getBulkRedispatchStatus(),
+    };
+  }
+
+  /** Bitta fon jarayonini yoqish/o'chirish. */
+  async setAutomation(
+    key: 'webhook_enabled' | 'reconcile_enabled' | 'auto_retry_enabled',
+    value: boolean,
+    user?: JwtPayload,
+  ): Promise<{ success: boolean; message: string }> {
+    const allowed = ['webhook_enabled', 'reconcile_enabled', 'auto_retry_enabled'];
+    if (!allowed.includes(key)) {
+      return { success: false, message: 'Noma\'lum sozlama' };
+    }
+    const config = await this.configRepo.findOne({ where: {} });
+    if (!config) {
+      return { success: false, message: 'LDG sozlamasi topilmadi' };
+    }
+    const prev = config[key];
+    config[key] = value;
+    await this.configRepo.save(config);
+    const KEY_LABEL: Record<string, string> = {
+      webhook_enabled: 'Webhook',
+      reconcile_enabled: 'Reconcile (tekshiruv)',
+      auto_retry_enabled: 'Avto qayta urinish',
+    };
+    this.activityLog.log({
+      entity_type: 'ldg_config',
+      entity_id: config.id,
+      action: 'automation_changed',
+      old_value: { [key]: prev },
+      new_value: { [key]: value },
+      description: `LDG avtomatika: ${KEY_LABEL[key] || key} ${
+        value ? 'yoqildi' : "o'chirildi"
+      }`,
+      user,
+      metadata: { source: 'ldg' },
+    });
+    return {
+      success: true,
+      message: `${key} = ${value ? 'yoqildi' : 'o\'chirildi'}`,
+    };
+  }
+
+  /** Webhook log'ni o'chirish (eski/keraksizlarni tozalash). */
+  async deleteWebhookLog(
+    deliveryId: string,
+    user?: JwtPayload,
+  ): Promise<{ success: boolean; message: string }> {
+    const r = await this.logRepo.delete({ delivery_id: deliveryId });
+    if (!r.affected) {
+      return { success: false, message: 'Webhook log topilmadi' };
+    }
+    const configId = await this.ldgConfigId();
+    if (configId) {
+      this.activityLog.log({
+        entity_type: 'ldg_config',
+        entity_id: configId,
+        action: 'webhook_deleted',
+        old_value: { delivery_id: deliveryId },
+        description: `LDG webhook log o'chirildi (${deliveryId})`,
+        user,
+        metadata: { source: 'ldg', delivery_id: deliveryId },
+      });
+    }
+    return { success: true, message: 'Webhook log o\'chirildi' };
+  }
+
   /**
    * Saqlangan webhook log'ni qayta ishlash (skip/failed bo'lib qolganlar uchun).
    */
-  async reprocessWebhook(deliveryId: string) {
-    return this.webhookService.reprocessFromLog(deliveryId);
+  async reprocessWebhook(deliveryId: string, user?: JwtPayload) {
+    const result = await this.webhookService.reprocessFromLog(deliveryId);
+    const configId = await this.ldgConfigId();
+    if (configId) {
+      this.activityLog.log({
+        entity_type: 'ldg_config',
+        entity_id: configId,
+        action: 'webhook_reprocessed',
+        new_value: { delivery_id: deliveryId },
+        description: `LDG webhook qayta ishlandi (${deliveryId})`,
+        user,
+        metadata: { source: 'ldg', delivery_id: deliveryId },
+      });
+    }
+    return result;
   }
 
   // ===== AUTO-RETRY (yuborilmaganlarni tizimning o'zi tuzatadi) =====
@@ -412,7 +688,7 @@ export class LdgAdminService {
     failed: number;
   }> {
     const config = await this.configRepo.findOne({ where: {} });
-    if (!config?.is_active) {
+    if (!config?.is_active || !config?.auto_retry_enabled) {
       return { retried: 0, success: 0, failed: 0 };
     }
 
@@ -529,7 +805,7 @@ export class LdgAdminService {
     errors: number;
   }> {
     const config = await this.configRepo.findOne({ where: {} });
-    if (!config?.is_active) {
+    if (!config?.is_active || !config?.reconcile_enabled) {
       return { checked: 0, applied: 0, unchanged: 0, errors: 0 };
     }
 

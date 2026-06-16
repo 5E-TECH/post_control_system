@@ -23,12 +23,15 @@ import { MergeDistrictsDto } from './dto/merge-districts.dto';
 import { Not, In, DataSource, Repository } from 'typeorm';
 import { matchDistricts } from 'src/infrastructure/lib/utils/sato-matcher';
 import { Roles } from 'src/common/enums';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 
 @Injectable()
 export class DistrictService implements OnModuleInit {
   constructor(
     @InjectRepository(DistrictEntity)
     private readonly districtRepository: DistrictRepository,
+    private readonly activityLog: ActivityLogService,
 
     @InjectRepository(RegionEntity)
     private readonly regionRepository: RegionRepository,
@@ -82,7 +85,7 @@ export class DistrictService implements OnModuleInit {
     console.log("✅ Boshlang'ich tumanlar yaratildi");
   }
 
-  async create(createDistrictDto: CreateDistrictDto) {
+  async create(createDistrictDto: CreateDistrictDto, actor?: JwtPayload) {
     try {
       const { name, region_id } = createDistrictDto;
 
@@ -100,6 +103,15 @@ export class DistrictService implements OnModuleInit {
         assigned_region: region_id,
       });
       await this.districtRepository.save(newDistrict);
+
+      this.activityLog.log({
+        entity_type: 'district',
+        entity_id: newDistrict.id,
+        action: 'created',
+        new_value: { name, region: existRegion.name },
+        description: `Tuman yaratildi: ${name} (${existRegion.name})`,
+        user: actor,
+      });
 
       return successRes(newDistrict, 201, 'New district added');
     } catch (error) {
@@ -142,7 +154,11 @@ export class DistrictService implements OnModuleInit {
     }
   }
 
-  async update(id: string, updateDistrictDto: UpdateDistrictDto) {
+  async update(
+    id: string,
+    updateDistrictDto: UpdateDistrictDto,
+    actor?: JwtPayload,
+  ) {
     try {
       const district = await this.districtRepository.findOne({ where: { id } });
       if (!district) {
@@ -175,21 +191,45 @@ export class DistrictService implements OnModuleInit {
 
       await this.districtRepository.save(district);
 
+      this.activityLog.log({
+        entity_type: 'district',
+        entity_id: district.id,
+        action: 'assigned',
+        new_value: { name: district.name, region: assigningRegion.name },
+        description: `Tuman "${district.name}" "${assigningRegion.name}" regioniga biriktirildi`,
+        user: actor,
+      });
+
       return successRes(district, 200, 'District assigned to new region');
     } catch (error) {
       return catchError(error);
     }
   }
 
-  async updateName(id: string, updateNameDto: UpdateDistrictNameDto) {
+  async updateName(
+    id: string,
+    updateNameDto: UpdateDistrictNameDto,
+    actor?: JwtPayload,
+  ) {
     try {
       const district = await this.districtRepository.findOne({ where: { id } });
       if (!district) {
         throw new NotFoundException('District not found');
       }
       const { name } = updateNameDto;
+      const oldName = district.name;
       district.name = name;
       await this.districtRepository.save(district);
+
+      this.activityLog.log({
+        entity_type: 'district',
+        entity_id: district.id,
+        action: 'updated',
+        old_value: { name: oldName },
+        new_value: { name },
+        description: `Tuman nomi o'zgardi: ${oldName} → ${name}`,
+        user: actor,
+      });
 
       return successRes({}, 200, 'District name updated');
     } catch (error) {
@@ -302,7 +342,7 @@ export class DistrictService implements OnModuleInit {
    * - source_district_ids dagi barcha tumanlardan buyurtmalarni target_district_id ga ko'chiradi
    * - source tumanlarni o'chiradi
    */
-  async mergeDistricts(dto: MergeDistrictsDto) {
+  async mergeDistricts(dto: MergeDistrictsDto, actor?: JwtPayload) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -462,6 +502,26 @@ export class DistrictService implements OnModuleInit {
       await queryRunner.commitTransaction();
       console.log('✅ TRANSACTION COMMIT QILINDI');
 
+      // Audit: tumanlarni birlashtirish (eng buzg'unchi amal — manba tumanlar o'chdi)
+      this.activityLog.log({
+        entity_type: 'district',
+        entity_id: target_district_id,
+        action: 'merged',
+        old_value: {
+          merged_districts: sourceDistricts.map((d) => d.name),
+        },
+        new_value: {
+          target: targetDistrict.name,
+          orders_moved: totalOrdersMoved,
+          users_moved: totalUsersMoved,
+          deleted_count: sourceDistricts.length,
+        },
+        description: `${sourceDistricts.length} ta tuman "${targetDistrict.name}" ga birlashtirildi (${sourceDistricts
+          .map((d) => d.name)
+          .join(', ')}) — ${totalOrdersMoved} buyurtma, ${totalUsersMoved} foydalanuvchi ko'chirildi`,
+        user: actor,
+      });
+
       return successRes(
         {
           targetDistrict: {
@@ -592,7 +652,7 @@ export class DistrictService implements OnModuleInit {
   /**
    * Tumanni o'chirish (buyurtmalari bilan birga)
    */
-  async deleteDistrict(id: string) {
+  async deleteDistrict(id: string, actor?: JwtPayload) {
     try {
       const district = await this.districtRepository.findOne({
         where: { id },
@@ -614,6 +674,17 @@ export class DistrictService implements OnModuleInit {
       }
 
       await this.districtRepository.delete({ id });
+
+      this.activityLog.log({
+        entity_type: 'district',
+        entity_id: district.id,
+        action: 'deleted',
+        old_value: { name: district.name, region: district.region?.name },
+        description: `Tuman o'chirildi: ${district.name}${
+          district.region?.name ? ` (${district.region.name})` : ''
+        }`,
+        user: actor,
+      });
 
       return successRes(
         { deletedDistrict: { id: district.id, name: district.name } },

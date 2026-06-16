@@ -34,6 +34,8 @@ import { useTranslation } from "react-i18next";
 import type { AxiosError } from "axios";
 import CustomCalendar from "../../../../shared/components/customDate";
 import PaymentPopup from "../../../../shared/ui/paymentPopup";
+import CardsManager from "../../components/CardsManager";
+import { SELECT_CLS, SELECT_POPUP_CLS } from "../../../../shared/ui/select-styles";
 
 const { RangePicker } = DatePicker;
 
@@ -46,6 +48,7 @@ interface IForm {
   market: string;
   comment: string;
   search: string;
+  card_id: string;
 }
 
 const initialForm: IForm = {
@@ -57,6 +60,7 @@ const initialForm: IForm = {
   market: "",
   comment: "",
   search: "",
+  card_id: "",
 };
 
 const MainDetail = () => {
@@ -79,6 +83,8 @@ const MainDetail = () => {
   const [salaryAmount, setSalaryAmount] = useState("");
   const [salaryPayMethod, setSalaryPayMethod] = useState<"cash" | "click">("cash");
   const [salaryComment, setSalaryComment] = useState("");
+  const [salaryCardId, setSalaryCardId] = useState<string | undefined>();
+  const [showCards, setShowCards] = useState(false);
   const { handleApiError } = useApiNotification();
 
   const navigate = useNavigate();
@@ -160,6 +166,7 @@ const MainDetail = () => {
       amount: Number(form.summa.replace(/\D/g, "")),
       type: form.payment,
       comment: form.comment,
+      card_id: form.payment === "click" ? form.card_id || undefined : undefined,
     };
     cashboxSpand.mutate(
       { data },
@@ -221,6 +228,7 @@ const MainDetail = () => {
       amount: Number(form.summa.replace(/\D/g, "")),
       type: form.payment,
       comment: form.comment,
+      card_id: form.payment === "click" ? form.card_id || undefined : undefined,
     };
 
     cashboxFill.mutate(
@@ -244,6 +252,11 @@ const MainDetail = () => {
   const raw = Number(data?.data?.cashbox?.balance || 0);
   const balanceCash = Number(data?.data?.cashbox?.balance_cash || 0);
   const balanceCard = Number(data?.data?.cashbox?.balance_card || 0);
+  const cards = data?.data?.cards || [];
+  const activeCards = cards.filter((c: any) => c.is_active !== false);
+  // Default karta — formalarda oldindan tanlangan turadi
+  const defaultCardId =
+    (cards.find((c: any) => c.is_default) || activeCards[0])?.id || undefined;
 
   const handleClose = () => {
     setShowMarket(false);
@@ -316,7 +329,7 @@ const MainDetail = () => {
   const isShiftOpen = shiftData?.data?.shift?.status === "open";
 
   return (
-    <div className="bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
+    <div className="min-h-full bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
       <div className="max-w-screen-2xl mx-auto flex gap-8 lg:gap-16 max-lg:flex-col">
         <div className="lg:max-w-[520px] w-full">
           {/* Header */}
@@ -343,6 +356,7 @@ const MainDetail = () => {
             show={show}
             setShow={setShow}
             isMainCashbox={true}
+            onCardsClick={() => setShowCards(true)}
           />
 
           {/* === ACTION BUTTONS - Modern Circular Design === */}
@@ -592,6 +606,7 @@ const MainDetail = () => {
           income={data?.data?.income}
           outcome={data?.data?.outcome}
           cashboxHistory={data?.data?.cashboxHistory}
+          movements={data?.data?.movements}
         />
       </div>
 
@@ -866,6 +881,30 @@ const MainDetail = () => {
                 </div>
               </div>
 
+              {/* Karta tanlash (faqat Karta usulida) */}
+              {salaryPayMethod === "click" && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                    {t("karta") || "Karta"}{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    value={salaryCardId || defaultCardId}
+                    onChange={(value) => setSalaryCardId(value)}
+                    placeholder={t("karta") || "Kartani tanlang"}
+                    className={SELECT_CLS}
+                    popupClassName={SELECT_POPUP_CLS}
+                    size="large"
+                    options={activeCards.map((c: any) => ({
+                      value: c.id,
+                      label: `${c.is_default ? "★ " : ""}${c.name} — ${Number(
+                        c.balance || 0,
+                      ).toLocaleString("uz-UZ")} UZS`,
+                    }))}
+                  />
+                </div>
+              )}
+
               {/* Izoh */}
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Izoh</label>
@@ -917,7 +956,16 @@ const MainDetail = () => {
 
                   const doPayment = () => {
                     paySalary.mutate(
-                      { user_id: salaryUser.id, amount, type: salaryPayMethod, comment: salaryComment || "Oylik maosh" },
+                      {
+                        user_id: salaryUser.id,
+                        amount,
+                        type: salaryPayMethod,
+                        comment: salaryComment || "Oylik maosh",
+                        card_id:
+                          salaryPayMethod === "click"
+                            ? salaryCardId || defaultCardId
+                            : undefined,
+                      },
                       {
                         onSuccess: () => {
                           message.success(`${salaryUser.name} ga ${amount.toLocaleString()} so'm maosh to'landi`);
@@ -1309,15 +1357,45 @@ const MainDetail = () => {
               </label>
               <Select
                 value={form.payment || undefined}
-                onChange={(value) => setForm((prev) => ({ ...prev, payment: value }))}
+                onChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    payment: value,
+                    card_id:
+                      value === "click" ? prev.card_id || defaultCardId || "" : "",
+                  }))
+                }
                 placeholder={t("paymentType") || "To'lov turini tanlang"}
-                className="w-full !h-12 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selector]:!border-2 [&_.ant-select-selector]:!border-gray-200 dark:[&_.ant-select-selector]:!border-gray-700 [&_.ant-select-selector]:!bg-gray-50 dark:[&_.ant-select-selector]:!bg-[#312D4B]"
+                className={SELECT_CLS} popupClassName={SELECT_POPUP_CLS}
                 size="large"
                 options={[
                   { value: "cash", label: `💵 ${t("cash") || "Naqd"}` },
                   { value: "click", label: `💳 ${t("click") || "Click/Karta"}` },
                 ]}
               />
+              {form.payment === "click" && (
+                <div className="mt-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    {t("karta") || "Karta"}{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    value={form.card_id || defaultCardId}
+                    onChange={(value) =>
+                      setForm((prev) => ({ ...prev, card_id: value }))
+                    }
+                    placeholder={t("karta") || "Kartani tanlang"}
+                    className={SELECT_CLS} popupClassName={SELECT_POPUP_CLS}
+                    size="large"
+                    options={activeCards.map((c: any) => ({
+                      value: c.id,
+                      label: `${c.is_default ? "★ " : ""}${c.name} — ${Number(
+                        c.balance || 0,
+                      ).toLocaleString("uz-UZ")} UZS`,
+                    }))}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Comment */}
@@ -1430,15 +1508,45 @@ const MainDetail = () => {
               </label>
               <Select
                 value={form.payment || undefined}
-                onChange={(value) => setForm((prev) => ({ ...prev, payment: value }))}
+                onChange={(value) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    payment: value,
+                    card_id:
+                      value === "click" ? prev.card_id || defaultCardId || "" : "",
+                  }))
+                }
                 placeholder={t("paymentType") || "To'lov turini tanlang"}
-                className="w-full !h-12 [&_.ant-select-selector]:!rounded-xl [&_.ant-select-selector]:!border-2 [&_.ant-select-selector]:!border-gray-200 dark:[&_.ant-select-selector]:!border-gray-700 [&_.ant-select-selector]:!bg-gray-50 dark:[&_.ant-select-selector]:!bg-[#312D4B]"
+                className={SELECT_CLS} popupClassName={SELECT_POPUP_CLS}
                 size="large"
                 options={[
                   { value: "cash", label: `💵 ${t("cash") || "Naqd"}` },
                   { value: "click", label: `💳 ${t("click") || "Click/Karta"}` },
                 ]}
               />
+              {form.payment === "click" && (
+                <div className="mt-3">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    {t("karta") || "Karta"}{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    value={form.card_id || defaultCardId}
+                    onChange={(value) =>
+                      setForm((prev) => ({ ...prev, card_id: value }))
+                    }
+                    placeholder={t("karta") || "Kartani tanlang"}
+                    className={SELECT_CLS} popupClassName={SELECT_POPUP_CLS}
+                    size="large"
+                    options={activeCards.map((c: any) => ({
+                      value: c.id,
+                      label: `${c.is_default ? "★ " : ""}${c.name} — ${Number(
+                        c.balance || 0,
+                      ).toLocaleString("uz-UZ")} UZS`,
+                    }))}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Comment */}
@@ -1490,6 +1598,12 @@ const MainDetail = () => {
         </div>
       </PaymentPopup>
 
+      {/* Virtual kartalar boshqaruvi */}
+      <CardsManager
+        open={showCards}
+        onClose={() => setShowCards(false)}
+        onChanged={() => refetch()}
+      />
 
       </div>
     </div>
