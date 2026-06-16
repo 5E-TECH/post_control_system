@@ -78,6 +78,48 @@ const actionConfig: Record<string, { icon: any; color: string; ringColor: string
     ringColor: "ring-indigo-200 dark:ring-indigo-900/50",
     label: "Yangilandi",
   },
+  dispatched: {
+    icon: Package,
+    color: "text-blue-500 bg-blue-100 dark:bg-blue-900/30",
+    ringColor: "ring-blue-200 dark:ring-blue-900/50",
+    label: "LDG'ga yuborildi",
+  },
+  ldg_mismatch: {
+    icon: AlertTriangle,
+    color: "text-red-500 bg-red-100 dark:bg-red-900/30",
+    ringColor: "ring-red-200 dark:ring-red-900/50",
+    label: "LDG nomuvofiqligi",
+  },
+  mismatch_resolved: {
+    icon: CheckCircle,
+    color: "text-green-500 bg-green-100 dark:bg-green-900/30",
+    ringColor: "ring-green-200 dark:ring-green-900/50",
+    label: "Nomuvofiqlik hal qilindi",
+  },
+  courier_changed: {
+    icon: RotateCcw,
+    color: "text-indigo-500 bg-indigo-100 dark:bg-indigo-900/30",
+    ringColor: "ring-indigo-200 dark:ring-indigo-900/50",
+    label: "Kuryer o'zgartirildi",
+  },
+  reassigned: {
+    icon: RotateCcw,
+    color: "text-purple-500 bg-purple-100 dark:bg-purple-900/30",
+    ringColor: "ring-purple-200 dark:ring-purple-900/50",
+    label: "Qayta biriktirildi",
+  },
+  return_approved: {
+    icon: CheckCircle,
+    color: "text-green-500 bg-green-100 dark:bg-green-900/30",
+    ringColor: "ring-green-200 dark:ring-green-900/50",
+    label: "Qaytarish tasdiqlandi",
+  },
+  return_rejected: {
+    icon: XCircle,
+    color: "text-red-500 bg-red-100 dark:bg-red-900/30",
+    ringColor: "ring-red-200 dark:ring-red-900/50",
+    label: "Qaytarish rad etildi",
+  },
 };
 
 const defaultConfig = {
@@ -96,12 +138,45 @@ const fieldLabels: Record<string, string> = {
   comment: "Izoh",
   where_deliver: "Yetkazib berish",
   payment_type: "To'lov turi",
+  payment_method: "To'lov turi",
   address: "Manzil",
   district_id: "Tuman",
   customer_id: "Mijoz",
   operator_id: "Operator",
   post_id: "Pochta",
+  // Server qo'shadigan nom maydonlari (xom UUID o'rniga ko'rsatiladi)
+  district_name: "Tuman",
+  region_name: "Region",
+  customer_name: "Mijoz",
+  market_name: "Market",
+  courier_name: "Kurier",
+  operator_name: "Operator",
+  counterparty_name: "Kontragent",
+  order_number: "Buyurtma raqami",
+  items_changed: "Mahsulotlar",
+  extra_cost: "Qo'shimcha xarajat",
+  ldg_tracking: "LDG kuzatuv",
+  source: "Manba",
 };
+
+const WHERE_DELIVER_LABELS: Record<string, string> = {
+  center: "Markazga",
+  address: "Uygacha",
+};
+
+// *_id yoniga *_name kelganda, xom UUID qatorini yashiramiz.
+const ID_NAME_SIBLING: Record<string, string> = {
+  district_id: "district_name",
+  customer_id: "customer_name",
+  market_id: "market_name",
+  courier_id: "courier_name",
+  operator_id: "operator_name",
+  region_id: "region_name",
+};
+
+const isUuid = (v: any) =>
+  typeof v === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 const statusLabels: Record<string, string> = {
   created: "Yaratildi",
@@ -124,11 +199,24 @@ const formatValue = (key: string, value: any): string => {
   if (key === "status" && typeof value === "string") {
     return statusLabels[value] || value;
   }
+  if (key === "where_deliver" && typeof value === "string") {
+    return WHERE_DELIVER_LABELS[value] || value;
+  }
+  if (key === "items_changed") {
+    return value ? "O'zgartirildi" : "—";
+  }
+  if (typeof value === "boolean") {
+    return value ? "Ha" : "Yo'q";
+  }
   if (
     typeof value === "number" &&
     (key.includes("price") || key.includes("amount") || key.includes("tariff"))
   ) {
     return `${value.toLocaleString("uz-UZ")} so'm`;
+  }
+  // Xom UUID — qisqartiramiz (to'liq UUID o'rniga)
+  if (isUuid(value)) {
+    return `${value.slice(0, 8)}…`;
   }
   if (typeof value === "object") {
     try {
@@ -155,6 +243,16 @@ const getValueDiffs = (
   for (const key of allKeys) {
     if (seen.has(key)) continue;
     seen.add(key);
+    // order_number identifikator — diffда ko'rsatmaymiz (sarlavhada bor)
+    if (key === "order_number") continue;
+    // Xom *_id yoniga *_name kelgan bo'lsa — UUID qatorini yashiramiz, nomni ko'rsatamiz
+    const sibling = ID_NAME_SIBLING[key];
+    if (
+      sibling &&
+      ((newValue && newValue[sibling]) || (oldValue && oldValue[sibling]))
+    ) {
+      continue;
+    }
     const oldV = oldValue?.[key];
     const newV = newValue?.[key];
     if (JSON.stringify(oldV) === JSON.stringify(newV)) continue;
