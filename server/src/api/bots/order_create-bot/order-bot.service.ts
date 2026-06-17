@@ -13,10 +13,11 @@ import { UserRepository } from 'src/core/repository/user.repository';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { InjectBot } from 'nestjs-telegraf';
-import { DataSource } from 'typeorm';
+import { DataSource, Not } from 'typeorm';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { MyContext } from './session.interface';
 import { Group_type, Order_status, Roles, Status } from 'src/common/enums';
+import { roleUz } from 'src/common/utils/status-label.util';
 import config from 'src/config';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
@@ -118,6 +119,20 @@ export class OrderBotService {
   ) {
     market.market_tg_token = 'group_token-' + generateCustomToken();
     return manager.save(UserEntity, market);
+  }
+
+  // Faqat market_tg_token ustunini id bo'yicha yangilaydi — boshqa
+  // ustunlarni (masalan, ayni topshiriqda o'rnatilgan telegram_id) eskirgan
+  // entity nusxasi bilan ustiga yozib yubormaslik uchun nuqtali UPDATE.
+  private rotateTokenById(
+    manager: import('typeorm').EntityManager,
+    marketId: string,
+  ) {
+    return manager.update(
+      UserEntity,
+      { id: marketId },
+      { market_tg_token: 'group_token-' + generateCustomToken() },
+    );
   }
 
   async syncStatusButton(orderId: string) {
@@ -226,7 +241,10 @@ export class OrderBotService {
         throw new NotFoundException("Token noto'g'ri yoki eskirgan.");
       }
 
-      await this.rotateMarketToken(queryRunner.manager, market);
+      // Token bu yerda AYLANTIRILMAYDI: u faqat ro'yxatdan o'tish (kontakt
+      // ulashish) muvaffaqiyatli yakunlangach registerNewOperator ichida
+      // yangilanadi. Aks holda foydalanuvchi yarmida to'xtasa yoki begona
+      // token yuborsa, o'sha marketning tokeni behuda "yondirilardi".
       await queryRunner.commitTransaction();
 
       return successRes(
@@ -256,8 +274,16 @@ export class OrderBotService {
       const contact = this.normalizePhone(phone_number);
       const telegramUserId = ctx.from?.id;
 
+      // Mijoz (CUSTOMER) yozuvlari alohida saqlanadi va buyurtma tarixiga
+      // bog'langan, shuning uchun ularning rolini operatorga AYLANTIRMAYMIZ.
+      // CUSTOMER'ni bu yerda istisno qilamiz — bunda telefon faqat mijoz
+      // sifatida mavjud bo'lsa, quyida yangi operator yozuvi yaratiladi.
       const existingUser = await queryRunner.manager.findOne(UserEntity, {
-        where: { phone_number: contact, is_deleted: false },
+        where: {
+          phone_number: contact,
+          is_deleted: false,
+          role: Not(Roles.CUSTOMER),
+        },
       });
 
       if (existingUser) {
@@ -272,7 +298,22 @@ export class OrderBotService {
           existingUser.role !== Roles.OPERATOR
         ) {
           throw new ForbiddenException(
-            'Bu telefon raqam market yoki operator sifatida ishlatilmaydi.',
+            `Bu telefon raqam allaqachon "${roleUz(existingUser.role)}" sifatida ro'yxatdan o'tgan, shuning uchun operator sifatida ishlatib bo'lmaydi.`,
+          );
+        }
+
+        // Yuborilgan token foydalanuvchining O'Z marketiga tegishli bo'lishi
+        // shart: market — o'z tokenini, operator — biriktirilgan marketining
+        // tokenini yuborishi kerak. Begona token jimgina qabul qilinmaydi
+        // (avval u boshqa marketning akkauntiga ta'sir qilmasdan rad etiladi).
+        const tokenMarketId = ctx.session.marketData.id;
+        const belongsToToken =
+          existingUser.role === Roles.MARKET
+            ? existingUser.id === tokenMarketId
+            : existingUser.market_id === tokenMarketId;
+        if (!belongsToToken) {
+          throw new ForbiddenException(
+            "Bu token sizning marketingizga tegishli emas. Iltimos, o'zingizning market tokeningizni yuboring.",
           );
         }
 
@@ -294,6 +335,8 @@ export class OrderBotService {
           );
         }
 
+        // Token ishlatildi — endi (bir martalik) yangilanadi.
+        await this.rotateTokenById(queryRunner.manager, tokenMarketId);
         await queryRunner.commitTransaction();
         return successRes(
           { id: existingUser.id, role: existingUser.role },
@@ -340,6 +383,11 @@ export class OrderBotService {
       });
 
       await queryRunner.manager.save(operator);
+      // Token ishlatildi — endi (bir martalik) yangilanadi.
+      await this.rotateTokenById(
+        queryRunner.manager,
+        ctx.session.marketData.id,
+      );
       await queryRunner.commitTransaction();
 
       this.logger.log(
