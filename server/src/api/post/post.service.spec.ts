@@ -34,6 +34,19 @@ const makeOrder = (overrides: Record<string, any>): any => ({
   ...overrides,
 });
 
+// Zanjirli (chainable) QueryBuilder mock — getMany berilgan rows'ni qaytaradi.
+const makeQueryBuilder = (rows: any[]) => {
+  const qb: any = {};
+  qb.innerJoin = jest.fn(() => qb);
+  qb.leftJoin = jest.fn(() => qb);
+  qb.leftJoinAndSelect = jest.fn(() => qb);
+  qb.where = jest.fn(() => qb);
+  qb.andWhere = jest.fn(() => qb);
+  qb.orderBy = jest.fn(() => qb);
+  qb.getMany = jest.fn(() => Promise.resolve(rows));
+  return qb;
+};
+
 // ─── QueryRunner mock factory ───────────────────────────────────
 function createQueryRunnerMock() {
   const saved: any[] = [];
@@ -42,6 +55,9 @@ function createQueryRunnerMock() {
   const manager = {
     find: jest.fn(),
     findOne: jest.fn(),
+    // Advisory lock (pg_advisory_xact_lock) — test'da no-op
+    query: jest.fn().mockResolvedValue([]),
+    createQueryBuilder: jest.fn(),
     create: jest.fn((Entity: any, data: any) => ({ ...data })),
     save: jest.fn((entity: any) => {
       // Yangi post yaratilganda ID qo'shib qaytaramiz
@@ -452,4 +468,145 @@ describe('PostService — Return Requests', () => {
       expect(updatePartial).not.toHaveProperty('status');
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // sendAllCanceledOrders (pagination fix — barcha bekor qilinganlar)
+  // ═══════════════════════════════════════════════════════════════
+  describe('sendAllCanceledOrders', () => {
+    const courierId = uuid(60);
+    const user = { id: courierId, role: 'courier' } as any;
+
+    it("kuryerning BARCHA CANCELLED buyurtmalarini bitta postga yig'adi", async () => {
+      const orders = [
+        { id: uuid(1), total_price: 30000, status: Order_status.CANCELLED },
+        { id: uuid(2), total_price: 20000, status: Order_status.CANCELLED },
+        { id: uuid(3), total_price: 50000, status: Order_status.CANCELLED },
+      ];
+      const { qr, manager, saved } = createQueryRunnerMock();
+      manager.createQueryBuilder.mockReturnValue(makeQueryBuilder(orders));
+      // 1-findOne: courier; 2-findOne: mavjud CANCELED post (yo'q -> null)
+      manager.findOne
+        .mockResolvedValueOnce({ id: courierId, region_id: uuid(70) })
+        .mockResolvedValueOnce(null);
+      dataSourceMock.createQueryRunner.mockReturnValue(qr);
+
+      const result: any = await service.sendAllCanceledOrders(user);
+
+      // ✅ advisory lock olindi
+      expect(manager.query).toHaveBeenCalledWith(
+        expect.stringContaining('pg_advisory_xact_lock'),
+        [expect.stringContaining(courierId)],
+      );
+      // ✅ yangi CANCELED post yaratildi, jami summa = 100000, 3 ta order
+      const postSaved = saved.find(
+        (e) => e.status === Post_status.CANCELED && e.courier_id === courierId,
+      );
+      expect(postSaved).toBeTruthy();
+      expect(Number(postSaved.post_total_price)).toBe(100000);
+      expect(Number(postSaved.order_quantity)).toBe(3);
+      // ✅ barcha orderlar CANCELLED_SENT
+      orders.forEach((o) =>
+        expect(o.status).toBe(Order_status.CANCELLED_SENT),
+      );
+      expect(result.statusCode).toBe(200);
+      expect(result.data.count).toBe(3);
+      expect(qr.commitTransaction).toHaveBeenCalled();
+    });
+
+    it("bekor qilingan buyurtma bo'lmasa — xato (400) va rollback", async () => {
+      const { qr, manager } = createQueryRunnerMock();
+      manager.createQueryBuilder.mockReturnValue(makeQueryBuilder([]));
+      dataSourceMock.createQueryRunner.mockReturnValue(qr);
+
+      await expect(service.sendAllCanceledOrders(user)).rejects.toThrow();
+      expect(qr.rollbackTransaction).toHaveBeenCalled();
+      expect(qr.commitTransaction).not.toHaveBeenCalled();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // receiveCanceledPost — qabul qilingan (CLOSED) bo'yicha stats qayta hisoblanadi
+  // ═══════════════════════════════════════════════════════════════
+  describe('receiveCanceledPost', () => {
+    const postId = uuid(80);
+
+    it("qisman qabulda post stats faqat CLOSED'larga moslab kamayadi", async () => {
+      const allOrders = [
+        { id: uuid(1), total_price: 100000 },
+        { id: uuid(2), total_price: 100000 },
+        { id: uuid(3), total_price: 100000 },
+        { id: uuid(4), total_price: 100000 },
+        { id: uuid(5), total_price: 100000 },
+      ];
+      const { qr, manager, updated } = createQueryRunnerMock();
+      // findOne(PostEntity, lock) -> CANCELED post (eski stats: 5 ta / 500000)
+      manager.findOne.mockResolvedValueOnce({
+        id: postId,
+        status: Post_status.CANCELED,
+        order_quantity: 5,
+        post_total_price: 500000,
+      });
+      // find(OrderEntity) -> postdagi barcha orderlar
+      manager.find.mockResolvedValueOnce(allOrders);
+      dataSourceMock.createQueryRunner.mockReturnValue(qr);
+
+      // 3 ta qabul qilinadi (CLOSED), 2 ta kuryerga qaytadi (CANCELLED)
+      const acceptedIds = [uuid(1), uuid(2), uuid(3)];
+      const result: any = await service.receiveCanceledPost(
+        postId,
+        { order_ids: acceptedIds } as any,
+        user_admin(),
+      );
+
+      // ✅ Post update: CANCELED_RECEIVED + stats QABUL QILINGANGA mos (3 ta / 300000)
+      const postUpdate = updated.find((u) => u.entity === PostEntity);
+      expect(postUpdate?.partial).toEqual(
+        expect.objectContaining({
+          status: Post_status.CANCELED_RECEIVED,
+          order_quantity: 3,
+          post_total_price: 300000,
+        }),
+      );
+
+      // ✅ Qabul qilinganlar CLOSED, qolganlari CANCELLED + canceled_post_id=null
+      const closedUpdate = updated.find(
+        (u) =>
+          u.entity === OrderEntity &&
+          u.partial?.status === Order_status.CLOSED,
+      );
+      expect(closedUpdate).toBeTruthy();
+      const backUpdate = updated.find(
+        (u) =>
+          u.entity === OrderEntity &&
+          u.partial?.status === Order_status.CANCELLED,
+      );
+      expect(backUpdate?.partial).toEqual(
+        expect.objectContaining({ canceled_post_id: null }),
+      );
+      expect(result.statusCode).toBe(200);
+      expect(qr.commitTransaction).toHaveBeenCalled();
+    });
+
+    it("CANCELED bo'lmagan postni qabul qilib bo'lmaydi (400)", async () => {
+      const { qr, manager } = createQueryRunnerMock();
+      manager.findOne.mockResolvedValueOnce({
+        id: postId,
+        status: Post_status.CANCELED_RECEIVED,
+      });
+      dataSourceMock.createQueryRunner.mockReturnValue(qr);
+
+      await expect(
+        service.receiveCanceledPost(
+          postId,
+          { order_ids: [uuid(1)] } as any,
+          user_admin(),
+        ),
+      ).rejects.toThrow();
+      expect(qr.rollbackTransaction).toHaveBeenCalled();
+    });
+  });
 });
+
+function user_admin() {
+  return { id: '00000000-0000-0000-0000-0000000000aa', role: 'admin' } as any;
+}

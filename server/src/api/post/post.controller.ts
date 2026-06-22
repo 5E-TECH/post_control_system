@@ -363,6 +363,19 @@ export class PostController {
     return this.postService.createCanceledPost(user, ordersArrayDto);
   }
 
+  @ApiOperation({
+    summary: 'Send ALL canceled orders to post (courier)',
+    description:
+      "Kuryerning barcha bekor qilingan buyurtmalarini bir martada qaytarish-postiga yig'adi (sahifalashdan qat'i nazar).",
+  })
+  @ApiResponse({ status: 200, description: 'All canceled orders sent to post' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Post('cancel/all')
+  sendAllCanceledOrders(@CurrentUser() user: JwtPayload) {
+    return this.postService.sendAllCanceledOrders(user);
+  }
+
   @ApiOperation({ summary: 'Receive canceled post (admin)' })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Canceled post received' })

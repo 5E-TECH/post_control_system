@@ -62,6 +62,13 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'float' })
   total_price: number;
 
+  // Qisman sotishdan (partlySold) OLDINGI asl summa. partlySold paytida bir
+  // marta yoziladi; rollback'da total_price aynan shu qiymatdan tiklanadi —
+  // dona o'zgarmay faqat narx tushirilgan holatda ham asl narx qaytariladi.
+  // Rollback yakunida null'ga qaytariladi. Eski buyurtmalarda NULL (xavfsiz).
+  @Column({ type: 'float', nullable: true })
+  original_total_price: number | null;
+
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   to_be_paid: number;
 
