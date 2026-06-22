@@ -253,23 +253,37 @@ describe('OrderBotService', () => {
       ).rejects.toThrow(HttpException);
     });
 
-    it('refuses to link to CUSTOMER account', async () => {
-      queryRunnerFactory.qr.manager.findOne.mockResolvedValueOnce({
-        id: uuid(5),
-        phone_number: '+998900000005',
-        role: Roles.CUSTOMER,
-        status: Status.ACTIVE,
-        is_deleted: false,
-        telegram_id: null,
-      });
+    it('creates a NEW operator when phone exists only as CUSTOMER (does not convert the customer)', async () => {
+      // existingUser lookup excludes CUSTOMER (role: Not(CUSTOMER)), so a
+      // customer-only phone resolves to null and falls through to creation.
+      queryRunnerFactory.qr.manager.findOne
+        .mockResolvedValueOnce(null) // existingUser (CUSTOMER filtered out)
+        .mockResolvedValueOnce(null) // existingByTelegramId
+        .mockResolvedValueOnce({
+          id: uuid(5),
+          role: Roles.MARKET,
+          is_deleted: false,
+        }); // market
 
       const ctx = makeCtx({
-        session: { marketData: { id: uuid(5), name: 'TestMarket' } },
+        session: {
+          marketData: { id: uuid(5), name: 'TestMarket', add_order: true },
+          name: 'NewOp',
+        },
       });
 
-      await expect(
-        service.registerNewOperator('998900000005', ctx),
-      ).rejects.toThrow(HttpException);
+      const res: any = await service.registerNewOperator('998900000005', ctx);
+
+      expect(res.statusCode).toBe(201);
+      expect(queryRunnerFactory.qr.manager.create).toHaveBeenCalled();
+      const createdOperator =
+        queryRunnerFactory.qr.manager.create.mock.calls[0][1];
+      expect(createdOperator.role).toBe(Roles.OPERATOR);
+      expect(createdOperator.market_id).toBe(uuid(5));
+      // The original CUSTOMER row is never mutated/saved into an operator.
+      const existingUserWhere =
+        queryRunnerFactory.qr.manager.findOne.mock.calls[0][1].where;
+      expect(existingUserWhere.role).toBeDefined();
     });
   });
 
@@ -337,6 +351,125 @@ describe('OrderBotService', () => {
       await expect(
         service.registerNewOperator('998900000009', ctx),
       ).rejects.toThrow(HttpException);
+    });
+  });
+
+  describe('registerNewOperator — token ownership & rotation', () => {
+    it('rejects an existing OPERATOR whose market_id does not match the token market', async () => {
+      queryRunnerFactory.qr.manager.findOne.mockResolvedValueOnce({
+        id: uuid(20),
+        phone_number: '+998900000020',
+        role: Roles.OPERATOR,
+        status: Status.ACTIVE,
+        is_deleted: false,
+        telegram_id: null,
+        market_id: uuid(98), // belongs to a DIFFERENT market
+      });
+
+      const ctx = makeCtx({
+        session: { marketData: { id: uuid(21), name: 'OtherMarket' } }, // foreign token
+      });
+
+      await expect(
+        service.registerNewOperator('998900000020', ctx),
+      ).rejects.toThrow(HttpException);
+      // Begona token rad etildi — boshqa marketning tokeni AYLANTIRILMAYDI.
+      expect(queryRunnerFactory.qr.manager.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an existing MARKET who sends another market token', async () => {
+      queryRunnerFactory.qr.manager.findOne.mockResolvedValueOnce({
+        id: uuid(22),
+        phone_number: '+998900000022',
+        role: Roles.MARKET,
+        status: Status.ACTIVE,
+        is_deleted: false,
+        telegram_id: null,
+      });
+
+      const ctx = makeCtx({
+        session: { marketData: { id: uuid(23), name: 'OtherMarket' } }, // not their own id
+      });
+
+      await expect(
+        service.registerNewOperator('998900000022', ctx),
+      ).rejects.toThrow(HttpException);
+      expect(queryRunnerFactory.qr.manager.update).not.toHaveBeenCalled();
+    });
+
+    it('rotates the market token after a successful existing-user link', async () => {
+      const market = {
+        id: uuid(24),
+        phone_number: '+998900000024',
+        role: Roles.MARKET,
+        status: Status.ACTIVE,
+        is_deleted: false,
+        telegram_id: null,
+      };
+      queryRunnerFactory.qr.manager.findOne.mockResolvedValueOnce(market);
+
+      const ctx = makeCtx({
+        session: { marketData: { id: market.id, name: 'TestMarket' } },
+      });
+
+      await service.registerNewOperator('998900000024', ctx);
+
+      expect(queryRunnerFactory.qr.manager.update).toHaveBeenCalledWith(
+        UserEntity,
+        { id: market.id },
+        expect.objectContaining({
+          market_tg_token: expect.stringMatching(/^group_token-/),
+        }),
+      );
+    });
+
+    it('rotates the market token after creating a new operator', async () => {
+      queryRunnerFactory.qr.manager.findOne
+        .mockResolvedValueOnce(null) // existingUser
+        .mockResolvedValueOnce(null) // existingByTelegramId
+        .mockResolvedValueOnce({
+          id: uuid(25),
+          role: Roles.MARKET,
+          is_deleted: false,
+        }); // market
+
+      const ctx = makeCtx({
+        session: {
+          marketData: { id: uuid(25), name: 'TestMarket', add_order: true },
+          name: 'Op',
+        },
+      });
+
+      await service.registerNewOperator('998900000025', ctx);
+
+      expect(queryRunnerFactory.qr.manager.update).toHaveBeenCalledWith(
+        UserEntity,
+        { id: uuid(25) },
+        expect.objectContaining({
+          market_tg_token: expect.stringMatching(/^group_token-/),
+        }),
+      );
+    });
+  });
+
+  describe('checkToken', () => {
+    it('does NOT rotate the token (rotation deferred to registration)', async () => {
+      queryRunnerFactory.qr.manager.findOne.mockResolvedValueOnce({
+        id: uuid(30),
+        name: 'M',
+        add_order: true,
+        role: Roles.MARKET,
+        market_tg_token: 'group_token-abc',
+      });
+
+      const ctx = makeCtx({});
+      const res: any = await service.checkToken('group_token-abc', ctx);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.data.id).toBe(uuid(30));
+      // checkToken endi faqat o'qiydi — token bu bosqichda yangilanmaydi.
+      expect(queryRunnerFactory.qr.manager.update).not.toHaveBeenCalled();
+      expect(queryRunnerFactory.qr.manager.save).not.toHaveBeenCalled();
     });
   });
 

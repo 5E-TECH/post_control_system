@@ -87,7 +87,8 @@ export class ActivityLogService {
       await repo.save(log);
     } catch (error) {
       // Log yozishda xato bo'lsa asosiy operatsiyani to'xtatmaymiz
-      console.error('Activity log write error:', error?.message);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Activity log write error:', message);
     }
   }
 
@@ -187,7 +188,8 @@ export class ActivityLogService {
       else if (log.entity_type === 'post') postIds.push(log.entity_id);
       else if (log.entity_type === 'user') entityUserIds.push(log.entity_id);
       else if (log.entity_type === 'cashbox') cashboxIds.push(log.entity_id);
-      else if (log.entity_type === 'region') regionEntityIds.push(log.entity_id);
+      else if (log.entity_type === 'region')
+        regionEntityIds.push(log.entity_id);
       else if (log.entity_type === 'district')
         districtEntityIds.push(log.entity_id);
       else if (log.entity_type === 'product')
@@ -435,7 +437,9 @@ export class ActivityLogService {
           'log.user_name ILIKE :search',
           'log.entity_id::text ILIKE :search',
         ];
-        const searchParams: Record<string, any> = { search: `%${filters.search}%` };
+        const searchParams: Record<string, any> = {
+          search: `%${filters.search}%`,
+        };
         if (orderNum) {
           conds.push(
             `log.entity_id IN (SELECT o.id FROM "order" o WHERE o.order_number = :orderNum)`,

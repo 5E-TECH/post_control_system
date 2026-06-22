@@ -12,7 +12,7 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { DataSource, EntityManager, In, IsNull } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, QueryRunner } from 'typeorm';
 import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { OrderItemRepository } from 'src/core/repository/order-item.repository';
 import {
@@ -2426,6 +2426,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // Egalik tekshiruvi: faqat buyurtma biriktirilgan kurier bekor qila oladi
       await this.assertCourierOwnsOrder(queryRunner.manager, order, currentUser);
 
+      // Holat qo'riqlovchisi: allaqachon yakunlangan/moliyaviy hisoblangan
+      // buyurtmani qayta bekor qilishga yo'l qo'ymaymiz. Aks holda SOLD buyurtma
+      // moliyaviy reversiyasiz CANCELLED bo'lib kassa balansini buzar, yoki
+      // CANCELLED_SENT buyurtma canceled_post_id'ni "osilgan" holatda qoldirardi.
+      // Ruxsat etilgan boshlang'ich holatlar: CREATED/NEW/RECEIVED/ON_THE_ROAD/WAITING.
+      // (LDG avto-bekor va bulk-cancel oqimlari bu holatlardan tashqarisini
+      //  allaqachon o'zlari filtrlaydi — shu sababli ular buzilmaydi.)
+      const NON_CANCELLABLE_STATUSES: Order_status[] = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+        Order_status.CLOSED,
+        Order_status.CANCELLED,
+        Order_status.CANCELLED_SENT,
+      ];
+      if (NON_CANCELLABLE_STATUSES.includes(order.status)) {
+        throw new BadRequestException(
+          `Bu holatdagi buyurtmani bekor qilib bo'lmaydi (status: ${order.status})`,
+        );
+      }
+      const previousStatus = order.status;
+
       const marketId = order.user_id;
       const [market, courier] = await Promise.all([
         queryRunner.manager.findOne(UserEntity, {
@@ -2585,7 +2607,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         entity_type: 'order',
         entity_id: order.id,
         action: 'cancelled',
-        old_value: { status: Order_status.WAITING },
+        old_value: { status: previousStatus },
         new_value: {
           order_number: order.order_number,
           status: Order_status.CANCELLED,
@@ -2881,6 +2903,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         to_be_paid: netToBePaid,
         paid_amount: paidAfter,
         total_price: price,
+        // Asl summani saqlaymiz — rollback'da total_price aynan shundan tiklanadi
+        // (dona kamaymay faqat narx tushgan holatda "bola" order bo'lmaydi).
+        original_total_price: order.original_total_price ?? oldTotalPrice,
         comment: finalComment,
         product_quantity: totalNewQty,
         sold_at: order.sold_at ?? Date.now(),
@@ -2949,6 +2974,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             courier.id,
           ),
         ]);
+      }
+
+      // === MOLIYAVIY TAROZI: pochta foydasi (sellOrder bilan bir xil) ===
+      // Qisman sotuv ham yetkazib berish — pochta foydasi (marketTarif −
+      // courierTarif) global moliyaviy balansga yoziladi. Avval bu yo'q edi:
+      // partlySold foydani yozmasdi-yu, rollback esa uni ayirardi (balans
+      // nomutanosibligi). Endi sellOrder bilan to'liq simmetrik.
+      const sellProfitPs = marketTarif - courierTarif;
+      if (sellProfitPs !== 0) {
+        const balanceBeforePs = await calculateFinancialBalance(
+          queryRunner.manager,
+        );
+        // foyda allaqachon kassa balanslarida aks etgan → balance_after = before
+        const balanceAfterPs = balanceBeforePs;
+        await queryRunner.manager.save(
+          queryRunner.manager.create(FinancialBalanceHistoryEntity, {
+            amount: sellProfitPs,
+            balance_before: balanceAfterPs - sellProfitPs,
+            balance_after: balanceAfterPs,
+            source_type: FinancialSource_type.SELL_PROFIT,
+            order_id: order.id,
+            related_user_id: marketId,
+            comment: `Buyurtma #${order.order_number} — qisman sotuv pochta foydasi: ${sellProfitPs} so'm`,
+            created_by: user.id,
+          }),
+        );
       }
 
       const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
@@ -3097,6 +3148,165 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  /**
+   * Buyurtmaga yozilgan qo'shimcha xarajatni (EXTRA_COST) berilgan kassada
+   * IDEMPOTENT tarzda teskari qaytaradi.
+   *
+   * Eski mantiq `Math.abs(order.updated_at - history.created_at) <= 5000` vaqt
+   * oynasiga tayanardi — bu deyarli hech qachon ishlamasdi (har save updated_at'ni
+   * surardi), ba'zan esa noto'g'ri ishlardi. Yangi mantiq net-balansga tayanadi:
+   *
+   *   net = SUM(EXTRA_COST chiqim) − SUM(CORRECTION kirim)   [shu kassa, shu order]
+   *
+   * net > 0 bo'lsa, aynan o'sha (hali qaytarilmagan) miqdor qaytariladi va
+   * CORRECTION kirim yoziladi. Takroriy rollback'da net=0 bo'lib, ikkilamchi
+   * qaytarish bo'lmaydi; qayta-bekor qilingach yana qaytarish mumkin bo'ladi.
+   * (cashbox_history'da CORRECTION+INCOME yozuvlari faqat shu teskari qaytarish
+   *  uchun ishlatiladi — sotuv/bekor farqi reversiyasi esa CORRECTION+EXPENSE.)
+   *
+   * Qaytarilgan miqdorni (>= 0) qaytaradi.
+   */
+  private async reverseExtraCostForCashbox(
+    queryRunner: QueryRunner,
+    orderId: string,
+    cashbox: CashEntity,
+    user: JwtPayload,
+    comment: string,
+  ): Promise<number> {
+    const appliedRaw = await queryRunner.manager
+      .createQueryBuilder(CashboxHistoryEntity, 'h')
+      .select('COALESCE(SUM(h.amount), 0)', 'sum')
+      .where('h.source_id = :orderId', { orderId })
+      .andWhere('h.cashbox_id = :cid', { cid: cashbox.id })
+      .andWhere('h.source_type = :st', { st: Source_type.EXTRA_COST })
+      .andWhere('h.operation_type = :op', { op: Operation_type.EXPENSE })
+      .getRawOne<{ sum: string }>();
+
+    const reversedRaw = await queryRunner.manager
+      .createQueryBuilder(CashboxHistoryEntity, 'h')
+      .select('COALESCE(SUM(h.amount), 0)', 'sum')
+      .where('h.source_id = :orderId', { orderId })
+      .andWhere('h.cashbox_id = :cid', { cid: cashbox.id })
+      .andWhere('h.source_type = :st', { st: Source_type.CORRECTION })
+      .andWhere('h.operation_type = :op', { op: Operation_type.INCOME })
+      .getRawOne<{ sum: string }>();
+
+    const applied = Number(appliedRaw?.sum) || 0;
+    const reversed = Number(reversedRaw?.sum) || 0;
+    const net = applied - reversed;
+    if (net <= 0) return 0;
+
+    cashbox.balance += net;
+    await queryRunner.manager.save(cashbox);
+    await queryRunner.manager.save(
+      queryRunner.manager.create(CashboxHistoryEntity, {
+        operation_type: Operation_type.INCOME,
+        cashbox_id: cashbox.id,
+        source_id: orderId,
+        source_type: Source_type.CORRECTION,
+        amount: net,
+        balance_after: cashbox.balance,
+        comment,
+        created_by: user.id,
+      }),
+    );
+    return net;
+  }
+
+  /**
+   * Qisman sotilgan buyurtma rollback qilinganda undan ajratilgan "bola"
+   * (CANCELLED, parent_order_id=order.id) buyurtmalarni asosiy buyurtmaga QAYTA
+   * BIRLASHTIRADI — narx, dona va itemlar tiklanadi, bola order soft-delete
+   * qilinadi.
+   *
+   * Asl narx alohida saqlanmaydi — u parent.total_price + SUM(bola.total_price)
+   * orqali to'liq tiklanadi (partlySold: bola.total_price = oldTotalPrice − price).
+   *
+   * XAVFSIZLIK:
+   *  - Faqat status hali CANCELLED bo'lgan bolalar birlashtiriladi. Agar bola
+   *    allaqachon pochtaga yuborilgan (CANCELLED_SENT)/yopilgan (CLOSED) bo'lsa —
+   *    tegmaymiz (boshqa oqimni buzmaslik uchun).
+   *  - Bola HARD delete emas, SOFT delete qilinadi (audit izi saqlanadi,
+   *    barcha so'rovlardan avtomatik chiqib ketadi). Item rivojiga tegmaymiz
+   *    (ularni hech bir agregatsiya order'siz sanamaydi — tekshirildi).
+   *  - Qisman sotuvsiz oddiy buyurtmalarda bola bo'lmaydi → bu funksiya no-op.
+   *  - Eski ma'lumotdagi bir nechta bola ham qo'llab-quvvatlanadi.
+   *
+   * `order` obyektining total_price/product_quantity maydonlari shu yerda
+   * o'zgartiriladi, lekin saqlash chaqiruvchidagi `save(order)` ga qoldiriladi.
+   * Birlashtirilgan bolalar sonini qaytaradi.
+   */
+  private async mergePartialChildrenBack(
+    queryRunner: QueryRunner,
+    order: OrderEntity,
+  ): Promise<number> {
+    const children = await queryRunner.manager.find(OrderEntity, {
+      where: {
+        parent_order_id: order.id,
+        status: Order_status.CANCELLED,
+      },
+    });
+
+    let restoredChildPrice = 0;
+    let restoredQty = 0;
+
+    // 1) Dona kamaytirilgan holat: "bola"(lar)dan itemlar va dona tiklanadi.
+    if (children.length) {
+      const parentItems = await queryRunner.manager.find(OrderItemEntity, {
+        where: { orderId: order.id },
+      });
+      const parentItemByProduct = new Map<string, OrderItemEntity>();
+      for (const it of parentItems) parentItemByProduct.set(it.productId, it);
+
+      for (const child of children) {
+        restoredChildPrice += Number(child.total_price) || 0;
+        restoredQty += Number(child.product_quantity) || 0;
+
+        const childItems = await queryRunner.manager.find(OrderItemEntity, {
+          where: { orderId: child.id },
+        });
+        for (const ci of childItems) {
+          const parentIt = parentItemByProduct.get(ci.productId);
+          if (parentIt) {
+            parentIt.quantity = Number(parentIt.quantity) + Number(ci.quantity);
+            await queryRunner.manager.save(parentIt);
+          } else {
+            // Ehtiyot chorasi: asosiy buyurtmada bu mahsulot qolmagan bo'lsa
+            const recreated = await queryRunner.manager.save(
+              queryRunner.manager.create(OrderItemEntity, {
+                productId: ci.productId,
+                quantity: Number(ci.quantity),
+                orderId: order.id,
+              }),
+            );
+            parentItemByProduct.set(ci.productId, recreated);
+          }
+        }
+
+        // Bola order'ni soft-delete qilamiz (audit saqlanadi, queries chiqaradi)
+        await queryRunner.manager.softDelete(OrderEntity, { id: child.id });
+      }
+    }
+
+    // 2) Narxni tiklash:
+    //    - original_total_price MAVJUD bo'lsa (yangi buyurtmalar) — undan aniq
+    //      tiklaymiz. Bu HAR IKKI holatni qoplaydi: dona kamaytirilgan ham,
+    //      faqat narx tushirilgan ham ("bola"siz discount).
+    //    - Aks holda (bu tuzatishdan OLDIN qisman sotilgan eski buyurtma) —
+    //      faqat dona kamaytirilgan bo'lsa "bola" summasidan fallback qilamiz.
+    if (order.original_total_price != null) {
+      order.total_price = Number(order.original_total_price);
+    } else if (children.length) {
+      order.total_price = (Number(order.total_price) || 0) + restoredChildPrice;
+    }
+    order.original_total_price = null;
+    order.product_quantity =
+      (Number(order.product_quantity) || 0) + restoredQty;
+
+    // Tiklash bo'lganini bildirish uchun: bola soni yoki narx tiklangani.
+    return children.length;
+  }
+
   async rollbackOrderToWaiting(
     user: JwtPayload,
     id: string,
@@ -3187,19 +3397,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ? courier.tariff_center
           : courier.tariff_home;
 
-      // Qo'shimcha xarajatni olish (agar mavjud bo‘lsa)
-      const extraCostHistory = await queryRunner.manager.findOne(
-        CashboxHistoryEntity,
-        {
-          where: {
-            source_id: order.id,
-            source_type: Source_type.EXTRA_COST,
-            cashbox_id: marketCashbox.id,
-          },
-          order: { created_at: 'DESC' },
-        },
-      );
-
       // === ROLLBACK FOR SOLD/PAID (courier or superadmin) ===
       if (
         order.status === Order_status.SOLD ||
@@ -3240,46 +3437,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           }),
         );
 
-        // Qo'shimcha xarajat rollback (agar mavjud va vaqti yaqin bo‘lsa)
-        const soldTime = Number(order.sold_at);
-        const extraCostTime = Number(extraCostHistory?.created_at);
-        const diff = Math.abs(soldTime - extraCostTime);
-
-        if (extraCostHistory && diff <= 5000) {
-          const extraAmount = Number(extraCostHistory.amount);
-
-          // Market kassasiga qaytarish
-          marketCashbox.balance += extraAmount;
-          await queryRunner.manager.save(marketCashbox);
-          await queryRunner.manager.save(
-            queryRunner.manager.create(CashboxHistoryEntity, {
-              operation_type: Operation_type.INCOME,
-              cashbox_id: marketCashbox.id,
-              source_id: order.id,
-              source_type: Source_type.CORRECTION,
-              amount: extraAmount,
-              balance_after: marketCashbox.balance,
-              comment: "Qo'shimcha xarajat orqaga qaytarildi",
-              created_by: user.id,
-            }),
-          );
-
-          // Courier kassasiga qaytarish
-          courierCashbox.balance += extraAmount;
-          await queryRunner.manager.save(courierCashbox);
-          await queryRunner.manager.save(
-            queryRunner.manager.create(CashboxHistoryEntity, {
-              operation_type: Operation_type.INCOME,
-              cashbox_id: courierCashbox.id,
-              source_id: order.id,
-              source_type: Source_type.CORRECTION,
-              amount: extraAmount,
-              balance_after: courierCashbox.balance,
-              comment: "Qo'shimcha xarajat orqaga qaytarildi",
-              created_by: user.id,
-            }),
-          );
-        }
+        // Qo'shimcha xarajat (EXTRA_COST) — IDEMPOTENT teskari qaytarish
+        // (eski 5 soniyalik vaqt oynasi o'rniga net-balans bo'yicha).
+        await this.reverseExtraCostForCashbox(
+          queryRunner,
+          order.id,
+          marketCashbox,
+          user,
+          "Qo'shimcha xarajat orqaga qaytarildi",
+        );
+        await this.reverseExtraCostForCashbox(
+          queryRunner,
+          order.id,
+          courierCashbox,
+          user,
+          "Qo'shimcha xarajat orqaga qaytarildi",
+        );
       }
 
       // === ROLLBACK FOR PARTLY PAID (superadmin) ===
@@ -3323,90 +3496,46 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           }),
         );
 
-        // Qo'shimcha xarajat rollback (agar mavjud va vaqti yaqin bo‘lsa)
-        const soldTime = Number(order.sold_at);
-        const extraCostTime = Number(extraCostHistory?.created_at);
-        const diff = Math.abs(soldTime - extraCostTime);
-
-        if (extraCostHistory && diff <= 5000) {
-          const extraAmount = Number(extraCostHistory.amount);
-
-          marketCashbox.balance += extraAmount;
-          await queryRunner.manager.save(marketCashbox);
-          await queryRunner.manager.save(
-            queryRunner.manager.create(CashboxHistoryEntity, {
-              operation_type: Operation_type.INCOME,
-              cashbox_id: marketCashbox.id,
-              source_id: order.id,
-              source_type: Source_type.CORRECTION,
-              amount: extraAmount,
-              balance_after: marketCashbox.balance,
-              comment: "Qo'shimcha xarajat orqaga qaytarildi",
-              created_by: user.id,
-            }),
-          );
-
-          courierCashbox.balance += extraAmount;
-          await queryRunner.manager.save(courierCashbox);
-          await queryRunner.manager.save(
-            queryRunner.manager.create(CashboxHistoryEntity, {
-              operation_type: Operation_type.INCOME,
-              cashbox_id: courierCashbox.id,
-              source_id: order.id,
-              source_type: Source_type.CORRECTION,
-              amount: extraAmount,
-              balance_after: courierCashbox.balance,
-              comment: "Qo'shimcha xarajat orqaga qaytarildi",
-              created_by: user.id,
-            }),
-          );
-        }
+        // Qo'shimcha xarajat (EXTRA_COST) — IDEMPOTENT teskari qaytarish
+        await this.reverseExtraCostForCashbox(
+          queryRunner,
+          order.id,
+          marketCashbox,
+          user,
+          "Qo'shimcha xarajat orqaga qaytarildi",
+        );
+        await this.reverseExtraCostForCashbox(
+          queryRunner,
+          order.id,
+          courierCashbox,
+          user,
+          "Qo'shimcha xarajat orqaga qaytarildi",
+        );
       }
 
-      // === ROLLBACK FOR CANCELLED ===
+      // === ROLLBACK FOR CANCELLED / CLOSED ===
+      // Bekor qilingan/yopilgan buyurtmaga yozilgan qo'shimcha xarajatni
+      // IDEMPOTENT (net-balans) tarzda teskari qaytaramiz — har ikki kassa uchun.
       if (
-        (order.status === Order_status.CANCELLED && extraCostHistory) ||
-        (order.status === Order_status.CLOSED && extraCostHistory)
+        order.status === Order_status.CANCELLED ||
+        order.status === Order_status.CLOSED
       ) {
-        const orderLastUpdateTime = Number(order.updated_at);
-        const extraCostTime = Number(extraCostHistory?.created_at);
-        const diff = Math.abs(orderLastUpdateTime - extraCostTime);
-
-        if (diff <= 5000) {
-          const extraAmount = Number(extraCostHistory.amount);
-
-          marketCashbox.balance += extraAmount;
-          await queryRunner.manager.save(marketCashbox);
-          await queryRunner.manager.save(
-            queryRunner.manager.create(CashboxHistoryEntity, {
-              operation_type: Operation_type.INCOME,
-              cashbox_id: marketCashbox.id,
-              source_id: order.id,
-              source_type: Source_type.CORRECTION,
-              amount: extraAmount,
-              balance_after: marketCashbox.balance,
-              comment:
-                "Bekor qilingan buyurtmaga yozilgan qo'shimcha xarajat orqaga qaytarildi",
-              created_by: user.id,
-            }),
-          );
-
-          courierCashbox.balance += extraAmount;
-          await queryRunner.manager.save(courierCashbox);
-          await queryRunner.manager.save(
-            queryRunner.manager.create(CashboxHistoryEntity, {
-              operation_type: Operation_type.INCOME,
-              cashbox_id: courierCashbox.id,
-              source_id: order.id,
-              source_type: Source_type.CORRECTION,
-              amount: extraAmount,
-              balance_after: courierCashbox.balance,
-              comment:
-                "Bekor qilingan buyurtmaga yozilgan qo'shimcha xarajat orqaga qaytarildi",
-              created_by: user.id,
-            }),
-          );
-        }
+        const extraReversalComment =
+          "Bekor qilingan buyurtmaga yozilgan qo'shimcha xarajat orqaga qaytarildi";
+        await this.reverseExtraCostForCashbox(
+          queryRunner,
+          order.id,
+          marketCashbox,
+          user,
+          extraReversalComment,
+        );
+        await this.reverseExtraCostForCashbox(
+          queryRunner,
+          order.id,
+          courierCashbox,
+          user,
+          extraReversalComment,
+        );
       }
 
       // === Operator earning ni o'chirish (rollback) ===
@@ -3422,6 +3551,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           );
         }
       }
+
+      // === Qisman sotuv "bola" buyurtmalarini qayta birlashtirish ===
+      // Kassa/extra_cost reversiyasi KAMAYTIRILGAN narx bo'yicha allaqachon
+      // bajarildi; endi order entity'sining narxi/dona/itemlarini asl holatiga
+      // tiklaymiz va ajratilgan bekor qism bola order'ni soft-delete qilamiz.
+      // (Qisman sotilmagan buyurtmalarda bola yo'q → no-op.)
+      const mergedChildren = await this.mergePartialChildrenBack(
+        queryRunner,
+        order,
+      );
 
       // === Update order status ===
       const previousStatus = order.status;
@@ -3495,9 +3634,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(order);
 
       // === MOLIYAVIY TAROZI: rollback uchun teskari yozuv ===
+      // Faqat shu buyurtma uchun SELL_PROFIT yozuvi MAVJUD bo'lsa teskari
+      // qaytaramiz (simmetriya). Aks holda — masalan bu tuzatishdan OLDIN qisman
+      // sotilgan eski buyurtma (unda SELL_PROFIT yozilmagan) — balansdan ortiqcha
+      // ayirib yubormaymiz. Bu eski ma'lumotlarni xavfsiz qiladi.
+      const existingSellProfit = await queryRunner.manager.findOne(
+        FinancialBalanceHistoryEntity,
+        {
+          where: {
+            order_id: order.id,
+            source_type: FinancialSource_type.SELL_PROFIT,
+          },
+        },
+      );
       const rollbackProfit = -(marketTarif - courierTarif);
       if (
         rollbackProfit !== 0 &&
+        existingSellProfit &&
         [
           Order_status.SOLD,
           Order_status.PAID,
@@ -3533,7 +3686,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         new_value: { order_number: order.order_number, status: order.status },
         description: `Buyurtma #${order.order_number} orqaga qaytarildi: ${orderStatusUz(
           previousStatus,
-        )} → ${orderStatusUz(order.status)}`,
+        )} → ${orderStatusUz(order.status)}${
+          mergedChildren > 0
+            ? ` (qisman sotuvdan ${mergedChildren} ta bo'lak qayta birlashtirildi)`
+            : ''
+        }`,
         user,
       });
 
@@ -3578,7 +3735,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           'acceptedCount',
         )
         .addSelect(
-          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status IN (:...cancelledStatuses) THEN 1 END)`,
           'cancelled',
         )
         .addSelect(
@@ -3588,7 +3745,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .setParameters({
           start,
           end,
-          cancelledStatus: Order_status.CANCELLED,
+          cancelledStatuses: [Order_status.CANCELLED, Order_status.CLOSED],
           soldStatuses: [
             Order_status.SOLD,
             Order_status.PAID,
@@ -4137,7 +4294,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .createQueryBuilder('o')
         // Jami = harakat (davrda sotilgan YOKI bekor qilingan) — harakat modeli
         .select(
-          `COUNT(CASE WHEN (o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses)) OR (o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus) THEN 1 END)`,
+          `COUNT(CASE WHEN (o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses)) OR (o.cancelled_at BETWEEN :start AND :end AND o.status IN (:...cancelledStatuses)) THEN 1 END)`,
           'totalOrders',
         )
         .addSelect(
@@ -4145,7 +4302,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           'soldOrders',
         )
         .addSelect(
-          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status IN (:...cancelledStatuses) THEN 1 END)`,
           'canceledOrders',
         )
         // Saqlangan tariflar bo'yicha profit (yangi buyurtmalar uchun)
@@ -4168,7 +4325,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           start,
           end,
           validStatuses,
-          cancelledStatus: Order_status.CANCELLED,
+          cancelledStatuses: [Order_status.CANCELLED, Order_status.CLOSED],
           addressType: Where_deliver.ADDRESS,
         })
         .getRawOne();
@@ -4228,7 +4385,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const statsResult = await this.orderRepo
         .createQueryBuilder('o')
         .select(
-          `COUNT(CASE WHEN (o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses)) OR (o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus) THEN 1 END)`,
+          `COUNT(CASE WHEN (o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses)) OR (o.cancelled_at BETWEEN :start AND :end AND o.status IN (:...cancelledStatuses)) THEN 1 END)`,
           'totalOrders',
         )
         .addSelect(
@@ -4236,7 +4393,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           'soldOrders',
         )
         .addSelect(
-          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status = :cancelledStatus THEN 1 END)`,
+          `COUNT(CASE WHEN o.cancelled_at BETWEEN :start AND :end AND o.status IN (:...cancelledStatuses) THEN 1 END)`,
           'canceledOrders',
         )
         .addSelect(
@@ -4248,7 +4405,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           start,
           end,
           validStatuses,
-          cancelledStatus: Order_status.CANCELLED,
+          cancelledStatuses: [Order_status.CANCELLED, Order_status.CLOSED],
         })
         .getRawOne();
 

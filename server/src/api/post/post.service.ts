@@ -10,7 +10,15 @@ import { PostEntity } from 'src/core/entity/post.entity';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderRepository } from 'src/core/repository/order.repository';
-import { Between, DataSource, In, IsNull, Not, Repository } from 'typeorm';
+import {
+  Between,
+  DataSource,
+  In,
+  IsNull,
+  Not,
+  QueryRunner,
+  Repository,
+} from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
@@ -1487,6 +1495,66 @@ export class PostService {
     }
   }
 
+  /**
+   * Bekor qilingan (CANCELLED) buyurtmalarni kuryerning YAGONA qaytarish-postiga
+   * (CANCELED status post) biriktiruvchi yadro mantiq.
+   * `createCanceledPost` (tanlangan order_ids) va `sendAllCanceledOrders`
+   * (barcha bekor qilinganlar) shu yordamchini ishlatadi.
+   *
+   * MUHIM:
+   *  - `orders` chaqirilishidan oldin validatsiya qilingan va kuryerga tegishli
+   *    (egalik tekshirilgan) bo'lishi shart.
+   *  - Bu yerda kuryer bo'yicha tranzaksiya-darajali advisory lock olinadi —
+   *    shu sababli bir kuryer uchun ayni vaqtda faqat bitta CANCELED post
+   *    bo'ladi (ikki marta bosish / retry tufayli dublikat post yaratilmaydi).
+   */
+  private async attachOrdersToCanceledPost(
+    queryRunner: QueryRunner,
+    courier: UserEntity,
+    orders: OrderEntity[],
+  ): Promise<PostEntity> {
+    // Kuryer bo'yicha tranzaksiya-darajali advisory lock. Parallel so'rovlar
+    // bir-birini kutadi — "bir kuryer = bitta CANCELED post" invarianti saqlanadi.
+    await queryRunner.manager.query(
+      'SELECT pg_advisory_xact_lock(hashtext($1))',
+      [`canceled_post:${courier.id}`],
+    );
+
+    let canceledPost = await queryRunner.manager.findOne(PostEntity, {
+      where: { courier_id: courier.id, status: Post_status.CANCELED },
+    });
+
+    if (!canceledPost) {
+      canceledPost = queryRunner.manager.create(PostEntity, {
+        courier_id: courier.id,
+        region_id: courier.region_id, // optional, faqat qo'shimcha info sifatida
+        post_total_price: 0,
+        order_quantity: 0,
+        qr_code_token: generateCustomToken(),
+        status: Post_status.CANCELED,
+      });
+      canceledPost = await queryRunner.manager.save(canceledPost);
+    }
+
+    let canceledOrderQt = Number(canceledPost.order_quantity) || 0;
+    let canPostTotalPrice = Number(canceledPost.post_total_price) || 0;
+
+    for (const order of orders) {
+      order.canceled_post_id = canceledPost.id;
+      order.status = Order_status.CANCELLED_SENT;
+      canceledOrderQt++;
+      canPostTotalPrice += Number(order.total_price) || 0;
+    }
+
+    await queryRunner.manager.save(orders);
+
+    canceledPost.order_quantity = canceledOrderQt;
+    canceledPost.post_total_price = canPostTotalPrice;
+    await queryRunner.manager.save(canceledPost);
+
+    return canceledPost;
+  }
+
   async createCanceledPost(user: JwtPayload, ordersArrayDto: ReceivePostDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -1499,6 +1567,7 @@ export class PostService {
       if (!order_ids?.length) {
         throw new BadRequestException('No orders provided');
       }
+      const uniqueIds = Array.from(new Set(order_ids));
 
       // 2️⃣ Faqat CANCELLED holatdagi VA shu kuryerga biriktirilgan orderlarni topish.
       //    Egalik post.courier_id orqali tekshiriladi — kuryer faqat o'zining
@@ -1506,73 +1575,39 @@ export class PostService {
       const orders = await queryRunner.manager
         .createQueryBuilder(OrderEntity, 'o')
         .innerJoin('o.post', 'p')
-        .where('o.id IN (:...ids)', { ids: order_ids })
+        .where('o.id IN (:...ids)', { ids: uniqueIds })
         .andWhere('o.status = :st', { st: Order_status.CANCELLED })
         .andWhere('p.courier_id = :uid', { uid: user.id })
         .getMany();
 
-      if (orders.length !== order_ids.length) {
+      // 3️⃣ Aniq xato: qaysi buyurtma(lar) muammoli ekanini ko'rsatamiz.
+      if (orders.length !== uniqueIds.length) {
+        const foundIds = new Set(orders.map((o) => o.id));
+        const problemIds = uniqueIds.filter((id) => !foundIds.has(id));
         throw new BadRequestException(
-          'Some orders not found, not in Canceled status, or not assigned to you',
+          `Quyidagi buyurtmalar topilmadi, "bekor qilingan" holatida emas yoki sizga tegishli emas: ${problemIds.join(', ')}`,
         );
       }
 
-      // 3️⃣ Courierni tekshirish
+      // 4️⃣ Courierni tekshirish
       const courier = await queryRunner.manager.findOne(UserEntity, {
         where: { id: user.id },
       });
-
       if (!courier) {
         throw new NotFoundException('Courier not found');
       }
 
-      // 4️⃣ Mavjud canceled postni topish (faqat courier bo'yicha)
-      let canceledPost = await queryRunner.manager.findOne(PostEntity, {
-        where: { courier_id: courier.id, status: Post_status.CANCELED },
-      });
+      // 5️⃣ Yagona CANCELED postga biriktirish (advisory lock yordamchi ichida)
+      const canceledPost = await this.attachOrdersToCanceledPost(
+        queryRunner,
+        courier,
+        orders,
+      );
 
-      // 5️⃣ Agar yo'q bo'lsa, yangi canceled post yaratamiz
-      if (!canceledPost) {
-        const customToken = generateCustomToken();
-
-        canceledPost = queryRunner.manager.create(PostEntity, {
-          courier_id: courier.id,
-          region_id: courier.region_id, // optional, faqat qo'shimcha info sifatida
-          post_total_price: 0,
-          order_quantity: 0,
-          qr_code_token: customToken,
-          status: Post_status.CANCELED,
-        });
-
-        canceledPost = await queryRunner.manager.save(canceledPost);
-      }
-
-      // 6️⃣ Canceled postning mavjud qiymatlarini olish
-      let canceledOrderQt: number = Number(canceledPost.order_quantity) || 0;
-      let canPostTotalPrice: number =
-        Number(canceledPost.post_total_price) || 0;
-
-      // 7️⃣ Har bir orderni yangilash
-      for (const order of orders) {
-        order.canceled_post_id = canceledPost.id;
-        order.status = Order_status.CANCELLED_SENT;
-        canceledOrderQt++;
-        canPostTotalPrice += Number(order.total_price) || 0;
-      }
-
-      // 8️⃣ Orderlarni saqlash
-      await queryRunner.manager.save(orders);
-
-      // 9️⃣ Canceled postni yangilash
-      canceledPost.order_quantity = canceledOrderQt;
-      canceledPost.post_total_price = canPostTotalPrice;
-      await queryRunner.manager.save(canceledPost);
-
-      // 🔟 Transactionni yakunlash
       await queryRunner.commitTransaction();
 
-      // Activity log
-      for (const oid of order_ids) {
+      const attachedIds = orders.map((o) => o.id);
+      for (const oid of attachedIds) {
         this.activityLog.log({
           entity_type: 'order',
           entity_id: oid,
@@ -1584,9 +1619,75 @@ export class PostService {
       }
 
       return successRes(
-        { post_id: canceledPost.id, order_ids },
+        { post_id: canceledPost.id, order_ids: attachedIds },
         200,
         'Canceled orders successfully sent to central post',
+      );
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Kuryerning BARCHA bekor qilingan (CANCELLED) buyurtmalarini bir martada
+   * qaytarish-postiga yig'adi — sahifalashdan (pagination) qat'i nazar.
+   * Avval kuryer har sahifani (10 talab) alohida yuborishga majbur edi; bu
+   * endpoint butun ro'yxatni bitta amalda yuboradi.
+   */
+  async sendAllCanceledOrders(user: JwtPayload) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Kuryerga tegishli (post.courier_id) barcha CANCELLED buyurtmalar.
+      const orders = await queryRunner.manager
+        .createQueryBuilder(OrderEntity, 'o')
+        .innerJoin('o.post', 'p')
+        .where('o.status = :st', { st: Order_status.CANCELLED })
+        .andWhere('p.courier_id = :uid', { uid: user.id })
+        .getMany();
+
+      if (!orders.length) {
+        throw new BadRequestException(
+          "Qaytariladigan bekor qilingan buyurtma yo'q",
+        );
+      }
+
+      const courier = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: user.id },
+      });
+      if (!courier) {
+        throw new NotFoundException('Courier not found');
+      }
+
+      const canceledPost = await this.attachOrdersToCanceledPost(
+        queryRunner,
+        courier,
+        orders,
+      );
+
+      await queryRunner.commitTransaction();
+
+      const orderIds = orders.map((o) => o.id);
+      for (const oid of orderIds) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: oid,
+          action: 'status_change',
+          new_value: { status: Order_status.CANCELLED_SENT },
+          description: `Bekor qilingan buyurtma pochtaga qaytarildi (barchasi)`,
+          user,
+        });
+      }
+
+      return successRes(
+        { post_id: canceledPost.id, count: orderIds.length, order_ids: orderIds },
+        200,
+        `${orderIds.length} ta bekor qilingan buyurtma pochtaga yuborildi`,
       );
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1606,10 +1707,12 @@ export class PostService {
     await queryRunner.startTransaction();
 
     try {
-      // Pochtani topamiz
+      // Pochtani pessimistic_write lock bilan topamiz — relations'siz
+      // (Postgres outer-join + FOR UPDATE'ni qabul qilmaydi). Lock tufayli
+      // ayni paytda createCanceledPost/double-submit bilan poyga bo'lmaydi.
       const post = await queryRunner.manager.findOne(PostEntity, {
         where: { id },
-        relations: ['orders'],
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (!post) {
@@ -1652,7 +1755,7 @@ export class PostService {
         );
       }
 
-      // Qolgan orderlar (id lar) => CANCELED
+      // Qolgan orderlar (id lar) => CANCELED, postdan ajratiladi
       const remainingOrderIds = allOrderIdsForPost.filter(
         (orderId) => !canceledOrderIds.includes(orderId),
       );
@@ -1665,11 +1768,26 @@ export class PostService {
         );
       }
 
+      // Post statistikasini QABUL QILINGAN (CLOSED) buyurtmalarga moslab qayta
+      // hisoblaymiz — ajratilgan buyurtmalar soni/summasi postda qolib ketmaydi
+      // (aks holda CANCELED_RECEIVED post haqiqatdan ko'p son/summa ko'rsatadi).
+      const acceptedOrders = allOrders.filter((o) =>
+        canceledOrderIds.includes(o.id),
+      );
+      const acceptedTotalPrice = acceptedOrders.reduce(
+        (sum, o) => sum + (Number(o.total_price) || 0),
+        0,
+      );
+
       // Pochtaning statusi har doim Canceled_RECEIVED bo'lib qoladi
       await queryRunner.manager.update(
         PostEntity,
         { id },
-        { status: Post_status.CANCELED_RECEIVED },
+        {
+          status: Post_status.CANCELED_RECEIVED,
+          order_quantity: acceptedOrders.length,
+          post_total_price: acceptedTotalPrice,
+        },
       );
 
       await queryRunner.commitTransaction();

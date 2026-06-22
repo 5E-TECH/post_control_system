@@ -108,6 +108,14 @@ export const usePost = () => {
       onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
     });
 
+  // Kuryerning BARCHA bekor qilingan buyurtmalarini bir martada yuborish
+  // (sahifalashdan qat'i nazar — 10 talab alohida yuborish muammosini hal qiladi)
+  const canceledPostAll = () =>
+    useMutation({
+      mutationFn: () => api.post("post/cancel/all").then((res) => res.data),
+      onSuccess: () => client.invalidateQueries({ queryKey: [post] }),
+    });
+
   const receiveCanceledPost = () =>
     useMutation({
       mutationFn: ({ id, data }: { id: string; data: any }) =>
@@ -185,6 +193,7 @@ export const usePost = () => {
     sendPost,
     receivePost,
     canceledPost,
+    canceledPostAll,
     receiveCanceledPost,
     checkPost,
     checkRefusedPost,
