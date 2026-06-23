@@ -19,27 +19,27 @@ export const useCashBox = () => {
 
   const getCashBoxById = (id: string | undefined, bool: boolean = true, params?:any) =>
     useQuery({
-      queryKey: [cashbox, id, params],
+      queryKey: [cashbox, "user", id, params],
       queryFn: () => api.get(`cashbox/user/${id}`, {params}).then((res) => res.data),
       enabled: bool,
     });
 
   const getCashBoxHistoryById = (id: string | null, bool: boolean = true) =>
     useQuery({
-      queryKey: [cashbox, id],
+      queryKey: [cashbox, "history", id],
       queryFn: () => api.get(`cashbox-history/${id}`).then((res) => res.data),
       enabled: bool,
     });
 
   const getCashboxMyCashbox = (params?:any) =>
     useQuery({
-      queryKey: [cashbox, params],
+      queryKey: [cashbox, "my-cashbox", params],
       queryFn: () => api.get("cashbox/my-cashbox", {params}).then((res) => res.data),
     });
 
   const getCashBoxInfo = (bool: boolean = true, params?: any) =>
     useQuery({
-      queryKey: [cashbox, params],
+      queryKey: [cashbox, "all-info", params],
       queryFn: () =>
         api.get(`cashbox/all-info`, { params }).then((res) => res.data),
       enabled: bool,
@@ -47,7 +47,7 @@ export const useCashBox = () => {
 
   const getCashBoxMain = (params?:any) =>
     useQuery({
-      queryKey: [cashbox, params],
+      queryKey: [cashbox, "main", params],
       queryFn: () => api.get(`cashbox/main`, {params}).then((res) => res.data),
     });
 
@@ -63,6 +63,82 @@ export const useCashBox = () => {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["cashbox"] });
     },
+  });
+
+  // ==================== VIRTUAL KARTA HOOKLARI ====================
+
+  const getCards = (params?: { includeInactive?: boolean }) =>
+    useQuery({
+      queryKey: [cashbox, "cards", params],
+      queryFn: () =>
+        api.get("cashbox/cards", { params }).then((res) => res.data),
+    });
+
+  const getCardMovements = (params?: {
+    cardId?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    useQuery({
+      queryKey: [cashbox, "card-movements", params],
+      queryFn: () =>
+        api
+          .get("cashbox/cards/movements", { params })
+          .then((res) => res.data),
+    });
+
+  const getCardLedger = (
+    id: string | null,
+    params?: { fromDate?: string; toDate?: string; page?: number; limit?: number },
+    bool: boolean = true,
+  ) =>
+    useQuery({
+      queryKey: [cashbox, "card-ledger", id, params],
+      queryFn: () =>
+        api.get(`cashbox/cards/${id}/ledger`, { params }).then((res) => res.data),
+      enabled: bool && !!id,
+    });
+
+  const invalidateCards = () => {
+    client.invalidateQueries({ queryKey: [cashbox] });
+  };
+
+  const createCard = useMutation({
+    mutationFn: (data: { name: string; sort_order?: number }) =>
+      api.post("cashbox/cards", data),
+    onSuccess: invalidateCards,
+  });
+
+  const renameCard = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.patch(`cashbox/cards/${id}`, { name }),
+    onSuccess: invalidateCards,
+  });
+
+  const setCardActive = useMutation({
+    mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
+      api.patch(`cashbox/cards/${id}/status`, { is_active }),
+    onSuccess: invalidateCards,
+  });
+
+  const transferCards = useMutation({
+    mutationFn: (data: {
+      from_card_id: string;
+      to_card_id: string;
+      amount: number;
+      comment?: string;
+    }) => api.post("cashbox/cards/transfer", data),
+    onSuccess: invalidateCards,
+  });
+
+  const convertCard = useMutation({
+    mutationFn: (data: {
+      type: "card_to_cash" | "cash_to_card";
+      card_id: string;
+      amount: number;
+      comment?: string;
+    }) => api.post("cashbox/cards/convert", data),
+    onSuccess: invalidateCards,
   });
 
   // ==================== FINANCIAL BALANCE HOOKS ====================
@@ -140,7 +216,7 @@ export const useCashBox = () => {
     });
 
   const paySalary = useMutation({
-    mutationFn: (data: { user_id: string; amount: number; type?: string; comment?: string }) =>
+    mutationFn: (data: { user_id: string; amount: number; type?: string; comment?: string; card_id?: string }) =>
       api.post("cashbox/salary", data),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: [cashbox] });
@@ -189,6 +265,15 @@ export const useCashBox = () => {
     cashboxSpand,
     cashboxFill,
     paySalary,
+    // Virtual karta hooklari
+    getCards,
+    getCardMovements,
+    getCardLedger,
+    createCard,
+    renameCard,
+    setCardActive,
+    transferCards,
+    convertCard,
     getSalaryHistory,
     getMySalaryHistory,
     // Financial balance hooks

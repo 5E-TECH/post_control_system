@@ -18,6 +18,8 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { Order_status } from 'src/common/enums';
 import { ExternalIntegrationService } from '../external-integration/external-integration.service';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 
 // Retry delays (milliseconds)
 const RETRY_DELAYS = [
@@ -50,6 +52,7 @@ export class IntegrationSyncService {
     private readonly httpService: HttpService,
     private readonly externalIntegrationService: ExternalIntegrationService,
     private readonly dataSource: DataSource,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   /**
@@ -722,7 +725,7 @@ export class IntegrationSyncService {
   /**
    * Barcha failed joblarni qayta sync qilish
    */
-  async retryAllFailedSyncs(integrationId?: string) {
+  async retryAllFailedSyncs(integrationId?: string, actor?: JwtPayload) {
     try {
       const queryBuilder = this.syncQueueRepo
         .createQueryBuilder()
@@ -747,6 +750,21 @@ export class IntegrationSyncService {
       // Worker ni trigger qilish
       this.triggerWorker();
 
+      // Integratsiya bo'yicha bo'lsa, integratsiyaga bog'lab loglaymiz.
+      if (integrationId) {
+        const integ = await this.integrationRepo.findOne({
+          where: { id: integrationId },
+        });
+        this.activityLog.log({
+          entity_type: 'integration',
+          entity_id: integrationId,
+          action: 'sync_retry',
+          new_value: { name: integ?.name, count: result.affected },
+          description: `${integ?.name || 'Integratsiya'}: ${result.affected} ta muvaffaqiyatsiz sync qayta navbatga qo'yildi`,
+          user: actor,
+        });
+      }
+
       return successRes(
         { count: result.affected },
         200,
@@ -760,12 +778,31 @@ export class IntegrationSyncService {
   /**
    * Sync job ni o'chirish
    */
-  async deleteSyncJob(jobId: string) {
+  async deleteSyncJob(jobId: string, actor?: JwtPayload) {
     try {
-      const result = await this.syncQueueRepo.delete(jobId);
-
-      if (result.affected === 0) {
+      const job = await this.syncQueueRepo.findOne({
+        where: { id: jobId },
+        relations: ['integration'],
+      });
+      if (!job) {
         throw new NotFoundException('Sync job topilmadi');
+      }
+
+      await this.syncQueueRepo.delete(jobId);
+
+      if (job.integration_id) {
+        this.activityLog.log({
+          entity_type: 'integration',
+          entity_id: job.integration_id,
+          action: 'sync_deleted',
+          old_value: {
+            name: job.integration?.name,
+            sync_action: job.action,
+            status: job.status,
+          },
+          description: `Sync job o'chirildi (${job.integration?.name || 'integratsiya'} — ${job.action})`,
+          user: actor,
+        });
       }
 
       return successRes(null, 200, "Sync job o'chirildi");

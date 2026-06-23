@@ -13,6 +13,8 @@ import { UpdateLdgConfigDto } from './dto/ldg-config.dto';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Roles } from 'src/common/enums';
 
 class BindCourierDto {
@@ -61,16 +63,22 @@ export class LdgConfigController {
 
   @ApiOperation({ summary: 'LDG sozlamalarini yangilash' })
   @Patch()
-  async update(@Body() dto: UpdateLdgConfigDto) {
-    return this.configService.update(dto);
+  async update(
+    @Body() dto: UpdateLdgConfigDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.configService.update(dto, user);
   }
 
   @ApiOperation({
     summary: 'Mavjud kuryerni LDG vakil-user qilib biriktirish',
   })
   @Post('bind-courier')
-  async bindCourier(@Body() dto: BindCourierDto) {
-    return this.configService.bindCourier(dto.user_id);
+  async bindCourier(
+    @Body() dto: BindCourierDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.configService.bindCourier(dto.user_id, user);
   }
 
   @ApiOperation({
@@ -78,7 +86,10 @@ export class LdgConfigController {
       'Yangi virtual kuryer-user yaratish va LDG vakil qilib belgilash',
   })
   @Post('create-courier')
-  async createCourier(@Body() dto: CreateLdgCourierDto) {
-    return this.configService.createCourier(dto);
+  async createCourier(
+    @Body() dto: CreateLdgCourierDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.configService.createCourier(dto, user);
   }
 }

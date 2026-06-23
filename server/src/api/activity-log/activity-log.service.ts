@@ -5,6 +5,7 @@ import { ActivityLogRepository } from 'src/core/repository/activity-log.reposito
 import { DataSource, EntityManager } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { JwtPayload } from 'src/common/utils/types/user.type';
+import { orderStatusUz } from 'src/common/utils/status-label.util';
 
 export interface LogParams {
   entity_type: string;
@@ -86,7 +87,8 @@ export class ActivityLogService {
       await repo.save(log);
     } catch (error) {
       // Log yozishda xato bo'lsa asosiy operatsiyani to'xtatmaymiz
-      console.error('Activity log write error:', error?.message);
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Activity log write error:', message);
     }
   }
 
@@ -111,7 +113,8 @@ export class ActivityLogService {
       old_value: { status: oldStatus },
       new_value: { status: newStatus },
       description:
-        extra?.description || `Buyurtma holati: ${oldStatus} → ${newStatus}`,
+        extra?.description ||
+        `Buyurtma holati: ${orderStatusUz(oldStatus)} → ${orderStatusUz(newStatus)}`,
       user,
       metadata: extra?.metadata,
       manager: extra?.manager,
@@ -158,17 +161,52 @@ export class ActivityLogService {
     const postIds: string[] = [];
     const entityUserIds: string[] = [];
     const cashboxIds: string[] = [];
+    // Nomli config/katalog entity'lari — entity_summary'da nom ko'rsatish uchun.
+    const regionEntityIds: string[] = [];
+    const districtEntityIds: string[] = [];
+    const productEntityIds: string[] = [];
+    const integrationEntityIds: string[] = [];
     // Log mualliflari (user_id) — JWT'da `name` saqlanmaydi, shuning uchun
     // log yozilayotganda user_name bo'sh qoladi. Bu yerda DB'dan to'ldiramiz.
     const actorIds: string[] = [];
+
+    // old_value/new_value ichidagi FK UUID'lari — diff ko'rinishida xom UUID
+    // emas, ismni ko'rsatish uchun ularni ham yig'amiz (Item 13b).
+    const fkUserIds = new Set<string>();
+    const fkDistrictIds = new Set<string>();
+    const fkRegionIds = new Set<string>();
+    const USER_FK_KEYS = [
+      'customer_id',
+      'courier_id',
+      'market_id',
+      'operator_id',
+      'staff_id',
+    ];
 
     for (const log of logs) {
       if (log.entity_type === 'order') orderIds.push(log.entity_id);
       else if (log.entity_type === 'post') postIds.push(log.entity_id);
       else if (log.entity_type === 'user') entityUserIds.push(log.entity_id);
       else if (log.entity_type === 'cashbox') cashboxIds.push(log.entity_id);
+      else if (log.entity_type === 'region')
+        regionEntityIds.push(log.entity_id);
+      else if (log.entity_type === 'district')
+        districtEntityIds.push(log.entity_id);
+      else if (log.entity_type === 'product')
+        productEntityIds.push(log.entity_id);
+      else if (log.entity_type === 'integration')
+        integrationEntityIds.push(log.entity_id);
 
       if (log.user_id) actorIds.push(log.user_id);
+
+      for (const obj of [log.old_value, log.new_value]) {
+        if (!obj || typeof obj !== 'object') continue;
+        for (const k of USER_FK_KEYS) {
+          if (obj[k]) fkUserIds.add(obj[k]);
+        }
+        if (obj.district_id) fkDistrictIds.add(obj.district_id);
+        if (obj.region_id) fkRegionIds.add(obj.region_id);
+      }
     }
 
     // unique
@@ -177,12 +215,18 @@ export class ActivityLogService {
     const [orders, posts, entityUsers, cashboxes, actors] = await Promise.all([
       orderIds.length
         ? this.dataSource.query(
-            `SELECT o.id, o.total_price, o.status, o.customer_id, o.user_id AS market_id,
+            `SELECT o.id, o.order_number, o.total_price, o.status,
+                    o.customer_id, o.user_id AS market_id,
                     c.name AS customer_name, c.phone_number AS customer_phone,
-                    m.name AS market_name
+                    m.name AS market_name,
+                    d.name AS district_name, r.name AS region_name,
+                    ls.tracking_number AS ldg_tracking, ls.ldg_status AS ldg_status
              FROM "order" o
              LEFT JOIN users c ON c.id = o.customer_id
              LEFT JOIN users m ON m.id = o.user_id
+             LEFT JOIN district d ON d.id = o.district_id
+             LEFT JOIN region r ON r.id = d.region_id
+             LEFT JOIN ldg_shipment ls ON ls.order_id = o.id
              WHERE o.id = ANY($1)`,
             [orderIds],
           )
@@ -190,7 +234,7 @@ export class ActivityLogService {
       postIds.length
         ? this.dataSource.query(
             `SELECT p.id, p.qr_code_token, p.status, p.order_quantity, p.post_total_price,
-                    p.courier_id, p.region_id,
+                    p.courier_id, p.region_id, p.created_at AS post_date,
                     cu.name AS courier_name, r.name AS region_name
              FROM post p
              LEFT JOIN users cu ON cu.id = p.courier_id
@@ -232,6 +276,103 @@ export class ActivityLogService {
     );
     const actorMap = new Map<string, any>(actors.map((a: any) => [a.id, a]));
 
+    // FK UUID -> nom (diff ko'rinishi uchun) — batch query, N+1 yo'q.
+    const [
+      fkUsers,
+      fkDistricts,
+      fkRegions,
+      regionEntities,
+      districtEntities,
+      productEntities,
+      integrationEntities,
+    ] = await Promise.all([
+      fkUserIds.size
+        ? this.dataSource.query(
+            `SELECT id, name FROM users WHERE id = ANY($1)`,
+            [Array.from(fkUserIds)],
+          )
+        : Promise.resolve([]),
+      fkDistrictIds.size
+        ? this.dataSource.query(
+            `SELECT id, name FROM district WHERE id = ANY($1)`,
+            [Array.from(fkDistrictIds)],
+          )
+        : Promise.resolve([]),
+      fkRegionIds.size
+        ? this.dataSource.query(
+            `SELECT id, name FROM region WHERE id = ANY($1)`,
+            [Array.from(fkRegionIds)],
+          )
+        : Promise.resolve([]),
+      // Nomli config/katalog entity'lari (entity_type bo'yicha)
+      regionEntityIds.length
+        ? this.dataSource.query(
+            `SELECT id, name FROM region WHERE id = ANY($1)`,
+            [regionEntityIds],
+          )
+        : Promise.resolve([]),
+      districtEntityIds.length
+        ? this.dataSource.query(
+            `SELECT id, name FROM district WHERE id = ANY($1)`,
+            [districtEntityIds],
+          )
+        : Promise.resolve([]),
+      productEntityIds.length
+        ? this.dataSource.query(
+            `SELECT id, name FROM product WHERE id = ANY($1)`,
+            [productEntityIds],
+          )
+        : Promise.resolve([]),
+      integrationEntityIds.length
+        ? this.dataSource.query(
+            `SELECT id, name FROM external_integration WHERE id = ANY($1)`,
+            [integrationEntityIds],
+          )
+        : Promise.resolve([]),
+    ]);
+    const fkUserMap = new Map<string, string>(
+      fkUsers.map((u: any) => [u.id, u.name]),
+    );
+    const fkDistrictMap = new Map<string, string>(
+      fkDistricts.map((d: any) => [d.id, d.name]),
+    );
+    const fkRegionMap = new Map<string, string>(
+      fkRegions.map((r: any) => [r.id, r.name]),
+    );
+    // entity_type'i nomli config/katalog bo'lgan loglar uchun nom xaritalari
+    const namedEntityMap = new Map<string, any>();
+    for (const row of [
+      ...regionEntities,
+      ...districtEntities,
+      ...productEntities,
+      ...integrationEntities,
+    ]) {
+      namedEntityMap.set(row.id, { name: row.name });
+    }
+
+    // value obyektidagi *_id maydonlari yoniga ism qo'shadi (mavjud bo'lmasa).
+    const resolveNames = (obj: any): any => {
+      if (!obj || typeof obj !== 'object') return obj;
+      const out = { ...obj };
+      const addName = (
+        idKey: string,
+        nameKey: string,
+        map: Map<string, string>,
+      ) => {
+        if (out[idKey] && out[nameKey] == null && map.has(out[idKey])) {
+          out[nameKey] = map.get(out[idKey]);
+        }
+      };
+      addName('customer_id', 'customer_name', fkUserMap);
+      addName('courier_id', 'courier_name', fkUserMap);
+      addName('market_id', 'market_name', fkUserMap);
+      addName('operator_id', 'operator_name', fkUserMap);
+      addName('staff_id', 'staff_name', fkUserMap);
+      addName('district_id', 'district_name', fkDistrictMap);
+      addName('region_id', 'region_name', fkRegionMap);
+      return out;
+    };
+
     return logs.map((log) => {
       let entity_summary: any = null;
       if (log.entity_type === 'order') {
@@ -242,6 +383,13 @@ export class ActivityLogService {
         entity_summary = entityUserMap.get(log.entity_id) || null;
       } else if (log.entity_type === 'cashbox') {
         entity_summary = cashboxMap.get(log.entity_id) || null;
+      } else if (
+        log.entity_type === 'region' ||
+        log.entity_type === 'district' ||
+        log.entity_type === 'product' ||
+        log.entity_type === 'integration'
+      ) {
+        entity_summary = namedEntityMap.get(log.entity_id) || null;
       }
 
       // Actor (kim qilgan) ma'lumotlarini DB'dan to'ldirib qaytaramiz —
@@ -253,6 +401,9 @@ export class ActivityLogService {
         user_name: log.user_name || actor?.name || null,
         user_role: log.user_role || actor?.role || null,
         user_phone: actor?.phone_number || null,
+        // old_value/new_value ichidagi FK ID'lar yoniga ism qo'shilgan nusxa
+        old_value: resolveNames(log.old_value),
+        new_value: resolveNames(log.new_value),
         entity_summary,
       };
     });
@@ -278,10 +429,24 @@ export class ActivityLogService {
         .orderBy('log.created_at', 'DESC');
 
       if (filters.search) {
-        qb.andWhere(
-          '(log.description ILIKE :search OR log.user_name ILIKE :search OR log.entity_id::text ILIKE :search)',
-          { search: `%${filters.search}%` },
-        );
+        // "#100042" yoki "100042" kabi buyurtma raqami bo'yicha ham qidiramiz —
+        // order_number log'da saqlanmaydi, shuning uchun order jadvalidan ID topamiz.
+        const orderNum = filters.search.replace(/[^0-9]/g, '');
+        const conds = [
+          'log.description ILIKE :search',
+          'log.user_name ILIKE :search',
+          'log.entity_id::text ILIKE :search',
+        ];
+        const searchParams: Record<string, any> = {
+          search: `%${filters.search}%`,
+        };
+        if (orderNum) {
+          conds.push(
+            `log.entity_id IN (SELECT o.id FROM "order" o WHERE o.order_number = :orderNum)`,
+          );
+          searchParams.orderNum = Number(orderNum);
+        }
+        qb.andWhere(`(${conds.join(' OR ')})`, searchParams);
       }
       if (filters.entity_type) {
         qb.andWhere('log.entity_type = :entity_type', {

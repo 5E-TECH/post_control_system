@@ -91,6 +91,16 @@ export enum Commission_type {
   FIXED = 'fixed',
 }
 
+// Asosiy kassa virtual kartalari orasidagi ichki ko'chirma turlari.
+// Bular kirim/chiqim EMAS — umumiy `balance` ni o'zgartirmaydi, faqat
+// kartalararo yoki naqd↔karta ajratimni o'zgartiradi. Shu sababli ular
+// `cashbox_history` ga emas, alohida `cashbox_card_movement` jadvaliga yoziladi.
+export enum CardMovementType {
+  CARD_TO_CARD = 'card_to_card', // Kartadan kartaga o'tkazma
+  CARD_TO_CASH = 'card_to_cash', // Kartadan naqdga yechish (bankomat)
+  CASH_TO_CARD = 'cash_to_card', // Naqddan kartaga solish
+}
+
 // Moliyaviy taroziga ta'sir qiluvchi manba turlari
 export enum FinancialSource_type {
   SELL_PROFIT = 'sell_profit', // Sotuvdan pochta foydasi

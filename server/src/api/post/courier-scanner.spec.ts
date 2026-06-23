@@ -5,6 +5,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { PostEntity } from 'src/core/entity/post.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
+import { RegionEntity } from 'src/core/entity/region.entity';
 import { DataSource } from 'typeorm';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
@@ -74,6 +76,8 @@ describe('PostService — Courier Scanner & Return Request (yangi qo\'shilgan)',
         { provide: getRepositoryToken(PostEntity), useValue: {} },
         { provide: getRepositoryToken(OrderEntity), useValue: orderRepoMock },
         { provide: getRepositoryToken(UserEntity), useValue: {} },
+        { provide: getRepositoryToken(CourierRegionEntity), useValue: {} },
+        { provide: getRepositoryToken(RegionEntity), useValue: {} },
         { provide: DataSource, useValue: dataSourceMock },
         { provide: ActivityLogService, useValue: activityLogMock },
         {

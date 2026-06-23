@@ -86,8 +86,11 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Post('admin')
-  create(@Body() createAdminDto: CreateAdminDto) {
-    return this.userService.createAdmin(createAdminDto);
+  create(
+    @Body() createAdminDto: CreateAdminDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.createAdmin(createAdminDto, user);
   }
 
   @ApiOperation({
@@ -105,8 +108,11 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('registrator')
-  createRegistrator(@Body() createRegistratorDto: CreateAdminDto) {
-    return this.userService.createRegistrator(createRegistratorDto);
+  createRegistrator(
+    @Body() createRegistratorDto: CreateAdminDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.createRegistrator(createRegistratorDto, user);
   }
 
   @ApiOperation({
@@ -143,8 +149,11 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('courier')
-  createCourier(@Body() createCourierDto: CreateCourierDto) {
-    return this.userService.createCourier(createCourierDto);
+  createCourier(
+    @Body() createCourierDto: CreateCourierDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.createCourier(createCourierDto, user);
   }
 
   @ApiOperation({ summary: 'Create market user' })
@@ -174,8 +183,11 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('market')
-  createMarket(@Body() createMarketDto: CreateMarketDto) {
-    return this.userService.createMarket(createMarketDto);
+  createMarket(
+    @Body() createMarketDto: CreateMarketDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.createMarket(createMarketDto, user);
   }
 
   @ApiOperation({ summary: 'Create customer' })
@@ -563,8 +575,8 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('logist')
-  createLogist(@Body() dto: CreateLogistDto) {
-    return this.userService.createLogist(dto);
+  createLogist(@Body() dto: CreateLogistDto, @CurrentUser() user: JwtPayload) {
+    return this.userService.createLogist(dto, user);
   }
 
   @ApiOperation({ summary: 'List all logists' })
@@ -584,8 +596,12 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Patch('logist/:id')
-  updateLogist(@Param('id') id: string, @Body() dto: UpdateLogistDto) {
-    return this.userService.updateLogist(id, dto);
+  updateLogist(
+    @Param('id') id: string,
+    @Body() dto: UpdateLogistDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.updateLogist(id, dto, user);
   }
 
   @ApiOperation({ summary: 'Delete logist' })
@@ -594,8 +610,8 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Delete('logist/:id')
-  deleteLogist(@Param('id') id: string) {
-    return this.userService.deleteLogist(id);
+  deleteLogist(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.userService.deleteLogist(id, user);
   }
 
   // ==================== OPERATOR ENDPOINTS ====================
@@ -791,8 +807,9 @@ export class UsersController {
   updateCourier(
     @Param('id') id: string,
     @Body() updateCourierDto: UpdateCourierDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.userService.updateCourier(id, updateCourierDto);
+    return this.userService.updateCourier(id, updateCourierDto, user);
   }
 
   @ApiOperation({ summary: 'Update market user' })
@@ -805,8 +822,9 @@ export class UsersController {
   updateMarket(
     @Param('id') id: string,
     @Body() updateMarketDto: UpdateMarketDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.userService.updateMarket(id, updateMarketDto);
+    return this.userService.updateMarket(id, updateMarketDto, user);
   }
 
   @ApiOperation({ summary: 'Self update user profile' })
@@ -865,8 +883,8 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.userService.remove(id, user);
   }
 
   // ==================== SALARY CRON MANUAL TRIGGER ====================

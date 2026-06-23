@@ -26,7 +26,8 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:show": "npm run typeorm -- migration:show",
     "db:backup": "bash scripts/db-backup.sh",
-    "db:check-cashbox": "ts-node -r tsconfig-paths/register scripts/check-cashbox-invariant.ts"
+    "db:check-cashbox": "ts-node -r tsconfig-paths/register scripts/check-cashbox-invariant.ts",
+    "db:check-cards": "ts-node -r tsconfig-paths/register scripts/check-card-invariant.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",

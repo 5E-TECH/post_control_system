@@ -12,6 +12,16 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { Cashbox_type, Roles, Status } from 'src/common/enums';
 import { UpdateLdgConfigDto } from './dto/ldg-config.dto';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { JwtPayload } from 'src/common/utils/types/user.type';
+
+// LDG config'da HECH QACHON loglanmaydigan maxfiy maydonlar
+const LDG_CONFIG_SECRET_FIELDS = new Set([
+  'api_key',
+  'webhook_secret',
+  'webhook_secret_previous',
+  'sender_phone',
+]);
 
 @Injectable()
 export class LdgConfigService {
@@ -23,6 +33,7 @@ export class LdgConfigService {
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
     private readonly dataSource: DataSource,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   /**
@@ -45,10 +56,45 @@ export class LdgConfigService {
    * Sozlamalarni yangilash. Faqat aniq berilgan maydonlar yangilanadi
    * (nullable maydonlar uchun bo'sh qator yuborilsa, null ga o'rnatiladi).
    */
-  async update(dto: UpdateLdgConfigDto): Promise<LdgConfigEntity> {
+  async update(
+    dto: UpdateLdgConfigDto,
+    user?: JwtPayload,
+  ): Promise<LdgConfigEntity> {
     const config = await this.getOrCreate();
+
+    // Audit uchun farqni yig'amiz — maxfiy maydonlar XOM emas, faqat "o'zgardi" flagi.
+    const oldNonSecret: Record<string, any> = {};
+    const newNonSecret: Record<string, any> = {};
+    const maskedFields: string[] = [];
+    for (const key of Object.keys(dto)) {
+      const value = (dto as any)[key];
+      if (value === undefined) continue;
+      if (LDG_CONFIG_SECRET_FIELDS.has(key)) {
+        maskedFields.push(key);
+        continue;
+      }
+      oldNonSecret[key] = (config as any)[key];
+      newNonSecret[key] = value;
+    }
+
     Object.assign(config, dto);
-    return this.repo.save(config);
+    const saved = await this.repo.save(config);
+
+    this.activityLog.log({
+      entity_type: 'ldg_config',
+      entity_id: config.id,
+      action: 'config_changed',
+      old_value: oldNonSecret,
+      new_value: {
+        ...newNonSecret,
+        ...(maskedFields.length ? { masked_fields: maskedFields } : {}),
+      },
+      description: `LDG sozlamasi o'zgartirildi${
+        maskedFields.length ? ` (maxfiy: ${maskedFields.join(', ')})` : ''
+      }`,
+      user,
+    });
+    return saved;
   }
 
   /**
@@ -63,7 +109,10 @@ export class LdgConfigService {
    * Boshqa user'larda `external_provider = 'ldg'` bo'lsa — konflikt (400):
    * bir vaqtning o'zida faqat bitta LDG vakil bo'lishi kerak.
    */
-  async bindCourier(userId: string): Promise<{
+  async bindCourier(
+    userId: string,
+    user?: JwtPayload,
+  ): Promise<{
     user_id: string;
     bound: boolean;
   }> {
@@ -127,6 +176,21 @@ export class LdgConfigService {
 
       await queryRunner.commitTransaction();
       this.logger.log(`LDG kuryer biriktirildi: ${target.id} (${target.name})`);
+      this.activityLog.log({
+        entity_type: 'ldg_config',
+        entity_id: config.id,
+        action: 'courier_bound',
+        new_value: {
+          ldg_courier_user_id: target.id,
+          courier_name: target.name,
+        },
+        description: `LDG vakil kuryer biriktirildi: ${target.name}${
+          previous && previous.id !== target.id
+            ? ` (eski vakil ${previous.name} bo'shatildi)`
+            : ''
+        }`,
+        user,
+      });
       return { user_id: target.id, bound: true };
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -141,13 +205,16 @@ export class LdgConfigService {
    * Foydalanuvchi forma orqali to'liq ma'lumot beradi (ism, telefon, tariflar,
    * region). Default qiymatlar yo'q — barcha majburiy maydonlar to'liq kelishi shart.
    */
-  async createCourier(args: {
-    name: string;
-    phone_number: string;
-    tariff_home: number;
-    tariff_center: number;
-    region_id?: string;
-  }): Promise<{ user_id: string; created: true }> {
+  async createCourier(
+    args: {
+      name: string;
+      phone_number: string;
+      tariff_home: number;
+      tariff_center: number;
+      region_id?: string;
+    },
+    user?: JwtPayload,
+  ): Promise<{ user_id: string; created: true }> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -207,6 +274,17 @@ export class LdgConfigService {
       this.logger.log(
         `Yangi LDG vakil-kuryer yaratildi: ${newUser.id} (${newUser.name})`,
       );
+      this.activityLog.log({
+        entity_type: 'ldg_config',
+        entity_id: config.id,
+        action: 'courier_bound',
+        new_value: {
+          ldg_courier_user_id: newUser.id,
+          courier_name: newUser.name,
+        },
+        description: `Yangi LDG vakil-kuryer yaratildi: ${newUser.name} (${args.phone_number})`,
+        user,
+      });
       return { user_id: newUser.id, created: true };
     } catch (err) {
       await queryRunner.rollbackTransaction();

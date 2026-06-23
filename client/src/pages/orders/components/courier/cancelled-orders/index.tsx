@@ -52,6 +52,9 @@ const CancelledOrders = () => {
   const { getCourierOrders } = useOrder();
 
   const { mutate: cancelPost, isPending } = usePost().canceledPost();
+  const { mutate: cancelPostAll, isPending: isPendingAll } =
+    usePost().canceledPostAll();
+  const [openAllPopup, setOpenAllPopup] = useState(false);
   const search = useSelector((state: RootState) => state.setUserFilter.search);
   const districtId = useSelector(
     (state: RootState) => state.setUserFilter.district_id,
@@ -89,10 +92,12 @@ const CancelledOrders = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { handleSuccess, handleApiError } = useApiNotification();
 
+  // Sahifa/filtr o'zgarganda tanlovni tozalaymiz. Avval butun sahifa avtomatik
+  // tanlanardi — kuryer adashib hammasini yuborib yuborishi mumkin edi (footgun).
+  // Endi kuryer yoki aniq tanlaydi, yoki "Barchasini yuborish" tugmasidan
+  // foydalanadi (u sahifalashga qaramay hamma bekor qilinganlarni yuboradi).
   useEffect(() => {
-    if (orders?.length > 0) {
-      setSelectedIds(orders.map((item: any) => item.id));
-    }
+    setSelectedIds([]);
   }, [data]);
 
   const handleClick = () => {
@@ -110,6 +115,25 @@ const CancelledOrders = () => {
           error,
           "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi",
         ),
+    });
+  };
+
+  const handleSendAll = () => {
+    cancelPostAll(undefined, {
+      onSuccess: (res: any) => {
+        handleSuccess(
+          res?.message || "Barcha bekor qilingan buyurtmalar pochtaga yuborildi",
+        );
+        refetch();
+        setOpenAllPopup(false);
+      },
+      onError: (error: any) => {
+        handleApiError(
+          error,
+          "Buyurtmalarni qaytarishda noma'lum xatolik yuz berdi",
+        );
+        setOpenAllPopup(false);
+      },
     });
   };
 
@@ -480,41 +504,80 @@ const CancelledOrders = () => {
             </button>
           </div>
 
-          {/* Yuborish — mobilda to'liq kenglik, desktopda o'ng tomonda */}
-          <button
-            onClick={() => setOpenPopup(true)}
-            disabled={isPending || selectedIds.length === 0}
-            className={`w-full sm:w-auto sm:min-w-[200px] h-11 px-5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all flex-shrink-0 ${
-              isPending || selectedIds.length === 0
-                ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-                : "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25 hover:shadow-xl active:scale-[0.98]"
-            }`}
-          >
-            {isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Yuborilmoqda...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                Pochtaga yuborish
-              </>
-            )}
-          </button>
+          {/* Yuborish tugmalari — mobilda to'liq kenglik, desktopda o'ng tomonda */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:flex-shrink-0">
+            {/* Tanlanganlarni yuborish — faqat tanlov bo'lganda faol */}
+            <button
+              onClick={() => setOpenPopup(true)}
+              disabled={isPending || isPendingAll || selectedIds.length === 0}
+              className={`w-full sm:w-auto sm:min-w-[170px] h-11 px-5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${
+                isPending || isPendingAll || selectedIds.length === 0
+                  ? "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
+                  : "bg-white dark:bg-[#2A263D] border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 active:scale-[0.98]"
+              }`}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Yuborilmoqda...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Tanlanganlarni yuborish
+                </>
+              )}
+            </button>
+
+            {/* Barchasini yuborish — sahifalashga qaramay hamma bekor qilinganlar */}
+            <button
+              onClick={() => setOpenAllPopup(true)}
+              disabled={isPending || isPendingAll}
+              className={`w-full sm:w-auto sm:min-w-[200px] h-11 px-5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${
+                isPending || isPendingAll
+                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                  : "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25 hover:shadow-xl active:scale-[0.98]"
+              }`}
+            >
+              {isPendingAll ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Yuborilmoqda...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Barchasini yuborish
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Confirm Popup */}
+      {/* Confirm Popup — tanlanganlarni yuborish */}
       {openPopup && (
         <ConfirmPopup
           isShow={openPopup}
-          title="Buyurtmalarni pochtaga qo'shishni tasdiqlaysizmi?"
+          title={`${selectedIds.length} ta tanlangan buyurtmani pochtaga qo'shasizmi?`}
           description="Ushbu amalni ortga qaytarib bo'lmaydi."
           confirmText="Ha"
           cancelText="Bekor qilish"
           onConfirm={handleClick}
           onCancel={() => setOpenPopup(false)}
+        />
+      )}
+
+      {/* Confirm Popup — barcha bekor qilinganlarni yuborish */}
+      {openAllPopup && (
+        <ConfirmPopup
+          isShow={openAllPopup}
+          title="Barcha bekor qilingan buyurtmalarni pochtaga yuborasizmi?"
+          description="Sahifalashga qaramay, sizdagi BARCHA bekor qilingan buyurtmalar pochtaga yuboriladi. Ushbu amalni ortga qaytarib bo'lmaydi."
+          confirmText="Ha, barchasini yuborish"
+          cancelText="Bekor qilish"
+          onConfirm={handleSendAll}
+          onCancel={() => setOpenAllPopup(false)}
         />
       )}
     </div>

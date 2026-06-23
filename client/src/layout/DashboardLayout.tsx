@@ -14,6 +14,7 @@ import LogistSidebar from "./components/LogistSidebar";
 import OperatorSidebar from "./components/OperatorSidebar";
 import type { UserRole } from "../shared/enums/Roles";
 import RenderMediaSidebar from "../shared/components/render-media-sidebar/RenderMediaSidebar";
+import { LdgBulkProgress } from "../shared/components/ldg-bulk-progress";
 
 const DashboardLayout = () => {
   const role = useSelector((state: RootState) => state.roleSlice.role);
@@ -68,7 +69,7 @@ const DashboardLayout = () => {
 
       {/* Dashboard container */}
       <div className="overflow-y-auto bg-[#F4F5FA] dark:bg-[var(--color-dark-bg-py)] pl-4 pb-8 max-[650px]:pb-24">
-        <main ref={mainRef} className="w-full h-full bg-[#fff] dark:bg-[#312d48] rounded-4xl overflow-y-auto">
+        <main ref={mainRef} className="w-full h-full bg-[#fff] dark:bg-[#312d48] rounded-4xl overflow-y-auto [&>*]:min-h-full">
           <Suspense fallback={<Suspensee />}>
             <Outlet />
           </Suspense>
@@ -76,6 +77,11 @@ const DashboardLayout = () => {
       </div>
 
       <RenderMediaSidebar role={role as string} />
+
+      {/* LDG ommaviy jo'natish — global, persistent progress widget.
+          Faqat LDG'ni boshqaradigan rollar uchun (superadmin/admin). */}
+      {(role === "superadmin" || role === "admin") && <LdgBulkProgress />}
+
       {/* Footer - hidden on mobile since bottom nav is there */}
       <div className="col-span-2 py-3 max-[650px]:hidden">
         <Footer />

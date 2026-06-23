@@ -2,6 +2,7 @@ import { BaseEntity } from 'src/common/database/BaseEntity';
 import { Operation_type, Source_type, PaymentMethod } from 'src/common/enums';
 import { Column, Entity, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { CashEntity } from './cash-box.entity';
+import { CashboxCardEntity } from './cashbox-card.entity';
 import { UserEntity } from './users.entity';
 import { OrderEntity } from './order.entity';
 import {
@@ -59,6 +60,11 @@ export class CashboxHistoryEntity extends BaseEntity {
   @Column({ type: 'enum', enum: PaymentMethod, nullable: true })
   payment_method: PaymentMethod | null;
 
+  // Qaysi virtual kartaga tegishli (faqat MAIN kassaning kartali yozuvlarida).
+  // NAQD yozuvlar va migratsiyagacha bo'lgan eski yozuvlar uchun `null`.
+  @Column({ type: 'uuid', nullable: true })
+  card_id: string | null;
+
   @Column({ type: 'varchar', nullable: true })
   comment: string;
 
@@ -91,4 +97,9 @@ export class CashboxHistoryEntity extends BaseEntity {
   @ManyToOne(() => UserEntity, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'source_user_id' })
   sourceUser?: UserEntity;
+
+  // 🔗 Virtual karta (kartali yozuvlar uchun)
+  @ManyToOne(() => CashboxCardEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'card_id' })
+  card?: CashboxCardEntity;
 }

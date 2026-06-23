@@ -12,3 +12,6 @@ server/home/ubuntu/uploads/
 # codex CLI cache
 .codex
 
+# editor settings (local)
+.vscode/
+

@@ -1,10 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 import { PaymentMethod } from 'src/common/enums';
@@ -34,4 +35,13 @@ export class UpdateCashBoxDto {
   @IsNotEmpty({ message: 'Izoh kiritish majburiy' })
   @IsString()
   comment: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Kartali (click) operatsiyada qaysi virtual kartaga. Bo‘sh bo‘lsa default karta.',
+  })
+  @IsOptional()
+  @IsUUID()
+  card_id?: string;
 }

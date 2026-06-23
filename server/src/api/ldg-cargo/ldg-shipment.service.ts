@@ -12,6 +12,8 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { LdgApiService } from './ldg-api.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Order_status } from 'src/common/enums';
 import {
   LdgCreateOrderRequestDto,
@@ -47,6 +49,7 @@ export class LdgShipmentService {
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
     private readonly api: LdgApiService,
+    private readonly activityLog: ActivityLogService,
   ) {}
 
   /**
@@ -59,7 +62,10 @@ export class LdgShipmentService {
    * jo'natilsa (post_id farq qiladi), bu yangi urinish — LDG'ga qaytadan
    * dispatch qilamiz (yangi idempotency-key bilan).
    */
-  async createShipmentForOrder(orderId: string): Promise<LdgShipmentEntity> {
+  async createShipmentForOrder(
+    orderId: string,
+    actor?: JwtPayload,
+  ): Promise<LdgShipmentEntity> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
       relations: ['items', 'items.product', 'customer', 'district'],
@@ -143,6 +149,21 @@ export class LdgShipmentService {
       this.logger.log(
         `LDG shipment yaratildi: order=${order.id} post=${order.post_id} ldg_order_id=${response.order_id} tracking=${response.tracking_number}`,
       );
+      // Audit: buyurtma LDG'ga jo'natildi (dispatch hodisasi)
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: order.id,
+        action: 'dispatched',
+        new_value: {
+          order_number: order.order_number,
+          ldg_order_id: shipment.ldg_order_id,
+          ldg_tracking: shipment.tracking_number,
+          total_price: order.total_price,
+        },
+        description: `Buyurtma #${order.order_number} LDG'ga jo'natildi (kuzatuv: ${shipment.tracking_number ?? '-'})`,
+        user: actor,
+        metadata: { source: 'ldg', ldg_order_id: shipment.ldg_order_id },
+      });
       return shipment;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

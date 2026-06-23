@@ -123,7 +123,7 @@ export class PostController {
   @ApiOperation({ summary: 'Get return-requested orders (admin)' })
   @ApiResponse({ status: 200, description: 'Return requested orders list' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get('return-requests/list')
   getReturnRequests() {
     return this.postService.getReturnRequests();
@@ -363,6 +363,19 @@ export class PostController {
     return this.postService.createCanceledPost(user, ordersArrayDto);
   }
 
+  @ApiOperation({
+    summary: 'Send ALL canceled orders to post (courier)',
+    description:
+      "Kuryerning barcha bekor qilingan buyurtmalarini bir martada qaytarish-postiga yig'adi (sahifalashdan qat'i nazar).",
+  })
+  @ApiResponse({ status: 200, description: 'All canceled orders sent to post' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.COURIER)
+  @Post('cancel/all')
+  sendAllCanceledOrders(@CurrentUser() user: JwtPayload) {
+    return this.postService.sendAllCanceledOrders(user);
+  }
+
   @ApiOperation({ summary: 'Receive canceled post (admin)' })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({ status: 200, description: 'Canceled post received' })
@@ -380,7 +393,7 @@ export class PostController {
   @ApiOperation({ summary: 'Approve return requests (admin)' })
   @ApiResponse({ status: 200, description: 'Return requests approved' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('return-requests/approve')
   approveReturnRequests(
     @Body() ordersArrayDto: OrdersArrayDto,
@@ -392,7 +405,7 @@ export class PostController {
   @ApiOperation({ summary: 'Reject return requests (admin)' })
   @ApiResponse({ status: 200, description: 'Return requests rejected' })
   @UseGuards(JwtGuard, RolesGuard)
-  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Post('return-requests/reject')
   rejectReturnRequests(
     @Body() ordersArrayDto: OrdersArrayDto,

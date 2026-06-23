@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Min,
 } from 'class-validator';
 import { PaymentMethod } from 'src/common/enums';
 
@@ -23,6 +24,7 @@ export class CreatePaymentsFromCourierDto {
   })
   @IsNotEmpty()
   @IsNumber()
+  @Min(1, { message: "To'lov summasi 0 dan katta bo'lishi kerak" })
   amount: number;
 
   @ApiProperty({
@@ -52,4 +54,13 @@ export class CreatePaymentsFromCourierDto {
   @IsOptional()
   @IsString()
   market_id: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Click usulida qaysi virtual kartaga. Bo‘sh bo‘lsa default karta. Click_to_market doim default karta orqali o‘tadi.',
+  })
+  @IsOptional()
+  @IsUUID()
+  card_id?: string;
 }

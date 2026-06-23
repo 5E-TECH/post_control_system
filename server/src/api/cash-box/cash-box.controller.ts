@@ -37,6 +37,13 @@ import { CreatePaymentsFromCourierDto } from './dto/payments-from-courier.dto';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { PaymentsToMarketDto } from './dto/payment-to-market.dto';
+import {
+  CreateCardDto,
+  RenameCardDto,
+  SetCardActiveDto,
+  TransferCardDto,
+  ConvertCardDto,
+} from './dto/card.dto';
 
 @ApiTags('Cash Box')
 @ApiBearerAuth()
@@ -502,6 +509,133 @@ export class CasheBoxController {
       page,
       limit,
     });
+  }
+
+  // ==================== VIRTUAL KARTA ENDPOINTLARI ====================
+
+  @ApiOperation({ summary: 'List virtual cards of the main cashbox' })
+  @ApiQuery({
+    name: 'includeInactive',
+    required: false,
+    type: Boolean,
+    description: 'Arxivlangan kartalarni ham qaytarish',
+  })
+  @ApiResponse({ status: 200, description: 'Virtual cards with balances' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('cards')
+  listCards(@Query('includeInactive') includeInactive?: string) {
+    return this.cashBoxService.listCards(includeInactive === 'true');
+  }
+
+  @ApiOperation({ summary: 'Card internal movements (transfer/convert) history' })
+  @ApiQuery({ name: 'cardId', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Card movements' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('cards/movements')
+  cardMovements(
+    @Query('cardId') cardId?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.listCardMovements({ cardId, page, limit });
+  }
+
+  @ApiOperation({ summary: 'Full per-card ledger (statement) with running balance' })
+  @ApiParam({ name: 'id', description: 'Card ID' })
+  @ApiQuery({ name: 'fromDate', required: false, type: String })
+  @ApiQuery({ name: 'toDate', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Card ledger with summary' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('cards/:id/ledger')
+  cardLedger(
+    @Param('id') id: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.cashBoxService.getCardLedger(id, {
+      fromDate,
+      toDate,
+      page,
+      limit,
+    });
+  }
+
+  @ApiOperation({ summary: 'Create a new virtual card' })
+  @ApiBody({ type: CreateCardDto })
+  @ApiResponse({ status: 201, description: 'Card created' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('cards')
+  createCard(
+    @CurrentUser() user: JwtPayload,
+    @Body() createCardDto: CreateCardDto,
+  ) {
+    return this.cashBoxService.createCard(user, createCardDto);
+  }
+
+  @ApiOperation({ summary: 'Transfer money between two cards' })
+  @ApiBody({ type: TransferCardDto })
+  @ApiResponse({ status: 201, description: 'Transfer done' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('cards/transfer')
+  transferCards(
+    @CurrentUser() user: JwtPayload,
+    @Body() transferCardDto: TransferCardDto,
+  ) {
+    return this.cashBoxService.transferBetweenCards(user, transferCardDto);
+  }
+
+  @ApiOperation({ summary: 'Convert between card and cash' })
+  @ApiBody({ type: ConvertCardDto })
+  @ApiResponse({ status: 201, description: 'Conversion done' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('cards/convert')
+  convertCard(
+    @CurrentUser() user: JwtPayload,
+    @Body() convertCardDto: ConvertCardDto,
+  ) {
+    return this.cashBoxService.convertCard(user, convertCardDto);
+  }
+
+  @ApiOperation({ summary: 'Rename a virtual card (not the default card)' })
+  @ApiParam({ name: 'id', description: 'Card ID' })
+  @ApiBody({ type: RenameCardDto })
+  @ApiResponse({ status: 200, description: 'Card renamed' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Patch('cards/:id')
+  renameCard(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() renameCardDto: RenameCardDto,
+  ) {
+    return this.cashBoxService.renameCard(user, id, renameCardDto);
+  }
+
+  @ApiOperation({ summary: 'Activate / deactivate (archive) a virtual card' })
+  @ApiParam({ name: 'id', description: 'Card ID' })
+  @ApiBody({ type: SetCardActiveDto })
+  @ApiResponse({ status: 200, description: 'Card status changed' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Patch('cards/:id/status')
+  setCardActive(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: SetCardActiveDto,
+  ) {
+    return this.cashBoxService.setCardActive(user, id, dto.is_active);
   }
 
   // ==================== SHIFT (SMENA) ENDPOINTS ====================

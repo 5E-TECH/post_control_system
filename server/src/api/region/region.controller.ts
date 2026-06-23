@@ -90,8 +90,12 @@ export class RegionController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN)
   @Patch('name/:id')
-  updateName(@Param('id') id: string, @Body() dto: UpdateRegionNameDto) {
-    return this.regionService.updateName(id, dto);
+  updateName(
+    @Param('id') id: string,
+    @Body() dto: UpdateRegionNameDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.regionService.updateName(id, dto, user);
   }
 
   /**
@@ -187,8 +191,9 @@ export class RegionController {
   assignMainCourier(
     @Param('id') id: string,
     @Body() dto: { courier_id: string | null },
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.regionService.assignMainCourier(id, dto.courier_id);
+    return this.regionService.assignMainCourier(id, dto.courier_id, user);
   }
 
   // ==================== LOGIST ASSIGNMENT ====================
@@ -202,8 +207,9 @@ export class RegionController {
   assignLogist(
     @Param('id') id: string,
     @Body() dto: { logist_id: string | null },
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.regionService.assignLogist(id, dto.logist_id);
+    return this.regionService.assignLogist(id, dto.logist_id, user);
   }
 
   /**
@@ -212,7 +218,14 @@ export class RegionController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.ADMIN, Roles.SUPERADMIN)
   @Post('logist/bulk-assign')
-  bulkAssignLogist(@Body() dto: { logist_id: string; region_ids: string[] }) {
-    return this.regionService.bulkAssignLogist(dto.logist_id, dto.region_ids);
+  bulkAssignLogist(
+    @Body() dto: { logist_id: string; region_ids: string[] },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.regionService.bulkAssignLogist(
+      dto.logist_id,
+      dto.region_ids,
+      user,
+    );
   }
 }
