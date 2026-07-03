@@ -3731,7 +3731,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const statsQuery = await this.orderRepo
         .createQueryBuilder('o')
         .select(
-          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end THEN 1 END)`,
+          // Jami = shu davrda YARATILGAN haqiqiy buyurtmalar (market kartasi
+          // bilan bir xil ta'rif): draft (CREATED) va partlySold sun'iy
+          // bola-orderlari (parent_order_id) chiqarib tashlanadi.
+          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end AND o.status != :createdStatus AND o.parent_order_id IS NULL THEN 1 END)`,
           'acceptedCount',
         )
         .addSelect(
@@ -3745,7 +3748,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .setParameters({
           start,
           end,
-          cancelledStatuses: [Order_status.CANCELLED, Order_status.CLOSED],
+          createdStatus: Order_status.CREATED,
+          // CANCELLED_SENT (bekor qilinib pochtaga yuborilgan) ham bekor
+          // hisoblanadi — aks holda qaytish yo'lida statistikadan yo'qolardi.
+          cancelledStatuses: [
+            Order_status.CANCELLED,
+            Order_status.CANCELLED_SENT,
+            Order_status.CLOSED,
+          ],
           soldStatuses: [
             Order_status.SOLD,
             Order_status.PAID,
@@ -3815,13 +3825,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const start = Number(startDate);
       const end = Number(endDate);
 
-      // 1) totalOrders: created_at oralig'ida yaratilgan buyurtmalar soni per market
+      // 1) totalOrders: shu davrda YARATILGAN haqiqiy buyurtmalar soni per market
+      // (market kartasi bilan bir xil ta'rif): draft (CREATED) va partlySold
+      // sun'iy bola-orderlari (parent_order_id) chiqarib tashlanadi.
       const totalsRaw = await this.orderRepo
         .createQueryBuilder('o')
         .select('o.user_id', 'user_id')
         .addSelect('COUNT(*)', 'total')
         .where('o.created_at BETWEEN :start AND :end', { start, end })
         .andWhere('o.user_id IS NOT NULL')
+        .andWhere('o.status != :createdStatus', {
+          createdStatus: Order_status.CREATED,
+        })
+        .andWhere('o.parent_order_id IS NULL')
         .groupBy('o.user_id')
         .getRawMany();
 
@@ -4379,13 +4395,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         Order_status.PARTLY_PAID,
       ];
 
-      // Harakat modeli: sotildi/bekor/foyda harakat sanasi (sold_at/cancelled_at)
-      // bo'yicha sanaladi — bir necha kun oldin yaratilib BUGUN sotilgan/bekor
-      // qilingan buyurtma bugungi statistikaga tushadi. Jami = sotildi + bekor.
+      // Har bir ko'rsatkich O'Z sanasi bo'yicha, mustaqil sanaladi:
+      //  • Jami (totalOrders)   = shu davrda YARATILGAN haqiqiy buyurtmalar
+      //    (created_at). Draft (CREATED) va partlySold sun'iy bola-orderlari
+      //    (parent_order_id) CHIQARIB TASHLANADI — ular market qo'ygan buyurtma
+      //    emas. Bu market o'zining /orders ro'yxatida ko'radigan ta'rif bilan
+      //    bir xil (status != CREATED).
+      //  • Sotildi (soldOrders) = shu davrda SOTILGAN (sold_at)
+      //  • Bekor (canceledOrders) = shu davrda BEKOR qilingan (cancelled_at)
+      // Jami endi "sotildi + bekor" EMAS — u davrda yaratilgan buyurtmalar soni.
       const statsResult = await this.orderRepo
         .createQueryBuilder('o')
         .select(
-          `COUNT(CASE WHEN (o.sold_at BETWEEN :start AND :end AND o.status IN (:...validStatuses)) OR (o.cancelled_at BETWEEN :start AND :end AND o.status IN (:...cancelledStatuses)) THEN 1 END)`,
+          `COUNT(CASE WHEN o.created_at BETWEEN :start AND :end AND o.status != :createdStatus AND o.parent_order_id IS NULL THEN 1 END)`,
           'totalOrders',
         )
         .addSelect(
@@ -4405,7 +4427,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           start,
           end,
           validStatuses,
-          cancelledStatuses: [Order_status.CANCELLED, Order_status.CLOSED],
+          // CANCELLED_SENT (bekor qilinib pochtaga yuborilgan) ham bekor
+          // hisoblanadi — aks holda qaytish yo'lida statistikadan yo'qolardi.
+          cancelledStatuses: [
+            Order_status.CANCELLED,
+            Order_status.CANCELLED_SENT,
+            Order_status.CLOSED,
+          ],
+          createdStatus: Order_status.CREATED,
         })
         .getRawOne();
 
