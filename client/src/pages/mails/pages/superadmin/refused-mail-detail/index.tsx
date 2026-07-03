@@ -4,7 +4,9 @@ import { usePost } from "../../../../../shared/api/hooks/usePost";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useTranslation } from "react-i18next";
 import { useRefusedPostScanner } from "../../../../../shared/components/refused-post-scanner";
+import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
 import debounce from "lodash/debounce";
+import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 import {
   ArrowLeft,
   Search,
@@ -93,7 +95,6 @@ const RefusedMailDetail = () => {
   const regionName = state?.regionName;
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const { visualFeedback } = useRefusedPostScanner(undefined, setSelectedIds);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,8 +117,37 @@ const RefusedMailDetail = () => {
     debouncedSetSearch(value);
   };
 
-  const { data, isLoading } = usePost().getRejectedPostsByPostId(id as string);
+  const { data, isLoading, refetch } = usePost().getRejectedPostsByPostId(
+    id as string,
+  );
   const postData = data?.data?.allOrdersByPostId || data?.data || [];
+
+  // ── Skaner manifesti (client-side tekshirish) ──────────────────────────
+  // Backend `checkCancelPost` predikatini AYNAN takrorlaymiz: faqat
+  // status==='cancelled (sent)' va shu bekor-pochtaga (canceled_post_id===id)
+  // tegishli buyurtmalar. Shu Map orqali har skan ~0ms da tekshiriladi.
+  const scanManifest = useMemo(() => {
+    const m = new Map<string, string>();
+    if (Array.isArray(postData)) {
+      for (const o of postData) {
+        if (
+          o?.status === "cancelled (sent)" &&
+          o?.canceled_post_id === id &&
+          o?.qr_code_token
+        ) {
+          m.set(normalizeQrToken(o.qr_code_token), o.id);
+        }
+      }
+    }
+    return m;
+  }, [postData, id]);
+
+  // Skaner: manifestda yo'q token uchun serverga bir martalik fallback +
+  // topilsa refetch (yangi qo'shilgan buyurtma ko'rinishi uchun).
+  const { visualFeedback } = useRefusedPostScanner(refetch, setSelectedIds, {
+    manifest: scanManifest,
+    postId: id,
+  });
 
   useEffect(() => {
     setSelectedIds([]);
@@ -324,6 +354,7 @@ const RefusedMailDetail = () => {
                             <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
                               {order?.customer?.name || "-"}
                             </p>
+                            <ReplacementBadge order={order} className="mt-0.5" />
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                               {order?.customer?.phone_number || "-"}
                             </p>
@@ -375,11 +406,12 @@ const RefusedMailDetail = () => {
 
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 lg:gap-4 flex-1">
                           {/* Customer Name */}
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
                             <span className="text-sm font-medium text-gray-800 dark:text-white truncate">
                               {order?.customer?.name || "-"}
                             </span>
+                            <ReplacementBadge order={order} />
                           </div>
 
                           {/* Phone */}

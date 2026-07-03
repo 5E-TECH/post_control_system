@@ -39,8 +39,13 @@ export const usePost = () => {
       queryFn: () =>
         api.get(`post/orders/${path}${id}`, params).then((res) => res.data),
       enabled: bool,
-      staleTime: 1000 * 60 * 3, // 3 daqiqa fresh
-      gcTime: 1000 * 60 * 15,   // 15 daqiqa cache
+      // Skaner manifesti yangi turishi uchun: operator tabga qaytganda ro'yxat
+      // qayta yuklanadi → sahifa ochilgandan keyin qo'shilgan buyurtmalar manifestga
+      // kiradi, skaner "miss"lari kamayadi. staleTime qisqartirildi (30s) — fokusda
+      // refetch samarali bo'lsin (faqat shu sahifalar getPostById ishlatadi).
+      refetchOnWindowFocus: true,
+      staleTime: 1000 * 30,   // 30 soniya fresh
+      gcTime: 1000 * 60 * 15, // 15 daqiqa cache
     });
 
   // Eski pochtalar filtri uchun (admin): viloyat↔kuryer juftliklari.

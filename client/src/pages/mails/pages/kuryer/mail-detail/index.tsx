@@ -1,12 +1,16 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { usePost } from "../../../../../shared/api/hooks/usePost";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePost, post } from "../../../../../shared/api/hooks/usePost";
+import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
+import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { useTranslation } from "react-i18next";
 import { buildAdminPath } from "../../../../../shared/const";
 import { useCourierOrderScanner } from "../../../../../shared/components/courier-order-scanner";
+import { CourierCameraScanner } from "../../../../../shared/components/courier-camera-scanner";
 import {
   ArrowLeft,
   Phone,
@@ -24,6 +28,7 @@ import {
   XCircle,
   CheckCircle,
   RefreshCw,
+  Camera,
 } from "lucide-react";
 
 const CourierMailDetail = () => {
@@ -31,6 +36,7 @@ const CourierMailDetail = () => {
   const regionName = useSelector((state: RootState) => state.region);
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { getPostById, receivePost, requestOrderReturnByCourier } = usePost();
   const { mutate: receivePostsByPostId, isPending } = receivePost();
@@ -40,6 +46,8 @@ const CourierMailDetail = () => {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  // Telefon-kamera skaneri modali (hardware skaner esa doim fonda ishlaydi)
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   // Dynamic fetching based on status
   const [params] = useSearchParams();
@@ -73,12 +81,53 @@ const CourierMailDetail = () => {
   // buyurtmalarni faqat o'qiy oladi.
   const isSentPost = postStatus === "sent";
 
-  const { feedback, successCount, errorCount, lastReceived } =
+  // ON_THE_ROAD buyurtmalar manifesti — skanerni client-side optimistik
+  // tekshirish uchun (token -> {id, mijoz ismi}). normalizeQrToken server bilan
+  // bir xil. getPostsOrders SENT+kuryer uchun faqat ON_THE_ROAD qaytaradi.
+  const scanManifest = useMemo(() => {
+    const m = new Map<string, { id: string; name: string | null }>();
+    if (Array.isArray(postData)) {
+      for (const o of postData) {
+        if (o?.status === "on the road" && o?.qr_code_token) {
+          m.set(normalizeQrToken(o.qr_code_token), {
+            id: o.id,
+            name: o?.customer?.name ?? null,
+          });
+        }
+      }
+    }
+    return m;
+  }, [postData]);
+
+  // Optimistik: skanerlangan buyurtmani DARROV cache'dan (ro'yxatdan) olib
+  // tashlaymiz — qator ko'zga ko'rinib yo'qoladi, refetch kutilmaydi. Xato
+  // bo'lsa scanner refetch chaqiradi va buyurtma qaytadi (retract).
+  const removeOrderFromCache = useCallback(
+    (orderId: string) => {
+      queryClient.setQueriesData<any>({ queryKey: [post, id] }, (old: any) => {
+        if (!old?.data?.allOrdersByPostId) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            allOrdersByPostId: old.data.allOrdersByPostId.filter(
+              (o: any) => o.id !== orderId,
+            ),
+          },
+        };
+      });
+    },
+    [queryClient, id],
+  );
+
+  const { feedback, successCount, errorCount, lastReceived, receiveByToken } =
     useCourierOrderScanner({
       enabled: isSentPost,
+      manifest: scanManifest,
+      onOptimisticReceive: removeOrderFromCache,
       refetch,
       onPostReceived: () => {
-        // Pochta to'liq qabul qilindi — qisqa muddatdan keyin orqaga
+        // Pochta to'liq qabul qilindi (SERVER tasdig'i) — qisqa muddatdan keyin orqaga
         setTimeout(() => {
           navigate(buildAdminPath("courier-mails"));
         }, 1500);
@@ -256,6 +305,15 @@ const CourierMailDetail = () => {
                 )}
               </div>
             </div>
+            {/* Telefon kamerasi bilan skanerlash — hardware skaner ham fonda ishlaydi */}
+            <button
+              type="button"
+              onClick={() => setCameraOpen(true)}
+              className="w-full bg-white dark:bg-[#2A263D] px-4 py-3 flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm active:bg-emerald-50 dark:active:bg-emerald-900/20 transition-colors"
+            >
+              <Camera className="w-5 h-5" />
+              Telefon kamerasi bilan skanerlash
+            </button>
           </div>
         )}
 
@@ -451,6 +509,7 @@ const CourierMailDetail = () => {
                             <h3 className="font-semibold text-gray-800 dark:text-white text-sm truncate">
                               {order?.customer?.name || "Noma'lum"}
                             </h3>
+                            <ReplacementBadge order={order} className="my-0.5" />
                             <a
                               href={`tel:${order?.customer?.phone_number}`}
                               onClick={(e) => e.stopPropagation()}
@@ -561,6 +620,14 @@ const CourierMailDetail = () => {
             </p>
           </div>
         )}
+
+        {/* Telefon-kamera skaneri (doimiy) — har QR avtomatik qabul qilinadi */}
+        <CourierCameraScanner
+          open={cameraOpen}
+          onClose={() => setCameraOpen(false)}
+          onToken={receiveByToken}
+          successCount={successCount}
+        />
       </div>
     </div>
   );
