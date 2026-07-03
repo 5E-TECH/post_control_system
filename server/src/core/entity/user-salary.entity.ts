@@ -23,6 +23,18 @@ export class UserSalaryEntity extends BaseEntity {
   @Max(30)
   payment_day: number;
 
+  /**
+   * Oxirgi marta oylik hisoblangan davr — 'YYYY-MM' (masalan '2026-06').
+   *
+   * Idempotentlik MANBAI. Ilgari CRON `updated_at` sanasiga tayanardi, lekin
+   * `updated_at` HAR `save()`da (avans/maosh to'lash, summa tahriri) yangilanadi —
+   * shu sabab o'sha kuni tegilgan ishchilar noto'g'ri "allaqachon qo'shilgan" deb
+   * o'tkazib yuborilardi. Bu ustun FAQAT accrual (CRON/catch-up) tomonidan
+   * o'zgartiriladi va boshqa hech qaysi oqim unga tegmaydi.
+   */
+  @Column({ type: 'varchar', length: 7, nullable: true })
+  last_accrued_period: string | null;
+
   // Bu tomonda FK bor → JoinColumn shu yerda
   @OneToOne(() => UserEntity, (user) => user.salary)
   @JoinColumn({ name: 'user_id' })
