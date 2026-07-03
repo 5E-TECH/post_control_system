@@ -173,6 +173,42 @@ export class OrderController {
     return this.orderService.newOrdersByMarketId(id, search, page, limit);
   }
 
+  // Almashtirish pickeri uchun — MUHIM: bu STATIC route '@Get(:id)' dan OLDIN
+  // turishi shart, aks holda ':id' uni yutib yuboradi.
+  @ApiOperation({
+    summary: 'Almashtirish uchun almashtirib bo\'ladigan buyurtmalar',
+    description:
+      'q berilsa market bo\'ylab telefon/ism/raqam bo\'yicha qidiradi (boshqa ' +
+      'mijoz ham); aks holda customer_id bo\'yicha shu mijoz buyurtmalari.',
+  })
+  @ApiQuery({ name: 'market_id', required: false })
+  @ApiQuery({ name: 'customer_id', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('replaceable')
+  getReplaceableOrders(
+    @CurrentUser() user: JwtPayload,
+    @Query('market_id') market_id?: string,
+    @Query('customer_id') customer_id?: string,
+    @Query('q') q?: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.orderService.getReplaceableOrders(user, {
+      market_id,
+      customer_id,
+      q,
+      limit,
+    });
+  }
+
   @ApiOperation({ summary: 'Get order by id' })
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Order data' })
@@ -443,6 +479,49 @@ export class OrderController {
     @Body() dto: BulkOrderActionDto,
   ) {
     return this.orderService.bulkCancelOrders(user, dto);
+  }
+
+  // ============== ALMASHTIRISH (kafolat-swap) QAYTISHLARI ==============
+
+  @ApiOperation({
+    summary: 'Almashtirish qaytishlari ro\'yxati',
+    description:
+      'Eski (almashtirilayotgan) mahsulotlar ro\'yxati. state: pending|collected|returned',
+  })
+  @ApiQuery({ name: 'state', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Get('replacement/returns')
+  getReplacementReturns(
+    @CurrentUser() user: JwtPayload,
+    @Query('state') state?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.orderService.getReplacementReturns(user, {
+      state,
+      page,
+      limit,
+      search,
+    });
+  }
+
+  @ApiOperation({
+    summary: 'Almashtirish: eski mahsulot marketga topshirildi (OLD_RETURNED)',
+  })
+  @ApiParam({ name: 'id', description: 'Eski (almashtirilayotgan) buyurtma ID' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('replacement/:id/returned')
+  confirmOldReturned(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.orderService.confirmOldReturned(user, id);
   }
 
   @ApiOperation({

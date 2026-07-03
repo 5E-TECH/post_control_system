@@ -1,4 +1,10 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
@@ -29,4 +35,16 @@ export class SellCancelOrderDto {
   @IsNumber()
   @Min(0)
   extraCost: number;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Almashtirish (kafolat-swap) buyurtmasini sotishda kuryer ESKI ' +
+      'mahsulotni mijozdan olib marketga qaytarish uchun olganini tasdiqlaydi. ' +
+      'Almashtirish buyurtmasi uchun true bo\'lishi SHART, aks holda sotuv ' +
+      'rad etiladi (eski mahsulot yo\'qolib ketmasligi uchun).',
+  })
+  @IsOptional()
+  @IsBoolean()
+  old_item_collected?: boolean;
 }

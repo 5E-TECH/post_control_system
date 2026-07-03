@@ -56,6 +56,9 @@ export class PrinterService {
       .leftJoinAndSelect('order.market', 'market')
       .leftJoinAndSelect('order.items', 'items')
       .leftJoinAndSelect('items.product', 'product')
+      // Almashtirish (kafolat-swap): chek bannerida ESKI buyurtma #raqam + sanasi
+      // ko'rsatish uchun eski buyurtmani ham yuklaymiz.
+      .leftJoinAndSelect('order.replacementOf', 'replacementOf')
       .where('order.id IN (:...ids)', { ids: orderIds })
       .getMany();
   }
@@ -116,6 +119,19 @@ export class PrinterService {
             : 'MARKAZGA';
         const qrCode = order.qr_code_token ?? '';
 
+        // Almashtirish (kafolat-swap) banneri — chekning eng tepasida, ko'zga
+        // tashlanadigan qilib: kuryer ESKI mahsulotni olib marketga qaytarishi
+        // SHART. Faqat almashtirish buyurtmasida chiqadi.
+        let replaceBannerHtml = '';
+        if (order.replacement_of_order_id) {
+          const ro: any = order.replacementOf;
+          const oldNo = ro?.order_number != null ? `#${ro.order_number}` : '';
+          const oldDate = ro?.created_at
+            ? ` (${this.formatDateStr(ro.created_at)})`
+            : '';
+          replaceBannerHtml = `<div class="replace-banner">ALMASHTIRISH — eski ${oldNo}${oldDate} mahsuloti MIJOZDAN OLINIB MARKETGA QAYTARILSIN</div>`;
+        }
+
         // Logist ma'lumoti (region orqali)
         const logist = (order.customer?.district?.assignedToRegion as any)
           ?.logist;
@@ -145,6 +161,7 @@ export class PrinterService {
         receipts.push(`
           <div class="cell">
             <div class="receipt">
+              ${replaceBannerHtml}
               <div class="zone-a">
                 <div class="left-panel">
                   <div class="brand-row">
@@ -243,6 +260,16 @@ export class PrinterService {
     border:0.5px solid #333;
     display:flex;flex-direction:column;
     overflow:hidden;
+  }
+
+  .replace-banner{
+    background:#000;color:#fff;
+    font-size:8px;font-weight:bold;
+    text-align:center;
+    padding:1.5px 2px;line-height:1.15;
+    letter-spacing:0.2px;
+    border-bottom:0.5px solid #333;
+    flex-shrink:0;
   }
 
   .zone-a{
@@ -527,7 +554,12 @@ ${pages.join('\n')}
       const RIGHT_W = FULL_W - LEFT_W;
       const LABEL_COL = 17 * MM; // Label ustuni
       const PAD = 3;
-      const TABLE_TOP = M;
+      // Almashtirish (kafolat-swap) banneri uchun tepada joy ajratamiz (faqat
+      // almashtirish buyurtmasida). TABLE_TOP shu balandlikka suriladi →
+      // TABLE_H va ZONE_A_H avtomatik qisqaradi, 60mm etiketka byudjeti buzilmaydi.
+      const isReplacementPdf = !!order.replacement_of_order_id;
+      const BANNER_H = isReplacementPdf ? 12 : 0;
+      const TABLE_TOP = M + BANNER_H;
       const TABLE_BOT = PAGE_H - M;
       const TABLE_H = TABLE_BOT - TABLE_TOP;
 
@@ -581,6 +613,25 @@ ${pages.join('\n')}
         `${orderPrice}   ${whereDeliver}`,
         `${market} / ${operator}`,
       ];
+
+      // ====== ALMASHTIRISH BANNER (tepada — qora fon, oq qalin matn) ======
+      if (isReplacementPdf) {
+        const roPdf: any = order.replacementOf;
+        const oldNoPdf =
+          roPdf?.order_number != null ? `#${roPdf.order_number}` : '';
+        const oldDatePdf = roPdf?.created_at
+          ? ` (${this.formatDateStr(roPdf.created_at)})`
+          : '';
+        const bannerText = `ALMASHTIRISH — eski ${oldNoPdf}${oldDatePdf} MARKETGA QAYTARILSIN`;
+        doc.rect(M, M, FULL_W, BANNER_H).fill('#000');
+        doc.fillColor('#fff').font('Sans-Bold').fontSize(6.5);
+        doc.text(bannerText, M, M + (BANNER_H - 6.5) / 2, {
+          width: FULL_W,
+          align: 'center',
+          lineBreak: false,
+        });
+        doc.fillColor('#000'); // keyingi chizmalar uchun rangni tiklash
+      }
 
       // ====== CHAP PANEL (logo + brend + QR + sana) ======
       doc.lineWidth(0.5);

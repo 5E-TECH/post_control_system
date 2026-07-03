@@ -1,5 +1,5 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Order_status, Where_deliver } from 'src/common/enums';
+import { Order_status, Where_deliver, Replacement_state } from 'src/common/enums';
 import {
   Column,
   Entity,
@@ -37,6 +37,11 @@ import {
 @Index('IDX_ORDER_DISTRICT_ID', ['district_id'])
 @Index('IDX_ORDER_OPERATOR_ID', ['operator_id'])
 @Index('IDX_ORDER_NUMBER', ['order_number'], { unique: true })
+@Index('IDX_ORDER_REPLACEMENT_OF', ['replacement_of_order_id'])
+// QR skaner qidiruvi (checkPost / kuryer qabul) qr_code_token bo'yicha izlaydi —
+// indekssiz har skan sequential scan edi. Non-unique (tokenlar amalda noyob,
+// lekin DB darajasida majburlanmagan; dublikat bo'lsa migration buzilmasin).
+@Index('IDX_ORDER_QR_TOKEN', ['qr_code_token'])
 export class OrderEntity extends BaseEntity {
   // O'qiladigan global buyurtma raqami (#100042). UUID `id` qoladi — bu faqat
   // ko'rsatish/qidiruv/chek uchun qulay, ketma-ket raqam. DB sequence orqali
@@ -158,6 +163,45 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   return_requested: boolean;
 
+  // ====================== ALMASHTIRISH (kafolat-swap) ======================
+  // Bu YANGI buyurtma qaysi ESKI (avval yetkazilgan) buyurtma o'rniga
+  // ketayotganini ko'rsatadi. Faqat almashtirish buyurtmasida to'ladi.
+  // parent_order_id'dan ATAYLAB ALOHIDA — u partlySold bola-buyurtmasiniki.
+  @Column({ type: 'uuid', nullable: true })
+  replacement_of_order_id: string | null;
+
+  // Almashtirishning jismoniy qaytarish holati (kuryer "Sotildi" gate'ini
+  // boshqaradi). YANGI buyurtmada to'ladi. NULL = oddiy buyurtma.
+  @Column({ type: 'enum', enum: Replacement_state, nullable: true })
+  replacement_state: Replacement_state | null;
+
+  // ESKI (almashtirilayotgan) buyurtmada true bo'ladi — statusini
+  // O'ZGARTIRMASDAN qaytarish ro'yxatida ko'rsatish uchun. Eski buyurtma
+  // SOTILGAN holatda qoladi, puli muzlatiladi (moliyaviy reversal YO'Q).
+  @Column({ type: 'boolean', default: false })
+  is_replacement_return: boolean;
+
+  // Kuryer eski mahsulotni mijozdan OLGAN vaqt (epoch ms).
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  old_product_collected_at: number | null;
+
+  // Eski mahsulot MARKETGA QAYTARILGAN (bekor pochta qabul qilingan) vaqt (epoch ms).
+  // "Marketga topshirildi" dalili — status SOLD qolgani uchun shu maydon isbotlaydi.
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  old_product_returned_at: number | null;
+
+  // Eski mahsulotni marketga qabul qilgan admin/registrator ID si (audit).
+  @Column({ type: 'uuid', nullable: true })
+  old_returned_by: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   create_bot_messages: { chatId: number; messageId: number }[];
 
@@ -195,4 +239,11 @@ export class OrderEntity extends BaseEntity {
   })
   @JoinColumn({ name: 'district_id' })
   district: DistrictEntity;
+
+  // 🔁 Almashtirish: YANGI buyurtma → o'rniga ketayotgan ESKI buyurtma
+  // (o'ziga-o'zi ManyToOne). Eski buyurtma o'chsa havola NULL bo'ladi —
+  // buyurtmaning o'zi qolaveradi.
+  @ManyToOne(() => OrderEntity, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'replacement_of_order_id' })
+  replacementOf: OrderEntity | null;
 }

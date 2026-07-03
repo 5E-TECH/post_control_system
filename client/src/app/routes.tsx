@@ -99,6 +99,9 @@ const Orderview = lazy(() => import("../pages/today-orders/pages/orderview"));
 const ReturnRequests = lazy(
   () => import("../pages/mails/components/superadmin/return-requests")
 );
+const ReplacementReturns = lazy(
+  () => import("../pages/orders/pages/superadmin/replacement-returns")
+);
 const RefusedMails = lazy(
   () => import("../pages/mails/components/superadmin/refused-mails")
 );
@@ -227,6 +230,14 @@ const AppRouters = () => {
                   ],
                 },
               ],
+            },
+            {
+              path: "replacement-returns",
+              element: (
+                <RequireRole roles={["superadmin", "admin", "registrator"]}>
+                  <ReplacementReturns />
+                </RequireRole>
+              ),
             },
             {
               path: "all-users",

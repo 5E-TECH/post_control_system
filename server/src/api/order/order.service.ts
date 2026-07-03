@@ -21,6 +21,7 @@ import {
   Operation_type,
   Order_status,
   Post_status,
+  Replacement_state,
   Roles,
   Source_type,
   Status,
@@ -176,6 +177,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('items.product', 'product')
         .leftJoinAndSelect('order.post', 'post')
         .leftJoinAndSelect('post.courier', 'courier')
+        // Almashtirish: yangi buyurtmada eski #raqamni ko'rsatish uchun
+        .leftJoinAndSelect('order.replacementOf', 'replacementOf')
         // Soft-deleted'lar TypeORM tomonidan filter qilinishi kerak,
         // lekin xavfsizlik uchun explicit ham qo'shamiz
         .andWhere('order.deleted_at IS NULL')
@@ -372,6 +375,50 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Customer not found');
       }
 
+      // === ALMASHTIRISH (kafolat-swap) validatsiyasi ===
+      // Bu yangi buyurtma avval yetkazilgan ESKI buyurtma o'rniga ketayotgan
+      // bo'lsa: eski buyurtmani LOCK bilan yuklab, shu market+mijozga tegishli,
+      // sotilgan va hali almashtirilmagan ekanini tekshiramiz. Eski buyurtmaning
+      // PULIGA TEGMAYMIZ (kafolat-swap — reversal yo'q), faqat jismoniy
+      // qaytarish uchun belgilaymiz.
+      let replacedOrder: OrderEntity | null = null;
+      if (createOrderDto.replaced_order_id) {
+        replacedOrder = await queryRunner.manager.findOne(OrderEntity, {
+          where: { id: createOrderDto.replaced_order_id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!replacedOrder) {
+          throw new NotFoundException(
+            'Almashtirilayotgan eski buyurtma topilmadi',
+          );
+        }
+        if (replacedOrder.user_id !== market_id) {
+          throw new BadRequestException(
+            'Eski buyurtma boshqa marketga tegishli — almashtirish faqat shu marketning buyurtmasi bilan mumkin',
+          );
+        }
+        // Eslatma: eski buyurtma BOSHQA mijozga tegishli bo'lishi mumkin
+        // (ataylab tekshirilmaydi) — masalan mijoz boshqa raqam bilan buyurtma
+        // bergan yoki almashtirish boshqa mijoz buyurtmasi o'rniga ketadi.
+        // Faqat shu MARKET va yetkazilgan (sotilgan) bo'lishi shart.
+        const DELIVERED_STATUSES: Order_status[] = [
+          Order_status.SOLD,
+          Order_status.PAID,
+          Order_status.PARTLY_PAID,
+          Order_status.CLOSED,
+        ];
+        if (!DELIVERED_STATUSES.includes(replacedOrder.status)) {
+          throw new BadRequestException(
+            'Faqat yetkazib berilgan (sotilgan) buyurtmani almashtirish mumkin',
+          );
+        }
+        if (replacedOrder.is_replacement_return) {
+          throw new BadRequestException(
+            'Bu buyurtma allaqachon almashtirishga belgilangan',
+          );
+        }
+      }
+
       const qr_code_token = generateCustomToken();
 
       // Agar manzil berilmagan bo'lsa, mijozning default manzilini olish
@@ -411,9 +458,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         customer_id,
         district_id: orderDistrictId,
         address: orderAddress,
+        // Almashtirish bo'lsa — eskiga havola + kuryer "eskisini oldim" gate'i
+        replacement_of_order_id: replacedOrder ? replacedOrder.id : null,
+        replacement_state: replacedOrder
+          ? Replacement_state.AWAITING_OLD_PICKUP
+          : null,
       });
 
       await queryRunner.manager.save(newOrder);
+
+      // Almashtirish: ESKI buyurtmani jismoniy qaytarish uchun belgilash.
+      // Statusi (SOTILGAN) va PULI O'ZGARMAYDI — faqat qaytarish ro'yxatida
+      // ko'rinishi va kuzatuvi uchun flag qo'yamiz.
+      if (replacedOrder) {
+        replacedOrder.is_replacement_return = true;
+        replacedOrder.replacement_state = Replacement_state.AWAITING_OLD_PICKUP;
+        await queryRunner.manager.save(replacedOrder);
+      }
 
       // ✅ Batch: Barcha order itemlarni bir vaqtda yaratish va saqlash
       const orderItems = order_item_info.map((o_item) =>
@@ -439,8 +500,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           total_price,
           customer_id,
           market_id,
+          ...(replacedOrder
+            ? {
+                replacement_of_order_id: replacedOrder.id,
+                replacement_of_order_number: replacedOrder.order_number,
+              }
+            : {}),
         },
-        description: `Buyurtma #${newOrder.order_number} yaratildi — ${total_price} so'm`,
+        description: replacedOrder
+          ? `Buyurtma #${newOrder.order_number} yaratildi (ALMASHTIRISH — eski #${replacedOrder.order_number} o'rniga) — ${total_price} so'm`
+          : `Buyurtma #${newOrder.order_number} yaratildi — ${total_price} so'm`,
         user,
       });
 
@@ -824,6 +893,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           'post',
           'post.courier',
           'district',
+          // Almashtirish: eski (almashtirilayotgan) buyurtma to'liq ma'lumoti
+          'replacementOf',
+          'replacementOf.items',
+          'replacementOf.items.product',
+          'replacementOf.customer',
         ],
       });
 
@@ -910,6 +984,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         delete payload.max_courier_tariff_center;
         delete payload.assigned_courier_tariff_home;
         delete payload.assigned_courier_tariff_center;
+      }
+
+      // Almashtirish: agar bu ESKI (qaytarilayotgan) buyurtma bo'lsa — uni qaysi
+      // YANGI buyurtma almashtirayotganini topib biriktiramiz (detalda havola).
+      if (newOrder.is_replacement_return) {
+        const replacedBy = await this.orderRepo.findOne({
+          where: { replacement_of_order_id: id },
+          relations: ['customer', 'items', 'items.product'],
+        });
+        payload.replaced_by_order = replacedBy || null;
       }
 
       return successRes(payload, 200, 'Order by id');
@@ -1909,6 +1993,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('o.district', 'orderDistrict')
         .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
         .leftJoinAndSelect('customer.district', 'district')
+        // Almashtirish: kuryer modalida "eski #X mahsulotini ol" deb ko'rsatish
+        .leftJoinAndSelect('o.replacementOf', 'replacementOf')
         .where('o.post_id IN (:...postIds)', { postIds: allPostIds })
         .orderBy('o.created_at', 'DESC')
         .skip(offset)
@@ -2034,6 +2120,58 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     throw new ForbiddenException('Bu buyurtma sizga tegishli emas');
   }
 
+  /**
+   * Almashtirish (kafolat-swap): eski (SOTILGAN) buyurtmani SOTUVCHI kuryerning
+   * yagona BEKOR (CANCELED) postiga biriktiradi — shunda u mavjud qaytarish reli
+   * orqali marketga boradi. STATUS O'ZGARMAYDI (SOLD qoladi; bekor pochta
+   * ro'yxatlari canceled_post_id bo'yicha ko'rsatadi, status bo'yicha emas);
+   * narx post yig'indisiga QO'SHILMAYDI (puli real sotuvda hisoblangan, qayta
+   * sanalmasin); faqat order_quantity +1. Idempotent.
+   */
+  private async attachReplacementToCanceledPost(
+    manager: EntityManager,
+    courierId: string,
+    oldOrder: OrderEntity,
+  ): Promise<void> {
+    // Idempotentlik: allaqachon aktiv CANCELED postda bo'lsa qayta biriktirmaymiz
+    if (oldOrder.canceled_post_id) {
+      const existing = await manager.findOne(PostEntity, {
+        where: { id: oldOrder.canceled_post_id, status: Post_status.CANCELED },
+        select: ['id'],
+      });
+      if (existing) return;
+    }
+
+    // Bitta kuryer = bitta CANCELED post invarianti (tranzaksiya-darajali lock)
+    await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+      `canceled_post:${courierId}`,
+    ]);
+
+    let canceledPost = await manager.findOne(PostEntity, {
+      where: { courier_id: courierId, status: Post_status.CANCELED },
+    });
+    if (!canceledPost) {
+      const courier = await manager.findOne(UserEntity, {
+        where: { id: courierId },
+        select: ['id', 'region_id'],
+      });
+      canceledPost = manager.create(PostEntity, {
+        courier_id: courierId,
+        region_id: courier?.region_id,
+        post_total_price: 0,
+        order_quantity: 0,
+        qr_code_token: generateCustomToken(),
+        status: Post_status.CANCELED,
+      });
+      canceledPost = await manager.save(canceledPost);
+    }
+
+    oldOrder.canceled_post_id = canceledPost.id;
+    // Faqat dona — narx EMAS (settled revenue qayta sanalmasin)
+    canceledPost.order_quantity = (Number(canceledPost.order_quantity) || 0) + 1;
+    await manager.save(canceledPost);
+  }
+
   async sellOrder(user: JwtPayload, id: string, sellDto: SellCancelOrderDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -2077,6 +2215,49 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // Egalik tekshiruvi: faqat buyurtma biriktirilgan kurier sotishi mumkin
       await this.assertCourierOwnsOrder(queryRunner.manager, order, user);
+
+      // === ALMASHTIRISH (kafolat-swap) GATE ===
+      // Almashtirish buyurtmasini sotish uchun kuryer ESKI mahsulotni mijozdan
+      // olib, marketga qaytarish uchun olganini tasdiqlashi SHART. Tasdiq
+      // (old_item_collected) bo'lmasa — sotuv RAD ETILADI (eski mahsulot
+      // yo'qolib ketmasligi uchun). Bulk avto-sotuv bu flagni yubormaydi, shu
+      // sababli almashtirishlar bulk'da shu yerda to'xtaydi va faqat bittalab
+      // sotuv modalida (kuryer tasdig'i bilan) sotiladi.
+      let replacementOldNumber: number | null = null;
+      if (order.replacement_of_order_id) {
+        if (sellDto.old_item_collected !== true) {
+          throw new BadRequestException(
+            'Bu almashtirish buyurtmasi. Avval eski mahsulotni mijozdan olib, ' +
+              'marketga qaytarish uchun olganingizni tasdiqlang ("Eskisini oldim").',
+          );
+        }
+        const collectedAt = Date.now();
+        // Yangi buyurtma: gate holatini OLD_COLLECTED ga o'tkazamiz (pastdagi
+        // save(order) bilan saqlanadi).
+        order.replacement_state = Replacement_state.OLD_COLLECTED;
+        order.old_product_collected_at = collectedAt;
+        // ESKI buyurtma: jismoniy qaytarish kuzatuvi uchun belgilaymiz. Statusi
+        // (SOTILGAN) va PULI O'ZGARMAYDI — kafolat-swap, reversal YO'Q.
+        const oldOrderForSwap = await queryRunner.manager.findOne(OrderEntity, {
+          where: { id: order.replacement_of_order_id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (oldOrderForSwap) {
+          oldOrderForSwap.replacement_state = Replacement_state.OLD_COLLECTED;
+          oldOrderForSwap.old_product_collected_at = collectedAt;
+          // Eski mahsulotni SOTUVCHI kuryerning BEKOR POCHTASIga biriktiramiz —
+          // shunda u qaytarish reli orqali marketga boradi. Status SOTILGAN
+          // QOLADI (canceled_post_id bo'yicha ko'rinadi, status bo'yicha emas);
+          // narx post yig'indisiga QO'SHILMAYDI (puli allaqachon real sotuvda).
+          await this.attachReplacementToCanceledPost(
+            queryRunner.manager,
+            user.id,
+            oldOrderForSwap,
+          );
+          await queryRunner.manager.save(oldOrderForSwap);
+          replacementOldNumber = oldOrderForSwap.order_number;
+        }
+      }
 
       const marketId = order.user_id;
       const [market, marketCashbox, courier, courierCashbox] =
@@ -2386,6 +2567,30 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         Order_status.WAITING,
         order.status,
       );
+
+      // Almashtirish (kafolat-swap): market'ni "eski mahsulot qaytmoqda" deb
+      // xabardor qilamiz. Commit'dan KEYIN va try/catch ichida — Telegram xatosi
+      // sotuvga ta'sir qilmaydi. Alohida RETURN guruh talab qilmaslik uchun
+      // market'ning mavjud CANCEL guruhiga yuboramiz.
+      if (order.replacement_of_order_id) {
+        try {
+          const returnGroup = await this.dataSource
+            .getRepository(TelegramEntity)
+            .findOne({
+              where: { market_id: order.user_id, group_type: Group_type.CANCEL },
+            });
+          await this.botService.sendMessageToGroup(
+            returnGroup?.group_id || null,
+            `*🔄 Almashtirish — mahsulot qaytmoqda!*\n\n` +
+              (replacementOldNumber != null
+                ? `📦 Eski buyurtma *#${replacementOldNumber}* mahsuloti mijozdan olindi va sizga (marketga) qaytarilmoqda.\n`
+                : `📦 Eski mahsulot mijozdan olindi va sizga (marketga) qaytarilmoqda.\n`) +
+              `🆕 Yangi buyurtma *#${order.order_number}* mijozga topshirildi.\n` +
+              `🚚 *Kuryer:* ${courier?.name || '-'}\n` +
+              `📞 *Aloqa:* ${courier?.phone_number || '-'}\n`,
+          );
+        } catch {}
+      }
 
       return successRes({}, 200, 'Order sold');
     } catch (error) {
@@ -5774,7 +5979,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     const successful: Array<{ id: string; total_price: number }> = [];
     const failed: Array<{ id: string; reason: string }> = [];
 
+    // Almashtirish (kafolat-swap) buyurtmalarini bulk avto-sotuvdan ISTISNO
+    // qilamiz: ular kuryerning "eskisini oldim" tasdig'ini talab qiladi, shuning
+    // uchun jimgina avto-sotilib ketmasligi va eski mahsulot yo'qolmasligi uchun
+    // faqat bittalab sotuv modalida sotiladi. Bu yerda oldindan ajratib, aniq
+    // sabab bilan failed'ga qo'shamiz (sellOrder gate'iga tushib ketmasdan).
+    const replacementIds = new Set<string>();
+    if (dto.order_ids.length) {
+      const rows = await this.dataSource
+        .getRepository(OrderEntity)
+        .createQueryBuilder('o')
+        .select('o.id', 'id')
+        .where('o.id IN (:...ids)', { ids: dto.order_ids })
+        .andWhere('o.replacement_of_order_id IS NOT NULL')
+        .getRawMany();
+      rows.forEach((r: { id: string }) => replacementIds.add(r.id));
+    }
+
     for (const orderId of dto.order_ids) {
+      if (replacementIds.has(orderId)) {
+        failed.push({
+          id: orderId,
+          reason:
+            "Almashtirish buyurtmasi — eskisini olib, bittalab soting (avto-sotilmaydi)",
+        });
+        continue;
+      }
       try {
         // Mavjud sellOrder metodini chaqiramiz (pessimistic lock + barcha logika).
         // Bulk uchun extra_cost yo'q, faqat umumiy izoh.
@@ -5818,6 +6048,293 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       200,
       `Bulk sotuv yakunlandi: ${successful.length} muvaffaqiyatli, ${failed.length} xato`,
     );
+  }
+
+  /**
+   * Almashtirish pickeri uchun ALMASHTIRIB BO'LADIGAN buyurtmalar.
+   *   - q berilsa: SHU MARKET bo'ylab telefon/ism/buyurtma raqami bo'yicha
+   *     qidiradi (boshqa mijoz buyurtmasini ham topadi).
+   *   - q bo'lmasa, customer_id berilsa: shu mijozning shu marketdagi buyurtmalari.
+   * Faqat YETKAZILGAN (sotilgan) va hali almashtirilmagan buyurtmalar. To'liq
+   * detallar (sana, izoh, mahsulotlar, mijoz) qaytadi — bir xil mahsulotni
+   * sana/izoh bo'yicha ajratish uchun.
+   */
+  async getReplaceableOrders(
+    user: JwtPayload,
+    query: {
+      market_id?: string;
+      customer_id?: string;
+      q?: string;
+      limit?: number;
+    },
+  ) {
+    try {
+      // Market'ni aniqlash: MARKET o'zini, OPERATOR o'z marketini, qolganlar param.
+      let marketId = query.market_id;
+      if (user.role === Roles.MARKET) {
+        marketId = user.id;
+      } else if (user.role === Roles.OPERATOR) {
+        const op = await this.userRepo.findOne({
+          where: { id: user.id },
+          select: ['id', 'market_id'],
+        });
+        marketId = op?.market_id || marketId;
+      }
+      if (!marketId) {
+        return successRes({ data: [] }, 200, 'market_id kerak');
+      }
+
+      const q = (query.q || '').trim();
+      if (!q && !query.customer_id) {
+        return successRes({ data: [] }, 200, 'Filtr yo‘q');
+      }
+
+      const limit = Math.min(Number(query.limit) || 30, 50);
+      const DELIVERED: Order_status[] = [
+        Order_status.SOLD,
+        Order_status.PAID,
+        Order_status.PARTLY_PAID,
+        Order_status.CLOSED,
+      ];
+
+      const qb = this.orderRepo
+        .createQueryBuilder('o')
+        .leftJoinAndSelect('o.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('o.customer', 'customer')
+        .where('o.user_id = :marketId', { marketId })
+        .andWhere('o.deleted_at IS NULL')
+        .andWhere('o.is_replacement_return = false')
+        .andWhere('o.status IN (:...statuses)', { statuses: DELIVERED })
+        .orderBy('o.created_at', 'DESC')
+        .take(limit);
+
+      if (q) {
+        qb.andWhere(
+          '(CAST(o.order_number AS TEXT) ILIKE :q OR customer.phone_number ILIKE :q OR customer.extra_number ILIKE :q OR customer.name ILIKE :q)',
+          { q: `%${q}%` },
+        );
+      } else if (query.customer_id) {
+        qb.andWhere('o.customer_id = :cid', { cid: query.customer_id });
+      }
+
+      const orders = await qb.getMany();
+
+      const data = orders.map((o) => ({
+        id: o.id,
+        order_number: o.order_number,
+        status: o.status,
+        total_price: o.total_price,
+        created_at: o.created_at,
+        sold_at: o.sold_at,
+        where_deliver: o.where_deliver,
+        comment: o.comment,
+        customer: {
+          name: o.customer?.name || null,
+          phone_number: o.customer?.phone_number || null,
+        },
+        items: (o.items || []).map((i) => ({
+          product_name: i.product?.name || '—',
+          quantity: i.quantity,
+        })),
+      }));
+
+      return successRes({ data }, 200, 'Replaceable orders');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Almashtirish (kafolat-swap) QAYTISHLARI ro'yxati — ESKI buyurtmalar
+   * (is_replacement_return = true). Markaz/admin qaytayotgan mahsulotlarni
+   * ko'rib, marketga topshirilganini tasdiqlaydi. Eski buyurtmalar SOTILGAN
+   * holatda qoladi (status emas, flag bo'yicha) — hisobotlar buzilmaydi.
+   *   state: 'pending' (kutilmoqda) | 'collected' (olindi) | 'returned' (qaytarildi)
+   */
+  async getReplacementReturns(
+    user: JwtPayload,
+    query: { state?: string; page?: number; limit?: number; search?: string },
+  ) {
+    try {
+      const page = query.page && query.page > 0 ? query.page : 1;
+      const limit = getSafeLimit(query.limit, false);
+      const offset = (page - 1) * limit;
+
+      const qb = this.orderRepo
+        .createQueryBuilder('o')
+        .leftJoinAndSelect('o.items', 'items')
+        .leftJoinAndSelect('items.product', 'product')
+        .leftJoinAndSelect('o.market', 'market')
+        .leftJoinAndSelect('o.customer', 'customer')
+        .where('o.is_replacement_return = :flag', { flag: true })
+        .andWhere('o.deleted_at IS NULL')
+        .orderBy('o.old_product_returned_at', 'DESC', 'NULLS LAST')
+        .addOrderBy('o.created_at', 'DESC')
+        .skip(offset)
+        .take(limit);
+
+      if (query.state === 'collected') {
+        qb.andWhere('o.replacement_state = :st', {
+          st: Replacement_state.OLD_COLLECTED,
+        });
+      } else if (query.state === 'returned') {
+        qb.andWhere('o.replacement_state = :st', {
+          st: Replacement_state.OLD_RETURNED,
+        });
+      } else if (query.state === 'pending') {
+        qb.andWhere('o.replacement_state = :st', {
+          st: Replacement_state.AWAITING_OLD_PICKUP,
+        });
+      }
+
+      if (query.search) {
+        const s = `%${query.search}%`;
+        qb.andWhere(
+          '(CAST(o.order_number AS TEXT) ILIKE :s OR customer.name ILIKE :s OR customer.phone_number ILIKE :s)',
+          { s },
+        );
+      }
+
+      const [data, total] = await qb.getManyAndCount();
+
+      // Har bir eski buyurtmaga bog'liq YANGI almashtirish buyurtmasini topamiz
+      const oldIds = data.map((o) => o.id);
+      const newByOld = new Map<string, OrderEntity>();
+      if (oldIds.length) {
+        const news = await this.orderRepo.find({
+          where: { replacement_of_order_id: In(oldIds) },
+          select: [
+            'id',
+            'order_number',
+            'replacement_of_order_id',
+            'replacement_state',
+            'status',
+            'sold_at',
+          ],
+        });
+        news.forEach((n) => {
+          if (n.replacement_of_order_id) {
+            newByOld.set(n.replacement_of_order_id, n);
+          }
+        });
+      }
+
+      // "Marketga qabul qilgan" shaxs ismlarini biriktiramiz (audit dalili)
+      const returnerIds = Array.from(
+        new Set(data.map((o) => o.old_returned_by).filter(Boolean)),
+      ) as string[];
+      const returnerMap = new Map<string, string>();
+      if (returnerIds.length) {
+        const returners = await this.userRepo.find({
+          where: { id: In(returnerIds) },
+          select: ['id', 'name'],
+        });
+        returners.forEach((u) => returnerMap.set(u.id, u.name));
+      }
+
+      const items = data.map((o) => ({
+        ...o,
+        replacement_new_order: newByOld.get(o.id) || null,
+        old_returned_by_name: o.old_returned_by
+          ? returnerMap.get(o.old_returned_by) || null
+          : null,
+      }));
+
+      return successRes(
+        { data: items, total, page, limit, totalPages: Math.ceil(total / limit) },
+        200,
+        'Replacement returns',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * Markaz/admin ESKI almashtirish mahsuloti marketga TOPSHIRILGANINI tasdiqlaydi
+   * → replacement_state = OLD_RETURNED. Moliyaga TEGMAYDI (kafolat-swap, reversal
+   * yo'q). Market'ga Telegram xabari yuboriladi.
+   */
+  async confirmOldReturned(user: JwtPayload, id: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const oldOrder = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+        relations: ['customer'],
+      });
+      if (!oldOrder) throw new NotFoundException('Buyurtma topilmadi');
+      if (!oldOrder.is_replacement_return) {
+        throw new BadRequestException('Bu buyurtma almashtirish qaytishi emas');
+      }
+      // Idempotent
+      if (oldOrder.replacement_state === Replacement_state.OLD_RETURNED) {
+        await queryRunner.commitTransaction();
+        return successRes(
+          oldOrder,
+          200,
+          'Allaqachon qaytarilgan deb belgilangan',
+        );
+      }
+
+      oldOrder.replacement_state = Replacement_state.OLD_RETURNED;
+      if (!oldOrder.old_product_returned_at) {
+        oldOrder.old_product_returned_at = Date.now();
+      }
+      oldOrder.old_returned_by = user.id; // audit: qabul qilgan shaxs
+      await queryRunner.manager.save(oldOrder);
+
+      // Yangi buyurtmani ham kuzatuv izchilligi uchun OLD_RETURNED ga o'tkazamiz
+      const newOrder = await queryRunner.manager.findOne(OrderEntity, {
+        where: { replacement_of_order_id: id },
+      });
+      if (newOrder) {
+        newOrder.replacement_state = Replacement_state.OLD_RETURNED;
+        await queryRunner.manager.save(newOrder);
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Market Telegram xabari (commit'dan keyin — xato sotuvga ta'sir qilmaydi)
+      try {
+        const returnGroup = await this.dataSource
+          .getRepository(TelegramEntity)
+          .findOne({
+            where: {
+              market_id: oldOrder.user_id,
+              group_type: Group_type.CANCEL,
+            },
+          });
+        await this.botService.sendMessageToGroup(
+          returnGroup?.group_id || null,
+          `*✅ Almashtirish — mahsulot qaytarildi!*\n\n` +
+            `📦 Eski buyurtma *#${oldOrder.order_number}* mahsuloti sizga (marketga) qaytarib topshirildi.\n` +
+            `👤 *Mijoz:* ${oldOrder.customer?.name || '-'}\n`,
+        );
+      } catch {}
+
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: oldOrder.id,
+        action: 'replacement_returned',
+        new_value: {
+          order_number: oldOrder.order_number,
+          replacement_state: Replacement_state.OLD_RETURNED,
+        },
+        description: `Almashtirish: eski buyurtma #${oldOrder.order_number} marketga qaytarildi`,
+        user,
+      });
+
+      return successRes(oldOrder, 200, 'Marked as returned to market');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   /**

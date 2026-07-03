@@ -10,6 +10,7 @@ import {
   CreditCard,
   Scale,
   Settings,
+  Repeat,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -28,6 +29,11 @@ const AdminSidebar = () => {
       label: t("new_orders"),
     },
     { to: "/mails", icon: <MailOpen />, label: t("mails") },
+    {
+      to: "/replacement-returns",
+      icon: <Repeat />,
+      label: "Almashtirishlar",
+    },
     { to: "/products", icon: <Apple />, label: t("products") },
     { to: "/all-users", icon: <UserRound />, label: t("users") },
     { to: "/payments", icon: <CreditCard />, label: t("payments") },

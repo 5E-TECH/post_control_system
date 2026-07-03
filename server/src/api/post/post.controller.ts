@@ -207,8 +207,11 @@ export class PostController {
     Roles.LOGIST,
   )
   @Get('orders/rejected/:id')
-  getAllRejectedOrdersByPostId(@Param('id') id: string) {
-    return this.postService.getRejectedPostsOrders(id);
+  getAllRejectedOrdersByPostId(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.postService.getRejectedPostsOrders(id, user);
   }
 
   @ApiOperation({ summary: 'Reassign post to different courier' })

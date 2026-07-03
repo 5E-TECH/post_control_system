@@ -8,6 +8,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { LdgCargoModule } from '../ldg-cargo/ldg-cargo.module';
+import { BotModule } from '../bots/notify-bot/bot.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { LdgCargoModule } from '../ldg-cargo/ldg-cargo.module';
       RegionEntity,
     ]),
     LdgCargoModule,
+    BotModule,
   ],
   controllers: [PostController],
   providers: [PostService],

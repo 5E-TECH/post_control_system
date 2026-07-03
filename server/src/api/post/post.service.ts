@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -23,8 +24,10 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import {
+  Group_type,
   Order_status,
   Post_status,
+  Replacement_state,
   Roles,
   Status,
   Where_deliver,
@@ -36,6 +39,8 @@ import { normalizeQrToken } from 'src/infrastructure/lib/qr-token/normalize';
 import { PostDto } from './dto/postId.dto';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
+import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { BotService } from '../bots/notify-bot/bot.service';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
@@ -88,6 +93,7 @@ export class PostService {
     private readonly dataSource: DataSource,
     private readonly activityLog: ActivityLogService,
     private readonly ldgShipmentService: LdgShipmentService,
+    private readonly botService: BotService,
   ) {}
 
   /**
@@ -572,6 +578,7 @@ export class PostService {
           'customer.district',
           'items',
           'items.product',
+          'replacementOf', // almashtirish: yangi buyurtmada eski #raqam ko'rsatish
         ],
       });
 
@@ -619,8 +626,18 @@ export class PostService {
     }
   }
 
-  async getRejectedPostsOrders(id: string) {
+  async getRejectedPostsOrders(id: string, user: JwtPayload) {
     try {
+      // IDOR himoyasi: kuryer faqat o'ziga tegishli bekor qilingan pochta
+      // buyurtmalarini ko'ra oladi (courier-order-ownership remediatsiyasiga
+      // mos). Admin/superadmin/registrator/logist cheklanmaydi.
+      const post = await this.postRepo.findOne({ where: { id } });
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+      if (user?.role === Roles.COURIER && post.courier_id !== user.id) {
+        throw new ForbiddenException('Bu pochta sizga tegishli emas');
+      }
       const allOrdersByPostId = await this.orderRepo.find({
         where: { canceled_post_id: id },
         relations: [
@@ -631,6 +648,7 @@ export class PostService {
           'items',
           'items.product',
           'market',
+          'replacementOf', // almashtirish: yangi buyurtmada eski #raqam ko'rsatish
         ],
       });
       return successRes(allOrdersByPostId, 200, 'All orders by post id');
@@ -1257,24 +1275,29 @@ export class PostService {
     await queryRunner.startTransaction();
 
     try {
-      // 1) Tokenga qarab orderni topamiz (Caps Lock / RU layout uchun normalize)
-      const order = await queryRunner.manager.findOne(OrderEntity, {
-        where: { qr_code_token: normalizeQrToken(token) },
-        relations: ['customer'],
+      // 1) Tokenga qarab buyurtmani topamiz — faqat qaysi pochta ekanini bilish
+      //    uchun (Caps Lock / RU layout uchun normalize). Lock keyin postda.
+      const normToken = normalizeQrToken(token);
+      const orderRef = await queryRunner.manager.findOne(OrderEntity, {
+        where: { qr_code_token: normToken },
+        select: ['id', 'post_id'],
       });
-      if (!order) {
+      if (!orderRef) {
         throw new NotFoundException('QR koddagi buyurtma topilmadi');
       }
-
-      if (!order.post_id) {
+      if (!orderRef.post_id) {
         throw new BadRequestException(
-          "Bu buyurtma hali pochtaga biriktirilmagan",
+          'Bu buyurtma hali pochtaga biriktirilmagan',
         );
       }
 
-      // 2) Post kuryer'niki ekanligini va SENT statusda ekanligini tekshiramiz
+      // 2) Postni PESSIMISTIC_WRITE lock bilan olamiz — shu post uchun barcha
+      //    qabul qilishlar ketma-ket bajariladi. Bir vaqtda 2 skan/retry (yoki
+      //    2 qurilma) post'ni 2 marta RECEIVED qilib, RECEIVED nojo'ya
+      //    ta'sirlarini 2 marta otishining oldini oladi.
       const post = await queryRunner.manager.findOne(PostEntity, {
-        where: { id: order.post_id, courier_id: user.id },
+        where: { id: orderRef.post_id, courier_id: user.id },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!post) {
         throw new NotFoundException(
@@ -1283,11 +1306,19 @@ export class PostService {
       }
       if (post.status !== Post_status.SENT) {
         throw new BadRequestException(
-          'Bu pochta allaqachon qabul qilingan yoki yo\'lda emas',
+          "Bu pochta allaqachon qabul qilingan yoki yo'lda emas",
         );
       }
 
-      // 3) Buyurtma allaqachon qabul qilingan bo'lsa — error
+      // 3) Buyurtmani post lock'idan KEYIN qayta o'qiymiz — statusi endi eng
+      //    yangi (parallel qabul qilingan bo'lsa, u allaqachon commit bo'lgan).
+      const order = await queryRunner.manager.findOne(OrderEntity, {
+        where: { id: orderRef.id },
+        relations: ['customer'],
+      });
+      if (!order) {
+        throw new NotFoundException('QR koddagi buyurtma topilmadi');
+      }
       if (order.status !== Order_status.ON_THE_ROAD) {
         throw new BadRequestException(
           `Bu buyurtma allaqachon qabul qilingan (${order.status})`,
@@ -1746,38 +1777,64 @@ export class PostService {
         );
       }
 
-      // Kelgan id-lar => CLOSED
-      if (canceledOrderIds.length > 0) {
+      // Almashtirish (kafolat-swap) qatorlarini ajratamiz: ular SOTILGAN qoladi,
+      // puli/statusi O'ZGARMAYDI; qabul qilinsa OLD_RETURNED bo'ladi (CLOSED emas).
+      const isRepl = (o: OrderEntity) => o.is_replacement_return === true;
+      const acceptedIdSet = new Set(canceledOrderIds);
+      const acceptedOrders = allOrders.filter((o) => acceptedIdSet.has(o.id));
+      const acceptedNormalIds = acceptedOrders
+        .filter((o) => !isRepl(o))
+        .map((o) => o.id);
+      const acceptedReplOrders = acceptedOrders.filter(isRepl);
+
+      const remainingOrders = allOrders.filter((o) => !acceptedIdSet.has(o.id));
+      const remainingNormalIds = remainingOrders
+        .filter((o) => !isRepl(o))
+        .map((o) => o.id);
+      // Qolgan ALMASHTIRISH qatorlari ATAYLAB tegilmaydi (SOLD + canceled_post_id
+      // qoladi — keyingi qabulda olinishi mumkin; CANCELLED'ga aylantirilmaydi,
+      // aks holda sotuvdan tushib hisobot buzilardi).
+
+      // Qabul qilingan ODDIY buyurtmalar => CLOSED
+      if (acceptedNormalIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(canceledOrderIds) },
+          { id: In(acceptedNormalIds) },
           { status: Order_status.CLOSED },
         );
       }
 
-      // Qolgan orderlar (id lar) => CANCELED, postdan ajratiladi
-      const remainingOrderIds = allOrderIdsForPost.filter(
-        (orderId) => !canceledOrderIds.includes(orderId),
-      );
-
-      if (remainingOrderIds.length > 0) {
+      // Qabul qilingan ALMASHTIRISH (eski) buyurtmalar => OLD_RETURNED.
+      // Status SOTILGAN QOLADI, canceled_post_id QOLADI, PUL O'ZGARMAYDI —
+      // "marketga qaytarildi" dalili: vaqt + qabul qilgan shaxs.
+      const returnedAt = Date.now();
+      if (acceptedReplOrders.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(remainingOrderIds) },
+          { id: In(acceptedReplOrders.map((o) => o.id)) },
+          {
+            replacement_state: Replacement_state.OLD_RETURNED,
+            old_product_returned_at: returnedAt,
+            old_returned_by: user?.id ?? null,
+          },
+        );
+      }
+
+      // Qabul qilinMAGAN ODDIY buyurtmalar => CANCELLED, postdan ajratiladi
+      if (remainingNormalIds.length > 0) {
+        await queryRunner.manager.update(
+          OrderEntity,
+          { id: In(remainingNormalIds) },
           { status: Order_status.CANCELLED, canceled_post_id: null },
         );
       }
 
-      // Post statistikasini QABUL QILINGAN (CLOSED) buyurtmalarga moslab qayta
-      // hisoblaymiz — ajratilgan buyurtmalar soni/summasi postda qolib ketmaydi
-      // (aks holda CANCELED_RECEIVED post haqiqatdan ko'p son/summa ko'rsatadi).
-      const acceptedOrders = allOrders.filter((o) =>
-        canceledOrderIds.includes(o.id),
-      );
-      const acceptedTotalPrice = acceptedOrders.reduce(
-        (sum, o) => sum + (Number(o.total_price) || 0),
-        0,
-      );
+      // Post statistikasi: dona = qabul qilingan barcha buyurtmalar (jismoniy);
+      // summa = faqat ODDIY buyurtmalar narxi (almashtirish narxi real sotuvda
+      // hisoblangan, qaytarish summasiga qo'shilmaydi).
+      const acceptedTotalPrice = acceptedOrders
+        .filter((o) => !isRepl(o))
+        .reduce((sum, o) => sum + (Number(o.total_price) || 0), 0);
 
       // Pochtaning statusi har doim Canceled_RECEIVED bo'lib qoladi
       await queryRunner.manager.update(
@@ -1792,8 +1849,8 @@ export class PostService {
 
       await queryRunner.commitTransaction();
 
-      // Activity log
-      for (const oid of ordersArrayDto.order_ids || []) {
+      // Activity log — ODDIY qabul (CLOSED)
+      for (const oid of acceptedNormalIds) {
         this.activityLog.log({
           entity_type: 'order',
           entity_id: oid,
@@ -1803,7 +1860,22 @@ export class PostService {
           user,
         });
       }
-      for (const oid of remainingOrderIds) {
+      // Activity log — ALMASHTIRISH qaytarildi (OLD_RETURNED, status SOLD qoladi)
+      for (const o of acceptedReplOrders) {
+        this.activityLog.log({
+          entity_type: 'order',
+          entity_id: o.id,
+          action: 'replacement_returned',
+          new_value: {
+            order_number: o.order_number,
+            replacement_state: Replacement_state.OLD_RETURNED,
+          },
+          description: `Almashtirish: eski buyurtma #${o.order_number} marketga qaytarildi`,
+          user,
+        });
+      }
+      // Activity log — qabul qilinmagan ODDIY buyurtmalar (CANCELLED)
+      for (const oid of remainingNormalIds) {
         this.activityLog.log({
           entity_type: 'order',
           entity_id: oid,
@@ -1812,6 +1884,23 @@ export class PostService {
           description: `Buyurtma qabul qilinmadi — kuryerga qaytarildi`,
           user,
         });
+      }
+
+      // Market Telegram xabari (commit'dan keyin — xato qabulni buzmaydi):
+      // har bir qaytarilgan almashtirish uchun "mahsulot qaytarildi".
+      for (const o of acceptedReplOrders) {
+        try {
+          const returnGroup = await this.dataSource
+            .getRepository(TelegramEntity)
+            .findOne({
+              where: { market_id: o.user_id, group_type: Group_type.CANCEL },
+            });
+          await this.botService.sendMessageToGroup(
+            returnGroup?.group_id || null,
+            `*✅ Almashtirish — mahsulot qaytarildi!*\n\n` +
+              `📦 Eski buyurtma *#${o.order_number}* mahsuloti sizga (marketga) qaytarib topshirildi.\n`,
+          );
+        } catch {}
       }
 
       return successRes({}, 200, 'Post received successfully');

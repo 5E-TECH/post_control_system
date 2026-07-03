@@ -22,10 +22,16 @@ import {
   X,
   AlertCircle,
   Home,
+  Repeat,
+  Package,
+  Calendar,
+  User,
+  ArrowRight,
 } from "lucide-react";
 import OrderTracking from "../../../components/order-tracking";
 import OrderMeta from "../../../components/order-meta";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
+import { buildAdminPath } from "../../../../../shared/const";
 
 const statusConfig: Record<
   string,
@@ -104,7 +110,11 @@ const statusConfig: Record<
 };
 
 const OrderDetails = () => {
-  useGlobalScanner();
+  // DIQQAT: bu sahifada global-scanner O'CHIRILGAN. Sababi: u marketId'ni URL
+  // oxirgi segmentidan oladi, bu yerda esa u ORDER id — shuning uchun tasodifiy
+  // skan `order/receive`'ni noto'g'ri marketId bilan yuborardi. Skaner bu
+  // sahifada kerak emas (faqat ko'rish sahifasi).
+  useGlobalScanner(undefined, { enabled: false });
   const { t } = useTranslation("orderList");
   const { t: st } = useTranslation("status");
   const { id } = useParams();
@@ -363,6 +373,114 @@ const OrderDetails = () => {
             </div>
           </div>
         </div>
+
+        {/* Almashtirish (kafolat-swap) ma'lumoti + eski/yangi buyurtmaga havola */}
+        {(data?.data?.replacement_of_order_id ||
+          data?.data?.is_replacement_return) &&
+          (() => {
+            const d: any = data.data;
+            const isNew = !!d.replacement_of_order_id;
+            const linked = isNew ? d.replacementOf : d.replaced_by_order;
+            const fmt = (ts: any) => {
+              if (!ts) return "—";
+              try {
+                return new Date(Number(ts)).toLocaleString("uz-UZ");
+              } catch {
+                return "—";
+              }
+            };
+            return (
+              <div className="mb-6 rounded-2xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/10 overflow-hidden">
+                <div className="flex items-center gap-2 px-5 py-3 bg-amber-100 dark:bg-amber-900/30">
+                  <Repeat className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  <h3 className="font-bold text-amber-800 dark:text-amber-300">
+                    {isNew
+                      ? "Almashtirish buyurtmasi"
+                      : "Almashtirish qaytarishi"}
+                  </h3>
+                  {!isNew && (
+                    <span className="ml-auto text-xs px-2 py-0.5 rounded-md bg-white/70 dark:bg-black/20 text-amber-700 dark:text-amber-300 font-medium">
+                      {d.replacement_state === "old_returned"
+                        ? "Marketga qaytarildi"
+                        : d.replacement_state === "old_collected"
+                          ? "Olindi — marketga ketmoqda"
+                          : "Kutilmoqda"}
+                    </span>
+                  )}
+                </div>
+                <div className="p-5">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
+                    {isNew
+                      ? "Bu buyurtma avval yetkazilgan buyurtma o'rniga yuborilmoqda. Kuryer yangisini topshirib, eski mahsulotni mijozdan olib marketga qaytaradi."
+                      : "Bu buyurtma mahsuloti almashtirilmoqda — mijozdan olinib marketga qaytariladi (puli o'zgarmaydi)."}
+                  </p>
+                  {linked ? (
+                    <button
+                      onClick={() =>
+                        navigate(
+                          buildAdminPath("orders/order-detail/" + linked.id)
+                        )
+                      }
+                      className="w-full text-left rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-[#2A263D] p-4 hover:border-amber-400 dark:hover:border-amber-600 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {isNew
+                              ? "Almashtirilayotgan eski buyurtma:"
+                              : "Almashtirish buyurtmasi:"}
+                          </span>
+                          <span className="text-base font-bold text-gray-800 dark:text-white">
+                            #{linked.order_number}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400 group-hover:gap-2 transition-all">
+                          Ochish <ArrowRight className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> {fmt(linked.created_at)}
+                        </span>
+                        {linked.customer?.name && (
+                          <span className="flex items-center gap-1">
+                            <User className="w-3 h-3" /> {linked.customer.name}
+                          </span>
+                        )}
+                        {linked.items?.length ? (
+                          <span className="flex items-center gap-1 min-w-0">
+                            <Package className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">
+                              {linked.items
+                                .map(
+                                  (i: any) =>
+                                    `${i.product?.name ?? "—"} x${i.quantity}`
+                                )
+                                .join(", ")}
+                            </span>
+                          </span>
+                        ) : null}
+                        <span className="font-semibold text-gray-700 dark:text-gray-200">
+                          {Number(linked.total_price || 0).toLocaleString()} so'm
+                        </span>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                      {isNew
+                        ? "Eski buyurtma ma'lumoti topilmadi."
+                        : "Almashtirish buyurtmasi hali bog'lanmagan."}
+                    </div>
+                  )}
+                  {!isNew && d.old_product_returned_at && (
+                    <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400">
+                      Marketga qaytarildi: {fmt(d.old_product_returned_at)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
