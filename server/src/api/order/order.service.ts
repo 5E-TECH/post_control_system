@@ -425,10 +425,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       const orderDistrictId = district_id || customer.district_id;
       const orderAddress = address !== undefined ? address : customer.address;
 
+      // Aniq tuman berilgan bo'lsa — mavjudligini tekshirish (aniq xato xabari
+      // + mavjud bo'lmagan district_id bilan buyurtma yozib qo'ymaslik uchun)
+      if (district_id) {
+        const districtExists = await queryRunner.manager.findOne(
+          DistrictEntity,
+          { where: { id: district_id }, select: ['id'] },
+        );
+        if (!districtExists) {
+          throw new NotFoundException('Tuman topilmadi');
+        }
+      }
+
       // ✅ Batch: Barcha productlarni bir so'rovda olish va tekshirish
+      // MUHIM: faqat SHU marketning (user_id === market_id) o'chirilmagan
+      // mahsulotlari qabul qilinadi — boshqa marketning mahsuloti buyurtmaga
+      // tushmasligi uchun (IDOR himoyasi).
       const productIds = order_item_info.map((item) => item.product_id);
       const existingProducts = await queryRunner.manager.find(ProductEntity, {
-        where: { id: In(productIds) },
+        where: { id: In(productIds), user_id: market_id, isDeleted: false },
       });
       const existingProductIds = new Set(existingProducts.map((p) => p.id));
       for (const productId of productIds) {
@@ -563,6 +578,121 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
+      // Tuman mavjudligini tekshirish (aniq xato xabari + noto'g'ri district_id
+      // bilan customer yozib qo'ymaslik uchun)
+      const districtExists = await queryRunner.manager.findOne(DistrictEntity, {
+        where: { id: district_id },
+        select: ['id'],
+      });
+      if (!districtExists) {
+        throw new NotFoundException('Tuman topilmadi');
+      }
+
+      // ── Dublikat himoyasi ──
+      // Tugmani ikki marta bosish, qayta yuborilgan forward yoki tarmoq retry
+      // bir xil buyurtmani ikki marta yozib qo'ymasligi uchun: (market + telefon)
+      // bo'yicha tranzaksiya-lock bilan bir vaqtli so'rovlarni ketma-ketlashtirib,
+      // yaqin vaqtdagi (narx + dona bir xil) aktiv buyurtmani qayta ishlatamiz
+      // (idempotent javob — yangi dublikat yaratilmaydi).
+      const dedupPhone9 = (phone_number || '').replace(/\D/g, '').slice(-9);
+      await queryRunner.manager.query(
+        'SELECT pg_advisory_xact_lock(hashtext($1))',
+        [`order_bot_create:${marketId}:${dedupPhone9}`],
+      );
+
+      const incomingQty = order_item_info.reduce(
+        (sum, o_item) => sum + Number(o_item.quantity),
+        0,
+      );
+
+      // Savat imzosi: product_id → umumiy dona (tartibdan mustaqil). Faqat
+      // AYNAN bir xil savat dublikat deb hisoblanadi — bir xil narx/dona
+      // bo'lgan boshqa mahsulotli HAQIQIY buyurtmani bloklamaslik uchun.
+      const cartSignature = (
+        pairs: { productId: string; quantity: number }[],
+      ): string => {
+        const totals = new Map<string, number>();
+        for (const p of pairs) {
+          totals.set(
+            p.productId,
+            (totals.get(p.productId) || 0) + Number(p.quantity),
+          );
+        }
+        return [...totals.entries()]
+          .map(([pid, qty]) => `${pid}:${qty}`)
+          .sort()
+          .join('|');
+      };
+      const incomingSignature = cartSignature(
+        order_item_info.map((i) => ({
+          productId: i.product_id,
+          quantity: Number(i.quantity),
+        })),
+      );
+
+      if (dedupPhone9.length >= 9) {
+        const DEDUP_WINDOW_MS = 2 * 60 * 1000; // 2 daqiqa
+        const recentCandidates = await queryRunner.manager
+          .createQueryBuilder(OrderEntity, 'order')
+          .leftJoinAndSelect('order.customer', 'customer')
+          .leftJoinAndSelect('order.items', 'items')
+          .leftJoinAndSelect('items.product', 'product')
+          .leftJoinAndSelect('customer.district', 'district')
+          .leftJoinAndSelect('district.region', 'region')
+          .where('order.user_id = :marketId', { marketId })
+          .andWhere('order.deleted_at IS NULL')
+          .andWhere('order.status IN (:...statuses)', {
+            statuses: [
+              Order_status.CREATED,
+              Order_status.NEW,
+              Order_status.RECEIVED,
+              Order_status.ON_THE_ROAD,
+              Order_status.WAITING,
+            ],
+          })
+          .andWhere('order.total_price = :totalPrice', {
+            totalPrice: total_price,
+          })
+          .andWhere('order.product_quantity = :incomingQty', { incomingQty })
+          .andWhere('order.created_at >= :threshold', {
+            threshold: Date.now() - DEDUP_WINDOW_MS,
+          })
+          .orderBy('order.created_at', 'DESC')
+          .take(20)
+          .getMany();
+
+        // Telefon (raqamlargacha normallashtirilib, oxirgi 9 raqam) VA savat
+        // imzosi AYNAN mos kelgan buyurtmagina dublikat hisoblanadi: tugmani
+        // ikki marta bosish / tarmoq retry / qayta forward. Saqlangan telefon
+        // formatli (bo'shliq/tire) bo'lishi mumkin — shuning uchun ikkala
+        // tomon ham raqamlargacha normallashtirib solishtiriladi.
+        const recentDuplicate = recentCandidates.find(
+          (cand) =>
+            (cand.customer?.phone_number || '')
+              .replace(/\D/g, '')
+              .slice(-9) === dedupPhone9 &&
+            cartSignature(
+              (cand.items || []).map((it) => ({
+                productId: it.productId,
+                quantity: Number(it.quantity),
+              })),
+            ) === incomingSignature,
+        );
+
+        if (recentDuplicate) {
+          await queryRunner.commitTransaction();
+          this.logger.log(
+            `Dublikat bot buyurtmasi bloklandi (market ${marketId}) — mavjud ${recentDuplicate.id} qaytarildi`,
+            'OrderBot',
+          );
+          return successRes(
+            recentDuplicate,
+            200,
+            'Bu buyurtma allaqachon yaratilgan',
+          );
+        }
+      }
+
       const newCustomer = queryRunner.manager.create(UserEntity, {
         name,
         phone_number,
@@ -604,9 +734,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       await queryRunner.manager.save(newOrder);
 
       // ✅ Batch: Barcha productlarni bir so'rovda olish
+      // MUHIM: faqat SHU marketning (user_id === marketId) o'chirilmagan
+      // mahsulotlari qabul qilinadi (IDOR himoyasi).
       const productIds = order_item_info.map((item) => item.product_id);
       const existingProducts = await queryRunner.manager.find(ProductEntity, {
-        where: { id: In(productIds) },
+        where: { id: In(productIds), user_id: marketId, isDeleted: false },
       });
 
       // Mavjud productlar ro'yxatini yaratish
@@ -654,34 +786,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Order not found');
       }
 
-      const telegramGroups = await queryRunner.manager.find(TelegramEntity, {
-        where: { market_id: order.user_id, group_type: Group_type.CREATE },
-      });
-      // created_at string yoki bigint bo'lishi mumkin
-
-      if (telegramGroups.length) {
-        const sendResults = await Promise.all(
-          telegramGroups.map((g) =>
-            this.orderBotService.sendOrderForApproval(
-              g.group_id || null,
-              order,
-            ),
-          ),
-        );
-
-        const messageRefs = sendResults
-          .map((res) => res.sentMessage)
-          .filter(Boolean) as { chatId: number; messageId: number }[];
-
-        if (messageRefs.length) {
-          order.create_bot_messages = [
-            ...(order.create_bot_messages || []),
-            ...messageRefs,
-          ];
-          await queryRunner.manager.save(order);
-        }
-      }
-
+      // Buyurtma va itemlar saqlandi — tranzaksiyani shu yerda YOPAMIZ.
+      // Telegram yuborish (tashqi HTTP) tranzaksiyadan TASHQARIDA bo'lishi shart:
+      // aks holda advisory lock va DB ulanishi butun Telegram round-trip davomida
+      // ushlanib qoladi (sekin/uzilishda lock va connection-pool contention).
       await queryRunner.commitTransaction();
 
       this.activityLog.log({
@@ -697,6 +805,54 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         description: `Buyurtma #${order.order_number} Telegram bot orqali yaratildi — ${order.total_price} so'm`,
         user,
       });
+
+      // Tranzaksiyadan TASHQARIDA: market guruh(lar)iga tasdiqlash uchun yuborish
+      // va yuborilgan xabar havolalarini alohida yozish (hech qanday lock ushlamay).
+      // Yuborish/yozish xatosi buyurtmani bekor qilmaydi — buyurtma allaqachon
+      // saqlangan; xato faqat loglanadi.
+      try {
+        const telegramGroups = await this.dataSource.manager.find(
+          TelegramEntity,
+          {
+            where: {
+              market_id: order.user_id,
+              group_type: Group_type.CREATE,
+            },
+          },
+        );
+
+        if (telegramGroups.length) {
+          const sendResults = await Promise.all(
+            telegramGroups.map((g) =>
+              this.orderBotService.sendOrderForApproval(
+                g.group_id || null,
+                order,
+              ),
+            ),
+          );
+
+          const messageRefs = sendResults
+            .map((res) => res.sentMessage)
+            .filter(Boolean) as { chatId: number; messageId: number }[];
+
+          if (messageRefs.length) {
+            order.create_bot_messages = [
+              ...(order.create_bot_messages || []),
+              ...messageRefs,
+            ];
+            await this.dataSource.manager.update(
+              OrderEntity,
+              { id: order.id },
+              { create_bot_messages: order.create_bot_messages },
+            );
+          }
+        }
+      } catch (notifyErr) {
+        this.logger.log(
+          `Bot buyurtma ${order.id} yaratildi, lekin guruhga yuborish/yozishda xato: ${(notifyErr as Error).message}`,
+          'OrderBot',
+        );
+      }
 
       return successRes(order, 201, 'New order created');
     } catch (error) {
@@ -1122,14 +1278,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           });
 
           for (const o_item of updateOrderDto.order_item_info) {
+            // Faqat SHU buyurtma marketining (editingOrder.user_id)
+            // o'chirilmagan mahsuloti qabul qilinadi (IDOR himoyasi).
             const isExistProduct = await queryRunner.manager.findOne(
               ProductEntity,
               {
-                where: { id: o_item.product_id },
+                where: {
+                  id: o_item.product_id,
+                  user_id: editingOrder.user_id,
+                  isDeleted: false,
+                },
               },
             );
             if (!isExistProduct) {
-              throw new NotFoundException('Product not found');
+              throw new NotFoundException(
+                `Product not found: ${o_item.product_id}`,
+              );
             }
 
             const newOrderItem = queryRunner.manager.create(OrderItemEntity, {
