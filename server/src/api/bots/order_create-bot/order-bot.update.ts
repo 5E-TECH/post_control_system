@@ -13,10 +13,12 @@ import {
   Update as TgUpdate,
 } from 'telegraf/typings/core/types/typegram';
 import { OrderBotService } from './order-bot.service';
-import { MyContext } from './session.interface';
+import { AiOrderService } from './ai-order.service';
+import { MyContext, AiOrderDraft } from './session.interface';
 import config from 'src/config';
 
 const TOKEN_REGEX = /^group_token-.+/i;
+const BUTTON_LABELS = ['➕ Yangi buyurtma', '➕ Add order'];
 
 const getHttpStatus = (err: unknown): number => {
   const candidate =
@@ -39,9 +41,15 @@ const getErrorMessage = (err: unknown): string => {
 
 @Update()
 export class OrderBotUpdate {
+  // Foydalanuvchi bo'yicha qayta-kirish qulfi: bir vaqtda kelgan bir nechta
+  // erkin matn parallel Claude chaqiruvi qilib draftni ustma-ust yozmasligi
+  // uchun. JS bir oqimli — has()+add() await'siz atomik.
+  private readonly aiBusy = new Set<number>();
+
   constructor(
     @InjectBot(config.ORDER_BOT_NAME) private readonly bot: Telegraf<MyContext>,
     private readonly orderBotService: OrderBotService,
+    private readonly aiOrderService: AiOrderService,
   ) {}
 
   @Start()
@@ -250,10 +258,216 @@ export class OrderBotUpdate {
     }
   }
 
+  // ─── AI orqali buyurtma yaratish (erkin matn) ───
+  // MUHIM: bu handler @Hears(TOKEN)/@Hears(tugma) dan KEYIN turadi, shuning uchun
+  // token va tugma matnlari ularga tushadi; qolgan erkin matn AI'ga keladi.
+  @On('text')
+  async onAiText(@Ctx() ctx: MyContext) {
+    if (ctx.chat?.type !== 'private') return;
+
+    const message = ctx.message as Message.TextMessage | undefined;
+    const text = message && 'text' in message ? message.text.trim() : '';
+    if (!text || text.startsWith('/')) return;
+    if (TOKEN_REGEX.test(text)) return; // @Hears(TOKEN_REGEX) ishlaydi
+    if (BUTTON_LABELS.includes(text)) return; // @Hears(tugma) ishlaydi
+    if (!this.aiOrderService.isEnabled()) return; // AI o'chiq — WebApp ishlaydi
+
+    const step = ctx.session.step;
+    if (step !== 'ready' && step !== 'confirming' && step !== 'clarifying') {
+      return;
+    }
+
+    const uid = ctx.from?.id;
+    if (uid == null) return;
+
+    // Qayta-kirish qulfi (has+add await'dan OLDIN — atomik)
+    if (this.aiBusy.has(uid)) {
+      await ctx.reply("⏳ Oldingi xabaringiz o'qilmoqda, biroz kuting...");
+      return;
+    }
+    this.aiBusy.add(uid);
+
+    try {
+      const operator = await this.aiOrderService.resolveOperator(uid);
+      if (!operator) return; // ro'yxatdan o'tmagan — jim
+
+      try {
+        await ctx.sendChatAction('typing');
+      } catch {
+        /* ignore */
+      }
+
+      let draft: AiOrderDraft | null;
+      try {
+        draft = await this.aiOrderService.extractDraft(text);
+      } catch {
+        draft = null;
+      }
+      if (!draft) {
+        await ctx.reply(
+          "🤖 Hozir AI buyurtmani o'qiy olmadi. Iltimos, WebApp formasidan foydalaning.",
+          { reply_markup: this.orderBotService.openWebApp() },
+        );
+        return;
+      }
+
+      await this.aiOrderService.resolveDraft(draft, operator.marketId);
+
+      const missing = this.aiOrderService.missingRequired(draft);
+      if (missing.length) {
+        ctx.session.order_draft = undefined;
+        ctx.session.step = 'ready';
+        await ctx.reply(
+          `🤖 Quyidagilar aniqlanmadi: ${missing.join(', ')}.\n` +
+            "Iltimos, WebApp formasidan to'ldiring.",
+          { reply_markup: this.orderBotService.openWebApp() },
+        );
+        return;
+      }
+
+      ctx.session.order_draft = draft;
+      const view = this.nextDraftView(ctx);
+      await ctx.reply(view.text, {
+        parse_mode: view.markdown ? 'Markdown' : undefined,
+        reply_markup: view.keyboard,
+      });
+    } finally {
+      this.aiBusy.delete(uid);
+    }
+  }
+
+  // Draftni keyingi holatga o'tkazib, ko'rsatiladigan matn+tugmalarni beradi.
+  private nextDraftView(ctx: MyContext): {
+    text: string;
+    keyboard: { inline_keyboard: { text: string; callback_data: string }[][] };
+    markdown: boolean;
+  } {
+    const draft = ctx.session.order_draft as AiOrderDraft;
+    const next = this.aiOrderService.firstUnresolved(draft);
+    if (next?.type === 'district') {
+      ctx.session.step = 'clarifying';
+      const v = this.aiOrderService.buildDistrictClarify(draft);
+      return { text: v.text, keyboard: v.keyboard, markdown: false };
+    }
+    if (next?.type === 'item') {
+      ctx.session.step = 'clarifying';
+      const v = this.aiOrderService.buildItemClarify(
+        draft,
+        next.itemIndex as number,
+      );
+      return { text: v.text, keyboard: v.keyboard, markdown: false };
+    }
+    ctx.session.step = 'confirming';
+    const v = this.aiOrderService.buildConfirmCard(draft);
+    // Karta plain text (Markdown injeksiyasidan xoli)
+    return { text: v.text, keyboard: v.keyboard, markdown: false };
+  }
+
+  private async handleAiCallback(ctx: MyContext, data: string) {
+    // format: order_ai:<action>:<nonce>[:<a3>[:<a4>]]
+    const [, action, nonce, a3, a4] = data.split(':');
+    const draft = ctx.session.order_draft;
+
+    // Eskirgan karta (draft almashtirilgan yoki yo'q) — nonce mos kelmasa rad
+    // etiladi, aks holda eski karta NOTO'G'RI (joriy) buyurtmani yaratardi.
+    if (!draft || !draft.nonce || draft.nonce !== nonce) {
+      await ctx.answerCbQuery('⏳ Bu buyurtma eskirgan.', { show_alert: true });
+      return;
+    }
+
+    if (action === 'cancel') {
+      ctx.session.order_draft = undefined;
+      ctx.session.step = 'ready';
+      try {
+        await ctx.editMessageText('❌ Buyurtma bekor qilindi.');
+      } catch {
+        /* ignore */
+      }
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    if (action === 'pickdistrict') {
+      const c = draft.district_candidates?.[Number(a3)];
+      if (c) {
+        draft.district_id = c.id;
+        draft.district_label = c.label;
+        draft.district_candidates = undefined;
+      }
+      await this.editDraftView(ctx);
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    if (action === 'pickproduct') {
+      const item = draft.items[Number(a3)];
+      const c = item?.candidates?.[Number(a4)];
+      if (item && c) {
+        item.product_id = c.id;
+        item.resolved_name = c.name;
+        item.candidates = undefined;
+      }
+      await this.editDraftView(ctx);
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    if (action === 'confirm') {
+      const operator = await this.aiOrderService.resolveOperator(ctx.from?.id);
+      if (!operator) {
+        await ctx.answerCbQuery("Ruxsat yo'q.", { show_alert: true });
+        return;
+      }
+      let result: { ok: boolean; message: string };
+      try {
+        result = await this.aiOrderService.commit(draft, operator);
+      } catch (e) {
+        result = { ok: false, message: `❌ ${getErrorMessage(e)}` };
+      }
+      ctx.session.order_draft = undefined;
+      ctx.session.step = 'ready';
+      try {
+        await ctx.editMessageText(result.message);
+      } catch {
+        /* ignore */
+      }
+      await ctx.answerCbQuery(result.ok ? '✅' : '❌');
+      return;
+    }
+
+    await ctx.answerCbQuery();
+  }
+
+  private async editDraftView(ctx: MyContext) {
+    const view = this.nextDraftView(ctx);
+    try {
+      await ctx.editMessageText(view.text, {
+        parse_mode: view.markdown ? 'Markdown' : undefined,
+        reply_markup: view.keyboard,
+      });
+    } catch {
+      /* ignore edit errors */
+    }
+  }
+
   @On('callback_query')
   async onCallback(@Ctx() ctx: MyContext) {
     const callback = ctx.callbackQuery as { data?: string } | undefined;
     const data = callback?.data ? String(callback.data) : '';
+
+    if (data.startsWith('order_ai:')) {
+      try {
+        await this.handleAiCallback(ctx, data);
+      } catch {
+        // eskirgan/xato callback query — jimgina yopamiz
+        try {
+          await ctx.answerCbQuery();
+        } catch {
+          /* ignore */
+        }
+      }
+      return;
+    }
 
     if (!data.startsWith('order:')) {
       await ctx.answerCbQuery();

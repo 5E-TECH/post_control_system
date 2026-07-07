@@ -4,7 +4,7 @@ import { satoRegions, SatoRegion } from '../data/sato-codes';
  * Nomni normalizatsiya qilish (solishtirishda ishlatiladi)
  * keepSuffix = true bo'lsa, "shahri", "viloyati" kabi qo'shimchalarni saqlaydi
  */
-function normalizeName(name: string, keepSuffix = false): string {
+export function normalizeName(name: string, keepSuffix = false): string {
   // Ko'rinmas belgilarni va maxsus unicode belgilarni olib tashlash
   let normalized = name
     .toLowerCase()
@@ -46,7 +46,7 @@ function normalizeForDuplicateCheck(name: string): string {
 /**
  * Ikki nomning o'xshashligini tekshirish
  */
-function namesMatch(name1: string, name2: string): boolean {
+export function namesMatch(name1: string, name2: string): boolean {
   // Ko'rinmas belgilarni tozalash
   const cleanName = (s: string) =>
     s

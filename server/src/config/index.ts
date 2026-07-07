@@ -26,4 +26,8 @@ export default {
   WEB_APP_URL: String(
     process.env.WEB_APP_URL || 'https://beepost.uz/admin/bot',
   ),
+
+  // AI (Claude) — bo'sh bo'lsa AI oqimi o'chiriladi, WebApp forma ishlayveradi
+  ANTHROPIC_API_KEY: String(process.env.ANTHROPIC_API_KEY || ''),
+  AI_ORDER_MODEL: String(process.env.AI_ORDER_MODEL || 'claude-haiku-4-5'),
 };

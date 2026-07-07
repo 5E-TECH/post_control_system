@@ -1,18 +1,23 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { ProductEntity } from 'src/core/entity/product.entity';
+import { DistrictEntity } from 'src/core/entity/district.entity';
 import { OrderBotUpdate } from './order-bot.update';
 import { TelegrafModule } from 'nestjs-telegraf';
 import config from 'src/config';
 import { OrderBotService } from './order-bot.service';
+import { AiOrderService } from './ai-order.service';
+import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { session } from 'telegraf';
 import { MySession } from './session.interface';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
+import { MyLogger } from 'src/logger/logger.service';
+import { OrderModule } from 'src/api/order/order.module';
 
 @Module({
   imports: [
@@ -48,8 +53,20 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
       OrderEntity,
       OrderItemEntity,
       ProductEntity,
+      DistrictEntity,
     ]),
+    // AiOrderService.commit() -> OrderService.createOrderByBot; OrderModule ham
+    // OrderBotModule'ni import qiladi, shuning uchun forwardRef bilan sikl yopiladi.
+    forwardRef(() => OrderModule),
   ],
-  providers: [OrderBotUpdate, OrderBotService, Token, BcryptEncryption],
+  providers: [
+    OrderBotUpdate,
+    OrderBotService,
+    AiOrderService,
+    ClaudeService,
+    Token,
+    BcryptEncryption,
+    MyLogger,
+  ],
 })
 export class OrderBotModule {}

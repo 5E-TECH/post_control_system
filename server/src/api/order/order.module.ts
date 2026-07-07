@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { OrderController } from './order.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -40,7 +40,7 @@ import { IntegrationSyncModule } from '../integration-sync/integration-sync.modu
     ]),
     CashBoxModule,
     BotModule,
-    OrderBotModule,
+    forwardRef(() => OrderBotModule),
     ExternalIntegrationModule,
     IntegrationSyncModule,
   ],
