@@ -197,7 +197,10 @@ function AiBalanceContent({ marketId }: { marketId: string }) {
 
 export default function AiBalanceButton({ user }: { user: MarketLite }) {
   const [open, setOpen] = useState(false);
-  if (user?.role !== "market") return null;
+  // Market bo'lmagan qatorlar uchun BO'SH slot — shunda toggle/trash ikonkalari
+  // barcha qatorlarda bir xil tekislanadi (jadval ko'rinishi buzilmaydi).
+  if (user?.role !== "market")
+    return <span className="w-8 h-8 flex-shrink-0" aria-hidden />;
   return (
     <>
       <button
@@ -206,19 +209,20 @@ export default function AiBalanceButton({ user }: { user: MarketLite }) {
           setOpen(true);
         }}
         title="AI balans"
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+        className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
       >
         <Bot className="w-4 h-4" />
       </button>
-      <Modal
-        title={`🤖 AI balans — ${user.name || ""}`}
-        open={open}
-        onCancel={() => setOpen(false)}
-        footer={null}
-        destroyOnClose
-      >
-        {open && <AiBalanceContent marketId={user.id} />}
-      </Modal>
+      {open && (
+        <Modal
+          title={`🤖 AI balans — ${user.name || ""}`}
+          open
+          onCancel={() => setOpen(false)}
+          footer={null}
+        >
+          <AiBalanceContent marketId={user.id} />
+        </Modal>
+      )}
     </>
   );
 }
