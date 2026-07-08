@@ -19,18 +19,34 @@ import { useTranslation } from "react-i18next";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
 import { buildAdminPath } from "../../../../../shared/const";
+import OrderModeModal from "./order-mode-modal";
+
+interface OrderMode {
+  marketId: string;
+  marketName?: string;
+  onManual: () => void;
+  onClose: () => void;
+}
 
 const ChooseMarket = () => {
   const { t } = useTranslation("createOrder");
   const { getMarkets } = useMarket();
   const [searchMarket, setSearchMarket] = useState<string>("");
   const [selectedMarket, setSelectedMarket] = useState<any>(null);
+  const [mode, setMode] = useState<OrderMode | null>(null);
 
   const { getParam, setParam, removeParam } = useParamsHook();
   const page = Number(getParam("page") || 1);
   const limit = Number(getParam("limit") || 10);
 
-  const { data, isLoading } = getMarkets(true, {
+  const roleState = useSelector((state: RootState) => state.roleSlice);
+  const isAdmin =
+    roleState.role === "admin" ||
+    roleState.role === "superadmin" ||
+    roleState.role === "registrator";
+
+  // Marketlar ro'yxatini faqat admin/registrator oladi (market/operator o'ziniki)
+  const { data, isLoading } = getMarkets(isAdmin, {
     search: searchMarket || undefined,
     page,
     limit,
@@ -64,18 +80,33 @@ const ChooseMarket = () => {
   const user = useSelector((state: RootState) => state.roleSlice);
   const role = user.role;
 
+  // Market/operator uchun market avtomatik — to'g'ridan o'tish o'rniga
+  // AI/qo'lda tanlov modalini ochamiz.
   useEffect(() => {
+    const goManual = (mid: string) => () => {
+      localStorage.setItem("marketId", mid);
+      navigate(buildAdminPath("orders/customer-info"));
+    };
     if (role === "market" && user.id) {
-      localStorage.setItem("marketId", user.id);
-      navigate(buildAdminPath("orders/customer-info"));
-    }
-    // Operator uchun market avtomatik tanlanadi
-    if (role === "operator" && user.market_id) {
-      localStorage.setItem("marketId", user.market_id);
-      navigate(buildAdminPath("orders/customer-info"));
+      const mid = user.id;
+      setMode({
+        marketId: mid,
+        marketName: user.name || undefined,
+        onManual: goManual(mid),
+        onClose: () => navigate(buildAdminPath("orders")),
+      });
+    } else if (role === "operator" && user.market_id) {
+      const mid = user.market_id;
+      setMode({
+        marketId: mid,
+        marketName: user.name || undefined,
+        onManual: goManual(mid),
+        onClose: () => navigate(buildAdminPath("orders")),
+      });
     }
   }, [role, user, navigate]);
 
+  // Admin/registrator: market tanlangach tanlov modalini ochamiz
   const onClick = () => {
     if (!selectedMarket) {
       handleWarning(
@@ -84,12 +115,41 @@ const ChooseMarket = () => {
       );
       return;
     }
-    localStorage.setItem("market", JSON.stringify(selectedMarket));
-    navigate(buildAdminPath("orders/customer-info"));
+    setMode({
+      marketId: selectedMarket.id,
+      marketName: selectedMarket.name,
+      onManual: () => {
+        localStorage.setItem("market", JSON.stringify(selectedMarket));
+        navigate(buildAdminPath("orders/customer-info"));
+      },
+      onClose: () => setMode(null),
+    });
   };
+
+  // Market/operator: admin market-tanlash grid'i kerak emas — faqat tanlov
+  // modali (yoki market biriktirilmagan bo'lsa xabar / yuklanish).
+  if (!isAdmin) {
+    if (mode) return <OrderModeModal {...mode} />;
+    if (
+      (role === "operator" && !user.market_id) ||
+      (role === "market" && !user.id)
+    ) {
+      return (
+        <div className="min-h-[calc(100vh-64px)] flex items-center justify-center text-gray-500 px-4 text-center">
+          Sizga market biriktirilmagan. Administrator bilan bog'laning.
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E]">
+      {mode && <OrderModeModal {...mode} />}
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Page Header */}
         <div className="mb-6">

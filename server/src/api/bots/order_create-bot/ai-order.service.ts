@@ -185,21 +185,73 @@ export class AiOrderService {
       }),
     );
 
-    const dto: CreateOrderDto = {
-      customer_id: customer.id,
-      market_id: marketId,
-      order_item_info: draft.items.map((i) => ({
-        product_id: i.product_id as string,
-        quantity: i.quantity,
-      })),
-      total_price: draft.total_price as number,
-      district_id: draft.district_id,
-      comment: draft.comment,
-      where_deliver: Where_deliver.CENTER,
-    } as CreateOrderDto;
+    try {
+      const dto: CreateOrderDto = {
+        customer_id: customer.id,
+        market_id: marketId,
+        order_item_info: draft.items.map((i) => ({
+          product_id: i.product_id as string,
+          quantity: i.quantity,
+        })),
+        total_price: draft.total_price as number,
+        district_id: draft.district_id,
+        comment: draft.comment,
+        where_deliver: Where_deliver.CENTER,
+      } as CreateOrderDto;
 
-    const order = await this.orderService.createOrder(dto, user);
-    return { ok: true, order, balance: charge?.balance };
+      const order = await this.orderService.createOrder(dto, user);
+      return { ok: true, order, balance: charge?.balance };
+    } catch (err) {
+      // createOrder xato berdi (masalan add_order o'chiq / operator telefoni
+      // majburiy) — orphan customer'ni tozalab, yechilgan pulni qaytaramiz.
+      try {
+        await this.userRepo.delete(customer.id);
+      } catch {
+        /* ignore */
+      }
+      if (charge) {
+        await this.aiBalance.refund(marketId, charge.price, { actor: user.id });
+      }
+      this.logger.log(
+        `createForPlatform createOrder xato: ${(err as Error).message}`,
+        'AiOrder',
+      );
+      return { ok: false, reason: 'create_failed' };
+    }
+  }
+
+  // Platforma: joriy foydalanuvchi uchun AI mavjudmi (market uchun balans
+  // tekshiriladi; admin/registrator ozod — doim mavjud).
+  async aiAvailabilityForUser(user: JwtPayload): Promise<{
+    available: boolean;
+    exempt?: boolean;
+    enabled?: boolean;
+    balance?: number;
+    price?: number;
+    reason?: string;
+  }> {
+    if (!this.isEnabled()) return { available: false, reason: 'ai_off' };
+    if (this.aiBalance.isExemptRole(user.role as Roles)) {
+      return { available: true, exempt: true };
+    }
+    let marketId: string | undefined;
+    if (user.role === Roles.MARKET) {
+      marketId = user.id;
+    } else if (user.role === Roles.OPERATOR) {
+      const op = await this.userRepo.findOne({ where: { id: user.id } });
+      marketId = op?.market_id || undefined;
+    }
+    if (!marketId) return { available: false, reason: 'no_market' };
+    const state = await this.aiBalance.getState(marketId);
+    if (!state) return { available: false, reason: 'no_market' };
+    const available = state.enabled && state.balance >= state.price;
+    return {
+      available,
+      enabled: state.enabled,
+      balance: state.balance,
+      price: state.price,
+      reason: available ? undefined : !state.enabled ? 'disabled' : 'insufficient',
+    };
   }
 
   // Frontend'ga ko'rsatish uchun draftning ochiq versiyasi

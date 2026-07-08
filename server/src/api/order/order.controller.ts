@@ -90,6 +90,20 @@ export class OrderController {
     return this.aiOrderService.createForPlatform(dto.text, user, dto.market_id);
   }
 
+  @ApiOperation({ summary: 'Joriy foydalanuvchi uchun AI mavjudmi' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('ai-availability')
+  aiAvailability(@CurrentUser() user: JwtPayload) {
+    return this.aiOrderService.aiAvailabilityForUser(user);
+  }
+
   @ApiOperation({ summary: 'List orders with filters' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'marketId', required: false })
