@@ -24,6 +24,7 @@ import OrderModeModal from "./order-mode-modal";
 interface OrderMode {
   marketId: string;
   marketName?: string;
+  onAi: () => void;
   onManual: () => void;
   onClose: () => void;
 }
@@ -87,19 +88,26 @@ const ChooseMarket = () => {
       localStorage.setItem("marketId", mid);
       navigate(buildAdminPath("orders/customer-info"));
     };
+    const goAi = (mid: string, name?: string) => () => {
+      localStorage.setItem("aiMarket", JSON.stringify({ id: mid, name }));
+      navigate(buildAdminPath("orders/ai-create"));
+    };
     if (role === "market" && user.id) {
       const mid = user.id;
       setMode({
         marketId: mid,
         marketName: user.name || undefined,
+        onAi: goAi(mid, user.name || undefined),
         onManual: goManual(mid),
         onClose: () => navigate(buildAdminPath("orders")),
       });
     } else if (role === "operator" && user.market_id) {
       const mid = user.market_id;
+      // Operator uchun user.name — shaxsiy ism, market nomi EMAS — ko'rsatilmaydi.
       setMode({
         marketId: mid,
-        marketName: user.name || undefined,
+        marketName: undefined,
+        onAi: goAi(mid, undefined),
         onManual: goManual(mid),
         onClose: () => navigate(buildAdminPath("orders")),
       });
@@ -118,6 +126,13 @@ const ChooseMarket = () => {
     setMode({
       marketId: selectedMarket.id,
       marketName: selectedMarket.name,
+      onAi: () => {
+        localStorage.setItem(
+          "aiMarket",
+          JSON.stringify({ id: selectedMarket.id, name: selectedMarket.name })
+        );
+        navigate(buildAdminPath("orders/ai-create"));
+      },
       onManual: () => {
         localStorage.setItem("market", JSON.stringify(selectedMarket));
         navigate(buildAdminPath("orders/customer-info"));

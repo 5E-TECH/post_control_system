@@ -41,7 +41,11 @@ import { UpdateOrderAddressDto } from './dto/update-order-address.dto';
 import { ReceiveExternalOrdersDto } from './dto/receive-external-orders.dto';
 import { RollbackOrderDto } from './dto/rollback-order.dto';
 import { BulkOrderActionDto } from './dto/bulk-order-action.dto';
-import { AiCreateOrderDto } from './dto/ai-create-order.dto';
+import {
+  AiCreateOrderDto,
+  AiParseOrderDto,
+  AiConfirmOrdersDto,
+} from './dto/ai-create-order.dto';
 import { AiOrderService } from '../bots/order_create-bot/ai-order.service';
 
 @ApiTags('Orders')
@@ -102,6 +106,41 @@ export class OrderController {
   @Get('ai-availability')
   aiAvailability(@CurrentUser() user: JwtPayload) {
     return this.aiOrderService.aiAvailabilityForUser(user);
+  }
+
+  @ApiOperation({ summary: 'AI matnni tahlil qilish (bir/bir nechta buyurtma)' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Post('ai-parse')
+  aiParse(@Body() dto: AiParseOrderDto, @CurrentUser() user: JwtPayload) {
+    return this.aiOrderService.parseForUser(dto.text, user, dto.market_id);
+  }
+
+  @ApiOperation({ summary: 'Tasdiqlangan AI buyurtmalarni yaratish' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Post('ai-create-confirmed')
+  aiCreateConfirmed(
+    @Body() dto: AiConfirmOrdersDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.aiOrderService.createConfirmedOrders(
+      dto.orders,
+      user,
+      dto.market_id,
+    );
   }
 
   @ApiOperation({ summary: 'List orders with filters' })

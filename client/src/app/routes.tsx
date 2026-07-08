@@ -59,6 +59,9 @@ const CreateLogist = lazy(
 const CreateOrder = lazy(
   () => import("../pages/orders/pages/superadmin/create-order")
 );
+const AiCreateOrder = lazy(
+  () => import("../pages/orders/pages/superadmin/ai-create-order")
+);
 const OrderDetail = lazy(
   () => import("../pages/orders/pages/superadmin/orderDetail")
 );
@@ -192,6 +195,7 @@ const AppRouters = () => {
               element: <Orders />,
               children: [
                 { path: "choose-market", element: <ChooseMarket /> },
+                { path: "ai-create", element: <AiCreateOrder /> },
                 {
                   path: "customer-info",
                   element: <CustomerInfoOrder />,

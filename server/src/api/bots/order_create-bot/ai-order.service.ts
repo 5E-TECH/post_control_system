@@ -78,6 +78,57 @@ interface RawExtraction {
   comment: string | null;
 }
 
+// Ko'p buyurtma: bitta matnda bir nechta buyurtma bo'lishi mumkin.
+const EXTRACT_MULTI_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    orders: {
+      type: 'array',
+      items: EXTRACT_SCHEMA,
+    },
+  },
+  required: ['orders'],
+};
+
+const EXTRACT_MULTI_SYSTEM = `${EXTRACT_SYSTEM}
+
+DIQQAT: Matnda BIR NECHTA buyurtma bo'lishi mumkin (har xil mijozlar / alohida buyurtmalar). Har bir ALOHIDA buyurtmani "orders" massivida alohida element qilib qaytar. Agar matnda bitta buyurtma bo'lsa — massivda bitta element bo'ladi. Buyurtmalar bo'sh qatorlar, raqamlash (1., 2., -) yoki har xil mijoz nomi/telefoni bilan ajralishi mumkin. Bitta mijozning bir nechta mahsulotini AJRATMA — u bitta buyurtma.`;
+
+export interface OrderPreviewItem {
+  name: string;
+  quantity: number;
+  product_id?: string;
+  resolved_name?: string;
+  candidates?: { id: string; name: string }[];
+}
+
+export interface OrderPreview {
+  customer_name?: string;
+  phone_number?: string;
+  extra_number?: string;
+  district_id?: string;
+  district_label?: string;
+  district_candidates?: { id: string; label: string }[];
+  address?: string;
+  items: OrderPreviewItem[];
+  total_price?: number;
+  comment?: string;
+  ready: boolean;
+  issues: string[];
+}
+
+export interface ConfirmedOrder {
+  customer_name: string;
+  phone_number: string;
+  extra_number?: string;
+  district_id: string;
+  address?: string;
+  order_item_info: { product_id: string; quantity: number }[];
+  total_price: number;
+  comment?: string;
+}
+
 export interface ResolvedOperator {
   user: UserEntity;
   marketId: string;
@@ -303,7 +354,10 @@ export class AiOrderService {
       schema: EXTRACT_SCHEMA,
     });
     if (!raw) return null;
+    return this.rawToDraft(raw);
+  }
 
+  private rawToDraft(raw: RawExtraction): AiOrderDraft {
     const items: AiDraftItem[] = (raw.items || [])
       .filter((i) => i && typeof i.name === 'string' && i.name.trim())
       .map((i) => ({
@@ -326,6 +380,254 @@ export class AiOrderService {
           : undefined,
       comment: raw.comment?.trim() || undefined,
     };
+  }
+
+  // ─── Ko'p buyurtma: matndan BIR NECHTA buyurtmani ajratib, har birini
+  //     rezolyutsiya qiladi va tasdiqlash uchun preview qaytaradi (charge YO'Q).
+  async parseOrders(text: string, marketId: string): Promise<OrderPreview[]> {
+    const res = await this.claude.extractJson<{ orders: RawExtraction[] }>({
+      system: EXTRACT_MULTI_SYSTEM,
+      userText: text,
+      schema: EXTRACT_MULTI_SCHEMA,
+      maxTokens: 3000,
+    });
+    if (!res || !Array.isArray(res.orders)) return [];
+
+    const previews: OrderPreview[] = [];
+    for (const raw of res.orders) {
+      const draft = this.rawToDraft(raw);
+      if (!draft.customer_name && !draft.phone_number && !draft.items.length) {
+        continue; // bo'sh element
+      }
+      await this.resolveDraft(draft, marketId);
+      previews.push(this.toPreview(draft));
+    }
+    return previews;
+  }
+
+  private toPreview(draft: AiOrderDraft): OrderPreview {
+    const issues: string[] = [];
+    if (!draft.customer_name) issues.push("mijoz ismi yo'q");
+    if (!draft.phone_number) issues.push("telefon yo'q");
+    if (!draft.district_id) {
+      issues.push(
+        draft.district_candidates?.length
+          ? 'tuman aniqlanmagan'
+          : 'tuman topilmadi',
+      );
+    }
+    if (draft.total_price == null) issues.push("narx yo'q");
+    if (!draft.items.length) issues.push("mahsulot yo'q");
+    draft.items.forEach((it) => {
+      if (!it.product_id) {
+        issues.push(
+          `"${it.name}" ${it.candidates?.length ? 'aniqlanmagan' : "katalogda yo'q"}`,
+        );
+      }
+    });
+
+    return {
+      customer_name: draft.customer_name,
+      phone_number: draft.phone_number,
+      extra_number: draft.extra_number,
+      district_id: draft.district_id,
+      district_label: draft.district_label,
+      district_candidates: draft.district_candidates,
+      address: draft.address,
+      items: draft.items.map((i) => ({
+        name: i.name,
+        quantity: i.quantity,
+        product_id: i.product_id,
+        resolved_name: i.resolved_name,
+        candidates: i.candidates,
+      })),
+      total_price: draft.total_price,
+      comment: draft.comment,
+      ready: issues.length === 0,
+      issues,
+    };
+  }
+
+  // Parse endpoint uchun: marketni aniqlab, AI mavjudligini tekshirib parseOrders.
+  async parseForUser(
+    text: string,
+    user: JwtPayload,
+    bodyMarketId?: string,
+  ): Promise<{
+    ok: boolean;
+    reason?: string;
+    orders?: OrderPreview[];
+    balance?: number;
+    price?: number;
+  }> {
+    if (!this.isEnabled()) return { ok: false, reason: 'ai_off' };
+    const marketId = await this.resolveMarketId(user, bodyMarketId);
+    if (!marketId) return { ok: false, reason: 'no_market' };
+
+    if (!this.aiBalance.isExemptRole(user.role as Roles)) {
+      const state = await this.aiBalance.getState(marketId);
+      if (!state || !state.enabled) return { ok: false, reason: 'disabled' };
+      if (state.balance < state.price) {
+        return {
+          ok: false,
+          reason: 'insufficient',
+          balance: state.balance,
+          price: state.price,
+        };
+      }
+    }
+
+    const orders = await this.parseOrders(text, marketId);
+    if (!orders.length) return { ok: false, reason: 'ai_error' };
+    return { ok: true, orders };
+  }
+
+  // Tasdiqlangan buyurtmalarni yaratish (har biriga alohida charge + create).
+  async createConfirmedOrders(
+    orders: ConfirmedOrder[],
+    user: JwtPayload,
+    bodyMarketId?: string,
+  ): Promise<{
+    results: {
+      ok: boolean;
+      reason?: string;
+      order_number?: number;
+      balance?: number;
+      customer_name?: string;
+    }[];
+  }> {
+    const marketId = await this.resolveMarketId(user, bodyMarketId);
+    if (!marketId) {
+      return {
+        results: orders.map((o) => ({
+          ok: false,
+          reason: 'no_market',
+          customer_name: o.customer_name,
+        })),
+      };
+    }
+    const exempt = this.aiBalance.isExemptRole(user.role as Roles);
+    const results: {
+      ok: boolean;
+      reason?: string;
+      order_number?: number;
+      balance?: number;
+      customer_name?: string;
+    }[] = [];
+    // Partiya ichida bir xil buyurtma ikki marta charge/yaratilmasin (dublikat
+    // qatorlar) — imzo faqat MUVAFFAQIYATLI yaratilgach belgilanadi.
+    const created = new Set<string>();
+
+    for (const o of orders) {
+      const sig = this.orderSignature(o);
+      if (created.has(sig)) {
+        results.push({
+          ok: false,
+          reason: 'duplicate',
+          customer_name: o.customer_name,
+        });
+        continue;
+      }
+
+      let charge: { reason: string; balance: number; price: number } | null =
+        null;
+      if (!exempt) {
+        charge = await this.aiBalance.chargeForOrder(marketId, {
+          actor: user.id,
+        });
+        if (charge.reason !== 'ok') {
+          results.push({
+            ok: false,
+            reason: charge.reason,
+            balance: charge.balance,
+            customer_name: o.customer_name,
+          });
+          continue;
+        }
+      }
+
+      // Charge'dan keyingi HAMMA narsa (customer.save + createOrder) himoyalangan:
+      // istalgan xato bo'lsa pul qaytariladi, orphan o'chiriladi, loop TO'XTAMAYDI.
+      let customerId: string | undefined;
+      try {
+        const customer = await this.userRepo.save(
+          this.userRepo.create({
+            name: o.customer_name,
+            phone_number: o.phone_number,
+            extra_number: o.extra_number,
+            district_id: o.district_id,
+            address: o.address,
+            role: Roles.CUSTOMER,
+          }),
+        );
+        customerId = customer.id;
+
+        const dto: CreateOrderDto = {
+          customer_id: customer.id,
+          market_id: marketId,
+          order_item_info: o.order_item_info,
+          total_price: o.total_price,
+          district_id: o.district_id,
+          comment: o.comment,
+          where_deliver: Where_deliver.CENTER,
+        } as CreateOrderDto;
+        const res = (await this.orderService.createOrder(dto, user)) as {
+          data?: { order_number?: number };
+        };
+        created.add(sig);
+        results.push({
+          ok: true,
+          order_number: res?.data?.order_number,
+          balance: charge?.balance,
+          customer_name: o.customer_name,
+        });
+      } catch (err) {
+        if (customerId) {
+          try {
+            await this.userRepo.delete(customerId);
+          } catch {
+            /* ignore */
+          }
+        }
+        if (charge) {
+          await this.aiBalance.refund(marketId, charge.price, {
+            actor: user.id,
+          });
+        }
+        this.logger.log(
+          `createConfirmedOrders xato: ${(err as Error).message}`,
+          'AiOrder',
+        );
+        results.push({
+          ok: false,
+          reason: 'create_failed',
+          customer_name: o.customer_name,
+        });
+      }
+    }
+    return { results };
+  }
+
+  // Buyurtma imzosi (partiya ichi dublikat aniqlash): telefon(oxirgi 9)+mahsulotlar+narx.
+  private orderSignature(o: ConfirmedOrder): string {
+    const phone = (o.phone_number || '').replace(/\D/g, '').slice(-9);
+    const items = (o.order_item_info || [])
+      .map((i) => `${i.product_id}:${i.quantity}`)
+      .sort()
+      .join(',');
+    return `${phone}|${items}|${o.total_price}`;
+  }
+
+  private async resolveMarketId(
+    user: JwtPayload,
+    bodyMarketId?: string,
+  ): Promise<string | undefined> {
+    if (user.role === Roles.MARKET) return user.id;
+    if (user.role === Roles.OPERATOR) {
+      const op = await this.userRepo.findOne({ where: { id: user.id } });
+      return op?.market_id || undefined;
+    }
+    return bodyMarketId;
   }
 
   // ─── 2-faza: REZOLYUTSIYA (DETERMINISTIK DB moslash) ───
