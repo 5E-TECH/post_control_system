@@ -5,7 +5,7 @@ export type BotStep =
   | 'waiting_for_token'
   | 'waiting_for_phone'
   | 'ready'
-  | 'drafting_order' // AI ekstraksiya jarayonida (qayta ishga tushmaslik uchun)
+  | 'collecting' // yetishmayotgan maydonlar so'ralmoqda (matn to'planmoqda)
   | 'clarifying' // past-ishonchli maydon so'ralmoqda (tuman/mahsulot)
   | 'confirming'; // tasdiq kartasi ko'rsatilgan, tugma kutilmoqda
 
@@ -55,6 +55,8 @@ export interface MySession {
 
   // ─── AI oqimi holati ───
   order_draft?: AiOrderDraft;
+  draft_raw?: string; // joriy buyurtmaning to'planayotgan xom matni
+  draft_attempts?: number; // ketma-ket to'liqsiz/xato urinishlar soni
 }
 
 export interface MyContext extends Context {

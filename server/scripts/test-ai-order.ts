@@ -119,6 +119,40 @@ async function main() {
     console.log('');
   }
 
+  // ─── Ko'p bosqichli (collecting) simulyatsiya ───
+  console.log('════════════════════════════════════════');
+  console.log("COLLECTING (ko'p bosqich): yetishmagan maydon so'raladi\n");
+  let raw = 'psarinorm 2 ta, andijon asaka, 550 ming, operator opertaor-2';
+  console.log('1-xabar:', raw);
+  let d = await ai.extractDraft(raw);
+  if (d) {
+    await ai.resolveDraft(d, market.id);
+    console.log(
+      '  → yetishmayapti:',
+      ai.missingRequired(d).join(', ') || "YO'Q",
+    );
+  }
+  const followUp = '994458745 Malika bozorova';
+  raw += '\n' + followUp;
+  console.log(`\n2-xabar (qo'shildi): ${followUp}`);
+  d = await ai.extractDraft(raw);
+  if (d) {
+    await ai.resolveDraft(d, market.id);
+    const miss = ai.missingRequired(d);
+    console.log('  → yetishmayapti:', miss.join(', ') || "YO'Q");
+    if (!miss.length && !ai.firstUnresolved(d)) {
+      console.log(
+        '  ✅ To‘liq! Tasdiq kartasi:\n' +
+          ai
+            .buildConfirmCard(d)
+            .text.split('\n')
+            .map((l) => '     ' + l)
+            .join('\n'),
+      );
+    }
+  }
+  console.log('');
+
   await AppDataSource.destroy();
   console.log('✅ Test tugadi');
 }

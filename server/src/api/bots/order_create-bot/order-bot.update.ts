@@ -273,7 +273,12 @@ export class OrderBotUpdate {
     if (!this.aiOrderService.isEnabled()) return; // AI o'chiq — WebApp ishlaydi
 
     const step = ctx.session.step;
-    if (step !== 'ready' && step !== 'confirming' && step !== 'clarifying') {
+    if (
+      step !== 'ready' &&
+      step !== 'collecting' &&
+      step !== 'confirming' &&
+      step !== 'clarifying'
+    ) {
       return;
     }
 
@@ -291,6 +296,16 @@ export class OrderBotUpdate {
       const operator = await this.aiOrderService.resolveOperator(uid);
       if (!operator) return; // ro'yxatdan o'tmagan — jim
 
+      // Davomi (collecting) — yetishmayotgan ma'lumot so'ralgach kelgan xabar
+      // avvalgi matnga QO'SHILADI; aks holda yangi buyurtma boshlanadi.
+      if (step === 'collecting' && ctx.session.draft_raw) {
+        ctx.session.draft_raw = `${ctx.session.draft_raw}\n${text}`;
+      } else {
+        ctx.session.draft_raw = text;
+        ctx.session.draft_attempts = 0;
+        ctx.session.order_draft = undefined;
+      }
+
       try {
         await ctx.sendChatAction('typing');
       } catch {
@@ -299,15 +314,12 @@ export class OrderBotUpdate {
 
       let draft: AiOrderDraft | null;
       try {
-        draft = await this.aiOrderService.extractDraft(text);
+        draft = await this.aiOrderService.extractDraft(ctx.session.draft_raw);
       } catch {
         draft = null;
       }
       if (!draft) {
-        await ctx.reply(
-          "🤖 Hozir AI buyurtmani o'qiy olmadi. Iltimos, WebApp formasidan foydalaning.",
-          { reply_markup: this.orderBotService.openWebApp() },
-        );
+        await this.handleIncomplete(ctx, [], true); // AI xatosi
         return;
       }
 
@@ -315,16 +327,13 @@ export class OrderBotUpdate {
 
       const missing = this.aiOrderService.missingRequired(draft);
       if (missing.length) {
-        ctx.session.order_draft = undefined;
-        ctx.session.step = 'ready';
-        await ctx.reply(
-          `🤖 Quyidagilar aniqlanmadi: ${missing.join(', ')}.\n` +
-            "Iltimos, WebApp formasidan to'ldiring.",
-          { reply_markup: this.orderBotService.openWebApp() },
-        );
+        await this.handleIncomplete(ctx, missing, false);
         return;
       }
 
+      // To'liq — to'plash holatini tozalab, kartani (clarify/confirm) ko'rsatamiz
+      ctx.session.draft_raw = undefined;
+      ctx.session.draft_attempts = 0;
       ctx.session.order_draft = draft;
       const view = this.nextDraftView(ctx);
       await ctx.reply(view.text, {
@@ -334,6 +343,47 @@ export class OrderBotUpdate {
     } finally {
       this.aiBusy.delete(uid);
     }
+  }
+
+  // To'liqsiz/xato urinish: yetishmagan maydonlarni SO'RAB davom etamiz; faqat
+  // 3 marta ketma-ket to'liqsiz/xato bo'lsa WebApp formasini beramiz.
+  private async handleIncomplete(
+    ctx: MyContext,
+    missing: string[],
+    isAiError: boolean,
+  ): Promise<void> {
+    const attempts = (ctx.session.draft_attempts ?? 0) + 1;
+    ctx.session.draft_attempts = attempts;
+
+    if (attempts >= 3) {
+      // 3-marta — endi WebApp; holatni tozalaymiz
+      ctx.session.step = 'ready';
+      ctx.session.draft_raw = undefined;
+      ctx.session.draft_attempts = 0;
+      ctx.session.order_draft = undefined;
+      await ctx.reply(
+        (isAiError
+          ? "🤖 Bir necha marta o'qib bo'lmadi."
+          : `🤖 Hali ham yetishmayapti: ${missing.join(', ')}.`) +
+          "\nIltimos, WebApp formasidan to'ldiring.",
+        { reply_markup: this.orderBotService.openWebApp() },
+      );
+      return;
+    }
+
+    // < 3 — yetishgan ma'lumotni so'rab, avvalgisini saqlab davom etamiz
+    ctx.session.step = 'collecting';
+    const msg = isAiError
+      ? "🤖 Xabarni o'qiy olmadim. Buyurtmani qayta yozib yuboring."
+      : `📝 Yana kerak: ${missing.join(', ')}.\n` +
+        "Shu ma'lumotni yozib yuboring (avvalgisi saqlanadi).";
+    await ctx.reply(msg, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '❌ Bekor', callback_data: 'order_ai:cancelcollect' }],
+        ],
+      },
+    });
   }
 
   // Draftni keyingi holatga o'tkazib, ko'rsatiladigan matn+tugmalarni beradi.
@@ -366,6 +416,23 @@ export class OrderBotUpdate {
   private async handleAiCallback(ctx: MyContext, data: string) {
     // format: order_ai:<action>:<nonce>[:<a3>[:<a4>]]
     const [, action, nonce, a3, a4] = data.split(':');
+
+    // To'plash (collecting) bekori — bu bosqichda draft/nonce hali yo'q,
+    // shuning uchun nonce tekshiruvidan OLDIN alohida ishlanadi.
+    if (action === 'cancelcollect') {
+      ctx.session.draft_raw = undefined;
+      ctx.session.draft_attempts = 0;
+      ctx.session.order_draft = undefined;
+      ctx.session.step = 'ready';
+      try {
+        await ctx.editMessageText('❌ Bekor qilindi.');
+      } catch {
+        /* ignore */
+      }
+      await ctx.answerCbQuery();
+      return;
+    }
+
     const draft = ctx.session.order_draft;
 
     // Eskirgan karta (draft almashtirilgan yoki yo'q) — nonce mos kelmasa rad
