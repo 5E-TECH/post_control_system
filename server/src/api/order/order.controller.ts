@@ -10,6 +10,8 @@ import {
   Query,
   Res,
   Header,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -39,12 +41,18 @@ import { UpdateOrderAddressDto } from './dto/update-order-address.dto';
 import { ReceiveExternalOrdersDto } from './dto/receive-external-orders.dto';
 import { RollbackOrderDto } from './dto/rollback-order.dto';
 import { BulkOrderActionDto } from './dto/bulk-order-action.dto';
+import { AiCreateOrderDto } from './dto/ai-create-order.dto';
+import { AiOrderService } from '../bots/order_create-bot/ai-order.service';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
 @Controller('order')
 export class OrderController {
-  constructor(private readonly orderService: OrderService) {}
+  constructor(
+    private readonly orderService: OrderService,
+    @Inject(forwardRef(() => AiOrderService))
+    private readonly aiOrderService: AiOrderService,
+  ) {}
 
   @ApiOperation({ summary: 'Create order' })
   @ApiResponse({ status: 201, description: 'Order created' })
@@ -66,6 +74,20 @@ export class OrderController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.orderService.createOrder(creteOrderDto, user);
+  }
+
+  @ApiOperation({ summary: 'AI orqali buyurtma yaratish (erkin matndan)' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Post('ai-create')
+  aiCreate(@Body() dto: AiCreateOrderDto, @CurrentUser() user: JwtPayload) {
+    return this.aiOrderService.createForPlatform(dto.text, user, dto.market_id);
   }
 
   @ApiOperation({ summary: 'List orders with filters' })

@@ -7,10 +7,12 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { OrderService } from 'src/api/order/order.service';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
+import { AiBalanceService } from 'src/api/ai-balance/ai-balance.service';
 import { MyLogger } from 'src/logger/logger.service';
 import { Roles, Where_deliver } from 'src/common/enums';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateOrderByBotDto } from 'src/api/order/dto/create-order-bot.dto';
+import { CreateOrderDto } from 'src/api/order/dto/create-order.dto';
 import { AiDraftItem, AiOrderDraft } from './session.interface';
 
 const MAX_CANDIDATE_BUTTONS = 5;
@@ -94,11 +96,130 @@ export class AiOrderService {
     private readonly userRepo: Repository<UserEntity>,
     @Inject(forwardRef(() => OrderService))
     private readonly orderService: OrderService,
+    private readonly aiBalance: AiBalanceService,
     private readonly logger: MyLogger,
   ) {}
 
   isEnabled(): boolean {
     return this.claude.isEnabled();
+  }
+
+  // ─── Platforma (web) uchun: matndan AI buyurtma yaratish ───
+  // Foydalanuvchi roliga qarab marketni aniqlab, balansdan yechadi (ozod
+  // rollar bepul), extract+resolve qiladi; to'liq bo'lsa yangi customer +
+  // createOrder (status NEW). To'liqsiz/xato bo'lsa pul qaytariladi.
+  async createForPlatform(
+    text: string,
+    user: JwtPayload,
+    bodyMarketId?: string,
+  ): Promise<{
+    ok: boolean;
+    reason?: string;
+    order?: unknown;
+    balance?: number;
+    price?: number;
+    missing?: string[];
+    draft?: Record<string, unknown>;
+  }> {
+    if (!this.isEnabled()) return { ok: false, reason: 'ai_off' };
+
+    // Market aniqlash
+    let marketId: string | undefined;
+    if (user.role === Roles.MARKET) {
+      marketId = user.id;
+    } else if (user.role === Roles.OPERATOR) {
+      const op = await this.userRepo.findOne({ where: { id: user.id } });
+      marketId = op?.market_id || undefined;
+    } else {
+      marketId = bodyMarketId; // admin/registrator/superadmin market tanlaydi
+    }
+    if (!marketId) return { ok: false, reason: 'no_market' };
+
+    // Balansdan yechish (ozod rollar bepul)
+    const exempt = this.aiBalance.isExemptRole(user.role as Roles);
+    let charge: { reason: string; balance: number; price: number } | null =
+      null;
+    if (!exempt) {
+      charge = await this.aiBalance.chargeForOrder(marketId, { actor: user.id });
+      if (charge.reason !== 'ok') {
+        return {
+          ok: false,
+          reason: charge.reason,
+          balance: charge.balance,
+          price: charge.price,
+        };
+      }
+    }
+
+    const draft = await this.extractDraft(text);
+    if (!draft) {
+      if (charge)
+        await this.aiBalance.refund(marketId, charge.price, { actor: user.id });
+      return { ok: false, reason: 'ai_error' };
+    }
+    await this.resolveDraft(draft, marketId);
+
+    const missing = this.missingRequired(draft);
+    const next = this.firstUnresolved(draft);
+    if (missing.length || next) {
+      // to'liq emas — pul qaytariladi, foydalanuvchi aniqlashtiradi
+      if (charge)
+        await this.aiBalance.refund(marketId, charge.price, { actor: user.id });
+      return {
+        ok: false,
+        reason: 'incomplete',
+        missing,
+        draft: this.publicDraft(draft),
+      };
+    }
+
+    // To'liq — yangi customer + createOrder (status NEW)
+    const customer = await this.userRepo.save(
+      this.userRepo.create({
+        name: draft.customer_name,
+        phone_number: draft.phone_number,
+        extra_number: draft.extra_number,
+        district_id: draft.district_id,
+        address: draft.address,
+        role: Roles.CUSTOMER,
+      }),
+    );
+
+    const dto: CreateOrderDto = {
+      customer_id: customer.id,
+      market_id: marketId,
+      order_item_info: draft.items.map((i) => ({
+        product_id: i.product_id as string,
+        quantity: i.quantity,
+      })),
+      total_price: draft.total_price as number,
+      district_id: draft.district_id,
+      comment: draft.comment,
+      where_deliver: Where_deliver.CENTER,
+    } as CreateOrderDto;
+
+    const order = await this.orderService.createOrder(dto, user);
+    return { ok: true, order, balance: charge?.balance };
+  }
+
+  // Frontend'ga ko'rsatish uchun draftning ochiq versiyasi
+  private publicDraft(draft: AiOrderDraft): Record<string, unknown> {
+    return {
+      customer_name: draft.customer_name,
+      phone_number: draft.phone_number,
+      district_label: draft.district_label,
+      district_resolved: !!draft.district_id,
+      district_candidates: draft.district_candidates,
+      items: draft.items.map((i) => ({
+        name: i.name,
+        quantity: i.quantity,
+        resolved_name: i.resolved_name,
+        resolved: !!i.product_id,
+        candidates: i.candidates,
+      })),
+      total_price: draft.total_price,
+      comment: draft.comment,
+    };
   }
 
   // ─── Operator/market'ni telegram_id bo'yicha aniqlash ───

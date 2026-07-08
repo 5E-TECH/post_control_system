@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import OrderList from "./pages/superadmin/order-list";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import AiOrderButton from "./ai-order-modal";
 
 const Orders = () => {
   const { pathname } = useLocation();
@@ -26,6 +27,13 @@ const Orders = () => {
     }
     return (
       <div className="bg-[#f4f5fa] m-5">
+        {["superadmin", "admin", "registrator", "market", "operator"].includes(
+          role,
+        ) && (
+          <div className="mb-3 flex justify-end">
+            <AiOrderButton />
+          </div>
+        )}
         <OrderList />
       </div>
     );

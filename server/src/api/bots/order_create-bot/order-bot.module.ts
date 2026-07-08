@@ -70,5 +70,6 @@ import { AiBalanceModule } from 'src/api/ai-balance/ai-balance.module';
     BcryptEncryption,
     MyLogger,
   ],
+  exports: [AiOrderService], // platforma (OrderController) AI buyurtma uchun
 })
 export class OrderBotModule {}
