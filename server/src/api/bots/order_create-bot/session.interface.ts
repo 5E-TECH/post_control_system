@@ -40,6 +40,16 @@ export interface AiOrderDraft {
   items: AiDraftItem[];
   total_price?: number;
   comment?: string;
+  where_deliver?: 'center' | 'address'; // yetkazish turi
+  is_replacement?: boolean; // matn almashtirishni bildiradimi
+  replaced_order_id?: string; // avto-tanlangan eski buyurtma (resolver to'ldiradi)
+  replacement_candidates?: {
+    id: string;
+    order_number: number;
+    created_at: number;
+    total_price: number;
+    items: string; // "Mahsulot x2, ..."
+  }[];
 }
 
 export interface MySession {

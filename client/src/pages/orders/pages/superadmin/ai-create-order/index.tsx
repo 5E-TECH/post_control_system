@@ -19,6 +19,8 @@ import {
   Loader2,
   Wallet,
   ClipboardList,
+  Truck,
+  Repeat,
 } from "lucide-react";
 import type { RootState } from "../../../../../app/store";
 import { api } from "../../../../../shared/api";
@@ -26,6 +28,19 @@ import { buildAdminPath } from "../../../../../shared/const";
 
 const som = (n?: number | null) =>
   (Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+const formatDate = (ts?: number | null) => {
+  if (!ts) return "—";
+  try {
+    return new Date(Number(ts)).toLocaleDateString("uz-UZ", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+};
 
 const inputCls =
   "w-full h-10 px-3 bg-gray-50 dark:bg-gray-800 border rounded-xl text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all";
@@ -40,6 +55,13 @@ interface PItem {
   resolved_name?: string;
   candidates?: { id: string; name: string }[];
 }
+interface ReplacementCandidate {
+  id: string;
+  order_number: number;
+  created_at: number;
+  total_price: number;
+  items: string;
+}
 interface Preview {
   id: string;
   customer_name?: string;
@@ -52,6 +74,12 @@ interface Preview {
   items: PItem[];
   total_price?: number;
   comment?: string;
+  where_deliver?: "center" | "address";
+  is_replacement?: boolean;
+  replaced_order_id?: string;
+  replacement_candidates?: ReplacementCandidate[];
+  // Operator ANIQ tasdiqlamaguncha almashtirish kuchga kirmaydi (avto-topilsa ham).
+  replacement_confirmed?: boolean;
 }
 interface CreatedRow {
   order_number?: number;
@@ -59,6 +87,7 @@ interface CreatedRow {
   district_label?: string;
   total_price?: number;
   items: number;
+  is_replacement?: boolean;
 }
 interface ParseResponse {
   ok: boolean;
@@ -85,7 +114,16 @@ function evalPreview(p: Preview): { ready: boolean; issues: string[] } {
     issues.push(
       p.district_candidates?.length ? "tuman tanlang" : "tuman topilmadi"
     );
-  if (p.total_price == null || p.total_price <= 0) issues.push("narx noto'g'ri");
+  // Almashtirish faqat operator TASDIQLAGANDA kuchga kiradi (avto-topilsa ham).
+  const isRepl = !!(p.replacement_confirmed && p.replaced_order_id);
+  if (p.replacement_confirmed && !p.replaced_order_id)
+    issues.push("eski buyurtmani tanlang");
+  // Narx: tasdiqlangan almashtirishda 0 ruxsat; aks holda > 0.
+  if (isRepl) {
+    if (p.total_price == null) issues.push("narx yozing (0 bo'lsa 0)");
+  } else if (p.total_price == null || p.total_price <= 0) {
+    issues.push("narx noto'g'ri");
+  }
   if (!p.items.length) issues.push("mahsulot yo'q");
   p.items.forEach((it) => {
     if (!it.product_id)
@@ -227,6 +265,12 @@ const AiCreateOrder = () => {
             })),
             total_price: p.total_price,
             comment: p.comment || undefined,
+            where_deliver: p.where_deliver || undefined,
+            // Faqat operator tasdiqlagan bo'lsa almashtirish sifatida jo'natiladi.
+            replaced_order_id:
+              p.replacement_confirmed && p.replaced_order_id
+                ? p.replaced_order_id
+                : undefined,
           })),
         })
         .then((r) => r.data as ConfirmResponse),
@@ -245,6 +289,10 @@ const AiCreateOrder = () => {
             district_label: toCreate[i].district_label,
             total_price: toCreate[i].total_price,
             items: toCreate[i].items.length,
+            is_replacement: !!(
+              toCreate[i].replacement_confirmed &&
+              toCreate[i].replaced_order_id
+            ),
           });
         } else if (r.reason === "insufficient") insuff++;
         else if (r.reason === "duplicate") dup++;
@@ -641,6 +689,21 @@ const AiCreateOrder = () => {
                           </div>
                           <div className="space-y-1">
                             <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5" /> Qo'shimcha raqam
+                            </label>
+                            <input
+                              value={p.extra_number || ""}
+                              placeholder="ixtiyoriy"
+                              onChange={(e) =>
+                                updatePreview(p.id, {
+                                  extra_number: e.target.value,
+                                })
+                              }
+                              className={`${inputCls} ${okBorder}`}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                               <MapPin className="w-3.5 h-3.5" /> Tuman
                             </label>
                             {p.district_id ? (
@@ -692,11 +755,63 @@ const AiCreateOrder = () => {
                                 });
                               }}
                               className={`${inputCls} ${
-                                p.total_price && p.total_price > 0
-                                  ? okBorder
-                                  : errBorder
+                                p.replacement_confirmed && p.replaced_order_id
+                                  ? p.total_price != null
+                                    ? okBorder
+                                    : errBorder
+                                  : p.total_price && p.total_price > 0
+                                    ? okBorder
+                                    : errBorder
                               }`}
                             />
+                          </div>
+                          {/* Manzil */}
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5" /> Manzil (ixtiyoriy)
+                            </label>
+                            <input
+                              value={p.address || ""}
+                              placeholder="Ko'cha, uy..."
+                              onChange={(e) =>
+                                updatePreview(p.id, { address: e.target.value })
+                              }
+                              className={`${inputCls} ${okBorder}`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Yetkazish turi */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                            <Truck className="w-3.5 h-3.5" /> Yetkazish turi
+                          </label>
+                          <div className="flex gap-2">
+                            {(
+                              [
+                                { v: "center", label: "Markazdan olib ketadi" },
+                                { v: "address", label: "Manzilga yetkazish" },
+                              ] as const
+                            ).map((opt) => {
+                              const active =
+                                (p.where_deliver || "center") === opt.v;
+                              return (
+                                <button
+                                  key={opt.v}
+                                  type="button"
+                                  onClick={() =>
+                                    updatePreview(p.id, { where_deliver: opt.v })
+                                  }
+                                  className={`flex-1 h-10 px-3 rounded-xl text-sm font-medium border transition-all cursor-pointer ${
+                                    active
+                                      ? "bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600 text-purple-700 dark:text-purple-300"
+                                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-purple-300"
+                                  }`}
+                                >
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
@@ -763,6 +878,75 @@ const AiCreateOrder = () => {
                             </div>
                           ))}
                         </div>
+
+                        {/* Almashtirish (AI avto-aniqladi — operator TASDIQLAYDI) */}
+                        {(p.is_replacement ||
+                          !!p.replacement_candidates?.length) && (
+                          <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 p-3 space-y-2">
+                            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                              <Repeat className="w-3.5 h-3.5" /> AI buni
+                              almashtirish deb topdi
+                            </div>
+                            {p.replacement_candidates?.length ? (
+                              <>
+                                <label className="flex items-start gap-2 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!p.replacement_confirmed}
+                                    onChange={(e) =>
+                                      updatePreview(p.id, {
+                                        replacement_confirmed: e.target.checked,
+                                      })
+                                    }
+                                    className="mt-0.5 w-4 h-4 accent-amber-600 cursor-pointer flex-shrink-0"
+                                  />
+                                  <span className="text-xs text-amber-800 dark:text-amber-300">
+                                    Ha, almashtirish sifatida yaratilsin — eski
+                                    buyurtma kuryer orqali qaytariladi (narx 0
+                                    bo'lishi mumkin).
+                                  </span>
+                                </label>
+                                {p.replacement_confirmed ? (
+                                  <Select
+                                    size="large"
+                                    className="w-full [&_.ant-select-selector]:!rounded-xl"
+                                    value={p.replaced_order_id}
+                                    placeholder="Eski buyurtmani tanlang"
+                                    status={
+                                      !p.replaced_order_id ? "error" : undefined
+                                    }
+                                    allowClear
+                                    onChange={(v) =>
+                                      updatePreview(p.id, {
+                                        replaced_order_id: v || undefined,
+                                      })
+                                    }
+                                    options={p.replacement_candidates.map(
+                                      (c) => ({
+                                        value: c.id,
+                                        label: `#${c.order_number} · ${formatDate(
+                                          c.created_at
+                                        )} · ${c.items} · ${som(
+                                          c.total_price
+                                        )} so'm`,
+                                      })
+                                    )}
+                                  />
+                                ) : (
+                                  <p className="text-[11px] text-gray-400">
+                                    Tasdiqlanmasa — oddiy buyurtma sifatida
+                                    yaratiladi (narx &gt; 0 kerak).
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-xs text-amber-700/80 dark:text-amber-400/80">
+                                Bu telefon bo'yicha sotilgan eski buyurtma
+                                topilmadi — oddiy buyurtma sifatida yaratiladi.
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                         {p.comment && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 flex items-start gap-1.5">
@@ -839,8 +1023,20 @@ const AiCreateOrder = () => {
                           className="border-b border-gray-50 dark:border-gray-800/50 last:border-0 hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition-colors"
                         >
                           <td className="px-5 py-3">
-                            <span className="font-mono font-semibold text-green-700 dark:text-green-400">
-                              {c.order_number != null ? `#${c.order_number}` : "—"}
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="font-mono font-semibold text-green-700 dark:text-green-400">
+                                {c.order_number != null
+                                  ? `#${c.order_number}`
+                                  : "—"}
+                              </span>
+                              {c.is_replacement && (
+                                <span
+                                  title="Almashtirish"
+                                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-md"
+                                >
+                                  <Repeat className="w-2.5 h-2.5" />
+                                </span>
+                              )}
                             </span>
                           </td>
                           <td className="px-3 py-3 text-gray-800 dark:text-gray-200 capitalize truncate max-w-[160px]">

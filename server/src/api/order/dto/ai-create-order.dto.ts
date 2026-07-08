@@ -2,6 +2,7 @@ import {
   ArrayMaxSize,
   ArrayNotEmpty,
   IsArray,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -13,6 +14,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Where_deliver } from 'src/common/enums';
 
 // AI matn uzunligi chegarasi — Claude'ga cheksiz matn ketmasligi uchun (DoS/xarajat).
 const AI_TEXT_MAX = 4000;
@@ -78,13 +80,23 @@ export class ConfirmedOrderDto {
   @Type(() => ConfirmedOrderItemDto)
   order_item_info: ConfirmedOrderItemDto[];
 
+  // Narx: oddiy buyurtma > 0 (servis tekshiradi); almashtirishda 0 bo'lishi mumkin.
   @IsNumber()
-  @Min(1)
+  @Min(0)
   total_price: number;
 
   @IsOptional()
   @IsString()
   comment?: string;
+
+  @IsOptional()
+  @IsEnum(Where_deliver)
+  where_deliver?: Where_deliver;
+
+  // Almashtirish: bu yangi buyurtma qaysi eski (sotilgan) buyurtma o'rniga.
+  @IsOptional()
+  @IsUUID()
+  replaced_order_id?: string;
 }
 
 // Tasdiqlangan buyurtmalarni yaratish (har biriga alohida charge + create).

@@ -5,11 +5,12 @@ import { randomBytes } from 'crypto';
 import { ProductEntity } from 'src/core/entity/product.entity';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderService } from 'src/api/order/order.service';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { AiBalanceService } from 'src/api/ai-balance/ai-balance.service';
 import { MyLogger } from 'src/logger/logger.service';
-import { Roles, Where_deliver } from 'src/common/enums';
+import { Roles, Where_deliver, Order_status } from 'src/common/enums';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateOrderByBotDto } from 'src/api/order/dto/create-order-bot.dto';
 import { CreateOrderDto } from 'src/api/order/dto/create-order.dto';
@@ -26,6 +27,9 @@ QAT'IY QOIDALAR:
 - total_price = butun buyurtma narxi RAQAM sifatida (masalan "250 ming" -> 250000, "2.5 mln" -> 2500000). Aniq bo'lmasa null.
 - comment = yetkazish bo'yicha izoh (masalan "kechqurun keling"). Telefon raqamlar comment'ga tushmasin.
 - Telefon O'zbekiston formatida; faqat raqamlarni ol.
+- extra_number = mijozning IKKINCHI (qo'shimcha) telefon raqami, agar bo'lsa.
+- where_deliver = yetkazish turi: "address" (uyga/manzilga yetkazilsa, "eshikkacha", "uyiga"), "center" (markazdan/pochtadan/filialdan olib ketsa yoki "olib ketadi"). Aniq bo'lmasa null.
+- is_replacement = true FAQAT matn ALMASHTIRISH/kafolat holatini bildirsa: "almashtirish", "almashtirib berish", "kafolat", "brak", "nosoz", "buzuq", "ishlamayapti", "eski ... o'rniga", "qaytarib olib yangisini". Oddiy yangi buyurtma bo'lsa false.
 Matn o'zbek, rus yoki lotin/kirill aralash bo'lishi mumkin.`;
 
 const EXTRACT_SCHEMA: Record<string, unknown> = {
@@ -52,6 +56,8 @@ const EXTRACT_SCHEMA: Record<string, unknown> = {
     },
     total_price: { type: ['number', 'null'] },
     comment: { type: ['string', 'null'] },
+    where_deliver: { type: ['string', 'null'] },
+    is_replacement: { type: 'boolean' },
   },
   required: [
     'customer_name',
@@ -63,6 +69,8 @@ const EXTRACT_SCHEMA: Record<string, unknown> = {
     'items',
     'total_price',
     'comment',
+    'where_deliver',
+    'is_replacement',
   ],
 };
 
@@ -76,6 +84,8 @@ interface RawExtraction {
   items: { name: string; quantity: number }[];
   total_price: number | null;
   comment: string | null;
+  where_deliver: string | null;
+  is_replacement: boolean;
 }
 
 // Ko'p buyurtma: bitta matnda bir nechta buyurtma bo'lishi mumkin.
@@ -114,6 +124,16 @@ export interface OrderPreview {
   items: OrderPreviewItem[];
   total_price?: number;
   comment?: string;
+  where_deliver?: 'center' | 'address';
+  is_replacement?: boolean;
+  replaced_order_id?: string;
+  replacement_candidates?: {
+    id: string;
+    order_number: number;
+    created_at: number;
+    total_price: number;
+    items: string;
+  }[];
   ready: boolean;
   issues: string[];
 }
@@ -127,6 +147,8 @@ export interface ConfirmedOrder {
   order_item_info: { product_id: string; quantity: number }[];
   total_price: number;
   comment?: string;
+  where_deliver?: Where_deliver;
+  replaced_order_id?: string;
 }
 
 export interface ResolvedOperator {
@@ -145,6 +167,8 @@ export class AiOrderService {
     private readonly districtRepo: Repository<DistrictEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+    @InjectRepository(OrderEntity)
+    private readonly orderRepo: Repository<OrderEntity>,
     @Inject(forwardRef(() => OrderService))
     private readonly orderService: OrderService,
     private readonly aiBalance: AiBalanceService,
@@ -379,6 +403,13 @@ export class AiOrderService {
           ? Math.round(Number(raw.total_price))
           : undefined,
       comment: raw.comment?.trim() || undefined,
+      where_deliver:
+        raw.where_deliver === 'address'
+          ? 'address'
+          : raw.where_deliver === 'center'
+            ? 'center'
+            : undefined,
+      is_replacement: raw.is_replacement === true,
     };
   }
 
@@ -400,9 +431,61 @@ export class AiOrderService {
         continue; // bo'sh element
       }
       await this.resolveDraft(draft, marketId);
+      if (draft.is_replacement) {
+        await this.resolveReplacement(draft, marketId);
+      }
       previews.push(this.toPreview(draft));
     }
     return previews;
+  }
+
+  // Almashtirish: telefon bo'yicha shu marketning SOTILGAN eski buyurtmalarini
+  // topib, eng so'nggisini avto-tanlaydi (operator tasdiqlaydi/o'zgartiradi).
+  private async resolveReplacement(
+    draft: AiOrderDraft,
+    marketId: string,
+  ): Promise<void> {
+    const phone9 = (draft.phone_number || '').replace(/\D/g, '').slice(-9);
+    if (phone9.length < 9) return; // to'liq 9 raqam bo'lsagina ishonchli qidiruv
+
+    const DELIVERED = [
+      Order_status.SOLD,
+      Order_status.PAID,
+      Order_status.PARTLY_PAID,
+      Order_status.CLOSED,
+    ];
+    const rows = await this.orderRepo
+      .createQueryBuilder('o')
+      .leftJoinAndSelect('o.items', 'items')
+      .leftJoinAndSelect('items.product', 'product')
+      .leftJoin('o.customer', 'customer')
+      .where('o.user_id = :m', { m: marketId })
+      .andWhere('o.deleted_at IS NULL')
+      .andWhere('o.is_replacement_return = false')
+      .andWhere('o.status IN (:...s)', { s: DELIVERED })
+      // Saqlangan telefon ajratuvchili bo'lishi mumkin (+998 90 111 22 33) —
+      // faqat raqamlarni qoldirib solishtiramiz.
+      .andWhere(
+        "regexp_replace(customer.phone_number, '[^0-9]', '', 'g') LIKE :q",
+        { q: `%${phone9}%` },
+      )
+      .orderBy('o.created_at', 'DESC')
+      .take(10)
+      .getMany();
+
+    if (!rows.length) return;
+
+    draft.replacement_candidates = rows.map((o) => ({
+      id: o.id,
+      order_number: o.order_number,
+      created_at: Number(o.created_at),
+      total_price: Number(o.total_price) || 0,
+      items: (o.items || [])
+        .map((it) => `${it.product?.name || 'mahsulot'} x${it.quantity}`)
+        .join(', '),
+    }));
+    // Eng so'nggisini avto-tanlaymiz (operator kartada o'zgartira oladi)
+    draft.replaced_order_id = rows[0].id;
   }
 
   private toPreview(draft: AiOrderDraft): OrderPreview {
@@ -416,7 +499,13 @@ export class AiOrderService {
           : 'tuman topilmadi',
       );
     }
-    if (draft.total_price == null) issues.push("narx yo'q");
+    // Almashtirish buyurtmasi narxi 0 bo'lishi mumkin (eski buyurtma o'rniga);
+    // oddiy buyurtma uchun narx > 0 bo'lishi shart.
+    if (draft.is_replacement) {
+      if (draft.total_price == null) issues.push("narx yo'q (0 bo'lsa 0 yozing)");
+    } else if (draft.total_price == null || draft.total_price <= 0) {
+      issues.push("narx yo'q");
+    }
     if (!draft.items.length) issues.push("mahsulot yo'q");
     draft.items.forEach((it) => {
       if (!it.product_id) {
@@ -443,6 +532,10 @@ export class AiOrderService {
       })),
       total_price: draft.total_price,
       comment: draft.comment,
+      where_deliver: draft.where_deliver,
+      is_replacement: draft.is_replacement,
+      replaced_order_id: draft.replaced_order_id,
+      replacement_candidates: draft.replacement_candidates,
       ready: issues.length === 0,
       issues,
     };
@@ -517,6 +610,10 @@ export class AiOrderService {
     // Partiya ichida bir xil buyurtma ikki marta charge/yaratilmasin (dublikat
     // qatorlar) — imzo faqat MUVAFFAQIYATLI yaratilgach belgilanadi.
     const created = new Set<string>();
+    // Kvitansiya uchun market default operator telefoni (mavjud bo'lsa).
+    const marketRow = await this.userRepo.findOne({ where: { id: marketId } });
+    const defaultOperatorPhone =
+      marketRow?.default_operator_phone?.trim() || undefined;
 
     for (const o of orders) {
       const sig = this.orderSignature(o);
@@ -524,6 +621,20 @@ export class AiOrderService {
         results.push({
           ok: false,
           reason: 'duplicate',
+          customer_name: o.customer_name,
+        });
+        continue;
+      }
+
+      // Oddiy (almashtirish EMAS) buyurtma narxi > 0 bo'lishi shart — 0-som
+      // buyurtma yaratilib pul yechilib qolmasin.
+      if (
+        !o.replaced_order_id &&
+        (o.total_price == null || o.total_price < 1)
+      ) {
+        results.push({
+          ok: false,
+          reason: 'invalid_price',
           customer_name: o.customer_name,
         });
         continue;
@@ -569,7 +680,9 @@ export class AiOrderService {
           total_price: o.total_price,
           district_id: o.district_id,
           comment: o.comment,
-          where_deliver: Where_deliver.CENTER,
+          where_deliver: o.where_deliver ?? Where_deliver.CENTER,
+          operator_phone: defaultOperatorPhone,
+          replaced_order_id: o.replaced_order_id,
         } as CreateOrderDto;
         const res = (await this.orderService.createOrder(dto, user)) as {
           data?: { order_number?: number };
@@ -608,14 +721,17 @@ export class AiOrderService {
     return { results };
   }
 
-  // Buyurtma imzosi (partiya ichi dublikat aniqlash): telefon(oxirgi 9)+mahsulotlar+narx.
+  // Buyurtma imzosi (partiya ichi dublikat aniqlash): telefon(oxirgi 9)+mahsulotlar
+  // +narx+almashtirilayotgan eski buyurtma. replaced_order_id imzoga kiradi —
+  // aks holda bir mijozning bir xil mahsulotli (narx 0) IKKI almashtirishi bitta
+  // deb sanalib, ikkinchisi yaratilmay qolardi.
   private orderSignature(o: ConfirmedOrder): string {
     const phone = (o.phone_number || '').replace(/\D/g, '').slice(-9);
     const items = (o.order_item_info || [])
       .map((i) => `${i.product_id}:${i.quantity}`)
       .sort()
       .join(',');
-    return `${phone}|${items}|${o.total_price}`;
+    return `${phone}|${items}|${o.total_price}|${o.replaced_order_id ?? ''}`;
   }
 
   private async resolveMarketId(
