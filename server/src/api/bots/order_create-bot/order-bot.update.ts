@@ -1,4 +1,5 @@
 import {
+  Command,
   Ctx,
   Hears,
   Help,
@@ -14,6 +15,7 @@ import {
 } from 'telegraf/typings/core/types/typegram';
 import { OrderBotService } from './order-bot.service';
 import { AiOrderService } from './ai-order.service';
+import { AiBalanceService } from 'src/api/ai-balance/ai-balance.service';
 import { MyContext, AiOrderDraft } from './session.interface';
 import config from 'src/config';
 
@@ -50,6 +52,7 @@ export class OrderBotUpdate {
     @InjectBot(config.ORDER_BOT_NAME) private readonly bot: Telegraf<MyContext>,
     private readonly orderBotService: OrderBotService,
     private readonly aiOrderService: AiOrderService,
+    private readonly aiBalanceService: AiBalanceService,
   ) {}
 
   @Start()
@@ -298,12 +301,44 @@ export class OrderBotUpdate {
 
       // Davomi (collecting) — yetishmayotgan ma'lumot so'ralgach kelgan xabar
       // avvalgi matnga QO'SHILADI; aks holda yangi buyurtma boshlanadi.
-      if (step === 'collecting' && ctx.session.draft_raw) {
-        ctx.session.draft_raw = `${ctx.session.draft_raw}\n${text}`;
-      } else {
+      const isNewOrder = !(step === 'collecting' && ctx.session.draft_raw);
+      if (isNewOrder) {
         ctx.session.draft_raw = text;
         ctx.session.draft_attempts = 0;
         ctx.session.order_draft = undefined;
+      } else {
+        ctx.session.draft_raw = `${ctx.session.draft_raw}\n${text}`;
+      }
+
+      // ── AI-balans: YANGI buyurtma uchun bir marta yechiladi (collecting bepul).
+      // Ichki rollar (admin/registrator) ozod. Yechilmasa — WebApp'ga.
+      const exempt = this.aiBalanceService.isExemptRole(operator.user.role);
+      let charge: { reason: string; balance: number; price: number } | null =
+        null;
+      if (isNewOrder && !exempt) {
+        charge = await this.aiBalanceService.chargeForOrder(operator.marketId, {
+          actor: operator.user.name,
+        });
+        if (charge.reason !== 'ok') {
+          ctx.session.step = 'ready';
+          ctx.session.draft_raw = undefined;
+          ctx.session.order_draft = undefined;
+          ctx.session.ai_balance_display = undefined;
+          const msg =
+            charge.reason === 'disabled'
+              ? "🤖 Bu market uchun AI yoqilmagan. Iltimos, WebApp formasidan foydalaning."
+              : `💳 AI balans yetarli emas (kerak: ${this.formatSom(
+                  charge.price,
+                )} so'm, qoldi: ${this.formatSom(charge.balance)} so'm).\n` +
+                "To'lov qilib davom eting yoki WebApp formasidan foydalaning.";
+          await ctx.reply(msg, {
+            reply_markup: this.orderBotService.openWebApp(),
+          });
+          return;
+        }
+        ctx.session.ai_balance_display = charge.balance;
+      } else if (isNewOrder) {
+        ctx.session.ai_balance_display = undefined; // ozod — ko'rsatilmaydi
       }
 
       try {
@@ -319,7 +354,14 @@ export class OrderBotUpdate {
         draft = null;
       }
       if (!draft) {
-        await this.handleIncomplete(ctx, [], true); // AI xatosi
+        // AI o'qiy olmadi — yechilgan bo'lsa qaytaramiz (bu bizning xatomiz)
+        if (charge && charge.reason === 'ok') {
+          await this.aiBalanceService.refund(operator.marketId, charge.price, {
+            actor: operator.user.name,
+          });
+          ctx.session.ai_balance_display = charge.balance + charge.price;
+        }
+        await this.handleIncomplete(ctx, [], true);
         return;
       }
 
@@ -336,13 +378,48 @@ export class OrderBotUpdate {
       ctx.session.draft_attempts = 0;
       ctx.session.order_draft = draft;
       const view = this.nextDraftView(ctx);
-      await ctx.reply(view.text, {
+      await ctx.reply(view.text + this.aiBalanceSuffix(ctx), {
         parse_mode: view.markdown ? 'Markdown' : undefined,
         reply_markup: view.keyboard,
       });
     } finally {
       this.aiBusy.delete(uid);
     }
+  }
+
+  // "💳 AI balans: X so'm" qo'shimchasi (undefined bo'lsa — ozod, ko'rsatilmaydi)
+  private aiBalanceSuffix(ctx: MyContext): string {
+    const b = ctx.session.ai_balance_display;
+    if (b == null) return '';
+    return `\n\n💳 AI balans: ${this.formatSom(b)} so'm`;
+  }
+
+  private formatSom(n: number): string {
+    return (Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
+
+  @Command('balance')
+  async onBalance(@Ctx() ctx: MyContext) {
+    if (ctx.chat?.type !== 'private') return;
+    const operator = await this.aiOrderService.resolveOperator(ctx.from?.id);
+    if (!operator) {
+      await ctx.reply("Avval botda ro'yxatdan o'ting.");
+      return;
+    }
+    if (this.aiBalanceService.isExemptRole(operator.user.role)) {
+      await ctx.reply("Sizda AI limiti yo'q (ichki xodim).");
+      return;
+    }
+    const state = await this.aiBalanceService.getState(operator.marketId);
+    if (!state) {
+      await ctx.reply('Balans topilmadi.');
+      return;
+    }
+    await ctx.reply(
+      `💳 AI balans: ${this.formatSom(state.balance)} so'm\n` +
+        `📦 Bir buyurtma narxi: ${this.formatSom(state.price)} so'm\n` +
+        `⚡ AI holati: ${state.enabled ? 'yoqilgan ✅' : "o'chirilgan ❌"}`,
+    );
   }
 
   // To'liqsiz/xato urinish: yetishmagan maydonlarni SO'RAB davom etamiz; faqat
@@ -377,7 +454,7 @@ export class OrderBotUpdate {
       ? "🤖 Xabarni o'qiy olmadim. Buyurtmani qayta yozib yuboring."
       : `📝 Yana kerak: ${missing.join(', ')}.\n` +
         "Shu ma'lumotni yozib yuboring (avvalgisi saqlanadi).";
-    await ctx.reply(msg, {
+    await ctx.reply(msg + this.aiBalanceSuffix(ctx), {
       reply_markup: {
         inline_keyboard: [
           [{ text: '❌ Bekor', callback_data: 'order_ai:cancelcollect' }],
@@ -508,7 +585,7 @@ export class OrderBotUpdate {
   private async editDraftView(ctx: MyContext) {
     const view = this.nextDraftView(ctx);
     try {
-      await ctx.editMessageText(view.text, {
+      await ctx.editMessageText(view.text + this.aiBalanceSuffix(ctx), {
         parse_mode: view.markdown ? 'Markdown' : undefined,
         reply_markup: view.keyboard,
       });

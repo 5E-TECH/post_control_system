@@ -30,4 +30,7 @@ export default {
   // AI (Claude) — bo'sh bo'lsa AI oqimi o'chiriladi, WebApp forma ishlayveradi
   ANTHROPIC_API_KEY: String(process.env.ANTHROPIC_API_KEY || ''),
   AI_ORDER_MODEL: String(process.env.AI_ORDER_MODEL || 'claude-haiku-4-5'),
+  // Bir AI buyurtma narxi (so'm) — market ai_price_per_order null bo'lsa shu
+  // global default ishlatiladi. Har market uchun UI'da alohida belgilanadi.
+  AI_PRICE_PER_ORDER: Number(process.env.AI_PRICE_PER_ORDER || 300),
 };

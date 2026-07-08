@@ -57,6 +57,7 @@ export interface MySession {
   order_draft?: AiOrderDraft;
   draft_raw?: string; // joriy buyurtmaning to'planayotgan xom matni
   draft_attempts?: number; // ketma-ket to'liqsiz/xato urinishlar soni
+  ai_balance_display?: number; // joriy buyurtmadan keyingi balans (ko'rsatish uchun; undefined = ozod/ko'rsatilmaydi)
 }
 
 export interface MyContext extends Context {

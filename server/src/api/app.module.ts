@@ -13,6 +13,7 @@ import { CashboxHistoryModule } from './cashbox-history/cashbox-history.module';
 import { LoggerModule } from 'src/logger/logger.module';
 import { PostModule } from './post/post.module';
 import { OrderModule } from './order/order.module';
+import { AiBalanceModule } from './ai-balance/ai-balance.module';
 import { OrderGateaway } from './socket/order.gateaway';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PrinterModule } from './printer/printer.module';
@@ -61,6 +62,7 @@ import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
     CashboxHistoryModule,
     PostModule,
     OrderModule,
+    AiBalanceModule,
     BotModule,
     OrderBotModule,
     DashboardModule,

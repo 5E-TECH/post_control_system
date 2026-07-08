@@ -18,6 +18,7 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { MyLogger } from 'src/logger/logger.service';
 import { OrderModule } from 'src/api/order/order.module';
+import { AiBalanceModule } from 'src/api/ai-balance/ai-balance.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { OrderModule } from 'src/api/order/order.module';
     // AiOrderService.commit() -> OrderService.createOrderByBot; OrderModule ham
     // OrderBotModule'ni import qiladi, shuning uchun forwardRef bilan sikl yopiladi.
     forwardRef(() => OrderModule),
+    AiBalanceModule, // AI-balans (charge/state) — botda ishlatiladi
   ],
   providers: [
     OrderBotUpdate,
