@@ -11,10 +11,6 @@ import { MyLogger } from 'src/logger/logger.service';
 import { Roles, Where_deliver } from 'src/common/enums';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateOrderByBotDto } from 'src/api/order/dto/create-order-bot.dto';
-import {
-  namesMatch,
-  normalizeName,
-} from 'src/infrastructure/lib/utils/sato-matcher';
 import { AiDraftItem, AiOrderDraft } from './session.interface';
 
 const MAX_CANDIDATE_BUTTONS = 5;
@@ -173,15 +169,25 @@ export class AiOrderService {
     if (!draft.district_name) return;
 
     const districts = await this.districtRepo.find({ relations: ['region'] });
+    const q = this.normGeo(draft.district_name);
 
-    let matches = districts.filter((d) =>
-      namesMatch(draft.district_name as string, d.name),
-    );
+    // Base-nom (geografik qo'shimchalarsiz) bo'yicha moslash: operator "tumani"
+    // yozmaydi, DB'da esa "... tumani" bo'ladi — shuning uchun ikkala tomon ham
+    // qo'shimchasiz solishtiriladi.
+    let matches = districts.filter((d) => this.normGeo(d.name) === q);
+    if (!matches.length) {
+      // Aniq base-mos topilmasa — qism (substring) bo'yicha
+      matches = districts.filter((d) => {
+        const dn = this.normGeo(d.name);
+        return dn.length > 2 && (dn.includes(q) || q.includes(dn));
+      });
+    }
 
     // Viloyat berilgan bo'lsa — shu viloyatga cheklab aniqlashtirish
     if (draft.region_name && matches.length > 1) {
+      const rq = this.normGeo(draft.region_name);
       const inRegion = matches.filter(
-        (d) => d.region && namesMatch(draft.region_name as string, d.region.name),
+        (d) => d.region && this.normGeo(d.region.name) === rq,
       );
       if (inRegion.length > 0) matches = inRegion;
     }
@@ -288,6 +294,23 @@ export class AiOrderService {
     // undefined -> missingRequired uni belgilaydi -> operator WebApp'ga o'tadi
     // (buzuq raqamni jimgina saqlab qo'ymaslik uchun).
     return /^998\d{9}$/.test(digits) ? `+${digits}` : undefined;
+  }
+
+  // Geografik nomni base holatga keltiradi: tumani/shahri/viloyati kabi
+  // qo'shimchalarni olib tashlaydi (operator kiritishi bilan DB nomini
+  // solishtirish uchun — operator qo'shimcha yozmaydi).
+  private normGeo(s: string): string {
+    return (s || '')
+      .toLowerCase()
+      .trim()
+      .normalize('NFKC')
+      .replace(/[`ʼʻ']/g, "'")
+      .replace(
+        /\s*(tumani|tuman|shahri|shahar|shaharcha|viloyati|viloyat|respublikasi|sh\.|t\.)\s*/g,
+        ' ',
+      )
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   // ─── Keyingi aniqlashtirilishi kerak bo'lgan maydon ───
