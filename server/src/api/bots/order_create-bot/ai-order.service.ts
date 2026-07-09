@@ -861,6 +861,22 @@ export class AiOrderService {
             return rn.length > 2 && (rn.includes(base) || base.includes(rn));
           });
           if (subs.length === 1) region = subs[0];
+          // FUZZY: viloyat nomi imlo xatosi bilan ("Andijn" -> "Andijon").
+          // Faqat aniq g'olib (0.72+ va ikkinchidan 0.1 oldinda) bo'lsa tanlanadi;
+          // teng bo'lsa (masalan "Toshknt" -> ikki Toshkent) qoldiramiz.
+          if (!region && base.length >= 3) {
+            const scored = list
+              .map((r) => ({ r, s: this.simRatio(this.normGeo(r.name), base) }))
+              .filter((x) => x.s > 0)
+              .sort((a, b) => b.s - a.s);
+            if (
+              scored.length &&
+              scored[0].s >= 0.72 &&
+              (scored.length === 1 || scored[0].s - scored[1].s >= 0.1)
+            ) {
+              region = scored[0].r;
+            }
+          }
         }
         // baseMatches.length > 1 (masalan bare "Toshkent") → NOANIQ: qoldiramiz.
       }
@@ -902,6 +918,28 @@ export class AiOrderService {
         if (found.length) {
           const maxLen = found[0].dn.length;
           matches = found.filter((x) => x.dn.length === maxLen).map((x) => x.d);
+        }
+      }
+    }
+
+    // 3-usul (FUZZY): tuman/shahar nomi imlo xatosi bilan ("Bosoton" ->
+    // "Bo'ston", apostrof olib tashlangach). Viloyat aniq bo'lsa shu viloyat
+    // ichida. Bitta aniq g'olib -> tanlanadi; bir nechta yaqin -> "qaysi biri?".
+    if (!matches.length && draft.district_name) {
+      const base = this.normGeo(draft.district_name);
+      if (base.length >= 3) {
+        const inRegion = draft.region_id
+          ? districts.filter((d) => d.region_id === draft.region_id)
+          : [];
+        const pool = inRegion.length ? inRegion : districts;
+        const scored = pool
+          .map((d) => ({ d, s: this.simRatio(this.normGeo(d.name), base) }))
+          .filter((x) => x.s >= 0.72)
+          .sort((a, b) => b.s - a.s);
+        if (scored.length) {
+          const top = scored[0].s;
+          const near = scored.filter((x) => top - x.s < 0.08);
+          matches = near.slice(0, MAX_CANDIDATE_BUTTONS).map((x) => x.d);
         }
       }
     }
@@ -1070,7 +1108,7 @@ export class AiOrderService {
       .toLowerCase()
       .trim()
       .normalize('NFKC')
-      .replace(/[`ʼʻ']/g, "'")
+      .replace(/[`ʼʻ'‘’ʹ]/g, "")
       .replace(/\b(dona|ta|шт|pcs|штук)\b/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -1096,7 +1134,7 @@ export class AiOrderService {
       .toLowerCase()
       .trim()
       .normalize('NFKC')
-      .replace(/[`ʼʻ']/g, "'")
+      .replace(/[`ʼʻ'‘’ʹ]/g, "")
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -1106,7 +1144,7 @@ export class AiOrderService {
       .toLowerCase()
       .trim()
       .normalize('NFKC')
-      .replace(/[`ʼʻ']/g, "'")
+      .replace(/[`ʼʻ'‘’ʹ]/g, "")
       .replace(
         /\s*(tumani|tuman|shahri|shahar|shaharcha|viloyati|viloyat|respublikasi|sh\.|t\.)\s*/g,
         ' ',
