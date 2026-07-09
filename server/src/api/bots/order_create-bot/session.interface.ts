@@ -45,6 +45,7 @@ export interface AiOrderDraft {
     district_name?: string;
   }[];
   address?: string;
+  full_address?: string; // manzilning to'liq matni (rezolyutsiya zaxirasi)
   items: AiDraftItem[];
   total_price?: number;
   comment?: string;

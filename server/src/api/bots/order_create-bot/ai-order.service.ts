@@ -18,6 +18,16 @@ import { AiDraftItem, AiOrderDraft } from './session.interface';
 
 const MAX_CANDIDATE_BUTTONS = 5;
 
+// Kirill (o'zbek + rus) -> lotin transliteratsiya. Foydalanuvchi kirill yozsa ham
+// DB (lotin) nomlariga mos kelishi uchun. Case-by-case emas — umumiy.
+const CYR_LATIN: Record<string, string> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'j',
+  з: 'z', и: 'i', й: 'y', к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', о: 'o',
+  п: 'p', р: 'r', с: 's', т: 't', у: 'u', ў: 'o', ф: 'f', х: 'x', ҳ: 'h',
+  ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sh', ъ: '', ы: 'i', ь: '', э: 'e', ю: 'yu',
+  я: 'ya', ә: 'a', ө: 'o', ү: 'u', ҷ: 'j', ұ: 'u',
+};
+
 const EXTRACT_SYSTEM = `Sen O'zbekistondagi yetkazib berish platformasining buyurtma yordamchisisan.
 Foydalanuvchi (operator yoki market) yozgan yoki mijozdan forward qilingan erkin matndan buyurtma ma'lumotlarini ajratasan.
 QAT'IY QOIDALAR:
@@ -25,6 +35,7 @@ QAT'IY QOIDALAR:
 - Mahsulotlar uchun faqat NOMINI va sonini (quantity) yoz; ID/narx to'qima. Son ko'rsatilmagan bo'lsa 1.
 - region_name = VILOYAT nomi (masalan "Andijon", "Navoiy"). Faqat matnda aniq bo'lsa; bo'lmasa null. MUHIM: agar matnda "shahri" yoki "viloyati" so'zi yozilgan bo'lsa, uni HAM qo'shib yoz — ayniqsa Toshkent uchun: "Toshkent shahri" (poytaxt) va "Toshkent viloyati" (atrofdagi tumanlar) ikki XIL joy, farqla.
 - district_name = yetkazish JOYI — TUMAN yoki SHAHAR nomi (masalan "Asaka", "Chilonzor", "Navoiy shahri", "Zarafshon shahri", "Nurota"). MUHIM: joy manzil ichida bo'lsa ham (masalan "Navoiy shahri vagzal xududi 20-uy") — shahar/tuman nomini ("Navoiy shahri") ajratib district_name'ga yoz, faqat qolgan ko'cha/uy qismini ("vagzal xududi 20-uy") address'ga yoz. SHAHAR ham district_name'ga tushadi, address'ga EMAS.
+- full_address = MANZILNING TO'LIQ MATNI — viloyat, tuman/shahar, ko'cha, uy — HAMMASI, matnda qanday yozilgan bo'lsa AYNAN o'sha holicha ko'chir (o'zgartirma, tarjima qilma, hech narsani tushirib qoldirma). Kirill bo'lsa kirill, lotin bo'lsa lotin. Bu maydon rezolyutsiya uchun zaxira.
 - total_price = butun buyurtma narxi RAQAM sifatida (masalan "250 ming" -> 250000, "2.5 mln" -> 2500000). Aniq bo'lmasa null.
 - comment = yetkazish bo'yicha izoh (masalan "kechqurun keling"). Telefon raqamlar comment'ga tushmasin.
 - Telefon O'zbekiston formatida; faqat raqamlarni ol.
@@ -44,6 +55,7 @@ const EXTRACT_SCHEMA: Record<string, unknown> = {
     region_name: { type: ['string', 'null'] },
     district_name: { type: ['string', 'null'] },
     address: { type: ['string', 'null'] },
+    full_address: { type: ['string', 'null'] },
     items: {
       type: 'array',
       items: {
@@ -69,6 +81,7 @@ const EXTRACT_SCHEMA: Record<string, unknown> = {
     'region_name',
     'district_name',
     'address',
+    'full_address',
     'items',
     'total_price',
     'comment',
@@ -85,6 +98,7 @@ interface RawExtraction {
   region_name: string | null;
   district_name: string | null;
   address: string | null;
+  full_address: string | null;
   items: { name: string; quantity: number }[];
   total_price: number | null;
   comment: string | null;
@@ -422,6 +436,7 @@ export class AiOrderService {
       region_name: raw.region_name?.trim() || undefined,
       district_name: raw.district_name?.trim() || undefined,
       address: raw.address?.trim() || undefined,
+      full_address: raw.full_address?.trim() || undefined,
       items,
       total_price:
         raw.total_price != null && Number(raw.total_price) > 0
@@ -999,10 +1014,67 @@ export class AiOrderService {
       }
     }
 
+    // 4-usul (FUZZY SUBSTRING): tuman AI tomonidan tushirib qoldirilgan yoki
+    // to'liq manzil ichida (kirill/imlo xato/AI noaniq ajratgan) — DB nomini
+    // FULL_ADDRESS matnidan bo'shliqsiz skeletda fuzzy-substring bilan topamiz.
+    // Umumiy — har case uchun alohida qoida emas.
+    if (!matches.length) {
+      // Viloyat nomini korpusdan olib tashlaymiz — "Andijon"/"Samarqand" so'zi
+      // shu nomli TUMANga (Andijon shahri/tumani) yolg'on mos kelmasin (faqat
+      // viloyat berilgan holat tuman qaytarmasin).
+      const regionWord = this.normGeo(
+        draft.region_label || draft.region_name || '',
+      );
+      const corpus = this.normGeo(
+        `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`,
+      )
+        .split(' ')
+        .filter((w) => w && w !== regionWord)
+        .join('');
+      if (corpus.length >= 4) {
+        const inRegion = draft.region_id
+          ? districts.filter((d) => d.region_id === draft.region_id)
+          : [];
+        const pool = inRegion.length ? inRegion : districts;
+        let bestScore = 0;
+        let bestDs: DistrictEntity[] = [];
+        for (const d of pool) {
+          const dn = this.normGeo(d.name).replace(/\s+/g, '');
+          if (dn.length < 4) continue;
+          const sc = this.bestSubstringSim(corpus, dn);
+          if (sc > bestScore + 1e-9) {
+            bestScore = sc;
+            bestDs = [d];
+          } else if (Math.abs(sc - bestScore) < 1e-9) {
+            bestDs.push(d);
+          }
+        }
+        if (bestScore >= 0.82) matches = bestDs.slice(0, MAX_CANDIDATE_BUTTONS);
+      }
+    }
+
     // Viloyat aniqlangan bo'lsa — shu viloyatga cheklab aniqlashtirish.
     if (draft.region_id && matches.length > 1) {
       const inRegion = matches.filter((d) => d.region_id === draft.region_id);
       if (inRegion.length > 0) matches = inRegion;
+    }
+
+    // Shahri/tumani afzalligi: matnda "tuman(i)" bo'lsa tumani, "shahar/shahri"
+    // bo'lsa shahri afzal (base-nom ikkalasiga mos kelganda — Samarqand
+    // shahri/tumani, Kattaqo'rg'on shahri/tumani).
+    if (matches.length > 1) {
+      const raw = this.translit(
+        `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`,
+      );
+      const wantsShahar = /\b(shahri|shahar)\b/.test(raw);
+      const wantsTuman = /\b(tumani|tuman)\b/.test(raw);
+      if (wantsTuman && !wantsShahar) {
+        const f = matches.filter((d) => /tuman/i.test(d.name));
+        if (f.length) matches = f;
+      } else if (wantsShahar && !wantsTuman) {
+        const f = matches.filter((d) => /shah/i.test(d.name));
+        if (f.length) matches = f;
+      }
     }
 
     const toLabel = (d: DistrictEntity) =>
@@ -1129,6 +1201,28 @@ export class AiOrderService {
     return avg * countPenalty;
   }
 
+  // needle'ning hay ichidagi ENG YAXSHI fuzzy-substring mosligi (0..1).
+  // Manzil matni ichidan tuman nomini (imlo xato bilan) topish uchun.
+  private bestSubstringSim(hay: string, needle: string): number {
+    const n = needle.length;
+    if (n < 4) return 0;
+    if (hay.length <= n) {
+      const m = Math.max(hay.length, n);
+      return m ? 1 - this.levenshtein(hay, needle) / m : 0;
+    }
+    let best = 0;
+    for (let len = n - 1; len <= n + 1; len++) {
+      if (len < 4) continue;
+      for (let i = 0; i + len <= hay.length; i++) {
+        const win = hay.slice(i, i + len);
+        const r = 1 - this.levenshtein(win, needle) / Math.max(len, n);
+        if (r > best) best = r;
+        if (best === 1) return 1;
+      }
+    }
+    return best;
+  }
+
   private simRatio(a: string, b: string): number {
     if (!a || !b) return 0;
     if (a === b) return 1;
@@ -1158,13 +1252,27 @@ export class AiOrderService {
     return prev[n];
   }
 
+  // Umumiy transliteratsiya + diakritik-folding — HAR QANDAY yozuvni (kirill,
+  // ö/ğ/ş/ç kabi nostandart lotin, apostrofli) yagona lotin-skeletga keltiradi.
+  // Shunda "Андижон"/"Kattaqörğon"/"Kattaqo'rg'on" bir xil taqqoslanadi. Har
+  // bir holat uchun alohida qoida YOZILMAYDI — universal.
+  private translit(s: string): string {
+    const src = (s || '').toLowerCase().normalize('NFKC');
+    let out = '';
+    for (const ch of src) out += CYR_LATIN[ch] ?? ch;
+    return out
+      .replace(/ş/g, 'sh')
+      .replace(/ç/g, 'ch')
+      .replace(/ø/g, 'o')
+      .replace(/ı/g, 'i')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // diakritiklar: ö→o, ü→u, ğ→g, é→e...
+      .replace(/[`ʼʻ'‘’ʹ]/g, ''); // apostroflar (o'→o, g'→g)
+  }
+
   private normalizeProduct(s: string): string {
-    return (s || '')
-      .toLowerCase()
-      .trim()
-      .normalize('NFKC')
-      .replace(/[`ʼʻ'‘’ʹ]/g, "")
-      .replace(/\b(dona|ta|шт|pcs|штук)\b/g, ' ')
+    return this.translit(s)
+      .replace(/\b(dona|ta|pcs|sht|shtuk)\b/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }
