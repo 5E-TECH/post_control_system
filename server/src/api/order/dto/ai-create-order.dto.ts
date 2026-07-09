@@ -90,6 +90,10 @@ export class ConfirmedOrderDto {
   comment?: string;
 
   @IsOptional()
+  @IsString()
+  operator?: string;
+
+  @IsOptional()
   @IsEnum(Where_deliver)
   where_deliver?: Where_deliver;
 

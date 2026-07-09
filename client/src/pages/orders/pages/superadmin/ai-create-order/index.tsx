@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Select, message } from "antd";
 import {
   Bot,
@@ -83,6 +83,7 @@ interface Preview {
   items: PItem[];
   total_price?: number;
   comment?: string;
+  operator?: string;
   where_deliver?: "center" | "address";
   is_replacement?: boolean;
   replaced_order_id?: string;
@@ -119,14 +120,8 @@ function evalPreview(p: Preview): { ready: boolean; issues: string[] } {
   const issues: string[] = [];
   if (!p.customer_name?.trim()) issues.push("mijoz ismi yo'q");
   if (!p.phone_number?.trim()) issues.push("telefon yo'q");
-  if (!p.district_id)
-    issues.push(
-      p.district_candidates?.length
-        ? "tuman/shahar tanlang"
-        : p.region_given
-          ? "shahar/tuman kiritilmagan"
-          : "tuman/shahar topilmadi"
-    );
+  if (!p.region_id) issues.push("viloyat tanlang");
+  else if (!p.district_id) issues.push("tuman/shahar tanlang");
   // Almashtirish faqat operator TASDIQLAGANDA kuchga kiradi (avto-topilsa ham).
   const isRepl = !!(p.replacement_confirmed && p.replaced_order_id);
   if (p.replacement_confirmed && !p.replaced_order_id)
@@ -242,6 +237,22 @@ const AiCreateOrder = () => {
   const [created, setCreated] = useState<CreatedRow[]>([]);
   const [parseErr, setParseErr] = useState<ParseResponse | null>(null);
 
+  // Barcha viloyat + tuman/shaharlar (tahrirlash Select'lari uchun) — bir marta.
+  const geoQ = useQuery({
+    queryKey: ["ai-geo"],
+    queryFn: () =>
+      api.get("order/ai-geo").then(
+        (r) =>
+          r.data as {
+            regions: { id: string; name: string }[];
+            districts: { id: string; name: string; region_id: string }[];
+          }
+      ),
+    staleTime: 1000 * 60 * 60,
+  });
+  const regions = geoQ.data?.regions ?? [];
+  const allDistricts = geoQ.data?.districts ?? [];
+
   const parseM = useMutation({
     mutationFn: () =>
       api
@@ -278,6 +289,7 @@ const AiCreateOrder = () => {
             })),
             total_price: p.total_price,
             comment: p.comment || undefined,
+            operator: p.operator || undefined,
             where_deliver: p.where_deliver || undefined,
             // Faqat operator tasdiqlagan bo'lsa almashtirish sifatida jo'natiladi.
             replaced_order_id:
@@ -715,54 +727,64 @@ const AiCreateOrder = () => {
                               className={`${inputCls} ${okBorder}`}
                             />
                           </div>
-                          {/* Viloyat — DB'dan (tuman/shaharga bog'liq) */}
+                          {/* Viloyat — barcha viloyatlar (DB), tahrirlanadi */}
                           <div className="space-y-1">
                             <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                               <MapPin className="w-3.5 h-3.5" /> Viloyat
                             </label>
-                            <div className="h-10 px-3 flex items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-700 dark:text-gray-200 truncate">
-                              {p.region_name || "—"}
-                            </div>
+                            <Select
+                              size="large"
+                              showSearch
+                              optionFilterProp="label"
+                              className="w-full [&_.ant-select-selector]:!rounded-xl"
+                              placeholder="Viloyatni tanlang"
+                              status={!p.region_id ? "warning" : undefined}
+                              value={p.region_id}
+                              loading={geoQ.isLoading}
+                              options={regions.map((r) => ({
+                                value: r.id,
+                                label: r.name,
+                              }))}
+                              onChange={(v) => {
+                                const r = regions.find((x) => x.id === v);
+                                updatePreview(p.id, {
+                                  region_id: v,
+                                  region_name: r?.name,
+                                  district_id: undefined,
+                                  district_name: undefined,
+                                });
+                              }}
+                            />
                           </div>
-                          {/* Tuman / Shahar — DB'dan */}
+                          {/* Tuman / Shahar — tanlangan viloyat tumanlari (DB) */}
                           <div className="space-y-1">
                             <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                               <MapPin className="w-3.5 h-3.5" /> Tuman / Shahar
                             </label>
-                            {p.district_id ? (
-                              <div className="h-10 px-3 flex items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-700 dark:text-gray-200 truncate">
-                                {p.district_name || "Tanlangan"}
-                              </div>
-                            ) : p.district_candidates?.length ? (
-                              <Select
-                                size="large"
-                                className="w-full [&_.ant-select-selector]:!rounded-xl"
-                                placeholder="Tuman/shaharni tanlang"
-                                status="warning"
-                                options={p.district_candidates.map((c) => ({
-                                  value: c.id,
-                                  label: c.label,
-                                }))}
-                                onChange={(v) => {
-                                  const c = p.district_candidates?.find(
-                                    (x) => x.id === v
-                                  );
-                                  updatePreview(p.id, {
-                                    district_id: v,
-                                    district_name: c?.district_name,
-                                    region_name: c?.region_name,
-                                  });
-                                }}
-                              />
-                            ) : (
-                              <div
-                                className={`h-10 px-3 flex items-center rounded-xl text-sm ${errBorder} border text-red-600 dark:text-red-400`}
-                              >
-                                {p.region_given
-                                  ? "Kiritilmagan"
-                                  : "Topilmadi — matnni tuzating"}
-                              </div>
-                            )}
+                            <Select
+                              size="large"
+                              showSearch
+                              optionFilterProp="label"
+                              className="w-full [&_.ant-select-selector]:!rounded-xl"
+                              placeholder={
+                                p.region_id
+                                  ? "Tuman/shaharni tanlang"
+                                  : "Avval viloyatni tanlang"
+                              }
+                              status={!p.district_id ? "warning" : undefined}
+                              value={p.district_id}
+                              disabled={!p.region_id}
+                              options={allDistricts
+                                .filter((d) => d.region_id === p.region_id)
+                                .map((d) => ({ value: d.id, label: d.name }))}
+                              onChange={(v) => {
+                                const d = allDistricts.find((x) => x.id === v);
+                                updatePreview(p.id, {
+                                  district_id: v,
+                                  district_name: d?.name,
+                                });
+                              }}
+                            />
                           </div>
                           <div className="space-y-1">
                             <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
@@ -789,6 +811,20 @@ const AiCreateOrder = () => {
                                     ? okBorder
                                     : errBorder
                               }`}
+                            />
+                          </div>
+                          {/* Mutaxassis (operator) */}
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5" /> Mutaxassis
+                            </label>
+                            <input
+                              value={p.operator || ""}
+                              placeholder="ixtiyoriy"
+                              onChange={(e) =>
+                                updatePreview(p.id, { operator: e.target.value })
+                              }
+                              className={`${inputCls} ${okBorder}`}
                             />
                           </div>
                           {/* Manzil */}

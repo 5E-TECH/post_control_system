@@ -48,6 +48,7 @@ export interface AiOrderDraft {
   items: AiDraftItem[];
   total_price?: number;
   comment?: string;
+  operator?: string; // mutaxassis / sotuvchi ismi
   where_deliver?: 'center' | 'address'; // yetkazish turi
   is_replacement?: boolean; // matn almashtirishni bildiradimi
   replaced_order_id?: string; // avto-tanlangan eski buyurtma (resolver to'ldiradi)

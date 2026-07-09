@@ -108,6 +108,20 @@ export class OrderController {
     return this.aiOrderService.aiAvailabilityForUser(user);
   }
 
+  @ApiOperation({ summary: 'AI karta uchun barcha viloyat + tuman/shaharlar' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('ai-geo')
+  aiGeo() {
+    return this.aiOrderService.getGeo();
+  }
+
   @ApiOperation({ summary: 'AI matnni tahlil qilish (bir/bir nechta buyurtma)' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(

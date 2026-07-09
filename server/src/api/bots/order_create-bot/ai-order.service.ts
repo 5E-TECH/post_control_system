@@ -31,6 +31,7 @@ QAT'IY QOIDALAR:
 - extra_number = mijozning IKKINCHI (qo'shimcha) telefon raqami, agar bo'lsa.
 - where_deliver = yetkazish turi: "address" (uyga/manzilga yetkazilsa, "eshikkacha", "uyiga"), "center" (markazdan/pochtadan/filialdan olib ketsa yoki "olib ketadi"). Aniq bo'lmasa null.
 - is_replacement = true FAQAT matn ALMASHTIRISH/kafolat holatini bildirsa: "almashtirish", "almashtirib berish", "kafolat", "brak", "nosoz", "buzuq", "ishlamayapti", "eski ... o'rniga", "qaytarib olib yangisini". Oddiy yangi buyurtma bo'lsa false.
+- operator = MUTAXASSIS / operator / sotuvchi ismi, agar matnda ko'rsatilgan bo'lsa (masalan "Mutaxassis: #sevinch" -> "sevinch", "operator Ali" -> "Ali"). '#' belgisini olib tashla. Yo'q bo'lsa null.
 Matn o'zbek, rus yoki lotin/kirill aralash bo'lishi mumkin.`;
 
 const EXTRACT_SCHEMA: Record<string, unknown> = {
@@ -59,6 +60,7 @@ const EXTRACT_SCHEMA: Record<string, unknown> = {
     comment: { type: ['string', 'null'] },
     where_deliver: { type: ['string', 'null'] },
     is_replacement: { type: 'boolean' },
+    operator: { type: ['string', 'null'] },
   },
   required: [
     'customer_name',
@@ -72,6 +74,7 @@ const EXTRACT_SCHEMA: Record<string, unknown> = {
     'comment',
     'where_deliver',
     'is_replacement',
+    'operator',
   ],
 };
 
@@ -87,6 +90,7 @@ interface RawExtraction {
   comment: string | null;
   where_deliver: string | null;
   is_replacement: boolean;
+  operator: string | null;
 }
 
 // Ko'p buyurtma: bitta matnda bir nechta buyurtma bo'lishi mumkin.
@@ -133,6 +137,7 @@ export interface OrderPreview {
   items: OrderPreviewItem[];
   total_price?: number;
   comment?: string;
+  operator?: string;
   where_deliver?: 'center' | 'address';
   is_replacement?: boolean;
   replaced_order_id?: string;
@@ -156,6 +161,7 @@ export interface ConfirmedOrder {
   order_item_info: { product_id: string; quantity: number }[];
   total_price: number;
   comment?: string;
+  operator?: string;
   where_deliver?: Where_deliver;
   replaced_order_id?: string;
 }
@@ -419,12 +425,17 @@ export class AiOrderService {
             ? 'center'
             : undefined,
       is_replacement: raw.is_replacement === true,
+      operator: raw.operator?.replace(/^#+/, '').trim() || undefined,
     };
   }
 
   // ─── Ko'p buyurtma: matndan BIR NECHTA buyurtmani ajratib, har birini
   //     rezolyutsiya qiladi va tasdiqlash uchun preview qaytaradi (charge YO'Q).
-  async parseOrders(text: string, marketId: string): Promise<OrderPreview[]> {
+  async parseOrders(
+    text: string,
+    marketId: string,
+    defaultTariff?: Where_deliver,
+  ): Promise<OrderPreview[]> {
     const res = await this.claude.extractJson<{ orders: RawExtraction[] }>({
       system: EXTRACT_MULTI_SYSTEM,
       userText: text,
@@ -433,12 +444,17 @@ export class AiOrderService {
     });
     if (!res || !Array.isArray(res.orders)) return [];
 
+    // Yetkazish turi — MARKET default'iga qarab (AI taxminiga emas).
+    const marketDefault: 'center' | 'address' =
+      defaultTariff === Where_deliver.ADDRESS ? 'address' : 'center';
+
     const previews: OrderPreview[] = [];
     for (const raw of res.orders) {
       const draft = this.rawToDraft(raw);
       if (!draft.customer_name && !draft.phone_number && !draft.items.length) {
         continue; // bo'sh element
       }
+      draft.where_deliver = marketDefault; // market default (operator kartada o'zgartiradi)
       await this.resolveDraft(draft, marketId);
       if (draft.is_replacement) {
         await this.resolveReplacement(draft, marketId);
@@ -547,6 +563,7 @@ export class AiOrderService {
       })),
       total_price: draft.total_price,
       comment: draft.comment,
+      operator: draft.operator,
       where_deliver: draft.where_deliver,
       is_replacement: draft.is_replacement,
       replaced_order_id: draft.replaced_order_id,
@@ -585,7 +602,13 @@ export class AiOrderService {
       }
     }
 
-    const orders = await this.parseOrders(text, marketId);
+    // Market default yetkazish tarifi
+    const marketRow = await this.userRepo.findOne({ where: { id: marketId } });
+    const orders = await this.parseOrders(
+      text,
+      marketId,
+      marketRow?.default_tariff,
+    );
     if (!orders.length) return { ok: false, reason: 'ai_error' };
     return { ok: true, orders };
   }
@@ -695,7 +718,9 @@ export class AiOrderService {
           total_price: o.total_price,
           district_id: o.district_id,
           comment: o.comment,
-          where_deliver: o.where_deliver ?? Where_deliver.CENTER,
+          where_deliver:
+            o.where_deliver ?? marketRow?.default_tariff ?? Where_deliver.CENTER,
+          operator: o.operator,
           operator_phone: defaultOperatorPhone,
           replaced_order_id: o.replaced_order_id,
         } as CreateOrderDto;
@@ -761,6 +786,26 @@ export class AiOrderService {
     return bodyMarketId;
   }
 
+  // Barcha viloyat + tuman/shaharlar (AI karta Select'lari uchun) — bitta so'rov.
+  async getGeo(): Promise<{
+    regions: { id: string; name: string }[];
+    districts: { id: string; name: string; region_id: string }[];
+  }> {
+    const districts = await this.districtRepo.find({ relations: ['region'] });
+    const regionsMap = new Map<string, { id: string; name: string }>();
+    const outDistricts = districts.map((d) => {
+      if (d.region) {
+        regionsMap.set(d.region_id, { id: d.region_id, name: d.region.name });
+      }
+      return { id: d.id, name: d.name, region_id: d.region_id };
+    });
+    const regions = [...regionsMap.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    outDistricts.sort((a, b) => a.name.localeCompare(b.name));
+    return { regions, districts: outDistricts };
+  }
+
   // ─── 2-faza: REZOLYUTSIYA (DETERMINISTIK DB moslash) ───
   async resolveDraft(
     draft: AiOrderDraft,
@@ -773,6 +818,28 @@ export class AiOrderService {
 
   private async resolveDistrict(draft: AiOrderDraft): Promise<void> {
     const districts = await this.districtRepo.find({ relations: ['region'] });
+
+    // 0. VILOYATNI mustaqil aniqlaymiz (tuman topilmasa ham viloyat qolsin).
+    if (draft.region_name) {
+      const rq = this.normGeo(draft.region_name);
+      const regions = new Map<string, { id: string; name: string }>();
+      for (const d of districts) {
+        if (d.region) regions.set(d.region_id, { id: d.region_id, name: d.region.name });
+      }
+      let region = [...regions.values()].find(
+        (r) => this.normGeo(r.name) === rq,
+      );
+      if (!region) {
+        region = [...regions.values()].find((r) => {
+          const rn = this.normGeo(r.name);
+          return rn.length > 2 && (rn.includes(rq) || rq.includes(rn));
+        });
+      }
+      if (region) {
+        draft.region_id = region.id;
+        draft.region_label = region.name;
+      }
+    }
 
     // 1-usul: district_name bo'yicha (aniq base-nom, keyin qism-mos).
     let matches: DistrictEntity[] = [];
@@ -804,19 +871,15 @@ export class AiOrderService {
           .filter((x) => x.dn.length >= 4 && padded.includes(` ${x.dn} `))
           .sort((a, b) => b.dn.length - a.dn.length);
         if (found.length) {
-          // Eng uzun mos nom uzunligidagilar (ustunlik uzunroq nomga)
           const maxLen = found[0].dn.length;
           matches = found.filter((x) => x.dn.length === maxLen).map((x) => x.d);
         }
       }
     }
 
-    // Viloyat berilgan bo'lsa — shu viloyatga cheklab aniqlashtirish.
-    if (draft.region_name && matches.length > 1) {
-      const rq = this.normGeo(draft.region_name);
-      const inRegion = matches.filter(
-        (d) => d.region && this.normGeo(d.region.name) === rq,
-      );
+    // Viloyat aniqlangan bo'lsa — shu viloyatga cheklab aniqlashtirish.
+    if (draft.region_id && matches.length > 1) {
+      const inRegion = matches.filter((d) => d.region_id === draft.region_id);
       if (inRegion.length > 0) matches = inRegion;
     }
 
@@ -827,15 +890,14 @@ export class AiOrderService {
       const d = matches[0];
       draft.district_id = d.id;
       draft.district_resolved_name = d.name;
-      draft.region_id = d.region_id;
-      draft.region_label = d.region?.name || undefined;
+      draft.region_id = d.region_id; // tuman viloyatini aniq bilamiz
+      draft.region_label = d.region?.name || draft.region_label;
       draft.district_label = toLabel(d);
       draft.district_candidates = undefined;
     } else if (matches.length > 1) {
+      // Tuman noaniq — lekin VILOYATni (0-bosqichda aniqlangan) saqlaymiz.
       draft.district_id = undefined;
       draft.district_resolved_name = undefined;
-      draft.region_id = undefined;
-      draft.region_label = undefined;
       draft.district_candidates = matches
         .slice(0, MAX_CANDIDATE_BUTTONS)
         .map((d) => ({
@@ -845,10 +907,9 @@ export class AiOrderService {
           district_name: d.name,
         }));
     } else {
+      // Tuman topilmadi — viloyat (agar aniqlangan bo'lsa) saqlanadi.
       draft.district_id = undefined;
       draft.district_resolved_name = undefined;
-      draft.region_id = undefined;
-      draft.region_label = undefined;
       draft.district_candidates = [];
     }
   }
