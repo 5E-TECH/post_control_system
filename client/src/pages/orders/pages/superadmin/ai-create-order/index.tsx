@@ -42,10 +42,16 @@ const formatDate = (ts?: number | null) => {
   }
 };
 
+// Zich (compact) inputlar — ko'p buyurtma tasdiqlashda kam scroll uchun.
 const inputCls =
-  "w-full h-10 px-3 bg-gray-50 dark:bg-gray-800 border rounded-xl text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all";
+  "w-full h-8 px-2.5 bg-gray-50 dark:bg-gray-800 border rounded-lg text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all";
 const okBorder = "border-gray-200 dark:border-gray-600";
 const errBorder = "border-red-300 dark:border-red-700/70 bg-red-50/50 dark:bg-red-900/10";
+const labelCls =
+  "text-[11px] font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-0.5";
+// Antd Select'ni h-8 va rounded-lg qilib native inputlarga moslash.
+const selSel =
+  "[&_.ant-select-selector]:!h-8 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!flex [&_.ant-select-selector]:!items-center [&_.ant-select-selection-search-input]:!h-8";
 
 // ─── Turlar ───
 interface PItem {
@@ -261,7 +267,8 @@ const AiCreateOrder = () => {
         .get("order/ai-products", { params: { market_id: market?.id } })
         .then((r) => r.data as { id: string; name: string }[]),
     staleTime: 1000 * 60 * 10,
-    enabled: !!market?.id,
+    // Market/operator uchun market_id yo'q bo'lsa ham backend JWT'dan oladi.
+    enabled: !!market?.id || isMarketOrOperator,
   });
   const allProducts = productsQ.data ?? [];
 
@@ -645,7 +652,7 @@ const AiCreateOrder = () => {
                     >
                       {/* header */}
                       <div
-                        className={`px-4 py-3 flex items-center justify-between gap-2 ${
+                        className={`px-3 py-2 flex items-center justify-between gap-2 ${
                           ready
                             ? "bg-green-50/60 dark:bg-green-900/10"
                             : "bg-amber-50/60 dark:bg-amber-900/10"
@@ -687,11 +694,11 @@ const AiCreateOrder = () => {
                         </div>
                       </div>
 
-                      <div className="p-4 space-y-4">
-                        {/* fields */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                      <div className="p-3 space-y-2.5">
+                        {/* fields — zich 3 ustun */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          <div>
+                            <label className={labelCls}>
                               <User className="w-3.5 h-3.5" /> Mijoz
                             </label>
                             <input
@@ -707,8 +714,8 @@ const AiCreateOrder = () => {
                               }`}
                             />
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <div>
+                            <label className={labelCls}>
                               <Phone className="w-3.5 h-3.5" /> Telefon
                             </label>
                             <input
@@ -724,8 +731,8 @@ const AiCreateOrder = () => {
                               }`}
                             />
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <div>
+                            <label className={labelCls}>
                               <Phone className="w-3.5 h-3.5" /> Qo'shimcha raqam
                             </label>
                             <input
@@ -740,15 +747,14 @@ const AiCreateOrder = () => {
                             />
                           </div>
                           {/* Viloyat — barcha viloyatlar (DB), tahrirlanadi */}
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <div>
+                            <label className={labelCls}>
                               <MapPin className="w-3.5 h-3.5" /> Viloyat
                             </label>
                             <Select
-                              size="large"
                               showSearch
                               optionFilterProp="label"
-                              className="w-full [&_.ant-select-selector]:!rounded-xl"
+                              className={`w-full ${selSel}`}
                               placeholder="Viloyatni tanlang"
                               status={!p.region_id ? "warning" : undefined}
                               value={p.region_id}
@@ -769,15 +775,14 @@ const AiCreateOrder = () => {
                             />
                           </div>
                           {/* Tuman / Shahar — tanlangan viloyat tumanlari (DB) */}
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <div>
+                            <label className={labelCls}>
                               <MapPin className="w-3.5 h-3.5" /> Tuman / Shahar
                             </label>
                             <Select
-                              size="large"
                               showSearch
                               optionFilterProp="label"
-                              className="w-full [&_.ant-select-selector]:!rounded-xl"
+                              className={`w-full ${selSel}`}
                               placeholder={
                                 p.region_id
                                   ? "Tuman/shaharni tanlang"
@@ -798,8 +803,8 @@ const AiCreateOrder = () => {
                               }}
                             />
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <div>
+                            <label className={labelCls}>
                               <Wallet className="w-3.5 h-3.5" /> Narx (so'm)
                             </label>
                             <input
@@ -826,8 +831,8 @@ const AiCreateOrder = () => {
                             />
                           </div>
                           {/* Mutaxassis (operator) */}
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <div>
+                            <label className={labelCls}>
                               <User className="w-3.5 h-3.5" /> Mutaxassis
                             </label>
                             <input
@@ -840,8 +845,8 @@ const AiCreateOrder = () => {
                             />
                           </div>
                           {/* Manzil */}
-                          <div className="space-y-1 sm:col-span-2">
-                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <div className="sm:col-span-2 md:col-span-3">
+                            <label className={labelCls}>
                               <MapPin className="w-3.5 h-3.5" /> Manzil (ixtiyoriy)
                             </label>
                             <input
@@ -856,11 +861,11 @@ const AiCreateOrder = () => {
                         </div>
 
                         {/* Yetkazish turi */}
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                        <div>
+                          <label className={labelCls}>
                             <Truck className="w-3.5 h-3.5" /> Yetkazish turi
                           </label>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1.5">
                             {(
                               [
                                 { v: "center", label: "Markazdan olib ketadi" },
@@ -876,7 +881,7 @@ const AiCreateOrder = () => {
                                   onClick={() =>
                                     updatePreview(p.id, { where_deliver: opt.v })
                                   }
-                                  className={`flex-1 h-10 px-3 rounded-xl text-sm font-medium border transition-all cursor-pointer ${
+                                  className={`flex-1 h-8 px-2 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                                     active
                                       ? "bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600 text-purple-700 dark:text-purple-300"
                                       : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-purple-300"
@@ -890,8 +895,8 @@ const AiCreateOrder = () => {
                         </div>
 
                         {/* items */}
-                        <div className="space-y-2">
-                          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                        <div className="space-y-1.5">
+                          <label className={labelCls}>
                             <ShoppingCart className="w-3.5 h-3.5" /> Mahsulotlar
                           </label>
                           {p.items.length === 0 && (
@@ -902,7 +907,7 @@ const AiCreateOrder = () => {
                           {p.items.map((it, idx) => (
                             <div
                               key={idx}
-                              className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl px-2.5 py-2"
+                              className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg px-2 py-1.5"
                             >
                               <input
                                 inputMode="numeric"
@@ -916,7 +921,7 @@ const AiCreateOrder = () => {
                                     ),
                                   })
                                 }
-                                className="w-14 h-9 px-2 text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-11 h-8 px-1.5 text-center bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
                               />
                               <span className="text-xs text-gray-400">×</span>
                               {it.product_id ? (
@@ -928,7 +933,7 @@ const AiCreateOrder = () => {
                                 <Select
                                   showSearch
                                   optionFilterProp="label"
-                                  className="flex-1 [&_.ant-select-selector]:!h-9 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!flex [&_.ant-select-selector]:!items-center"
+                                  className={`flex-1 ${selSel}`}
                                   status={it.candidates?.length ? "warning" : "error"}
                                   loading={productsQ.isLoading}
                                   placeholder={
@@ -1009,8 +1014,7 @@ const AiCreateOrder = () => {
                                 </label>
                                 {p.replacement_confirmed ? (
                                   <Select
-                                    size="large"
-                                    className="w-full [&_.ant-select-selector]:!rounded-xl"
+                                    className={`w-full ${selSel}`}
                                     value={p.replaced_order_id}
                                     placeholder="Eski buyurtmani tanlang"
                                     status={

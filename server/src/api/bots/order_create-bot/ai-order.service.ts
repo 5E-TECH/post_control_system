@@ -1016,6 +1016,8 @@ export class AiOrderService {
   }
 
   // Har bir so'rov so'ziga eng yaqin mahsulot so'zini topib, o'rtacha o'xshashlik.
+  // So'z SONI farqiga jarima — "olma sharbat" != "olma va uzum sharbat" (superset
+  // boshqa SKU/narx) jimgina avto-tanlanib qolmasligi uchun.
   private tokenFuzzy(qTokens: string[], pTokens: string[]): number {
     if (!qTokens.length || !pTokens.length) return 0;
     let sum = 0;
@@ -1027,13 +1029,22 @@ export class AiOrderService {
       }
       sum += best;
     }
-    return sum / qTokens.length;
+    const avg = sum / qTokens.length;
+    const countPenalty =
+      Math.min(qTokens.length, pTokens.length) /
+      Math.max(qTokens.length, pTokens.length);
+    return avg * countPenalty;
   }
 
   private simRatio(a: string, b: string): number {
     if (!a || !b) return 0;
     if (a === b) return 1;
+    // Raqamli token (o'lcham/model: "700 gr", "a51") ANIQ mos kelishi shart —
+    // "700"->"500", "a51"->"a50" fuzzy bilan avto-tanlanib boshqa SKU bo'lmasin.
+    if (/\d/.test(a) || /\d/.test(b)) return 0;
     const m = Math.max(a.length, b.length);
+    // Uzunliklar juda farq qilsa (ratio <= min/max < 0.4) — Levenshteinsiz 0.
+    if (Math.min(a.length, b.length) < m * 0.4) return 0;
     return m ? 1 - this.levenshtein(a, b) / m : 0;
   }
 
