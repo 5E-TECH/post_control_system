@@ -65,6 +65,14 @@ const okBorder = "border-gray-200 dark:border-gray-600";
 const errBorder = "border-red-300 dark:border-red-700/70 bg-red-50/50 dark:bg-red-900/10";
 const labelCls =
   "text-[11px] font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-0.5";
+
+// Maydon ostidagi qizil kamchilik izohi — qayeri to'ldirilishi kerakligi aniq.
+const FieldHint = ({ children }: { children: React.ReactNode }) => (
+  <span className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-red-500 dark:text-red-400">
+    <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0" />
+    {children}
+  </span>
+);
 // Antd Select'ni h-8 va rounded-lg qilib native inputlarga moslash.
 const selSel =
   "[&_.ant-select-selector]:!h-8 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!flex [&_.ant-select-selector]:!items-center [&_.ant-select-selection-search-input]:!h-8";
@@ -671,32 +679,41 @@ const AiCreateOrder = () => {
                   return (
                     <div
                       key={p.id}
-                      className={`bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden border ${
+                      className={`bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden border border-l-[5px] ${
                         ready
-                          ? "border-green-200 dark:border-green-900/40"
-                          : "border-amber-200 dark:border-amber-900/40"
+                          ? "border-green-200 dark:border-green-900/40 border-l-green-500"
+                          : "border-amber-200 dark:border-amber-900/40 border-l-amber-500"
                       }`}
                     >
-                      {/* header */}
+                      {/* header — buyurtmani ajratib turadi (raqam + mijoz ismi) */}
                       <div
-                        className={`px-3 py-2 flex items-center justify-between gap-2 ${
+                        className={`px-3 py-2.5 flex items-center justify-between gap-2 border-b ${
                           ready
-                            ? "bg-green-50/60 dark:bg-green-900/10"
-                            : "bg-amber-50/60 dark:bg-amber-900/10"
+                            ? "bg-green-50/60 dark:bg-green-900/10 border-green-100 dark:border-green-900/30"
+                            : "bg-amber-50/60 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30"
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs font-semibold text-gray-400">
-                            #{cardIdx + 1}
+                          <span
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                              ready
+                                ? "bg-green-500 text-white"
+                                : "bg-amber-500 text-white"
+                            }`}
+                          >
+                            {cardIdx + 1}
+                          </span>
+                          <span className="font-semibold text-sm text-gray-800 dark:text-white truncate">
+                            {p.customer_name?.trim() || "Ismsiz buyurtma"}
                           </span>
                           {ready ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full flex-shrink-0">
                               <CheckCircle2 className="w-3 h-3" /> Tayyor
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full flex-shrink-0">
                               <AlertTriangle className="w-3 h-3" />{" "}
-                              {issues.length} ta to'ldirilishi kerak
+                              {issues.length} ta kamchilik
                             </span>
                           )}
                         </div>
@@ -740,6 +757,9 @@ const AiCreateOrder = () => {
                                 p.customer_name?.trim() ? okBorder : errBorder
                               }`}
                             />
+                            {!p.customer_name?.trim() && (
+                              <FieldHint>Mijoz ismi kerak</FieldHint>
+                            )}
                           </div>
                           <div>
                             <label className={labelCls}>
@@ -757,6 +777,9 @@ const AiCreateOrder = () => {
                                 p.phone_number?.trim() ? okBorder : errBorder
                               }`}
                             />
+                            {!p.phone_number?.trim() && (
+                              <FieldHint>Telefon raqam kerak</FieldHint>
+                            )}
                           </div>
                           <div>
                             <label className={labelCls}>
@@ -800,6 +823,9 @@ const AiCreateOrder = () => {
                                 });
                               }}
                             />
+                            {!p.region_id && (
+                              <FieldHint>Viloyat tanlanmagan</FieldHint>
+                            )}
                           </div>
                           {/* Tuman / Shahar — tanlangan viloyat tumanlari (DB) */}
                           <div>
@@ -829,6 +855,9 @@ const AiCreateOrder = () => {
                                 });
                               }}
                             />
+                            {p.region_id && !p.district_id && (
+                              <FieldHint>Tuman/shahar tanlanmagan</FieldHint>
+                            )}
                           </div>
                           <div>
                             <label className={labelCls}>
@@ -856,6 +885,17 @@ const AiCreateOrder = () => {
                                     : errBorder
                               }`}
                             />
+                            {(
+                              p.replacement_confirmed && p.replaced_order_id
+                                ? p.total_price == null
+                                : !(p.total_price && p.total_price > 0)
+                            ) && (
+                              <FieldHint>
+                                {p.replacement_confirmed && p.replaced_order_id
+                                  ? "Narx kerak (0 bo'lsa 0 yozing)"
+                                  : "Narx kerak (0 dan katta)"}
+                              </FieldHint>
+                            )}
                           </div>
                           {/* Mutaxassis (operator) */}
                           <div>
