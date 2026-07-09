@@ -23,7 +23,7 @@ Foydalanuvchi (operator yoki market) yozgan yoki mijozdan forward qilingan erkin
 QAT'IY QOIDALAR:
 - Faqat matnda ANIQ bor ma'lumotni chiqar. Yo'q bo'lsa null qoldiring — HECH NARSA TO'QIB CHIQARMA.
 - Mahsulotlar uchun faqat NOMINI va sonini (quantity) yoz; ID/narx to'qima. Son ko'rsatilmagan bo'lsa 1.
-- region_name = VILOYAT nomi (masalan "Andijon", "Navoiy", "Toshkent"). Faqat matnda aniq bo'lsa; bo'lmasa null.
+- region_name = VILOYAT nomi (masalan "Andijon", "Navoiy"). Faqat matnda aniq bo'lsa; bo'lmasa null. MUHIM: agar matnda "shahri" yoki "viloyati" so'zi yozilgan bo'lsa, uni HAM qo'shib yoz — ayniqsa Toshkent uchun: "Toshkent shahri" (poytaxt) va "Toshkent viloyati" (atrofdagi tumanlar) ikki XIL joy, farqla.
 - district_name = yetkazish JOYI — TUMAN yoki SHAHAR nomi (masalan "Asaka", "Chilonzor", "Navoiy shahri", "Zarafshon shahri", "Nurota"). MUHIM: joy manzil ichida bo'lsa ham (masalan "Navoiy shahri vagzal xududi 20-uy") — shahar/tuman nomini ("Navoiy shahri") ajratib district_name'ga yoz, faqat qolgan ko'cha/uy qismini ("vagzal xududi 20-uy") address'ga yoz. SHAHAR ham district_name'ga tushadi, address'ga EMAS.
 - total_price = butun buyurtma narxi RAQAM sifatida (masalan "250 ming" -> 250000, "2.5 mln" -> 2500000). Aniq bo'lmasa null.
 - comment = yetkazish bo'yicha izoh (masalan "kechqurun keling"). Telefon raqamlar comment'ga tushmasin.
@@ -820,20 +820,34 @@ export class AiOrderService {
     const districts = await this.districtRepo.find({ relations: ['region'] });
 
     // 0. VILOYATNI mustaqil aniqlaymiz (tuman topilmasa ham viloyat qolsin).
+    //    "Toshkent shahri" va "Toshkent viloyati" bir xil base-nomga ega —
+    //    shuning uchun avval "shahri/viloyati" markerini SAQLAB aniq mos
+    //    qidiramiz; bare "Toshkent" (noaniq) bo'lsa qoldiramiz — tuman aniqlaydi.
     if (draft.region_name) {
-      const rq = this.normGeo(draft.region_name);
       const regions = new Map<string, { id: string; name: string }>();
       for (const d of districts) {
-        if (d.region) regions.set(d.region_id, { id: d.region_id, name: d.region.name });
+        if (d.region) {
+          regions.set(d.region_id, { id: d.region_id, name: d.region.name });
+        }
       }
-      let region = [...regions.values()].find(
-        (r) => this.normGeo(r.name) === rq,
-      );
+      const list = [...regions.values()];
+      const rqLight = this.lightNorm(draft.region_name);
+      let region = list.find((r) => this.lightNorm(r.name) === rqLight);
       if (!region) {
-        region = [...regions.values()].find((r) => {
-          const rn = this.normGeo(r.name);
-          return rn.length > 2 && (rn.includes(rq) || rq.includes(rn));
-        });
+        const base = this.normGeo(draft.region_name);
+        const baseMatches = base
+          ? list.filter((r) => this.normGeo(r.name) === base)
+          : [];
+        if (baseMatches.length === 1) {
+          region = baseMatches[0];
+        } else if (baseMatches.length === 0 && base.length > 2) {
+          const subs = list.filter((r) => {
+            const rn = this.normGeo(r.name);
+            return rn.length > 2 && (rn.includes(base) || base.includes(rn));
+          });
+          if (subs.length === 1) region = subs[0];
+        }
+        // baseMatches.length > 1 (masalan bare "Toshkent") → NOANIQ: qoldiramiz.
       }
       if (region) {
         draft.region_id = region.id;
@@ -1003,6 +1017,18 @@ export class AiOrderService {
   // Geografik nomni base holatga keltiradi: tumani/shahri/viloyati kabi
   // qo'shimchalarni olib tashlaydi (operator kiritishi bilan DB nomini
   // solishtirish uchun — operator qo'shimcha yozmaydi).
+  // Yengil normalizatsiya — geografik qo'shimchalarni (shahri/viloyati) SAQLAYDI.
+  // "Toshkent shahri" != "Toshkent viloyati" farqini saqlash uchun.
+  private lightNorm(s: string): string {
+    return (s || '')
+      .toLowerCase()
+      .trim()
+      .normalize('NFKC')
+      .replace(/[`ʼʻ']/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   private normGeo(s: string): string {
     return (s || '')
       .toLowerCase()
