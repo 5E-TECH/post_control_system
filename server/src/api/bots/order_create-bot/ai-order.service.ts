@@ -190,6 +190,16 @@ export class AiOrderService {
     private readonly logger: MyLogger,
   ) {}
 
+  // Parse (tahlil) throttle: bir buyurtmani ko'p marta qayta tahlil qilish
+  // Claude'ni behuda ishlatadi. Har market uchun BEPUL tahlillar soni; undan
+  // ortig'i 1 buyurtma narxida yechiladi (telegram botdagi 3-urinish mantig'i).
+  private readonly parseAttempts = new Map<
+    string,
+    { count: number; ts: number }
+  >();
+  private static readonly PARSE_FREE_LIMIT = 3;
+  private static readonly PARSE_WINDOW_MS = 30 * 60 * 1000;
+
   isEnabled(): boolean {
     return this.claude.isEnabled();
   }
@@ -584,11 +594,13 @@ export class AiOrderService {
     orders?: OrderPreview[];
     balance?: number;
     price?: number;
+    reanalysis_charged?: boolean; // 3-tahlildan oshgani uchun pul yechildimi
   }> {
     if (!this.isEnabled()) return { ok: false, reason: 'ai_off' };
     const marketId = await this.resolveMarketId(user, bodyMarketId);
     if (!marketId) return { ok: false, reason: 'no_market' };
 
+    let reanalysisCharged = false;
     if (!this.aiBalance.isExemptRole(user.role as Roles)) {
       const state = await this.aiBalance.getState(marketId);
       if (!state || !state.enabled) return { ok: false, reason: 'disabled' };
@@ -600,6 +612,32 @@ export class AiOrderService {
           price: state.price,
         };
       }
+
+      // Qayta tahlil throttle: BEPUL_LIMIT tahlildan oshsa 1 buyurtma narxida
+      // yechiladi va bepul hisob nolga tushadi (keyingi 3 yana bepul).
+      const now = Date.now();
+      const rec = this.parseAttempts.get(marketId);
+      const attempts =
+        rec && now - rec.ts <= AiOrderService.PARSE_WINDOW_MS
+          ? rec.count + 1
+          : 1;
+      if (attempts > AiOrderService.PARSE_FREE_LIMIT) {
+        const charge = await this.aiBalance.chargeForOrder(marketId, {
+          actor: user.id,
+        });
+        if (charge.reason !== 'ok') {
+          return {
+            ok: false,
+            reason: 'insufficient',
+            balance: charge.balance,
+            price: charge.price,
+          };
+        }
+        reanalysisCharged = true;
+        this.parseAttempts.set(marketId, { count: 0, ts: now });
+      } else {
+        this.parseAttempts.set(marketId, { count: attempts, ts: now });
+      }
     }
 
     // Market default yetkazish tarifi
@@ -610,7 +648,7 @@ export class AiOrderService {
       marketRow?.default_tariff,
     );
     if (!orders.length) return { ok: false, reason: 'ai_error' };
-    return { ok: true, orders };
+    return { ok: true, orders, reanalysis_charged: reanalysisCharged };
   }
 
   // Tasdiqlangan buyurtmalarni yaratish (har biriga alohida charge + create).
@@ -758,6 +796,9 @@ export class AiOrderService {
         });
       }
     }
+    // Buyurtma yaratildi — qayta-tahlil bepul hisobini tiklaymiz (bu buyurtma
+    // "tugadi"; keyingisi uchun yana bepul tahlillar).
+    if (results.some((r) => r.ok)) this.parseAttempts.delete(marketId);
     return { results };
   }
 
@@ -1135,6 +1176,7 @@ export class AiOrderService {
       .trim()
       .normalize('NFKC')
       .replace(/[`ʼʻ'‘’ʹ]/g, "")
+      .replace(/kh/g, 'x')
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -1145,6 +1187,8 @@ export class AiOrderService {
       .trim()
       .normalize('NFKC')
       .replace(/[`ʼʻ'‘’ʹ]/g, "")
+      // Transliteratsiya: "kh" = "x" (Khiva=Xiva, Khorazm=Xorazm).
+      .replace(/kh/g, 'x')
       // So'z-chegara bilan: qo'shimchalar faqat ALOHIDA so'z sifatida olib
       // tashlanadi — "Shahrixon"/"Shahrisabz" ichidagi "shahri" TEGILMAYDI.
       .replace(

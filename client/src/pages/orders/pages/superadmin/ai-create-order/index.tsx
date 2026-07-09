@@ -129,6 +129,7 @@ interface ParseResponse {
   balance?: number;
   price?: number;
   orders?: Omit<Preview, "id">[];
+  reanalysis_charged?: boolean;
 }
 interface ConfirmResponse {
   results: {
@@ -301,6 +302,12 @@ const AiCreateOrder = () => {
         setPreviews(
           data.orders.map((o, i) => ({ ...o, id: `p${Date.now()}_${i}` }))
         );
+        if (data.reanalysis_charged) {
+          message.warning(
+            "3 tahlildan oshdi — 1 buyurtma narxida balansdan yechildi."
+          );
+          qc.invalidateQueries({ queryKey: ["ai-availability"] });
+        }
       } else {
         setPreviews([]);
         setParseErr(data);
@@ -576,7 +583,7 @@ const AiCreateOrder = () => {
                     "Dilnoza, 901112233, Toshkent Chilonzor, 2 dona olma, 150 ming\n" +
                     "Akmal, 935556677, Andijon Asaka, 1 televizor, 3 mln"
                   }
-                  className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-y leading-relaxed"
+                  className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-y leading-relaxed min-h-[120px] max-h-[70vh]"
                 />
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <span className="text-xs text-gray-400">
