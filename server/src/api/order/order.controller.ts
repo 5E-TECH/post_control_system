@@ -122,6 +122,23 @@ export class OrderController {
     return this.aiOrderService.getGeo();
   }
 
+  @ApiOperation({ summary: 'AI karta uchun market mahsulotlari ro\'yxati' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('ai-products')
+  aiProducts(
+    @Query('market_id') marketId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.aiOrderService.getMarketProducts(user, marketId);
+  }
+
   @ApiOperation({ summary: 'AI matnni tahlil qilish (bir/bir nechta buyurtma)' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(

@@ -253,6 +253,18 @@ const AiCreateOrder = () => {
   const regions = geoQ.data?.regions ?? [];
   const allDistricts = geoQ.data?.districts ?? [];
 
+  // Market mahsulotlari (topilmasa/noaniqda qo'lda tanlash uchun).
+  const productsQ = useQuery({
+    queryKey: ["ai-products", market?.id],
+    queryFn: () =>
+      api
+        .get("order/ai-products", { params: { market_id: market?.id } })
+        .then((r) => r.data as { id: string; name: string }[]),
+    staleTime: 1000 * 60 * 10,
+    enabled: !!market?.id,
+  });
+  const allProducts = productsQ.data ?? [];
+
   const parseM = useMutation({
     mutationFn: () =>
       api
@@ -912,30 +924,57 @@ const AiCreateOrder = () => {
                                   <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
                                   {it.resolved_name || it.name}
                                 </span>
-                              ) : it.candidates?.length ? (
+                              ) : (
                                 <Select
+                                  showSearch
+                                  optionFilterProp="label"
                                   className="flex-1 [&_.ant-select-selector]:!h-9 [&_.ant-select-selector]:!rounded-lg [&_.ant-select-selector]:!flex [&_.ant-select-selector]:!items-center"
-                                  status="warning"
-                                  placeholder={`"${it.name}" — tanlang`}
-                                  options={it.candidates.map((c) => ({
-                                    value: c.id,
-                                    label: c.name,
-                                  }))}
-                                  onChange={(v) => {
-                                    const c = it.candidates?.find(
-                                      (x) => x.id === v
+                                  status={it.candidates?.length ? "warning" : "error"}
+                                  loading={productsQ.isLoading}
+                                  placeholder={
+                                    it.candidates?.length
+                                      ? `"${it.name}" — qaysi biri?`
+                                      : `"${it.name}" topilmadi — ro'yxatdan tanlang`
+                                  }
+                                  value={undefined}
+                                  options={(() => {
+                                    const candIds = new Set(
+                                      (it.candidates ?? []).map((c) => c.id)
                                     );
+                                    const groups: {
+                                      label: string;
+                                      options: { value: string; label: string }[];
+                                    }[] = [];
+                                    if (it.candidates?.length) {
+                                      groups.push({
+                                        label: "AI o'xshashini topdi",
+                                        options: it.candidates.map((c) => ({
+                                          value: c.id,
+                                          label: c.name,
+                                        })),
+                                      });
+                                    }
+                                    groups.push({
+                                      label: "Barcha mahsulotlar",
+                                      options: allProducts
+                                        .filter((pr) => !candIds.has(pr.id))
+                                        .map((pr) => ({
+                                          value: pr.id,
+                                          label: pr.name,
+                                        })),
+                                    });
+                                    return groups;
+                                  })()}
+                                  onChange={(v) => {
+                                    const prod =
+                                      allProducts.find((x) => x.id === v) ||
+                                      it.candidates?.find((x) => x.id === v);
                                     updateItem(p.id, idx, {
                                       product_id: v,
-                                      resolved_name: c?.name,
+                                      resolved_name: prod?.name,
                                     });
                                   }}
                                 />
-                              ) : (
-                                <span className="flex-1 text-sm text-red-500 truncate flex items-center gap-1.5">
-                                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                                  "{it.name}" — katalogda yo'q
-                                </span>
                               )}
                             </div>
                           ))}

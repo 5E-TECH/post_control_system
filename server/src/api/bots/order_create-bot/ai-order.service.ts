@@ -806,6 +806,21 @@ export class AiOrderService {
     return { regions, districts: outDistricts };
   }
 
+  // Market mahsulotlari (AI karta Select'i uchun — mahsulot topilmasa qo'lda tanlash).
+  async getMarketProducts(
+    user: JwtPayload,
+    bodyMarketId?: string,
+  ): Promise<{ id: string; name: string }[]> {
+    const marketId = await this.resolveMarketId(user, bodyMarketId);
+    if (!marketId) return [];
+    const products = await this.productRepo.find({
+      where: { user_id: marketId, isDeleted: false },
+    });
+    return products
+      .map((p) => ({ id: p.id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   // ─── 2-faza: REZOLYUTSIYA (DETERMINISTIK DB moslash) ───
   async resolveDraft(
     draft: AiOrderDraft,
@@ -971,7 +986,8 @@ export class AiOrderService {
   ): { product: ProductEntity; score: number }[] {
     const q = this.normalizeProduct(query);
     if (!q) return [];
-    const qTokens = new Set(q.split(' ').filter(Boolean));
+    const qTokens = q.split(' ').filter(Boolean);
+    const qTokenSet = new Set(qTokens);
 
     return catalog
       .map((product) => {
@@ -982,15 +998,60 @@ export class AiOrderService {
         // qo'shimcha token boshqa SKU bo'lishi mumkin — avto-tanlanmaydi.
         else if (p.includes(q) || q.includes(p)) score = 0.8;
         else {
-          const pTokens = new Set(p.split(' ').filter(Boolean));
-          const inter = [...qTokens].filter((t) => pTokens.has(t)).length;
-          const union = new Set([...qTokens, ...pTokens]).size || 1;
-          score = inter / union; // Jaccard
+          const pTokens = p.split(' ').filter(Boolean);
+          const pTokenSet = new Set(pTokens);
+          const inter = [...qTokenSet].filter((t) => pTokenSet.has(t)).length;
+          const union = new Set([...qTokenSet, ...pTokenSet]).size || 1;
+          const jaccard = inter / union;
+          // FUZZY (Levenshtein) — imlo xatolari/tushib qolgan harflarga bardosh:
+          // har bir so'zga eng yaqin so'zni topib o'rtachasini oladi
+          // ("televizr" -> "televizor" ~0.89).
+          const tokenFuzzy = this.tokenFuzzy(qTokens, pTokens);
+          score = Math.max(jaccard, tokenFuzzy);
         }
         return { product, score };
       })
-      .filter((r) => r.score >= 0.34)
+      .filter((r) => r.score >= 0.4)
       .sort((a, b) => b.score - a.score);
+  }
+
+  // Har bir so'rov so'ziga eng yaqin mahsulot so'zini topib, o'rtacha o'xshashlik.
+  private tokenFuzzy(qTokens: string[], pTokens: string[]): number {
+    if (!qTokens.length || !pTokens.length) return 0;
+    let sum = 0;
+    for (const qt of qTokens) {
+      let best = 0;
+      for (const pt of pTokens) {
+        const r = this.simRatio(qt, pt);
+        if (r > best) best = r;
+      }
+      sum += best;
+    }
+    return sum / qTokens.length;
+  }
+
+  private simRatio(a: string, b: string): number {
+    if (!a || !b) return 0;
+    if (a === b) return 1;
+    const m = Math.max(a.length, b.length);
+    return m ? 1 - this.levenshtein(a, b) / m : 0;
+  }
+
+  private levenshtein(a: string, b: string): number {
+    const m = a.length;
+    const n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    let prev = Array.from({ length: n + 1 }, (_, i) => i);
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      }
+      prev = cur;
+    }
+    return prev[n];
   }
 
   private normalizeProduct(s: string): string {
