@@ -1,7 +1,21 @@
 import { useState } from "react";
-import { Switch, InputNumber, Button, message, Spin, Tag, Empty } from "antd";
+import {
+  Modal,
+  Switch,
+  InputNumber,
+  Button,
+  message,
+  Spin,
+  Tag,
+  Empty,
+} from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { api } from "../../../../shared/api";
+
+// Bir buyurtma narxi shu summadan katta bo'lsa — ehtimol hisob to'ldirish bilan
+// adashtirilgan (odatiy narx ~300 so'm) — ogohlantirish + tasdiq so'raladi.
+const PRICE_WARN = 5000;
 
 const som = (n: number) =>
   (Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -94,50 +108,80 @@ export function AiBalanceContent({ marketId }: { marketId: string }) {
         </div>
       </div>
 
-      {/* To'ldirish */}
-      <div>
-        <div className="text-xs text-gray-500 mb-1">
-          Balansni to'ldirish (to'lov kelganda)
+      {/* To'ldirish + Narx — bir qatorda, ixcham va ajralib turgan */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Balansni to'ldirish (yashil — balansga QO'SHILADI) */}
+        <div className="rounded-lg border border-green-200 dark:border-green-900/40 bg-green-50/40 dark:bg-green-900/10 p-2.5">
+          <div className="text-xs font-medium text-green-700 dark:text-green-400 mb-1.5">
+            Balansni to'ldirish
+          </div>
+          <div className="flex gap-1.5">
+            <InputNumber
+              size="small"
+              min={1}
+              value={topup ?? undefined}
+              onChange={(v) => setTopup((v as number) ?? null)}
+              placeholder="Summa"
+              style={{ width: "100%" }}
+            />
+            <Button
+              size="small"
+              type="primary"
+              loading={topupM.isPending}
+              disabled={!topup}
+              onClick={() => topup && topupM.mutate(topup)}
+            >
+              Qo'shish
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <InputNumber
-            min={1}
-            value={topup ?? undefined}
-            onChange={(v) => setTopup((v as number) ?? null)}
-            placeholder="Summa (so'm)"
-            style={{ width: "100%" }}
-          />
-          <Button
-            type="primary"
-            loading={topupM.isPending}
-            disabled={!topup}
-            onClick={() => topup && topupM.mutate(topup)}
-          >
-            Qo'shish
-          </Button>
-        </div>
-      </div>
 
-      {/* Narx */}
-      <div>
-        <div className="text-xs text-gray-500 mb-1">
-          Bir buyurtma narxi (hozir: {som(s.price)} so'm)
-        </div>
-        <div className="flex gap-2">
-          <InputNumber
-            min={0}
-            value={price ?? undefined}
-            onChange={(v) => setPrice((v as number) ?? null)}
-            placeholder="Yangi narx"
-            style={{ width: "100%" }}
-          />
-          <Button
-            loading={priceM.isPending}
-            disabled={price == null}
-            onClick={() => price != null && priceM.mutate(price)}
-          >
-            Saqlash
-          </Button>
+        {/* Bir buyurtma narxi (neytral — har buyurtmadan yechiladi) */}
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-2.5">
+          <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5">
+            Bir buyurtma narxi{" "}
+            <span className="text-gray-400">(hozir: {som(s.price)})</span>
+          </div>
+          <div className="flex gap-1.5">
+            <InputNumber
+              size="small"
+              min={0}
+              value={price ?? undefined}
+              onChange={(v) => setPrice((v as number) ?? null)}
+              placeholder="Narx"
+              style={{ width: "100%" }}
+            />
+            <Button
+              size="small"
+              loading={priceM.isPending}
+              disabled={price == null}
+              onClick={() => {
+                if (price == null) return;
+                if (price >= PRICE_WARN) {
+                  Modal.confirm({
+                    title: "Katta narx — tasdiqlang",
+                    content: `Bir buyurtma narxini ${som(
+                      price
+                    )} so'm qilib belgilaysizmi? Bu HAR BUYURTMA narxi (odatda ~300 so'm), hisob TO'LDIRISH EMAS.`,
+                    okText: "Ha, shu narx",
+                    cancelText: "Bekor",
+                    onOk: () => priceM.mutate(price),
+                  });
+                } else {
+                  priceM.mutate(price);
+                }
+              }}
+            >
+              Saqlash
+            </Button>
+          </div>
+          {price != null && price >= PRICE_WARN && (
+            <div className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 flex items-start gap-1">
+              <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              Bu HAR BUYURTMA narxi, hisob to'ldirish EMAS. To'ldirish uchun chap
+              ustundan foydalaning.
+            </div>
+          )}
         </div>
       </div>
 
