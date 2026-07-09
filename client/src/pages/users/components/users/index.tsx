@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom";
 import { useUser } from "../../../../shared/api/hooks/useRegister";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import ConfirmPopup from "../../../../shared/components/confirmPopup";
-import AiBalanceButton from "./ai-balance-modal";
 
 interface Props {
   data: any[];
@@ -219,7 +218,6 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
                       checked={user?.status === "active"}
                       onChange={(checked) => onChangeChecked(checked, user)}
                     />
-                    <AiBalanceButton user={user} />
                     <button
                       onClick={() => {
                         setDeleteItem(user);
@@ -301,7 +299,6 @@ const UsersTableComp: FC<Props> = ({ data, isLoading, total = 1 }) => {
                       checked={user?.status === "active"}
                       onChange={(checked) => onChangeChecked(checked, user)}
                     />
-                    <AiBalanceButton user={user} />
                     <button
                       onClick={() => {
                         setDeleteItem(user);

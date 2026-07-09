@@ -1,19 +1,12 @@
 import { useState } from "react";
-import { Modal, Switch, InputNumber, Button, message, Spin, Tag, Empty } from "antd";
+import { Switch, InputNumber, Button, message, Spin, Tag, Empty } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot } from "lucide-react";
 import { api } from "../../../../shared/api";
-
-interface MarketLite {
-  id: string;
-  name?: string;
-  role?: string;
-}
 
 const som = (n: number) =>
   (Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 
-function AiBalanceContent({ marketId }: { marketId: string }) {
+export function AiBalanceContent({ marketId }: { marketId: string }) {
   const qc = useQueryClient();
   const stateQ = useQuery({
     queryKey: ["ai-balance", marketId],
@@ -192,37 +185,5 @@ function AiBalanceContent({ marketId }: { marketId: string }) {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function AiBalanceButton({ user }: { user: MarketLite }) {
-  const [open, setOpen] = useState(false);
-  // Market bo'lmagan qatorlar uchun BO'SH slot — shunda toggle/trash ikonkalari
-  // barcha qatorlarda bir xil tekislanadi (jadval ko'rinishi buzilmaydi).
-  if (user?.role !== "market")
-    return <span className="w-8 h-8 flex-shrink-0" aria-hidden />;
-  return (
-    <>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(true);
-        }}
-        title="AI balans"
-        className="w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
-      >
-        <Bot className="w-4 h-4" />
-      </button>
-      {open && (
-        <Modal
-          title={`🤖 AI balans — ${user.name || ""}`}
-          open
-          onCancel={() => setOpen(false)}
-          footer={null}
-        >
-          <AiBalanceContent marketId={user.id} />
-        </Modal>
-      )}
-    </>
   );
 }
