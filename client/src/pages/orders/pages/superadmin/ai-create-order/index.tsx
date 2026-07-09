@@ -62,14 +62,23 @@ interface ReplacementCandidate {
   total_price: number;
   items: string;
 }
+interface DistrictCandidate {
+  id: string;
+  label: string;
+  region_name?: string;
+  district_name?: string;
+}
 interface Preview {
   id: string;
   customer_name?: string;
   phone_number?: string;
   extra_number?: string;
   district_id?: string;
-  district_label?: string;
-  district_candidates?: { id: string; label: string }[];
+  district_name?: string;
+  region_id?: string;
+  region_name?: string;
+  region_given?: boolean;
+  district_candidates?: DistrictCandidate[];
   address?: string;
   items: PItem[];
   total_price?: number;
@@ -112,7 +121,11 @@ function evalPreview(p: Preview): { ready: boolean; issues: string[] } {
   if (!p.phone_number?.trim()) issues.push("telefon yo'q");
   if (!p.district_id)
     issues.push(
-      p.district_candidates?.length ? "tuman tanlang" : "tuman topilmadi"
+      p.district_candidates?.length
+        ? "tuman/shahar tanlang"
+        : p.region_given
+          ? "shahar/tuman kiritilmagan"
+          : "tuman/shahar topilmadi"
     );
   // Almashtirish faqat operator TASDIQLAGANDA kuchga kiradi (avto-topilsa ham).
   const isRepl = !!(p.replacement_confirmed && p.replaced_order_id);
@@ -286,7 +299,7 @@ const AiCreateOrder = () => {
           okRows.push({
             order_number: r.order_number,
             customer_name: r.customer_name || toCreate[i].customer_name,
-            district_label: toCreate[i].district_label,
+            district_label: toCreate[i].district_name,
             total_price: toCreate[i].total_price,
             items: toCreate[i].items.length,
             is_replacement: !!(
@@ -702,19 +715,29 @@ const AiCreateOrder = () => {
                               className={`${inputCls} ${okBorder}`}
                             />
                           </div>
+                          {/* Viloyat — DB'dan (tuman/shaharga bog'liq) */}
                           <div className="space-y-1">
                             <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5" /> Tuman
+                              <MapPin className="w-3.5 h-3.5" /> Viloyat
+                            </label>
+                            <div className="h-10 px-3 flex items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-700 dark:text-gray-200 truncate">
+                              {p.region_name || "—"}
+                            </div>
+                          </div>
+                          {/* Tuman / Shahar — DB'dan */}
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5" /> Tuman / Shahar
                             </label>
                             {p.district_id ? (
                               <div className="h-10 px-3 flex items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-700 dark:text-gray-200 truncate">
-                                {p.district_label || "Tanlangan"}
+                                {p.district_name || "Tanlangan"}
                               </div>
                             ) : p.district_candidates?.length ? (
                               <Select
                                 size="large"
                                 className="w-full [&_.ant-select-selector]:!rounded-xl"
-                                placeholder="Tumanni tanlang"
+                                placeholder="Tuman/shaharni tanlang"
                                 status="warning"
                                 options={p.district_candidates.map((c) => ({
                                   value: c.id,
@@ -726,7 +749,8 @@ const AiCreateOrder = () => {
                                   );
                                   updatePreview(p.id, {
                                     district_id: v,
-                                    district_label: c?.label,
+                                    district_name: c?.district_name,
+                                    region_name: c?.region_name,
                                   });
                                 }}
                               />
@@ -734,7 +758,9 @@ const AiCreateOrder = () => {
                               <div
                                 className={`h-10 px-3 flex items-center rounded-xl text-sm ${errBorder} border text-red-600 dark:text-red-400`}
                               >
-                                Topilmadi — matnni tuzating
+                                {p.region_given
+                                  ? "Kiritilmagan"
+                                  : "Topilmadi — matnni tuzating"}
                               </div>
                             )}
                           </div>

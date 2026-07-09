@@ -31,11 +31,19 @@ export interface AiOrderDraft {
   customer_name?: string;
   phone_number?: string; // +998 formatga normallashtirilgan
   extra_number?: string;
-  region_name?: string;
-  district_name?: string;
+  region_name?: string; // matndan (xom)
+  district_name?: string; // matndan (xom)
   district_id?: string; // resolver to'ldiradi (UUID)
-  district_label?: string; // "Viloyat, Tuman"
-  district_candidates?: { id: string; label: string }[];
+  district_label?: string; // "Viloyat, Tuman/Shahar" (bot kartasi uchun)
+  district_resolved_name?: string; // DB'dagi tuman/shahar nomi (masalan "Navoiy shahri")
+  region_id?: string; // DB region UUID (district'dan olinadi)
+  region_label?: string; // DB region nomi (masalan "Navoiy viloyati")
+  district_candidates?: {
+    id: string;
+    label: string; // "Viloyat, Tuman/Shahar"
+    region_name?: string;
+    district_name?: string;
+  }[];
   address?: string;
   items: AiDraftItem[];
   total_price?: number;

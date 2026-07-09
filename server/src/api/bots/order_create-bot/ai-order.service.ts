@@ -23,7 +23,8 @@ Foydalanuvchi (operator yoki market) yozgan yoki mijozdan forward qilingan erkin
 QAT'IY QOIDALAR:
 - Faqat matnda ANIQ bor ma'lumotni chiqar. Yo'q bo'lsa null qoldiring — HECH NARSA TO'QIB CHIQARMA.
 - Mahsulotlar uchun faqat NOMINI va sonini (quantity) yoz; ID/narx to'qima. Son ko'rsatilmagan bo'lsa 1.
-- region_name = viloyat nomi (masalan "Andijon"), district_name = tuman nomi (masalan "Asaka"). Faqat matndan.
+- region_name = VILOYAT nomi (masalan "Andijon", "Navoiy", "Toshkent"). Faqat matnda aniq bo'lsa; bo'lmasa null.
+- district_name = yetkazish JOYI — TUMAN yoki SHAHAR nomi (masalan "Asaka", "Chilonzor", "Navoiy shahri", "Zarafshon shahri", "Nurota"). MUHIM: joy manzil ichida bo'lsa ham (masalan "Navoiy shahri vagzal xududi 20-uy") — shahar/tuman nomini ("Navoiy shahri") ajratib district_name'ga yoz, faqat qolgan ko'cha/uy qismini ("vagzal xududi 20-uy") address'ga yoz. SHAHAR ham district_name'ga tushadi, address'ga EMAS.
 - total_price = butun buyurtma narxi RAQAM sifatida (masalan "250 ming" -> 250000, "2.5 mln" -> 2500000). Aniq bo'lmasa null.
 - comment = yetkazish bo'yicha izoh (masalan "kechqurun keling"). Telefon raqamlar comment'ga tushmasin.
 - Telefon O'zbekiston formatida; faqat raqamlarni ol.
@@ -118,8 +119,16 @@ export interface OrderPreview {
   phone_number?: string;
   extra_number?: string;
   district_id?: string;
-  district_label?: string;
-  district_candidates?: { id: string; label: string }[];
+  district_name?: string; // DB'dagi tuman/shahar nomi
+  region_id?: string;
+  region_name?: string; // DB'dagi viloyat nomi
+  region_given?: boolean; // matnda viloyat bor edimi (xabar uchun)
+  district_candidates?: {
+    id: string;
+    label: string;
+    region_name?: string;
+    district_name?: string;
+  }[];
   address?: string;
   items: OrderPreviewItem[];
   total_price?: number;
@@ -493,11 +502,14 @@ export class AiOrderService {
     if (!draft.customer_name) issues.push("mijoz ismi yo'q");
     if (!draft.phone_number) issues.push("telefon yo'q");
     if (!draft.district_id) {
-      issues.push(
-        draft.district_candidates?.length
-          ? 'tuman aniqlanmagan'
-          : 'tuman topilmadi',
-      );
+      if (draft.district_candidates?.length) {
+        issues.push('tuman/shahar tanlang');
+      } else if (draft.region_name) {
+        // Viloyat berilgan, lekin tuman/shahar aniqlanmagan
+        issues.push('shahar/tuman kiritilmagan');
+      } else {
+        issues.push('tuman/shahar topilmadi');
+      }
     }
     // Almashtirish buyurtmasi narxi 0 bo'lishi mumkin (eski buyurtma o'rniga);
     // oddiy buyurtma uchun narx > 0 bo'lishi shart.
@@ -520,7 +532,10 @@ export class AiOrderService {
       phone_number: draft.phone_number,
       extra_number: draft.extra_number,
       district_id: draft.district_id,
-      district_label: draft.district_label,
+      district_name: draft.district_resolved_name,
+      region_id: draft.region_id,
+      region_name: draft.region_label,
+      region_given: !!draft.region_name,
       district_candidates: draft.district_candidates,
       address: draft.address,
       items: draft.items.map((i) => ({
@@ -757,24 +772,46 @@ export class AiOrderService {
   }
 
   private async resolveDistrict(draft: AiOrderDraft): Promise<void> {
-    if (!draft.district_name) return;
-
     const districts = await this.districtRepo.find({ relations: ['region'] });
-    const q = this.normGeo(draft.district_name);
 
-    // Base-nom (geografik qo'shimchalarsiz) bo'yicha moslash: operator "tumani"
-    // yozmaydi, DB'da esa "... tumani" bo'ladi — shuning uchun ikkala tomon ham
-    // qo'shimchasiz solishtiriladi.
-    let matches = districts.filter((d) => this.normGeo(d.name) === q);
-    if (!matches.length) {
-      // Aniq base-mos topilmasa — qism (substring) bo'yicha
-      matches = districts.filter((d) => {
-        const dn = this.normGeo(d.name);
-        return dn.length > 2 && (dn.includes(q) || q.includes(dn));
-      });
+    // 1-usul: district_name bo'yicha (aniq base-nom, keyin qism-mos).
+    let matches: DistrictEntity[] = [];
+    if (draft.district_name) {
+      const q = this.normGeo(draft.district_name);
+      if (q) {
+        matches = districts.filter((d) => this.normGeo(d.name) === q);
+        if (!matches.length) {
+          matches = districts.filter((d) => {
+            const dn = this.normGeo(d.name);
+            return dn.length > 2 && (dn.includes(q) || q.includes(dn));
+          });
+        }
+      }
     }
 
-    // Viloyat berilgan bo'lsa — shu viloyatga cheklab aniqlashtirish
+    // 2-usul (FALLBACK): district_name topilmadi/bo'sh bo'lsa — LLM shaharni
+    // address'ga qo'yib yuborgan bo'lishi mumkin. DB'dagi tuman/shahar nomini
+    // (district_name + address) matnidan qidiramiz. region_name QO'SHILMAYDI —
+    // shunda "faqat viloyat berilgan" holat topilmasdan qoladi (kerakli xatti-harakat).
+    if (!matches.length) {
+      const corpus = this.normGeo(
+        `${draft.district_name || ''} ${draft.address || ''}`,
+      );
+      if (corpus) {
+        const padded = ` ${corpus} `;
+        const found = districts
+          .map((d) => ({ d, dn: this.normGeo(d.name) }))
+          .filter((x) => x.dn.length >= 4 && padded.includes(` ${x.dn} `))
+          .sort((a, b) => b.dn.length - a.dn.length);
+        if (found.length) {
+          // Eng uzun mos nom uzunligidagilar (ustunlik uzunroq nomga)
+          const maxLen = found[0].dn.length;
+          matches = found.filter((x) => x.dn.length === maxLen).map((x) => x.d);
+        }
+      }
+    }
+
+    // Viloyat berilgan bo'lsa — shu viloyatga cheklab aniqlashtirish.
     if (draft.region_name && matches.length > 1) {
       const rq = this.normGeo(draft.region_name);
       const inRegion = matches.filter(
@@ -787,16 +824,31 @@ export class AiOrderService {
       d.region?.name ? `${d.region.name}, ${d.name}` : d.name;
 
     if (matches.length === 1) {
-      draft.district_id = matches[0].id;
-      draft.district_label = toLabel(matches[0]);
+      const d = matches[0];
+      draft.district_id = d.id;
+      draft.district_resolved_name = d.name;
+      draft.region_id = d.region_id;
+      draft.region_label = d.region?.name || undefined;
+      draft.district_label = toLabel(d);
       draft.district_candidates = undefined;
     } else if (matches.length > 1) {
       draft.district_id = undefined;
+      draft.district_resolved_name = undefined;
+      draft.region_id = undefined;
+      draft.region_label = undefined;
       draft.district_candidates = matches
         .slice(0, MAX_CANDIDATE_BUTTONS)
-        .map((d) => ({ id: d.id, label: toLabel(d) }));
+        .map((d) => ({
+          id: d.id,
+          label: toLabel(d),
+          region_name: d.region?.name || undefined,
+          district_name: d.name,
+        }));
     } else {
       draft.district_id = undefined;
+      draft.district_resolved_name = undefined;
+      draft.region_id = undefined;
+      draft.region_label = undefined;
       draft.district_candidates = [];
     }
   }
