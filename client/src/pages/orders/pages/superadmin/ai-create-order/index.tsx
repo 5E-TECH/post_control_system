@@ -42,6 +42,22 @@ const formatDate = (ts?: number | null) => {
   }
 };
 
+// Asosiy buyurtmalar jadvali bilan bir xil formatlar
+const formatPhone = (phone?: string) =>
+  !phone
+    ? "—"
+    : phone
+        .replace(/\D/g, "")
+        .replace(/^(\d{3})(\d{2})(\d{3})(\d{2})(\d{2})$/, "+$1 $2 $3 $4 $5");
+const formatDateTime = (ts?: number | null) => {
+  if (!ts) return "—";
+  const d = new Date(Number(ts));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(
+    d.getMinutes()
+  )}`;
+};
+
 // Zich (compact) inputlar — ko'p buyurtma tasdiqlashda kam scroll uchun.
 const inputCls =
   "w-full h-8 px-2.5 bg-gray-50 dark:bg-gray-800 border rounded-lg text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all";
@@ -100,10 +116,12 @@ interface Preview {
 interface CreatedRow {
   order_number?: number;
   customer_name?: string;
+  phone_number?: string;
   district_label?: string;
   total_price?: number;
   items: number;
   is_replacement?: boolean;
+  created_at?: number;
 }
 interface ParseResponse {
   ok: boolean;
@@ -330,6 +348,7 @@ const AiCreateOrder = () => {
           okRows.push({
             order_number: r.order_number,
             customer_name: r.customer_name || toCreate[i].customer_name,
+            phone_number: toCreate[i].phone_number,
             district_label: toCreate[i].district_name,
             total_price: toCreate[i].total_price,
             items: toCreate[i].items.length,
@@ -337,6 +356,7 @@ const AiCreateOrder = () => {
               toCreate[i].replacement_confirmed &&
               toCreate[i].replaced_order_id
             ),
+            created_at: Date.now(),
           });
         } else if (r.reason === "insufficient") insuff++;
         else if (r.reason === "duplicate") dup++;
@@ -1072,9 +1092,9 @@ const AiCreateOrder = () => {
               </div>
             )}
 
-            {/* Created orders — jadval ko'rinishida */}
-            <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-gray-100 dark:border-gray-700/50 flex items-center justify-between gap-2 flex-wrap">
+            {/* Created orders — asosiy buyurtmalar jadvali bilan bir xil */}
+            <div>
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
                 <h2 className="text-base font-semibold text-gray-800 dark:text-white flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                     <CheckCircle2 className="w-4.5 h-4.5 text-green-600 dark:text-green-400" />
@@ -1094,7 +1114,7 @@ const AiCreateOrder = () => {
               </div>
 
               {created.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center text-center">
+                <div className="bg-white dark:bg-[#2A2640] rounded-xl shadow-sm py-12 flex flex-col items-center justify-center text-center">
                   <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
                     <ShoppingCart className="w-7 h-7 text-gray-300 dark:text-gray-600" />
                   </div>
@@ -1106,60 +1126,113 @@ const AiCreateOrder = () => {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-gray-400 border-b border-gray-100 dark:border-gray-700/50">
-                        <th className="px-5 py-2.5 font-medium">№</th>
-                        <th className="px-3 py-2.5 font-medium">Mijoz</th>
-                        <th className="px-3 py-2.5 font-medium">Tuman</th>
-                        <th className="px-3 py-2.5 font-medium text-center">
-                          Mahsulot
-                        </th>
-                        <th className="px-5 py-2.5 font-medium text-right">
-                          Narx
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {created.map((c, i) => (
-                        <tr
-                          key={i}
-                          className="border-b border-gray-50 dark:border-gray-800/50 last:border-0 hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition-colors"
-                        >
-                          <td className="px-5 py-3">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="font-mono font-semibold text-green-700 dark:text-green-400">
-                                {c.order_number != null
-                                  ? `#${c.order_number}`
-                                  : "—"}
-                              </span>
-                              {c.is_replacement && (
-                                <span
-                                  title="Almashtirish"
-                                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-md"
-                                >
-                                  <Repeat className="w-2.5 h-2.5" />
-                                </span>
-                              )}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-gray-800 dark:text-gray-200 capitalize truncate max-w-[160px]">
-                            {c.customer_name || "—"}
-                          </td>
-                          <td className="px-3 py-3 text-gray-500 dark:text-gray-400 truncate max-w-[180px]">
-                            {c.district_label || "—"}
-                          </td>
-                          <td className="px-3 py-3 text-center text-gray-500 dark:text-gray-400">
-                            {c.items} ta
-                          </td>
-                          <td className="px-5 py-3 text-right font-medium text-gray-800 dark:text-gray-200">
-                            {som(c.total_price)}
-                          </td>
+                <div className="bg-white dark:bg-[#2A2640] rounded-xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                          <th className="px-4 py-4 text-left text-sm font-semibold w-12">
+                            #
+                          </th>
+                          <th className="px-4 py-4 text-left text-sm font-semibold min-w-[180px] max-w-[250px]">
+                            Mijoz
+                          </th>
+                          <th className="px-4 py-4 text-left text-sm font-semibold whitespace-nowrap">
+                            Telefon
+                          </th>
+                          <th className="px-4 py-4 text-left text-sm font-semibold min-w-[100px]">
+                            Tuman
+                          </th>
+                          <th className="px-4 py-4 text-left text-sm font-semibold min-w-[100px]">
+                            Market
+                          </th>
+                          <th className="px-4 py-4 text-left text-sm font-semibold whitespace-nowrap">
+                            Holat
+                          </th>
+                          <th className="px-4 py-4 text-right text-sm font-semibold whitespace-nowrap">
+                            Narx
+                          </th>
+                          <th className="px-4 py-4 text-left text-sm font-semibold whitespace-nowrap">
+                            Sana
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {created.map((c, i) => (
+                          <tr
+                            key={i}
+                            className="hover:bg-purple-50 dark:hover:bg-[#3d3759] transition-colors group"
+                          >
+                            <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                              {i + 1}
+                            </td>
+                            <td className="px-4 py-4 max-w-[250px]">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                                  <User className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="min-w-0">
+                                  <span
+                                    className="font-medium text-gray-800 dark:text-white truncate block capitalize"
+                                    title={c.customer_name}
+                                  >
+                                    {c.customer_name || "—"}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1">
+                                    {c.order_number != null && (
+                                      <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                                        #{c.order_number}
+                                      </span>
+                                    )}
+                                    {c.is_replacement && (
+                                      <span
+                                        title="Almashtirish"
+                                        className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded"
+                                      >
+                                        <Repeat className="w-2.5 h-2.5" />
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                              {formatPhone(c.phone_number)}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                <span className="truncate">
+                                  {c.district_label || "—"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+                              <span className="truncate block capitalize">
+                                {market?.name || "—"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                                Yangi
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-right whitespace-nowrap">
+                              <span className="font-semibold text-gray-800 dark:text-white">
+                                {som(c.total_price)}
+                              </span>
+                              <span className="text-xs text-gray-500 ml-1">
+                                so'm
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                              {formatDateTime(c.created_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>

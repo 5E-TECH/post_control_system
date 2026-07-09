@@ -1145,8 +1145,10 @@ export class AiOrderService {
       .trim()
       .normalize('NFKC')
       .replace(/[`ʼʻ'‘’ʹ]/g, "")
+      // So'z-chegara bilan: qo'shimchalar faqat ALOHIDA so'z sifatida olib
+      // tashlanadi — "Shahrixon"/"Shahrisabz" ichidagi "shahri" TEGILMAYDI.
       .replace(
-        /\s*(tumani|tuman|shahri|shahar|shaharcha|viloyati|viloyat|respublikasi|sh\.|t\.)\s*/g,
+        /\s*(\b(?:tumani|tuman|shahri|shahar|shaharcha|viloyati|viloyat|respublikasi)\b|\b(?:sh|t)\.)\s*/g,
         ' ',
       )
       .replace(/\s+/g, ' ')
