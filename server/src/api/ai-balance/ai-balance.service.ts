@@ -70,6 +70,22 @@ export class AiBalanceService {
     };
   }
 
+  // Market/operatorning O'Z marketini JWT'dan aniqlaydi (self-service uchun).
+  async resolveOwnMarket(user: {
+    id: string;
+    role: string;
+  }): Promise<string | undefined> {
+    if (user.role === Roles.MARKET) return user.id;
+    if (user.role === Roles.OPERATOR) {
+      const op = await this.userRepo.findOne({
+        where: { id: user.id },
+        select: ['id', 'market_id'],
+      });
+      return op?.market_id || undefined;
+    }
+    return undefined;
+  }
+
   /**
    * Bir buyurtma uchun ATOMIK yechish: faqat ai_enabled=true VA balans>=narx
    * bo'lsagina yechadi va "usage" yozadi. Yechilmasa sababini qaytaradi.

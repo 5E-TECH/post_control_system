@@ -27,6 +27,30 @@ import { SetPriceDto, ToggleAiDto, TopupDto } from './dto/ai-balance.dto';
 export class AiBalanceController {
   constructor(private readonly aiBalance: AiBalanceService) {}
 
+  // ─── Market/operator O'ZINING balansini va tarixini ko'radi (self-service).
+  //     JWT'dan aniqlanadi (marketId param YO'Q — IDOR bo'lmasin). Bu marshrutlar
+  //     `:marketId` dan OLDIN turishi shart (aks holda param ushlab qoladi).
+  @Get('me')
+  @AcceptRoles(Roles.MARKET, Roles.OPERATOR)
+  async myState(@CurrentUser() user: JwtPayload) {
+    const marketId = await this.aiBalance.resolveOwnMarket(user);
+    const state = marketId ? await this.aiBalance.getState(marketId) : null;
+    return successRes(state, 200, 'OK');
+  }
+
+  @Get('me/history')
+  @AcceptRoles(Roles.MARKET, Roles.OPERATOR)
+  async myHistory(
+    @CurrentUser() user: JwtPayload,
+    @Query('limit') limit?: string,
+  ) {
+    const marketId = await this.aiBalance.resolveOwnMarket(user);
+    const rows = marketId
+      ? await this.aiBalance.getHistory(marketId, Number(limit) || 50)
+      : [];
+    return successRes(rows, 200, 'OK');
+  }
+
   // Market AI holati: yoqilganmi, balans, narx
   @Get(':marketId')
   async getState(@Param('marketId') marketId: string) {

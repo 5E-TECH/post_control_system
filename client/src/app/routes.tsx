@@ -62,6 +62,7 @@ const CreateOrder = lazy(
 const AiCreateOrder = lazy(
   () => import("../pages/orders/pages/superadmin/ai-create-order")
 );
+const MarketAiBalance = lazy(() => import("../pages/ai-balance"));
 const OrderDetail = lazy(
   () => import("../pages/orders/pages/superadmin/orderDetail")
 );
@@ -333,6 +334,7 @@ const AppRouters = () => {
               ],
             },
             { path: "cash-box", element: <CashDetailMarketCourier /> },
+            { path: "ai-balance", element: <MarketAiBalance /> },
             { path: "my-region", element: <MyRegion /> },
             // Rollar endi Settings ichida — eski URL redirect
             {
