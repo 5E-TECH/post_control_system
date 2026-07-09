@@ -446,6 +446,10 @@ const AiCreateOrder = () => {
         setCreated((prev) => [...okRows, ...prev]);
         message.success(`✅ ${okRows.length} ta buyurtma yaratildi`);
         qc.invalidateQueries();
+        // Matnni tozalaymiz — xuddi shu matnni qayta tahlil qilib buyurtmani
+        // ikkinchi marta yaratib qo'ymaslik uchun (parse tugmasi ham o'chadi).
+        setText("");
+        setParseErr(null);
       }
       // Yaratilganlarni olib tashlaymiz, muvaffaqiyatsizlarga xato belgisini qo'yamiz.
       setPreviews((prev) =>

@@ -759,6 +759,17 @@ export class AiOrderService {
         continue;
       }
 
+      // Cross-request DB dublikat (qayta tahlil -> qayta yaratish, retry) —
+      // charge'DAN OLDIN tekshiramiz (dublikat uchun pul yechilmasin).
+      if (await this.findRecentDuplicate(marketId, o)) {
+        results.push({
+          ok: false,
+          reason: 'duplicate',
+          customer_name: o.customer_name,
+        });
+        continue;
+      }
+
       let charge: { reason: string; balance: number; price: number } | null =
         null;
       if (!exempt) {
@@ -856,6 +867,52 @@ export class AiOrderService {
       .sort()
       .join(',');
     return `${phone}|${items}|${o.total_price}|${o.replaced_order_id ?? ''}`;
+  }
+
+  // Cross-request DB dublikat: yaqinda (2 daqiqa) shu market'da AYNAN shu
+  // telefon+savat+narx bilan yaratilgan (o'chirilmagan, aktiv) buyurtma bormi?
+  // Qayta tahlil -> qayta yaratish, tugmani ikki bosish, retry'ni bloklaydi.
+  private async findRecentDuplicate(
+    marketId: string,
+    o: ConfirmedOrder,
+  ): Promise<boolean> {
+    const phone9 = (o.phone_number || '').replace(/\D/g, '').slice(-9);
+    if (phone9.length < 9) return false;
+    const incomingSig = this.orderSignature(o);
+    const WINDOW_MS = 2 * 60 * 1000;
+    const recent = await this.orderRepo
+      .createQueryBuilder('o')
+      .leftJoinAndSelect('o.items', 'items')
+      .leftJoinAndSelect('o.customer', 'customer')
+      .where('o.user_id = :m', { m: marketId })
+      .andWhere('o.deleted_at IS NULL')
+      .andWhere('o.total_price = :p', { p: o.total_price })
+      .andWhere('o.created_at >= :t', { t: Date.now() - WINDOW_MS })
+      .andWhere('o.status IN (:...s)', {
+        s: [
+          Order_status.CREATED,
+          Order_status.NEW,
+          Order_status.RECEIVED,
+          Order_status.ON_THE_ROAD,
+          Order_status.WAITING,
+        ],
+      })
+      .orderBy('o.created_at', 'DESC')
+      .take(20)
+      .getMany();
+    return recent.some((cand) => {
+      const cp9 = (cand.customer?.phone_number || '')
+        .replace(/\D/g, '')
+        .slice(-9);
+      const citems = (cand.items || [])
+        .map((it) => `${it.productId}:${it.quantity}`)
+        .sort()
+        .join(',');
+      const candSig = `${cp9}|${citems}|${cand.total_price}|${
+        cand.replacement_of_order_id ?? ''
+      }`;
+      return candSig === incomingSig;
+    });
   }
 
   private async resolveMarketId(
