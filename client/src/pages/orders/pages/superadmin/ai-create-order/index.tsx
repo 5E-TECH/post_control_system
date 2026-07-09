@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,6 +21,7 @@ import {
   ClipboardList,
   Truck,
   Repeat,
+  Plus,
 } from "lucide-react";
 import type { RootState } from "../../../../../app/store";
 import { api } from "../../../../../shared/api";
@@ -28,6 +29,34 @@ import { buildAdminPath } from "../../../../../shared/const";
 
 const som = (n?: number | null) =>
   (Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+// Telefonni +998XXXXXXXXX ga keltiradi (davlat kodi/trunk prefiksni yechadi);
+// noto'g'ri bo'lsa "" qaytaradi. Backend DTO ham shu formatni talab qiladi.
+const cleanPhone = (raw?: string): string => {
+  const d = (raw || "").replace(/\D/g, "");
+  const nat =
+    d.length === 12 && d.startsWith("998")
+      ? d.slice(3)
+      : d.length === 10 && /^[08]/.test(d)
+        ? d.slice(1)
+        : d;
+  return nat.length === 9 ? `+998${nat}` : "";
+};
+
+// Buyurtma imzosi (dublikatni aniqlash: telefon + mahsulotlar + narx + almashtirish).
+const previewSig = (p: {
+  phone_number?: string;
+  items: { product_id?: string; quantity: number }[];
+  total_price?: number;
+  replaced_order_id?: string;
+}): string => {
+  const phone9 = cleanPhone(p.phone_number).slice(-9);
+  const items = p.items
+    .map((i) => `${i.product_id || ""}:${i.quantity}`)
+    .sort()
+    .join(",");
+  return `${phone9}|${items}|${p.total_price ?? ""}|${p.replaced_order_id || ""}`;
+};
 
 const formatDate = (ts?: number | null) => {
   if (!ts) return "—";
@@ -120,6 +149,7 @@ interface Preview {
   replacement_candidates?: ReplacementCandidate[];
   // Operator ANIQ tasdiqlamaguncha almashtirish kuchga kirmaydi (avto-topilsa ham).
   replacement_confirmed?: boolean;
+  createError?: string; // yaratishда server xatosi (kartada ko'rsatiladi)
 }
 interface CreatedRow {
   order_number?: number;
@@ -153,6 +183,7 @@ function evalPreview(p: Preview): { ready: boolean; issues: string[] } {
   const issues: string[] = [];
   if (!p.customer_name?.trim()) issues.push("mijoz ismi yo'q");
   if (!p.phone_number?.trim()) issues.push("telefon yo'q");
+  else if (!cleanPhone(p.phone_number)) issues.push("telefon noto'g'ri");
   if (!p.region_id) issues.push("viloyat tanlang");
   else if (!p.district_id) issues.push("tuman/shahar tanlang");
   // Almashtirish faqat operator TASDIQLAGANDA kuchga kiradi (avto-topilsa ham).
@@ -164,6 +195,9 @@ function evalPreview(p: Preview): { ready: boolean; issues: string[] } {
     if (p.total_price == null) issues.push("narx yozing (0 bo'lsa 0)");
   } else if (p.total_price == null || p.total_price <= 0) {
     issues.push("narx noto'g'ri");
+  } else if (p.total_price < 1000) {
+    // "250 ming" -> 250 kabi 1000x kam o'qish — ogohlantiramiz.
+    issues.push("narx juda kichik — tekshiring");
   }
   if (!p.items.length) issues.push("mahsulot yo'q");
   p.items.forEach((it) => {
@@ -187,6 +221,12 @@ function reasonText(r?: string): string {
       return "AI balansi yetarli emas — to'lov qiling yoki qo'lda to'ldiring.";
     case "ai_error":
       return "AI matndan buyurtma topa olmadi. Matnni aniqroq yozing.";
+    case "invalid_price":
+      return "Narx noto'g'ri (0 dan katta bo'lishi kerak).";
+    case "duplicate":
+      return "Dublikat — bu buyurtma allaqachon yuborilgan.";
+    case "create_failed":
+      return "Yaratilmadi — maydonlarni tekshiring (mahsulot/tuman).";
     default:
       return "Xatolik yuz berdi.";
   }
@@ -269,6 +309,9 @@ const AiCreateOrder = () => {
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [created, setCreated] = useState<CreatedRow[]>([]);
   const [parseErr, setParseErr] = useState<ParseResponse | null>(null);
+  // Yaratilgan buyurtmalar imzosi — qayta tahlilда ular qayta chiqib, ikkinchi
+  // marta yaratilib qolmasin (dublikat himoya).
+  const createdSigs = useRef<Set<string>>(new Set());
 
   // Barcha viloyat + tuman/shaharlar (tahrirlash Select'lari uchun) — bir marta.
   const geoQ = useQuery({
@@ -307,9 +350,21 @@ const AiCreateOrder = () => {
     onSuccess: (data) => {
       if (data.ok && data.orders?.length) {
         setParseErr(null);
-        setPreviews(
-          data.orders.map((o, i) => ({ ...o, id: `p${Date.now()}_${i}` }))
+        const mapped = data.orders.map((o, i) => ({
+          ...o,
+          id: `p${Date.now()}_${i}`,
+        }));
+        // Allaqachon yaratilgan buyurtmalarni qayta ko'rsatmaymiz (dublikat himoya).
+        const fresh = mapped.filter(
+          (o) => !createdSigs.current.has(previewSig(o))
         );
+        setPreviews(fresh);
+        const skipped = mapped.length - fresh.length;
+        if (skipped > 0) {
+          message.info(
+            `${skipped} ta allaqachon yaratilgan buyurtma o'tkazib yuborildi`
+          );
+        }
         if (data.reanalysis_charged) {
           message.warning(
             "3 tahlildan oshdi — 1 buyurtma narxida balansdan yechildi."
@@ -331,7 +386,7 @@ const AiCreateOrder = () => {
           market_id: market?.id,
           orders: toCreate.map((p) => ({
             customer_name: p.customer_name,
-            phone_number: p.phone_number,
+            phone_number: cleanPhone(p.phone_number),
             extra_number: p.extra_number || undefined,
             district_id: p.district_id,
             address: p.address || undefined,
@@ -357,9 +412,12 @@ const AiCreateOrder = () => {
       let insuff = 0;
       let dup = 0;
       let other = 0;
+      const errById = new Map<string, string>();
+      const failNames: string[] = [];
       data.results.forEach((r, i) => {
         if (r.ok) {
           createdIds.add(toCreate[i].id);
+          createdSigs.current.add(previewSig(toCreate[i])); // dublikat himoya
           okRows.push({
             order_number: r.order_number,
             customer_name: r.customer_name || toCreate[i].customer_name,
@@ -373,20 +431,37 @@ const AiCreateOrder = () => {
             ),
             created_at: Date.now(),
           });
-        } else if (r.reason === "insufficient") insuff++;
-        else if (r.reason === "duplicate") dup++;
-        else other++;
+        } else {
+          if (r.reason === "insufficient") insuff++;
+          else if (r.reason === "duplicate") dup++;
+          else other++;
+          // Kartaga aynan sababni yozamiz (yashil "Tayyor" bo'lib qolmasin).
+          errById.set(toCreate[i].id, reasonText(r.reason));
+          failNames.push(
+            `${toCreate[i].customer_name || "Ismsiz"}: ${reasonText(r.reason)}`
+          );
+        }
       });
       if (okRows.length) {
         setCreated((prev) => [...okRows, ...prev]);
-        setPreviews((prev) => prev.filter((p) => !createdIds.has(p.id)));
         message.success(`✅ ${okRows.length} ta buyurtma yaratildi`);
         qc.invalidateQueries();
       }
+      // Yaratilganlarni olib tashlaymiz, muvaffaqiyatsizlarga xato belgisini qo'yamiz.
+      setPreviews((prev) =>
+        prev
+          .filter((p) => !createdIds.has(p.id))
+          .map((p) =>
+            errById.has(p.id)
+              ? { ...p, createError: errById.get(p.id) }
+              : p
+          )
+      );
       if (insuff)
         message.warning(`${insuff} ta buyurtma yaratilmadi — balans yetmadi`);
       if (dup) message.warning(`${dup} ta dublikat o'tkazib yuborildi`);
-      if (other) message.error(`${other} ta buyurtma yaratilmadi`);
+      if (other && failNames.length)
+        message.error(failNames.join(" · "));
     },
     onError: () => message.error("Server xatosi. Qayta urinib ko'ring."),
   });
@@ -411,8 +486,37 @@ const AiCreateOrder = () => {
     );
   const removePreview = (id: string) =>
     setPreviews((prev) => prev.filter((p) => p.id !== id));
+  const addItem = (id: string) =>
+    setPreviews((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, items: [...p.items, { name: "", quantity: 1 }] }
+          : p
+      )
+    );
+  const removeItem = (id: string, idx: number) =>
+    setPreviews((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? { ...p, items: p.items.filter((_, i) => i !== idx) }
+          : p
+      )
+    );
 
   const readyList = previews.filter((p) => evalPreview(p).ready);
+
+  // Qayta tahlil joriy (tahrirlangan, tasdiqlanmagan) kartalarni o'chiradi —
+  // avval tasdiq so'raymiz (tahrirlar bekorga yo'qolmasin).
+  const handleParse = () => {
+    if (
+      previews.length > 0 &&
+      !window.confirm(
+        "Joriy tasdiqlanmagan buyurtmalar (va tahrirlaringiz) o'chib, matn qayta tahlil qilinadi. Davom etasizmi?"
+      )
+    )
+      return;
+    parseM.mutate();
+  };
   const createdTotal = created.reduce((s, c) => s + (c.total_price || 0), 0);
 
   // Qadam holatlari
@@ -598,7 +702,7 @@ const AiCreateOrder = () => {
                     {text.length}/4000 belgi
                   </span>
                   <button
-                    onClick={() => parseM.mutate()}
+                    onClick={handleParse}
                     disabled={!text.trim() || parseM.isPending}
                     className={`h-11 px-6 rounded-xl flex items-center gap-2 text-sm font-medium transition-all ${
                       !text.trim() || parseM.isPending
@@ -777,9 +881,13 @@ const AiCreateOrder = () => {
                                 p.phone_number?.trim() ? okBorder : errBorder
                               }`}
                             />
-                            {!p.phone_number?.trim() && (
+                            {!p.phone_number?.trim() ? (
                               <FieldHint>Telefon raqam kerak</FieldHint>
-                            )}
+                            ) : !cleanPhone(p.phone_number) ? (
+                              <FieldHint>
+                                Telefon noto'g'ri (+998XXXXXXXXX)
+                              </FieldHint>
+                            ) : null}
                           </div>
                           <div>
                             <label className={labelCls}>
@@ -880,22 +988,20 @@ const AiCreateOrder = () => {
                                   ? p.total_price != null
                                     ? okBorder
                                     : errBorder
-                                  : p.total_price && p.total_price > 0
+                                  : p.total_price && p.total_price >= 1000
                                     ? okBorder
                                     : errBorder
                               }`}
                             />
-                            {(
-                              p.replacement_confirmed && p.replaced_order_id
-                                ? p.total_price == null
-                                : !(p.total_price && p.total_price > 0)
-                            ) && (
-                              <FieldHint>
-                                {p.replacement_confirmed && p.replaced_order_id
-                                  ? "Narx kerak (0 bo'lsa 0 yozing)"
-                                  : "Narx kerak (0 dan katta)"}
-                              </FieldHint>
-                            )}
+                            {p.replacement_confirmed && p.replaced_order_id ? (
+                              p.total_price == null && (
+                                <FieldHint>Narx kerak (0 bo'lsa 0 yozing)</FieldHint>
+                              )
+                            ) : !(p.total_price && p.total_price > 0) ? (
+                              <FieldHint>Narx kerak (0 dan katta)</FieldHint>
+                            ) : p.total_price < 1000 ? (
+                              <FieldHint>Juda kichik — "ming"da?</FieldHint>
+                            ) : null}
                           </div>
                           {/* Mutaxassis (operator) */}
                           <div>
@@ -1048,8 +1154,23 @@ const AiCreateOrder = () => {
                                   }}
                                 />
                               )}
+                              <button
+                                type="button"
+                                onClick={() => removeItem(p.id, idx)}
+                                title="Olib tashlash"
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer flex-shrink-0"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           ))}
+                          <button
+                            type="button"
+                            onClick={() => addItem(p.id)}
+                            className="flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg px-2 py-1.5 transition-colors cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Mahsulot qo'shish
+                          </button>
                         </div>
 
                         {/* Almashtirish (AI avto-aniqladi — operator TASDIQLAYDI) */}
@@ -1130,6 +1251,12 @@ const AiCreateOrder = () => {
                           <div className="text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1.5 pt-1 border-t border-gray-100 dark:border-gray-700/50">
                             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                             <span>{issues.join(" · ")}</span>
+                          </div>
+                        )}
+                        {p.createError && (
+                          <div className="text-xs text-red-600 dark:text-red-400 flex items-start gap-1.5 rounded-lg bg-red-50 dark:bg-red-900/20 p-2">
+                            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                            <span>Yaratilmadi: {p.createError}</span>
                           </div>
                         )}
                       </div>

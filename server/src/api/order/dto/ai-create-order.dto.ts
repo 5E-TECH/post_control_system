@@ -9,6 +9,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   Min,
   ValidateNested,
@@ -58,8 +59,12 @@ export class ConfirmedOrderDto {
   @IsString()
   customer_name: string;
 
+  // Telefon +998 + 9 raqam formatida bo'lishi shart (buzuq/typo raqam bilan
+  // buyurtma yaratilib qolmasin).
   @IsNotEmpty()
-  @IsString()
+  @Matches(/^\+998\d{9}$/, {
+    message: "Telefon +998XXXXXXXXX formatida bo'lishi kerak",
+  })
   phone_number: string;
 
   @IsOptional()

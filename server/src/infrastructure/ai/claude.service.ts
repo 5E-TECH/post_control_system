@@ -64,6 +64,15 @@ export class ClaudeService {
         this.logger.log('Claude refused extraction request', 'ClaudeService');
         return null;
       }
+      // max_tokens: JSON kesilib qolgan — parse xato beradi. Log qoldiramiz
+      // (matn juda katta — foydalanuvchi partiyani bo'lishi kerak).
+      if (response.stop_reason === 'max_tokens') {
+        this.logger.log(
+          'Claude output truncated (max_tokens) — matn juda katta',
+          'ClaudeService',
+        );
+        return null;
+      }
 
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === 'text',

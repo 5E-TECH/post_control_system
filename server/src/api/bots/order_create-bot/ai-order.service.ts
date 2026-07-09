@@ -36,7 +36,7 @@ QAT'IY QOIDALAR:
 - region_name = VILOYAT nomi (masalan "Andijon", "Navoiy"). Faqat matnda aniq bo'lsa; bo'lmasa null. MUHIM: agar matnda "shahri" yoki "viloyati" so'zi yozilgan bo'lsa, uni HAM qo'shib yoz — ayniqsa Toshkent uchun: "Toshkent shahri" (poytaxt) va "Toshkent viloyati" (atrofdagi tumanlar) ikki XIL joy, farqla.
 - district_name = yetkazish JOYI — TUMAN yoki SHAHAR nomi (masalan "Asaka", "Chilonzor", "Navoiy shahri", "Zarafshon shahri", "Nurota"). MUHIM: joy manzil ichida bo'lsa ham (masalan "Navoiy shahri vagzal xududi 20-uy") — shahar/tuman nomini ("Navoiy shahri") ajratib district_name'ga yoz, faqat qolgan ko'cha/uy qismini ("vagzal xududi 20-uy") address'ga yoz. SHAHAR ham district_name'ga tushadi, address'ga EMAS.
 - full_address = MANZILNING TO'LIQ MATNI — viloyat, tuman/shahar, ko'cha, uy — HAMMASI, matnda qanday yozilgan bo'lsa AYNAN o'sha holicha ko'chir (o'zgartirma, tarjima qilma, hech narsani tushirib qoldirma). Kirill bo'lsa kirill, lotin bo'lsa lotin. Bu maydon rezolyutsiya uchun zaxira.
-- total_price = butun buyurtma narxi RAQAM sifatida (masalan "250 ming" -> 250000, "2.5 mln" -> 2500000). Aniq bo'lmasa null.
+- total_price = BUTUN buyurtma narxi RAQAM sifatida (masalan "250 ming" -> 250000, "2.5 mln" -> 2500000, "300k" -> 300000). "ming"=1000, "mln"/"million"=1000000 ga ko'paytir. MUHIM: agar narx BIR DONA uchun berilsa ("donasi", "bittasi", "har biri", "tasi X so'm") — uni MAHSULOT SONIGA KO'PAYTIRIB butun narxni yoz (masalan "3 dona, donasi 2 mln" -> 6000000). Aniq bo'lmasa null.
 - comment = yetkazish bo'yicha izoh (masalan "kechqurun keling"). Telefon raqamlar comment'ga tushmasin.
 - Telefon O'zbekiston formatida; faqat raqamlarni ol.
 - extra_number = mijozning IKKINCHI (qo'shimcha) telefon raqami, agar bo'lsa.
@@ -428,11 +428,16 @@ export class AiOrderService {
         quantity: Math.max(1, Math.floor(Number(i.quantity) || 1)),
       }));
 
+    // Telefon: asosiy bo'sh bo'lsa, qo'shimcha raqamni asosiy qilamiz (yagona
+    // raqam extra_number'ga tushib qolsa buyurtma bloklanmasin).
+    const phone = this.normalizePhone(raw.phone_number);
+    const extra = this.normalizePhone(raw.extra_number);
+
     return {
       nonce: randomBytes(4).toString('hex'),
       customer_name: raw.customer_name?.trim() || undefined,
-      phone_number: this.normalizePhone(raw.phone_number),
-      extra_number: this.normalizePhone(raw.extra_number),
+      phone_number: phone || extra,
+      extra_number: phone ? extra : undefined,
       region_name: raw.region_name?.trim() || undefined,
       district_name: raw.district_name?.trim() || undefined,
       address: raw.address?.trim() || undefined,
@@ -465,13 +470,19 @@ export class AiOrderService {
       system: EXTRACT_MULTI_SYSTEM,
       userText: text,
       schema: EXTRACT_MULTI_SCHEMA,
-      maxTokens: 3000,
+      maxTokens: 16000, // ko'p buyurtma (30+) JSON'i kesilib qolmasin
     });
     if (!res || !Array.isArray(res.orders)) return [];
 
     // Yetkazish turi — MARKET default'iga qarab (AI taxminiga emas).
     const marketDefault: 'center' | 'address' =
       defaultTariff === Where_deliver.ADDRESS ? 'address' : 'center';
+
+    // Ko'p buyurtma uchun tuman va mahsulotlarni BIR MARTA yuklaymiz (N+1 emas).
+    const [districts, products] = await Promise.all([
+      this.districtRepo.find({ relations: ['region'] }),
+      this.productRepo.find({ where: { user_id: marketId, isDeleted: false } }),
+    ]);
 
     const previews: OrderPreview[] = [];
     for (const raw of res.orders) {
@@ -480,7 +491,7 @@ export class AiOrderService {
         continue; // bo'sh element
       }
       draft.where_deliver = marketDefault; // market default (operator kartada o'zgartiradi)
-      await this.resolveDraft(draft, marketId);
+      await this.resolveDraft(draft, marketId, { districts, products });
       if (draft.is_replacement) {
         await this.resolveReplacement(draft, marketId);
       }
@@ -558,6 +569,9 @@ export class AiOrderService {
       if (draft.total_price == null) issues.push("narx yo'q (0 bo'lsa 0 yozing)");
     } else if (draft.total_price == null || draft.total_price <= 0) {
       issues.push("narx yo'q");
+    } else if (draft.total_price < 1000) {
+      // "250 ming" -> 250 kabi noto'g'ri o'qish (1000x kam) — RED qilib ogohlantiramiz.
+      issues.push('narx juda kichik — tekshiring (mingda?)');
     }
     if (!draft.items.length) issues.push("mahsulot yo'q");
     draft.items.forEach((it) => {
@@ -895,14 +909,21 @@ export class AiOrderService {
   async resolveDraft(
     draft: AiOrderDraft,
     marketId: string,
+    cache?: { districts?: DistrictEntity[]; products?: ProductEntity[] },
   ): Promise<AiOrderDraft> {
-    await this.resolveDistrict(draft);
-    await this.resolveItems(draft, marketId);
+    await this.resolveDistrict(draft, cache?.districts);
+    await this.resolveItems(draft, marketId, cache?.products);
     return draft;
   }
 
-  private async resolveDistrict(draft: AiOrderDraft): Promise<void> {
-    const districts = await this.districtRepo.find({ relations: ['region'] });
+  private async resolveDistrict(
+    draft: AiOrderDraft,
+    districtsCache?: DistrictEntity[],
+  ): Promise<void> {
+    // Ko'p buyurtma parse'ida bir marta yuklab, qayta ishlatamiz (N+1 emas).
+    const districts =
+      districtsCache ??
+      (await this.districtRepo.find({ relations: ['region'] }));
 
     // 0. VILOYATNI mustaqil aniqlaymiz (tuman topilmasa ham viloyat qolsin).
     //    "Toshkent shahri" va "Toshkent viloyati" bir xil base-nomga ega —
@@ -1129,12 +1150,15 @@ export class AiOrderService {
   private async resolveItems(
     draft: AiOrderDraft,
     marketId: string,
+    productsCache?: ProductEntity[],
   ): Promise<void> {
     if (!draft.items.length) return;
 
-    const catalog = await this.productRepo.find({
-      where: { user_id: marketId, isDeleted: false },
-    });
+    const catalog =
+      productsCache ??
+      (await this.productRepo.find({
+        where: { user_id: marketId, isDeleted: false },
+      }));
 
     for (const item of draft.items) {
       const ranked = this.rankProducts(item.name, catalog);
@@ -1298,6 +1322,14 @@ export class AiOrderService {
   private normalizePhone(input: string | null | undefined): string | undefined {
     if (!input) return undefined;
     let digits = String(input).replace(/\D/g, '');
+    // Davlat kodi (998...) yoki trunk prefiks (0.../8...) — milliy 9 raqamga
+    // keltiramiz ("+998 90...", "0 90...", "8 90..." hammasi qabul qilinsin).
+    if (digits.length === 12 && digits.startsWith('998')) digits = digits.slice(3);
+    else if (
+      digits.length === 10 &&
+      (digits.startsWith('0') || digits.startsWith('8'))
+    )
+      digits = digits.slice(1);
     if (digits.length === 9) digits = `998${digits}`;
     // Faqat haqiqiy O'zbekiston raqami (998 + 9 raqam) qabul qilinadi; aks holda
     // undefined -> missingRequired uni belgilaydi -> operator WebApp'ga o'tadi
