@@ -601,6 +601,7 @@ export class AiOrderService {
     if (!marketId) return { ok: false, reason: 'no_market' };
 
     let reanalysisCharged = false;
+    let reanalysisPrice = 0;
     if (!this.aiBalance.isExemptRole(user.role as Roles)) {
       const state = await this.aiBalance.getState(marketId);
       if (!state || !state.enabled) return { ok: false, reason: 'disabled' };
@@ -622,6 +623,10 @@ export class AiOrderService {
           ? rec.count + 1
           : 1;
       if (attempts > AiOrderService.PARSE_FREE_LIMIT) {
+        // Bepul hisobni AVVAL (await'dan oldin) nolga tushiramiz — parallel
+        // parse ikki marta charge qilmasin: racing so'rov count:0 o'qib bepul
+        // yo'ldan ketadi (double-charge oldini oladi).
+        this.parseAttempts.set(marketId, { count: 0, ts: now });
         const charge = await this.aiBalance.chargeForOrder(marketId, {
           actor: user.id,
         });
@@ -634,7 +639,7 @@ export class AiOrderService {
           };
         }
         reanalysisCharged = true;
-        this.parseAttempts.set(marketId, { count: 0, ts: now });
+        reanalysisPrice = charge.price;
       } else {
         this.parseAttempts.set(marketId, { count: attempts, ts: now });
       }
@@ -647,7 +652,16 @@ export class AiOrderService {
       marketId,
       marketRow?.default_tariff,
     );
-    if (!orders.length) return { ok: false, reason: 'ai_error' };
+    if (!orders.length) {
+      // AI o'qiy olmadi (bizning xatomiz) — qayta-tahlil uchun yechilgan pulni
+      // qaytaramiz (createForPlatform ai_error refund mantig'i kabi).
+      if (reanalysisCharged) {
+        await this.aiBalance.refund(marketId, reanalysisPrice, {
+          actor: user.id,
+        });
+      }
+      return { ok: false, reason: 'ai_error' };
+    }
     return { ok: true, orders, reanalysis_charged: reanalysisCharged };
   }
 
