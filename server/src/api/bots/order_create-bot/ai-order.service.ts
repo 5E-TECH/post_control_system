@@ -971,6 +971,18 @@ export class AiOrderService {
       }
     }
 
+    // PLACE-SIGNAL: matnda tuman/shahar ANIQ berilganmi (district_name yoki
+    // "tuman/shahar" so'zi)? Bo'lmasa — oddiy address so'zini ("uzun ko'cha",
+    // "Uzuntepa mahalla") jimgina TUMANga aylantirmaymiz; taklif qilamiz
+    // (forceCandidate) — operator tasdiqlaydi. "Uzun"(=uzun) kabi lug'at
+    // so'zlari yolg'on avto-tanlanmasin.
+    const hasPlaceSignal =
+      !!draft.district_name ||
+      /\b(tumani|tuman|shahri|shahar|shaharcha)\b/.test(
+        this.translit(`${draft.full_address || ''} ${draft.address || ''}`),
+      );
+    let forceCandidate = false;
+
     // 2-usul (FALLBACK): district_name topilmadi/bo'sh bo'lsa — LLM shaharni
     // address'ga qo'yib yuborgan bo'lishi mumkin. DB'dagi tuman/shahar nomini
     // (district_name + address) matnidan qidiramiz. region_name QO'SHILMAYDI —
@@ -988,6 +1000,7 @@ export class AiOrderService {
         if (found.length) {
           const maxLen = found[0].dn.length;
           matches = found.filter((x) => x.dn.length === maxLen).map((x) => x.d);
+          if (!hasPlaceSignal) forceCandidate = true;
         }
       }
     }
@@ -1049,7 +1062,10 @@ export class AiOrderService {
             bestDs.push(d);
           }
         }
-        if (bestScore >= 0.82) matches = bestDs.slice(0, MAX_CANDIDATE_BUTTONS);
+        if (bestScore >= 0.82) {
+          matches = bestDs.slice(0, MAX_CANDIDATE_BUTTONS);
+          if (!hasPlaceSignal) forceCandidate = true;
+        }
       }
     }
 
@@ -1080,7 +1096,7 @@ export class AiOrderService {
     const toLabel = (d: DistrictEntity) =>
       d.region?.name ? `${d.region.name}, ${d.name}` : d.name;
 
-    if (matches.length === 1) {
+    if (matches.length === 1 && !forceCandidate) {
       const d = matches[0];
       draft.district_id = d.id;
       draft.district_resolved_name = d.name;
@@ -1088,7 +1104,9 @@ export class AiOrderService {
       draft.region_label = d.region?.name || draft.region_label;
       draft.district_label = toLabel(d);
       draft.district_candidates = undefined;
-    } else if (matches.length > 1) {
+    } else if (matches.length >= 1) {
+      // Bir nechta mos YOKI place-signal yo'q bitta mos — jimgina tanlamaymiz,
+      // TAKLIF qilamiz (operator tasdiqlaydi).
       // Tuman noaniq — lekin VILOYATni (0-bosqichda aniqlangan) saqlaymiz.
       draft.district_id = undefined;
       draft.district_resolved_name = undefined;
@@ -1293,32 +1311,27 @@ export class AiOrderService {
   // Yengil normalizatsiya — geografik qo'shimchalarni (shahri/viloyati) SAQLAYDI.
   // "Toshkent shahri" != "Toshkent viloyati" farqini saqlash uchun.
   private lightNorm(s: string): string {
-    return (s || '')
-      .toLowerCase()
-      .trim()
-      .normalize('NFKC')
-      .replace(/[`ʼʻ'‘’ʹ]/g, "")
+    // translit: kirill->lotin + diakritik + apostrof (universal).
+    return this.translit(s)
       .replace(/kh/g, 'x')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
   private normGeo(s: string): string {
-    return (s || '')
-      .toLowerCase()
-      .trim()
-      .normalize('NFKC')
-      .replace(/[`ʼʻ'‘’ʹ]/g, "")
-      // Transliteratsiya: "kh" = "x" (Khiva=Xiva, Khorazm=Xorazm).
-      .replace(/kh/g, 'x')
-      // So'z-chegara bilan: qo'shimchalar faqat ALOHIDA so'z sifatida olib
-      // tashlanadi — "Shahrixon"/"Shahrisabz" ichidagi "shahri" TEGILMAYDI.
-      .replace(
-        /\s*(\b(?:tumani|tuman|shahri|shahar|shaharcha|viloyati|viloyat|respublikasi)\b|\b(?:sh|t)\.)\s*/g,
-        ' ',
-      )
-      .replace(/\s+/g, ' ')
-      .trim();
+    return (
+      this.translit(s) // kirill->lotin + diakritik + apostrof
+        // Transliteratsiya: "kh" = "x" (Khiva=Xiva, Khorazm=Xorazm).
+        .replace(/kh/g, 'x')
+        // So'z-chegara bilan: qo'shimchalar faqat ALOHIDA so'z sifatida olib
+        // tashlanadi — "Shahrixon"/"Shahrisabz" ichidagi "shahri" TEGILMAYDI.
+        .replace(
+          /\s*(\b(?:tumani|tuman|shahri|shahar|shaharcha|viloyati|viloyat|respublikasi)\b|\b(?:sh|t)\.)\s*/g,
+          ' ',
+        )
+        .replace(/\s+/g, ' ')
+        .trim()
+    );
   }
 
   // ─── Keyingi aniqlashtirilishi kerak bo'lgan maydon ───
