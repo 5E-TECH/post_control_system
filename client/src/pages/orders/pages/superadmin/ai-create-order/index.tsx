@@ -918,7 +918,7 @@ const AiCreateOrder = () => {
                               optionFilterProp="label"
                               className={`w-full ${selSel}`}
                               placeholder="Viloyatni tanlang"
-                              status={!p.region_id ? "warning" : undefined}
+                              status={!p.region_id ? "error" : undefined}
                               value={p.region_id}
                               loading={geoQ.isLoading}
                               options={regions.map((r) => ({
@@ -953,7 +953,7 @@ const AiCreateOrder = () => {
                                   ? "Tuman/shaharni tanlang"
                                   : "Avval viloyatni tanlang"
                               }
-                              status={!p.district_id ? "warning" : undefined}
+                              status={!p.district_id ? "error" : undefined}
                               value={p.district_id}
                               disabled={!p.region_id}
                               options={allDistricts
@@ -1073,18 +1073,36 @@ const AiCreateOrder = () => {
 
                         {/* items */}
                         <div className="space-y-1.5">
-                          <label className={labelCls}>
+                          <label
+                            className={`${labelCls} ${
+                              p.items.length === 0 ||
+                              p.items.some((it) => !it.product_id)
+                                ? "!text-red-500 dark:!text-red-400"
+                                : ""
+                            }`}
+                          >
                             <ShoppingCart className="w-3.5 h-3.5" /> Mahsulotlar
+                            {p.items.some((it) => !it.product_id) && (
+                              <span className="text-[10px] font-semibold text-red-500 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded-full">
+                                {p.items.filter((it) => !it.product_id).length}{" "}
+                                aniqlanmagan
+                              </span>
+                            )}
                           </label>
                           {p.items.length === 0 && (
-                            <div className="text-xs text-red-500">
-                              Mahsulot topilmadi — matnni tuzating
+                            <div className="flex items-center gap-1.5 text-xs text-red-500 rounded-lg bg-red-50 dark:bg-red-900/15 border border-red-200 dark:border-red-800/50 px-2 py-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                              Mahsulot topilmadi — pastdan qo'shing
                             </div>
                           )}
                           {p.items.map((it, idx) => (
                             <div
                               key={idx}
-                              className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg px-2 py-1.5"
+                              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 border ${
+                                it.product_id
+                                  ? "bg-gray-50 dark:bg-gray-800/50 border-transparent"
+                                  : "bg-red-50 dark:bg-red-900/15 border-red-300 dark:border-red-800/60"
+                              }`}
                             >
                               <input
                                 inputMode="numeric"
