@@ -1045,6 +1045,41 @@ const AiCreateOrder = () => {
                               className={`${inputCls} ${okBorder}`}
                             />
                           </div>
+                          {/* Yetkazish turi — Mutaxassis yonidagi bo'sh joyni to'ldiradi */}
+                          <div className="sm:col-span-2">
+                            <label className={labelCls}>
+                              <Truck className="w-3.5 h-3.5" /> Yetkazish turi
+                            </label>
+                            <div className="flex gap-1.5">
+                              {(
+                                [
+                                  { v: "center", label: "Markazdan olib ketadi" },
+                                  { v: "address", label: "Manzilga yetkazish" },
+                                ] as const
+                              ).map((opt) => {
+                                const active =
+                                  (p.where_deliver || "center") === opt.v;
+                                return (
+                                  <button
+                                    key={opt.v}
+                                    type="button"
+                                    onClick={() =>
+                                      updatePreview(p.id, {
+                                        where_deliver: opt.v,
+                                      })
+                                    }
+                                    className={`flex-1 h-8 px-2 rounded-lg text-xs font-medium border transition-all cursor-pointer truncate ${
+                                      active
+                                        ? "bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600 text-purple-700 dark:text-purple-300"
+                                        : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-purple-300"
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                           {/* Manzil */}
                           <div className="sm:col-span-2 md:col-span-3">
                             <label className={labelCls}>
@@ -1058,40 +1093,6 @@ const AiCreateOrder = () => {
                               }
                               className={`${inputCls} ${okBorder}`}
                             />
-                          </div>
-                        </div>
-
-                        {/* Yetkazish turi */}
-                        <div>
-                          <label className={labelCls}>
-                            <Truck className="w-3.5 h-3.5" /> Yetkazish turi
-                          </label>
-                          <div className="flex gap-1.5">
-                            {(
-                              [
-                                { v: "center", label: "Markazdan olib ketadi" },
-                                { v: "address", label: "Manzilga yetkazish" },
-                              ] as const
-                            ).map((opt) => {
-                              const active =
-                                (p.where_deliver || "center") === opt.v;
-                              return (
-                                <button
-                                  key={opt.v}
-                                  type="button"
-                                  onClick={() =>
-                                    updatePreview(p.id, { where_deliver: opt.v })
-                                  }
-                                  className={`flex-1 h-8 px-2 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                                    active
-                                      ? "bg-purple-50 dark:bg-purple-900/20 border-purple-400 dark:border-purple-600 text-purple-700 dark:text-purple-300"
-                                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-purple-300"
-                                  }`}
-                                >
-                                  {opt.label}
-                                </button>
-                              );
-                            })}
                           </div>
                         </div>
 
