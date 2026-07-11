@@ -753,8 +753,32 @@ const AiCreateOrder = () => {
               </div>
             </div>
 
+            {/* AI tahlil qilayotgani — ko'zga tashlanadigan loading */}
+            {parseM.isPending && (
+              <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-8 flex flex-col items-center justify-center text-center border-2 border-dashed border-purple-200 dark:border-purple-800/50">
+                <div className="relative mb-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/30 animate-pulse">
+                    <Bot className="w-8 h-8 text-white" />
+                  </div>
+                  <Sparkles className="w-5 h-5 text-purple-400 absolute -top-1.5 -right-1.5 animate-ping" />
+                  <Sparkles className="w-4 h-4 text-indigo-400 absolute -bottom-1 -left-1.5 animate-pulse" />
+                </div>
+                <p className="text-base font-semibold text-gray-800 dark:text-white">
+                  AI buyurtmalarni tahlil qilmoqda...
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Mijoz, manzil, mahsulot va narx aniqlanmoqda
+                </p>
+                <div className="flex gap-1.5 mt-4">
+                  <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" />
+                </div>
+              </div>
+            )}
+
             {/* Confirmation cards */}
-            {hasPreviews && (
+            {hasPreviews && !parseM.isPending && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <h2 className="text-base font-semibold text-gray-800 dark:text-white flex items-center gap-2">
