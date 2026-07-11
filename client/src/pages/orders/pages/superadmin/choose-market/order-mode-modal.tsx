@@ -38,29 +38,33 @@ export default function OrderModeModal({
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">Buyurtmani qanday yaratamiz?</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Buyurtmani qanday yaratamiz?
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {avail?.available && (
               <button
                 onClick={onAi}
-                className="flex flex-col items-center gap-2 p-5 rounded-xl border-2 border-purple-200 hover:border-purple-500 hover:bg-purple-50 transition-all cursor-pointer"
+                className="flex flex-col items-center gap-2 p-5 rounded-xl border-2 border-purple-200 dark:border-purple-800 hover:border-purple-500 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all cursor-pointer"
               >
-                <Bot className="w-7 h-7 text-purple-600" />
-                <span className="font-semibold text-gray-800">AI orqali</span>
-                <span className="text-xs text-gray-500 text-center">
+                <Bot className="w-7 h-7 text-purple-600 dark:text-purple-400" />
+                <span className="font-semibold text-gray-800 dark:text-white">
+                  AI orqali
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
                   Matn yozing — AI to'ldiradi
                 </span>
               </button>
             )}
             <button
               onClick={onManual}
-              className="flex flex-col items-center gap-2 p-5 rounded-xl border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition-all cursor-pointer"
+              className="flex flex-col items-center gap-2 p-5 rounded-xl border-2 border-gray-200 dark:border-gray-600 hover:border-indigo-500 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all cursor-pointer"
             >
-              <PencilLine className="w-7 h-7 text-indigo-600" />
-              <span className="font-semibold text-gray-800">
+              <PencilLine className="w-7 h-7 text-indigo-600 dark:text-indigo-400" />
+              <span className="font-semibold text-gray-800 dark:text-white">
                 Qo'lda to'ldirish
               </span>
-              <span className="text-xs text-gray-500 text-center">
+              <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
                 Maydonlarni o'zingiz to'ldirasiz
               </span>
             </button>
