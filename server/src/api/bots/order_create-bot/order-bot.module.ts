@@ -11,6 +11,8 @@ import { TelegrafModule } from 'nestjs-telegraf';
 import config from 'src/config';
 import { OrderBotService } from './order-bot.service';
 import { AiOrderService } from './ai-order.service';
+import { BotNotifyService } from './bot-notify.service';
+import { BotBroadcastController } from './bot-broadcast.controller';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { session } from 'telegraf';
 import { MySession } from './session.interface';
@@ -59,17 +61,22 @@ import { AiBalanceModule } from 'src/api/ai-balance/ai-balance.module';
     // AiOrderService.commit() -> OrderService.createOrderByBot; OrderModule ham
     // OrderBotModule'ni import qiladi, shuning uchun forwardRef bilan sikl yopiladi.
     forwardRef(() => OrderModule),
-    AiBalanceModule, // AI-balans (charge/state) — botda ishlatiladi
+    // AI-balans (charge/state) botda ishlatiladi; ai-balance esa topup'да
+    // BotNotifyService'ni chaqiradi — sikl forwardRef bilan yopiladi.
+    forwardRef(() => AiBalanceModule),
   ],
+  controllers: [BotBroadcastController],
   providers: [
     OrderBotUpdate,
     OrderBotService,
     AiOrderService,
+    BotNotifyService,
     ClaudeService,
     Token,
     BcryptEncryption,
     MyLogger,
   ],
-  exports: [AiOrderService], // platforma (OrderController) AI buyurtma uchun
+  // AiOrderService — platforma (OrderController); BotNotifyService — ai-balance topup.
+  exports: [AiOrderService, BotNotifyService],
 })
 export class OrderBotModule {}

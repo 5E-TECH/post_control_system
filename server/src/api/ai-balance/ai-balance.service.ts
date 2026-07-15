@@ -1,11 +1,14 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { BotNotifyService } from 'src/api/bots/order_create-bot/bot-notify.service';
 import {
   AiTransactionEntity,
   AiTxType,
@@ -38,6 +41,9 @@ export class AiBalanceService {
     private readonly txRepo: Repository<AiTransactionEntity>,
     private readonly dataSource: DataSource,
     private readonly logger: MyLogger,
+    // Botда foydalanuvchini xabardor qilish (topup). Sikl — forwardRef.
+    @Inject(forwardRef(() => BotNotifyService))
+    private readonly botNotify: BotNotifyService,
   ) {}
 
   isExemptRole(role: Roles): boolean {
@@ -211,6 +217,16 @@ export class AiBalanceService {
       actor: actor ?? null,
       orderId: null,
     });
+    // Marketning bot foydalanuvchilariga xabar (best-effort, fire-and-forget) —
+    // topup javobini kutdirmaydi va xato topup'ni buzmaydi.
+    void this.botNotify
+      .notifyBalanceTopup(marketId, amount, balance)
+      .catch((err) =>
+        this.logger.log(
+          `topup notify xato: ${(err as Error).message}`,
+          'AiBalance',
+        ),
+      );
     return { balance };
   }
 
