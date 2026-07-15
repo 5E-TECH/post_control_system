@@ -124,6 +124,11 @@ const EXTRACT_MULTI_SYSTEM = `${EXTRACT_SYSTEM}
 
 DIQQAT: Matnda BIR NECHTA buyurtma bo'lishi mumkin (har xil mijozlar / alohida buyurtmalar). Har bir ALOHIDA buyurtmani "orders" massivida alohida element qilib qaytar. Agar matnda bitta buyurtma bo'lsa — massivda bitta element bo'ladi. Buyurtmalar bo'sh qatorlar, raqamlash (1., 2., -) yoki har xil mijoz nomi/telefoni bilan ajralishi mumkin. Bitta mijozning bir nechta mahsulotini AJRATMA — u bitta buyurtma.`;
 
+// Narx shu chegaradan KAM bo'lsa shubhali (masalan 1 mln -> 1000, 1.2 mln ->
+// 1200 kabi "ming"ni tushirib o'qish) — operator TASDIQLAMAGUNCHA kamchilik.
+// 0 ham shu yerga tushadi (bepul buyurtma — tasdiqlansin). >= chegara to'g'ri.
+export const PRICE_CONFIRM_THRESHOLD = 10000;
+
 export interface OrderPreviewItem {
   name: string;
   quantity: number;
@@ -164,6 +169,8 @@ export interface OrderPreview {
   }[];
   ready: boolean;
   issues: string[];
+  created?: boolean; // bot: bu buyurtma yaratildimi (jonli xulosa hisobi uchun)
+  price_confirmed?: boolean; // operator kichik/0 narxni ATAYLAB tasdiqladimi
 }
 
 export interface ConfirmedOrder {
@@ -549,40 +556,65 @@ export class AiOrderService {
     draft.replaced_order_id = rows[0].id;
   }
 
-  private toPreview(draft: AiOrderDraft): OrderPreview {
+  // Kamchiliklar ro'yxati — YAGONA manba (toPreview ham, bot ichidagi tuzatish
+  // recomputePreview ham shuni ishlatadi, mantiq bir joyda turadi).
+  private computeIssues(p: {
+    customer_name?: string;
+    phone_number?: string;
+    district_id?: string;
+    district_candidates?: { id: string }[];
+    region_given?: boolean;
+    is_replacement?: boolean;
+    total_price?: number;
+    price_confirmed?: boolean;
+    items: { name: string; product_id?: string; candidates?: { id: string }[] }[];
+  }): string[] {
     const issues: string[] = [];
-    if (!draft.customer_name) issues.push("mijoz ismi yo'q");
-    if (!draft.phone_number) issues.push("telefon yo'q");
-    if (!draft.district_id) {
-      if (draft.district_candidates?.length) {
+    if (!p.customer_name) issues.push("mijoz ismi yo'q");
+    if (!p.phone_number) issues.push("telefon yo'q");
+    if (!p.district_id) {
+      if (p.district_candidates?.length) {
         issues.push('tuman/shahar tanlang');
-      } else if (draft.region_name) {
+      } else if (p.region_given) {
         // Viloyat berilgan, lekin tuman/shahar aniqlanmagan
         issues.push('shahar/tuman kiritilmagan');
       } else {
         issues.push('tuman/shahar topilmadi');
       }
     }
-    // Almashtirish buyurtmasi narxi 0 bo'lishi mumkin (eski buyurtma o'rniga);
-    // oddiy buyurtma uchun narx > 0 bo'lishi shart.
-    if (draft.is_replacement) {
-      if (draft.total_price == null) issues.push("narx yo'q (0 bo'lsa 0 yozing)");
-    } else if (draft.total_price == null || draft.total_price <= 0) {
+    // Narx: bo'sh (null) — har doim kamchilik. Aks holda 0 yoki < 10 000 shubhali
+    // ("1 mln"->1000 kabi xato) — operator ATAYLAB tasdiqlamaguncha (price_confirmed)
+    // kamchilik. 0 ham ruxsat (bepul buyurtma), lekin tasdiq orqali. >= 10 000 to'g'ri.
+    if (p.is_replacement) {
+      if (p.total_price == null) issues.push("narx yo'q (0 bo'lsa 0 yozing)");
+    } else if (p.total_price == null) {
       issues.push("narx yo'q");
-    } else if (draft.total_price < 1000) {
-      // "250 ming" -> 250 kabi noto'g'ri o'qish (1000x kam) — RED qilib ogohlantiramiz.
-      issues.push('narx juda kichik — tekshiring (mingda?)');
+    } else if (p.total_price < PRICE_CONFIRM_THRESHOLD && !p.price_confirmed) {
+      issues.push(
+        p.total_price === 0
+          ? 'narx 0 (bepul) — tasdiqlang'
+          : 'narx juda kichik — tasdiqlang (mingda?)',
+      );
     }
-    if (!draft.items.length) issues.push("mahsulot yo'q");
-    draft.items.forEach((it) => {
+    if (!p.items.length) issues.push("mahsulot yo'q");
+    p.items.forEach((it) => {
       if (!it.product_id) {
         issues.push(
           `"${it.name}" ${it.candidates?.length ? 'aniqlanmagan' : "katalogda yo'q"}`,
         );
       }
     });
+    return issues;
+  }
 
-    return {
+  // Bot ichida tuzatilgach preview'ning issues/ready'sini qayta hisoblaydi (in-place).
+  recomputePreview(p: OrderPreview): void {
+    p.issues = this.computeIssues(p);
+    p.ready = p.issues.length === 0;
+  }
+
+  private toPreview(draft: AiOrderDraft): OrderPreview {
+    const preview: OrderPreview = {
       customer_name: draft.customer_name,
       phone_number: draft.phone_number,
       extra_number: draft.extra_number,
@@ -607,8 +639,97 @@ export class AiOrderService {
       is_replacement: draft.is_replacement,
       replaced_order_id: draft.replaced_order_id,
       replacement_candidates: draft.replacement_candidates,
-      ready: issues.length === 0,
-      issues,
+      ready: false,
+      issues: [],
+    };
+    preview.issues = this.computeIssues(preview);
+    preview.ready = preview.issues.length === 0;
+    return preview;
+  }
+
+  // Bot ichida bitta tuman/shahar matnini qayta rezolyutsiya (foydalanuvchi
+  // yozgan "Andijon Bo'ston" kabi). Faqat DB — Claude chaqirilmaydi (bepul).
+  async resolveDistrictInput(
+    text: string,
+    cache?: DistrictEntity[],
+  ): Promise<{
+    district_id?: string;
+    district_name?: string;
+    region_id?: string;
+    region_name?: string;
+    region_given: boolean;
+    district_candidates?: OrderPreview['district_candidates'];
+  }> {
+    const draft = {
+      nonce: '',
+      district_name: text,
+      full_address: text,
+      items: [],
+    } as AiOrderDraft;
+    await this.resolveDistrict(draft, cache);
+    return {
+      district_id: draft.district_id,
+      district_name: draft.district_resolved_name,
+      region_id: draft.region_id,
+      region_name: draft.region_label,
+      region_given: !!draft.region_id,
+      district_candidates: draft.district_candidates,
+    };
+  }
+
+  // Bot ichida bitta mahsulot nomini qayta rezolyutsiya. Faqat DB (fuzzy).
+  async resolveItemInput(
+    name: string,
+    quantity: number,
+    marketId: string,
+    cache?: ProductEntity[],
+  ): Promise<OrderPreviewItem> {
+    const draft = {
+      nonce: '',
+      items: [{ name, quantity: quantity > 0 ? quantity : 1 }],
+    } as AiOrderDraft;
+    await this.resolveItems(draft, marketId, cache);
+    const it = draft.items[0];
+    return {
+      name: it.name,
+      quantity: it.quantity,
+      product_id: it.product_id,
+      resolved_name: it.resolved_name,
+      candidates: it.candidates,
+    };
+  }
+
+  // Telefon matnini +998XXXXXXXXX ga keltiradi (bot tuzatishi uchun ochiq wrapper).
+  normalizePhoneInput(input: string): string | undefined {
+    return this.normalizePhone(input);
+  }
+
+  // Tayyor preview'ni yaratishga tayyor ConfirmedOrder'ga aylantiradi (bot
+  // "✅ Yaratish" tugmasi uchun). Faqat ready buyurtmalar uchun chaqiriladi —
+  // bu yerda barcha majburiy maydonlar mavjud deb hisoblanadi.
+  previewToConfirmed(p: OrderPreview): ConfirmedOrder {
+    return {
+      customer_name: p.customer_name || '',
+      phone_number: p.phone_number || '',
+      extra_number: p.extra_number,
+      district_id: p.district_id || '',
+      address: p.address,
+      order_item_info: p.items
+        .filter((i) => i.product_id)
+        .map((i) => ({
+          product_id: i.product_id as string,
+          quantity: i.quantity,
+        })),
+      total_price: p.total_price ?? 0,
+      comment: p.comment,
+      operator: p.operator,
+      where_deliver:
+        p.where_deliver === 'address'
+          ? Where_deliver.ADDRESS
+          : Where_deliver.CENTER,
+      // Avto-topilgan eski buyurtma (almashtirish) — operatorning "Yaratish"
+      // bosishi tasdiq hisoblanadi.
+      replaced_order_id: p.replaced_order_id,
     };
   }
 
@@ -706,6 +827,7 @@ export class AiOrderService {
       order_number?: number;
       balance?: number;
       customer_name?: string;
+      pending_approval?: boolean; // guruh tasdiqiga yuborildimi (CREATED)
     }[];
   }> {
     const marketId = await this.resolveMarketId(user, bodyMarketId);
@@ -725,6 +847,7 @@ export class AiOrderService {
       order_number?: number;
       balance?: number;
       customer_name?: string;
+      pending_approval?: boolean;
     }[] = [];
     // Partiya ichida bir xil buyurtma ikki marta charge/yaratilmasin (dublikat
     // qatorlar) — imzo faqat MUVAFFAQIYATLI yaratilgach belgilanadi.
@@ -745,11 +868,11 @@ export class AiOrderService {
         continue;
       }
 
-      // Oddiy (almashtirish EMAS) buyurtma narxi > 0 bo'lishi shart — 0-som
-      // buyurtma yaratilib pul yechilib qolmasin.
+      // Narx bo'sh (null) yoki manfiy bo'lsa rad etamiz. 0 ATAYLAB ruxsat etiladi
+      // (bepul buyurtma — sovg'a/aksiya); operator uni kartada tasdiqlagan bo'ladi.
       if (
         !o.replaced_order_id &&
-        (o.total_price == null || o.total_price < 1)
+        (o.total_price == null || o.total_price < 0)
       ) {
         results.push({
           ok: false,
@@ -817,14 +940,34 @@ export class AiOrderService {
           replaced_order_id: o.replaced_order_id,
         } as CreateOrderDto;
         const res = (await this.orderService.createOrder(dto, user)) as {
-          data?: { order_number?: number };
+          data?: { order_number?: number; id?: string };
         };
         created.add(sig);
+
+        // Bot buyurtmasini guruh-tasdiqlashga yo'naltiramiz (WebApp bilan bir xil):
+        // CREATE guruh bo'lsa CREATED+guruhga ✅/❌; aks holda NEW. Xato bo'lsa
+        // buyurtma allaqachon yaratilgan — faqat loglanadi (create'ni buzmaydi).
+        let pendingApproval = false;
+        if (res?.data?.id) {
+          try {
+            const disp = await this.orderService.dispatchOrderForApproval(
+              res.data.id,
+            );
+            pendingApproval = disp === 'created';
+          } catch (dispErr) {
+            this.logger.log(
+              `dispatchOrderForApproval xato (order ${res.data.id}): ${(dispErr as Error).message}`,
+              'AiOrder',
+            );
+          }
+        }
+
         results.push({
           ok: true,
           order_number: res?.data?.order_number,
           balance: charge?.balance,
           customer_name: o.customer_name,
+          pending_approval: pendingApproval,
         });
       } catch (err) {
         if (customerId) {
@@ -954,6 +1097,19 @@ export class AiOrderService {
   ): Promise<{ id: string; name: string }[]> {
     const marketId = await this.resolveMarketId(user, bodyMarketId);
     if (!marketId) return [];
+    const products = await this.productRepo.find({
+      where: { user_id: marketId, isDeleted: false },
+    });
+    return products
+      .map((p) => ({ id: p.id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // Bot tuzatishi uchun: marketning barcha mahsulotlari (marketId to'g'ridan-
+  // to'g'ri — JwtPayload kerak emas). Mahsulot topilmaganда ro'yxat ko'rsatiladi.
+  async listProductsForMarket(
+    marketId: string,
+  ): Promise<{ id: string; name: string }[]> {
     const products = await this.productRepo.find({
       where: { user_id: marketId, isDeleted: false },
     });
@@ -1116,11 +1272,24 @@ export class AiOrderService {
       const regionWord = this.normGeo(
         draft.region_label || draft.region_name || '',
       );
+      // Region so'zining FAQAT BIRINCHI uchrashini (viloyat mention) olib
+      // tashlaymiz. Keyingilari SAQLANADI — chunki region nomi == tuman nomi
+      // bo'lganda (masalan "Andijon viloyati Andijon tumani") ikkinchi "Andijon"
+      // aynan TUMAN; hammasini o'chirsak tuman topilmay qolardi (flaky bug).
+      // Faqat-viloyat holati (bitta "Andijon") baribir bo'sh korpus beradi.
+      let regionRemoved = false;
       const corpus = this.normGeo(
         `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`,
       )
         .split(' ')
-        .filter((w) => w && w !== regionWord)
+        .filter((w) => {
+          if (!w) return false;
+          if (regionWord && w === regionWord && !regionRemoved) {
+            regionRemoved = true;
+            return false;
+          }
+          return true;
+        })
         .join('');
       if (corpus.length >= 4) {
         const inRegion = draft.region_id

@@ -537,6 +537,84 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
   }
 
+  /**
+   * BOT buyurtmasini guruh-tasdiqlashga yo'naltiradi (yagona, markazlashgan joy).
+   * - Market'da CREATE tipidagi guruh bor bo'lsa: buyurtmani CREATED qilib
+   *   guruh(lar)ga ✅/❌ tugmalar bilan yuboradi va xabar havolalarini yozadi.
+   * - Guruh YO'Q yoki BARCHA yuborish muvaffaqiyatsiz bo'lsa: buyurtmani NEW ga
+   *   o'tkazadi — CREATED holatida "qotib" qolmasin (operator navbatida ko'rinsin).
+   * Web/platforma buyurtmalari (createOrder) BU HELPERNI CHAQIRMAYDI — ular
+   * avvalgidek to'g'ridan NEW qoladi (faqat bot oqimi guruhga tushadi).
+   */
+  async dispatchOrderForApproval(orderId: string): Promise<'created' | 'new'> {
+    const order = await this.dataSource.manager.findOne(OrderEntity, {
+      where: { id: orderId },
+      relations: [
+        'items',
+        'items.product',
+        'customer',
+        'customer.district',
+        'customer.district.region',
+      ],
+    });
+    if (!order) return 'new';
+
+    const toNew = async () => {
+      if (order.status !== Order_status.NEW || order.deleted_at) {
+        await this.dataSource.manager.update(
+          OrderEntity,
+          { id: order.id },
+          { status: Order_status.NEW },
+        );
+      }
+      return 'new' as const;
+    };
+
+    const groups = await this.dataSource.manager.find(TelegramEntity, {
+      where: { market_id: order.user_id, group_type: Group_type.CREATE },
+    });
+
+    // Guruh yo'q — tasdiq talab qilinmaydi, to'g'ridan NEW.
+    if (!groups.length) {
+      return toNew();
+    }
+
+    // Guruhga yuboriladigan xabar CREATED (tasdiq kutilmoqda) holatini ko'rsatsin.
+    order.status = Order_status.CREATED;
+    const sendResults = await Promise.all(
+      groups.map((g) =>
+        this.orderBotService.sendOrderForApproval(g.group_id || null, order),
+      ),
+    );
+    const messageRefs = sendResults
+      .map((r) => r.sentMessage)
+      .filter(Boolean) as { chatId: number; messageId: number }[];
+
+    // Hech qaysi guruhga yuborib bo'lmadi (bot guruhda yo'q / group_id noto'g'ri /
+    // rate-limit / tarmoq) — CREATED da qotib qolmasin, NEW ga o'tkazamiz.
+    if (!messageRefs.length) {
+      this.logger.log(
+        `Order ${order.id}: CREATE guruh(lar)iga yuborib bo'lmadi — NEW ga o'tkazildi`,
+        'OrderBot',
+      );
+      return toNew();
+    }
+
+    // Yuborildi — CREATED (tasdiq kutilmoqda) + xabar havolalari.
+    await this.dataSource.manager.update(
+      OrderEntity,
+      { id: order.id },
+      {
+        status: Order_status.CREATED,
+        create_bot_messages: [
+          ...(order.create_bot_messages || []),
+          ...messageRefs,
+        ],
+      },
+    );
+    return 'created';
+  }
+
   async createOrderByBot(dto: CreateOrderByBotDto, user: JwtPayload) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -806,52 +884,27 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         user,
       });
 
-      // Tranzaksiyadan TASHQARIDA: market guruh(lar)iga tasdiqlash uchun yuborish
-      // va yuborilgan xabar havolalarini alohida yozish (hech qanday lock ushlamay).
-      // Yuborish/yozish xatosi buyurtmani bekor qilmaydi — buyurtma allaqachon
-      // saqlangan; xato faqat loglanadi.
+      // Tranzaksiyadan TASHQARIDA (lock ushlamay): guruh-tasdiqlashga yo'naltirish.
+      // Yagona helper — guruh bo'lsa CREATED+yuborish, aks holda/xatoda NEW
+      // (CREATED da qotib qolmaslik). Xato buyurtmani bekor qilmaydi.
       try {
-        const telegramGroups = await this.dataSource.manager.find(
-          TelegramEntity,
-          {
-            where: {
-              market_id: order.user_id,
-              group_type: Group_type.CREATE,
-            },
-          },
-        );
-
-        if (telegramGroups.length) {
-          const sendResults = await Promise.all(
-            telegramGroups.map((g) =>
-              this.orderBotService.sendOrderForApproval(
-                g.group_id || null,
-                order,
-              ),
-            ),
-          );
-
-          const messageRefs = sendResults
-            .map((res) => res.sentMessage)
-            .filter(Boolean) as { chatId: number; messageId: number }[];
-
-          if (messageRefs.length) {
-            order.create_bot_messages = [
-              ...(order.create_bot_messages || []),
-              ...messageRefs,
-            ];
-            await this.dataSource.manager.update(
-              OrderEntity,
-              { id: order.id },
-              { create_bot_messages: order.create_bot_messages },
-            );
-          }
-        }
+        await this.dispatchOrderForApproval(order.id);
       } catch (notifyErr) {
+        // Guruhga yo'naltirishda kutilmagan xato — buyurtma CREATED da qotib
+        // qolmasin, NEW ga o'tkazamiz (fallback).
         this.logger.log(
-          `Bot buyurtma ${order.id} yaratildi, lekin guruhga yuborish/yozishda xato: ${(notifyErr as Error).message}`,
+          `Bot buyurtma ${order.id} guruh-yo'naltirishda xato: ${(notifyErr as Error).message} — NEW ga o'tkazildi`,
           'OrderBot',
         );
+        try {
+          await this.dataSource.manager.update(
+            OrderEntity,
+            { id: order.id },
+            { status: Order_status.NEW },
+          );
+        } catch {
+          /* ignore */
+        }
       }
 
       return successRes(order, 201, 'New order created');

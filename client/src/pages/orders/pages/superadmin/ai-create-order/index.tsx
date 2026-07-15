@@ -141,6 +141,7 @@ interface Preview {
   address?: string;
   items: PItem[];
   total_price?: number;
+  price_confirmed?: boolean; // operator kichik/0 narxni ATAYLAB tasdiqladimi
   comment?: string;
   operator?: string;
   where_deliver?: "center" | "address";
@@ -179,6 +180,10 @@ interface ConfirmResponse {
   }[];
 }
 
+// Narx shu chegaradan kam bo'lsa shubhali ("1 mln"->1000 xatosi) — operator
+// tasdiqlashi shart. 0 ham shu yerga tushadi (bepul buyurtma). Backend bilan bir xil.
+const PRICE_CONFIRM_THRESHOLD = 10000;
+
 function evalPreview(p: Preview): { ready: boolean; issues: string[] } {
   const issues: string[] = [];
   if (!p.customer_name?.trim()) issues.push("mijoz ismi yo'q");
@@ -190,14 +195,19 @@ function evalPreview(p: Preview): { ready: boolean; issues: string[] } {
   const isRepl = !!(p.replacement_confirmed && p.replaced_order_id);
   if (p.replacement_confirmed && !p.replaced_order_id)
     issues.push("eski buyurtmani tanlang");
-  // Narx: tasdiqlangan almashtirishda 0 ruxsat; aks holda > 0.
+  // Narx: null — har doim kerak. 0 yoki < 10 000 shubhali ("1 mln"->1000 xatosi)
+  // — operator ATAYLAB tasdiqlamaguncha (price_confirmed) kamchilik. 0 ham
+  // ruxsat (bepul buyurtma), lekin tasdiq orqali. >= 10 000 to'g'ri.
   if (isRepl) {
     if (p.total_price == null) issues.push("narx yozing (0 bo'lsa 0)");
-  } else if (p.total_price == null || p.total_price <= 0) {
-    issues.push("narx noto'g'ri");
-  } else if (p.total_price < 1000) {
-    // "250 ming" -> 250 kabi 1000x kam o'qish — ogohlantiramiz.
-    issues.push("narx juda kichik — tekshiring");
+  } else if (p.total_price == null) {
+    issues.push("narx yozing");
+  } else if (p.total_price < PRICE_CONFIRM_THRESHOLD && !p.price_confirmed) {
+    issues.push(
+      p.total_price === 0
+        ? "narx 0 (bepul) — tasdiqlang"
+        : "narx juda kichik — tasdiqlang"
+    );
   }
   if (!p.items.length) issues.push("mahsulot yo'q");
   p.items.forEach((it) => {
@@ -1009,6 +1019,9 @@ const AiCreateOrder = () => {
                                 const digits = e.target.value.replace(/\D/g, "");
                                 updatePreview(p.id, {
                                   total_price: digits ? Number(digits) : undefined,
+                                  // Operator narxni tahrirladi = ATAYLAB tasdiqladi
+                                  // (kichik/0 narx ham endi qabul qilinadi).
+                                  price_confirmed: true,
                                 });
                               }}
                               className={`${inputCls} ${
@@ -1016,7 +1029,9 @@ const AiCreateOrder = () => {
                                   ? p.total_price != null
                                     ? okBorder
                                     : errBorder
-                                  : p.total_price && p.total_price >= 1000
+                                  : p.total_price != null &&
+                                      (p.total_price >= PRICE_CONFIRM_THRESHOLD ||
+                                        p.price_confirmed)
                                     ? okBorder
                                     : errBorder
                               }`}
@@ -1025,10 +1040,16 @@ const AiCreateOrder = () => {
                               p.total_price == null && (
                                 <FieldHint>Narx kerak (0 bo'lsa 0 yozing)</FieldHint>
                               )
-                            ) : !(p.total_price && p.total_price > 0) ? (
-                              <FieldHint>Narx kerak (0 dan katta)</FieldHint>
-                            ) : p.total_price < 1000 ? (
-                              <FieldHint>Juda kichik — "ming"da?</FieldHint>
+                            ) : p.total_price == null ? (
+                              <FieldHint>Narx yozing</FieldHint>
+                            ) : p.total_price < PRICE_CONFIRM_THRESHOLD &&
+                              !p.price_confirmed ? (
+                              <FieldHint>
+                                {p.total_price === 0
+                                  ? "0 (bepul)"
+                                  : `Juda kichik (${som(p.total_price)})`}{" "}
+                                — to'g'ri bo'lsa narxni qayta kiritib tasdiqlang
+                              </FieldHint>
                             ) : null}
                           </div>
                           {/* Mutaxassis (operator) */}
