@@ -9,11 +9,14 @@ import {
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { memo, useCallback } from "react";
+import { memo, useCallback, useState } from "react";
 import type { RootState } from "../../../../../app/store";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import OrderItems from "../../../components/order-items";
 import ProductInfo from "../../../components/product-info";
+import ReplacementPicker, {
+  type ReplacementSelection,
+} from "./ReplacementPicker";
 import {
   resetOrderItems,
   setCustomerData,
@@ -52,6 +55,12 @@ const CreateOrder = () => {
 
   const { handleApiError, handleWarning } = useApiNotification();
 
+  // Almashtirish (kafolat-swap): bu yangi buyurtma qaysi eski buyurtma o'rniga
+  // ketayotgani. Tanlansa, payloadʼda `replaced_order_id` sifatida boradi.
+  const [replacement, setReplacement] = useState<ReplacementSelection | null>(
+    null
+  );
+
   const handleClick = () => {
     if (
       !orderItems ||
@@ -64,11 +73,20 @@ const CreateOrder = () => {
       );
       return;
     }
+    // Summa MAJBURIY: bo'sh qoldirilsa (null/undefined) ogohlantiramiz.
+    // Atayin nol summali buyurtma uchun foydalanuvchi 0 deb yozishi kerak —
+    // bo'sh input jimgina 0 bo'lib ketmaydi.
     if (
       productInfo?.total_price === null ||
-      productInfo?.total_price === undefined ||
-      !productInfo?.where_deliver
+      productInfo?.total_price === undefined
     ) {
+      handleWarning(
+        "Summa kiritilmagan",
+        "Iltimos buyurtma summasini kiriting. Bepul (nol summali) bo'lsa 0 deb yozing."
+      );
+      return;
+    }
+    if (!productInfo?.where_deliver) {
       handleWarning(
         t("productForm.incompleteProductData"),
         t("productForm.fillAllFields")
@@ -124,12 +142,15 @@ const CreateOrder = () => {
       // Buyurtma uchun yetkazib berish manzili
       district_id: customer?.district_id,
       address: customer?.address,
+      // Almashtirish (kafolat-swap): tanlangan eski buyurtma ID si
+      replaced_order_id: replacement?.id,
     };
     createOrder.mutate(newOrder, {
       onSuccess: () => {
         dispatch(setCustomerData(null));
         dispatch(resetOrderItems());
         dispatch(setProductInfo(null));
+        setReplacement(null);
         navigate(buildAdminPath("orders/customer-info"));
       },
       onError: (err: any) =>
@@ -142,7 +163,7 @@ const CreateOrder = () => {
       e.preventDefault();
       handleClick();
     }
-  }, [orderItems, productInfo, market_id, customer_id]);
+  }, [orderItems, productInfo, market_id, customer_id, replacement]);
 
   const handleBack = () => {
     navigate(buildAdminPath("orders/customer-info"));
@@ -279,13 +300,13 @@ const CreateOrder = () => {
                           {orderItems.length} ta
                         </span>
                       </div>
-                      {productInfo?.total_price && (
+                      {productInfo?.total_price != null && (
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-xs text-gray-600 dark:text-gray-400">
                             Jami:
                           </span>
                           <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
-                            {productInfo.total_price.toLocaleString()} so'm
+                            {Number(productInfo.total_price).toLocaleString()} so'm
                           </span>
                         </div>
                       )}
@@ -303,6 +324,14 @@ const CreateOrder = () => {
 
             {/* Product Info */}
             <ProductInfo />
+
+            {/* Almashtirish (kafolat-swap) — eski buyurtmani tanlash */}
+            <ReplacementPicker
+              customerId={customer_id}
+              marketId={market_id || undefined}
+              value={replacement}
+              onChange={setReplacement}
+            />
 
             {/* Navigation Buttons */}
             <div className="flex justify-between">

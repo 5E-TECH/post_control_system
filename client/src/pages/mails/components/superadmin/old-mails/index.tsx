@@ -1,16 +1,17 @@
-import { memo, useCallback, useMemo, type MouseEvent } from "react";
+import { memo, useCallback, useMemo, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost, post } from "../../../../../shared/api/hooks/usePost";
 import { useTranslation } from "react-i18next";
 import { DatePicker, Pagination, Select, type PaginationProps } from "antd";
 import dayjs from "dayjs";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
-import { ChevronRight, Loader2, Clock, CheckCircle, XCircle, Calendar, Archive, User, MapPin, Filter, X, Printer } from "lucide-react";
+import { ChevronRight, Loader2, Clock, CheckCircle, XCircle, Calendar, Archive, User, MapPin, Filter, X, Printer, FileSpreadsheet } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../../../shared/api";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { generateCourierReceipt } from "../../../../../shared/helpers/generate-courier-receipt";
+import { exportPostOrdersToExcel } from "../../../../../shared/helpers/export-post-orders-excel";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 
 interface FilterRegion {
@@ -49,7 +50,63 @@ const OldMails = () => {
   const canSeePrice = role === "superadmin" || role === "admin";
   const { getAllPosts, getOldPostsFilterOptions } = usePost();
   const { getParam, setParam, removeParam } = useParamsHook();
-  const { handleSuccess, handleApiError } = useApiNotification();
+  const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
+
+  // Excel yuklanayotgan pochta id'si (faqat shu karta tugmasi spinnerga o'tadi).
+  const [excelLoadingId, setExcelLoadingId] = useState<string | null>(null);
+
+  // Eski pochtadan Excel (hisobot) olish. Karta javobida buyurtmalar yo'q —
+  // shuning uchun chek bosilganda buyurtmalar alohida yuklanadi (received yoki
+  // rejected endpoint, status bo'yicha), keyin jo'natish paytidagi bilan bir
+  // xil formatdagi Excel hosil qilinadi. stopPropagation — kartaga navigatsiya
+  // bilan to'qnashmasligi uchun.
+  const handleDownloadExcel = useCallback(
+    async (e: MouseEvent<HTMLButtonElement>, post: any) => {
+      e.stopPropagation();
+      if (!post?.id || excelLoadingId) return;
+      try {
+        setExcelLoadingId(post.id);
+        // Bekor qilingan pochtalar buyurtmalari rejected endpointdan keladi
+        // (massiv); qolganlari received endpointdan ({ allOrdersByPostId }).
+        const isRejected = ["canceled", "canceled_received"].includes(
+          post?.status?.toLowerCase(),
+        );
+        const path = isRejected ? "rejected/" : "";
+        const res = await api.get(`post/orders/${path}${post.id}`);
+        const payload = res?.data?.data;
+        const orders: any[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.allOrdersByPostId)
+          ? payload.allOrdersByPostId
+          : [];
+        if (!orders.length) {
+          handleWarning(
+            "Bu pochtada buyurtmalar topilmadi",
+            "Eksport qilish uchun buyurtma yo'q.",
+          );
+          return;
+        }
+        await exportPostOrdersToExcel(orders, {
+          qrCodeToken: post?.qr_code_token,
+          regionName: post?.region?.name,
+          courierName: post?.courier?.name,
+          // Bekor pochtada saqlangan order_quantity (jo'natish paytidagi son)
+          // yuklangan qatorlardan farq qilishi mumkin — sarlavha qatorlar bilan
+          // mos bo'lishi uchun rejected yo'lda orders.length ishlatamiz.
+          totalOrders: isRejected
+            ? orders.length
+            : post?.order_quantity ?? orders.length,
+          date: post?.created_at,
+        });
+        handleSuccess("Excel tayyor");
+      } catch (err) {
+        handleApiError(err, "Excel yuklashda xatolik yuz berdi");
+      } finally {
+        setExcelLoadingId(null);
+      }
+    },
+    [excelLoadingId, handleSuccess, handleApiError, handleWarning],
+  );
 
   // Eski pochtadan kuryer chekini (QR kodli) qayta chiqarish. Pochta
   // jo'natilganda generatsiya bo'lgan chekni istalgan vaqtda qayta hosil
@@ -413,16 +470,30 @@ const OldMails = () => {
                   )}
                 </div>
 
-                {["sent", "received"].includes(post?.status?.toLowerCase()) &&
-                  post?.qr_code_token && (
-                    <button
-                      onClick={(e) => handleReprintReceipt(e, post)}
-                      className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-colors"
-                    >
-                      <Printer className="w-4 h-4" />
-                      Chekni qayta chiqarish
-                    </button>
-                  )}
+                <div className="mt-4 flex items-center gap-2">
+                  <button
+                    onClick={(e) => handleDownloadExcel(e, post)}
+                    disabled={!!excelLoadingId}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-white text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {excelLoadingId === post?.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="w-4 h-4" />
+                    )}
+                    Excel
+                  </button>
+                  {["sent", "received"].includes(post?.status?.toLowerCase()) &&
+                    post?.qr_code_token && (
+                      <button
+                        onClick={(e) => handleReprintReceipt(e, post)}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-colors"
+                      >
+                        <Printer className="w-4 h-4" />
+                        Chek
+                      </button>
+                    )}
+                </div>
               </div>
             );
           })}

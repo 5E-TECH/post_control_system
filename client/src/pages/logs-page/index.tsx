@@ -380,6 +380,8 @@ const FIELD_LABEL: Record<string, string> = {
   product_quantity: "Mahsulot soni",
   user_agent: "Qurilma",
   ip: "IP manzil",
+  device_id: "Qurilma ID",
+  device_name: "Qurilma nomi",
   post_token: "Pochta kodi",
   external_id: "Tashqi ID",
   integration: "Integratsiya",
@@ -849,37 +851,62 @@ const AmountPill: React.FC<{ amount?: number | string; positive?: boolean }> = (
 };
 
 // Render the "title line" and "meta line" based on action type
+// Qurilma + IP + qurilma-ID chiplari — HAR BIR log qatorida ko'rsatiladi
+// (avval faqat login'da edi). Backend endi har bir amalga metadata.ip/user_agent/
+// device_id yozadi, shuning uchun bu chiplar sotuv/bekor/kassa loglarida ham chiqadi.
+const DeviceIpChips: React.FC<{ meta?: any }> = ({ meta }) => {
+  if (!meta) return null;
+  const hasUa = !!meta.user_agent;
+  const hasIp = !!meta.ip;
+  const hasDev = !!meta.device_id;
+  if (!hasUa && !hasIp && !hasDev) return null;
+  const { device, os, browser, icon: DeviceIcon } = parseUserAgent(meta.user_agent);
+  return (
+    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
+      {hasUa && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400">
+          <DeviceIcon className="w-3 h-3" />
+          {device}
+          {os && ` · ${os}`}
+          {browser && ` · ${browser}`}
+        </span>
+      )}
+      {hasIp && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-mono">
+          <Globe className="w-3 h-3" />
+          {meta.ip}
+        </span>
+      )}
+      {hasDev && (
+        <Tooltip title={`Qurilma ID: ${meta.device_id}`}>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-mono cursor-help">
+            #{String(meta.device_id).slice(0, 6)}
+          </span>
+        </Tooltip>
+      )}
+    </div>
+  );
+};
+
 const describeLog = (log: LogRow): { title: string; extras: React.ReactNode } => {
   const nv = log.new_value || {};
   const ov = log.old_value || {};
   const desc = log.description || ACTION_CONFIG[log.action]?.label || "Harakat";
 
   if (log.action === "login") {
+    // Qurilma + IP chiplari endi global DeviceIpChips orqali har bir qatorda
+    // ko'rsatiladi — bu yerda faqat manba (web'dan farqli: telegram va h.k.).
     const meta = log.metadata || {};
-    const { device, os, browser, icon: DeviceIcon } = parseUserAgent(meta.user_agent);
     return {
       title: desc,
-      extras: (
-        <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400">
-            <DeviceIcon className="w-3 h-3" />
-            {device}
-            {os && ` · ${os}`}
-            {browser && ` · ${browser}`}
-          </span>
-          {meta.ip && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-mono">
-              <Globe className="w-3 h-3" />
-              {meta.ip}
-            </span>
-          )}
-          {meta.source && meta.source !== "web" && (
+      extras:
+        meta.source && meta.source !== "web" ? (
+          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
               {meta.source}
             </span>
-          )}
-        </div>
-      ),
+          </div>
+        ) : null,
     };
   }
 
@@ -1067,6 +1094,7 @@ const LogCard: React.FC<{
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <UserChip name={log.user_name} role={log.user_role} compact />
               </div>
+              <DeviceIpChips meta={log.metadata} />
               {extras}
             </div>
 
@@ -1248,6 +1276,7 @@ const TimelineDrawer: React.FC<{
                         <div className="mt-1">
                           <UserChip name={log.user_name} role={log.user_role} compact />
                         </div>
+                        <DeviceIpChips meta={log.metadata} />
                         {extras}
                       </div>
                       <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">

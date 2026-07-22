@@ -33,6 +33,7 @@ import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { useProfile } from "../../../../../shared/api/hooks/useProfile";
+import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 
 export type FieldType = {
   comment?: string;
@@ -89,6 +90,9 @@ const WaitingOrders = () => {
   const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
   const [totalPrice, setTotalPrice] = useState<number | string>("");
   const [extraCostValue, setExtraCostValue] = useState<string>("");
+  // Almashtirish (kafolat-swap): kuryer eski mahsulotni olganini tasdiqlaydi.
+  // Almashtirish buyurtmasini sotish uchun MAJBURIY (server ham tekshiradi).
+  const [oldItemCollected, setOldItemCollected] = useState<boolean>(false);
 
   const closePopup = () => {
     setIsShow(false);
@@ -97,6 +101,7 @@ const WaitingOrders = () => {
     setTotalPrice("");
     setExtraCostValue("");
     setOrderItemInfo([]);
+    setOldItemCollected(false);
   };
 
   useEffect(() => {
@@ -143,10 +148,23 @@ const WaitingOrders = () => {
           },
         );
       } else {
+        // Almashtirish (kafolat-swap) gate: eski mahsulot olinmagan bo'lsa
+        // sotishga yo'l qo'ymaymiz (server ham rad etadi).
+        if (item?.replacement_of_order_id && !oldItemCollected) {
+          handleWarning(
+            "Eski mahsulotni olishni tasdiqlang",
+            "Bu almashtirish buyurtmasi. Avval eski mahsulotni mijozdan olib, marketga qaytarish uchun olganingizni belgilang.",
+          );
+          return;
+        }
         // extraCost ni qo'lda qo'shish (Form.Item ichida emas)
         const data = {
           comment: values?.comment,
           extraCost: parsedExtraCost,
+          // Almashtirish buyurtmasi bo'lsa — eski mahsulot olingani tasdig'i
+          ...(item?.replacement_of_order_id
+            ? { old_item_collected: oldItemCollected }
+            : {}),
         };
         sellOrder.mutate(
           { id: item?.id as string, data },
@@ -219,6 +237,7 @@ const WaitingOrders = () => {
     form.resetFields();
     setPartlySoldShow(false);
     setTotalPrice("");
+    setOldItemCollected(false);
   };
 
   const handleCancelOrder = (
@@ -368,6 +387,7 @@ const WaitingOrders = () => {
                 <h3 className="font-bold text-base text-gray-800 dark:text-white truncate">
                   {item?.customer?.name || "Noma'lum"}
                 </h3>
+                <ReplacementBadge order={item} className="my-0.5" />
                 <a
                   href={`tel:${item?.customer?.phone_number}`}
                   onClick={(e) => e.stopPropagation()}
@@ -500,6 +520,7 @@ const WaitingOrders = () => {
                     <span className="font-medium text-gray-800 dark:text-white truncate">
                       {item?.customer?.name}
                     </span>
+                    <ReplacementBadge order={item} />
                   </div>
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">
@@ -637,8 +658,37 @@ const WaitingOrders = () => {
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto px-5 py-4">
-            {/* Partial Toggle Button - ONLY FOR SELL */}
-            {urlType.current === "sell" && (
+            {/* ALMASHTIRISH (kafolat-swap) — majburiy tasdiq */}
+            {urlType.current === "sell" &&
+              order.current?.replacement_of_order_id && (
+                <div className="mb-4 rounded-xl border-2 border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20 overflow-hidden">
+                  <div className="flex items-start gap-2 p-3 bg-amber-100 dark:bg-amber-900/30">
+                    <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                      ALMASHTIRISH: eski buyurtma
+                      {order.current?.replacementOf?.order_number
+                        ? ` #${order.current.replacementOf.order_number}`
+                        : ""}{" "}
+                      mahsulotini mijozdan olib, marketga qaytaring!
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-3 p-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={oldItemCollected}
+                      onChange={(e) => setOldItemCollected(e.target.checked)}
+                      className="w-5 h-5 accent-amber-600 cursor-pointer flex-shrink-0"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                      Eski mahsulotni mijozdan oldim (marketga qaytarish uchun)
+                    </span>
+                  </label>
+                </div>
+              )}
+
+            {/* Partial Toggle Button - ONLY FOR SELL (almashtirishda yashiriladi) */}
+            {urlType.current === "sell" &&
+              !order.current?.replacement_of_order_id && (
               <button
                 type="button"
                 onClick={() => setPartlySoldShow((p) => !p)}
@@ -893,15 +943,22 @@ const WaitingOrders = () => {
 
           {/* Fixed Bottom Button - Single Full Width */}
           <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            {(() => {
+              const blockReplacement =
+                urlType.current === "sell" &&
+                !!order.current?.replacement_of_order_id &&
+                !oldItemCollected;
+              const disabled = getIsPending() || blockReplacement;
+              return (
             <button
               type="button"
               onClick={() => form.submit()}
-              disabled={getIsPending()}
+              disabled={disabled}
               className={`w-full h-14 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
                 urlType.current === "sell"
                   ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/25"
                   : "bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25"
-              } ${getIsPending() ? "opacity-50 cursor-not-allowed" : ""}`}
+              } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {getIsPending() ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -917,6 +974,8 @@ const WaitingOrders = () => {
                 </>
               )}
             </button>
+              );
+            })()}
           </div>
         </div>
       </Popup>

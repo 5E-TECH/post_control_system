@@ -10,6 +10,8 @@ import {
   Query,
   Res,
   Header,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -39,12 +41,22 @@ import { UpdateOrderAddressDto } from './dto/update-order-address.dto';
 import { ReceiveExternalOrdersDto } from './dto/receive-external-orders.dto';
 import { RollbackOrderDto } from './dto/rollback-order.dto';
 import { BulkOrderActionDto } from './dto/bulk-order-action.dto';
+import {
+  AiCreateOrderDto,
+  AiParseOrderDto,
+  AiConfirmOrdersDto,
+} from './dto/ai-create-order.dto';
+import { AiOrderService } from '../bots/order_create-bot/ai-order.service';
 
 @ApiTags('Orders')
 @ApiBearerAuth()
 @Controller('order')
 export class OrderController {
-  constructor(private readonly orderService: OrderService) {}
+  constructor(
+    private readonly orderService: OrderService,
+    @Inject(forwardRef(() => AiOrderService))
+    private readonly aiOrderService: AiOrderService,
+  ) {}
 
   @ApiOperation({ summary: 'Create order' })
   @ApiResponse({ status: 201, description: 'Order created' })
@@ -66,6 +78,100 @@ export class OrderController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.orderService.createOrder(creteOrderDto, user);
+  }
+
+  @ApiOperation({ summary: 'AI orqali buyurtma yaratish (erkin matndan)' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Post('ai-create')
+  aiCreate(@Body() dto: AiCreateOrderDto, @CurrentUser() user: JwtPayload) {
+    return this.aiOrderService.createForPlatform(dto.text, user, dto.market_id);
+  }
+
+  @ApiOperation({ summary: 'Joriy foydalanuvchi uchun AI mavjudmi' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('ai-availability')
+  aiAvailability(@CurrentUser() user: JwtPayload) {
+    return this.aiOrderService.aiAvailabilityForUser(user);
+  }
+
+  @ApiOperation({ summary: 'AI karta uchun barcha viloyat + tuman/shaharlar' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('ai-geo')
+  aiGeo() {
+    return this.aiOrderService.getGeo();
+  }
+
+  @ApiOperation({ summary: 'AI karta uchun market mahsulotlari ro\'yxati' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('ai-products')
+  aiProducts(
+    @Query('market_id') marketId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.aiOrderService.getMarketProducts(user, marketId);
+  }
+
+  @ApiOperation({ summary: 'AI matnni tahlil qilish (bir/bir nechta buyurtma)' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Post('ai-parse')
+  aiParse(@Body() dto: AiParseOrderDto, @CurrentUser() user: JwtPayload) {
+    return this.aiOrderService.parseForUser(dto.text, user, dto.market_id);
+  }
+
+  @ApiOperation({ summary: 'Tasdiqlangan AI buyurtmalarni yaratish' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Post('ai-create-confirmed')
+  aiCreateConfirmed(
+    @Body() dto: AiConfirmOrdersDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.aiOrderService.createConfirmedOrders(
+      dto.orders,
+      user,
+      dto.market_id,
+    );
   }
 
   @ApiOperation({ summary: 'List orders with filters' })
@@ -171,6 +277,42 @@ export class OrderController {
     @Query('limit') limit: number = 10,
   ) {
     return this.orderService.newOrdersByMarketId(id, search, page, limit);
+  }
+
+  // Almashtirish pickeri uchun — MUHIM: bu STATIC route '@Get(:id)' dan OLDIN
+  // turishi shart, aks holda ':id' uni yutib yuboradi.
+  @ApiOperation({
+    summary: 'Almashtirish uchun almashtirib bo\'ladigan buyurtmalar',
+    description:
+      'q berilsa market bo\'ylab telefon/ism/raqam bo\'yicha qidiradi (boshqa ' +
+      'mijoz ham); aks holda customer_id bo\'yicha shu mijoz buyurtmalari.',
+  })
+  @ApiQuery({ name: 'market_id', required: false })
+  @ApiQuery({ name: 'customer_id', required: false })
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('replaceable')
+  getReplaceableOrders(
+    @CurrentUser() user: JwtPayload,
+    @Query('market_id') market_id?: string,
+    @Query('customer_id') customer_id?: string,
+    @Query('q') q?: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.orderService.getReplaceableOrders(user, {
+      market_id,
+      customer_id,
+      q,
+      limit,
+    });
   }
 
   @ApiOperation({ summary: 'Get order by id' })
@@ -443,6 +585,49 @@ export class OrderController {
     @Body() dto: BulkOrderActionDto,
   ) {
     return this.orderService.bulkCancelOrders(user, dto);
+  }
+
+  // ============== ALMASHTIRISH (kafolat-swap) QAYTISHLARI ==============
+
+  @ApiOperation({
+    summary: 'Almashtirish qaytishlari ro\'yxati',
+    description:
+      'Eski (almashtirilayotgan) mahsulotlar ro\'yxati. state: pending|collected|returned',
+  })
+  @ApiQuery({ name: 'state', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Get('replacement/returns')
+  getReplacementReturns(
+    @CurrentUser() user: JwtPayload,
+    @Query('state') state?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.orderService.getReplacementReturns(user, {
+      state,
+      page,
+      limit,
+      search,
+    });
+  }
+
+  @ApiOperation({
+    summary: 'Almashtirish: eski mahsulot marketga topshirildi (OLD_RETURNED)',
+  })
+  @ApiParam({ name: 'id', description: 'Eski (almashtirilayotgan) buyurtma ID' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR)
+  @Post('replacement/:id/returned')
+  confirmOldReturned(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.orderService.confirmOldReturned(user, id);
   }
 
   @ApiOperation({

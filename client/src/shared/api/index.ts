@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { BASE_URL } from "../const";
+import { getDeviceId } from "../lib/device";
 
 export const api = axios.create({
     baseURL: BASE_URL,
@@ -33,6 +34,9 @@ api.interceptors.request.use((config) => {
     if (token) {
         config.headers.Authorization = `Bearer ${token}`
     }
+    // Barqaror qurilma-ID — audit-log har bir amalда qaysi qurilmadan
+    // qilinganini yozib borishi uchun (backend metadata.device_id).
+    config.headers["X-Device-Id"] = getDeviceId()
     return config
 })
 
@@ -67,7 +71,10 @@ api.interceptors.response.use(
                 const response = await axios.post(
                     `${BASE_URL}user/refresh`,
                     {},
-                    { withCredentials: true }
+                    {
+                        withCredentials: true,
+                        headers: { "X-Device-Id": getDeviceId() },
+                    }
                 );
 
                 const newToken = response.data?.data?.access_token;

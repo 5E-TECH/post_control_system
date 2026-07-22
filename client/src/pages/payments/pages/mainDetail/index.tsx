@@ -177,9 +177,9 @@ const MainDetail = () => {
           setForm(initialForm);
         },
         onError: (error) => {
-          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const err = error as AxiosError<{ message?: string; error?: string }>;
           const msg =
-            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+            err.response?.data?.message || "Xatolik yuz berdi!";
           handleApiError(err, `${msg}`);
         },
       }
@@ -240,9 +240,9 @@ const MainDetail = () => {
           setForm(initialForm);
         },
         onError: (error) => {
-          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const err = error as AxiosError<{ message?: string; error?: string }>;
           const msg =
-            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+            err.response?.data?.message || "Xatolik yuz berdi!";
           handleApiError(err, `${msg}`);
         },
       }
@@ -279,8 +279,8 @@ const MainDetail = () => {
         refetchShift();
       },
       onError: (error) => {
-        const err = error as AxiosError<{ error?: { message?: string } }>;
-        const msg = err.response?.data?.error?.message || "Xatolik yuz berdi!";
+        const err = error as AxiosError<{ message?: string; error?: string }>;
+        const msg = err.response?.data?.message || "Xatolik yuz berdi!";
         handleApiError(err, msg);
       },
     });
@@ -318,8 +318,8 @@ const MainDetail = () => {
       refetchShift();
       refetch();
     } catch (error) {
-      const err = error as AxiosError<{ error?: { message?: string } }>;
-      const msg = err.response?.data?.error?.message || "Xatolik yuz berdi!";
+      const err = error as AxiosError<{ message?: string; error?: string }>;
+      const msg = err.response?.data?.message || "Xatolik yuz berdi!";
       handleApiError(err, msg);
     } finally {
       setIsClosingShift(false);
@@ -1193,8 +1193,8 @@ const MainDetail = () => {
                     setPendingAction(null);
                   },
                   onError: (error) => {
-                    const err = error as AxiosError<{ error?: { message?: string } }>;
-                    const msg = err.response?.data?.error?.message || "Xatolik yuz berdi!";
+                    const err = error as AxiosError<{ message?: string; error?: string }>;
+                    const msg = err.response?.data?.message || "Xatolik yuz berdi!";
                     handleApiError(err, msg);
                     setPendingAction(null);
                   },

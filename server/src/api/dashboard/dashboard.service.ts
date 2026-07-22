@@ -14,30 +14,46 @@ export class DashboardService {
     private readonly orderStats: OrderService,
     private readonly logger: MyLogger,
   ) {}
+
+  /**
+   * Dashboard sana oralig'ini normallashtiradi (Toshkent vaqti, epoch-ms string).
+   *  • Ikkalasi ham yo'q → bugungi kun.
+   *  • Faqat "dan" (startDate) → o'sha kundan BUGUNGACHA. (Avval ikkalasi ham
+   *    bugunga tushib ketardi — mobil "faqat-dan" tanlashda haqiqiy bug edi:
+   *    sarlavha "X dan boshlab" der, raqamlar esa bugunni ko'rsatardi.)
+   *  • Faqat "gacha" (endDate) → boshidan o'sha kungacha.
+   *  • Ikkalasi ham bor → to'liq oraliq (bir xil kun bo'lsa 00:00–23:59).
+   */
+  private resolveRange(
+    startDate?: string,
+    endDate?: string,
+  ): { start: string; end: string } {
+    const today = getUzbekistanDayRange();
+
+    if (!startDate && !endDate) {
+      return { start: String(today.start), end: String(today.end) };
+    }
+    if (startDate && !endDate) {
+      return {
+        start: String(toUzbekistanTimestamp(startDate, false)),
+        end: String(today.end),
+      };
+    }
+    if (!startDate && endDate) {
+      return { start: '0', end: String(toUzbekistanTimestamp(endDate, true)) };
+    }
+    return {
+      start: String(toUzbekistanTimestamp(startDate as string, false)),
+      end: String(toUzbekistanTimestamp(endDate as string, true)),
+    };
+  }
+
   async getOverview(filter: { startDate?: string; endDate?: string }) {
     try {
-      let { startDate, endDate } = filter;
-
-      if (!startDate || !endDate) {
-        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
-        const { start, end } = getUzbekistanDayRange();
-        startDate = String(start);
-        endDate = String(end);
-      } else {
-        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
-        if (startDate === endDate) {
-          const start = toUzbekistanTimestamp(startDate, false);
-          const end = toUzbekistanTimestamp(endDate, true);
-          startDate = String(start);
-          endDate = String(end);
-        } else {
-          // Har xil kunlar oralig‘i
-          const start = toUzbekistanTimestamp(startDate, false);
-          const end = toUzbekistanTimestamp(endDate, true);
-          startDate = String(start);
-          endDate = String(end);
-        }
-      }
+      const { start: startDate, end: endDate } = this.resolveRange(
+        filter.startDate,
+        filter.endDate,
+      );
 
       const [orders, markets, couriers, topMarkets, topCouriers] =
         await Promise.all([
@@ -63,28 +79,10 @@ export class DashboardService {
     filter: { startDate?: string; endDate?: string },
   ) {
     try {
-      let { startDate, endDate } = filter;
-
-      if (!startDate || !endDate) {
-        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
-        const { start, end } = getUzbekistanDayRange();
-        startDate = String(start);
-        endDate = String(end);
-      } else {
-        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
-        if (startDate === endDate) {
-          const start = toUzbekistanTimestamp(startDate, false);
-          const end = toUzbekistanTimestamp(endDate, true);
-          startDate = String(start);
-          endDate = String(end);
-        } else {
-          // Har xil kunlar oralig‘i
-          const start = toUzbekistanTimestamp(startDate, false);
-          const end = toUzbekistanTimestamp(endDate, true);
-          startDate = String(start);
-          endDate = String(end);
-        }
-      }
+      const { start: startDate, end: endDate } = this.resolveRange(
+        filter.startDate,
+        filter.endDate,
+      );
 
       const [myStat, couriers, topCouriers] = await Promise.all([
         this.orderStats.courierStat(user, startDate, endDate),
@@ -107,28 +105,10 @@ export class DashboardService {
     filter: { startDate?: string; endDate?: string },
   ) {
     try {
-      let { startDate, endDate } = filter;
-
-      if (!startDate || !endDate) {
-        // Sana berilmagan bo‘lsa — bugungi O‘zbekiston kuni
-        const { start, end } = getUzbekistanDayRange();
-        startDate = String(start);
-        endDate = String(end);
-      } else {
-        // Ikkalasi bir xil bo‘lsa — 00:00 dan 23:59 gacha olish kerak
-        if (startDate === endDate) {
-          const start = toUzbekistanTimestamp(startDate, false);
-          const end = toUzbekistanTimestamp(endDate, true);
-          startDate = String(start);
-          endDate = String(end);
-        } else {
-          // Har xil kunlar oralig‘i
-          const start = toUzbekistanTimestamp(startDate, false);
-          const end = toUzbekistanTimestamp(endDate, true);
-          startDate = String(start);
-          endDate = String(end);
-        }
-      }
+      const { start: startDate, end: endDate } = this.resolveRange(
+        filter.startDate,
+        filter.endDate,
+      );
 
       const [myStat, markets, topMarkets, topOperators] = await Promise.all([
         this.orderStats.marketStat(user, startDate, endDate),

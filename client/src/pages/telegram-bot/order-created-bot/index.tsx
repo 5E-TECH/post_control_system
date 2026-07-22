@@ -41,7 +41,10 @@ const CreateOrderBot = () => {
     !!customerData?.name &&
     !!customerData?.phone_number &&
     !!customerData?.district_id &&
-    !!productInfo?.total_price &&
+    // Summa kiritilgan bo'lishi shart, lekin atayin 0 ham ruxsat etiladi —
+    // shuning uchun !!total_price emas, null/undefined tekshiruvi.
+    productInfo?.total_price !== null &&
+    productInfo?.total_price !== undefined &&
     (orderItems || []).length > 0;
 
   const handleSubmit = () => {

@@ -22,10 +22,12 @@ import {
   Wallet,
   Lock,
   Truck,
+  Bot,
 } from "lucide-react";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { setUserData } from "../../../../shared/lib/features/login/authSlice";
 import CourierRegionBreakdown from "./CourierRegionBreakdown";
+import { AiBalanceContent } from "../../../users/components/users/ai-balance-modal";
 
 const UserProfile = () => {
   const { id } = useParams();
@@ -780,6 +782,30 @@ const UserProfile = () => {
                   </button>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* AI sozlamalari — market detali (yoqish/o'chirish, balans
+              to'ldirish, narx, sarflar tarixi). Faqat admin/superadmin boshqaradi
+              (market o'z read-only /ai-balance sahifasiga ega). */}
+          {user?.role === "market" &&
+            (currentUserRole === "superadmin" ||
+              currentUserRole === "admin") && (
+            <div className="md:col-span-2 lg:col-span-3 bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/10 to-indigo-500/10 flex items-center justify-center">
+                  <Bot className="w-6 h-6 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                    AI sozlamalari
+                  </p>
+                  <p className="text-base font-semibold text-gray-800 dark:text-white mt-0.5">
+                    AI'ni yoqish/o'chirish, balans, narx va sarflar tarixi
+                  </p>
+                </div>
+              </div>
+              <AiBalanceContent marketId={user.id} />
             </div>
           )}
 

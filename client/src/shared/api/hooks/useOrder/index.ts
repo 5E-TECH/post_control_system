@@ -208,7 +208,40 @@ export const useOrder = () => {
       client.invalidateQueries({ queryKey: [order], refetchType: "active" }),
   });
 
+  // Almashtirish pickeri: almashtirib bo'ladigan buyurtmalar (mijoz yoki qidiruv)
+  const getReplaceableOrders = (params?: any, enabled = true) =>
+    useQuery({
+      queryKey: [order, "replaceable", params],
+      queryFn: () =>
+        api.get("order/replaceable", { params }).then((res) => res.data),
+      enabled,
+    });
+
+  // Almashtirish (kafolat-swap) qaytishlari ro'yxati
+  const getReplacementReturns = (params?: any) =>
+    useQuery({
+      queryKey: [order, "replacement-returns", params],
+      queryFn: () =>
+        api
+          .get("order/replacement/returns", { params })
+          .then((res) => res.data),
+    });
+
+  // Eski mahsulot marketga topshirildi (OLD_RETURNED)
+  const confirmOldReturned = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`order/replacement/${id}/returned`).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({
+        queryKey: [order, "replacement-returns"],
+        refetchType: "active",
+      }),
+  });
+
   return {
+    getReplaceableOrders,
+    getReplacementReturns,
+    confirmOldReturned,
     createOrder,
     updateOrders,
     sellOrder,

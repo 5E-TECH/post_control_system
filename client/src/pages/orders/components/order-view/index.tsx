@@ -11,6 +11,7 @@ import { resetDownload } from "../../../../shared/lib/features/excel-download-fu
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { BASE_URL } from "../../../../shared/const";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
+import ReplacementBadge from "../../../../shared/components/replacement-badge";
 import {
   User,
   Phone,
@@ -185,10 +186,11 @@ const OrderCard = ({
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
           <User className="w-5 h-5 text-white" />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h3 className="font-bold text-base text-gray-800 dark:text-white">
             {item?.customer?.name || "Noma'lum"}
           </h3>
+          <ReplacementBadge order={item} className="my-0.5" />
           <a
             href={`tel:${item?.customer?.phone_number}`}
             onClick={(e) => e.stopPropagation()}

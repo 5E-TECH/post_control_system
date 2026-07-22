@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { House, ShoppingBag, Apple, Calendar1, Wallet, ClipboardList } from "lucide-react";
+import { House, ShoppingBag, Apple, Calendar1, Wallet, ClipboardList, Bot } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
@@ -30,6 +30,7 @@ const OperatorSidebar = () => {
       label: t("new_orders"),
     },
     { to: "/products", icon: <Apple />, label: t("products") },
+    { to: "/ai-balance", icon: <Bot />, label: "AI balans" },
     ...(showEarnings
       ? [{ to: "/my-earnings", icon: <Wallet />, label: "Daromadlarim" }]
       : []),

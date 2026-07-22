@@ -13,11 +13,11 @@ import { UserRepository } from 'src/core/repository/user.repository';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { InjectBot } from 'nestjs-telegraf';
-import { DataSource, Not } from 'typeorm';
+import { DataSource, IsNull, Not } from 'typeorm';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { MyContext } from './session.interface';
 import { Group_type, Order_status, Roles, Status } from 'src/common/enums';
-import { roleUz } from 'src/common/utils/status-label.util';
+import { roleUz, orderStatusUz } from 'src/common/utils/status-label.util';
 import config from 'src/config';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
@@ -67,13 +67,14 @@ export class OrderBotService {
   }
 
   private statusButtonLabel(order: OrderEntity) {
-    const status = order.deleted_at
-      ? 'deleted'
-      : order.status || Order_status.CREATED;
+    // Guruh-tasdiqlash konteksti uchun ANIQ o'zbekcha yorliqlar.
+    if (order.deleted_at) return '❌ Bekor qilingan';
+    const status = order.status || Order_status.CREATED;
+    if (status === Order_status.CREATED) return '🟡 Tasdiqlash kutilmoqda';
+    if (status === Order_status.NEW) return '🟢 Tasdiqlandi';
 
+    // Buyurtma guruh oqimidan o'tib ketgan — umumiy o'zbekcha status + ikon.
     const iconMap: Record<string, string> = {
-      [Order_status.CREATED]: '🟡',
-      [Order_status.NEW]: '🟢',
       [Order_status.RECEIVED]: '📦',
       [Order_status.ON_THE_ROAD]: '🚚',
       [Order_status.WAITING]: '⏳',
@@ -83,11 +84,9 @@ export class OrderBotService {
       [Order_status.PARTLY_PAID]: '💸',
       [Order_status.CANCELLED_SENT]: '📮',
       [Order_status.CLOSED]: '🔒',
-      deleted: '🗑️',
     };
-
     const icon = iconMap[status] || 'ℹ️';
-    return `Holat: ${icon} ${status}`;
+    return `Holat: ${icon} ${orderStatusUz(status)}`;
   }
 
   private normalizePhone(input: string): string {
@@ -479,8 +478,17 @@ export class OrderBotService {
       )
       .join('\n');
 
+    // Sarlavha buyurtma holatiga mos (CREATED — tasdiq kutilmoqda; NEW — tasdiqlandi).
+    const title = order.deleted_at
+      ? '❌ *Buyurtma bekor qilindi*'
+      : order.status === Order_status.CREATED
+        ? '🟡 *Yangi buyurtma — tasdiqlash kutilmoqda*'
+        : order.status === Order_status.NEW
+          ? '🟢 *Buyurtma tasdiqlandi*'
+          : `📦 *Buyurtma — ${orderStatusUz(order.status)}*`;
+
     return (
-      `*✅ Yangi buyurtma!*\n\n` +
+      `${title}\n\n` +
       `👤 *Mijoz:* ${this.escapeMarkdown(order.customer?.name)}\n` +
       `📞 *Telefon:* ${this.escapeMarkdown(order.customer?.phone_number)}\n` +
       `📍 *Manzil:* ${addressLine}\n\n` +
@@ -573,8 +581,11 @@ export class OrderBotService {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      // withDeleted: allaqachon bekor qilingan (soft-deleted) buyurtma ham
+      // topilsin — shунда uning eskirgan ✅/❌ tugmalarini ham to'g'rilay olamiz.
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id: orderId },
+        withDeleted: true,
         relations: [
           'items',
           'items.product',
@@ -596,29 +607,38 @@ export class OrderBotService {
         throw new ForbiddenException("Bu amal uchun sizda ruxsat yo'q.");
       }
 
-      if (order.deleted_at || order.status !== Order_status.CREATED) {
-        return successRes(
-          order,
-          200,
-          "Bu buyurtma allaqachon ko'rib chiqilgan",
-        );
-      }
-
+      // ATOMIK shartli o'tish (TOCTOU/poyga yo'q): faqat CREATED va o'chirilmagan
+      // bo'lsa o'zgartiramiz. Shart UPDATE ichida — bir vaqtli ✅/❌ yoki qayta
+      // bosishda faqat BITTASI o'tadi, ikkinchisi affected=0 oladi.
+      let transitioned = false;
       if (action === 'approve') {
-        order.status = Order_status.NEW;
-        await queryRunner.manager.save(order);
+        const upd = await queryRunner.manager.update(
+          OrderEntity,
+          { id: order.id, status: Order_status.CREATED, deleted_at: IsNull() },
+          { status: Order_status.NEW },
+        );
+        transitioned = (upd.affected ?? 0) > 0;
+        if (transitioned) order.status = Order_status.NEW;
       } else {
-        // Soft delete — TypeORM deleted_at = NOW yozadi
-        await queryRunner.manager.softDelete(OrderEntity, { id: order.id });
-        order.deleted_at = new Date();
+        const upd = await queryRunner.manager.update(
+          OrderEntity,
+          { id: order.id, status: Order_status.CREATED, deleted_at: IsNull() },
+          { deleted_at: new Date() },
+        );
+        transitioned = (upd.affected ?? 0) > 0;
+        if (transitioned) order.deleted_at = new Date();
       }
 
       await queryRunner.commitTransaction();
 
-      const statusText =
-        action === 'approve'
+      // Tugmalar HAR DOIM yakuniy holatga moslanadi (o'tgan bo'lsa ham, allaqachon
+      // ko'rilgan bo'lsa ham) — "✅ bosilgach tugmalar o'zgarmaydi" bug'i shu bilan
+      // hal bo'ladi (bir marta o'tkazib yuborilsa ham tuzatiladi).
+      const statusText = order.deleted_at
+        ? '❌ Buyurtma bekor qilindi'
+        : order.status === Order_status.NEW
           ? '✅ Buyurtma tasdiqlandi'
-          : '❌ Buyurtma bekor qilindi';
+          : "Bu buyurtma allaqachon ko'rib chiqilgan";
 
       const statusButton = {
         text: this.statusButtonLabel(order),
@@ -655,7 +675,7 @@ export class OrderBotService {
               chatId,
               messageId,
               undefined,
-              `${this.buildOrderMessage(order)}\n\n${statusText}`,
+              this.buildOrderMessage(order),
               {
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard },
@@ -721,6 +741,11 @@ export class OrderBotService {
       resize_keyboard: true,
       one_time_keyboard: true,
     };
+  }
+
+  // WebApp URL'ini tashqariga beradi (AI kartasidagi "Tuzatish" tugmasi uchun).
+  webAppUrl(): string {
+    return this.resolveWebAppUrl();
   }
 
   openWebApp() {

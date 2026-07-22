@@ -54,7 +54,10 @@ const formatPhoneForDisplay = (raw?: string | null): string => {
 };
 
 export interface IProductInfo {
-  total_price: number | string;
+  // null  → summa kiritilmagan (bo'sh)
+  // 0     → atayin nol summali buyurtma
+  // string → forma ichidagi vaqtinchalik kiritilayotgan qiymat
+  total_price: number | string | null;
   where_deliver: string;
   comment?: string;
   operator?: string;
@@ -152,7 +155,13 @@ const ProductInfo = () => {
   );
 
   useEffect(() => {
-    const cleanedPrice = parsePriceToNumber(formData.total_price);
+    // Bo'sh input (summa kiritilmagan) bilan atayin "0" ni farqlaymiz:
+    //  • ""  → null  (kiritilmagan; submit'da ogohlantirish chiqadi)
+    //  • "0" → 0     (atayin nol summali buyurtma — ruxsat etiladi)
+    const cleanedPrice =
+      formData.total_price === "" || formData.total_price === null
+        ? null
+        : parsePriceToNumber(formData.total_price);
     const data = {
       ...formData,
       total_price: cleanedPrice,
@@ -166,9 +175,11 @@ const ProductInfo = () => {
     }
   }, [productInfo]);
 
-  const formatPrice = (value: string | number) => {
+  const formatPrice = (value: string | number | null) => {
+    // Faqat bo'sh qiymat uchun "" qaytaramiz — "0" ni yashirmaymiz,
+    // shunda foydalanuvchi atayin nol summani ko'rib kirita oladi.
+    if (value === "" || value === null || value === undefined) return "";
     const num = parsePriceToNumber(value);
-    if (num === 0) return "";
     return new Intl.NumberFormat("uz-UZ").format(num);
   };
 
@@ -207,9 +218,12 @@ const ProductInfo = () => {
                 value={formatPrice(formData.total_price)}
                 onChange={(e) => {
                   const rawValue = e.target.value.replace(/\D/g, "");
-                  const formatted = new Intl.NumberFormat("uz-UZ").format(
-                    Number(rawValue || 0)
-                  );
+                  // Bo'shatilsa "" bo'lib qoladi (kiritilmagan holat),
+                  // "0" yozilsa "0" bo'lib ko'rinadi (nol summa).
+                  const formatted =
+                    rawValue === ""
+                      ? ""
+                      : new Intl.NumberFormat("uz-UZ").format(Number(rawValue));
                   handleChange({
                     ...e,
                     target: {
@@ -332,7 +346,7 @@ const ProductInfo = () => {
         </div>
 
         {/* Summary Preview */}
-        {formData.total_price && parsePriceToNumber(formData.total_price) > 0 && (
+        {formData.total_price !== "" && formData.total_price !== null && (
           <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800/30">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600 dark:text-gray-400">

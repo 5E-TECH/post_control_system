@@ -7,6 +7,7 @@ import ConfirmPopup from "../../shared/components/confirmPopup";
 import { Pagination, type PaginationProps, Empty } from "antd";
 import { useParamsHook } from "../../shared/hooks/useParams";
 import { buildAdminPath } from "../../shared/const";
+import ReplacementBadge from "../../shared/components/replacement-badge";
 import {
   ShoppingBag,
   CheckCircle2,
@@ -141,6 +142,7 @@ const OrderCard = ({
         <h3 className="font-bold text-base text-gray-800 dark:text-white truncate">
           {item?.customer?.name || "Noma'lum"}
         </h3>
+        <ReplacementBadge order={item} className="my-0.5" />
         <span className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300">
           <Phone className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
           {formatPhone(item?.customer?.phone_number)}
