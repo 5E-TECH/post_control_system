@@ -2,7 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { HttpStatus, ValidationPipe, HttpException } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.exception.filter';
+import { requestContextMiddleware } from 'src/common/middleware/request-context.middleware';
 import config from 'src/config';
 import * as express from 'express';
 import { MyLogger } from 'src/logger/logger.service';
@@ -43,9 +45,26 @@ export default class Application {
       }
     });
 
-    const app = await NestFactory.create(AppModule, {
+    const app = await NestFactory.create<NestExpressApplication>(AppModule, {
       bufferLogs: true,
     });
+
+    // ✅ HAQIQIY mijoz IP manzili (audit-log uchun kritik).
+    // Node localhost:PORT'da tinglaydi, oldida nginx reverse-proxy turadi va
+    // /api/v1/* ni 127.0.0.1'ga uzatadi. `trust proxy` o'rnatilmasa Express
+    // req.ip'ni loopback (::ffff:127.0.0.1) deb biladi — shuning uchun HOZIR
+    // barcha loglarda IP 127.0.0.1 bo'lib chiqadi.
+    //
+    // 'loopback' — FAQAT loopback (nginx bir xil hostda) hop'iga ishonadi.
+    // Bu X-Forwarded-For'ni soxtalashtirishdan himoya qiladi: uzoqdagi mijoz
+    // o'zini ishonchli proksi qilib ko'rsatolmaydi, natijada req.ip
+    // X-Forwarded-For zanjiridagi HAQIQIY mijoz manzilini qaytaradi.
+    //
+    // ⚠️ nginx tomonida quyidagi header uzatilishi SHART, aks holda IP baribir
+    // loopback bo'ladi (kod emas, nginx sozlamasi):
+    //   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    //   proxy_set_header X-Real-IP       $remote_addr;
+    app.set('trust proxy', 'loopback');
 
     // Logger chiqadi
     const myLogger = app.get(MyLogger);
@@ -73,6 +92,12 @@ export default class Application {
     // Global filters, pipes, cors
     app.useGlobalFilters(new AllExceptionsFilter());
     app.use(cookieParser());
+
+    // ✅ Request-kontekst (AsyncLocalStorage) — har bir so'rovning IP/qurilma
+    // ma'lumotini do'konga yozadi. Shu tufayli ActivityLogService.log() har bir
+    // amalga (sotuv, bekor, kassa...) IP/qurilma'ni AVTOMATIK qo'shadi.
+    // cookie-parser'dan keyin, guard/handler'dan oldin turishi shart.
+    app.use(requestContextMiddleware);
     app.enableCors({
       origin: true,
       credentials: true,

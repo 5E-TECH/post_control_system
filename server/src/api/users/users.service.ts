@@ -31,6 +31,7 @@ import { SignInUserDto } from './dto/signInUserDto';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
 import { parseDurationToMs } from 'src/common/utils/parse-duration.util';
+import { extractRequestMeta } from 'src/common/utils/request-meta.util';
 import { Request, Response } from 'express';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
@@ -1570,10 +1571,16 @@ export class UserService implements OnModuleInit {
 
   private extractLoginMetadata(req?: Request): Record<string, any> {
     if (!req) return {};
-    const userAgent = (req.headers?.['user-agent'] as string) || '';
-    const forwardedFor = (req.headers?.['x-forwarded-for'] as string) || '';
-    const ip = forwardedFor.split(',')[0]?.trim() || (req as any).ip || '';
-    return { user_agent: userAgent, ip };
+    // Yagona yordamchi orqali — trust proxy 'loopback' bilan req.ip HAQIQIY
+    // mijoz IP'sini beradi; eski "eng chapdagi X-Forwarded-For" (soxtalashtirsa
+    // bo'ladigan) usul olib tashlandi. Mijoz yuborsa qurilma ID/nomi ham olinadi.
+    const meta = extractRequestMeta(req);
+    return {
+      user_agent: meta.user_agent,
+      ip: meta.ip,
+      ...(meta.device_id ? { device_id: meta.device_id } : {}),
+      ...(meta.device_name ? { device_name: meta.device_name } : {}),
+    };
   }
 
   // Muvaffaqiyatsiz login urinishini loglaydi. Maxfiylik: telefon TO'LIQ

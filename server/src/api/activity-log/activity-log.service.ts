@@ -6,6 +6,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { orderStatusUz } from 'src/common/utils/status-label.util';
+import { getRequestAuditMeta } from 'src/common/context/request-context';
 
 export interface LogParams {
   entity_type: string;
@@ -72,6 +73,15 @@ export class ActivityLogService {
         }
       }
 
+      // Request-kontekstdan (AsyncLocalStorage) IP/qurilma'ni AVTOMATIK qo'shamiz —
+      // har bir amalga (call-site'ni o'zgartirmasdan). Chaqiruvchi bergan metadata
+      // USTUN turadi (masalan login o'z ip/source'ini aniq bersa saqlanadi).
+      // HTTP bo'lmagan oqimda (bot/CRON/webhook) kontekst bo'sh → {} (IP yo'q).
+      const mergedMeta = {
+        ...getRequestAuditMeta(),
+        ...(params.metadata || {}),
+      };
+
       const log = repo.create({
         entity_type: params.entity_type,
         entity_id: params.entity_id,
@@ -82,7 +92,7 @@ export class ActivityLogService {
         user_id: userId,
         user_name: resolvedName || undefined,
         user_role: resolvedRole,
-        metadata: params.metadata || undefined,
+        metadata: Object.keys(mergedMeta).length ? mergedMeta : undefined,
       } as any);
       await repo.save(log);
     } catch (error) {
