@@ -2,6 +2,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { buildAdminPath } from "../../../../../../shared/const";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../../../app/store";
+import { api } from "../../../../../../shared/api";
+import { normalizeQrToken } from "../../../../../../shared/helpers/normalizeQrToken";
 import {
   ArrowLeft,
   QrCode,
@@ -12,69 +16,171 @@ import {
   AlertCircle,
   CheckCircle2,
   ScanLine,
+  XCircle,
 } from "lucide-react";
+
+// Skaner natijasidan tokenni ajratib olish (URL bo'lsa oxirgi segment) +
+// server bilan bir xil normalize (Caps Lock / RU layout).
+function extractToken(result: unknown): string {
+  let scannedValue = "";
+  if (Array.isArray(result) && result.length > 0) {
+    scannedValue = (result[0] as { rawValue?: string })?.rawValue || "";
+  } else if (
+    typeof result === "object" &&
+    result !== null &&
+    "rawValue" in result
+  ) {
+    scannedValue = (result as { rawValue?: string }).rawValue || "";
+  } else if (typeof result === "string") {
+    scannedValue = result;
+  }
+  if (!scannedValue) return "";
+  const raw = scannedValue.startsWith("http")
+    ? scannedValue.split("/").pop() || scannedValue
+    : scannedValue;
+  return normalizeQrToken(raw);
+}
 
 export default function ScanPage() {
   const navigate = useNavigate();
+  const role = useSelector((state: RootState) => state.roleSlice.role);
+  const isCourier = role === "courier";
+
   const [error, setError] = useState("");
   const [isScanning, setIsScanning] = useState(true);
   const [torchOn, setTorchOn] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const beepAudioRef = useRef<HTMLAudioElement | null>(null);
+  const errorAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Kuryer doimiy rejimi uchun
+  const courierProcessingRef = useRef(false);
+  const lastScanRef = useRef<{ token: string; at: number }>({
+    token: "",
+    at: 0,
+  });
+  const [courierFeedback, setCourierFeedback] = useState<{
+    show: boolean;
+    type: "success" | "error";
+    message: string;
+  }>({ show: false, type: "success", message: "" });
 
   useEffect(() => {
     beepAudioRef.current = new Audio(
       `${import.meta.env.BASE_URL}sound/beep.mp3`
     );
     beepAudioRef.current.preload = "auto";
+    errorAudioRef.current = new Audio(
+      `${import.meta.env.BASE_URL}sound/error.mp3`
+    );
+    errorAudioRef.current.preload = "auto";
 
     // Kamera tayyor bo'lgandan keyin
     const timer = setTimeout(() => setCameraReady(true), 1000);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleScan = useCallback(
-    (result: any) => {
-      if (!isScanning || scanSuccess) return;
+  const showCourierFeedback = useCallback(
+    (type: "success" | "error", message: string) => {
+      setCourierFeedback({ show: true, type, message });
+      setTimeout(
+        () => setCourierFeedback((f) => ({ ...f, show: false })),
+        1300,
+      );
+    },
+    [],
+  );
 
-      if (result) {
-        let scannedValue = "";
-
-        if (Array.isArray(result) && result.length > 0) {
-          scannedValue = result[0]?.rawValue || "";
-        } else if (typeof result === "object" && result.rawValue) {
-          scannedValue = result.rawValue;
-        } else if (typeof result === "string") {
-          scannedValue = result;
-        }
-
-        if (scannedValue) {
-          setIsScanning(false);
-          setScanSuccess(true);
-          setError("");
-
-          // Beep ovozi
-          beepAudioRef.current
-            ?.play()
-            .catch((err) => console.error("Ovoz chiqmadi:", err));
-
-          // Vibration (if supported)
-          if (navigator.vibrate) {
-            navigator.vibrate(100);
+  // Kuryer: doimiy rejim. Har skan — buyurtmani QABUL QILISHGA urinamiz.
+  //  - muvaffaqiyat (on the road) → avtomatik qabul qilinadi, davom etamiz;
+  //  - "allaqachon" (buyurtma allaqachon kuryerники — qabul qilingan) → amallar
+  //    sahifasiga (sotish/bekor/detail) yo'naltiramiz;
+  //  - boshqa xato (topilmadi / sizga tegishli emas) → feedback, davom.
+  const handleCourierScan = useCallback(
+    async (token: string) => {
+      const now = Date.now();
+      // Kamera bir xil QR'ni uzluksiz o'qiydi — cooldown bilan spamni to'xtatamiz
+      if (
+        lastScanRef.current.token === token &&
+        now - lastScanRef.current.at < 3000
+      ) {
+        return;
+      }
+      if (courierProcessingRef.current) return;
+      lastScanRef.current = { token, at: now };
+      courierProcessingRef.current = true;
+      try {
+        await api.patch(`post/receive/order/scan/token/${token}`);
+        beepAudioRef.current?.play().catch(() => {});
+        if (navigator.vibrate) {
+          try {
+            navigator.vibrate(60);
+          } catch {
+            /* ignore */
           }
-
-          // tokenni ajratib olish
-          const token = scannedValue.split("/").at(-1);
-
-          // Kichik delay bilan sahifaga yo'naltirish (success animatsiyasi uchun)
-          setTimeout(() => {
-            navigate(buildAdminPath(`scan/${token}`));
-          }, 500);
         }
+        showCourierFeedback("success", "Qabul qilindi!");
+      } catch (err) {
+        const status = (err as { response?: { status?: number } })?.response
+          ?.status;
+        const msg = (
+          (err as { response?: { data?: { message?: string } } })?.response?.data
+            ?.message || ""
+        ).toLowerCase();
+
+        // Buyurtma allaqachon kuryerники (qabul qilingan) — amallar sahifasiga
+        // (sotish / bekor qilish / detail). Bu holat post egaligidan keyin
+        // aniqlanadi, shuning uchun yo'naltirish xavfsiz.
+        if (msg.includes("allaqachon")) {
+          navigate(buildAdminPath(`scan/${token}`));
+          return;
+        }
+
+        errorAudioRef.current?.play().catch(() => {});
+        // Aniqroq xabar. DIQQAT: "Pochta topilmadi yoki sizga biriktirilmagan"
+        // xabarida "topilmadi" ham bor — shuning uchun avval "biriktirilmagan/
+        // tegishli"ni tekshiramiz (begona/tegishli emas), keyingina sof
+        // "topilmadi"ni (buyurtma umuman yo'q).
+        let display = "Qabul qilinmadi";
+        if (msg.includes("biriktirilmagan") || msg.includes("tegishli")) {
+          display = "Sizga tegishli emas";
+        } else if (status === 404 || msg.includes("topilmadi")) {
+          display = "Topilmadi!";
+        }
+        showCourierFeedback("error", display);
+      } finally {
+        courierProcessingRef.current = false;
       }
     },
-    [isScanning, scanSuccess, navigate]
+    [navigate, showCourierFeedback],
+  );
+
+  const handleScan = useCallback(
+    (result: unknown) => {
+      const token = extractToken(result);
+      if (!token) return;
+
+      // KURYER — doimiy avtomatik qabul rejimi (sahifadan chiqmaydi)
+      if (isCourier) {
+        handleCourierScan(token);
+        return;
+      }
+
+      // Boshqa rollar — hozirgiday: bitta skan → amallar sahifasi
+      if (!isScanning || scanSuccess) return;
+      setIsScanning(false);
+      setScanSuccess(true);
+      setError("");
+      beepAudioRef.current
+        ?.play()
+        .catch((err) => console.error("Ovoz chiqmadi:", err));
+      if (navigator.vibrate) navigator.vibrate(100);
+      setTimeout(() => {
+        navigate(buildAdminPath(`scan/${token}`));
+      }, 500);
+    },
+    [isCourier, handleCourierScan, isScanning, scanSuccess, navigate],
   );
 
   const handleError = () => {
@@ -133,7 +239,9 @@ export default function ScanPage() {
             QR kodni skanerlang
           </h1>
           <p className="text-gray-400 text-sm max-w-xs">
-            Buyurtma QR kodini ramka ichiga joylashtiring
+            {isCourier
+              ? "Ketma-ket skanerlang — buyurtma avtomatik qabul qilinadi"
+              : "Buyurtma QR kodini ramka ichiga joylashtiring"}
           </p>
         </div>
 
@@ -159,7 +267,7 @@ export default function ScanPage() {
                 constraints={{
                   facingMode: "environment",
                   ...(torchOn && {
-                    advanced: [{ torch: true }] as any,
+                    advanced: [{ torch: true } as never],
                   }),
                 }}
                 styles={{
@@ -213,7 +321,7 @@ export default function ScanPage() {
               </>
             )}
 
-            {/* Success overlay */}
+            {/* Success overlay (non-courier — bitta skan) */}
             {scanSuccess && (
               <div className="absolute inset-0 bg-green-500/20 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
                 <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center mb-4 animate-bounce-in">
@@ -221,6 +329,34 @@ export default function ScanPage() {
                 </div>
                 <p className="text-white font-semibold text-lg">
                   QR kod topildi!
+                </p>
+              </div>
+            )}
+
+            {/* Kuryer feedback overlay (doimiy rejim — qabul/xato) */}
+            {courierFeedback.show && (
+              <div
+                className={`absolute inset-0 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in ${
+                  courierFeedback.type === "success"
+                    ? "bg-green-500/25"
+                    : "bg-red-500/25"
+                }`}
+              >
+                <div
+                  className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 animate-bounce-in ${
+                    courierFeedback.type === "success"
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                  }`}
+                >
+                  {courierFeedback.type === "success" ? (
+                    <CheckCircle2 className="w-12 h-12 text-white" />
+                  ) : (
+                    <XCircle className="w-12 h-12 text-white" />
+                  )}
+                </div>
+                <p className="text-white font-semibold text-lg text-center px-4">
+                  {courierFeedback.message}
                 </p>
               </div>
             )}

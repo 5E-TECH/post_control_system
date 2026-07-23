@@ -37,8 +37,10 @@ type Props = {
 const fmt = (n: number) => Number(n || 0).toLocaleString("uz-UZ");
 const parseAmount = (s: string) => Number(String(s).replace(/\D/g, "")) || 0;
 const apiMsg = (e: unknown, fallback: string) => {
-  const err = e as AxiosError<{ error?: { message?: string } }>;
-  return err?.response?.data?.error?.message || fallback;
+  const err = e as AxiosError<{ message?: string; error?: string }>;
+  return (
+    err?.response?.data?.message || err?.response?.data?.error || fallback
+  );
 };
 
 export const CardsManager = ({ open, onClose, onChanged }: Props) => {

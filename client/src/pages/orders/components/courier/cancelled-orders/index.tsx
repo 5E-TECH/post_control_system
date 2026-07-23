@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import ConfirmPopup from "../../../../../shared/components/confirmPopup";
+import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 import {
   User,
   Phone,
@@ -259,6 +260,7 @@ const CancelledOrders = () => {
                         <h3 className="font-semibold text-gray-800 dark:text-white text-sm truncate">
                           {item?.customer?.name || "Noma'lum"}
                         </h3>
+                        <ReplacementBadge order={item} className="my-0.5" />
                         <a
                           href={`tel:${item?.customer?.phone_number}`}
                           onClick={(e) => e.stopPropagation()}
@@ -410,6 +412,7 @@ const CancelledOrders = () => {
                       <span className="font-medium text-gray-800 dark:text-white text-sm truncate">
                         {item?.customer?.name || "Noma'lum"}
                       </span>
+                      <ReplacementBadge order={item} />
                     </div>
                   </td>
                   <td className="py-3 px-3">

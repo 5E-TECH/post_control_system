@@ -31,6 +31,7 @@ import { SignInUserDto } from './dto/signInUserDto';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
 import { parseDurationToMs } from 'src/common/utils/parse-duration.util';
+import { extractRequestMeta } from 'src/common/utils/request-meta.util';
 import { Request, Response } from 'express';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
@@ -128,7 +129,18 @@ export class UserService implements OnModuleInit {
         await this.userRepo.save(superAdminthis);
       }
     } catch (error) {
-      return catchError(error);
+      catchError(error);
+    }
+
+    // Restart tufayli o'tkazib yuborilgan oylik run'ni tiklash (idempotent).
+    // Superadmin seed xatosidan mustaqil ishlashi uchun alohida try ichida.
+    try {
+      await this.catchUpMissedSalaries();
+    } catch (error) {
+      this.logger.error(
+        `[SALARY CATCHUP] startup xato: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -1559,10 +1571,16 @@ export class UserService implements OnModuleInit {
 
   private extractLoginMetadata(req?: Request): Record<string, any> {
     if (!req) return {};
-    const userAgent = (req.headers?.['user-agent'] as string) || '';
-    const forwardedFor = (req.headers?.['x-forwarded-for'] as string) || '';
-    const ip = forwardedFor.split(',')[0]?.trim() || (req as any).ip || '';
-    return { user_agent: userAgent, ip };
+    // Yagona yordamchi orqali — trust proxy 'loopback' bilan req.ip HAQIQIY
+    // mijoz IP'sini beradi; eski "eng chapdagi X-Forwarded-For" (soxtalashtirsa
+    // bo'ladigan) usul olib tashlandi. Mijoz yuborsa qurilma ID/nomi ham olinadi.
+    const meta = extractRequestMeta(req);
+    return {
+      user_agent: meta.user_agent,
+      ip: meta.ip,
+      ...(meta.device_id ? { device_id: meta.device_id } : {}),
+      ...(meta.device_name ? { device_name: meta.device_name } : {}),
+    };
   }
 
   // Muvaffaqiyatsiz login urinishini loglaydi. Maxfiylik: telefon TO'LIQ
@@ -2006,11 +2024,17 @@ export class UserService implements OnModuleInit {
       // Format the response with order details
       const formattedOrders = orders.map((order) => ({
         id: order.id,
+        order_number: order.order_number,
         status: order.status,
         total_price: order.total_price,
         created_at: order.created_at,
+        sold_at: order.sold_at,
         where_deliver: order.where_deliver,
         market_name: order.market?.name || 'Unknown',
+        // Almashtirish pickeri uchun: bu buyurtma allaqachon almashtirishga
+        // belgilangan bo'lsa (boshqa yangi buyurtma o'rniga olinmoqda), uni
+        // qayta tanlash mumkin emas.
+        is_replacement_return: order.is_replacement_return,
         items: order.items.map((item) => ({
           product_name: item.product?.name || 'Unknown product',
           quantity: item.quantity,
@@ -2912,35 +2936,64 @@ export class UserService implements OnModuleInit {
   // ==================== SALARY CRON ====================
 
   /**
-   * Har kuni soat 00:05 da ishlaydi (Toshkent vaqti)
-   * Bugungi kun = payment_day bo'lgan barcha ACTIVE ishchilar uchun
-   * have_to_pay ga salary_amount qo'shiladi
+   * Sanani DOIM Asia/Tashkent bo'yicha hisoblaydi — server lokal TZ (ehtimol UTC)
+   * ga tayanmaydi. Aks holda `@Cron` Toshkent 00:05 da otsa-da, ichidagi
+   * `new Date().getDate()` server-UTC da bir kun orqada bo'lib, oy/kun chegarasida
+   * noto'g'ri davr yoki kun beradi.
    *
-   * Qoidalar:
-   * - Bloklangan (INACTIVE) xodimlar uchun oylik hisoblanmaydi
-   * - Xodim ishga kirganidan keyin 1 oy to'lmaguncha oylik hisoblanmaydi
-   * - Ikki marta qo'shilishdan himoya: updated_at orqali tekshiriladi
+   * `period` ('YYYY-MM') idempotentlik kaliti; `currentDay`/`lastDayOfMonth`
+   * payment_day mosligi uchun; `oneMonthAgo` "kamida 1 oy ishlagan" filtri uchun.
    */
-  @Cron('0 5 0 * * *', { timeZone: 'Asia/Tashkent' })
-  async handleMonthlySalary(): Promise<void> {
-    const today = new Date();
-    const currentDay = today.getDate();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+  private getTashkentSalaryContext() {
+    // 'en-CA' locale ISO ko'rinish beradi: "YYYY-MM-DD"
+    const ymd = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Tashkent',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const [yStr, mStr, dStr] = ymd.split('-');
 
-    // Oyning oxirgi kunlari uchun: agar payment_day > oyning kunlari bo'lsa
-    // masalan: payment_day=31, lekin fevralda 28 kun → fevral 28-da hisoblanadi
+    const currentYear = Number(yStr);
+    const currentMonth = Number(mStr) - 1; // 0-indeksli (Date arifmetikasi uchun)
+    const currentDay = Number(dStr);
+    const period = `${yStr}-${mStr}`; // 'YYYY-MM'
     const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-
-    // Bugungi sana string (ikki marta qo'shilishdan himoya uchun)
-    const todayStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
-
-    // 1 oy oldingi sana (milliseconds) — faqat 1 oy to'lgan xodimlar uchun oylik hisoblanadi
+    // 1 oy oldingi sana (ms) — faqat 1 oydan ortiq ishlagan xodimlarga oylik
     const oneMonthAgo = new Date(
       currentYear,
       currentMonth - 1,
       currentDay,
     ).getTime();
+
+    return { currentYear, currentDay, period, lastDayOfMonth, oneMonthAgo };
+  }
+
+  /**
+   * Oylik hisoblashning YAGONA o'zagi — CRON ham, startup catch-up ham shuni
+   * chaqiradi.
+   *
+   * Idempotentlik `last_accrued_period` ('YYYY-MM') ustuni orqali. Har qator
+   * uchun ATOMIK UPDATE ishlatamiz:
+   *   UPDATE ... SET have_to_pay = have_to_pay + salary_amount,
+   *                  last_accrued_period = :period
+   *   WHERE id = :id
+   *     AND (last_accrued_period IS NULL OR last_accrued_period <> :period)
+   * Bu bir vaqtda hal qiladi:
+   *   - (A) updated_at idempotentlik bug'i — accrual endi `updated_at`ga tegmaydi,
+   *         demak avans/tahrir hisoblashni buzmaydi;
+   *   - lost-update — read-modify-write emas, DB darajasida atomik qo'shish;
+   *   - ikki marta qo'shish — WHERE guard.
+   *
+   * `mode='cron'`: faqat AYNAN bugungi to'lov kuni (oy oxiri mantig'i bilan).
+   * `mode='catchup'`: to'lov kuni shu oyda ALLAQACHON yetib kelgan, lekin hali
+   *   bu davr uchun hisoblanmagan qatorlar (restart tufayli o'tkazib yuborilgan
+   *   run'ni tiklaydi). Idempotent — qayta ishga tushsa ikki marta qo'shmaydi.
+   */
+  private async accrueSalaries(mode: 'cron' | 'catchup'): Promise<void> {
+    const { currentDay, period, lastDayOfMonth, oneMonthAgo } =
+      this.getTashkentSalaryContext();
+    const tag = mode === 'cron' ? 'SALARY CRON' : 'SALARY CATCHUP';
 
     try {
       const salaryRepo = this.dataSource.getRepository(UserSalaryEntity);
@@ -2955,11 +3008,22 @@ export class UserService implements OnModuleInit {
           allowedRoles: [Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST],
         })
         // Xodim ishga kirganidan kamida 1 oy o'tgan bo'lishi kerak
-        .andWhere('u.created_at <= :oneMonthAgo', { oneMonthAgo });
+        .andWhere('u.created_at <= :oneMonthAgo', { oneMonthAgo })
+        // Bu davr (oy) uchun allaqachon hisoblanganlarni oldindan chiqaramiz
+        .andWhere(
+          '(s.last_accrued_period IS NULL OR s.last_accrued_period <> :period)',
+          { period },
+        );
 
-      // Payment day filter
-      if (currentDay === lastDayOfMonth) {
-        // Oyning oxirgi kunida: payment_day = bugun YOKI payment_day > oyning oxirgi kuni
+      if (mode === 'catchup') {
+        // To'lov kuni shu oyda yetib kelganlar (oy oxiri mantig'i bilan):
+        // effektiv kun = LEAST(payment_day, oyning oxirgi kuni) <= bugun
+        qb.andWhere('LEAST(s.payment_day, :lastDay) <= :day', {
+          lastDay: lastDayOfMonth,
+          day: currentDay,
+        });
+      } else if (currentDay === lastDayOfMonth) {
+        // Oyning oxirgi kunida: payment_day = bugun YOKI payment_day > oxirgi kun
         qb.andWhere('(s.payment_day = :day OR s.payment_day > :lastDay)', {
           day: currentDay,
           lastDay: lastDayOfMonth,
@@ -2971,36 +3035,81 @@ export class UserService implements OnModuleInit {
       const salaries = await qb.getMany();
 
       if (salaries.length === 0) {
-        this.logger.log(
-          `[SALARY CRON] Bugun (${currentDay}-kun) uchun oylik to'lanadigan ishchi yo'q`,
-        );
+        if (mode === 'cron') {
+          this.logger.log(
+            `[${tag}] Bugun (${currentDay}-kun, ${period}) uchun oylik to'lanadigan ishchi yo'q`,
+          );
+        }
         return;
       }
 
       let updated = 0;
       let skipped = 0;
+      let failed = 0;
 
       for (const salary of salaries) {
-        // Ikki marta qo'shilishdan himoya: shu oy allaqachon qo'shilganmi?
-        // updated_at ni tekshiramiz — agar bugungi sana bilan bir xil bo'lsa, skip
-        const lastUpdate = new Date(Number(salary.updated_at));
-        const lastUpdateStr = `${lastUpdate.getFullYear()}-${String(lastUpdate.getMonth() + 1).padStart(2, '0')}-${String(lastUpdate.getDate()).padStart(2, '0')}`;
+        try {
+          // ATOMIK + idempotent: WHERE guard ikki marta qo'shishni to'sadi,
+          // `have_to_pay + salary_amount` DB darajasida — lost-update yo'q.
+          // DIQQAT: QueryBuilder update entity listener'larini (@BeforeUpdate)
+          // ishlatmaydi — shu sabab `updated_at` ataylab O'ZGARMAYDI.
+          const res = await salaryRepo
+            .createQueryBuilder()
+            .update(UserSalaryEntity)
+            .set({
+              have_to_pay: () => 'have_to_pay + salary_amount',
+              last_accrued_period: period,
+            })
+            .where('id = :id', { id: salary.id })
+            .andWhere(
+              '(last_accrued_period IS NULL OR last_accrued_period <> :period)',
+              { period },
+            )
+            .execute();
 
-        if (lastUpdateStr === todayStr) {
-          skipped++;
-          continue; // Bugun allaqachon yangilangan — o'tkazib yuboramiz
+          if (res.affected && res.affected > 0) updated++;
+          else skipped++;
+        } catch (e) {
+          // Bitta qator xatosi qolganlarini UZMASIN
+          failed++;
+          this.logger.error(
+            `[${tag}] user_salary ${salary.id} xato: ${e.message}`,
+          );
         }
-
-        salary.have_to_pay += salary.salary_amount;
-        await salaryRepo.save(salary);
-        updated++;
       }
 
       this.logger.log(
-        `[SALARY CRON] ${updated} ta ishchiga oylik qo'shildi, ${skipped} ta o'tkazildi (${currentDay}-kun)`,
+        `[${tag}] ${updated} ta ishchiga oylik qo'shildi, ${skipped} ta o'tkazildi, ${failed} ta xato (${currentDay}-kun, ${period})`,
       );
     } catch (error) {
-      this.logger.error(`[SALARY CRON] Xatolik: ${error.message}`, error.stack);
+      this.logger.error(`[${tag}] Xatolik: ${error.message}`, error.stack);
     }
+  }
+
+  /**
+   * Har kuni soat 00:05 da ishlaydi (Toshkent vaqti).
+   * Bugun = payment_day bo'lgan barcha ACTIVE ishchilarning have_to_pay'iga
+   * salary_amount qo'shadi.
+   *
+   * Qoidalar:
+   * - Bloklangan (INACTIVE) / o'chirilgan xodimlar uchun oylik hisoblanmaydi
+   * - Xodim ishga kirganidan keyin 1 oy to'lmaguncha oylik hisoblanmaydi
+   * - Ikki marta qo'shilishdan himoya: `last_accrued_period` ('YYYY-MM') orqali
+   */
+  @Cron('0 5 0 * * *', { timeZone: 'Asia/Tashkent' })
+  async handleMonthlySalary(): Promise<void> {
+    await this.accrueSalaries('cron');
+  }
+
+  /**
+   * Startup catch-up: in-process scheduler (@nestjs/schedule) o'tkazib yuborilgan
+   * run'ni TIKLAMAYDI (deploy paytida 00:05'da `systemctl restart` bo'lsa run
+   * abadiy yo'qoladi). Bu metod app ko'tarilganda — agar to'lov kuni shu oyda
+   * allaqachon yetib kelgan, lekin hali hisoblanmagan ishchilar bo'lsa — ularni
+   * tiklaydi. To'liq idempotent: `last_accrued_period` tufayli ikki marta
+   * qo'shilmaydi, shuning uchun har restartda xavfsiz ishlaydi.
+   */
+  async catchUpMissedSalaries(): Promise<void> {
+    await this.accrueSalaries('catchup');
   }
 }

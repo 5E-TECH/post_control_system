@@ -36,6 +36,7 @@ import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { useProfile } from "../../../../../shared/api/hooks/useProfile";
+import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 
 const statusConfig: Record<
   string,
@@ -485,6 +486,7 @@ const AllOrders = () => {
                 <h3 className="font-bold text-base text-gray-800 dark:text-white truncate">
                   {item?.customer?.name || "Noma'lum"}
                 </h3>
+                <ReplacementBadge order={item} className="my-0.5" />
                 <a
                   href={`tel:${item?.customer?.phone_number}`}
                   onClick={(e) => e.stopPropagation()}
@@ -627,6 +629,7 @@ const AllOrders = () => {
                     <span className="font-medium text-gray-800 dark:text-white truncate text-sm">
                       {item?.customer?.name}
                     </span>
+                    <ReplacementBadge order={item} />
                   </div>
                 </td>
                 <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-300">

@@ -14,6 +14,10 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
+import {
+  bigintTransformer,
+  bigintTransformerNonNull,
+} from 'src/common/database/bigint.transformer';
 import { UserSalaryEntity } from './user-salary.entity';
 import { CashEntity } from './cash-box.entity';
 import { CashboxHistoryEntity } from './cashbox-history.entity';
@@ -78,6 +82,17 @@ export class UserEntity extends BaseEntity {
 
   @Column({ type: 'boolean', default: false, nullable: true })
   add_order: boolean;
+
+  // ─── AI-balans (prepaid hamyon) — faqat MARKET uchun ma'noli ───
+  @Column({ type: 'boolean', default: false })
+  ai_enabled: boolean;
+
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformerNonNull })
+  ai_balance: number;
+
+  // null bo'lsa global default (config.AI_PRICE_PER_ORDER) ishlatiladi
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  ai_price_per_order: number | null;
 
   @Column({ type: 'varchar', nullable: true })
   market_tg_token: string;

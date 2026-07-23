@@ -224,9 +224,9 @@ const CashDetail = () => {
           refetch();
         },
         onError: (error) => {
-          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const err = error as AxiosError<{ message?: string; error?: string }>;
           const msg =
-            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+            err.response?.data?.message || "Xatolik yuz berdi!";
           if (/smena/i.test(msg)) {
             setShowShiftModal(true);
             return;
@@ -250,9 +250,9 @@ const CashDetail = () => {
           refetch();
         },
         onError: (error) => {
-          const err = error as AxiosError<{ error?: { message?: string } }>;
+          const err = error as AxiosError<{ message?: string; error?: string }>;
           const msg =
-            err.response?.data?.error?.message || "Xatolik yuz berdi!";
+            err.response?.data?.message || "Xatolik yuz berdi!";
           if (/smena/i.test(msg)) {
             setShowShiftModal(true);
             return;
@@ -280,8 +280,8 @@ const CashDetail = () => {
         performPayment();
       },
       onError: (error) => {
-        const err = error as AxiosError<{ error?: { message?: string } }>;
-        const msg = err.response?.data?.error?.message || "Smenani ochib bo'lmadi";
+        const err = error as AxiosError<{ message?: string; error?: string }>;
+        const msg = err.response?.data?.message || "Smenani ochib bo'lmadi";
         handleApiError(err, msg);
       },
     });

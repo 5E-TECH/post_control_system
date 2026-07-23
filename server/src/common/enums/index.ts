@@ -76,6 +76,19 @@ export enum Post_status {
   CANCELED_RECEIVED = 'canceled_received',
 }
 
+// Almashtirish (kafolat-swap) buyurtmasi holati. YANGI buyurtmada turadi va
+// kuryer "eski mahsulotni oldim" tasdig'ini boshqaradi:
+//   AWAITING_OLD_PICKUP → kuryer hali eskini olmagan (sotuv BLOKLANADI)
+//   OLD_COLLECTED       → kuryer eskini mijozdan oldi (sotuvga ruxsat)
+//   OLD_RETURNED        → eski mahsulot marketga topshirildi
+// Eski (almashtirilayotgan) buyurtmaning STATUSI o'zgarmaydi (SOTILGAN qoladi,
+// pul muzlatiladi) — bu enum faqat jismoniy qaytarishni kuzatadi.
+export enum Replacement_state {
+  AWAITING_OLD_PICKUP = 'awaiting_old_pickup',
+  OLD_COLLECTED = 'old_collected',
+  OLD_RETURNED = 'old_returned',
+}
+
 export enum Manual_payment_methods {
   CASH = 'cash',
   CARD = 'card',

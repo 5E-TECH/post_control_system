@@ -1,7 +1,8 @@
-import { memo } from "react";
+import { memo, useCallback, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePost } from "../../../../../shared/api/hooks/usePost";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../../../../../app/store";
 import {
   setHideSend,
   setRegionName,
@@ -10,7 +11,10 @@ import { useTranslation } from "react-i18next";
 import { DatePicker, Pagination, Select, type PaginationProps } from "antd";
 import dayjs from "dayjs";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
-import { ChevronRight, Loader2, Clock, Calendar, CheckCircle, XCircle, Archive, Filter, X } from "lucide-react";
+import { ChevronRight, Loader2, Clock, Calendar, CheckCircle, XCircle, Archive, Filter, X, FileSpreadsheet } from "lucide-react";
+import { api } from "../../../../../shared/api";
+import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { exportPostOrdersToExcel } from "../../../../../shared/helpers/export-post-orders-excel";
 
 const { RangePicker } = DatePicker;
 
@@ -36,6 +40,65 @@ const CourierOldMails = () => {
   const dispatch = useDispatch();
 
   const { getOldPostsCourier } = usePost();
+  const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
+  // Kuryerning o'z ismi (Excel sarlavhasi uchun) — kartada courier obyekti yo'q,
+  // chunki bular kuryerning o'z pochtalari.
+  const courierName = useSelector((state: RootState) => state.roleSlice.name);
+
+  // Excel yuklanayotgan pochta id'si (faqat shu karta tugmasi spinnerga o'tadi).
+  const [excelLoadingId, setExcelLoadingId] = useState<string | null>(null);
+
+  // Eski pochtadan Excel (hisobot) olish. Kartada buyurtmalar yo'q — status
+  // bo'yicha mos endpoint (received yoki rejected) orqali yuklanadi, keyin
+  // jo'natish paytidagi bilan bir xil formatdagi Excel hosil qilinadi.
+  // stopPropagation — kartaga navigatsiya bilan to'qnashmasligi uchun.
+  const handleDownloadExcel = useCallback(
+    async (e: MouseEvent<HTMLButtonElement>, post: any) => {
+      e.stopPropagation();
+      if (!post?.id || excelLoadingId) return;
+      try {
+        setExcelLoadingId(post.id);
+        // Bekor qilingan pochtalar buyurtmalari rejected endpointdan keladi
+        // (massiv); qolganlari received endpointdan ({ allOrdersByPostId }).
+        const isRejected = ["canceled", "canceled_received"].includes(
+          post?.status?.toLowerCase(),
+        );
+        const path = isRejected ? "rejected/" : "";
+        const res = await api.get(`post/orders/${path}${post.id}`);
+        const payload = res?.data?.data;
+        const orders: any[] = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.allOrdersByPostId)
+          ? payload.allOrdersByPostId
+          : [];
+        if (!orders.length) {
+          handleWarning(
+            "Bu pochtada buyurtmalar topilmadi",
+            "Eksport qilish uchun buyurtma yo'q.",
+          );
+          return;
+        }
+        await exportPostOrdersToExcel(orders, {
+          qrCodeToken: post?.qr_code_token,
+          regionName: post?.region?.name,
+          courierName: courierName || undefined,
+          // Bekor pochtada saqlangan order_quantity yuklangan qatorlardan farq
+          // qilishi mumkin — sarlavha qatorlar bilan mos bo'lishi uchun rejected
+          // yo'lda orders.length ishlatamiz.
+          totalOrders: isRejected
+            ? orders.length
+            : post?.order_quantity ?? orders.length,
+          date: post?.created_at,
+        });
+        handleSuccess("Excel tayyor");
+      } catch (err) {
+        handleApiError(err, "Excel yuklashda xatolik yuz berdi");
+      } finally {
+        setExcelLoadingId(null);
+      }
+    },
+    [excelLoadingId, courierName, handleSuccess, handleApiError, handleWarning],
+  );
 
   const { getParam, setParam, removeParam } = useParamsHook();
   const page = Number(getParam("page") || 1);
@@ -238,6 +301,19 @@ const CourierOldMails = () => {
                     </span>
                   </div>
                 </div>
+
+                <button
+                  onClick={(e) => handleDownloadExcel(e, post)}
+                  disabled={!!excelLoadingId}
+                  className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-white text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {excelLoadingId === post?.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-4 h-4" />
+                  )}
+                  Excel
+                </button>
               </div>
             );
           })}

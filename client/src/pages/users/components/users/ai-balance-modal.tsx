@@ -1,0 +1,233 @@
+import { useState } from "react";
+import {
+  Modal,
+  Switch,
+  InputNumber,
+  Button,
+  message,
+  Spin,
+  Tag,
+  Empty,
+} from "antd";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
+import { api } from "../../../../shared/api";
+
+// Bir buyurtma narxi shu summadan katta bo'lsa — ehtimol hisob to'ldirish bilan
+// adashtirilgan (odatiy narx ~300 so'm) — ogohlantirish + tasdiq so'raladi.
+const PRICE_WARN = 5000;
+
+const som = (n: number) =>
+  (Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+export function AiBalanceContent({ marketId }: { marketId: string }) {
+  const qc = useQueryClient();
+  const stateQ = useQuery({
+    queryKey: ["ai-balance", marketId],
+    queryFn: () => api.get(`ai-balance/${marketId}`).then((r) => r.data.data),
+  });
+  const historyQ = useQuery({
+    queryKey: ["ai-balance-history", marketId],
+    queryFn: () =>
+      api.get(`ai-balance/${marketId}/history`).then((r) => r.data.data),
+  });
+
+  const [topup, setTopup] = useState<number | null>(null);
+  const [price, setPrice] = useState<number | null>(null);
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["ai-balance", marketId] });
+    qc.invalidateQueries({ queryKey: ["ai-balance-history", marketId] });
+  };
+
+  const toggleM = useMutation({
+    mutationFn: (enabled: boolean) =>
+      api.patch(`ai-balance/${marketId}/toggle`, { enabled }),
+    onSuccess: (r) => {
+      message.success(r.data?.message || "OK");
+      refresh();
+    },
+    onError: () => message.error("Xatolik"),
+  });
+  const topupM = useMutation({
+    mutationFn: (amount: number) =>
+      api.post(`ai-balance/${marketId}/topup`, { amount }),
+    onSuccess: () => {
+      message.success("Balans to'ldirildi");
+      setTopup(null);
+      refresh();
+    },
+    onError: () => message.error("Xatolik"),
+  });
+  const priceM = useMutation({
+    mutationFn: (p: number) =>
+      api.patch(`ai-balance/${marketId}/price`, { price: p }),
+    onSuccess: () => {
+      message.success("Narx yangilandi");
+      refresh();
+    },
+    onError: () => message.error("Xatolik"),
+  });
+
+  if (stateQ.isLoading)
+    return (
+      <div className="py-8 text-center">
+        <Spin />
+      </div>
+    );
+
+  const s = stateQ.data as
+    | { enabled: boolean; balance: number; price: number }
+    | null;
+  if (!s) return <Empty description="Ma'lumot topilmadi" />;
+
+  const history = Array.isArray(historyQ.data) ? historyQ.data : [];
+
+  return (
+    <div className="space-y-4">
+      {/* Holat */}
+      <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+        <div>
+          <div className="text-xs text-gray-500 mb-1">AI holati</div>
+          <Tag color={s.enabled ? "green" : "red"}>
+            {s.enabled ? "Yoqilgan" : "O'chirilgan"}
+          </Tag>
+        </div>
+        <Switch
+          checked={s.enabled}
+          loading={toggleM.isPending}
+          onChange={(c) => toggleM.mutate(c)}
+        />
+      </div>
+
+      {/* Balans */}
+      <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20">
+        <div className="text-xs text-gray-500">Balans</div>
+        <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+          {som(s.balance)} so'm
+        </div>
+      </div>
+
+      {/* To'ldirish + Narx — bir qatorda, ixcham va ajralib turgan */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Balansni to'ldirish (yashil — balansga QO'SHILADI) */}
+        <div className="rounded-lg border border-green-200 dark:border-green-900/40 bg-green-50/40 dark:bg-green-900/10 p-2.5">
+          <div className="text-xs font-medium text-green-700 dark:text-green-400 mb-1.5">
+            Balansni to'ldirish
+          </div>
+          <div className="flex gap-1.5">
+            <InputNumber
+              size="small"
+              min={1}
+              value={topup ?? undefined}
+              onChange={(v) => setTopup((v as number) ?? null)}
+              placeholder="Summa"
+              style={{ width: "100%" }}
+            />
+            <Button
+              size="small"
+              type="primary"
+              loading={topupM.isPending}
+              disabled={!topup}
+              onClick={() => topup && topupM.mutate(topup)}
+            >
+              Qo'shish
+            </Button>
+          </div>
+        </div>
+
+        {/* Bir buyurtma narxi (neytral — har buyurtmadan yechiladi) */}
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-2.5">
+          <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5">
+            Bir buyurtma narxi{" "}
+            <span className="text-gray-400">(hozir: {som(s.price)})</span>
+          </div>
+          <div className="flex gap-1.5">
+            <InputNumber
+              size="small"
+              min={0}
+              value={price ?? undefined}
+              onChange={(v) => setPrice((v as number) ?? null)}
+              placeholder="Narx"
+              style={{ width: "100%" }}
+            />
+            <Button
+              size="small"
+              loading={priceM.isPending}
+              disabled={price == null}
+              onClick={() => {
+                if (price == null) return;
+                if (price >= PRICE_WARN) {
+                  Modal.confirm({
+                    title: "Katta narx — tasdiqlang",
+                    content: `Bir buyurtma narxini ${som(
+                      price
+                    )} so'm qilib belgilaysizmi? Bu HAR BUYURTMA narxi (odatda ~300 so'm), hisob TO'LDIRISH EMAS.`,
+                    okText: "Ha, shu narx",
+                    cancelText: "Bekor",
+                    onOk: () => priceM.mutate(price),
+                  });
+                } else {
+                  priceM.mutate(price);
+                }
+              }}
+            >
+              Saqlash
+            </Button>
+          </div>
+          {price != null && price >= PRICE_WARN && (
+            <div className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400 flex items-start gap-1">
+              <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+              Bu HAR BUYURTMA narxi, hisob to'ldirish EMAS. To'ldirish uchun chap
+              ustundan foydalaning.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tarix */}
+      <div>
+        <div className="text-xs text-gray-500 mb-1">Tarix</div>
+        <div className="max-h-52 overflow-auto rounded-lg border border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+          {history.length === 0 ? (
+            <div className="p-3 text-center text-xs text-gray-400">
+              Hozircha yo'q
+            </div>
+          ) : (
+            history.map((tx: any) => (
+              <div
+                key={tx.id}
+                className="flex items-center justify-between gap-2 p-2 text-sm"
+              >
+                <span className="flex items-center gap-1 min-w-0">
+                  <Tag
+                    color={
+                      tx.type === "topup"
+                        ? "green"
+                        : tx.type === "refund"
+                          ? "blue"
+                          : "orange"
+                    }
+                  >
+                    {tx.type}
+                  </Tag>
+                  <span className="truncate text-gray-500 text-xs">
+                    {tx.note}
+                  </span>
+                </span>
+                <span
+                  className={`whitespace-nowrap ${
+                    tx.type === "usage" ? "text-red-500" : "text-green-600"
+                  }`}
+                >
+                  {tx.type === "usage" ? "−" : "+"}
+                  {som(tx.amount)} → {som(tx.balance_after)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

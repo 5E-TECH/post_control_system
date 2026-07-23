@@ -86,6 +86,8 @@ import ConfirmPopup from "../../../../../shared/components/confirmPopup";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
 import { buildAdminPath } from "../../../../../shared/const";
 import { debounce } from "../../../../../shared/helpers/DebounceFunc";
+import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
+import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -212,8 +214,6 @@ const MailDetail = () => {
     });
   };
 
-  const { visualFeedback } = usePostScanner(undefined, setSelectedIds);
-
   const [params] = useSearchParams();
   const status = params.get("status");
 
@@ -272,6 +272,30 @@ const MailDetail = () => {
     return { groups, orderIds };
   }, [postData]);
 
+  // ── Skaner manifesti (client-side tekshirish) ──────────────────────────
+  // Backend `checkPost` predikatini AYNAN takrorlaymiz: faqat status==='received'
+  // va shu pochtaga (post_id===id) tegishli buyurtmalar kiritiladi. Tokenlar
+  // normalizeQrToken bilan (server bilan bir xil) normallashtiriladi. Shu Map
+  // orqali har skan ~0ms da, internetga bog'liq bo'lmagan holda tekshiriladi.
+  const scanManifest = useMemo(() => {
+    const m = new Map<string, string>();
+    if (Array.isArray(postData)) {
+      for (const o of postData) {
+        if (o?.status === "received" && o?.post_id === id && o?.qr_code_token) {
+          m.set(normalizeQrToken(o.qr_code_token), o.id);
+        }
+      }
+    }
+    return m;
+  }, [postData, id]);
+
+  // Skaner: manifest topilmasa, yangi qo'shilgan buyurtmani tutish uchun refetch
+  // bilan birga serverga bir martalik fallback (usePostScanner ichida).
+  const { visualFeedback } = usePostScanner(refetch, setSelectedIds, {
+    manifest: scanManifest,
+    postId: id,
+  });
+
   useEffect(() => {
     if (postData && !initialized) {
       setSelectedIds([]);
@@ -314,7 +338,20 @@ const MailDetail = () => {
               onSuccess: (res) => {
 
                 const courierName = res?.data?.updatedPost?.courier?.name;
-                handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
+                // Server HAQIQATAN jo'natgan buyurtmalar soni (stale tanlovlar
+                // post_id bo'yicha tushib qolgan bo'lishi mumkin). Tanlangandan
+                // kam bo'lsa — operatorni ogohlantiramiz.
+                const sentCount = res?.data?.newOrders?.length ?? selectedIds.length;
+                if (sentCount < selectedIds.length) {
+                  handleWarning(
+                    `Pochta ${courierName} kuryerga jo'natildi`,
+                    `Tanlangan ${selectedIds.length} tadan ${sentCount} tasi jo'natildi (qolganlari endi bu pochtada emas).`,
+                  );
+                } else {
+                  handleSuccess(
+                    `Pochta ${courierName} kuryerga jo'natildi (${sentCount} ta)`,
+                  );
+                }
 
                 try {
                   const mails = res?.data?.newOrders;
@@ -746,6 +783,7 @@ const MailDetail = () => {
                         <p className="text-sm font-semibold text-gray-800 dark:text-white truncate">
                           {order?.customer?.name}
                         </p>
+                        <ReplacementBadge order={order} className="mt-0.5" />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                           {formatPhone(order?.customer?.phone_number)}
                         </p>
@@ -838,11 +876,12 @@ const MailDetail = () => {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 lg:gap-4 flex-1">
                       {/* Customer Name */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
                         <span className="text-sm font-medium text-gray-800 dark:text-white truncate">
                           {order?.customer?.name}
                         </span>
+                        <ReplacementBadge order={order} />
                       </div>
 
                       {/* Phone */}

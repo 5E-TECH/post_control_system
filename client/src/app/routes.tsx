@@ -59,6 +59,10 @@ const CreateLogist = lazy(
 const CreateOrder = lazy(
   () => import("../pages/orders/pages/superadmin/create-order")
 );
+const AiCreateOrder = lazy(
+  () => import("../pages/orders/pages/superadmin/ai-create-order")
+);
+const MarketAiBalance = lazy(() => import("../pages/ai-balance"));
 const OrderDetail = lazy(
   () => import("../pages/orders/pages/superadmin/orderDetail")
 );
@@ -98,6 +102,9 @@ const TodayMails = lazy(
 const Orderview = lazy(() => import("../pages/today-orders/pages/orderview"));
 const ReturnRequests = lazy(
   () => import("../pages/mails/components/superadmin/return-requests")
+);
+const ReplacementReturns = lazy(
+  () => import("../pages/orders/pages/superadmin/replacement-returns")
 );
 const RefusedMails = lazy(
   () => import("../pages/mails/components/superadmin/refused-mails")
@@ -189,6 +196,7 @@ const AppRouters = () => {
               element: <Orders />,
               children: [
                 { path: "choose-market", element: <ChooseMarket /> },
+                { path: "ai-create", element: <AiCreateOrder /> },
                 {
                   path: "customer-info",
                   element: <CustomerInfoOrder />,
@@ -227,6 +235,14 @@ const AppRouters = () => {
                   ],
                 },
               ],
+            },
+            {
+              path: "replacement-returns",
+              element: (
+                <RequireRole roles={["superadmin", "admin", "registrator"]}>
+                  <ReplacementReturns />
+                </RequireRole>
+              ),
             },
             {
               path: "all-users",
@@ -318,6 +334,7 @@ const AppRouters = () => {
               ],
             },
             { path: "cash-box", element: <CashDetailMarketCourier /> },
+            { path: "ai-balance", element: <MarketAiBalance /> },
             { path: "my-region", element: <MyRegion /> },
             // Rollar endi Settings ichida — eski URL redirect
             {
