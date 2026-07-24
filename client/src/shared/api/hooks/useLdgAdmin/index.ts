@@ -321,7 +321,11 @@ export const useLdgAdmin = () => {
 
   const setAutomation = useMutation({
     mutationFn: (body: {
-      key: "webhook_enabled" | "reconcile_enabled" | "auto_retry_enabled";
+      key:
+        | "is_active"
+        | "webhook_enabled"
+        | "reconcile_enabled"
+        | "auto_retry_enabled";
       value: boolean;
     }) =>
       api
