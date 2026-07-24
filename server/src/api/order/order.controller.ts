@@ -167,10 +167,12 @@ export class OrderController {
     @Body() dto: AiConfirmOrdersDto,
     @CurrentUser() user: JwtPayload,
   ) {
+    // Platforma (web) manbasi → to'g'ridan NEW, guruhga yuborilmaydi.
     return this.aiOrderService.createConfirmedOrders(
       dto.orders,
       user,
       dto.market_id,
+      'platform',
     );
   }
 

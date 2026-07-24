@@ -1820,11 +1820,15 @@ export class PostService {
         );
       }
 
-      // Qabul qilinMAGAN ODDIY buyurtmalar => CANCELLED, postdan ajratiladi
+      // Qabul qilinMAGAN ODDIY buyurtmalar => CANCELLED, postdan ajratiladi.
+      // WHERE'da status=CANCELLED_SENT sharti: agar pochtadagi buyurtma allaqachon
+      // boshqa yo'l bilan yakunlangan bo'lsa (masalan global skaner orqali CLOSED,
+      // yoki qandaydir sabab bilan SOLD), uni ORQAGA qaytarmaymiz — CLOSED "faqat
+      // skanerdan va qaytmaydi" invarianti buzilmasin.
       if (remainingNormalIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(remainingNormalIds) },
+          { id: In(remainingNormalIds), status: Order_status.CANCELLED_SENT },
           { status: Order_status.CANCELLED, canceled_post_id: null },
         );
       }

@@ -1058,10 +1058,12 @@ export class OrderBotUpdate {
       };
       try {
         const confirmed = this.aiOrderService.previewToConfirmed(p);
+        // Manba = 'bot' → guruh-tasdiqlash (CREATED→guruhga ✅/❌→NEW).
         const created = await this.aiOrderService.createConfirmedOrders(
           [confirmed],
           operator.jwt,
           operator.marketId,
+          'bot',
         );
         result = created.results[0] || { ok: false, reason: 'create_failed' };
       } catch (e) {
