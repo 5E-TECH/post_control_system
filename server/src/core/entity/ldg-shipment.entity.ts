@@ -8,7 +8,12 @@ import {
   Unique,
 } from 'typeorm';
 import { OrderEntity } from './order.entity';
-import { bigintTransformerNonNull as bigintTransformer } from 'src/common/database/bigint.transformer';
+// MUHIM: null-SAQLOVCHI transformer (bigintTransformer), `bigintTransformerNonNull`
+// EMAS. Bu ustunlar `nullable: true` va `default: 0` EMAS — nonNull variant esa
+// null → 0 yozadi. `mismatch_at` uchun bu halokatli edi: har status saqlanganda
+// mismatch_at=0 yozilib, "WHERE mismatch_at IS NOT NULL" filtri (admin panel
+// "Mismatch" kartasi/filtri) HAR BIR shipmentni "nomuvofiq" deb sanardi.
+import { bigintTransformer } from 'src/common/database/bigint.transformer';
 
 /**
  * LDG Cargo dagi paketning bizning order bilan bog'lanishi.

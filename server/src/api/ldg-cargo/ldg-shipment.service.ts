@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
@@ -14,24 +15,20 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { LdgApiService } from './ldg-api.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { JwtPayload } from 'src/common/utils/types/user.type';
-import { Order_status } from 'src/common/enums';
+import { Status } from 'src/common/enums';
 import {
   LdgCreateOrderRequestDto,
   LdgCreateOrderResponseDto,
 } from './dto/ldg-create-order.dto';
+import { LDG_FINAL_ORDER_STATUSES } from './utils/ldg-status.guard';
 
 // Yakunlangan (terminal) order statuslari — bularni LDG'ga JO'NATMAYMIZ.
 // Faqat faol (NEW/RECEIVED/ON_THE_ROAD/WAITING) buyurtmalar LDG'ga ketadi:
 // yakunlangan buyurtma LDG'da qayta yaratilsa, LDG o'z statusini qaytarib
 // bizning yakuniy status bilan keraksiz "mismatch" chiqaradi.
-const LDG_SKIP_ORDER_STATUSES: Order_status[] = [
-  Order_status.SOLD,
-  Order_status.PAID,
-  Order_status.PARTLY_PAID,
-  Order_status.CANCELLED,
-  Order_status.CANCELLED_SENT,
-  Order_status.CLOSED,
-];
+// Yagona manba — utils/ldg-status.guard.ts (webhook/reconcile tomoni ham shundan
+// foydalanadi, shunda "LDG tegmaydigan statuslar" ta'rifi ikkiga bo'linmaydi).
+const LDG_SKIP_ORDER_STATUSES = LDG_FINAL_ORDER_STATUSES;
 
 @Injectable()
 export class LdgShipmentService {
@@ -94,6 +91,12 @@ export class LdgShipmentService {
       return shipment;
     }
 
+    // ===== KILL SWITCH — LDG'ga jo'natishning YAGONA to'sig'i =====
+    // Bu tekshiruv barcha dispatch yo'llari uchun amal qiladi (pochta jo'natish,
+    // admin qo'lda qayta jo'natish, auto-retry cron) — chunki hammasi shu metodga
+    // keladi. Off/blok bo'lsa shipment yozuvi ham YARATILMAYDI (toza "o'chirish").
+    const config = await this.assertLdgDispatchEnabled();
+
     // YAKUNLANGAN buyurtmalarni LDG'ga jo'natmaymiz (mismatch oldini olish).
     // Allaqachon yuborilgan bo'lsa — mavjud shipmentni qaytaramiz (idempotent),
     // aks holda aniq xabar bilan to'xtatamiz.
@@ -116,11 +119,6 @@ export class LdgShipmentService {
     shipment.tracking_number = null;
     shipment.ldg_status = null;
     shipment.ldg_status_changed_at = null;
-
-    const config = await this.configRepo.findOne({ where: {} });
-    if (!config) {
-      throw new BadRequestException('LDG sozlamalari yo\'q');
-    }
 
     const body = await this.buildCreateOrderBody(order, config);
 
@@ -226,6 +224,40 @@ export class LdgShipmentService {
       m.includes('rate limit') ||
       m.includes('rate-limit')
     );
+  }
+
+  /**
+   * LDG'ga dispatch ruxsat etilganini tekshiradi — YAGONA "kill switch".
+   * Off yoki vakil-kuryer bloklangan bo'lsa xato tashlaydi (buyurtma LDG'ga
+   * jo'natilmaydi, shipment yozuvi ham yaratilmaydi). Config'ni qaytaradi
+   * (chaqiruvchi qayta so'rov qilmasin).
+   *
+   *  - KILL SWITCH 1: `config.is_active === false` → integratsiya o'chirilgan.
+   *  - KILL SWITCH 2: LDG vakil-kuryer (ldg_courier_user_id) status !== ACTIVE
+   *    → admin uni bloklab qo'ygan; buyurtmalar LDG tizimiga ketmaydi.
+   */
+  private async assertLdgDispatchEnabled(): Promise<LdgConfigEntity> {
+    const config = await this.configRepo.findOne({ where: {} });
+    if (!config) {
+      throw new BadRequestException('LDG sozlamalari yo\'q');
+    }
+    if (!config.is_active) {
+      throw new ServiceUnavailableException(
+        "LDG integratsiyasi o'chirilgan — buyurtma LDG'ga jo'natilmaydi",
+      );
+    }
+    if (config.ldg_courier_user_id) {
+      const courier = await this.userRepo.findOne({
+        where: { id: config.ldg_courier_user_id },
+        select: ['id', 'status'],
+      });
+      if (!courier || courier.status !== Status.ACTIVE) {
+        throw new ServiceUnavailableException(
+          "LDG vakil-kuryer bloklangan — buyurtma LDG'ga jo'natilmaydi",
+        );
+      }
+    }
+    return config;
   }
 
   /**

@@ -1,4 +1,4 @@
-import { Switch, Tag, Button, message, Tooltip } from "antd";
+import { Switch, Tag, Button, message, Tooltip, Modal } from "antd";
 import {
   Webhook,
   RefreshCw,
@@ -8,6 +8,7 @@ import {
   Loader2,
   Info,
   Activity,
+  PlugZap,
 } from "lucide-react";
 import { useLdgAdmin } from "../../../shared/api/hooks/useLdgAdmin";
 
@@ -26,6 +27,33 @@ export const LdgControlTab = () => {
     } catch {
       message.error("O'zgartirishda xatolik");
     }
+  };
+
+  // Master kalit — LDG integratsiyasini butunlay yoqish/uzish.
+  const setMaster = async (value: boolean) => {
+    try {
+      const r = await setAutomation.mutateAsync({ key: "is_active", value });
+      message.success(r.message);
+    } catch {
+      message.error("O'zgartirishda xatolik");
+    }
+  };
+
+  const handleMasterToggle = (value: boolean) => {
+    if (value) {
+      setMaster(true);
+      return;
+    }
+    // O'chirish — sezilarli amal, tasdiq so'raymiz.
+    Modal.confirm({
+      title: "LDG integratsiyasini o'chirasizmi?",
+      content:
+        "O'chirilsa: yangi buyurtmalar LDG'ga jo'natilmaydi va LDG'dan kelgan status o'zgarishlari qo'llanmaydi (reconcile/auto-retry ham to'xtaydi). Xohlagan vaqt qayta yoqishingiz mumkin.",
+      okText: "Ha, o'chirish",
+      okButtonProps: { danger: true },
+      cancelText: "Bekor qilish",
+      onOk: () => setMaster(false),
+    });
   };
 
   const handleStart = async () => {
@@ -96,12 +124,44 @@ export const LdgControlTab = () => {
         <span className="font-semibold text-gray-800 dark:text-white">
           Fon jarayonlari boshqaruvi
         </span>
-        {auto && (
-          <Tag color={auto.is_active ? "green" : "red"} className="ml-1">
-            Integratsiya: {auto.is_active ? "Faol" : "O'chiq"}
-          </Tag>
-        )}
         {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+      </div>
+
+      {/* MASTER kalit — integratsiyani butunlay yoqish/uzish */}
+      <div
+        className={`flex items-center gap-4 p-4 rounded-xl border-2 ${
+          auto?.is_active
+            ? "border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-900/20"
+            : "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20"
+        }`}
+      >
+        <div className="shrink-0">
+          <PlugZap
+            className={`w-6 h-6 ${
+              auto?.is_active ? "text-green-600" : "text-red-500"
+            }`}
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-800 dark:text-white">
+              LDG integratsiyasi
+            </span>
+            <Tag color={auto?.is_active ? "green" : "red"}>
+              {auto?.is_active ? "Faol" : "O'chiq"}
+            </Tag>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            O'chirilsa buyurtmalar LDG'ga <b>jo'natilmaydi</b> va LDG'dan kelgan
+            status o'zgarishlari <b>qo'llanmaydi</b>. LDG vakil-kuryerni bloklash
+            ham jo'natishni to'xtatadi.
+          </p>
+        </div>
+        <Switch
+          checked={!!auto?.is_active}
+          loading={setAutomation.isPending}
+          onChange={handleMasterToggle}
+        />
       </div>
 
       {/* Fon jarayonlari (toggle) */}

@@ -178,10 +178,14 @@ export class LdgAdminService {
         active: LDG_DISPATCHABLE_STATUSES,
       })
       .getCount();
-    // LDG ↔ Beepost status to'qnashishi (real biznes muammosi)
+    // LDG ↔ Beepost status to'qnashishi (real biznes muammosi).
+    // `> 0` sharti MAJBURIY: eski yozuvlarda transformer tuzog'i tufayli
+    // mismatch_at=0 (null o'rniga) saqlangan bo'lishi mumkin — 0 haqiqiy mismatch
+    // emas (Date.now() hech qachon 0 bermaydi). Bu shart ularni chetlab o'tadi.
     const mismatch = await this.shipmentRepo
       .createQueryBuilder('s')
       .where('s.mismatch_at IS NOT NULL')
+      .andWhere('s.mismatch_at > 0')
       .getCount();
 
     return { total, delivered, with_error: withError, pending, mismatch };
@@ -291,11 +295,11 @@ export class LdgAdminService {
     } else if (query.filter === 'pending') {
       qb.andWhere('s.ldg_order_id IS NULL');
     } else if (query.filter === 'mismatch') {
-      // Mismatch'larni avval — eng yangi mismatch tepada
-      qb.andWhere('s.mismatch_at IS NOT NULL').orderBy(
-        's.mismatch_at',
-        'DESC',
-      );
+      // Mismatch'larni avval — eng yangi mismatch tepada.
+      // `> 0` — transformer tuzog'i tufayli 0 saqlangan soxta yozuvlarni chetlab o'tadi.
+      qb.andWhere('s.mismatch_at IS NOT NULL')
+        .andWhere('s.mismatch_at > 0')
+        .orderBy('s.mismatch_at', 'DESC');
     }
 
     const [rows, total] = await qb.getManyAndCount();
@@ -357,7 +361,8 @@ export class LdgAdminService {
     if (!shipment) {
       return { success: false, message: 'Shipment topilmadi' };
     }
-    if (!shipment.mismatch_at) {
+    // `<= 0` — transformer tuzog'i tufayli 0 saqlangan yozuvlar haqiqiy mismatch emas.
+    if (!shipment.mismatch_at || shipment.mismatch_at <= 0) {
       return { success: false, message: 'Bu shipmentda mismatch yo\'q' };
     }
     const prevReason = shipment.mismatch_reason;
@@ -590,13 +595,23 @@ export class LdgAdminService {
     };
   }
 
-  /** Bitta fon jarayonini yoqish/o'chirish. */
+  /** Bitta fon jarayonini yoqish/o'chirish. `is_active` — asosiy master kalit
+   * (o'chirilsa LDG'ga buyurtma jo'natilmaydi va kelgan webhook status qo'llamaydi). */
   async setAutomation(
-    key: 'webhook_enabled' | 'reconcile_enabled' | 'auto_retry_enabled',
+    key:
+      | 'is_active'
+      | 'webhook_enabled'
+      | 'reconcile_enabled'
+      | 'auto_retry_enabled',
     value: boolean,
     user?: JwtPayload,
   ): Promise<{ success: boolean; message: string }> {
-    const allowed = ['webhook_enabled', 'reconcile_enabled', 'auto_retry_enabled'];
+    const allowed = [
+      'is_active',
+      'webhook_enabled',
+      'reconcile_enabled',
+      'auto_retry_enabled',
+    ];
     if (!allowed.includes(key)) {
       return { success: false, message: 'Noma\'lum sozlama' };
     }
@@ -608,6 +623,7 @@ export class LdgAdminService {
     config[key] = value;
     await this.configRepo.save(config);
     const KEY_LABEL: Record<string, string> = {
+      is_active: 'Integratsiya (asosiy)',
       webhook_enabled: 'Webhook',
       reconcile_enabled: 'Reconcile (tekshiruv)',
       auto_retry_enabled: 'Avto qayta urinish',

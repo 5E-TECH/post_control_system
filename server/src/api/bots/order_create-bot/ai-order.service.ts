@@ -816,10 +816,16 @@ export class AiOrderService {
   }
 
   // Tasdiqlangan buyurtmalarni yaratish (har biriga alohida charge + create).
+  // `source` — buyurtma manbasi:
+  //   'platform' (default) → to'g'ridan NEW, guruhga YUBORILMAYDI (web platforma);
+  //   'bot'                → CREATE guruh bo'lsa CREATED+guruhga ✅/❌ (Telegram bot).
+  // Default 'platform' — yangi chaqiruvchi unutsa ham buyurtma xato guruhga
+  // tushmaydi (guruh-tasdiqlash faqat bot uchun ataylab yoqiladi).
   async createConfirmedOrders(
     orders: ConfirmedOrder[],
     user: JwtPayload,
     bodyMarketId?: string,
+    source: 'platform' | 'bot' = 'platform',
   ): Promise<{
     results: {
       ok: boolean;
@@ -944,11 +950,12 @@ export class AiOrderService {
         };
         created.add(sig);
 
-        // Bot buyurtmasini guruh-tasdiqlashga yo'naltiramiz (WebApp bilan bir xil):
-        // CREATE guruh bo'lsa CREATED+guruhga ✅/❌; aks holda NEW. Xato bo'lsa
-        // buyurtma allaqachon yaratilgan — faqat loglanadi (create'ni buzmaydi).
+        // Guruh-tasdiqlashga yo'naltirish FAQAT bot manbasi uchun: CREATE guruh
+        // bo'lsa CREATED+guruhga ✅/❌; aks holda NEW. Platforma (web) buyurtmasi
+        // to'g'ridan NEW qoladi — guruhga yuborilmaydi. Xato bo'lsa buyurtma
+        // allaqachon yaratilgan — faqat loglanadi (create'ni buzmaydi).
         let pendingApproval = false;
-        if (res?.data?.id) {
+        if (source === 'bot' && res?.data?.id) {
           try {
             const disp = await this.orderService.dispatchOrderForApproval(
               res.data.id,

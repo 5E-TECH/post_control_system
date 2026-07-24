@@ -6114,16 +6114,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
   /**
    * LDG webhook'dan `RETURNED` statusi (terminal_action='return') kelganda
-   * chaqiriladi. Buyurtma jismonan bizga qaytarilgan.
+   * chaqiriladi. LDG buyurtmani BEKOR QILIB, paketni bizga QAYTARMOQDA — lekin
+   * paket hali jismonan yetib kelmagan.
    *
-   * Avval `cancelOrder` oqimidan o'tkazamiz (market guruhiga bildirishnoma,
-   * tashqi integratsiya sinxron, operator daromadi tozalanadi), so'ng yakuniy
-   * status sifatida CLOSED ga o'rnatamiz — qaytarilgan buyurtma yopildi.
+   * MUHIM: bu yerda buyurtma CLOSED ("Yopilgan") QILINMAYDI. CLOSED — eng yakuniy
+   * status va u FAQAT skaner oqimidan (receiveWithScaner/receiveCanceledPost)
+   * qo'yiladi, chunki "mahsulot jismonan qaytib keldi va skaner bilan tasdiqlandi"
+   * degan invariantni bildiradi. LDG eng ko'pi bilan buyurtmani CANCELLED_SENT
+   * ("Bekor (yuborilgan)" — qaytish yo'lida) holatiga o'tkaza oladi; paket idoraga
+   * yetib kelib registrator uni skanerdan o'tkazgandagina CLOSED bo'ladi.
    *
-   * Idempotent: order allaqachon CLOSED bo'lsa skip. SOLD bo'lsa tegmaymiz
-   * (nizoli holat — qo'lda tekshirilishi kerak). Agar order allaqachon
-   * CANCELLED/CANCELLED_SENT bo'lsa, `cancelOrder` takror chaqirilmaydi —
-   * faqat CLOSED ga o'tkaziladi.
+   * Avval (agar hali bekor qilinmagan bo'lsa) `cancelOrder` oqimidan o'tkazamiz
+   * (market guruhiga bildirishnoma, tashqi integratsiya sinxron, operator daromadi
+   * tozalanadi) — bu buyurtmani CANCELLED qiladi. So'ng ATOMIK ravishda
+   * CANCELLED → CANCELLED_SENT ga o'tkazamiz.
+   *
+   * Idempotent: order allaqachon CANCELLED_SENT/CLOSED bo'lsa skip. SOLD bo'lsa
+   * tegmaymiz (nizoli holat — mismatch, qo'lda tekshirilishi kerak).
    */
   async markReturnedByLdg(
     orderId: string,
@@ -6134,8 +6141,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       this.logger.warn(`LDG webhook returned: order topilmadi (${orderId})`);
       return { kind: 'skipped', reason: 'order_not_found' };
     }
-    if (order.status === Order_status.CLOSED) {
-      return { kind: 'skipped', reason: 'already CLOSED' };
+    // Allaqachon qaytish yo'lida (CANCELLED_SENT) yoki skaner bilan yopilgan
+    // (CLOSED) — qayta ishlamaymiz (idempotent). CLOSED'ni LDG teskari qaytara
+    // olmaydi.
+    if (
+      order.status === Order_status.CLOSED ||
+      order.status === Order_status.CANCELLED_SENT
+    ) {
+      return { kind: 'skipped', reason: `already ${order.status}` };
     }
     // MISMATCH: LDG paketni bizga qaytardi, lekin bizda allaqachon sotilgan/to'langan
     if (
@@ -6155,32 +6168,42 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       status: Status.ACTIVE,
     };
 
-    // Hali bekor qilinmagan bo'lsa — bekor qilish oqimini o'tkazamiz
-    if (
-      order.status !== Order_status.CANCELLED &&
-      order.status !== Order_status.CANCELLED_SENT
-    ) {
+    // Hali bekor qilinmagan bo'lsa — bekor qilish oqimini o'tkazamiz (bu buyurtmani
+    // CANCELLED qiladi va moliyaviy/bildirishnoma oqimini bajaradi).
+    if (order.status !== Order_status.CANCELLED) {
       await this.cancelOrder(payload, orderId, {
-        comment: 'LDG qaytarib berdi',
+        comment: 'LDG bekor qilib qaytardi',
         extraCost: 0,
       });
     }
 
-    // Yakuniy status — CLOSED (qaytarilgan buyurtma yopildi)
-    await this.orderRepo.update(
-      { id: orderId },
-      { status: Order_status.CLOSED },
+    // Yakuniy status — CANCELLED_SENT (qaytish yo'lida, skaner kutilmoqda).
+    // ATOMIK + status-guard: faqat CANCELLED bo'lsa o'tkazamiz. Poyga holatida
+    // (oradan kimdir statusni o'zgartirgan bo'lsa) 0 qator ta'sirlanadi → skipped.
+    // canceled_post_id ATAYLAB tegilmaydi (NULL qoladi) — LDG virtual kuryeri
+    // qaytarish-pochtasi oqimida qatnashmaydi; buyurtma global skaner orqali
+    // yopiladi (receiveWithScaner CANCELLED_SENT'ni pochtasiz ham qabul qiladi).
+    const res = await this.orderRepo.update(
+      { id: orderId, status: In([Order_status.CANCELLED]) },
+      { status: Order_status.CANCELLED_SENT },
     );
+    if ((res.affected ?? 0) === 0) {
+      const fresh = await this.orderRepo.findOne({ where: { id: orderId } });
+      return { kind: 'skipped', reason: `race: now ${fresh?.status ?? 'unknown'}` };
+    }
 
     this.activityLog.log({
       entity_type: 'order',
       entity_id: orderId,
-      action: 'status_change',
+      action: 'ldg_returned',
       old_value: { status: Order_status.CANCELLED },
-      new_value: { order_number: order.order_number, status: Order_status.CLOSED },
-      description: `Buyurtma #${order.order_number} — LDG qaytarib berdi (Yopilgan)`,
+      new_value: {
+        order_number: order.order_number,
+        status: Order_status.CANCELLED_SENT,
+      },
+      description: `Buyurtma #${order.order_number} — LDG bekor qilib qaytardi (qaytish yo'lida, skaner kutilmoqda)`,
       user: payload,
-      metadata: { source: 'ldg' },
+      metadata: { source: 'ldg', ldg_status: 'RETURNED' },
     });
     return { kind: 'applied' };
   }

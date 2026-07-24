@@ -1,6 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Not, Repository } from 'typeorm';
 import { LdgWebhookLogEntity } from 'src/core/entity/ldg-webhook-log.entity';
 import { LdgConfigEntity } from 'src/core/entity/ldg-config.entity';
 import { LdgShipmentEntity } from 'src/core/entity/ldg-shipment.entity';
@@ -11,6 +11,10 @@ import {
   LdgWebhookEnvelope,
 } from './dto/ldg-webhook.dto';
 import { mapLdgStatus, ldgStatusLabel } from './utils/ldg-status.mapper';
+import {
+  LDG_FINAL_ORDER_STATUSES,
+  assertLdgMayNotClose,
+} from './utils/ldg-status.guard';
 import { verifyLdgSignature } from './utils/ldg-signature.util';
 import { Order_status } from 'src/common/enums';
 import { OrderService, LdgTerminalResult } from '../order/order.service';
@@ -134,6 +138,14 @@ export class LdgWebhookService {
       if (eventType === 'webhook.test') {
         // Test webhook — hech narsa qilmaymiz, faqat log
         resultStatus = 'success';
+      } else if (!config.is_active) {
+        // MASTER SWITCH: integratsiya o'chirilgan — LDG webhook orqali buyurtma
+        // statuslarini O'ZGARTIRA OLMAYDI (faqat log). "Uzib qo'yish" shu.
+        this.logger.warn(
+          'LDG webhook keldi, lekin integratsiya o\'chirilgan (is_active=false) — status qo\'llanmaydi',
+        );
+        resultStatus = 'skipped';
+        errorMsg = 'integratsiya o\'chirilgan (is_active=false)';
       } else if (config.webhook_enabled === false) {
         // Admin webhook qabulini o'chirib qo'ygan — faqat log, status o'zgartirilmaydi.
         this.logger.warn('LDG webhook o\'chirilgan (webhook_enabled=false) — skip');
@@ -190,6 +202,16 @@ export class LdgWebhookService {
     }
 
     const eventType = log.event_type || envelope.type || 'unknown';
+
+    // MASTER SWITCH: integratsiya o'chirilgan bo'lsa qayta ishlash ham buyurtma
+    // statusini o'zgartirmaydi (avval yoqib oling).
+    const cfg = await this.configRepo.findOne({ where: {} });
+    if (!cfg?.is_active) {
+      return {
+        http_status: 503,
+        message: 'LDG integratsiyasi o\'chirilgan — avval yoqing (is_active=false)',
+      };
+    }
 
     try {
       let resultStatus: 'success' | 'skipped' | 'mismatch' | 'failed' =
@@ -441,18 +463,22 @@ export class LdgWebhookService {
     // Terminal statuslar uchun maxsus oqimlar (kassa, status flow).
     if (mapping.terminal_action) {
       if (!config?.ldg_courier_user_id) {
-        this.logger.warn(
-          `LDG status: ldg_courier_user_id sozlanmagan, terminal oqim o'tkazib yuborildi (order=${shipment.order_id})`,
+        // Terminal oqim (kassa/bekor/qaytarish) LDG vakil-kuryer hisobini talab
+        // qiladi. U sozlanmagan bo'lsa XOM status YOZMAYMIZ — aks holda DELIVERED
+        // buyurtmani kassaga pul tushmasdan SOLD qilib, yoki bekor/qaytarish
+        // oqimini (bildirishnoma, moliyaviy teskari yozuv) o'tkazmasdan status
+        // yozib, ma'lumotni buzardik. O'rniga xato qayd etamiz: shipment.ldg_status
+        // O'ZGARMAYDI → ldg_courier_user_id sozlangach reconcile to'g'ri qo'llaydi.
+        this.logger.error(
+          `LDG terminal status keldi, lekin ldg_courier_user_id sozlanmagan — qo'llanmadi (order=${shipment.order_id}, ldg_status=${code})`,
         );
-        // Hech bo'lmaganda order statusini qo'yamiz; xato bo'lsa status yozilmaydi.
-        try {
-          await this.applyOrderStatus(shipment.order_id, mapping.order_status);
-        } catch (err) {
-          return this.recordApplyError(shipment, mapping.terminal_action, err);
-        }
-        await this.persistShipmentStatus(shipment, code, changedAt);
-        this.logIntermediateStatus(shipment.order_id, mapping.order_status, code, config);
-        return 'applied';
+        return this.recordApplyError(
+          shipment,
+          mapping.terminal_action,
+          new Error(
+            'ldg_courier_user_id sozlanmagan — terminal oqim bajarilmadi',
+          ),
+        );
       }
 
       let result: LdgTerminalResult;
@@ -510,13 +536,27 @@ export class LdgWebhookService {
 
     // Oraliq statuslar (NEW, RECEIVED, IN_TRANSIT, OUT_FOR_DELIVERY) — faqat order
     // statusini yangilash. Xato bo'lsa status yozilmaydi → reconcile qayta uradi.
+    let affected = 0;
     try {
-      await this.applyOrderStatus(shipment.order_id, mapping.order_status);
+      affected = await this.applyOrderStatus(
+        shipment.order_id,
+        mapping.order_status,
+      );
     } catch (err) {
       return this.recordApplyError(shipment, code, err);
     }
+    // LDG statusini shipmentda baribir yozamiz (audit — LDG nima deyayotgani
+    // ko'rinsin), ammo order statusi guard tomonidan to'silgan bo'lsa (buyurtma
+    // allaqachon yakunlangan) activity_log'ga "status o'zgardi" deb yozmaymiz.
     await this.persistShipmentStatus(shipment, code, changedAt);
-    this.logIntermediateStatus(shipment.order_id, mapping.order_status, code, config);
+    if (affected > 0) {
+      this.logIntermediateStatus(
+        shipment.order_id,
+        mapping.order_status,
+        code,
+        config,
+      );
+    }
     return 'applied';
   }
 
@@ -591,14 +631,27 @@ export class LdgWebhookService {
     await this.shipmentService.saveShipment(shipment);
   }
 
+  /**
+   * LDG kelib chiqishli ORALIQ status yozuvining YAGONA markazi. Ikki qat'iy
+   * qoidaga bo'ysunadi:
+   *   1. CLOSED hech qachon yozilmaydi (CLOSED faqat skanerdan) — buzilsa throw.
+   *   2. Buyurtma allaqachon YAKUNLANGAN (SOLD/PAID/PARTLY_PAID/CANCELLED/
+   *      CANCELLED_SENT/CLOSED) bo'lsa, LDG oraliq statusi uni ORQAGA qaytara
+   *      olmaydi (WHERE status NOT IN final). Aks holda kechikkan/tartibsiz webhook
+   *      sotilgan yoki bekor qilingan buyurtmani qayta "tiriltirib" yuborardi.
+   *
+   * Qaytadi: DB'da haqiqatan o'zgargan qatorlar soni (0 = guard to'sdi).
+   */
   private async applyOrderStatus(
     orderId: string,
     newStatus: Order_status,
-  ): Promise<void> {
-    await this.orderRepo.update(
-      { id: orderId },
+  ): Promise<number> {
+    assertLdgMayNotClose(newStatus);
+    const res = await this.orderRepo.update(
+      { id: orderId, status: Not(In([...LDG_FINAL_ORDER_STATUSES])) },
       { status: newStatus },
     );
+    return res.affected ?? 0;
   }
 
   private async saveLog(args: {

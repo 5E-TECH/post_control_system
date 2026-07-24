@@ -165,7 +165,11 @@ export class LdgAdminController {
   async setAutomation(
     @Body()
     body: {
-      key: 'webhook_enabled' | 'reconcile_enabled' | 'auto_retry_enabled';
+      key:
+        | 'is_active'
+        | 'webhook_enabled'
+        | 'reconcile_enabled'
+        | 'auto_retry_enabled';
       value: boolean;
     },
     @CurrentUser() user: JwtPayload,

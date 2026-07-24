@@ -20,7 +20,9 @@ import { Order_status, Post_status } from 'src/common/enums';
  *  - LDG yo'lda (`IN_TRANSIT`/`OUT_FOR_DELIVERY`) → bizda hamon WAITING.
  *  - LDG yetkazib berdi (`DELIVERED`) → bizda SOLD (sotuv oqimi).
  *  - LDG bekor qildi (`CANCELLED`) → bizda CANCELLED (bekor qilish oqimi).
- *  - LDG qaytarib berdi (`RETURNED`) → bizda CLOSED (bekor qilish oqimi + yopildi).
+ *  - LDG qaytarib berdi (`RETURNED`) → bizda CANCELLED_SENT (bekor qilib qaytardi,
+ *    paket qaytish yo'lida — skaner kutilmoqda). CLOSED (Yopilgan) esa FAQAT skaner
+ *    oqimidan qo'yiladi; LDG hech qachon buyurtmani CLOSED qila olmaydi.
  */
 
 /** Terminal status kelganda chaqiriladigan biznes oqimi. */
@@ -39,7 +41,7 @@ export interface LdgStatusMapping {
   // Terminal status uchun qaysi biznes oqimi chaqiriladi:
   //   'sell'   → OrderService.markDeliveredByLdg (kassaga pul tushadi, SOLD)
   //   'cancel' → OrderService.markCancelledByLdg (bekor qilish oqimi, CANCELLED)
-  //   'return' → OrderService.markReturnedByLdg  (bekor qilish oqimi + CLOSED)
+  //   'return' → OrderService.markReturnedByLdg  (bekor qilib qaytardi, CANCELLED_SENT)
   // Oraliq statuslar uchun `null` — faqat order statusi yangilanadi.
   terminal_action: LdgTerminalAction | null;
 }
@@ -98,8 +100,11 @@ const MAPPING: Record<string, LdgStatusMapping> = {
     terminal_action: 'sell',
   },
   RETURNED: {
-    order_status: Order_status.CLOSED,
-    post_status: Post_status.CANCELED_RECEIVED,
+    // LDG bekor qilib paketni bizga QAYTARADI — bu hali "yopildi" EMAS. Paket
+    // jismonan yetib kelib skanerdan o'tgandagina CLOSED bo'ladi. Shu sababli
+    // bu yerda CANCELLED_SENT ("Bekor (yuborilgan)" — qaytish yo'lida).
+    order_status: Order_status.CANCELLED_SENT,
+    post_status: Post_status.CANCELED,
     is_terminal: true,
     terminal_action: 'return',
   },
@@ -110,6 +115,18 @@ const MAPPING: Record<string, LdgStatusMapping> = {
     terminal_action: 'cancel',
   },
 };
+
+// MODUL INVARIANTI: LDG hech qanday statusi buyurtmani CLOSED ("Yopilgan") qila
+// olmaydi — CLOSED faqat skaner oqimidan (receiveWithScaner/receiveCanceledPost)
+// qo'yiladi. Agar kimdir mappingga CLOSED qo'shsa, modul yuklanishda darhol
+// yiqiladi va xato ishga tushishga yetib bormaydi.
+for (const [code, mapping] of Object.entries(MAPPING)) {
+  if (mapping.order_status === Order_status.CLOSED) {
+    throw new Error(
+      `LDG status mapping xato: "${code}" → CLOSED taqiqlangan (CLOSED faqat skanerdan)`,
+    );
+  }
+}
 
 /**
  * LDG status -> bizning mapping. Noma'lum status uchun `null` qaytadi
