@@ -24,6 +24,7 @@ import { ExternalIntegrationModule } from './external-integration/external-integ
 import { IntegrationSyncModule } from './integration-sync/integration-sync.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
+import { InvestorModule } from './investor/investor.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
     ExternalIntegrationModule,
     IntegrationSyncModule,
     LdgCargoModule,
+    InvestorModule,
   ],
   providers: [OrderGateaway],
 })

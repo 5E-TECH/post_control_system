@@ -38,9 +38,9 @@ jobs:
         working-directory: server
         run: npm run audit:roles
 
-      - name: 🛡️ Guard / xavfsizlik unit-testlari (BLOKLOVCHI)
+      - name: 🛡️ Guard + investor leak unit-testlari (BLOKLOVCHI)
         working-directory: server
-        run: npx jest src/common/guards --ci
+        run: npx jest src/common/guards src/api/investor --ci
 
       - name: 🧪 To'liq test to'plami (informatsion — oldindan mavjud xatolar)
         working-directory: server

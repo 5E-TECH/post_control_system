@@ -26,6 +26,6 @@ import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance
   ],
   controllers: [CasheBoxController],
   providers: [CashBoxService],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, CashBoxService],
 })
 export class CashBoxModule {}

@@ -33,6 +33,7 @@ import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { CreateInvestorDto } from './dto/create-investor.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { SelfGuard } from 'src/common/guards/self.guard';
 import { UpdateSelfDto } from './dto/self-update.dto';
@@ -91,6 +92,28 @@ export class UsersController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.createAdmin(createAdminDto, user);
+  }
+
+  @ApiOperation({
+    summary: 'Create investor user',
+    description:
+      "Yangi faqat-o'qish investor (ulushdor) akkaunti yaratish (SuperAdmin only)",
+  })
+  @ApiResponse({ status: 201, description: 'Investor created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - SuperAdmin required' })
+  @ApiResponse({ status: 409, description: 'Phone number already exists' })
+  @ApiResponse({ status: 422, description: 'Validation error' })
+  @ApiBody({ type: CreateInvestorDto })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN)
+  @Post('investor')
+  createInvestor(
+    @Body() createInvestorDto: CreateInvestorDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.createInvestor(createInvestorDto, user);
   }
 
   @ApiOperation({

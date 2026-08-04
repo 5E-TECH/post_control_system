@@ -47,6 +47,7 @@ import {
 } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { CreateInvestorDto } from './dto/create-investor.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { CreateLogistDto } from './dto/create-logist.dto';
 import { UpdateLogistDto } from './dto/update-logist.dto';
@@ -190,6 +191,53 @@ export class UserService implements OnModuleInit {
         user: actor,
       });
       return successRes(admin, 201, 'New Admin created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // Faqat-o'qish investor (ulushdor) akkaunti. createAdmin patteni bo'yicha,
+  // lekin oyliksiz. Kapital/ulush/taqsimot Faza 3 equity-ledger orqali kiritiladi.
+  async createInvestor(
+    createInvestorDto: CreateInvestorDto,
+    actor?: JwtPayload,
+  ): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { password, phone_number, name } = createInvestorDto;
+      const exist = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number },
+      });
+      if (exist) {
+        throw new ConflictException(
+          `User with ${phone_number} number already exists`,
+        );
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const investor = queryRunner.manager.create(UserEntity, {
+        name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.INVESTOR,
+      });
+      await queryRunner.manager.save(investor);
+      await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: investor.id,
+        action: 'created',
+        new_value: { name: investor.name, role: investor.role },
+        description: `Investor yaratildi: ${investor.name}`,
+        user: actor,
+      });
+      // Parol hashini javobda qaytarmaymiz.
+      const { password: _pw, ...safe } = investor;
+      return successRes(safe, 201, 'New Investor created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
