@@ -89,5 +89,8 @@
   "error": "An error occurred",
   "capitalRecorded": "Capital recorded",
   "ownershipSet": "Ownership set",
-  "distributionRecorded": "Distribution recorded"
+  "distributionRecorded": "Distribution recorded",
+  "export": "Excel",
+  "exporting": "Exporting...",
+  "exportError": "Export error"
 }

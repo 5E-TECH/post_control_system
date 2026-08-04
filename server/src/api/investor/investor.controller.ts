@@ -1,4 +1,5 @@
-import { Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { InvestorService } from './investor.service';
 import { InvestorLedgerService } from './investor-ledger.service';
@@ -158,5 +159,58 @@ export class InvestorController {
       Number(page) || 1,
       Number(limit) || 20,
     );
+  }
+
+  // ---- Aggregat Excel eksport ----
+  @Get('export')
+  @LogInvestorAccess('export')
+  @ApiOperation({ summary: 'Business aggregat Excel eksport (PII yo\'q, ≤366 kun)' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'YYYY-MM-DD' })
+  async exportBusiness(
+    @Res() res: Response,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const buffer = await this.investorService.exportBusinessWorkbook(
+      startDate,
+      endDate,
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=investor-${startDate || 'umumiy'}.xlsx`,
+    );
+    res.send(buffer);
+  }
+
+  @Get('my-investment/export')
+  @LogInvestorAccess('my-investment-export')
+  @ApiOperation({ summary: 'Shaxsiy equity Excel eksport' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'YYYY-MM-DD' })
+  async exportMyInvestment(
+    @CurrentUser() user: JwtPayload,
+    @Res() res: Response,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const buffer = await this.ledgerService.exportMyWorkbook(
+      user.id,
+      startDate,
+      endDate,
+    );
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=my-investment-${startDate || 'umumiy'}.xlsx`,
+    );
+    res.send(buffer);
   }
 }

@@ -89,5 +89,8 @@
   "error": "Xatolik yuz berdi",
   "capitalRecorded": "Kapital yozildi",
   "ownershipSet": "Ulush o'rnatildi",
-  "distributionRecorded": "Taqsimot yozildi"
+  "distributionRecorded": "Taqsimot yozildi",
+  "export": "Excel",
+  "exporting": "Yuklanmoqda...",
+  "exportError": "Eksport xatosi"
 }

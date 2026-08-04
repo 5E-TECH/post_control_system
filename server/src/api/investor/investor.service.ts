@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as ExcelJS from 'exceljs';
 import { OrderService } from '../order/order.service';
 import { CashBoxService } from '../cash-box/cash-box.service';
 import { RegionService } from '../region/region.service';
@@ -315,6 +316,77 @@ export class InvestorService {
       })
       .getRawOne();
     return this.num(raw?.gross);
+  }
+
+  // Eksport oralig'i cheklovi (exfiltration surface'ini kamaytiradi).
+  private assertSpan(startDate?: string, endDate?: string) {
+    if (startDate && endDate) {
+      const s = toUzbekistanTimestamp(startDate, false);
+      const e = toUzbekistanTimestamp(endDate, true);
+      if (e - s > 366 * 24 * 3600 * 1000) {
+        throw new BadRequestException(
+          "Eksport oralig'i 366 kundan oshmasligi kerak",
+        );
+      }
+    }
+  }
+
+  // Aggregat Excel eksport (business ko'rsatkichlari — PII yo'q).
+  async exportBusinessWorkbook(
+    startDate?: string,
+    endDate?: string,
+  ): Promise<Buffer> {
+    this.assertSpan(startDate, endDate);
+    const [ov, rev, np, cash, ue, reg]: any[] = await Promise.all([
+      this.getOverview(startDate, endDate),
+      this.getRevenue('daily', startDate, endDate),
+      this.getNetProfit(startDate, endDate),
+      this.getCashPosition(),
+      this.getUnitEconomics(startDate, endDate),
+      this.getRegions(startDate, endDate),
+    ]);
+    const wb = new ExcelJS.Workbook();
+
+    const s1 = wb.addWorksheet('Overview');
+    s1.addRow(['Korsatkich', 'Qiymat']);
+    const o = ov.data ?? {};
+    s1.addRow(['Sof foyda (davr)', o.profit]);
+    s1.addRow(['Qabul qilingan', o.acceptedCount]);
+    s1.addRow(['Sotilgan/tolangan', o.soldAndPaid]);
+    s1.addRow(['Bekor/qaytgan', o.cancelled]);
+
+    const s2 = wb.addWorksheet('Revenue');
+    s2.addRow(['Davr', 'Foyda', 'Buyurtma', 'Osish %']);
+    for (const p of (rev.data?.data ?? []).slice(0, 1000)) {
+      s2.addRow([p.label, p.revenue, p.ordersCount, p.growthPct]);
+    }
+
+    const s3 = wb.addWorksheet('Financials');
+    s3.addRow(['Korsatkich', 'Qiymat']);
+    s3.addRow(['Gross foyda', np.data?.grossProfit]);
+    s3.addRow(['Umumiy OpEx', np.data?.totalOpEx]);
+    s3.addRow(['Sof foyda', np.data?.netProfit]);
+    s3.addRow(['Sof naqd pozitsiya', cash.data?.netCashPosition]);
+    s3.addRow(['Naqd', cash.data?.cash]);
+    s3.addRow(['Karta', cash.data?.card]);
+    s3.addRow(['Buyurtmaga foyda', ue.data?.revenuePerOrder]);
+    s3.addRow(['Take-rate %', ue.data?.takeRatePct]);
+    s3.addRow(['GMV', ue.data?.grossSold]);
+
+    const s4 = wb.addWorksheet('Regions');
+    s4.addRow(['Region', 'Buyurtma', 'Yetkazilgan', 'Bekor', 'Foyda', 'Daraja %']);
+    for (const r of reg.data?.regions ?? []) {
+      s4.addRow([
+        r.name,
+        r.totalOrders,
+        r.deliveredOrders,
+        r.cancelledOrders,
+        r.totalRevenue,
+        r.successRate,
+      ]);
+    }
+
+    return (await wb.xlsx.writeBuffer()) as unknown as Buffer;
   }
 
   // ---- Unit-economics: buyurtmaga foyda + take-rate ----

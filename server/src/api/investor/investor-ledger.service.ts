@@ -13,6 +13,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { FinancialSource_type, Roles } from 'src/common/enums';
 import { successRes } from 'src/infrastructure/lib/response';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
+import * as ExcelJS from 'exceljs';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import {
@@ -217,6 +218,36 @@ export class InvestorLedgerService {
       200,
       'My ledger',
     );
+  }
+
+  // Shaxsiy equity Excel eksport (o'ziga scoped).
+  async exportMyWorkbook(
+    investorId: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<Buffer> {
+    const sum: any = await this.getSummary(investorId, startDate, endDate);
+    const led: any = await this.listEntries(investorId, 1, 1000);
+    const d = sum.data ?? {};
+    const wb = new ExcelJS.Workbook();
+
+    const s1 = wb.addWorksheet('Summary');
+    s1.addRow(['Korsatkich', 'Qiymat']);
+    s1.addRow(['Kiritilgan kapital', d.capitalInvested]);
+    s1.addRow(['Egalik ulushi %', d.ownershipPct]);
+    s1.addRow(['Hisoblangan ulush (foyda)', d.accruedProfitShare]);
+    s1.addRow(['Tolangan taqsimotlar', d.distributionsPaid]);
+    s1.addRow(['Taqsimlanmagan', d.undistributed]);
+    s1.addRow(['Accrued ROI %', d.accruedRoiPct]);
+    s1.addRow(['Realized ROI %', d.realizedRoiPct]);
+
+    const s2 = wb.addWorksheet('Ledger');
+    s2.addRow(['Sana(ms)', 'Tur', 'Miqdor', 'Ulush(bps)', 'Izoh']);
+    for (const e of led.data?.items ?? []) {
+      s2.addRow([e.occurred_at, e.type, e.amount, e.ownershipBps, e.note]);
+    }
+
+    return (await wb.xlsx.writeBuffer()) as unknown as Buffer;
   }
 
   // ===================== ADMIN YOZUVLARI =====================

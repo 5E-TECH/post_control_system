@@ -94,6 +94,13 @@ export const useInvestor = () => {
           .then((res) => res.data),
     });
 
+  // Imperativ Excel eksport (blob) — react-query emas.
+  const exportBusiness = (params: RangeParams = {}) =>
+    api.get("investor/export", { params, responseType: "blob" });
+
+  const exportMyInvestment = (params: RangeParams = {}) =>
+    api.get("investor/my-investment/export", { params, responseType: "blob" });
+
   return {
     getOverview,
     getRevenue,
@@ -106,5 +113,7 @@ export const useInvestor = () => {
     getUnitEconomics,
     getMyInvestment,
     getMyLedger,
+    exportBusiness,
+    exportMyInvestment,
   };
 };

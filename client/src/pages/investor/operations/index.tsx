@@ -4,6 +4,7 @@ import { ShoppingCart, PackageCheck, XCircle, Percent } from "lucide-react";
 import { useInvestor } from "../../../shared/api/hooks/useInvestor";
 import StatCard from "../components/StatCard";
 import DateRangeFilter from "../components/DateRangeFilter";
+import ExportButton from "../components/ExportButton";
 import { formatMoney, formatNumber } from "../components/format";
 
 interface LbRow {
@@ -91,7 +92,10 @@ const InvestorOperations = () => {
             {t("operationsSubtitle", "Buyurtma oqimi, reyting va regionlar")}
           </p>
         </div>
-        <DateRangeFilter from={from} to={to} onChange={(f, tt) => { setFrom(f); setTo(tt); }} />
+        <div className="flex items-center gap-2">
+          <DateRangeFilter from={from} to={to} onChange={(f, tt) => { setFrom(f); setTo(tt); }} />
+          <ExportButton scope="business" from={from} to={to} />
+        </div>
       </div>
 
       {/* Buyurtma oqimi */}

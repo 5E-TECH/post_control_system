@@ -4,6 +4,7 @@ import { PieChart, Banknote, Wallet, TrendingUp, Layers, HandCoins } from "lucid
 import { useInvestor } from "../../../shared/api/hooks/useInvestor";
 import StatCard from "../components/StatCard";
 import DateRangeFilter from "../components/DateRangeFilter";
+import ExportButton from "../components/ExportButton";
 import { formatMoney } from "../components/format";
 
 const fmtDate = (ms?: number) => {
@@ -48,7 +49,10 @@ const InvestorMyInvestment = () => {
             {t("myInvestmentSubtitle", "Kapital, ulush va qaytim (ROI)")}
           </p>
         </div>
-        <DateRangeFilter from={from} to={to} onChange={(f, tt) => { setFrom(f); setTo(tt); }} />
+        <div className="flex items-center gap-2">
+          <DateRangeFilter from={from} to={to} onChange={(f, tt) => { setFrom(f); setTo(tt); }} />
+          <ExportButton scope="personal" from={from} to={to} />
+        </div>
       </div>
 
       {/* Hero */}

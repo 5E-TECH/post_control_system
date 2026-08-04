@@ -89,5 +89,8 @@
   "error": "Произошла ошибка",
   "capitalRecorded": "Капитал записан",
   "ownershipSet": "Доля установлена",
-  "distributionRecorded": "Выплата записана"
+  "distributionRecorded": "Выплата записана",
+  "export": "Excel",
+  "exporting": "Загрузка...",
+  "exportError": "Ошибка экспорта"
 }

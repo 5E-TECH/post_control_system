@@ -12,6 +12,7 @@ import { useInvestor } from "../../../shared/api/hooks/useInvestor";
 import StatCard from "../components/StatCard";
 import InvestorRevenueChart from "../components/InvestorRevenueChart";
 import DateRangeFilter from "../components/DateRangeFilter";
+import ExportButton from "../components/ExportButton";
 import { formatMoney } from "../components/format";
 
 const InvestorOverview = () => {
@@ -44,14 +45,17 @@ const InvestorOverview = () => {
             {t("overviewSubtitle", "Biznes salomatligi — ulushdor ko'rinishi")}
           </p>
         </div>
-        <DateRangeFilter
-          from={from}
-          to={to}
-          onChange={(f, tt) => {
-            setFrom(f);
-            setTo(tt);
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <DateRangeFilter
+            from={from}
+            to={to}
+            onChange={(f, tt) => {
+              setFrom(f);
+              setTo(tt);
+            }}
+          />
+          <ExportButton scope="business" from={from} to={to} />
+        </div>
       </div>
 
       {/* KPI kartalari */}
