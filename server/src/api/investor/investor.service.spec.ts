@@ -58,6 +58,23 @@ const makeService = (over: Partial<any> = {}) => {
         difference: 2_000_000,
       },
     }),
+    financialBalanceAnalytics: jest.fn().mockResolvedValue({
+      statusCode: 200,
+      message: 'ok',
+      data: {
+        positiveImpact: [
+          { source_type: 'sell_profit', total_amount: 10_000_000 },
+          { source_type: 'manual_income', total_amount: 500_000 },
+        ],
+        negativeImpact: [
+          { source_type: 'salary', total_amount: 3_000_000 },
+          { source_type: 'bills', total_amount: 1_000_000 },
+          { source_type: 'manual_expense', total_amount: 500_000 },
+        ],
+        // topTransactions PII (created_by nomi) bilan — investor ko'rmasligi kerak.
+        topTransactions: [{ id: 't1', created_by: { id: 'u1', name: 'Maxfiy Xodim' } }],
+      },
+    }),
     ...over.cashBoxService,
   };
   const regionService: any = {
@@ -73,7 +90,21 @@ const makeService = (over: Partial<any> = {}) => {
     }),
     ...over.regionService,
   };
-  return new InvestorService(orderService, cashBoxService, regionService);
+  // OrderEntity repo mock — grossSold query builder zanjiri.
+  const orderRepo: any = {
+    createQueryBuilder: jest.fn(() => {
+      const qb: any = {
+        select: () => qb,
+        addSelect: () => qb,
+        where: () => qb,
+        andWhere: () => qb,
+        getRawOne: jest.fn().mockResolvedValue({ gross: 50_000_000 }),
+      };
+      return qb;
+    }),
+    ...over.orderRepo,
+  };
+  return new InvestorService(orderService, cashBoxService, regionService, orderRepo);
 };
 
 // Chuqur (rekursiv) kalitlar to'plami — maxfiy maydon oqib ketmaganini tekshirish uchun.
@@ -91,6 +122,7 @@ const DENY = [
   'market_id', 'market_name', 'courier_id', 'courier_name',
   'allMarketCashboxes', 'allCourierCashboxes', 'card_id',
   'password', 'customer_phone', 'customer_name', 'salary_amount',
+  'created_by', 'topTransactions', 'related_user', 'salary', 'bills',
 ];
 
 describe('InvestorService — investor-safe mapping (PII/maxfiy oqmasligi)', () => {
@@ -135,10 +167,64 @@ describe('InvestorService — investor-safe mapping (PII/maxfiy oqmasligi)', () 
     expect(res.data.returnRate).toBe(10);
   });
 
+  it("getNetProfit = grossProfit − totalOpEx, xarajat komponentlari OSHKOR EMAS", async () => {
+    const res: any = await makeService().getNetProfit();
+    expect(res.data).toEqual({
+      grossProfit: 10_000_000,
+      totalOpEx: 4_500_000, // 3M salary + 1M bills + 0.5M manual_expense
+      netProfit: 5_500_000,
+      from: null,
+      to: null,
+    });
+    const keys = deepKeys(res.data);
+    for (const bad of ["salary", "bills", "manualExpense", "created_by", "topTransactions", "name"]) {
+      expect(keys.has(bad)).toBe(false);
+    }
+  });
+
+  it("getOpEx faqat BITTA yig'ma raqam qaytaradi", async () => {
+    const res: any = await makeService().getOpEx();
+    expect(res.data).toEqual({ totalOpEx: 4_500_000, from: null, to: null });
+  });
+
+  it("getUnitEconomics: revenuePerOrder va takeRatePct", async () => {
+    const res: any = await makeService().getUnitEconomics();
+    expect(res.data.grossSold).toBe(50_000_000);
+    expect(res.data.totalProfit).toBe(5_000_000);
+    expect(res.data.soldOrders).toBe(90);
+    expect(res.data.revenuePerOrder).toBe(Math.round(5_000_000 / 90));
+    expect(res.data.takeRatePct).toBe(10); // 5M/50M*100
+  });
+
+  it("getRevenue seriyasiga growth% qo'shiladi (oldingi 0/yo'q -> null)", async () => {
+    const res: any = await makeService({
+      orderService: {
+        getRevenueStats: jest.fn().mockResolvedValue({
+          statusCode: 200,
+          message: "ok",
+          data: {
+            data: [
+              { period: "p1", label: "p1", ordersCount: 1, revenue: 100 },
+              { period: "p2", label: "p2", ordersCount: 2, revenue: 150 },
+              { period: "p3", label: "p3", ordersCount: 3, revenue: 0 },
+            ],
+            summary: { totalRevenue: 250, totalOrders: 6, avgRevenue: 83 },
+          },
+        }),
+      },
+    }).getRevenue();
+    const pts = res.data.data;
+    expect(pts[0].growthPct).toBeNull();
+    expect(pts[1].growthPct).toBe(50); // (150-100)/100*100
+    expect(pts[2].growthPct).toBe(-100); // (0-150)/150*100
+  });
+
   it('barcha endpointlar birgalikda hech qanday DENY-kalitni oqizmaydi', async () => {
     const s = makeService();
     const results = await Promise.all([
-      s.getOverview(), s.getRevenue(), s.getOrderFlow(), s.getRegions(), s.getLeaderboards(), s.getCashPosition(),
+      s.getOverview(), s.getRevenue(), s.getOrderFlow(), s.getRegions(),
+      s.getLeaderboards(), s.getCashPosition(),
+      s.getNetProfit(), s.getOpEx(), s.getUnitEconomics(),
     ]);
     for (const r of results as any[]) {
       const keys = deepKeys(r.data);

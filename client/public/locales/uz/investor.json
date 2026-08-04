@@ -40,5 +40,13 @@
   "profit": "Foyda",
   "rate": "Daraja",
   "noData": "Ma'lumot yo'q",
-  "successful": "Muvaffaqiyatli"
+  "successful": "Muvaffaqiyatli",
+  "pnlTitle": "Sof foyda (P&L)",
+  "grossProfit": "Gross foyda",
+  "totalOpex": "Umumiy OpEx",
+  "netProfitLabel": "Sof foyda",
+  "unitEconomics": "Unit-economics",
+  "revenuePerOrder": "Buyurtmaga foyda",
+  "takeRate": "Take-rate",
+  "grossSold": "Savdo hajmi (GMV)"
 }

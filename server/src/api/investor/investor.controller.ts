@@ -86,4 +86,40 @@ export class InvestorController {
   getCashPosition() {
     return this.investorService.getCashPosition();
   }
+
+  @Get('net-profit')
+  @LogInvestorAccess('net-profit')
+  @ApiOperation({ summary: 'Sof foyda P&L (gross foyda − OpEx)' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'YYYY-MM-DD' })
+  getNetProfit(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.investorService.getNetProfit(startDate, endDate);
+  }
+
+  @Get('opex')
+  @LogInvestorAccess('opex')
+  @ApiOperation({ summary: 'Umumiy OpEx — bitta yig\'ma raqam' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'YYYY-MM-DD' })
+  getOpEx(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.investorService.getOpEx(startDate, endDate);
+  }
+
+  @Get('unit-economics')
+  @LogInvestorAccess('unit-economics')
+  @ApiOperation({ summary: 'Unit-economics (buyurtmaga foyda, take-rate)' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'YYYY-MM-DD' })
+  getUnitEconomics(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.investorService.getUnitEconomics(startDate, endDate);
+  }
 }

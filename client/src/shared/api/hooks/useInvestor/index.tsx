@@ -57,6 +57,27 @@ export const useInvestor = () => {
         api.get("investor/cash-position").then((res) => res.data),
     });
 
+  const getNetProfit = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "net-profit", params],
+      queryFn: () =>
+        api.get("investor/net-profit", { params }).then((res) => res.data),
+    });
+
+  const getOpEx = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "opex", params],
+      queryFn: () =>
+        api.get("investor/opex", { params }).then((res) => res.data),
+    });
+
+  const getUnitEconomics = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "unit-economics", params],
+      queryFn: () =>
+        api.get("investor/unit-economics", { params }).then((res) => res.data),
+    });
+
   return {
     getOverview,
     getRevenue,
@@ -64,5 +85,8 @@ export const useInvestor = () => {
     getRegions,
     getLeaderboards,
     getCashPosition,
+    getNetProfit,
+    getOpEx,
+    getUnitEconomics,
   };
 };

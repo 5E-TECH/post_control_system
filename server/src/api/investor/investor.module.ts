@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { InvestorController } from './investor.controller';
 import { InvestorService } from './investor.service';
 import { OrderModule } from '../order/order.module';
 import { CashBoxModule } from '../cash-box/cash-box.module';
 import { RegionModule } from '../region/region.module';
+import { OrderEntity } from 'src/core/entity/order.entity';
 import { LogInvestorAccessInterceptor } from 'src/common/interceptors/log-investor-access.interceptor';
 
 /**
@@ -15,7 +17,12 @@ import { LogInvestorAccessInterceptor } from 'src/common/interceptors/log-invest
  * ActivityLogService @Global bo'lgani uchun interceptor uni to'g'ridan inject qiladi.
  */
 @Module({
-  imports: [OrderModule, CashBoxModule, RegionModule],
+  imports: [
+    OrderModule,
+    CashBoxModule,
+    RegionModule,
+    TypeOrmModule.forFeature([OrderEntity]),
+  ],
   controllers: [InvestorController],
   providers: [InvestorService, LogInvestorAccessInterceptor],
 })

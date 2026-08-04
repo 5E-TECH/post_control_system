@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { OrderService } from '../order/order.service';
 import { CashBoxService } from '../cash-box/cash-box.service';
 import { RegionService } from '../region/region.service';
 import { successRes } from 'src/infrastructure/lib/response';
+import { OrderEntity } from 'src/core/entity/order.entity';
+import { FinancialSource_type, Order_status } from 'src/common/enums';
 import {
   getUzbekistanDayRange,
   toUzbekistanTimestamp,
@@ -26,6 +30,8 @@ export class InvestorService {
     private readonly orderService: OrderService,
     private readonly cashBoxService: CashBoxService,
     private readonly regionService: RegionService,
+    @InjectRepository(OrderEntity)
+    private readonly orderRepo: Repository<OrderEntity>,
   ) {}
 
   // 5-daqiqali oddiy TTL kesh (biznes aggregatlari uchun; DB yukini kamaytiradi).
@@ -104,14 +110,24 @@ export class InvestorService {
       );
       const d = res?.data ?? {};
       const series = Array.isArray(d.data) ? d.data : [];
+      const points = series.map((p: any) => ({
+        period: p.period,
+        label: p.label,
+        ordersCount: this.num(p.ordersCount),
+        revenue: this.num(p.revenue),
+      }));
+      // Period-over-period o'sish % (oldingi nuqta 0 yoki yo'q bo'lsa null).
+      const withGrowth = points.map((p: any, i: number) => {
+        const prev = i > 0 ? points[i - 1].revenue : null;
+        const growthPct =
+          prev !== null && prev !== 0
+            ? Math.round(((p.revenue - prev) / Math.abs(prev)) * 10000) / 100
+            : null;
+        return { ...p, growthPct };
+      });
       return {
         period,
-        data: series.map((p: any) => ({
-          period: p.period,
-          label: p.label,
-          ordersCount: this.num(p.ordersCount),
-          revenue: this.num(p.revenue),
-        })),
+        data: withGrowth,
         summary: {
           totalRevenue: this.num(d.summary?.totalRevenue),
           totalOrders: this.num(d.summary?.totalOrders),
@@ -224,5 +240,106 @@ export class InvestorService {
       };
     });
     return successRes(data, 200, 'Investor cash position (current)');
+  }
+
+  // ---- Sof foyda / OpEx uchun ichki hisob (financial_balance_history'dan) ----
+  // negativeImpact allaqachon MUSBAT magnitude (SUM(-1*amount)). Shuning uchun:
+  //   netProfit = sellProfit − (salary + bills + manualExpense)
+  // MANUAL_INCOME va CORRECTION ATAYLAB kiritilmaydi (kelishilgan formula).
+  private async computeProfitBreakdown(startDate?: string, endDate?: string) {
+    const res: any = await this.cashBoxService.financialBalanceAnalytics({
+      fromDate: startDate,
+      toDate: endDate,
+    });
+    const d = res?.data ?? {};
+    const pos = Array.isArray(d.positiveImpact) ? d.positiveImpact : [];
+    const neg = Array.isArray(d.negativeImpact) ? d.negativeImpact : [];
+    const findPos = (t: string) =>
+      this.num(pos.find((s: any) => s.source_type === t)?.total_amount);
+    const findNeg = (t: string) =>
+      this.num(neg.find((s: any) => s.source_type === t)?.total_amount);
+
+    const sellProfit = findPos(FinancialSource_type.SELL_PROFIT);
+    const salary = findNeg(FinancialSource_type.SALARY);
+    const bills = findNeg(FinancialSource_type.BILLS);
+    const manualExpense = findNeg(FinancialSource_type.MANUAL_EXPENSE);
+    const totalOpEx = salary + bills + manualExpense;
+    const netProfit = sellProfit - totalOpEx;
+    return { sellProfit, salary, bills, manualExpense, totalOpEx, netProfit };
+  }
+
+  // ---- Sof foyda P&L (gross foyda − OpEx). OpEx bitta jami — shaxssiz. ----
+  async getNetProfit(startDate?: string, endDate?: string) {
+    const key = `net-profit:${startDate ?? ''}:${endDate ?? ''}`;
+    const data = await this.cached(key, async () => {
+      const b = await this.computeProfitBreakdown(startDate, endDate);
+      // DIQQAT (decision #4): xarajat bitta jami raqam sifatida beriladi —
+      // salary/bills alohida ko'rsatilmaydi (shaxsiy oyliklar oshkor bo'lmasin).
+      return {
+        grossProfit: b.sellProfit,
+        totalOpEx: b.totalOpEx,
+        netProfit: b.netProfit,
+        from: startDate ?? null,
+        to: endDate ?? null,
+      };
+    });
+    return successRes(data, 200, 'Investor net profit');
+  }
+
+  // ---- Umumiy OpEx — BITTA yig'ma raqam (hech qachon shaxs bo'yicha) ----
+  async getOpEx(startDate?: string, endDate?: string) {
+    const key = `opex:${startDate ?? ''}:${endDate ?? ''}`;
+    const data = await this.cached(key, async () => {
+      const b = await this.computeProfitBreakdown(startDate, endDate);
+      return { totalOpEx: b.totalOpEx, from: startDate ?? null, to: endDate ?? null };
+    });
+    return successRes(data, 200, 'Investor total OpEx');
+  }
+
+  // sold/paid/partly_paid buyurtmalarning jami savdo hajmi (GMV).
+  private async getGrossSold(start: string, end: string): Promise<number> {
+    const raw = await this.orderRepo
+      .createQueryBuilder('o')
+      .select('COALESCE(SUM(o.total_price), 0)', 'gross')
+      .where('o.status IN (:...statuses)', {
+        statuses: [
+          Order_status.SOLD,
+          Order_status.PAID,
+          Order_status.PARTLY_PAID,
+        ],
+      })
+      .andWhere('o.sold_at IS NOT NULL')
+      .andWhere('o.sold_at BETWEEN :start AND :end', {
+        start: Number(start),
+        end: Number(end),
+      })
+      .getRawOne();
+    return this.num(raw?.gross);
+  }
+
+  // ---- Unit-economics: buyurtmaga foyda + take-rate ----
+  async getUnitEconomics(startDate?: string, endDate?: string) {
+    const { start, end } = this.resolveRange(startDate, endDate);
+    const data = await this.cached(`unit-econ:${start}:${end}`, async () => {
+      const statsRes: any = await this.orderService.getStats(start, end);
+      const s = statsRes?.data ?? {};
+      const totalProfit = this.num(s.profit);
+      const soldOrders = this.num(s.soldAndPaid);
+      const grossSold = await this.getGrossSold(start, end);
+      return {
+        totalProfit,
+        soldOrders,
+        grossSold,
+        revenuePerOrder:
+          soldOrders > 0 ? Math.round(totalProfit / soldOrders) : null,
+        takeRatePct:
+          grossSold > 0
+            ? Math.round((totalProfit / grossSold) * 10000) / 100
+            : null,
+        from: this.num(s.from),
+        to: this.num(s.to),
+      };
+    });
+    return successRes(data, 200, 'Investor unit economics');
   }
 }

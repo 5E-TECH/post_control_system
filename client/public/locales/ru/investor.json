@@ -40,5 +40,13 @@
   "profit": "Прибыль",
   "rate": "Уровень",
   "noData": "Нет данных",
-  "successful": "Успешные"
+  "successful": "Успешные",
+  "pnlTitle": "Чистая прибыль (P&L)",
+  "grossProfit": "Валовая прибыль",
+  "totalOpex": "Общие OpEx",
+  "netProfitLabel": "Чистая прибыль",
+  "unitEconomics": "Юнит-экономика",
+  "revenuePerOrder": "Прибыль на заказ",
+  "takeRate": "Take-rate",
+  "grossSold": "Объём продаж (GMV)"
 }

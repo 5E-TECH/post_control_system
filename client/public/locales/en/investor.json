@@ -40,5 +40,13 @@
   "profit": "Profit",
   "rate": "Rate",
   "noData": "No data",
-  "successful": "Successful"
+  "successful": "Successful",
+  "pnlTitle": "Net profit (P&L)",
+  "grossProfit": "Gross profit",
+  "totalOpex": "Total OpEx",
+  "netProfitLabel": "Net profit",
+  "unitEconomics": "Unit economics",
+  "revenuePerOrder": "Profit per order",
+  "takeRate": "Take rate",
+  "grossSold": "Gross sold (GMV)"
 }

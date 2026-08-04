@@ -1,6 +1,18 @@
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Banknote, CreditCard, Wallet, Landmark, Truck, Store } from "lucide-react";
+import {
+  Banknote,
+  CreditCard,
+  Wallet,
+  Landmark,
+  Truck,
+  Store,
+  Target,
+  TrendingDown,
+  Gauge,
+  Percent,
+  Boxes,
+} from "lucide-react";
 import { useInvestor } from "../../../shared/api/hooks/useInvestor";
 import StatCard from "../components/StatCard";
 import InvestorRevenueChart from "../components/InvestorRevenueChart";
@@ -16,16 +28,21 @@ const InvestorFinancials = () => {
   const [to, setTo] = useState<string | undefined>();
   const [period, setPeriod] = useState<Period>("daily");
 
-  const { getRevenue, getCashPosition } = useInvestor();
+  const { getRevenue, getCashPosition, getNetProfit, getUnitEconomics } =
+    useInvestor();
+  const range = { startDate: from, endDate: to };
   const { data: revRes, isLoading: revLoading } = getRevenue({
-    startDate: from,
-    endDate: to,
+    ...range,
     period,
   });
   const { data: cashRes } = getCashPosition();
+  const { data: npRes } = getNetProfit(range);
+  const { data: ueRes } = getUnitEconomics(range);
 
   const rev = revRes?.data ?? {};
   const cash = cashRes?.data ?? {};
+  const np = npRes?.data ?? {};
+  const ue = ueRes?.data ?? {};
   const series = Array.isArray(rev.data) ? rev.data : [];
   const summary = rev.summary ?? {};
 
@@ -70,6 +87,60 @@ const InvestorFinancials = () => {
           value={formatMoney(summary.avgRevenue)}
           gradient="from-indigo-500 to-violet-600"
         />
+      </div>
+
+      {/* Sof foyda (P&L) */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-3">
+          {t("pnlTitle", "Sof foyda (P&L)")}
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <StatCard
+            icon={<Target className="w-5 h-5" />}
+            label={t("grossProfit", "Gross foyda")}
+            value={formatMoney(np.grossProfit)}
+            gradient="from-emerald-500 to-green-600"
+          />
+          <StatCard
+            icon={<TrendingDown className="w-5 h-5" />}
+            label={t("totalOpex", "Umumiy OpEx")}
+            value={formatMoney(np.totalOpEx)}
+            gradient="from-rose-500 to-pink-600"
+          />
+          <StatCard
+            icon={<Wallet className="w-5 h-5" />}
+            label={t("netProfitLabel", "Sof foyda")}
+            value={formatMoney(np.netProfit)}
+            gradient="from-indigo-500 to-violet-600"
+          />
+        </div>
+      </div>
+
+      {/* Unit-economics */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-800 dark:text-white mb-3">
+          {t("unitEconomics", "Unit-economics")}
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <StatCard
+            icon={<Gauge className="w-5 h-5" />}
+            label={t("revenuePerOrder", "Buyurtmaga foyda")}
+            value={ue.revenuePerOrder != null ? formatMoney(ue.revenuePerOrder) : "—"}
+            gradient="from-blue-500 to-cyan-500"
+          />
+          <StatCard
+            icon={<Percent className="w-5 h-5" />}
+            label={t("takeRate", "Take-rate")}
+            value={ue.takeRatePct != null ? `${ue.takeRatePct}%` : "—"}
+            gradient="from-amber-500 to-orange-600"
+          />
+          <StatCard
+            icon={<Boxes className="w-5 h-5" />}
+            label={t("grossSold", "Savdo hajmi (GMV)")}
+            value={formatMoney(ue.grossSold)}
+            gradient="from-teal-500 to-cyan-600"
+          />
+        </div>
       </div>
 
       {/* Period tanlash */}
