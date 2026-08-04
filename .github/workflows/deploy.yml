@@ -6,7 +6,49 @@ on:
       - main
 
 jobs:
+  # 🛡️ Faza 0 — xavfsizlik gate'i. Deploy'dan OLDIN ishlaydi.
+  #   • audit:roles + guard testi — BLOKLOVCHI (yashil): RolesGuard fail-closed
+  #     invariantini muhofaza qiladi (himoyalangan endpoint @AcceptRoles'siz qolmasin).
+  #   • To'liq `npm test` — hozircha INFORMATSION (continue-on-error): 3 ta suite
+  #     oldindan qizil (order-bot / courier-scanner / post.service). O'shalar
+  #     tuzatilgach `continue-on-error`ni olib tashlab, to'liq testni bloklovchi qiling.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache server node_modules
+        uses: actions/cache@v4
+        with:
+          path: server/node_modules
+          key: server-${{ hashFiles('server/package-lock.json') }}
+          restore-keys: server-
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci --prefer-offline --legacy-peer-deps
+
+      - name: 🛡️ RBAC fail-closed audit (BLOKLOVCHI)
+        working-directory: server
+        run: npm run audit:roles
+
+      - name: 🛡️ Guard / xavfsizlik unit-testlari (BLOKLOVCHI)
+        working-directory: server
+        run: npx jest src/common/guards --ci
+
+      - name: 🧪 To'liq test to'plami (informatsion — oldindan mavjud xatolar)
+        working-directory: server
+        continue-on-error: true
+        run: npm test
+
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     environment: Production
 

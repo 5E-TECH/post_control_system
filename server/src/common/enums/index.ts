@@ -7,6 +7,9 @@ export enum Roles {
   CUSTOMER = 'customer',
   OPERATOR = 'operator',
   LOGIST = 'logist',
+  // Faqat o'qish uchun ulushdor (equity investor) roli. Hozircha hech qanday
+  // endpointga ulanmagan — INVESTOR surface Faza 1'da qo'shiladi.
+  INVESTOR = 'investor',
 }
 
 export enum Status {
