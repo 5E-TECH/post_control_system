@@ -141,6 +141,10 @@ const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
 const OperatorOrders = lazy(() => import("../pages/operator-orders"));
 const CourierBulk = lazy(() => import("../pages/courier-bulk"));
 const MyRegion = lazy(() => import("../pages/my-region"));
+const Investor = lazy(() => import("../pages/investor"));
+const InvestorOverview = lazy(() => import("../pages/investor/overview"));
+const InvestorFinancials = lazy(() => import("../pages/investor/financials"));
+const InvestorOperations = lazy(() => import("../pages/investor/operations"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -445,6 +449,20 @@ const AppRouters = () => {
             {
               path: "my-orders",
               element: <OperatorOrders />,
+            },
+            {
+              path: "investor",
+              element: (
+                <RequireRole roles={["investor", "superadmin"]}>
+                  <Investor />
+                </RequireRole>
+              ),
+              children: [
+                { index: true, element: <Navigate to="overview" replace /> },
+                { path: "overview", element: <InvestorOverview /> },
+                { path: "financials", element: <InvestorFinancials /> },
+                { path: "operations", element: <InvestorOperations /> },
+              ],
             },
           ],
         },
