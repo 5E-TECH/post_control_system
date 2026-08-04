@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { LayoutDashboard, Banknote, Activity, UserRound } from "lucide-react";
+import { LayoutDashboard, Banknote, Activity, UserRound, PieChart } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
@@ -23,6 +23,11 @@ const InvestorSidebar = () => {
       to: "/investor/operations",
       icon: <Activity />,
       label: t("navOperations", "Operatsiyalar"),
+    },
+    {
+      to: "/investor/my-investment",
+      icon: <PieChart />,
+      label: t("navMyInvestment", "Mening investitsiyam"),
     },
     { to: "/profile", icon: <UserRound />, label: t("navProfile", "Profil") },
   ];

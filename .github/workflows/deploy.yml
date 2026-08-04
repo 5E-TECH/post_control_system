@@ -177,6 +177,13 @@ jobs:
                 exit 1
               fi
 
+              # ----- 🩺 Investor ledger invariant (strict, migration keyin) -----
+              echo '🩺 Post-migration investor ledger invariant...'
+              if ! npm run db:check-investor-ledger; then
+                echo '❌ INVESTOR LEDGER INVARIANT FAILED! App restart QILINMAYDI.'
+                exit 1
+              fi
+
               cd ..
             fi
 

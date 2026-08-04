@@ -78,6 +78,22 @@ export const useInvestor = () => {
         api.get("investor/unit-economics", { params }).then((res) => res.data),
     });
 
+  const getMyInvestment = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "my-investment", params],
+      queryFn: () =>
+        api.get("investor/my-investment", { params }).then((res) => res.data),
+    });
+
+  const getMyLedger = (params: { page?: number; limit?: number } = {}) =>
+    useQuery({
+      queryKey: [investorKey, "my-ledger", params],
+      queryFn: () =>
+        api
+          .get("investor/my-investment/ledger", { params })
+          .then((res) => res.data),
+    });
+
   return {
     getOverview,
     getRevenue,
@@ -88,5 +104,7 @@ export const useInvestor = () => {
     getNetProfit,
     getOpEx,
     getUnitEconomics,
+    getMyInvestment,
+    getMyLedger,
   };
 };

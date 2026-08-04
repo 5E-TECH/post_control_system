@@ -1,10 +1,13 @@
 import { Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { InvestorService } from './investor.service';
+import { InvestorLedgerService } from './investor-ledger.service';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { LogInvestorAccess } from 'src/common/decorator/log-investor-access.decorator';
 import { LogInvestorAccessInterceptor } from 'src/common/interceptors/log-investor-access.interceptor';
 
@@ -21,7 +24,10 @@ import { LogInvestorAccessInterceptor } from 'src/common/interceptors/log-invest
 @UseInterceptors(LogInvestorAccessInterceptor)
 @Controller('investor')
 export class InvestorController {
-  constructor(private readonly investorService: InvestorService) {}
+  constructor(
+    private readonly investorService: InvestorService,
+    private readonly ledgerService: InvestorLedgerService,
+  ) {}
 
   @Get('overview')
   @LogInvestorAccess('overview')
@@ -121,5 +127,36 @@ export class InvestorController {
     @Query('endDate') endDate?: string,
   ) {
     return this.investorService.getUnitEconomics(startDate, endDate);
+  }
+
+  // ---- Shaxsiy equity (o'ziga scoped — req.user.id) ----
+  @Get('my-investment')
+  @LogInvestorAccess('my-investment')
+  @ApiOperation({ summary: 'Shaxsiy investitsiya (kapital, ulush %, accrued share, ROI)' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'YYYY-MM-DD' })
+  getMyInvestment(
+    @CurrentUser() user: JwtPayload,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.ledgerService.getSummary(user.id, startDate, endDate);
+  }
+
+  @Get('my-investment/ledger')
+  @LogInvestorAccess('my-investment-ledger')
+  @ApiOperation({ summary: 'Shaxsiy ledger tarixi (kapital/taqsimot/ulush)' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  getMyLedger(
+    @CurrentUser() user: JwtPayload,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.ledgerService.listEntries(
+      user.id,
+      Number(page) || 1,
+      Number(limit) || 20,
+    );
   }
 }

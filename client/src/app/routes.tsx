@@ -145,6 +145,8 @@ const Investor = lazy(() => import("../pages/investor"));
 const InvestorOverview = lazy(() => import("../pages/investor/overview"));
 const InvestorFinancials = lazy(() => import("../pages/investor/financials"));
 const InvestorOperations = lazy(() => import("../pages/investor/operations"));
+const InvestorMyInvestment = lazy(() => import("../pages/investor/my-investment"));
+const InvestorAdmin = lazy(() => import("../pages/investor-admin"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -462,7 +464,16 @@ const AppRouters = () => {
                 { path: "overview", element: <InvestorOverview /> },
                 { path: "financials", element: <InvestorFinancials /> },
                 { path: "operations", element: <InvestorOperations /> },
+                { path: "my-investment", element: <InvestorMyInvestment /> },
               ],
+            },
+            {
+              path: "investor-admin",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <InvestorAdmin />
+                </RequireRole>
+              ),
             },
           ],
         },

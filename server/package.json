@@ -28,7 +28,8 @@
     "migration:show": "npm run typeorm -- migration:show",
     "db:backup": "bash scripts/db-backup.sh",
     "db:check-cashbox": "ts-node -r tsconfig-paths/register scripts/check-cashbox-invariant.ts",
-    "db:check-cards": "ts-node -r tsconfig-paths/register scripts/check-card-invariant.ts"
+    "db:check-cards": "ts-node -r tsconfig-paths/register scripts/check-card-invariant.ts",
+    "db:check-investor-ledger": "ts-node -r tsconfig-paths/register scripts/check-investor-ledger-invariant.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
