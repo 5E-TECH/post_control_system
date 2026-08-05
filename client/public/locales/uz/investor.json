@@ -96,5 +96,7 @@
   "recordWithdrawal": "Kapital qaytarish",
   "withdrawalRecorded": "Kapital qaytarildi",
   "withdrawalHint": "Tikkan asosiy puldan qaytarish (dividend emas)",
-  "typeCapitalWithdrawal": "Kapital qaytarish"
+  "typeCapitalWithdrawal": "Kapital qaytarish",
+  "equityTitle": "Investor equity boshqaruvi",
+  "capitalWithdrawn": "Qaytarilgan kapital"
 }

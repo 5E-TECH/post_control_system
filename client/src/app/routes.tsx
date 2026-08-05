@@ -56,6 +56,9 @@ const CreateRegistrator = lazy(
 const CreateLogist = lazy(
   () => import("../pages/users/pages/create-logist")
 );
+const CreateInvestor = lazy(
+  () => import("../pages/users/pages/create-investor")
+);
 const CreateOrder = lazy(
   () => import("../pages/orders/pages/superadmin/create-order")
 );
@@ -146,7 +149,6 @@ const InvestorOverview = lazy(() => import("../pages/investor/overview"));
 const InvestorFinancials = lazy(() => import("../pages/investor/financials"));
 const InvestorOperations = lazy(() => import("../pages/investor/operations"));
 const InvestorMyInvestment = lazy(() => import("../pages/investor/my-investment"));
-const InvestorAdmin = lazy(() => import("../pages/investor-admin"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -266,6 +268,14 @@ const AppRouters = () => {
                     { path: "courier", element: <CreateCourier /> },
                     { path: "market", element: <CreateMarket /> },
                     { path: "logist", element: <CreateLogist /> },
+                    {
+                      path: "investor",
+                      element: (
+                        <RequireRole roles={["superadmin"]}>
+                          <CreateInvestor />
+                        </RequireRole>
+                      ),
+                    },
                   ],
                 },
               ],
@@ -468,12 +478,9 @@ const AppRouters = () => {
               ],
             },
             {
+              // Eski standalone sahifa — endi boshqaruv foydalanuvchi detalida.
               path: "investor-admin",
-              element: (
-                <RequireRole roles={["superadmin", "admin"]}>
-                  <InvestorAdmin />
-                </RequireRole>
-              ),
+              element: <Navigate to="/all-users" replace />,
             },
           ],
         },

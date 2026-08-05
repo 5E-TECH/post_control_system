@@ -12,7 +12,6 @@ import {
   Settings,
   Repeat,
   Megaphone,
-  PieChart,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -42,7 +41,6 @@ const AdminSidebar = () => {
     { to: "/m-balance", icon: <Scale />, label: t("balance") },
     { to: "/regions", icon: <MapPinned />, label: t("region") },
     { to: "/send-message", icon: <Megaphone />, label: "Bildirishnomalar" },
-    { to: "/investor-admin", icon: <PieChart />, label: "Investorlar" },
     { to: "/settings", icon: <Settings />, label: t("settings") },
   ];
   const sidebarRedux = useSelector((state: RootState) => state.sidebar);

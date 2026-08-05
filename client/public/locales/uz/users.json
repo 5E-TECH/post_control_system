@@ -41,5 +41,16 @@
   "marketDescription": "Market ma'lumotlarini kiriting",
   "clear": "Tozalash",
   "active":"faol",
-  "inactive":"faol emas"
+  "inactive":"faol emas",
+  "investor": "Investor",
+  "investorTitle": "Investor yaratish",
+  "investorDescription": "Investor va uning boshlang'ich investitsiyasini kiriting",
+  "investorCreated": "Investor muvaffaqiyatli yaratildi",
+  "createError": "Yaratishda xatolik yuz berdi",
+  "initialCapital": "Boshlang'ich kapital (so'm)",
+  "ownershipPct": "Ulush (%)",
+  "ownershipRange": "Ulush 0..100 oralig'ida",
+  "startDate": "Boshlanish sanasi",
+  "selectDate": "Sanani tanlang",
+  "startDateHint": "O'tmish sanani kiriting — tizim o'sha kundan foydani avtomatik hisoblaydi"
 }

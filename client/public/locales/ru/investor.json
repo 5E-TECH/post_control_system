@@ -96,5 +96,7 @@
   "recordWithdrawal": "Возврат капитала",
   "withdrawalRecorded": "Капитал возвращён",
   "withdrawalHint": "Возврат основного капитала (не дивиденд)",
-  "typeCapitalWithdrawal": "Возврат капитала"
+  "typeCapitalWithdrawal": "Возврат капитала",
+  "equityTitle": "Управление долей инвестора",
+  "capitalWithdrawn": "Возвращённый капитал"
 }

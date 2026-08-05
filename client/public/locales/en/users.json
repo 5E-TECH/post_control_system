@@ -41,6 +41,16 @@
   "marketDescription": "Enter market details",
   "clear": "clear",
   "active": "active",
-  "inactive": "inactive"
-  
+  "inactive": "inactive",
+  "investor": "Investor",
+  "investorTitle": "Create Investor",
+  "investorDescription": "Enter investor details and initial investment",
+  "investorCreated": "Investor created successfully",
+  "createError": "Error while creating",
+  "initialCapital": "Initial capital (UZS)",
+  "ownershipPct": "Ownership (%)",
+  "ownershipRange": "Ownership must be 0..100",
+  "startDate": "Start date",
+  "selectDate": "Select date",
+  "startDateHint": "Enter a past date — the system auto-computes profit from that day"
 }

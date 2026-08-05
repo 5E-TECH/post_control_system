@@ -96,5 +96,7 @@
   "recordWithdrawal": "Capital withdrawal",
   "withdrawalRecorded": "Capital withdrawn",
   "withdrawalHint": "Return of principal (not a dividend)",
-  "typeCapitalWithdrawal": "Capital withdrawal"
+  "typeCapitalWithdrawal": "Capital withdrawal",
+  "equityTitle": "Investor equity management",
+  "capitalWithdrawn": "Withdrawn capital"
 }

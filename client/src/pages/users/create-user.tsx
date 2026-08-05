@@ -1,6 +1,8 @@
 import { memo } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../app/store";
 import {
   ArrowLeft,
   UserPlus,
@@ -9,6 +11,7 @@ import {
   Truck,
   Store,
   HeadphonesIcon,
+  TrendingUp,
 } from "lucide-react";
 
 const roleIcons: Record<string, React.ElementType> = {
@@ -17,6 +20,7 @@ const roleIcons: Record<string, React.ElementType> = {
   courier: Truck,
   market: Store,
   logist: HeadphonesIcon,
+  investor: TrendingUp,
 };
 
 const roleColors: Record<
@@ -48,11 +52,21 @@ const roleColors: Record<
     bg: "bg-teal-100 dark:bg-teal-900/30",
     icon: "text-teal-600 dark:text-teal-400",
   },
+  investor: {
+    gradient: "from-rose-500 to-pink-600",
+    bg: "bg-rose-100 dark:bg-rose-900/30",
+    icon: "text-rose-600 dark:text-rose-400",
+  },
 };
 
 const CreateUser = () => {
   const { t } = useTranslation("users");
   const navigate = useNavigate();
+  // Investor yaratish — faqat superadmin ko'radi.
+  const role =
+    useSelector((s: RootState) => s.roleSlice.role) ||
+    localStorage.getItem("role") ||
+    "";
 
   const roles = [
     { key: "admin", path: "", label: t("admin") },
@@ -60,6 +74,9 @@ const CreateUser = () => {
     { key: "courier", path: "courier", label: t("courier") },
     { key: "market", path: "market", label: t("market") },
     { key: "logist", path: "logist", label: "Logist" },
+    ...(role === "superadmin"
+      ? [{ key: "investor", path: "investor", label: t("investor", "Investor") }]
+      : []),
   ];
 
   return (
