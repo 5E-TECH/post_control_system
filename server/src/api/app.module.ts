@@ -2,6 +2,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import config from 'src/config';
 import { UsersModule } from './users/users.module';
 import { ProductModule } from './product/product.module';
@@ -29,6 +30,10 @@ import { InvestorModule } from './investor/investor.module';
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    // Rate-limiting infratuzilmasi. GLOBAL guard QO'YILMAGAN (shtatli bulk
+    // amallar buzilmasin) — faqat login endpointida @Throttle+ThrottlerGuard
+    // ishlatiladi (brute-force himoyasi). ttl millisekundda.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: config.DB_URL,

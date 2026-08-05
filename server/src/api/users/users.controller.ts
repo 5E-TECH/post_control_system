@@ -32,6 +32,7 @@ import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { CreateInvestorDto } from './dto/create-investor.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
@@ -274,6 +275,10 @@ export class UsersController {
       },
     },
   })
+  // 🛡️ Brute-force himoyasi: har IP'dan 60 soniyada 10 ta login urinishi.
+  // Faqat shu endpointga (global emas) — boshqa amallar throttle qilinmaydi.
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('signin')
   async signIn(
     @Body() signInuser: SignInUserDto,
@@ -285,6 +290,8 @@ export class UsersController {
 
   @ApiOperation({ summary: 'Login with telegram' })
   @ApiResponse({ status: 200, description: 'Loggen in with telegram' })
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('telegram/signin')
   telegramLogin(@Body() initData: TelegramInitData, @Req() req: Request) {
     return this.userService.loginTelegram(initData, req);
