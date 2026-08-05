@@ -1,12 +1,18 @@
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
 import { Input, InputNumber, Button, Select, message } from "antd";
 import { UserPlus, Banknote, PieChart, HandCoins, MinusCircle } from "lucide-react";
 import { useInvestorAdmin } from "../../shared/api/hooks/useInvestorAdmin";
 import { formatMoney } from "../investor/components/format";
+import type { RootState } from "../../app/store";
 
 const InvestorAdmin = () => {
   const { t } = useTranslation(["investor"]);
+  // Investitsiya belgilash/o'zgartirish/qaytarish — faqat SUPERADMIN.
+  // Foyda taqsimoti — ADMIN ham qila oladi.
+  const role = useSelector((s: RootState) => s.roleSlice.role);
+  const isSuper = role === "superadmin";
   const {
     getInvestors,
     getInvestorSummary,
@@ -137,7 +143,8 @@ const InvestorAdmin = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Yangi investor */}
+        {/* Yangi investor — faqat SuperAdmin */}
+        {isSuper && (
         <div className={card}>
           <div className="flex items-center gap-2 mb-3">
             <UserPlus className="w-5 h-5 text-violet-500" />
@@ -154,6 +161,7 @@ const InvestorAdmin = () => {
             </Button>
           </div>
         </div>
+        )}
 
         {/* Investor tanlash + xulosa */}
         <div className={card}>
@@ -196,6 +204,7 @@ const InvestorAdmin = () => {
 
       {/* Amal formalari */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {isSuper && (
         <div className={card}>
           <div className="flex items-center gap-2 mb-3">
             <Banknote className="w-5 h-5 text-blue-500" />
@@ -212,7 +221,9 @@ const InvestorAdmin = () => {
             {t("save", "Saqlash")}
           </Button>
         </div>
+        )}
 
+        {isSuper && (
         <div className={card}>
           <div className="flex items-center gap-2 mb-3">
             <PieChart className="w-5 h-5 text-emerald-500" />
@@ -231,6 +242,7 @@ const InvestorAdmin = () => {
             {t("save", "Saqlash")}
           </Button>
         </div>
+        )}
 
         <div className={card}>
           <div className="flex items-center gap-2 mb-3">
@@ -249,6 +261,7 @@ const InvestorAdmin = () => {
           </Button>
         </div>
 
+        {isSuper && (
         <div className={card}>
           <div className="flex items-center gap-2 mb-3">
             <MinusCircle className="w-5 h-5 text-rose-500" />
@@ -268,6 +281,7 @@ const InvestorAdmin = () => {
             {t("withdrawalHint", "Tikkan asosiy puldan qaytarish (dividend emas)")}
           </p>
         </div>
+        )}
       </div>
     </div>
   );

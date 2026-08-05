@@ -23,8 +23,17 @@ import {
 } from './dto/ledger.dto';
 
 /**
- * Admin equity boshqaruvi — investorlarning kapital/ulush/taqsimotini kiritish.
- * FAQAT SUPERADMIN/ADMIN. Har yozuv activity-log'ga tushadi (servis ichida).
+ * Admin equity boshqaruvi.
+ *
+ * RBAC (ega qaroriga ko'ra):
+ *   • O'qish (list/summary/ledger) — SUPERADMIN + ADMIN
+ *   • FOYDA taqsimoti (dividend) — SUPERADMIN + ADMIN
+ *   • Kapital belgilash/o'zgartirish/qaytarish, ULUSH o'rnatish (kamaytirish/
+ *     ko'paytirish/yopish) — FAQAT SUPERADMIN
+ *
+ * Class-level default = SUPERADMIN+ADMIN; superadmin-only endpointlar
+ * method-level @AcceptRoles(SUPERADMIN) bilan override qilinadi.
+ * Har yozuv activity-log'ga tushadi (servis ichida).
  */
 @ApiTags('Investor Admin')
 @ApiBearerAuth()
@@ -64,8 +73,10 @@ export class InvestorAdminController {
     );
   }
 
+  // FAQAT SUPERADMIN — kapital belgilash.
   @Post(':id/capital')
-  @ApiOperation({ summary: 'Kapital hissasini yozish' })
+  @AcceptRoles(Roles.SUPERADMIN)
+  @ApiOperation({ summary: 'Kapital hissasini yozish (faqat SuperAdmin)' })
   capital(
     @Param('id') id: string,
     @Body() dto: RecordCapitalDto,
@@ -74,8 +85,10 @@ export class InvestorAdminController {
     return this.ledgerService.recordCapital(id, dto, user);
   }
 
+  // FAQAT SUPERADMIN — ulush o'rnatish (kamaytirish/ko'paytirish/yopish).
   @Post(':id/ownership')
-  @ApiOperation({ summary: 'Egalik ulushini o\'rnatish / o\'zgartirish' })
+  @AcceptRoles(Roles.SUPERADMIN)
+  @ApiOperation({ summary: 'Egalik ulushini o\'rnatish/o\'zgartirish (faqat SuperAdmin)' })
   ownership(
     @Param('id') id: string,
     @Body() dto: SetOwnershipDto,
@@ -84,7 +97,9 @@ export class InvestorAdminController {
     return this.ledgerService.setOwnership(id, dto, user);
   }
 
+  // SUPERADMIN + ADMIN — foyda taqsimoti (dividend).
   @Post(':id/distribution')
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @ApiOperation({ summary: 'To\'langan taqsimotni yozish (foyda dividendi)' })
   distribution(
     @Param('id') id: string,
@@ -94,8 +109,10 @@ export class InvestorAdminController {
     return this.ledgerService.recordDistribution(id, dto, user);
   }
 
+  // FAQAT SUPERADMIN — tikkan kapitaldan qaytarib berish.
   @Post(':id/capital-withdrawal')
-  @ApiOperation({ summary: 'Tikkan kapitaldan qaytarib berish (dividend EMAS)' })
+  @AcceptRoles(Roles.SUPERADMIN)
+  @ApiOperation({ summary: 'Tikkan kapitaldan qaytarib berish (faqat SuperAdmin)' })
   capitalWithdrawal(
     @Param('id') id: string,
     @Body() dto: RecordWithdrawalDto,
