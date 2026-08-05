@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
 import { InvestorCapitalContributionEntity } from 'src/core/entity/investor-capital-contribution.entity';
+import { InvestorCapitalWithdrawalEntity } from 'src/core/entity/investor-capital-withdrawal.entity';
 import { InvestorOwnershipStakeEntity } from 'src/core/entity/investor-ownership-stake.entity';
 import { InvestorDistributionEntity } from 'src/core/entity/investor-distribution.entity';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
@@ -19,6 +20,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import {
   RecordCapitalDto,
   RecordDistributionDto,
+  RecordWithdrawalDto,
   SetOwnershipDto,
 } from './dto/ledger.dto';
 
@@ -37,6 +39,8 @@ export class InvestorLedgerService {
   constructor(
     @InjectRepository(InvestorCapitalContributionEntity)
     private readonly capitalRepo: Repository<InvestorCapitalContributionEntity>,
+    @InjectRepository(InvestorCapitalWithdrawalEntity)
+    private readonly withdrawalRepo: Repository<InvestorCapitalWithdrawalEntity>,
     @InjectRepository(InvestorOwnershipStakeEntity)
     private readonly stakeRepo: Repository<InvestorOwnershipStakeEntity>,
     @InjectRepository(InvestorDistributionEntity)
@@ -119,18 +123,26 @@ export class InvestorLedgerService {
 
   // Investorning shaxsiy xulosasi (o'ziga scoped).
   async getSummary(investorId: string, startDate?: string, endDate?: string) {
-    const [contributions, distributions, openStake] = await Promise.all([
-      this.capitalRepo.find({ where: { investor_id: investorId } }),
-      this.distRepo.find({ where: { investor_id: investorId } }),
-      this.stakeRepo.findOne({
-        where: { investor_id: investorId, effective_to: IsNull() },
-      }),
-    ]);
+    const [contributions, withdrawals, distributions, openStake] =
+      await Promise.all([
+        this.capitalRepo.find({ where: { investor_id: investorId } }),
+        this.withdrawalRepo.find({ where: { investor_id: investorId } }),
+        this.distRepo.find({ where: { investor_id: investorId } }),
+        this.stakeRepo.findOne({
+          where: { investor_id: investorId, effective_to: IsNull() },
+        }),
+      ]);
 
-    const capitalInvested = contributions.reduce(
+    const capitalContributed = contributions.reduce(
       (a, c) => a + this.num(c.amount),
       0,
     );
+    const capitalWithdrawn = withdrawals.reduce(
+      (a, w) => a + this.num(w.amount),
+      0,
+    );
+    // Sof (joriy) kapital = kiritilgan − qaytarilgan.
+    const capitalInvested = capitalContributed - capitalWithdrawn;
     const distributionsPaid = distributions.reduce(
       (a, d) => a + this.num(d.amount),
       0,
@@ -158,7 +170,9 @@ export class InvestorLedgerService {
 
     return successRes(
       {
-        capitalInvested,
+        capitalContributed, // jami kiritilgan (gross)
+        capitalWithdrawn, // jami qaytarilgan
+        capitalInvested, // sof joriy kapital (contributed − withdrawn)
         ownershipBps,
         ownershipPct: ownershipBps / 100,
         accruedProfitShare,
@@ -177,8 +191,9 @@ export class InvestorLedgerService {
 
   // Birlashtirilgan ledger tarixi (kapital + taqsimot + ulush o'zgarishlari).
   async listEntries(investorId: string, page = 1, limit = 20) {
-    const [caps, dists, stakes] = await Promise.all([
+    const [caps, withs, dists, stakes] = await Promise.all([
       this.capitalRepo.find({ where: { investor_id: investorId } }),
+      this.withdrawalRepo.find({ where: { investor_id: investorId } }),
       this.distRepo.find({ where: { investor_id: investorId } }),
       this.stakeRepo.find({ where: { investor_id: investorId } }),
     ]);
@@ -190,6 +205,14 @@ export class InvestorLedgerService {
         note: c.note,
         occurred_at: this.num(c.contributed_at),
         created_at: this.num(c.created_at),
+      })),
+      ...withs.map((w) => ({
+        type: 'capital_withdrawal',
+        amount: this.num(w.amount),
+        ownershipBps: null as number | null,
+        note: w.note,
+        occurred_at: this.num(w.withdrawn_at),
+        created_at: this.num(w.created_at),
       })),
       ...dists.map((d) => ({
         type: 'distribution',
@@ -233,7 +256,9 @@ export class InvestorLedgerService {
 
     const s1 = wb.addWorksheet('Summary');
     s1.addRow(['Korsatkich', 'Qiymat']);
-    s1.addRow(['Kiritilgan kapital', d.capitalInvested]);
+    s1.addRow(['Jami kiritilgan kapital', d.capitalContributed]);
+    s1.addRow(['Jami qaytarilgan kapital', d.capitalWithdrawn]);
+    s1.addRow(['Sof (joriy) kapital', d.capitalInvested]);
     s1.addRow(['Egalik ulushi %', d.ownershipPct]);
     s1.addRow(['Hisoblangan ulush (foyda)', d.accruedProfitShare]);
     s1.addRow(['Tolangan taqsimotlar', d.distributionsPaid]);
@@ -284,6 +309,44 @@ export class InvestorLedgerService {
       user: actor,
     });
     return successRes(row, 201, 'Capital contribution recorded');
+  }
+
+  async recordWithdrawal(
+    investorId: string,
+    dto: RecordWithdrawalDto,
+    actor?: JwtPayload,
+  ) {
+    await this.assertInvestor(investorId);
+    // Qaytarish joriy sof kapitaldan oshib ketmasligi kerak.
+    const [contribs, withs] = await Promise.all([
+      this.capitalRepo.find({ where: { investor_id: investorId } }),
+      this.withdrawalRepo.find({ where: { investor_id: investorId } }),
+    ]);
+    const net =
+      contribs.reduce((a, c) => a + this.num(c.amount), 0) -
+      withs.reduce((a, w) => a + this.num(w.amount), 0);
+    if (dto.amount > net) {
+      throw new BadRequestException(
+        `Qaytarish (${dto.amount}) joriy kapitaldan (${net}) oshib ketmasligi kerak`,
+      );
+    }
+    const row = this.withdrawalRepo.create({
+      investor_id: investorId,
+      amount: dto.amount,
+      withdrawn_at: dto.withdrawn_at ?? Date.now(),
+      note: dto.note ?? null,
+      created_by: actor?.id ?? null,
+    });
+    await this.withdrawalRepo.save(row);
+    this.activityLog.log({
+      entity_type: 'investor_capital_withdrawal',
+      entity_id: investorId,
+      action: 'created',
+      new_value: { amount: dto.amount },
+      description: `Investor kapital qaytarish: ${dto.amount}`,
+      user: actor,
+    });
+    return successRes(row, 201, 'Capital withdrawal recorded');
   }
 
   async setOwnership(

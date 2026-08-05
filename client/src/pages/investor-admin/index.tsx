@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input, InputNumber, Button, Select, message } from "antd";
-import { UserPlus, Banknote, PieChart, HandCoins } from "lucide-react";
+import { UserPlus, Banknote, PieChart, HandCoins, MinusCircle } from "lucide-react";
 import { useInvestorAdmin } from "../../shared/api/hooks/useInvestorAdmin";
 import { formatMoney } from "../investor/components/format";
 
@@ -14,6 +14,7 @@ const InvestorAdmin = () => {
     recordCapital,
     setOwnership,
     recordDistribution,
+    recordWithdrawal,
   } = useInvestorAdmin();
 
   const { data: listRes, isLoading } = getInvestors();
@@ -32,6 +33,7 @@ const InvestorAdmin = () => {
   const [capital, setCapital] = useState<number | null>(null);
   const [ownershipPct, setOwnershipPct] = useState<number | null>(null);
   const [distribution, setDistribution] = useState<number | null>(null);
+  const [withdrawal, setWithdrawal] = useState<number | null>(null);
 
   const handleCreate = () => {
     if (!name || !phone || !password)
@@ -99,6 +101,21 @@ const InvestorAdmin = () => {
         onSuccess: () => {
           message.success(t("distributionRecorded", "Taqsimot yozildi"));
           setDistribution(null);
+        },
+        onError: (e: any) =>
+          message.error(e?.response?.data?.message || t("error", "Xatolik")),
+      },
+    );
+  };
+
+  const handleWithdrawal = () => {
+    if (!guardSel() || !withdrawal) return;
+    recordWithdrawal.mutate(
+      { id: selectedId!, body: { amount: withdrawal } },
+      {
+        onSuccess: () => {
+          message.success(t("withdrawalRecorded", "Kapital qaytarildi"));
+          setWithdrawal(null);
         },
         onError: (e: any) =>
           message.error(e?.response?.data?.message || t("error", "Xatolik")),
@@ -178,7 +195,7 @@ const InvestorAdmin = () => {
       </div>
 
       {/* Amal formalari */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className={card}>
           <div className="flex items-center gap-2 mb-3">
             <Banknote className="w-5 h-5 text-blue-500" />
@@ -230,6 +247,26 @@ const InvestorAdmin = () => {
           <Button className="mt-2 w-full" loading={recordDistribution.isPending} onClick={handleDistribution}>
             {t("save", "Saqlash")}
           </Button>
+        </div>
+
+        <div className={card}>
+          <div className="flex items-center gap-2 mb-3">
+            <MinusCircle className="w-5 h-5 text-rose-500" />
+            <h3 className="font-semibold text-gray-800 dark:text-white">{t("recordWithdrawal", "Kapital qaytarish")}</h3>
+          </div>
+          <InputNumber
+            className="w-full"
+            placeholder={t("amountUzs", "Miqdor (so'm)")}
+            min={1}
+            value={withdrawal}
+            onChange={(v) => setWithdrawal(v as number)}
+          />
+          <Button className="mt-2 w-full" loading={recordWithdrawal.isPending} onClick={handleWithdrawal}>
+            {t("save", "Saqlash")}
+          </Button>
+          <p className="mt-2 text-xs text-gray-400">
+            {t("withdrawalHint", "Tikkan asosiy puldan qaytarish (dividend emas)")}
+          </p>
         </div>
       </div>
     </div>

@@ -34,6 +34,7 @@ const InvestorMyInvestment = () => {
 
   const typeLabel: Record<string, string> = {
     capital: t("typeCapital", "Kapital"),
+    capital_withdrawal: t("typeCapitalWithdrawal", "Kapital qaytarish"),
     distribution: t("typeDistribution", "Taqsimot"),
     stake: t("typeStake", "Ulush o'zgarishi"),
   };

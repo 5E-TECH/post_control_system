@@ -20,6 +20,12 @@ const makeLedger = (over: any = {}) => {
     save: jest.fn(),
     ...over.capitalRepo,
   };
+  const withdrawalRepo: any = {
+    find: jest.fn().mockResolvedValue([]),
+    create: jest.fn((x) => x),
+    save: jest.fn(),
+    ...over.withdrawalRepo,
+  };
   const stakeRepo: any = {
     find: jest.fn().mockResolvedValue([
       { ownership_bps: 1000, effective_from: 100, effective_to: 200, created_at: 100, note: null },
@@ -44,7 +50,7 @@ const makeLedger = (over: any = {}) => {
   const dataSource: any = { transaction: jest.fn(), ...over.dataSource };
   const activityLog: any = { log: jest.fn() };
   return new InvestorLedgerService(
-    capitalRepo, stakeRepo, distRepo, fbhRepo, userRepo, dataSource, activityLog,
+    capitalRepo, withdrawalRepo, stakeRepo, distRepo, fbhRepo, userRepo, dataSource, activityLog,
   );
 };
 
@@ -108,6 +114,44 @@ describe('InvestorLedgerService', () => {
     const res: any = await svc.getSummary('inv');
     expect(res.data.accruedRoiPct).toBeNull();
     expect(res.data.realizedRoiPct).toBeNull();
+  });
+
+  it('kapital qaytarish sof kapitalni kamaytiradi (contributed − withdrawn)', async () => {
+    const svc = makeLedger({
+      capitalRepo: {
+        find: jest.fn().mockResolvedValue([{ amount: 1_000_000, contributed_at: 50, created_at: 50 }]),
+      },
+      withdrawalRepo: {
+        find: jest.fn().mockResolvedValue([{ amount: 300_000, withdrawn_at: 100, created_at: 100 }]),
+      },
+    });
+    jest.spyOn(svc, 'netProfitBetween').mockResolvedValue(0);
+    const res: any = await svc.getSummary('inv');
+    expect(res.data.capitalContributed).toBe(1_000_000);
+    expect(res.data.capitalWithdrawn).toBe(300_000);
+    expect(res.data.capitalInvested).toBe(700_000); // 1M − 300k
+  });
+
+  it('recordWithdrawal joriy kapitaldan oshsa RAD etadi', async () => {
+    const svc = makeLedger({
+      userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
+      capitalRepo: { find: jest.fn().mockResolvedValue([{ amount: 500_000 }]) },
+      withdrawalRepo: { find: jest.fn().mockResolvedValue([]), create: jest.fn((x) => x), save: jest.fn() },
+    });
+    await expect(
+      svc.recordWithdrawal('inv', { amount: 600_000 } as any, { id: 'a' } as any),
+    ).rejects.toThrow();
+  });
+
+  it('recordWithdrawal kapital yetsa yozadi', async () => {
+    const save = jest.fn();
+    const svc = makeLedger({
+      userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
+      capitalRepo: { find: jest.fn().mockResolvedValue([{ amount: 500_000 }]) },
+      withdrawalRepo: { find: jest.fn().mockResolvedValue([]), create: jest.fn((x) => x), save },
+    });
+    await svc.recordWithdrawal('inv', { amount: 200_000 } as any, { id: 'a' } as any);
+    expect(save).toHaveBeenCalled();
   });
 
   it("setOwnership joriy ochiq qatorni yopadi va yangi qo'shadi (tranzaksiya)", async () => {

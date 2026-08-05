@@ -92,5 +92,9 @@
   "distributionRecorded": "Taqsimot yozildi",
   "export": "Excel",
   "exporting": "Yuklanmoqda...",
-  "exportError": "Eksport xatosi"
+  "exportError": "Eksport xatosi",
+  "recordWithdrawal": "Kapital qaytarish",
+  "withdrawalRecorded": "Kapital qaytarildi",
+  "withdrawalHint": "Tikkan asosiy puldan qaytarish (dividend emas)",
+  "typeCapitalWithdrawal": "Kapital qaytarish"
 }

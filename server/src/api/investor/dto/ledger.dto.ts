@@ -31,6 +31,29 @@ export class RecordCapitalDto {
   note?: string;
 }
 
+// Admin: investorga tikkan KAPITALdan qaytarib berish (dividend EMAS).
+export class RecordWithdrawalDto {
+  @ApiProperty({ example: 30_000_000, description: 'UZS qaytarilgan, > 0' })
+  @IsNotEmpty()
+  @IsInt()
+  @Min(1)
+  amount: number;
+
+  @ApiPropertyOptional({
+    example: 1754300000000,
+    description: "Qaytarish sanasi (epoch-ms). Bo'sh bo'lsa — hozir.",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  withdrawn_at?: number;
+
+  @ApiPropertyOptional({ example: 'Kelishuv bo\'yicha qisman qaytarish' })
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
 // Admin: egalik ulushini o'rnatish / o'zgartirish (basis points).
 export class SetOwnershipDto {
   @ApiProperty({ example: 2000, description: 'Basis points (0..10000). 20% = 2000' })

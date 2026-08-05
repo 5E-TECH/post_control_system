@@ -34,6 +34,7 @@ async function main() {
   // 2) Orphan yoki investor-bo'lmagan bog'lanishlar.
   const tables: [string, string][] = [
     ['investor_capital_contribution', 'kapital'],
+    ['investor_capital_withdrawal', 'kapital qaytarish'],
     ['investor_ownership_stake', 'ulush'],
     ['investor_distribution', 'taqsimot'],
   ];
@@ -55,6 +56,9 @@ async function main() {
   const negCap = await dataSource.query(
     `SELECT COUNT(*)::int AS c FROM investor_capital_contribution WHERE amount <= 0`,
   );
+  const negWith = await dataSource.query(
+    `SELECT COUNT(*)::int AS c FROM investor_capital_withdrawal WHERE amount <= 0`,
+  );
   const negDist = await dataSource.query(
     `SELECT COUNT(*)::int AS c FROM investor_distribution WHERE amount <= 0`,
   );
@@ -62,8 +66,22 @@ async function main() {
     `SELECT COUNT(*)::int AS c FROM investor_ownership_stake WHERE ownership_bps < 0 OR ownership_bps > 10000`,
   );
   if (negCap[0].c) problems.push(`${negCap[0].c} ta kapital amount <= 0`);
+  if (negWith[0].c) problems.push(`${negWith[0].c} ta kapital qaytarish amount <= 0`);
   if (negDist[0].c) problems.push(`${negDist[0].c} ta taqsimot amount <= 0`);
   if (badBps[0].c) problems.push(`${badBps[0].c} ta ulush 0..10000 dan tashqarida`);
+
+  // 4) Sof kapital manfiy bo'lmasligi (qaytarish > hissa bo'lgan investor).
+  const negativeCapital = await dataSource.query(`
+    SELECT investor_id FROM (
+      SELECT c.investor_id,
+        COALESCE((SELECT SUM(amount) FROM investor_capital_contribution WHERE investor_id = c.investor_id), 0)
+        - COALESCE((SELECT SUM(amount) FROM investor_capital_withdrawal WHERE investor_id = c.investor_id), 0) AS net
+      FROM (SELECT DISTINCT investor_id FROM investor_capital_contribution) c
+    ) t WHERE t.net < 0
+  `);
+  if (negativeCapital.length) {
+    problems.push(`${negativeCapital.length} ta investorda sof kapital MANFIY (qaytarish > hissa)`);
+  }
 
   await dataSource.destroy();
 

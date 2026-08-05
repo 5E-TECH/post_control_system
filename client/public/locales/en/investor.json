@@ -92,5 +92,9 @@
   "distributionRecorded": "Distribution recorded",
   "export": "Excel",
   "exporting": "Exporting...",
-  "exportError": "Export error"
+  "exportError": "Export error",
+  "recordWithdrawal": "Capital withdrawal",
+  "withdrawalRecorded": "Capital withdrawn",
+  "withdrawalHint": "Return of principal (not a dividend)",
+  "typeCapitalWithdrawal": "Capital withdrawal"
 }

@@ -11,6 +11,7 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { InvestorCapitalContributionEntity } from 'src/core/entity/investor-capital-contribution.entity';
+import { InvestorCapitalWithdrawalEntity } from 'src/core/entity/investor-capital-withdrawal.entity';
 import { InvestorOwnershipStakeEntity } from 'src/core/entity/investor-ownership-stake.entity';
 import { InvestorDistributionEntity } from 'src/core/entity/investor-distribution.entity';
 import { LogInvestorAccessInterceptor } from 'src/common/interceptors/log-investor-access.interceptor';
@@ -33,6 +34,7 @@ import { LogInvestorAccessInterceptor } from 'src/common/interceptors/log-invest
       UserEntity,
       FinancialBalanceHistoryEntity,
       InvestorCapitalContributionEntity,
+      InvestorCapitalWithdrawalEntity,
       InvestorOwnershipStakeEntity,
       InvestorDistributionEntity,
     ]),

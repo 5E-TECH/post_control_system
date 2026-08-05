@@ -18,6 +18,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import {
   RecordCapitalDto,
   RecordDistributionDto,
+  RecordWithdrawalDto,
   SetOwnershipDto,
 } from './dto/ledger.dto';
 
@@ -84,12 +85,22 @@ export class InvestorAdminController {
   }
 
   @Post(':id/distribution')
-  @ApiOperation({ summary: 'To\'langan taqsimotni yozish' })
+  @ApiOperation({ summary: 'To\'langan taqsimotni yozish (foyda dividendi)' })
   distribution(
     @Param('id') id: string,
     @Body() dto: RecordDistributionDto,
     @CurrentUser() user: JwtPayload,
   ) {
     return this.ledgerService.recordDistribution(id, dto, user);
+  }
+
+  @Post(':id/capital-withdrawal')
+  @ApiOperation({ summary: 'Tikkan kapitaldan qaytarib berish (dividend EMAS)' })
+  capitalWithdrawal(
+    @Param('id') id: string,
+    @Body() dto: RecordWithdrawalDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.ledgerService.recordWithdrawal(id, dto, user);
   }
 }

@@ -92,5 +92,9 @@
   "distributionRecorded": "Выплата записана",
   "export": "Excel",
   "exporting": "Загрузка...",
-  "exportError": "Ошибка экспорта"
+  "exportError": "Ошибка экспорта",
+  "recordWithdrawal": "Возврат капитала",
+  "withdrawalRecorded": "Капитал возвращён",
+  "withdrawalHint": "Возврат основного капитала (не дивиденд)",
+  "typeCapitalWithdrawal": "Возврат капитала"
 }

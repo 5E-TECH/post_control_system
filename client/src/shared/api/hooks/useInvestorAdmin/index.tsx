@@ -58,6 +58,12 @@ export const useInvestorAdmin = () => {
     onSuccess: invalidate,
   });
 
+  const recordWithdrawal = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      api.post(`investor-admin/${id}/capital-withdrawal`, body),
+    onSuccess: invalidate,
+  });
+
   return {
     getInvestors,
     getInvestorSummary,
@@ -66,5 +72,6 @@ export const useInvestorAdmin = () => {
     recordCapital,
     setOwnership,
     recordDistribution,
+    recordWithdrawal,
   };
 };
