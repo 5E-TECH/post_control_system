@@ -170,9 +170,9 @@ describe('InvestorService — investor-safe mapping (PII/maxfiy oqmasligi)', () 
   it("getNetProfit = grossProfit − totalOpEx, xarajat komponentlari OSHKOR EMAS", async () => {
     const res: any = await makeService().getNetProfit();
     expect(res.data).toEqual({
-      grossProfit: 10_000_000,
+      grossProfit: 5_000_000, // getStats.profit (buyurtma-asosli)
       totalOpEx: 4_500_000, // 3M salary + 1M bills + 0.5M manual_expense
-      netProfit: 5_500_000,
+      netProfit: 500_000, // 5M − 4.5M
       from: null,
       to: null,
     });

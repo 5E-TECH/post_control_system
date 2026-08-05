@@ -104,6 +104,18 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
     );
   };
 
+  // Foyda asosini o'zgartirish (superadmin) — joriy ulush% bilan yangi versiya.
+  const changeBasis = (basis: "net" | "gross") => {
+    if (basis === s.profitBasis) return;
+    setOwnership.mutate(
+      { id: investorUserId, body: { ownership_bps: s.ownershipBps ?? 0, profit_basis: basis } },
+      {
+        onSuccess: () => message.success(t("basisChanged", "Foyda asosi o'zgartirildi")),
+        onError: err,
+      }
+    );
+  };
+
   const dp = "w-full dark:bg-[#342d4a]! dark:border-[#4b3b6a]!";
   const typeLabel: Record<string, string> = {
     capital: t("typeCapital", "Kapital"),
@@ -114,11 +126,42 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
 
   return (
     <div className="md:col-span-2 lg:col-span-3 flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <TrendingUp className="w-5 h-5 text-rose-500" />
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white">
-          {t("equityTitle", "Investor equity boshqaruvi")}
-        </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-rose-500" />
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white">
+            {t("equityTitle", "Investor equity boshqaruvi")}
+          </h3>
+        </div>
+        {/* Foyda asosi (net/gross) */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {t("profitBasis", "Foyda asosi")}:
+          </span>
+          {isSuper ? (
+            <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs">
+              {(["net", "gross"] as const).map((b) => (
+                <button
+                  key={b}
+                  onClick={() => changeBasis(b)}
+                  className={`px-3 py-1 font-medium transition-colors ${
+                    (s.profitBasis ?? "net") === b
+                      ? "bg-rose-500 text-white"
+                      : "bg-white dark:bg-[#2A263D] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#352F4A]"
+                  }`}
+                >
+                  {b === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+              {(s.profitBasis ?? "net") === "net"
+                ? t("basisNet", "Sof foyda")
+                : t("basisGross", "Yalpi marja")}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Xulosa */}

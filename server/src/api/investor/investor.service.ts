@@ -248,25 +248,27 @@ export class InvestorService {
   //   netProfit = sellProfit − (salary + bills + manualExpense)
   // MANUAL_INCOME va CORRECTION ATAYLAB kiritilmaydi (kelishilgan formula).
   private async computeProfitBreakdown(startDate?: string, endDate?: string) {
+    // YALPI foyda — buyurtma-asosli (to'liq), dashboard bilan bir xil.
+    const { start, end } = this.resolveRange(startDate, endDate);
+    const statsRes: any = await this.orderService.getStats(start, end);
+    const grossProfit = this.num(statsRes?.data?.profit);
+
+    // OpEx — FBH manfiylari (financialBalanceAnalytics YYYY-MM-DD).
     const res: any = await this.cashBoxService.financialBalanceAnalytics({
       fromDate: startDate,
       toDate: endDate,
     });
     const d = res?.data ?? {};
-    const pos = Array.isArray(d.positiveImpact) ? d.positiveImpact : [];
     const neg = Array.isArray(d.negativeImpact) ? d.negativeImpact : [];
-    const findPos = (t: string) =>
-      this.num(pos.find((s: any) => s.source_type === t)?.total_amount);
     const findNeg = (t: string) =>
       this.num(neg.find((s: any) => s.source_type === t)?.total_amount);
 
-    const sellProfit = findPos(FinancialSource_type.SELL_PROFIT);
     const salary = findNeg(FinancialSource_type.SALARY);
     const bills = findNeg(FinancialSource_type.BILLS);
     const manualExpense = findNeg(FinancialSource_type.MANUAL_EXPENSE);
     const totalOpEx = salary + bills + manualExpense;
-    const netProfit = sellProfit - totalOpEx;
-    return { sellProfit, salary, bills, manualExpense, totalOpEx, netProfit };
+    const netProfit = grossProfit - totalOpEx;
+    return { grossProfit, salary, bills, manualExpense, totalOpEx, netProfit };
   }
 
   // ---- Sof foyda P&L (gross foyda − OpEx). OpEx bitta jami — shaxssiz. ----
@@ -277,7 +279,7 @@ export class InvestorService {
       // DIQQAT (decision #4): xarajat bitta jami raqam sifatida beriladi —
       // salary/bills alohida ko'rsatilmaydi (shaxsiy oyliklar oshkor bo'lmasin).
       return {
-        grossProfit: b.sellProfit,
+        grossProfit: b.grossProfit,
         totalOpEx: b.totalOpEx,
         netProfit: b.netProfit,
         from: startDate ?? null,

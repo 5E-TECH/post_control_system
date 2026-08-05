@@ -98,5 +98,9 @@
   "withdrawalHint": "Возврат основного капитала (не дивиденд)",
   "typeCapitalWithdrawal": "Возврат капитала",
   "equityTitle": "Управление долей инвестора",
-  "capitalWithdrawn": "Возвращённый капитал"
+  "capitalWithdrawn": "Возвращённый капитал",
+  "profitBasis": "Основа прибыли",
+  "basisNet": "Чистая прибыль",
+  "basisGross": "Валовая маржа",
+  "basisChanged": "Основа прибыли изменена"
 }

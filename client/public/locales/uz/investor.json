@@ -98,5 +98,9 @@
   "withdrawalHint": "Tikkan asosiy puldan qaytarish (dividend emas)",
   "typeCapitalWithdrawal": "Kapital qaytarish",
   "equityTitle": "Investor equity boshqaruvi",
-  "capitalWithdrawn": "Qaytarilgan kapital"
+  "capitalWithdrawn": "Qaytarilgan kapital",
+  "profitBasis": "Foyda asosi",
+  "basisNet": "Sof foyda",
+  "basisGross": "Yalpi marja",
+  "basisChanged": "Foyda asosi o'zgartirildi"
 }

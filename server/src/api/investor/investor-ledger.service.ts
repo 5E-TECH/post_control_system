@@ -12,6 +12,7 @@ import { InvestorDistributionEntity } from 'src/core/entity/investor-distributio
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { FinancialSource_type, Roles } from 'src/common/enums';
+import { OrderService } from '../order/order.service';
 import { successRes } from 'src/infrastructure/lib/response';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import * as ExcelJS from 'exceljs';
@@ -49,6 +50,7 @@ export class InvestorLedgerService {
     private readonly fbhRepo: Repository<FinancialBalanceHistoryEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
+    private readonly orderService: OrderService,
     private readonly dataSource: DataSource,
     private readonly activityLog: ActivityLogService,
   ) {}
@@ -58,42 +60,59 @@ export class InvestorLedgerService {
     return Number.isFinite(n) ? n : 0;
   }
 
-  // Berilgan epoch-ms oralig'i [from, to) uchun biznes sof foydasi.
-  async netProfitBetween(fromTs: number, toTs: number): Promise<number> {
+  // ---- FOYDA MANBALARI (buyurtma-asosli, to'liq) ----
+  // YALPI foyda = pochta marjasi (market_tariff − courier_tariff) barcha sotilgan
+  // buyurtmalar bo'yicha — OrderService.getStats orqali (dashboard bilan bir xil,
+  // TO'LIQ). Ilgari FBH SELL_PROFIT ishlatilardi, lekin u faqat yangi buyurtmalarга
+  // yoziladi (eski sotilganlarга yo'q) — shuning uchun chala edi.
+  async grossProfitBetween(fromTs: number, toTs: number): Promise<number> {
     if (toTs <= fromTs) return 0;
-    const rows = await this.fbhRepo
+    const res: any = await this.orderService.getStats(
+      String(fromTs),
+      String(toTs),
+    );
+    return this.num(res?.data?.profit);
+  }
+
+  // OpEx = FBH manfiylari (salary + bills + manual_expense) magnitudasi.
+  async opexBetween(fromTs: number, toTs: number): Promise<number> {
+    if (toTs <= fromTs) return 0;
+    const row = await this.fbhRepo
       .createQueryBuilder('h')
-      .select('h.source_type', 'source_type')
-      .addSelect(
-        'SUM(CASE WHEN h.amount > 0 THEN h.amount ELSE 0 END)',
-        'pos',
-      )
-      .addSelect(
+      .select(
         'SUM(CASE WHEN h.amount < 0 THEN (-1 * h.amount) ELSE 0 END)',
-        'neg',
+        'opex',
       )
-      .where('h.created_at >= :from AND h.created_at < :to', {
+      .where('h.source_type IN (:...types)', {
+        types: [
+          FinancialSource_type.SALARY,
+          FinancialSource_type.BILLS,
+          FinancialSource_type.MANUAL_EXPENSE,
+        ],
+      })
+      .andWhere('h.created_at >= :from AND h.created_at < :to', {
         from: fromTs,
         to: toTs,
       })
-      .groupBy('h.source_type')
-      .getRawMany();
+      .getRawOne();
+    return this.num(row?.opex);
+  }
 
-    let sellProfit = 0;
-    let opex = 0;
-    for (const r of rows) {
-      const st = r.source_type;
-      if (st === FinancialSource_type.SELL_PROFIT) {
-        sellProfit += this.num(r.pos);
-      } else if (
-        st === FinancialSource_type.SALARY ||
-        st === FinancialSource_type.BILLS ||
-        st === FinancialSource_type.MANUAL_EXPENSE
-      ) {
-        opex += this.num(r.neg);
-      }
-    }
-    return sellProfit - opex;
+  // SOF foyda = yalpi − OpEx.
+  async netProfitBetween(fromTs: number, toTs: number): Promise<number> {
+    const gross = await this.grossProfitBetween(fromTs, toTs);
+    const opex = await this.opexBetween(fromTs, toTs);
+    return gross - opex;
+  }
+
+  // Basis bo'yicha foyda: 'gross' → yalpi marja, aks holda → sof foyda.
+  async profitBetween(
+    fromTs: number,
+    toTs: number,
+    basis: string,
+  ): Promise<number> {
+    if (basis === 'gross') return this.grossProfitBetween(fromTs, toTs);
+    return this.netProfitBetween(fromTs, toTs);
   }
 
   // Vaqt-tortilgan accrued profit share. Har ulush versiyasi o'z sub-davri
@@ -115,8 +134,9 @@ export class InvestorLedgerService {
       const ovStart = Math.max(sFrom, rangeStart);
       const ovEnd = Math.min(sTo, rangeEnd);
       if (ovEnd <= ovStart) continue;
-      const np = await this.netProfitBetween(ovStart, ovEnd);
-      total += Math.floor((np * s.ownership_bps) / 10000);
+      // Har ulush versiyasi O'Z profit_basis'i bilan (vaqt-tortilgan).
+      const p = await this.profitBetween(ovStart, ovEnd, s.profit_basis || 'net');
+      total += Math.floor((p * s.ownership_bps) / 10000);
     }
     return total;
   }
@@ -175,6 +195,7 @@ export class InvestorLedgerService {
         capitalInvested, // sof joriy kapital (contributed − withdrawn)
         ownershipBps,
         ownershipPct: ownershipBps / 100,
+        profitBasis: openStake?.profit_basis ?? 'net',
         accruedProfitShare,
         distributionsPaid,
         undistributed,
@@ -359,6 +380,11 @@ export class InvestorLedgerService {
       throw new BadRequestException('ownership_bps 0..10000 oralig\'ida bo\'lishi kerak');
     }
     const effectiveFrom = dto.effective_from ?? Date.now();
+    // Basis berilsa — o'sha; aks holda joriy ochiq versiyanikini saqlaymiz.
+    const currentOpen = await this.stakeRepo.findOne({
+      where: { investor_id: investorId, effective_to: IsNull() },
+    });
+    const profitBasis = dto.profit_basis ?? currentOpen?.profit_basis ?? 'net';
     await this.dataSource.transaction(async (m) => {
       const repo = m.getRepository(InvestorOwnershipStakeEntity);
       // Joriy ochiq qatorni yopamiz (tarix o'zgartirilmaydi).
@@ -369,6 +395,7 @@ export class InvestorLedgerService {
       const row = repo.create({
         investor_id: investorId,
         ownership_bps: dto.ownership_bps,
+        profit_basis: profitBasis,
         effective_from: effectiveFrom,
         effective_to: null,
         note: dto.note ?? null,
@@ -380,12 +407,16 @@ export class InvestorLedgerService {
       entity_type: 'investor_ownership',
       entity_id: investorId,
       action: 'updated',
-      new_value: { ownership_bps: dto.ownership_bps },
-      description: `Investor ulushi: ${dto.ownership_bps} bp`,
+      new_value: { ownership_bps: dto.ownership_bps, profit_basis: profitBasis },
+      description: `Investor ulushi: ${dto.ownership_bps} bp (${profitBasis})`,
       user: actor,
     });
     return successRes(
-      { ownership_bps: dto.ownership_bps, effective_from: effectiveFrom },
+      {
+        ownership_bps: dto.ownership_bps,
+        profit_basis: profitBasis,
+        effective_from: effectiveFrom,
+      },
       200,
       'Ownership stake set',
     );

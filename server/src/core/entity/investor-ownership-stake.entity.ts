@@ -22,6 +22,11 @@ export class InvestorOwnershipStakeEntity extends BaseEntity {
   @Column({ type: 'int' })
   ownership_bps: number;
 
+  // Foyda asosi: 'net' (yalpi − OpEx) yoki 'gross' (yalpi marja). Har versiya
+  // o'z basis'iga ega — vaqt-tortilgan hisobda ishlatiladi.
+  @Column({ type: 'varchar', default: 'net' })
+  profit_basis: string;
+
   // Amal qilish boshi (epoch-ms, inklyuziv).
   @Column({ type: 'bigint', transformer: bigintTransformerNonNull })
   effective_from: number;

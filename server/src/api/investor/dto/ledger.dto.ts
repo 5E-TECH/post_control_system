@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -71,6 +72,14 @@ export class SetOwnershipDto {
   @IsInt()
   @Min(0)
   effective_from?: number;
+
+  @ApiPropertyOptional({
+    enum: ['net', 'gross'],
+    description: "Foyda asosi: 'net' (sof) yoki 'gross' (yalpi marja). Default: net",
+  })
+  @IsOptional()
+  @IsIn(['net', 'gross'])
+  profit_basis?: 'net' | 'gross';
 
   @ApiPropertyOptional({ example: 'Ulush qayta ko\'rib chiqildi' })
   @IsOptional()

@@ -98,5 +98,9 @@
   "withdrawalHint": "Return of principal (not a dividend)",
   "typeCapitalWithdrawal": "Capital withdrawal",
   "equityTitle": "Investor equity management",
-  "capitalWithdrawn": "Withdrawn capital"
+  "capitalWithdrawn": "Withdrawn capital",
+  "profitBasis": "Profit basis",
+  "basisNet": "Net profit",
+  "basisGross": "Gross margin",
+  "basisChanged": "Profit basis changed"
 }
