@@ -25,6 +25,7 @@ const ExportButton = ({ scope = "business", from, to }: Props) => {
         scope === "personal"
           ? await exportMyInvestment(params)
           : await exportBusiness(params);
+      if (!res?.data) throw new Error("empty");
       const blob = new Blob([res.data], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });

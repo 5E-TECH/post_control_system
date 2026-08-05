@@ -85,7 +85,7 @@ const InvestorAdmin = () => {
   };
 
   const handleOwnership = () => {
-    if (!guardSel() || ownershipPct == null) return;
+    if (!guardSel() || ownershipPct == null || ownershipPct < 0 || ownershipPct > 100) return;
     setOwnership.mutate(
       { id: selectedId!, body: { ownership_bps: Math.round(ownershipPct * 100) } },
       {
@@ -215,7 +215,7 @@ const InvestorAdmin = () => {
             placeholder={t("amountUzs", "Miqdor (so'm)")}
             min={1}
             value={capital}
-            onChange={(v) => setCapital(v as number)}
+            onChange={(v) => setCapital(v == null ? null : Number(v))}
           />
           <Button className="mt-2 w-full" loading={recordCapital.isPending} onClick={handleCapital}>
             {t("save", "Saqlash")}
@@ -236,7 +236,7 @@ const InvestorAdmin = () => {
             max={100}
             step={0.01}
             value={ownershipPct}
-            onChange={(v) => setOwnershipPct(v as number)}
+            onChange={(v) => setOwnershipPct(v == null ? null : Number(v))}
           />
           <Button className="mt-2 w-full" loading={setOwnership.isPending} onClick={handleOwnership}>
             {t("save", "Saqlash")}
@@ -254,7 +254,7 @@ const InvestorAdmin = () => {
             placeholder={t("amountUzs", "Miqdor (so'm)")}
             min={1}
             value={distribution}
-            onChange={(v) => setDistribution(v as number)}
+            onChange={(v) => setDistribution(v == null ? null : Number(v))}
           />
           <Button className="mt-2 w-full" loading={recordDistribution.isPending} onClick={handleDistribution}>
             {t("save", "Saqlash")}
@@ -272,7 +272,7 @@ const InvestorAdmin = () => {
             placeholder={t("amountUzs", "Miqdor (so'm)")}
             min={1}
             value={withdrawal}
-            onChange={(v) => setWithdrawal(v as number)}
+            onChange={(v) => setWithdrawal(v == null ? null : Number(v))}
           />
           <Button className="mt-2 w-full" loading={recordWithdrawal.isPending} onClick={handleWithdrawal}>
             {t("save", "Saqlash")}

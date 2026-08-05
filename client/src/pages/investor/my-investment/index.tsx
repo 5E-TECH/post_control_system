@@ -138,7 +138,7 @@ const InvestorMyInvestment = () => {
                 <tbody>
                   {items.map((e: any, i: number) => (
                     <tr
-                      key={i}
+                      key={`${i}-${e.type}-${e.occurred_at}`}
                       className="border-b border-gray-50 dark:border-[#332f49] last:border-0"
                     >
                       <td className="py-2 pr-2 text-gray-600 dark:text-gray-300">
@@ -150,8 +150,8 @@ const InvestorMyInvestment = () => {
                         </span>
                       </td>
                       <td className="py-2 pr-2 font-medium text-gray-700 dark:text-gray-200">
-                        {e.type === "stake"
-                          ? `${(e.ownershipBps ?? 0) / 100}%`
+                        {e.type === "stake" && e.ownershipBps != null
+                          ? `${(e.ownershipBps / 100).toFixed(2)}%`
                           : formatMoney(e.amount)}
                       </td>
                       <td className="py-2 text-gray-500 dark:text-gray-400">

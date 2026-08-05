@@ -160,7 +160,7 @@ const InvestorOperations = () => {
                 </tr>
               </thead>
               <tbody>
-                {regions.map((r: any) => (
+                {regions.filter((r: any) => r && r.id).map((r: any) => (
                   <tr
                     key={r.id}
                     className="border-b border-gray-50 dark:border-[#332f49] last:border-0"
