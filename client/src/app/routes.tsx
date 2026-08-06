@@ -149,6 +149,7 @@ const InvestorOverview = lazy(() => import("../pages/investor/overview"));
 const InvestorFinancials = lazy(() => import("../pages/investor/financials"));
 const InvestorOperations = lazy(() => import("../pages/investor/operations"));
 const InvestorMyInvestment = lazy(() => import("../pages/investor/my-investment"));
+const InvestorAction = lazy(() => import("../pages/investor-action"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -481,6 +482,15 @@ const AppRouters = () => {
               // Eski standalone sahifa — endi boshqaruv foydalanuvchi detalida.
               path: "investor-admin",
               element: <Navigate to="/all-users" replace />,
+            },
+            {
+              // Investor equity amali — alohida sahifa (kapital/ulush/taqsimot/qaytarish).
+              path: "investor-equity/:id/:action",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <InvestorAction />
+                </RequireRole>
+              ),
             },
           ],
         },

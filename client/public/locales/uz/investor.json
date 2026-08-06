@@ -108,5 +108,12 @@
   "investorShare": "Investor foydasi",
   "total": "jami",
   "cancel": "Bekor",
-  "optional": "ixtiyoriy"
+  "optional": "ixtiyoriy",
+  "capitalDesc": "Investor tikkan kapitalni kiriting",
+  "ownershipDesc": "Egalik ulushi va foyda asosini belgilang",
+  "distributionDesc": "Investorga to'langan foydani yozing",
+  "basisNetHint": "Buyurtma marjasi minus xarajatlar",
+  "basisGrossHint": "Faqat buyurtma marjasi (xarajatsiz)",
+  "enterAmount": "Miqdorni kiriting",
+  "saving": "Saqlanmoqda..."
 }

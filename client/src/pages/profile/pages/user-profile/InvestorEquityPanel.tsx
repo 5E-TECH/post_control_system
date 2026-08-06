@@ -1,8 +1,8 @@
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
-import { InputNumber, DatePicker, Input, Modal, message } from "antd";
-import type { Dayjs } from "dayjs";
+import { useNavigate } from "react-router-dom";
+import { DatePicker, message } from "antd";
 import {
   Bar,
   BarChart,
@@ -24,8 +24,6 @@ import { useInvestorAdmin } from "../../../../shared/api/hooks/useInvestorAdmin"
 import type { RootState } from "../../../../app/store";
 import { formatMoney, formatMoneyShort, formatNumber } from "../../../investor/components/format";
 
-type ActionType = "capital" | "ownership" | "distribution" | "withdrawal";
-
 const fmtDate = (ms?: number) =>
   !ms
     ? "—"
@@ -33,23 +31,16 @@ const fmtDate = (ms?: number) =>
 
 const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => {
   const { t } = useTranslation(["investor"]);
+  const navigate = useNavigate();
   const role = useSelector((s: RootState) => s.roleSlice.role);
   const isSuper = role === "superadmin";
 
-  const {
-    getInvestorSummary,
-    getInvestorLedger,
-    getInvestorDaily,
-    recordCapital,
-    setOwnership,
-    recordDistribution,
-    recordWithdrawal,
-  } = useInvestorAdmin();
+  const { getInvestorSummary, getInvestorLedger, getInvestorDaily, setOwnership } =
+    useInvestorAdmin();
 
   const { data: sumRes } = getInvestorSummary(investorUserId);
   const s = sumRes?.data ?? {};
 
-  // Kunlik breakdown (sana filtri bilan)
   const [from, setFrom] = useState<string | undefined>();
   const [to, setTo] = useState<string | undefined>();
   const { data: dailyRes, isLoading: dailyLoading } = getInvestorDaily(investorUserId, {
@@ -66,76 +57,25 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
   const items = Array.isArray(led.items) ? led.items : [];
   const totalPages = Math.max(1, Math.ceil((led.total ?? 0) / (led.limit ?? 10)));
 
-  // ---- Amal modali ----
-  const [modalType, setModalType] = useState<ActionType | null>(null);
-  const [mAmount, setMAmount] = useState<number | null>(null);
-  const [mOwnership, setMOwnership] = useState<number | null>(null);
-  const [mBasis, setMBasis] = useState<"net" | "gross">("net");
-  const [mDate, setMDate] = useState<Dayjs | null>(null);
-  const [mNote, setMNote] = useState("");
-
-  const err = (e: any) => message.error(e?.response?.data?.message || t("error", "Xatolik"));
-  const closeModal = () => {
-    setModalType(null);
-    setMAmount(null);
-    setMOwnership(null);
-    setMBasis("net");
-    setMDate(null);
-    setMNote("");
-  };
-  const openModal = (type: ActionType) => {
-    closeModal();
-    setModalType(type);
-    if (type === "ownership") {
-      setMOwnership(s.ownershipPct ?? null);
-      setMBasis((s.profitBasis as any) ?? "net");
-    }
-  };
-
-  const submitModal = () => {
-    const id = investorUserId;
-    const dateMs = mDate?.valueOf();
-    const note = mNote || undefined;
-    const done = (key: string) => () => { message.success(t(key)); closeModal(); };
-    if (modalType === "capital") {
-      if (!mAmount) return;
-      recordCapital.mutate({ id, body: { amount: mAmount, contributed_at: dateMs, note } }, { onSuccess: done("capitalRecorded"), onError: err });
-    } else if (modalType === "ownership") {
-      if (mOwnership == null || mOwnership < 0 || mOwnership > 100) return;
-      setOwnership.mutate({ id, body: { ownership_bps: Math.round(mOwnership * 100), profit_basis: mBasis, effective_from: dateMs, note } }, { onSuccess: done("ownershipSet"), onError: err });
-    } else if (modalType === "distribution") {
-      if (!mAmount) return;
-      recordDistribution.mutate({ id, body: { amount: mAmount, distributed_at: dateMs, note } }, { onSuccess: done("distributionRecorded"), onError: err });
-    } else if (modalType === "withdrawal") {
-      if (!mAmount) return;
-      recordWithdrawal.mutate({ id, body: { amount: mAmount, withdrawn_at: dateMs, note } }, { onSuccess: done("withdrawalRecorded"), onError: err });
-    }
-  };
-  const modalBusy =
-    recordCapital.isPending || setOwnership.isPending || recordDistribution.isPending || recordWithdrawal.isPending;
+  const go = (action: string) => navigate(`/investor-equity/${investorUserId}/${action}`);
 
   const changeBasis = (basis: "net" | "gross") => {
     if (basis === s.profitBasis) return;
     setOwnership.mutate(
       { id: investorUserId, body: { ownership_bps: s.ownershipBps ?? 0, profit_basis: basis } },
-      { onSuccess: () => message.success(t("basisChanged", "Foyda asosi o'zgartirildi")), onError: err }
+      {
+        onSuccess: () => message.success(t("basisChanged", "Foyda asosi o'zgartirildi")),
+        onError: (e: any) => message.error(e?.response?.data?.message || t("error", "Xatolik")),
+      }
     );
   };
 
-  const modalTitle: Record<ActionType, string> = {
-    capital: t("recordCapital", "Kapital kiritish"),
-    ownership: t("setOwnership", "Ulush o'rnatish"),
-    distribution: t("recordDistribution", "Taqsimot (dividend)"),
-    withdrawal: t("recordWithdrawal", "Kapital qaytarish"),
-  };
   const typeLabel: Record<string, string> = {
     capital: t("typeCapital", "Kapital"),
     capital_withdrawal: t("typeCapitalWithdrawal", "Kapital qaytarish"),
     distribution: t("typeDistribution", "Taqsimot"),
     stake: t("typeStake", "Ulush o'zgarishi"),
   };
-
-  // Chart uchun (oxirgi kunlar)
   const chartData = days.map((d) => ({ label: d.label, investor: d.investorShare, post: d.postProfit }));
 
   return (
@@ -188,23 +128,23 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
         </div>
       </div>
 
-      {/* Amal tugmalari */}
+      {/* Amal tugmalari — alohida sahifaga o'tadi */}
       <div className="flex flex-wrap gap-2">
         {isSuper && (
-          <button onClick={() => openModal("capital")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white transition-colors">
+          <button onClick={() => go("capital")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white transition-colors">
             <Plus className="w-4 h-4" /> {t("recordCapital", "Kapital kiritish")}
           </button>
         )}
         {isSuper && (
-          <button onClick={() => openModal("ownership")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-colors">
+          <button onClick={() => go("ownership")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-colors">
             <PieChart className="w-4 h-4" /> {t("setOwnership", "Ulush o'rnatish")}
           </button>
         )}
-        <button onClick={() => openModal("distribution")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors">
+        <button onClick={() => go("distribution")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors">
           <HandCoins className="w-4 h-4" /> {t("recordDistribution", "Taqsimot")}
         </button>
         {isSuper && (
-          <button onClick={() => openModal("withdrawal")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-rose-500 hover:bg-rose-600 text-white transition-colors">
+          <button onClick={() => go("withdrawal")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-rose-500 hover:bg-rose-600 text-white transition-colors">
             <MinusCircle className="w-4 h-4" /> {t("recordWithdrawal", "Kapital qaytarish")}
           </button>
         )}
@@ -227,7 +167,6 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
           />
         </div>
 
-        {/* Jami */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div className="bg-gray-50 dark:bg-[#3B3656] rounded-xl p-3">
             <p className="text-xs text-gray-500 dark:text-gray-400">{t("postProfit", "Pochta foydasi")} ({t("total", "jami")})</p>
@@ -239,7 +178,6 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
           </div>
         </div>
 
-        {/* Chart */}
         {chartData.length > 0 && (
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
@@ -254,7 +192,6 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
           </ResponsiveContainer>
         )}
 
-        {/* Jadval */}
         {dailyLoading ? (
           <p className="text-sm text-gray-400 py-4 text-center">…</p>
         ) : days.length === 0 ? (
@@ -322,57 +259,6 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
           )}
         </div>
       )}
-
-      {/* Amal modali */}
-      <Modal
-        open={modalType != null}
-        onCancel={closeModal}
-        onOk={submitModal}
-        confirmLoading={modalBusy}
-        okText={t("save", "Saqlash")}
-        cancelText={t("cancel", "Bekor")}
-        title={modalType ? modalTitle[modalType] : ""}
-        centered
-        destroyOnClose
-      >
-        <div className="flex flex-col gap-3 pt-2">
-          {modalType === "ownership" ? (
-            <>
-              <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400">{t("ownershipPct", "Ulush (%)")}</label>
-                <InputNumber className="w-full" min={0} max={100} step={0.01} value={mOwnership} onChange={(v) => setMOwnership(v == null ? null : Number(v))} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400">{t("profitBasis", "Foyda asosi")}</label>
-                <div className="flex gap-2 mt-1">
-                  {(["net", "gross"] as const).map((b) => (
-                    <button key={b} onClick={() => setMBasis(b)} className={`flex-1 py-1.5 rounded-lg text-sm border ${mBasis === b ? "bg-rose-500 text-white border-rose-500" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"}`}>
-                      {b === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400">{t("amountUzs", "Miqdor (so'm)")}</label>
-              <InputNumber className="w-full" min={1} value={mAmount} onChange={(v) => setMAmount(v == null ? null : Number(v))}
-                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, " ")} parser={(v) => (v ? Number(v.replace(/\s/g, "")) : 0) as any} />
-            </div>
-          )}
-          <div>
-            <label className="text-xs text-gray-500 dark:text-gray-400">{t("date", "Sana")} ({t("optional", "ixtiyoriy")})</label>
-            <DatePicker className="w-full" format="DD-MM-YYYY" value={mDate} onChange={setMDate} placeholder={t("selectDate", "Sanani tanlang")} />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 dark:text-gray-400">{t("note", "Izoh")}</label>
-            <Input value={mNote} onChange={(e) => setMNote(e.target.value)} placeholder={t("note", "Izoh")} />
-          </div>
-          {modalType === "withdrawal" && (
-            <p className="text-xs text-gray-400">{t("withdrawalHint", "Tikkan asosiy puldan qaytarish (dividend emas)")}</p>
-          )}
-        </div>
-      </Modal>
     </div>
   );
 };

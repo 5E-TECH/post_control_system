@@ -108,5 +108,12 @@
   "investorShare": "Investor share",
   "total": "total",
   "cancel": "Cancel",
-  "optional": "optional"
+  "optional": "optional",
+  "capitalDesc": "Enter the investor's capital",
+  "ownershipDesc": "Set ownership and profit basis",
+  "distributionDesc": "Record profit paid to the investor",
+  "basisNetHint": "Order margin minus expenses",
+  "basisGrossHint": "Order margin only (no expenses)",
+  "enterAmount": "Enter amount",
+  "saving": "Saving..."
 }
