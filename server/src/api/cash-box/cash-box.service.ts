@@ -7,6 +7,7 @@ import {
 import { CreateCashBoxDto } from './dto/create-cash-box.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
+import { InvestorDistributionEntity } from 'src/core/entity/investor-distribution.entity';
 import { CashRepository } from 'src/core/repository/cash.box.repository';
 import { catchError } from 'src/infrastructure/lib/response';
 import { BaseService } from 'src/infrastructure/lib/baseServise';
@@ -51,6 +52,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 import { SalaryDto } from './dto/salary.dto';
+import { PayInvestorDto } from './dto/pay-investor.dto';
 import { UserSalaryEntity } from 'src/core/entity/user-salary.entity';
 import {
   getUzbekistanDayRange,
@@ -2329,6 +2331,108 @@ export class CashBoxService
   }
 
   /**
+   * Kassadan INVESTORga foyda taqsimoti to'lash.
+   * Maosh/chiqim kabi kassadan yechadi + cashbox_history (EXPENSE) yozadi
+   * (invariant uchun MAJBURIY), va investor_distribution ledgeriga yozadi —
+   * BITTA tranzaksiyada. LEKIN financial_balance_history'ga YOZMAYDI: bu foyda
+   * taqsimoti, biznes xarajati (OpEx) EMAS — shuning uchun sof foydani kamaytirmaydi.
+   */
+  async payInvestor(user: JwtPayload, dto: PayInvestorDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      await this.requireOpenShift();
+      const { investor_id, amount } = dto;
+      const investor = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: investor_id },
+      });
+      if (!investor) throw new NotFoundException('Investor topilmadi');
+      if (investor.role !== Roles.INVESTOR) {
+        throw new BadRequestException('Bu foydalanuvchi investor emas');
+      }
+      const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
+        where: { cashbox_type: Cashbox_type.MAIN },
+      });
+      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+      const cardId = await this.resolveCardForOp(
+        queryRunner.manager,
+        mainCashbox,
+        dto.type,
+        dto.card_id,
+      );
+
+      const isCash = !dto.type || dto.type === PaymentMethod.CASH;
+      if (isCash) {
+        if (mainCashbox.balance_cash < amount) {
+          throw new BadRequestException(
+            `Naqd kassada yetarli mablag' yo'q! Mavjud: ${mainCashbox.balance_cash.toLocaleString()} so'm, So'ralgan: ${amount.toLocaleString()} so'm`,
+          );
+        }
+        mainCashbox.balance_cash -= amount;
+      } else {
+        await this.applyCardDelta(
+          queryRunner.manager,
+          mainCashbox,
+          cardId as string,
+          -amount,
+        );
+      }
+      mainCashbox.balance -= amount;
+      await queryRunner.manager.save(mainCashbox);
+
+      const comment =
+        dto.comment || `${investor.name || 'Investor'} ga foyda taqsimoti`;
+
+      // Kassa tarixi — EXPENSE (invariant uchun MAJBURIY).
+      await queryRunner.manager.save(
+        queryRunner.manager.create(CashboxHistoryEntity, {
+          amount,
+          balance_after: mainCashbox.balance,
+          balance_after_cash: mainCashbox.balance_cash,
+          balance_after_card: mainCashbox.balance_card,
+          cashbox_id: mainCashbox.id,
+          comment,
+          created_by: user.id,
+          payment_method: dto.type,
+          operation_type: Operation_type.EXPENSE,
+          source_type: Source_type.INVESTOR_PAYOUT,
+          source_user_id: investor_id,
+          card_id: cardId,
+        }),
+      );
+
+      // Investor ledger — taqsimot (append-only). ATAYLAB FBH/OpEx yo'q.
+      await queryRunner.manager.save(
+        queryRunner.manager.create(InvestorDistributionEntity, {
+          investor_id,
+          amount,
+          distributed_at: Date.now(),
+          note: dto.note ?? dto.comment ?? null,
+          created_by: user.id,
+        }),
+      );
+
+      await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'cashbox',
+        entity_id: investor_id,
+        action: 'investor_payout',
+        new_value: { amount, investor_name: investor.name },
+        description: `Investorga to'lov: ${investor.name || ''} — ${amount} so'm`,
+        user,
+      });
+      return successRes({}, 200, 'Investor payout paid');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
    * Ishchining maosh to'lovlari tarixi.
    * `cashbox_history` dagi SALARY yozuvlaridan o'qiydi (source_user_id = ishchi).
    * Admin (har qanday ishchi uchun) va ishchining o'zi (my-history) ishlatadi.
@@ -2667,6 +2771,7 @@ export class CashBoxService
       [Source_type.CANCEL]: 'Bekor qilish',
       [Source_type.EXTRA_COST]: "Qo'shimcha xarajat",
       [Source_type.BILLS]: "To'lovlar",
+      [Source_type.INVESTOR_PAYOUT]: 'Investorga to\'lov',
     };
     return labels[sourceType] || sourceType;
   }

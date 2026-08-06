@@ -10,6 +10,7 @@ import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { ShiftEntity } from 'src/core/entity/shift.entity';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
+import { InvestorDistributionEntity } from 'src/core/entity/investor-distribution.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance
       UserEntity,
       ShiftEntity,
       FinancialBalanceHistoryEntity,
+      InvestorDistributionEntity,
     ]),
   ],
   controllers: [CasheBoxController],

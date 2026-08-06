@@ -23,6 +23,7 @@ import {
 import { CashBoxService } from './cash-box.service';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 import { SalaryDto } from './dto/salary.dto';
+import { PayInvestorDto } from './dto/pay-investor.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import {
   Cashbox_type,
@@ -461,6 +462,17 @@ export class CasheBoxController {
   @Post('salary')
   paySalary(@CurrentUser() user: JwtPayload, @Body() salaryDto: SalaryDto) {
     return this.cashBoxService.paySalary(user, salaryDto);
+  }
+
+  @ApiOperation({ summary: 'Kassadan investorga foyda taqsimoti to\'lash' })
+  @ApiBody({ type: PayInvestorDto })
+  @ApiResponse({ status: 200, description: 'Investor payout paid' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('pay-investor')
+  payInvestor(@CurrentUser() user: JwtPayload, @Body() dto: PayInvestorDto) {
+    return this.cashBoxService.payInvestor(user, dto);
   }
 
   @ApiOperation({ summary: 'Get my own salary payment history' })

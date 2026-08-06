@@ -44,6 +44,9 @@ export enum Source_type {
   CANCEL = 'cancel',
   EXTRA_COST = 'extra_cost',
   BILLS = 'bills',
+  // Investorga foyda taqsimoti (kassadan chiqim; OpEx EMAS). DB enumida
+  // allaqachon mavjud. financial_balance_history'ga YOZILMAYDI.
+  INVESTOR_PAYOUT = 'investor_payout',
 }
 
 export enum Order_status {

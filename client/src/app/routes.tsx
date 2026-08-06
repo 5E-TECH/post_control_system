@@ -150,6 +150,7 @@ const InvestorFinancials = lazy(() => import("../pages/investor/financials"));
 const InvestorOperations = lazy(() => import("../pages/investor/operations"));
 const InvestorMyInvestment = lazy(() => import("../pages/investor/my-investment"));
 const InvestorAction = lazy(() => import("../pages/investor-action"));
+const CashboxPayInvestor = lazy(() => import("../pages/cashbox-pay-investor"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -489,6 +490,15 @@ const AppRouters = () => {
               element: (
                 <RequireRole roles={["superadmin", "admin"]}>
                   <InvestorAction />
+                </RequireRole>
+              ),
+            },
+            {
+              // Kassadan investorga foyda to'lash — alohida sahifa.
+              path: "cashbox/pay-investor",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <CashboxPayInvestor />
                 </RequireRole>
               ),
             },

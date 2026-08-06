@@ -147,8 +147,8 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
             <PieChart className="w-4 h-4" /> {t("setOwnership", "Ulush o'rnatish")}
           </button>
         )}
-        <button onClick={() => go("distribution")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors">
-          <HandCoins className="w-4 h-4" /> {t("recordDistribution", "Taqsimot")}
+        <button onClick={() => navigate(`/cashbox/pay-investor?investorId=${investorUserId}`)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors">
+          <HandCoins className="w-4 h-4" /> {t("recordDistribution", "Taqsimot (kassadan)")}
         </button>
         {isSuper && (
           <button onClick={() => go("withdrawal")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-rose-500 hover:bg-rose-600 text-white transition-colors">

@@ -88,7 +88,12 @@ const InvestorAction = () => {
   const backTo = `/user-profile/${id}`;
 
   // Noto'g'ri action yoki ruxsat yo'q → orqaga.
+  // Taqsimot endi kassadan yechiladi → maxsus kassa sahifasiga yo'naltiramiz.
   useEffect(() => {
+    if (action === "distribution") {
+      navigate(`/cashbox/pay-investor?investorId=${id}`, { replace: true });
+      return;
+    }
     if (!meta) navigate(backTo, { replace: true });
     else if (meta.superOnly && !isSuper) navigate(backTo, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -19,6 +19,7 @@ import {
   Square,
   Magnet,
   ChevronLeft,
+  HandCoins,
 } from "lucide-react";
 import { BASE_URL } from "../../../../shared/const";
 import { message, Modal } from "antd";
@@ -450,6 +451,21 @@ const MainDetail = () => {
                 </div>
                 <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
                   {t("maoshTo'lash") || "Maosh"}
+                </span>
+              </button>
+
+              {/* Investorga to'lash */}
+              <button
+                onClick={() => navigate("/cashbox/pay-investor")}
+                className="group flex flex-col items-center gap-2 cursor-pointer"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-teal-400 via-emerald-500 to-green-600 flex items-center justify-center shadow-xl shadow-emerald-500/40 group-hover:shadow-emerald-500/60 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
+                    <HandCoins size={24} className="text-white" />
+                  </div>
+                </div>
+                <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-300 text-center max-w-[60px] leading-tight">
+                  {t("investorgaTolash") || "Investor"}
                 </span>
               </button>
 
