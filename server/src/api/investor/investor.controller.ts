@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Query, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { InvestorService } from './investor.service';
@@ -172,6 +172,28 @@ export class InvestorController {
     @Query('endDate') endDate?: string,
   ) {
     return this.ledgerService.getDailyBreakdown(user.id, startDate, endDate);
+  }
+
+  // ---- Foyda-asosi taklifini ko'rish/tasdiqlash/rad etish (investor o'zi) ----
+  @Get('my-investment/basis-request')
+  @LogInvestorAccess('basis-request')
+  @ApiOperation({ summary: 'Kutayotgan foyda-asosi taklifi' })
+  getMyBasisRequest(@CurrentUser() user: JwtPayload) {
+    return this.ledgerService.getPendingBasisRequest(user.id);
+  }
+
+  @Post('my-investment/basis-request/approve')
+  @LogInvestorAccess('basis-approve')
+  @ApiOperation({ summary: 'Foyda-asosi o\'zgarishini tasdiqlash' })
+  approveMyBasis(@CurrentUser() user: JwtPayload) {
+    return this.ledgerService.approveBasisRequest(user.id, user);
+  }
+
+  @Post('my-investment/basis-request/reject')
+  @LogInvestorAccess('basis-reject')
+  @ApiOperation({ summary: 'Foyda-asosi o\'zgarishini rad etish' })
+  rejectMyBasis(@CurrentUser() user: JwtPayload) {
+    return this.ledgerService.rejectBasisRequest(user.id, user);
   }
 
   // ---- Aggregat Excel eksport ----

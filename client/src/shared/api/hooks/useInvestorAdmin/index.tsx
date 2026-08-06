@@ -75,6 +75,20 @@ export const useInvestorAdmin = () => {
     onSuccess: invalidate,
   });
 
+  const getPendingBasis = (id?: string) =>
+    useQuery({
+      queryKey: [investorAdminKey, "basis-req", id],
+      queryFn: () =>
+        api.get(`investor-admin/${id}/basis-request`).then((r) => r.data),
+      enabled: !!id,
+    });
+
+  const proposeBasis = useMutation({
+    mutationFn: ({ id, basis }: { id: string; basis: string }) =>
+      api.post(`investor-admin/${id}/basis-request`, { basis }),
+    onSuccess: invalidate,
+  });
+
   return {
     getInvestors,
     getInvestorSummary,
@@ -85,5 +99,7 @@ export const useInvestorAdmin = () => {
     setOwnership,
     recordDistribution,
     recordWithdrawal,
+    getPendingBasis,
+    proposeBasis,
   };
 };

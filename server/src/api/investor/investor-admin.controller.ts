@@ -16,6 +16,7 @@ import { Roles } from 'src/common/enums';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import {
+  ProposeBasisDto,
   RecordCapitalDto,
   RecordDistributionDto,
   RecordWithdrawalDto,
@@ -129,5 +130,23 @@ export class InvestorAdminController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.ledgerService.recordWithdrawal(id, dto, user);
+  }
+
+  // FAQAT SUPERADMIN — foyda asosi o'zgarishini TAKLIF qiladi (investor tasdiqlaydi).
+  @Post(':id/basis-request')
+  @AcceptRoles(Roles.SUPERADMIN)
+  @ApiOperation({ summary: 'Foyda asosi o\'zgarishini taklif qilish (investor tasdiqlaydi)' })
+  proposeBasis(
+    @Param('id') id: string,
+    @Body() dto: ProposeBasisDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.ledgerService.proposeBasisChange(id, dto.basis, user);
+  }
+
+  @Get(':id/basis-request')
+  @ApiOperation({ summary: 'Kutayotgan foyda-asosi taklifi (admin ko\'rinishi)' })
+  pendingBasis(@Param('id') id: string) {
+    return this.ledgerService.getPendingBasisRequest(id);
   }
 }

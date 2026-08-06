@@ -115,5 +115,16 @@
   "basisNetHint": "Order margin minus expenses",
   "basisGrossHint": "Order margin only (no expenses)",
   "enterAmount": "Enter amount",
-  "saving": "Saving..."
+  "saving": "Saving...",
+  "basisProposed": "Proposal sent — awaiting investor approval",
+  "awaitingInvestor": "awaiting investor approval",
+  "proposeBasisChange": "Propose change",
+  "basisConsentNote": "Changing profit basis only via investor approval (not here)",
+  "basisRequestTitle": "Profit basis change proposal",
+  "basisRequestBody": "New basis",
+  "basisRequestConfirm": "approve?",
+  "basisApproved": "Approved",
+  "basisRejected": "Rejected",
+  "approve": "Approve",
+  "reject": "Reject"
 }

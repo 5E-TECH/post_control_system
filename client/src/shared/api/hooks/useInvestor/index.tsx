@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../..";
 
 // Investor (ulushdor) faqat-o'qish aggregat endpointlari uchun React Query hooklar.
@@ -15,6 +15,7 @@ interface RevenueParams extends RangeParams {
 }
 
 export const useInvestor = () => {
+  const qc = useQueryClient();
   const getOverview = (params: RangeParams = {}) =>
     useQuery({
       queryKey: [investorKey, "overview", params],
@@ -103,6 +104,22 @@ export const useInvestor = () => {
           .then((res) => res.data),
     });
 
+  // Foyda-asosi taklifi (investor tasdig'i)
+  const getMyBasisRequest = () =>
+    useQuery({
+      queryKey: [investorKey, "basis-req"],
+      queryFn: () =>
+        api.get("investor/my-investment/basis-request").then((r) => r.data),
+    });
+  const approveBasis = useMutation({
+    mutationFn: () => api.post("investor/my-investment/basis-request/approve"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [investorKey] }),
+  });
+  const rejectBasis = useMutation({
+    mutationFn: () => api.post("investor/my-investment/basis-request/reject"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [investorKey] }),
+  });
+
   // Imperativ Excel eksport (blob) — react-query emas.
   const exportBusiness = (params: RangeParams = {}) =>
     api.get("investor/export", { params, responseType: "blob" });
@@ -123,6 +140,9 @@ export const useInvestor = () => {
     getMyInvestment,
     getMyLedger,
     getMyDaily,
+    getMyBasisRequest,
+    approveBasis,
+    rejectBasis,
     exportBusiness,
     exportMyInvestment,
   };

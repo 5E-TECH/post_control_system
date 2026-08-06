@@ -96,18 +96,16 @@ const InvestorAction = () => {
 
   const [amount, setAmount] = useState("");
   const [ownershipPct, setOwnershipPct] = useState("");
-  const [basis, setBasis] = useState<"net" | "gross">("net");
   const [date, setDate] = useState<Dayjs | null>(null);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (meta?.kind === "ownership") {
-      if (s.ownershipPct != null) setOwnershipPct(String(s.ownershipPct));
-      if (s.profitBasis) setBasis(s.profitBasis);
+    if (meta?.kind === "ownership" && s.ownershipPct != null) {
+      setOwnershipPct(String(s.ownershipPct));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.ownershipPct, s.profitBasis]);
+  }, [s.ownershipPct]);
 
   if (!meta) return null;
 
@@ -145,8 +143,9 @@ const InvestorAction = () => {
       if (Number.isNaN(pct) || pct < 0 || pct > 100)
         return message.error(t("ownershipRange", "Ulush 0..100 oralig'ida"));
       setLoading(true);
+      // Basis bu yerda o'zgarmaydi (joriy saqlanadi) — u faqat investor tasdig'i orqali.
       setOwnership.mutate(
-        { id, body: { ownership_bps: Math.round(pct * 100), profit_basis: basis, effective_from: dateMs, note: noteVal } },
+        { id, body: { ownership_bps: Math.round(pct * 100), effective_from: dateMs, note: noteVal } },
         { onSuccess: done("ownershipSet"), onError: err },
       );
       return;
@@ -166,7 +165,7 @@ const InvestorAction = () => {
 
   return (
     <div className="min-h-full bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] p-4 sm:p-6">
-      <div className="max-w-xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
           <button
@@ -188,24 +187,9 @@ const InvestorAction = () => {
           </div>
         </div>
 
-        {/* Joriy holat konteksti */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="bg-white dark:bg-[#2A263D] rounded-xl p-3 border border-gray-100 dark:border-gray-700/50">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("ownership", "Ulush")}</p>
-            <p className="text-sm font-bold text-gray-800 dark:text-white">{s.ownershipPct ?? 0}%</p>
-          </div>
-          <div className="bg-white dark:bg-[#2A263D] rounded-xl p-3 border border-gray-100 dark:border-gray-700/50">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("capitalInvested", "Sof kapital")}</p>
-            <p className="text-sm font-bold text-gray-800 dark:text-white">{formatMoney(s.capitalInvested)}</p>
-          </div>
-          <div className="bg-white dark:bg-[#2A263D] rounded-xl p-3 border border-gray-100 dark:border-gray-700/50">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("accruedShare", "Foyda")}</p>
-            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatMoney(s.accruedProfitShare)}</p>
-          </div>
-        </div>
-
-        {/* Forma */}
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-5 sm:p-6 flex flex-col gap-4">
+        <div className="grid lg:grid-cols-5 gap-5 items-start">
+          {/* Forma (chap) */}
+          <div className="lg:col-span-3 bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-5 sm:p-6 flex flex-col gap-4">
           {meta.kind === "ownership" ? (
             <>
               <div>
@@ -218,26 +202,13 @@ const InvestorAction = () => {
                     onChange={(e) => setOwnershipPct(e.target.value)} className={field} placeholder="5" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                  {t("profitBasis", "Foyda asosi")}
-                </label>
-                <div className="flex gap-2">
-                  {(["net", "gross"] as const).map((b) => (
-                    <button key={b} type="button" onClick={() => setBasis(b)}
-                      className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${
-                        basis === b
-                          ? "bg-gradient-to-r from-rose-500 to-pink-600 text-white border-transparent shadow"
-                          : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-rose-300"
-                      }`}>
-                      {b === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  {basis === "net"
-                    ? t("basisNetHint", "Buyurtma marjasi minus xarajatlar")
-                    : t("basisGrossHint", "Faqat buyurtma marjasi (xarajatsiz)")}
+              <div className="bg-gray-50 dark:bg-[#312D4B] rounded-xl p-3 border border-gray-100 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("profitBasis", "Foyda asosi")}</p>
+                <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                  {(s.profitBasis ?? "net") === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
+                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  {t("basisConsentNote", "Foyda asosini o'zgartirish faqat investor tasdig'i orqali (bu sahifada o'zgarmaydi)")}
                 </p>
               </div>
             </>
@@ -294,6 +265,34 @@ const InvestorAction = () => {
               <>{t("save", "Saqlash")} <ArrowRight className="w-4 h-4" /></>
             )}
           </button>
+          </div>
+
+          {/* Kontekst (o'ng) */}
+          <div className="lg:col-span-2 flex flex-col gap-3">
+            <div className="bg-gradient-to-br from-[#8247ff] to-[#5b21b6] text-white p-4 rounded-2xl shadow-lg">
+              <p className="text-xs opacity-90">{t("ownership", "Ulush")}</p>
+              <p className="text-3xl font-bold mt-0.5">{s.ownershipPct ?? 0}%</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <div className="bg-white dark:bg-[#2A263D] rounded-2xl p-4 border border-gray-100 dark:border-gray-700/50">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("capitalInvested", "Sof kapital")}</p>
+                <p className="text-lg font-bold text-gray-800 dark:text-white">{formatMoney(s.capitalInvested)}</p>
+              </div>
+              <div className="bg-white dark:bg-[#2A263D] rounded-2xl p-4 border border-gray-100 dark:border-gray-700/50">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("accruedShare", "Hisoblangan foyda")}</p>
+                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatMoney(s.accruedProfitShare)}</p>
+              </div>
+              <div className="bg-white dark:bg-[#2A263D] rounded-2xl p-4 border border-gray-100 dark:border-gray-700/50">
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t("profitBasis", "Foyda asosi")}</p>
+                <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                  {(s.profitBasis ?? "net") === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
+                </p>
+              </div>
+            </div>
+            <div className={`${meta.iconBg} rounded-2xl p-4`}>
+              <p className={`text-sm ${meta.iconColor}`}>{descriptions[action as ActionKey]}</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

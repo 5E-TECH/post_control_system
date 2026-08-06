@@ -14,6 +14,7 @@ import { InvestorCapitalContributionEntity } from 'src/core/entity/investor-capi
 import { InvestorCapitalWithdrawalEntity } from 'src/core/entity/investor-capital-withdrawal.entity';
 import { InvestorOwnershipStakeEntity } from 'src/core/entity/investor-ownership-stake.entity';
 import { InvestorDistributionEntity } from 'src/core/entity/investor-distribution.entity';
+import { InvestorBasisRequestEntity } from 'src/core/entity/investor-basis-request.entity';
 import { LogInvestorAccessInterceptor } from 'src/common/interceptors/log-investor-access.interceptor';
 
 /**
@@ -37,6 +38,7 @@ import { LogInvestorAccessInterceptor } from 'src/common/interceptors/log-invest
       InvestorCapitalWithdrawalEntity,
       InvestorOwnershipStakeEntity,
       InvestorDistributionEntity,
+      InvestorBasisRequestEntity,
     ]),
   ],
   controllers: [InvestorController, InvestorAdminController],

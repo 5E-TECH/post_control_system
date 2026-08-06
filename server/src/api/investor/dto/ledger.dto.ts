@@ -55,6 +55,14 @@ export class RecordWithdrawalDto {
   note?: string;
 }
 
+// Admin: foyda-asosi o'zgarishini TAKLIF qilish (investor tasdiqlaydi).
+export class ProposeBasisDto {
+  @ApiProperty({ enum: ['net', 'gross'] })
+  @IsNotEmpty()
+  @IsIn(['net', 'gross'])
+  basis: 'net' | 'gross';
+}
+
 // Admin: egalik ulushini o'rnatish / o'zgartirish (basis points).
 export class SetOwnershipDto {
   @ApiProperty({ example: 2000, description: 'Basis points (0..10000). 20% = 2000' })

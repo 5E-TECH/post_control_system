@@ -115,5 +115,16 @@
   "basisNetHint": "Buyurtma marjasi minus xarajatlar",
   "basisGrossHint": "Faqat buyurtma marjasi (xarajatsiz)",
   "enterAmount": "Miqdorni kiriting",
-  "saving": "Saqlanmoqda..."
+  "saving": "Saqlanmoqda...",
+  "basisProposed": "Taklif yuborildi — investor tasdig'i kutilmoqda",
+  "awaitingInvestor": "investor tasdig'i kutilmoqda",
+  "proposeBasisChange": "O'zgartirishni taklif qilish",
+  "basisConsentNote": "Foyda asosini o'zgartirish faqat investor tasdig'i orqali (bu sahifada o'zgarmaydi)",
+  "basisRequestTitle": "Foyda asosini o'zgartirish taklifi",
+  "basisRequestBody": "Yangi asos",
+  "basisRequestConfirm": "tasdiqlaysizmi?",
+  "basisApproved": "Tasdiqlandi",
+  "basisRejected": "Rad etildi",
+  "approve": "Tasdiqlash",
+  "reject": "Rad etish"
 }

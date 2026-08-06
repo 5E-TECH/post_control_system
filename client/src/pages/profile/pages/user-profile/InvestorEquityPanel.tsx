@@ -35,11 +35,28 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
   const role = useSelector((s: RootState) => s.roleSlice.role);
   const isSuper = role === "superadmin";
 
-  const { getInvestorSummary, getInvestorLedger, getInvestorDaily, setOwnership } =
-    useInvestorAdmin();
+  const {
+    getInvestorSummary,
+    getInvestorLedger,
+    getInvestorDaily,
+    getPendingBasis,
+    proposeBasis,
+  } = useInvestorAdmin();
 
   const { data: sumRes } = getInvestorSummary(investorUserId);
   const s = sumRes?.data ?? {};
+  const { data: pendRes } = getPendingBasis(investorUserId);
+  const pending = pendRes?.data;
+
+  const proposeBasisChange = (basis: "net" | "gross") => {
+    proposeBasis.mutate(
+      { id: investorUserId, basis },
+      {
+        onSuccess: () => message.success(t("basisProposed", "Taklif yuborildi — investor tasdig'i kutilmoqda")),
+        onError: (e: any) => message.error(e?.response?.data?.message || t("error", "Xatolik")),
+      }
+    );
+  };
 
   const [from, setFrom] = useState<string | undefined>();
   const [to, setTo] = useState<string | undefined>();
@@ -58,17 +75,6 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
   const totalPages = Math.max(1, Math.ceil((led.total ?? 0) / (led.limit ?? 10)));
 
   const go = (action: string) => navigate(`/investor-equity/${investorUserId}/${action}`);
-
-  const changeBasis = (basis: "net" | "gross") => {
-    if (basis === s.profitBasis) return;
-    setOwnership.mutate(
-      { id: investorUserId, body: { ownership_bps: s.ownershipBps ?? 0, profit_basis: basis } },
-      {
-        onSuccess: () => message.success(t("basisChanged", "Foyda asosi o'zgartirildi")),
-        onError: (e: any) => message.error(e?.response?.data?.message || t("error", "Xatolik")),
-      }
-    );
-  };
 
   const typeLabel: Record<string, string> = {
     capital: t("typeCapital", "Kapital"),
@@ -90,22 +96,23 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
             {t("equityTitle", "Investor equity boshqaruvi")}
           </h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400">{t("profitBasis", "Foyda asosi")}:</span>
-          {isSuper ? (
-            <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs">
-              {(["net", "gross"] as const).map((b) => (
-                <button key={b} onClick={() => changeBasis(b)}
-                  className={`px-3 py-1 font-medium transition-colors ${(s.profitBasis ?? "net") === b ? "bg-rose-500 text-white" : "bg-white dark:bg-[#2A263D] text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#352F4A]"}`}>
-                  {b === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-              {(s.profitBasis ?? "net") === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
+          <span className="text-xs font-semibold px-2 py-1 rounded-lg bg-gray-100 dark:bg-[#3B3656] text-gray-700 dark:text-gray-200">
+            {(s.profitBasis ?? "net") === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
+          </span>
+          {pending ? (
+            <span className="text-xs px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              ⏳ {pending.requested_basis === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")} — {t("awaitingInvestor", "investor tasdig'i kutilmoqda")}
             </span>
-          )}
+          ) : isSuper ? (
+            <button
+              onClick={() => proposeBasisChange((s.profitBasis ?? "net") === "net" ? "gross" : "net")}
+              className="text-xs px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#352F4A] transition-colors"
+            >
+              {t("proposeBasisChange", "O'zgartirishni taklif qilish")}
+            </button>
+          ) : null}
         </div>
       </div>
 

@@ -9,6 +9,7 @@ import { InvestorCapitalContributionEntity } from 'src/core/entity/investor-capi
 import { InvestorCapitalWithdrawalEntity } from 'src/core/entity/investor-capital-withdrawal.entity';
 import { InvestorOwnershipStakeEntity } from 'src/core/entity/investor-ownership-stake.entity';
 import { InvestorDistributionEntity } from 'src/core/entity/investor-distribution.entity';
+import { InvestorBasisRequestEntity } from 'src/core/entity/investor-basis-request.entity';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { FinancialSource_type, Roles } from 'src/common/enums';
@@ -46,6 +47,8 @@ export class InvestorLedgerService {
     private readonly stakeRepo: Repository<InvestorOwnershipStakeEntity>,
     @InjectRepository(InvestorDistributionEntity)
     private readonly distRepo: Repository<InvestorDistributionEntity>,
+    @InjectRepository(InvestorBasisRequestEntity)
+    private readonly basisReqRepo: Repository<InvestorBasisRequestEntity>,
     @InjectRepository(FinancialBalanceHistoryEntity)
     private readonly fbhRepo: Repository<FinancialBalanceHistoryEntity>,
     @InjectRepository(UserEntity)
@@ -563,6 +566,91 @@ export class InvestorLedgerService {
       user: actor,
     });
     return successRes(row, 201, 'Distribution recorded');
+  }
+
+  // ---- Foyda-asosi o'zgarishi: TASDIQLASH oqimi ----
+  // Admin faqat TAKLIF qiladi — o'zi bevosita o'zgartira olmaydi. Investor
+  // tasdiqlagandagina basis o'zgaradi (joriy ulush% saqlanadi, o'sha kundan).
+  async proposeBasisChange(
+    investorId: string,
+    basis: string,
+    actor?: JwtPayload,
+  ) {
+    await this.assertInvestor(investorId);
+    if (basis !== 'net' && basis !== 'gross') {
+      throw new BadRequestException("basis 'net' yoki 'gross' bo'lishi kerak");
+    }
+    await this.basisReqRepo.delete({ investor_id: investorId });
+    const row = this.basisReqRepo.create({
+      investor_id: investorId,
+      requested_basis: basis,
+      requested_by: actor?.id ?? null,
+    });
+    await this.basisReqRepo.save(row);
+    this.activityLog.log({
+      entity_type: 'investor_basis_request',
+      entity_id: investorId,
+      action: 'proposed',
+      new_value: { requested_basis: basis },
+      description: `Foyda asosi taklifi: ${basis}`,
+      user: actor,
+    });
+    return successRes({ requested_basis: basis }, 201, 'Basis change proposed');
+  }
+
+  async getPendingBasisRequest(investorId: string) {
+    const row = await this.basisReqRepo.findOne({
+      where: { investor_id: investorId },
+    });
+    return successRes(
+      row
+        ? { requested_basis: row.requested_basis, created_at: row.created_at }
+        : null,
+      200,
+      'Pending basis request',
+    );
+  }
+
+  async approveBasisRequest(investorId: string, actor?: JwtPayload) {
+    const row = await this.basisReqRepo.findOne({
+      where: { investor_id: investorId },
+    });
+    if (!row) throw new NotFoundException("Kutayotgan so'rov yo'q");
+    const openStake = await this.stakeRepo.findOne({
+      where: { investor_id: investorId, effective_to: IsNull() },
+    });
+    const bps = openStake?.ownership_bps ?? 0;
+    await this.setOwnership(
+      investorId,
+      { ownership_bps: bps, profit_basis: row.requested_basis as 'net' | 'gross' },
+      actor,
+    );
+    await this.basisReqRepo.delete({ investor_id: investorId });
+    this.activityLog.log({
+      entity_type: 'investor_basis_request',
+      entity_id: investorId,
+      action: 'approved',
+      new_value: { profit_basis: row.requested_basis },
+      description: `Foyda asosi tasdiqlandi: ${row.requested_basis}`,
+      user: actor,
+    });
+    return successRes(
+      { profit_basis: row.requested_basis },
+      200,
+      'Basis change approved',
+    );
+  }
+
+  async rejectBasisRequest(investorId: string, actor?: JwtPayload) {
+    await this.basisReqRepo.delete({ investor_id: investorId });
+    this.activityLog.log({
+      entity_type: 'investor_basis_request',
+      entity_id: investorId,
+      action: 'rejected',
+      description: 'Foyda asosi taklifi rad etildi',
+      user: actor,
+    });
+    return successRes(null, 200, 'Basis change rejected');
   }
 
   // Admin: barcha investorlar ro'yxati (equity boshqaruvi uchun).

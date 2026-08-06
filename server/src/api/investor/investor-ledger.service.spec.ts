@@ -47,6 +47,13 @@ const makeLedger = (over: any = {}) => {
     save: jest.fn(),
     ...over.distRepo,
   };
+  const basisReqRepo: any = {
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn((x) => x),
+    save: jest.fn(),
+    delete: jest.fn(),
+    ...over.basisReqRepo,
+  };
   const fbhRepo: any = {
     createQueryBuilder: jest.fn(() => makeQb({ opex: '0' })),
     ...over.fbhRepo,
@@ -59,8 +66,8 @@ const makeLedger = (over: any = {}) => {
   const dataSource: any = { transaction: jest.fn(), ...over.dataSource };
   const activityLog: any = { log: jest.fn() };
   return new InvestorLedgerService(
-    capitalRepo, withdrawalRepo, stakeRepo, distRepo, fbhRepo, userRepo,
-    orderService, dataSource, activityLog,
+    capitalRepo, withdrawalRepo, stakeRepo, distRepo, basisReqRepo, fbhRepo,
+    userRepo, orderService, dataSource, activityLog,
   );
 };
 
@@ -184,5 +191,33 @@ describe('InvestorLedgerService', () => {
     await expect(
       svc.setOwnership('x', { ownership_bps: 1000 } as any, { id: 'a' } as any),
     ).rejects.toThrow();
+  });
+
+  it('proposeBasisChange kutayotgan so\'rov yozadi (o\'zi o\'zgartirmaydi)', async () => {
+    const save = jest.fn();
+    const svc = makeLedger({
+      userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
+      basisReqRepo: { findOne: jest.fn(), create: jest.fn((x) => x), save, delete: jest.fn() },
+    });
+    await svc.proposeBasisChange('inv', 'gross', { id: 'admin' } as any);
+    expect(save).toHaveBeenCalled();
+  });
+
+  it('approveBasisRequest so\'rovni qo\'llaydi (setOwnership) va o\'chiradi', async () => {
+    const del = jest.fn();
+    const svc = makeLedger({
+      userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
+      stakeRepo: { findOne: jest.fn().mockResolvedValue({ ownership_bps: 1000, profit_basis: 'net' }) },
+      basisReqRepo: { findOne: jest.fn().mockResolvedValue({ requested_basis: 'gross' }), delete: del },
+      dataSource: { transaction: jest.fn(async (cb: any) => cb({ getRepository: () => ({ update: jest.fn(), create: jest.fn((x) => x), save: jest.fn() }) })) },
+    });
+    const res: any = await svc.approveBasisRequest('inv', { id: 'inv' } as any);
+    expect(res.data.profit_basis).toBe('gross');
+    expect(del).toHaveBeenCalled();
+  });
+
+  it('approveBasisRequest so\'rov yo\'q bo\'lsa rad etadi', async () => {
+    const svc = makeLedger({ basisReqRepo: { findOne: jest.fn().mockResolvedValue(null) } });
+    await expect(svc.approveBasisRequest('inv', { id: 'inv' } as any)).rejects.toThrow();
   });
 });
