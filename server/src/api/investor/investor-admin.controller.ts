@@ -73,6 +73,16 @@ export class InvestorAdminController {
     );
   }
 
+  @Get(':id/daily')
+  @ApiOperation({ summary: 'Kunlik foyda breakdown (pochta foydasi + investor ulushi)' })
+  daily(
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.ledgerService.getDailyBreakdown(id, startDate, endDate);
+  }
+
   // FAQAT SUPERADMIN — kapital belgilash.
   @Post(':id/capital')
   @AcceptRoles(Roles.SUPERADMIN)

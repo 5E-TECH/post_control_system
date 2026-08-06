@@ -161,6 +161,19 @@ export class InvestorController {
     );
   }
 
+  @Get('my-investment/daily')
+  @LogInvestorAccess('my-investment-daily')
+  @ApiOperation({ summary: 'Shaxsiy kunlik foyda breakdown' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'YYYY-MM-DD' })
+  getMyDaily(
+    @CurrentUser() user: JwtPayload,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.ledgerService.getDailyBreakdown(user.id, startDate, endDate);
+  }
+
   // ---- Aggregat Excel eksport ----
   @Get('export')
   @LogInvestorAccess('export')

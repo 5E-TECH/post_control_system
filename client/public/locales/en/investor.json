@@ -102,5 +102,11 @@
   "profitBasis": "Profit basis",
   "basisNet": "Net profit",
   "basisGross": "Gross margin",
-  "basisChanged": "Profit basis changed"
+  "basisChanged": "Profit basis changed",
+  "dailyTitle": "Daily profit",
+  "postProfit": "Post profit",
+  "investorShare": "Investor share",
+  "total": "total",
+  "cancel": "Cancel",
+  "optional": "optional"
 }

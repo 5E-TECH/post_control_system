@@ -296,6 +296,122 @@ export class InvestorLedgerService {
     return (await wb.xlsx.writeBuffer()) as unknown as Buffer;
   }
 
+  // Kunlik OpEx (FBH negativlari, Toshkent kuni bo'yicha) → {'YYYY-MM-DD': opex}.
+  private async dailyOpexMap(
+    fromTs: number,
+    toTs: number,
+  ): Promise<Record<string, number>> {
+    const rows: any[] = await this.fbhRepo.query(
+      `SELECT TO_CHAR(TO_TIMESTAMP(h.created_at/1000) AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD') AS day,
+              SUM(CASE WHEN h.amount < 0 THEN (-1*h.amount) ELSE 0 END) AS opex
+       FROM financial_balance_history h
+       WHERE h.source_type IN ('salary','bills','manual_expense')
+         AND h.created_at >= $1 AND h.created_at <= $2
+       GROUP BY day`,
+      [fromTs, toTs],
+    );
+    const map: Record<string, number> = {};
+    for (const r of rows) map[r.day] = this.num(r.opex);
+    return map;
+  }
+
+  private stakeForDay(
+    stakes: InvestorOwnershipStakeEntity[],
+    dayMs: number,
+  ): InvestorOwnershipStakeEntity | null {
+    for (const s of stakes) {
+      const from = this.num(s.effective_from);
+      const to = s.effective_to == null ? Infinity : this.num(s.effective_to);
+      if (from <= dayMs && dayMs < to) return s;
+    }
+    return null;
+  }
+
+  // KUNLIK breakdown: har kun pochta foydasi + o'sha kungi ulush → investor ulushi.
+  // Pochta kunlik foydasi = getRevenueStats(daily) (tarif marjasi). 'net' basis'da
+  // o'sha kungi OpEx ayriladi. Har kun O'ZINING aktiv ulush versiyasi bilan.
+  // epoch-ms → 'YYYY-MM-DD' (Toshkent).
+  private toYmd(ms: number): string {
+    const uz = new Date(ms + 5 * 60 * 60 * 1000);
+    return `${uz.getUTCFullYear()}-${String(uz.getUTCMonth() + 1).padStart(2, '0')}-${String(uz.getUTCDate()).padStart(2, '0')}`;
+  }
+
+  async getDailyBreakdown(
+    investorId: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const stakes = await this.stakeRepo.find({
+      where: { investor_id: investorId },
+      order: { effective_from: 'ASC' },
+    });
+
+    // Default oraliq: eng erta ulush boshidan → bugun. getRevenueStats faqat
+    // startDate VA endDate birga berilganda ularni ishlatadi — shuning uchun
+    // ikkalasini ham beramiz (aks holda oxirgi 30 kun bo'sh chiqishi mumkin).
+    let sd = startDate;
+    let ed = endDate;
+    if (!sd || !ed) {
+      const earliest =
+        stakes.length > 0
+          ? Math.min(...stakes.map((s) => this.num(s.effective_from)))
+          : Date.now();
+      sd = sd || this.toYmd(earliest);
+      ed = ed || this.toYmd(Date.now());
+    }
+
+    const revRes: any = await this.orderService.getRevenueStats('daily', sd, ed);
+    const series: any[] = revRes?.data?.data ?? [];
+    const needNet = stakes.some((s) => (s.profit_basis || 'net') === 'net');
+
+    let opexByDay: Record<string, number> = {};
+    if (needNet && series.length) {
+      opexByDay = await this.dailyOpexMap(
+        toUzbekistanTimestamp(series[0].period, false),
+        toUzbekistanTimestamp(series[series.length - 1].period, true),
+      );
+    }
+
+    const days = series.map((d) => {
+      const dayMs = toUzbekistanTimestamp(d.period, false);
+      const stake = this.stakeForDay(stakes, dayMs);
+      const bps = stake?.ownership_bps ?? 0;
+      const basis = stake?.profit_basis ?? 'net';
+      const gross = this.num(d.revenue);
+      const opex = basis === 'net' ? this.num(opexByDay[d.period]) : 0;
+      const postProfit = gross - opex;
+      const investorShare = Math.floor((postProfit * bps) / 10000);
+      return {
+        date: d.period,
+        label: d.label,
+        ordersCount: this.num(d.ordersCount),
+        postProfit,
+        ownershipPct: bps / 100,
+        investorShare,
+      };
+    });
+
+    const totals = days.reduce(
+      (a, x) => ({
+        postProfit: a.postProfit + x.postProfit,
+        investorShare: a.investorShare + x.investorShare,
+      }),
+      { postProfit: 0, investorShare: 0 },
+    );
+    const openStake = stakes.find((s) => s.effective_to == null);
+
+    return successRes(
+      {
+        basis: openStake?.profit_basis ?? 'net',
+        ownershipPct: (openStake?.ownership_bps ?? 0) / 100,
+        days,
+        totals,
+      },
+      200,
+      'Daily breakdown',
+    );
+  }
+
   // ===================== ADMIN YOZUVLARI =====================
 
   private async assertInvestor(investorId: string): Promise<UserEntity> {

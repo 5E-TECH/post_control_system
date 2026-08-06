@@ -34,6 +34,17 @@ export const useInvestorAdmin = () => {
       enabled: !!id,
     });
 
+  const getInvestorDaily = (
+    id?: string,
+    params: { startDate?: string; endDate?: string } = {},
+  ) =>
+    useQuery({
+      queryKey: [investorAdminKey, "daily", id, params],
+      queryFn: () =>
+        api.get(`investor-admin/${id}/daily`, { params }).then((r) => r.data),
+      enabled: !!id,
+    });
+
   const createInvestor = useMutation({
     mutationFn: (body: { name: string; phone_number: string; password: string }) =>
       api.post("user/investor", body),
@@ -68,6 +79,7 @@ export const useInvestorAdmin = () => {
     getInvestors,
     getInvestorSummary,
     getInvestorLedger,
+    getInvestorDaily,
     createInvestor,
     recordCapital,
     setOwnership,

@@ -102,5 +102,11 @@
   "profitBasis": "Foyda asosi",
   "basisNet": "Sof foyda",
   "basisGross": "Yalpi marja",
-  "basisChanged": "Foyda asosi o'zgartirildi"
+  "basisChanged": "Foyda asosi o'zgartirildi",
+  "dailyTitle": "Kunlik foyda",
+  "postProfit": "Pochta foydasi",
+  "investorShare": "Investor foydasi",
+  "total": "jami",
+  "cancel": "Bekor",
+  "optional": "ixtiyoriy"
 }

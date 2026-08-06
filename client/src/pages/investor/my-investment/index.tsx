@@ -23,9 +23,13 @@ const InvestorMyInvestment = () => {
   const [to, setTo] = useState<string | undefined>();
   const [page, setPage] = useState(1);
 
-  const { getMyInvestment, getMyLedger } = useInvestor();
+  const { getMyInvestment, getMyLedger, getMyDaily } = useInvestor();
   const { data: miRes, isLoading } = getMyInvestment({ startDate: from, endDate: to });
   const { data: ledRes } = getMyLedger({ page, limit: 20 });
+  const { data: dailyRes } = getMyDaily({ startDate: from, endDate: to });
+  const daily = dailyRes?.data ?? {};
+  const dailyDays: any[] = Array.isArray(daily.days) ? daily.days : [];
+  const dailyTotals = daily.totals ?? { postProfit: 0, investorShare: 0 };
 
   const mi = miRes?.data ?? {};
   const led = ledRes?.data ?? {};
@@ -112,6 +116,59 @@ const InvestorMyInvestment = () => {
           value={formatMoney(mi.undistributed)}
           gradient="from-purple-500 to-fuchsia-600"
         />
+      </div>
+
+      {/* Kunlik foyda */}
+      <div className="bg-white dark:bg-[#2A263D] p-4 sm:p-5 rounded-2xl shadow-sm">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white mb-3">
+          {t("dailyTitle", "Kunlik foyda")}
+        </h3>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="bg-gray-50 dark:bg-[#3B3656] rounded-xl p-3">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("postProfit", "Pochta foydasi")} ({t("total", "jami")})
+            </p>
+            <p className="font-bold text-gray-800 dark:text-white">
+              {formatMoney(dailyTotals.postProfit)}
+            </p>
+          </div>
+          <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-3">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t("investorShare", "Sizning foydangiz")} ({t("total", "jami")})
+            </p>
+            <p className="font-bold text-emerald-600 dark:text-emerald-400">
+              {formatMoney(dailyTotals.investorShare)}
+            </p>
+          </div>
+        </div>
+        {dailyDays.length === 0 ? (
+          <p className="text-sm text-gray-400 py-4 text-center">
+            {t("noData", "Ma'lumot yo'q")}
+          </p>
+        ) : (
+          <div className="overflow-x-auto max-h-72 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white dark:bg-[#2A263D]">
+                <tr className="text-left text-gray-400 border-b border-gray-100 dark:border-[#3B3656]">
+                  <th className="py-2 pr-2">{t("date", "Sana")}</th>
+                  <th className="py-2 pr-2">{t("postProfit", "Pochta foydasi")}</th>
+                  <th className="py-2 pr-2">{t("ownership", "Ulush")}</th>
+                  <th className="py-2 text-right">{t("investorShare", "Sizning foydangiz")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyDays.map((d: any) => (
+                  <tr key={d.date} className="border-b border-gray-50 dark:border-[#332f49] last:border-0">
+                    <td className="py-2 pr-2 text-gray-600 dark:text-gray-300">{d.date}</td>
+                    <td className="py-2 pr-2 text-gray-700 dark:text-gray-200">{formatMoney(d.postProfit)}</td>
+                    <td className="py-2 pr-2 text-gray-500">{d.ownershipPct}%</td>
+                    <td className="py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{formatMoney(d.investorShare)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Ledger tarixi */}

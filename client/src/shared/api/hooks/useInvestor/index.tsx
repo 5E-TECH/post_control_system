@@ -94,6 +94,15 @@ export const useInvestor = () => {
           .then((res) => res.data),
     });
 
+  const getMyDaily = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "my-daily", params],
+      queryFn: () =>
+        api
+          .get("investor/my-investment/daily", { params })
+          .then((res) => res.data),
+    });
+
   // Imperativ Excel eksport (blob) — react-query emas.
   const exportBusiness = (params: RangeParams = {}) =>
     api.get("investor/export", { params, responseType: "blob" });
@@ -113,6 +122,7 @@ export const useInvestor = () => {
     getUnitEconomics,
     getMyInvestment,
     getMyLedger,
+    getMyDaily,
     exportBusiness,
     exportMyInvestment,
   };

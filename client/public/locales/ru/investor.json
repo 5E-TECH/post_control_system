@@ -102,5 +102,11 @@
   "profitBasis": "Основа прибыли",
   "basisNet": "Чистая прибыль",
   "basisGross": "Валовая маржа",
-  "basisChanged": "Основа прибыли изменена"
+  "basisChanged": "Основа прибыли изменена",
+  "dailyTitle": "Прибыль по дням",
+  "postProfit": "Прибыль почты",
+  "investorShare": "Доля инвестора",
+  "total": "всего",
+  "cancel": "Отмена",
+  "optional": "необязательно"
 }
