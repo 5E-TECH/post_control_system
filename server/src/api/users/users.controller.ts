@@ -893,6 +893,7 @@ export class UsersController {
     Roles.MARKET,
     Roles.LOGIST,
     Roles.OPERATOR,
+    Roles.INVESTOR,
   )
   @Patch('self')
   selfUpdate(
