@@ -803,6 +803,7 @@ export class UsersController {
     Roles.MARKET,
     Roles.OPERATOR,
     Roles.LOGIST,
+    Roles.INVESTOR,
   )
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload) {
