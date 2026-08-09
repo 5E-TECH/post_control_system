@@ -35,6 +35,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { CreateInvestorDto } from './dto/create-investor.dto';
+import { UpdateInvestorDto } from './dto/update-investor.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { SelfGuard } from 'src/common/guards/self.guard';
 import { UpdateSelfDto } from './dto/self-update.dto';
@@ -115,6 +116,27 @@ export class UsersController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.createInvestor(createInvestorDto, user);
+  }
+
+  @ApiOperation({
+    summary: 'Update investor user',
+    description: "Investor akkauntini tahrirlash — ism/telefon/parol/status (SuperAdmin only)",
+  })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiBody({ type: UpdateInvestorDto })
+  @ApiResponse({ status: 200, description: 'Investor updated successfully' })
+  @ApiResponse({ status: 404, description: 'Investor not found' })
+  @ApiResponse({ status: 409, description: 'Phone number already exists' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN)
+  @Patch('investor/:id')
+  updateInvestor(
+    @Param('id') id: string,
+    @Body() updateInvestorDto: UpdateInvestorDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.updateInvestor(id, updateInvestorDto, user);
   }
 
   @ApiOperation({
