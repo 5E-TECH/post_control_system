@@ -154,10 +154,17 @@ describe('InvestorService — investor-safe mapping (PII/maxfiy oqmasligi)', () 
     expect(res.data.couriers[0]).toEqual({ rank: 1, totalOrders: 150, successfulOrders: 140, successRate: 93 });
   });
 
-  it('getOverview safe maydonlar + raqamga coerce', async () => {
+  it('getOverview safe maydonlar + sof foyda (TO\'LIQ marja − OpEx)', async () => {
     const res: any = await makeService().getOverview();
     expect(res.data).toEqual({
-      acceptedCount: 120, soldAndPaid: 90, cancelled: 10, profit: 5_000_000, from: 1000, to: 2000,
+      acceptedCount: 120,
+      soldAndPaid: 90,
+      cancelled: 10,
+      profit: -4_200_000, // sof foyda = 300k marja − 4.5M OpEx
+      grossProfit: 300_000, // getRevenueStats summasi (TO'LIQ marja, getStats EMAS)
+      totalOpEx: 4_500_000,
+      from: 1000,
+      to: 2000,
     });
   });
 
@@ -170,9 +177,9 @@ describe('InvestorService — investor-safe mapping (PII/maxfiy oqmasligi)', () 
   it("getNetProfit = grossProfit − totalOpEx, xarajat komponentlari OSHKOR EMAS", async () => {
     const res: any = await makeService().getNetProfit();
     expect(res.data).toEqual({
-      grossProfit: 5_000_000, // getStats.profit (buyurtma-asosli)
+      grossProfit: 300_000, // getRevenueStats summasi (TO'LIQ marja, getStats EMAS)
       totalOpEx: 4_500_000, // 3M salary + 1M bills + 0.5M manual_expense
-      netProfit: 500_000, // 5M − 4.5M
+      netProfit: -4_200_000, // 300k − 4.5M
       from: null,
       to: null,
     });
@@ -190,10 +197,10 @@ describe('InvestorService — investor-safe mapping (PII/maxfiy oqmasligi)', () 
   it("getUnitEconomics: revenuePerOrder va takeRatePct", async () => {
     const res: any = await makeService().getUnitEconomics();
     expect(res.data.grossSold).toBe(50_000_000);
-    expect(res.data.totalProfit).toBe(5_000_000);
+    expect(res.data.totalProfit).toBe(300_000); // getRevenueStats summasi (TO'LIQ marja)
     expect(res.data.soldOrders).toBe(90);
-    expect(res.data.revenuePerOrder).toBe(Math.round(5_000_000 / 90));
-    expect(res.data.takeRatePct).toBe(10); // 5M/50M*100
+    expect(res.data.revenuePerOrder).toBe(Math.round(300_000 / 90));
+    expect(res.data.takeRatePct).toBe(0.6); // 300k/50M*100
   });
 
   it("getRevenue seriyasiga growth% qo'shiladi (oldingi 0/yo'q -> null)", async () => {

@@ -10,9 +10,14 @@ const InvestorSidebar = () => {
 
   const links = [
     {
+      to: "/investor/my-investment",
+      icon: <PieChart />,
+      label: t("navMyMoney", "Mening foydam"),
+    },
+    {
       to: "/investor/overview",
       icon: <LayoutDashboard />,
-      label: t("navOverview", "Umumiy"),
+      label: t("navOverview", "Biznes ko'rinishi"),
     },
     {
       to: "/investor/financials",
@@ -23,11 +28,6 @@ const InvestorSidebar = () => {
       to: "/investor/operations",
       icon: <Activity />,
       label: t("navOperations", "Operatsiyalar"),
-    },
-    {
-      to: "/investor/my-investment",
-      icon: <PieChart />,
-      label: t("navMyInvestment", "Mening investitsiyam"),
     },
     { to: "/profile", icon: <UserRound />, label: t("navProfile", "Profil") },
   ];

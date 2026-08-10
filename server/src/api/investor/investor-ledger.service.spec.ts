@@ -1,4 +1,5 @@
 import { InvestorLedgerService } from './investor-ledger.service';
+import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 
 // Chainable QB mock — getRawOne/getRawMany beradi.
 const makeQb = (rawOne: any = {}, rawMany: any[] = []) => {
@@ -56,11 +57,12 @@ const makeLedger = (over: any = {}) => {
   };
   const fbhRepo: any = {
     createQueryBuilder: jest.fn(() => makeQb({ opex: '0' })),
+    query: jest.fn().mockResolvedValue([]),
     ...over.fbhRepo,
   };
   const userRepo: any = { findOne: jest.fn(), find: jest.fn(), ...over.userRepo };
   const orderService: any = {
-    getStats: jest.fn().mockResolvedValue({ data: { profit: 0 } }),
+    getRevenueStats: jest.fn().mockResolvedValue({ data: { data: [] } }),
     ...over.orderService,
   };
   const dataSource: any = { transaction: jest.fn(), ...over.dataSource };
@@ -72,71 +74,114 @@ const makeLedger = (over: any = {}) => {
 };
 
 describe('InvestorLedgerService', () => {
-  it('grossProfitBetween = buyurtma-asosli (getStats.profit)', async () => {
+  it("computeDaily — TO'LIQ OpEx ayiriladi; jami = ulush% × sof foyda", async () => {
+    const day = '2026-03-25';
     const svc = makeLedger({
-      orderService: { getStats: jest.fn().mockResolvedValue({ data: { profit: 665000 } }) },
+      stakeRepo: {
+        find: jest.fn().mockResolvedValue([
+          { ownership_bps: 2000, profit_basis: 'net', effective_from: toUzbekistanTimestamp(day, false), effective_to: null },
+        ]),
+      },
+      distRepo: { find: jest.fn().mockResolvedValue([]) },
+      // OpEx BUTUN oraliq bo'yicha (buyurtmasiz kunda ham) — 375000
+      fbhRepo: { query: jest.fn().mockResolvedValue([{ day, opex: '375000' }]) },
+      orderService: {
+        getRevenueStats: jest.fn().mockResolvedValue({
+          data: { data: [{ period: day, label: '25.03', ordersCount: 5, revenue: 505000 }] },
+        }),
+      },
     });
-    expect(await svc.grossProfitBetween(0, 100)).toBe(665000);
+    const r: any = await (svc as any).computeDaily('inv', day, day);
+    expect(r.totals.revenue).toBe(505000);
+    expect(r.totals.postProfit).toBe(130000); // 505000 − 375000
+    expect(r.totals.investorShare).toBe(26000); // 20% × 130000
   });
 
-  it('opexBetween = FBH salary+bills+manual_expense magnitudasi', async () => {
+  it("computeDaily — har kun O'ZINING ulush versiyasi bilan (vaqt-tortilgan)", async () => {
+    const dayA = '2026-03-01';
+    const dayB = '2026-03-02';
     const svc = makeLedger({
-      fbhRepo: { createQueryBuilder: () => makeQb({ opex: '390000' }) },
+      stakeRepo: {
+        find: jest.fn().mockResolvedValue([
+          { ownership_bps: 1000, profit_basis: 'net', effective_from: toUzbekistanTimestamp(dayA, false), effective_to: toUzbekistanTimestamp(dayB, false) },
+          { ownership_bps: 2000, profit_basis: 'net', effective_from: toUzbekistanTimestamp(dayB, false), effective_to: null },
+        ]),
+      },
+      distRepo: { find: jest.fn().mockResolvedValue([]) },
+      fbhRepo: { query: jest.fn().mockResolvedValue([]) }, // OpEx yo'q
+      orderService: {
+        getRevenueStats: jest.fn().mockResolvedValue({
+          data: { data: [
+            { period: dayA, label: '01.03', ordersCount: 2, revenue: 500000 },
+            { period: dayB, label: '02.03', ordersCount: 3, revenue: 300000 },
+          ] },
+        }),
+      },
     });
-    expect(await svc.opexBetween(0, 100)).toBe(390000);
+    const r: any = await (svc as any).computeDaily('inv', dayA, dayB);
+    // dayA: 10% × 500000 = 50000; dayB: 20% × 300000 = 60000
+    expect(r.totals.investorShare).toBe(110000);
+    expect(r.days.find((d: any) => d.date === dayA).ownershipPct).toBe(10);
+    expect(r.days.find((d: any) => d.date === dayB).ownershipPct).toBe(20);
   });
 
-  it('netProfitBetween = yalpi − OpEx', async () => {
+  it('INVARIANT: hero (getSummary) == kunlik jadval jami (getDailyBreakdown)', async () => {
+    const day = '2026-03-25';
+    const over = {
+      stakeRepo: {
+        find: jest.fn().mockResolvedValue([
+          { ownership_bps: 2000, profit_basis: 'net', effective_from: toUzbekistanTimestamp(day, false), effective_to: null },
+        ]),
+      },
+      distRepo: { find: jest.fn().mockResolvedValue([{ amount: 10000, distributed_at: toUzbekistanTimestamp(day, false), created_at: 0 }]) },
+      fbhRepo: { query: jest.fn().mockResolvedValue([{ day, opex: '375000' }]) },
+      orderService: {
+        getRevenueStats: jest.fn().mockResolvedValue({
+          data: { data: [{ period: day, label: '25.03', ordersCount: 5, revenue: 505000 }] },
+        }),
+      },
+    };
+    const svc = makeLedger(over);
+    const sum: any = await svc.getSummary('inv', day, day);
+    const daily: any = await svc.getDailyBreakdown('inv', day, day);
+    // Bir xil dvigatel → hero AYNAN kunlik jami bilan bir xil.
+    expect(sum.data.accruedProfitShare).toBe(daily.data.totals.investorShare);
+    expect(sum.data.netProfitForRange).toBe(daily.data.totals.postProfit);
+    expect(sum.data.accruedProfitShare).toBe(26000);
+    expect(sum.data.distributionsPaid).toBe(10000);
+    expect(sum.data.undistributed).toBe(16000); // 26000 − 10000
+  });
+
+  it('getSummary — ROI + profitBasis to\'g\'ri (kunlik dvigateldan)', async () => {
+    const day = '2026-03-25';
     const svc = makeLedger({
-      orderService: { getStats: jest.fn().mockResolvedValue({ data: { profit: 665000 } }) },
-      fbhRepo: { createQueryBuilder: () => makeQb({ opex: '390000' }) },
+      stakeRepo: {
+        find: jest.fn().mockResolvedValue([
+          { ownership_bps: 2000, profit_basis: 'net', effective_from: toUzbekistanTimestamp(day, false), effective_to: null },
+        ]),
+      },
+      distRepo: { find: jest.fn().mockResolvedValue([{ amount: 100000, distributed_at: toUzbekistanTimestamp(day, false), created_at: 0 }]) },
+      fbhRepo: { query: jest.fn().mockResolvedValue([]) }, // OpEx yo'q → sof = yalpi
+      orderService: {
+        getRevenueStats: jest.fn().mockResolvedValue({
+          data: { data: [{ period: day, label: '25.03', ordersCount: 5, revenue: 550000 }] },
+        }),
+      },
     });
-    expect(await svc.netProfitBetween(0, 100)).toBe(275000); // 665k − 390k
-  });
-
-  it("profitBetween: 'gross' → yalpi, 'net' → sof", async () => {
-    const svc = makeLedger({
-      orderService: { getStats: jest.fn().mockResolvedValue({ data: { profit: 665000 } }) },
-      fbhRepo: { createQueryBuilder: () => makeQb({ opex: '390000' }) },
-    });
-    expect(await svc.profitBetween(0, 100, 'gross')).toBe(665000);
-    expect(await svc.profitBetween(0, 100, 'net')).toBe(275000);
-  });
-
-  it('accruedProfitShare — mid-period stake change vaqt-tortiladi (basis bo\'yicha)', async () => {
-    const svc = makeLedger();
-    jest.spyOn(svc, 'profitBetween').mockImplementation(async (from: number) =>
-      from === 100 ? 500_000 : from === 200 ? 300_000 : 0,
-    );
-    const accrued = await (svc as any).accruedProfitShare('inv', 100, 300);
-    // floor(500000*1000/10000) + floor(300000*2000/10000) = 50000 + 60000
-    expect(accrued).toBe(110_000);
-  });
-
-  it('getSummary — ROI + profitBasis to\'g\'ri', async () => {
-    const svc = makeLedger();
-    jest.spyOn(svc, 'profitBetween').mockImplementation(async (from: number) =>
-      from === 100 ? 500_000 : from === 200 ? 300_000 : 0,
-    );
-    jest.spyOn(svc, 'netProfitBetween').mockImplementation(async (from: number) =>
-      from === 0 ? 800_000 : 0,
-    );
-    const res: any = await svc.getSummary('inv');
+    const res: any = await svc.getSummary('inv', day, day);
     const d = res.data;
     expect(d.capitalInvested).toBe(1_000_000);
     expect(d.ownershipBps).toBe(2000);
     expect(d.profitBasis).toBe('net');
-    expect(d.accruedProfitShare).toBe(110_000);
+    expect(d.accruedProfitShare).toBe(110_000); // 20% × 550000
     expect(d.distributionsPaid).toBe(100_000);
-    expect(d.accruedRoiPct).toBe(11);
-    expect(d.realizedRoiPct).toBe(10);
-    expect(d.netProfitForRange).toBe(800_000);
+    expect(d.accruedRoiPct).toBe(11); // 110000/1000000
+    expect(d.realizedRoiPct).toBe(10); // 100000/1000000
+    expect(d.netProfitForRange).toBe(550_000);
   });
 
   it("capital 0 bo'lsa ROI null (NaN emas)", async () => {
     const svc = makeLedger({ capitalRepo: { find: jest.fn().mockResolvedValue([]) } });
-    jest.spyOn(svc, 'profitBetween').mockResolvedValue(0);
-    jest.spyOn(svc, 'netProfitBetween').mockResolvedValue(0);
     const res: any = await svc.getSummary('inv');
     expect(res.data.accruedRoiPct).toBeNull();
     expect(res.data.realizedRoiPct).toBeNull();
@@ -147,8 +192,6 @@ describe('InvestorLedgerService', () => {
       capitalRepo: { find: jest.fn().mockResolvedValue([{ amount: 1_000_000, contributed_at: 50, created_at: 50 }]) },
       withdrawalRepo: { find: jest.fn().mockResolvedValue([{ amount: 300_000, withdrawn_at: 100, created_at: 100 }]) },
     });
-    jest.spyOn(svc, 'profitBetween').mockResolvedValue(0);
-    jest.spyOn(svc, 'netProfitBetween').mockResolvedValue(0);
     const res: any = await svc.getSummary('inv');
     expect(res.data.capitalContributed).toBe(1_000_000);
     expect(res.data.capitalWithdrawn).toBe(300_000);

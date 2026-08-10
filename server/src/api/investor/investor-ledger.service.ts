@@ -12,7 +12,7 @@ import { InvestorDistributionEntity } from 'src/core/entity/investor-distributio
 import { InvestorBasisRequestEntity } from 'src/core/entity/investor-basis-request.entity';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
-import { FinancialSource_type, Roles } from 'src/common/enums';
+import { Roles } from 'src/common/enums';
 import { OrderService } from '../order/order.service';
 import { successRes } from 'src/infrastructure/lib/response';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
@@ -63,98 +63,154 @@ export class InvestorLedgerService {
     return Number.isFinite(n) ? n : 0;
   }
 
-  // ---- FOYDA MANBALARI (buyurtma-asosli, to'liq) ----
-  // YALPI foyda = pochta marjasi (market_tariff − courier_tariff) barcha sotilgan
-  // buyurtmalar bo'yicha — OrderService.getStats orqali (dashboard bilan bir xil,
-  // TO'LIQ). Ilgari FBH SELL_PROFIT ishlatilardi, lekin u faqat yangi buyurtmalarга
-  // yoziladi (eski sotilganlarга yo'q) — shuning uchun chala edi.
-  async grossProfitBetween(fromTs: number, toTs: number): Promise<number> {
-    if (toTs <= fromTs) return 0;
-    const res: any = await this.orderService.getStats(
-      String(fromTs),
-      String(toTs),
-    );
-    return this.num(res?.data?.profit);
+  // ---- KANONIK KUNLIK EQUITY DVIGATELI (yagona haqiqat manbai) ----
+  // Investor ko'radigan HAR BIR pul raqami shu yerdan kelib chiqadi:
+  //   kunlik YALPI marja (getRevenueStats — to'liq raw LEFT JOIN)
+  //   − o'sha kungi OpEx (FBH: salary + bills + manual_expense)
+  //   = kunlik SOF foyda; har kun O'ZINING aktiv ulush versiyasi bilan
+  //   → investor kunlik ulushi.
+  // Hero xulosa (getSummary) ham, kunlik jadval (getDailyBreakdown) ham AYNAN
+  // shu natijadan o'qiydi — shuning uchun ular hech qachon farq qilmaydi.
+
+  // So'ralgan oraliqni 'YYYY-MM-DD' ga keltiradi. Berilmasa: eng erta ulush
+  // boshidan → bugungacha (butun egalik davri).
+  private resolveRange(
+    stakes: InvestorOwnershipStakeEntity[],
+    startDate?: string,
+    endDate?: string,
+  ): { sd: string; ed: string } {
+    let sd = startDate;
+    let ed = endDate;
+    if (!sd || !ed) {
+      const earliest =
+        stakes.length > 0
+          ? Math.min(...stakes.map((s) => this.num(s.effective_from)))
+          : Date.now();
+      sd = sd || this.toYmd(earliest);
+      ed = ed || this.toYmd(Date.now());
+    }
+    return { sd, ed };
   }
 
-  // OpEx = FBH manfiylari (salary + bills + manual_expense) magnitudasi.
-  async opexBetween(fromTs: number, toTs: number): Promise<number> {
-    if (toTs <= fromTs) return 0;
-    const row = await this.fbhRepo
-      .createQueryBuilder('h')
-      .select(
-        'SUM(CASE WHEN h.amount < 0 THEN (-1 * h.amount) ELSE 0 END)',
-        'opex',
-      )
-      .where('h.source_type IN (:...types)', {
-        types: [
-          FinancialSource_type.SALARY,
-          FinancialSource_type.BILLS,
-          FinancialSource_type.MANUAL_EXPENSE,
-        ],
-      })
-      .andWhere('h.created_at >= :from AND h.created_at < :to', {
-        from: fromTs,
-        to: toTs,
-      })
-      .getRawOne();
-    return this.num(row?.opex);
-  }
-
-  // SOF foyda = yalpi − OpEx.
-  async netProfitBetween(fromTs: number, toTs: number): Promise<number> {
-    const gross = await this.grossProfitBetween(fromTs, toTs);
-    const opex = await this.opexBetween(fromTs, toTs);
-    return gross - opex;
-  }
-
-  // Basis bo'yicha foyda: 'gross' → yalpi marja, aks holda → sof foyda.
-  async profitBetween(
-    fromTs: number,
-    toTs: number,
-    basis: string,
-  ): Promise<number> {
-    if (basis === 'gross') return this.grossProfitBetween(fromTs, toTs);
-    return this.netProfitBetween(fromTs, toTs);
-  }
-
-  // Vaqt-tortilgan accrued profit share. Har ulush versiyasi o'z sub-davri
-  // uchun O'SHA paytdagi ulush bilan hisoblanadi (integer: avval ko'paytir, keyin bo'l).
-  private async accruedProfitShare(
+  // Kunlik equity qatorlari + jami. BIR joyda hisoblanadi; hamma iste'molchi
+  // (hero xulosa + kunlik jadval) shu YAGONA natijadan foydalanadi.
+  private async computeDaily(
     investorId: string,
-    rangeStart: number,
-    rangeEnd: number,
-  ): Promise<number> {
-    if (rangeEnd <= rangeStart) return 0;
+    startDate?: string,
+    endDate?: string,
+  ) {
     const stakes = await this.stakeRepo.find({
       where: { investor_id: investorId },
       order: { effective_from: 'ASC' },
     });
-    let total = 0;
-    for (const s of stakes) {
-      const sFrom = this.num(s.effective_from);
-      const sTo = s.effective_to == null ? rangeEnd : this.num(s.effective_to);
-      const ovStart = Math.max(sFrom, rangeStart);
-      const ovEnd = Math.min(sTo, rangeEnd);
-      if (ovEnd <= ovStart) continue;
-      // Har ulush versiyasi O'Z profit_basis'i bilan (vaqt-tortilgan).
-      const p = await this.profitBetween(ovStart, ovEnd, s.profit_basis || 'net');
-      total += Math.floor((p * s.ownership_bps) / 10000);
+    const { sd, ed } = this.resolveRange(stakes, startDate, endDate);
+    const openStake = stakes.find((s) => s.effective_to == null) ?? null;
+
+    // 1) Kunlik YALPI marja — TO'LIQ manba (raw LEFT JOIN, getStats EMAS).
+    const revRes: any = await this.orderService.getRevenueStats('daily', sd, ed);
+    const series: any[] = revRes?.data?.data ?? [];
+    const seriesByDay: Record<string, any> = {};
+    for (const d of series) seriesByDay[d.period] = d;
+
+    // 2) Kunlik OpEx — BUTUN oraliq bo'yicha (faqat buyurtma bo'lgan kunlar EMAS).
+    const needNet = stakes.some((s) => (s.profit_basis || 'net') === 'net');
+    const opexByDay: Record<string, number> = needNet
+      ? await this.dailyOpexMap(
+          toUzbekistanTimestamp(sd, false),
+          toUzbekistanTimestamp(ed, true),
+        )
+      : {};
+
+    // 3) Kunlik taqsimotlar (investor o'sha kuni yechib olgan pul).
+    const dists = await this.distRepo.find({
+      where: { investor_id: investorId },
+    });
+    const distByDay: Record<string, number> = {};
+    for (const dst of dists) {
+      const ymd = this.toYmd(this.num(dst.distributed_at));
+      if (ymd < sd || ymd > ed) continue;
+      distByDay[ymd] = (distByDay[ymd] ?? 0) + this.num(dst.amount);
     }
-    return total;
+
+    // Kunlar to'plami: tushum ∪ OpEx ∪ taqsimot kunlari (har uch manba ham
+    // ko'rinsin — tushumsiz kunda ham OpEx yoki pul yechish bo'lishi mumkin).
+    const allDates = Array.from(
+      new Set([
+        ...series.map((d) => d.period),
+        ...Object.keys(opexByDay),
+        ...Object.keys(distByDay),
+      ]),
+    ).sort();
+
+    const rows = allDates.map((period) => {
+      const d = seriesByDay[period];
+      const dayMs = toUzbekistanTimestamp(period, false);
+      const stake = this.stakeForDay(stakes, dayMs);
+      const bps = stake?.ownership_bps ?? 0;
+      const basis = stake?.profit_basis ?? 'net';
+      const revenue = d ? this.num(d.revenue) : 0;
+      const opex = basis === 'net' ? this.num(opexByDay[period]) : 0;
+      const postProfit = revenue - opex;
+      const investorShare = Math.floor((postProfit * bps) / 10000);
+      const distributed = this.num(distByDay[period]);
+      return {
+        date: period,
+        label: d?.label ?? period,
+        ordersCount: d ? this.num(d.ordersCount) : 0,
+        revenue, // o'sha kungi tushum (yalpi marja)
+        opex, // o'sha kungi xarajat (OpEx)
+        postProfit, // o'sha kungi (pochta) sof foydasi
+        ownershipPct: bps / 100,
+        investorShare, // shundan sizning ulushingiz
+        distributed, // o'sha kuni yechib olganingiz
+        bps,
+      };
+    });
+
+    // Faqat investorga taalluqli kunlar: egalik ulushi bo'lgan (foyda/zarar)
+    // yoki pul yechib olgan kunlar. Egalik qilmagan davr hisobga olinmaydi.
+    const days = rows
+      .filter((x) => x.bps > 0 || x.distributed > 0)
+      .map((x) => ({
+        date: x.date,
+        label: x.label,
+        ordersCount: x.ordersCount,
+        revenue: x.revenue,
+        opex: x.opex,
+        postProfit: x.postProfit,
+        ownershipPct: x.ownershipPct,
+        investorShare: x.investorShare,
+        distributed: x.distributed,
+      }));
+
+    const totals = days.reduce(
+      (a, x) => ({
+        revenue: a.revenue + x.revenue,
+        postProfit: a.postProfit + x.postProfit,
+        investorShare: a.investorShare + x.investorShare,
+        distributed: a.distributed + x.distributed,
+      }),
+      { revenue: 0, postProfit: 0, investorShare: 0, distributed: 0 },
+    );
+
+    return { stakes, openStake, days, totals, sd, ed };
   }
 
-  // Investorning shaxsiy xulosasi (o'ziga scoped).
+  // Investorning shaxsiy xulosasi (o'ziga scoped). Hero pul raqamlari (ishlab
+  // topilgan foyda, taqsimlanmagan) AYNAN kunlik dvigateldan — kunlik jadval
+  // jamisi bilan HAR DOIM bir xil.
   async getSummary(investorId: string, startDate?: string, endDate?: string) {
-    const [contributions, withdrawals, distributions, openStake] =
-      await Promise.all([
-        this.capitalRepo.find({ where: { investor_id: investorId } }),
-        this.withdrawalRepo.find({ where: { investor_id: investorId } }),
-        this.distRepo.find({ where: { investor_id: investorId } }),
-        this.stakeRepo.findOne({
-          where: { investor_id: investorId, effective_to: IsNull() },
-        }),
-      ]);
+    const [contributions, withdrawals, distributions] = await Promise.all([
+      this.capitalRepo.find({ where: { investor_id: investorId } }),
+      this.withdrawalRepo.find({ where: { investor_id: investorId } }),
+      this.distRepo.find({ where: { investor_id: investorId } }),
+    ]);
+
+    const { openStake, totals, sd, ed } = await this.computeDaily(
+      investorId,
+      startDate,
+      endDate,
+    );
 
     const capitalContributed = contributions.reduce(
       (a, c) => a + this.num(c.amount),
@@ -172,15 +228,9 @@ export class InvestorLedgerService {
     );
     const ownershipBps = openStake ? openStake.ownership_bps : 0;
 
-    const rangeStart = startDate ? toUzbekistanTimestamp(startDate, false) : 0;
-    const rangeEnd = endDate ? toUzbekistanTimestamp(endDate, true) : Date.now();
-
-    const accruedProfitShare = await this.accruedProfitShare(
-      investorId,
-      rangeStart,
-      rangeEnd,
-    );
-    const netProfitForRange = await this.netProfitBetween(rangeStart, rangeEnd);
+    // Hero raqamlar AYNAN kunlik jadval jamisidan (bir xil dvigatel — farq yo'q).
+    const accruedProfitShare = totals.investorShare;
+    const netProfitForRange = totals.postProfit;
     const undistributed = accruedProfitShare - distributionsPaid;
     const accruedRoiPct =
       capitalInvested > 0
@@ -205,8 +255,8 @@ export class InvestorLedgerService {
         accruedRoiPct,
         realizedRoiPct,
         netProfitForRange,
-        from: rangeStart,
-        to: rangeEnd,
+        from: sd,
+        to: ed,
       },
       200,
       'My investment summary',
@@ -330,79 +380,24 @@ export class InvestorLedgerService {
     return null;
   }
 
-  // KUNLIK breakdown: har kun pochta foydasi + o'sha kungi ulush → investor ulushi.
-  // Pochta kunlik foydasi = getRevenueStats(daily) (tarif marjasi). 'net' basis'da
-  // o'sha kungi OpEx ayriladi. Har kun O'ZINING aktiv ulush versiyasi bilan.
-  // epoch-ms → 'YYYY-MM-DD' (Toshkent).
+  // epoch-ms → 'YYYY-MM-DD' (Toshkent, UTC+5).
   private toYmd(ms: number): string {
     const uz = new Date(ms + 5 * 60 * 60 * 1000);
     return `${uz.getUTCFullYear()}-${String(uz.getUTCMonth() + 1).padStart(2, '0')}-${String(uz.getUTCDate()).padStart(2, '0')}`;
   }
 
+  // KUNLIK breakdown: har kun tushum + o'sha kungi ulush + yechib olgan pul.
+  // Barcha hisob computeDaily'da (hero xulosa bilan AYNAN bir xil manba).
   async getDailyBreakdown(
     investorId: string,
     startDate?: string,
     endDate?: string,
   ) {
-    const stakes = await this.stakeRepo.find({
-      where: { investor_id: investorId },
-      order: { effective_from: 'ASC' },
-    });
-
-    // Default oraliq: eng erta ulush boshidan → bugun. getRevenueStats faqat
-    // startDate VA endDate birga berilganda ularni ishlatadi — shuning uchun
-    // ikkalasini ham beramiz (aks holda oxirgi 30 kun bo'sh chiqishi mumkin).
-    let sd = startDate;
-    let ed = endDate;
-    if (!sd || !ed) {
-      const earliest =
-        stakes.length > 0
-          ? Math.min(...stakes.map((s) => this.num(s.effective_from)))
-          : Date.now();
-      sd = sd || this.toYmd(earliest);
-      ed = ed || this.toYmd(Date.now());
-    }
-
-    const revRes: any = await this.orderService.getRevenueStats('daily', sd, ed);
-    const series: any[] = revRes?.data?.data ?? [];
-    const needNet = stakes.some((s) => (s.profit_basis || 'net') === 'net');
-
-    let opexByDay: Record<string, number> = {};
-    if (needNet && series.length) {
-      opexByDay = await this.dailyOpexMap(
-        toUzbekistanTimestamp(series[0].period, false),
-        toUzbekistanTimestamp(series[series.length - 1].period, true),
-      );
-    }
-
-    const days = series.map((d) => {
-      const dayMs = toUzbekistanTimestamp(d.period, false);
-      const stake = this.stakeForDay(stakes, dayMs);
-      const bps = stake?.ownership_bps ?? 0;
-      const basis = stake?.profit_basis ?? 'net';
-      const gross = this.num(d.revenue);
-      const opex = basis === 'net' ? this.num(opexByDay[d.period]) : 0;
-      const postProfit = gross - opex;
-      const investorShare = Math.floor((postProfit * bps) / 10000);
-      return {
-        date: d.period,
-        label: d.label,
-        ordersCount: this.num(d.ordersCount),
-        postProfit,
-        ownershipPct: bps / 100,
-        investorShare,
-      };
-    });
-
-    const totals = days.reduce(
-      (a, x) => ({
-        postProfit: a.postProfit + x.postProfit,
-        investorShare: a.investorShare + x.investorShare,
-      }),
-      { postProfit: 0, investorShare: 0 },
+    const { openStake, days, totals } = await this.computeDaily(
+      investorId,
+      startDate,
+      endDate,
     );
-    const openStake = stakes.find((s) => s.effective_to == null);
-
     return successRes(
       {
         basis: openStake?.profit_basis ?? 'net',

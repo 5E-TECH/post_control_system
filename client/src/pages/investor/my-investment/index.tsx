@@ -1,12 +1,26 @@
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { message } from "antd";
-import { PieChart, Banknote, Wallet, TrendingUp, Layers, HandCoins } from "lucide-react";
+import {
+  PieChart,
+  Banknote,
+  Wallet,
+  TrendingUp,
+  HandCoins,
+  CalendarDays,
+  Info,
+} from "lucide-react";
 import { useInvestor } from "../../../shared/api/hooks/useInvestor";
-import StatCard from "../components/StatCard";
 import DateRangeFilter from "../components/DateRangeFilter";
 import ExportButton from "../components/ExportButton";
 import { formatMoney } from "../components/format";
+
+// 'YYYY-MM-DD' → 'DD.MM.YYYY'
+const fmtYmd = (ymd?: string) => {
+  if (!ymd) return "—";
+  const [y, m, d] = ymd.split("-");
+  return d && m && y ? `${d}.${m}.${y}` : ymd;
+};
 
 const fmtDate = (ms?: number) => {
   if (!ms) return "—";
@@ -32,7 +46,9 @@ const InvestorMyInvestment = () => {
   const { data: dailyRes } = getMyDaily({ startDate: from, endDate: to });
   const daily = dailyRes?.data ?? {};
   const dailyDays: any[] = Array.isArray(daily.days) ? daily.days : [];
-  const dailyTotals = daily.totals ?? { postProfit: 0, investorShare: 0 };
+  const dailyTotals = daily.totals ?? { revenue: 0, postProfit: 0, investorShare: 0, distributed: 0 };
+  // Eng yangi kun yuqorida
+  const daysDesc = [...dailyDays].reverse();
 
   const mi = miRes?.data ?? {};
   const led = ledRes?.data ?? {};
@@ -40,21 +56,24 @@ const InvestorMyInvestment = () => {
   const totalPages = Math.max(1, Math.ceil((led.total ?? 0) / (led.limit ?? 20)));
 
   const typeLabel: Record<string, string> = {
-    capital: t("typeCapital", "Kapital"),
+    capital: t("typeCapital", "Kapital kiritish"),
     capital_withdrawal: t("typeCapitalWithdrawal", "Kapital qaytarish"),
-    distribution: t("typeDistribution", "Taqsimot"),
+    distribution: t("typeDistribution", "Foyda olish"),
     stake: t("typeStake", "Ulush o'zgarishi"),
   };
 
+  const dash = "—";
+
   return (
     <div className="flex flex-col gap-5">
+      {/* Sarlavha */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">
-            {t("myInvestmentTitle", "Mening investitsiyam")}
+            {t("myMoneyTitle", "Mening foydam")}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t("myInvestmentSubtitle", "Kapital, ulush va qaytim (ROI)")}
+            {t("myMoneySubtitle", "Qancha foyda topdingiz, qanchasini oldingiz va qancha qoldi")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -102,109 +121,141 @@ const InvestorMyInvestment = () => {
         </div>
       )}
 
-      {/* Hero */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-[#8247ff] to-[#5b21b6] text-white p-6 rounded-2xl shadow-lg flex flex-col justify-between">
-          <div className="flex items-center gap-2 opacity-90">
-            <PieChart className="w-5 h-5" />
-            <span className="text-sm">{t("ownership", "Egalik ulushi")}</span>
+      {/* HERO — 3 ta asosiy raqam (sodda til) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Jami ishlab topilgan foyda */}
+        <div className="bg-gradient-to-br from-[#8247ff] to-[#5b21b6] text-white p-6 rounded-2xl shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <span className="text-xs bg-white/20 px-2 py-1 rounded-full">{mi.ownershipPct ?? 0}% {t("share", "ulush")}</span>
           </div>
-          <p className="text-4xl font-bold mt-2">
-            {isLoading ? "…" : `${mi.ownershipPct ?? 0}%`}
-          </p>
-          <p className="text-sm opacity-80 mt-1">
-            {t("capitalInvested", "Kiritilgan kapital")}: {formatMoney(mi.capitalInvested)}
-          </p>
+          <p className="text-sm opacity-90 mt-4">{t("totalEarned", "Jami ishlab topgan foydangiz")}</p>
+          <p className="text-3xl font-bold mt-1">{isLoading ? "…" : formatMoney(mi.accruedProfitShare)}</p>
         </div>
-        <StatCard
-          icon={<TrendingUp className="w-5 h-5" />}
-          label={t("accruedRoi", "Hisoblangan ROI")}
-          value={mi.accruedRoiPct != null ? `${mi.accruedRoiPct}%` : "—"}
-          gradient="from-emerald-500 to-green-600"
-          badge={t("accrued", "hisoblangan")}
-        />
-        <StatCard
-          icon={<HandCoins className="w-5 h-5" />}
-          label={t("realizedRoi", "Real ROI (to'langan)")}
-          value={mi.realizedRoiPct != null ? `${mi.realizedRoiPct}%` : "—"}
-          gradient="from-amber-500 to-orange-600"
-          badge={t("realized", "real")}
-        />
+
+        {/* Yechib olingan */}
+        <div className="bg-gradient-to-br from-amber-500 to-orange-600 text-white p-6 rounded-2xl shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
+              <HandCoins className="w-6 h-6" />
+            </div>
+          </div>
+          <p className="text-sm opacity-90 mt-4">{t("totalWithdrawn", "Yechib olgan pulingiz")}</p>
+          <p className="text-3xl font-bold mt-1">{isLoading ? "…" : formatMoney(mi.distributionsPaid)}</p>
+        </div>
+
+        {/* Qoldiq — olishingiz mumkin */}
+        <div className="bg-gradient-to-br from-emerald-500 to-green-600 text-white p-6 rounded-2xl shadow-lg ring-2 ring-emerald-300/40">
+          <div className="flex items-center justify-between">
+            <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
+              <Wallet className="w-6 h-6" />
+            </div>
+            <span className="text-xs bg-white/20 px-2 py-1 rounded-full">{t("available", "mavjud")}</span>
+          </div>
+          <p className="text-sm opacity-90 mt-4">{t("availableToWithdraw", "Hozir olishingiz mumkin")}</p>
+          <p className="text-3xl font-bold mt-1">{isLoading ? "…" : formatMoney(mi.undistributed)}</p>
+        </div>
       </div>
 
-      {/* Sub-kartalar */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard
-          icon={<Banknote className="w-5 h-5" />}
-          label={t("totalCapitalIn", "Jami kiritilgan kapital")}
-          value={formatMoney(mi.capitalInvested)}
-          gradient="from-blue-500 to-cyan-500"
-        />
-        <StatCard
-          icon={<Wallet className="w-5 h-5" />}
-          label={t("totalDistributions", "Jami to'langan taqsimot")}
-          value={formatMoney(mi.distributionsPaid)}
-          gradient="from-teal-500 to-cyan-600"
-        />
-        <StatCard
-          icon={<Layers className="w-5 h-5" />}
-          label={t("accruedShare", "Hisoblangan ulush (foyda)")}
-          value={formatMoney(mi.accruedProfitShare)}
-          gradient="from-indigo-500 to-violet-600"
-        />
-        <StatCard
-          icon={<TrendingUp className="w-5 h-5" />}
-          label={t("undistributed", "Taqsimlanmagan qoldiq")}
-          value={formatMoney(mi.undistributed)}
-          gradient="from-purple-500 to-fuchsia-600"
-        />
+      {/* Ikkilamchi — kapital, ulush, ROI (kichik, aniq izohli) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white flex items-center justify-center">
+            <Banknote className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t("capitalInvested", "Kiritilgan kapital")}</p>
+            <p className="text-lg font-bold text-gray-800 dark:text-white">{formatMoney(mi.capitalInvested)}</p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center">
+            <PieChart className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t("ownership", "Egalik ulushi")}</p>
+            <p className="text-lg font-bold text-gray-800 dark:text-white">{mi.ownershipPct ?? 0}%</p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow-sm flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t("roiPlain", "Qaytim (foyda / kapital)")}</p>
+            <p className="text-lg font-bold text-gray-800 dark:text-white">
+              {mi.accruedRoiPct != null ? `${mi.accruedRoiPct}%` : dash}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Kunlik foyda */}
+      {/* KUNLIK JADVAL — asosiy: qaysi kuni qancha tushum + sizning foydangiz + yechib olgan */}
       <div className="bg-white dark:bg-[#2A263D] p-4 sm:p-5 rounded-2xl shadow-sm">
-        <h3 className="text-base font-semibold text-gray-800 dark:text-white mb-3">
-          {t("dailyTitle", "Kunlik foyda")}
-        </h3>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="flex items-center gap-2 mb-1">
+          <CalendarDays className="w-5 h-5 text-gray-400" />
+          <h3 className="text-base font-semibold text-gray-800 dark:text-white">
+            {t("dailyTitle2", "Kunlik hisobot")}
+          </h3>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 flex items-start gap-1">
+          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          {t("dailyHint", "Har kuni qancha tushum bo'lgani, undан biznes foydasi va sizning ulushingiz, hamda o'sha kuni yechib olgan pulingiz.")}
+        </p>
+
+        {/* Jami strip */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-3">
           <div className="bg-gray-50 dark:bg-[#3B3656] rounded-xl p-3">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t("postProfit", "Pochta foydasi")} ({t("total", "jami")})
-            </p>
-            <p className="font-bold text-gray-800 dark:text-white">
-              {formatMoney(dailyTotals.postProfit)}
-            </p>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("totalRevenue", "Jami tushum")}</p>
+            <p className="font-bold text-gray-800 dark:text-white text-sm sm:text-base">{formatMoney(dailyTotals.revenue)}</p>
+          </div>
+          <div className="bg-gray-50 dark:bg-[#3B3656] rounded-xl p-3">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("totalProfit", "Jami foyda")}</p>
+            <p className="font-bold text-gray-800 dark:text-white text-sm sm:text-base">{formatMoney(dailyTotals.postProfit)}</p>
           </div>
           <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-3">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t("investorShare", "Sizning foydangiz")} ({t("total", "jami")})
-            </p>
-            <p className="font-bold text-emerald-600 dark:text-emerald-400">
-              {formatMoney(dailyTotals.investorShare)}
-            </p>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("totalYourProfit", "Jami sizning foydangiz")}</p>
+            <p className="font-bold text-emerald-600 dark:text-emerald-400 text-sm sm:text-base">{formatMoney(dailyTotals.investorShare)}</p>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-500/10 rounded-xl p-3">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("totalWithdrawnShort", "Jami yechib olgan")}</p>
+            <p className="font-bold text-amber-600 dark:text-amber-400 text-sm sm:text-base">{formatMoney(dailyTotals.distributed)}</p>
           </div>
         </div>
-        {dailyDays.length === 0 ? (
-          <p className="text-sm text-gray-400 py-4 text-center">
-            {t("noData", "Ma'lumot yo'q")}
-          </p>
+
+        {daysDesc.length === 0 ? (
+          <p className="text-sm text-gray-400 py-6 text-center">{t("noData", "Ma'lumot yo'q")}</p>
         ) : (
-          <div className="overflow-x-auto max-h-72 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white dark:bg-[#2A263D]">
-                <tr className="text-left text-gray-400 border-b border-gray-100 dark:border-[#3B3656]">
-                  <th className="py-2 pr-2">{t("date", "Sana")}</th>
-                  <th className="py-2 pr-2">{t("postProfit", "Pochta foydasi")}</th>
-                  <th className="py-2 pr-2">{t("ownership", "Ulush")}</th>
-                  <th className="py-2 text-right">{t("investorShare", "Sizning foydangiz")}</th>
+          <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border border-gray-100 dark:border-[#3B3656]">
+            <table className="w-full text-sm min-w-[760px]">
+              <thead className="sticky top-0 bg-gray-50 dark:bg-[#332f49] z-10">
+                <tr className="text-left text-gray-500 dark:text-gray-300">
+                  <th className="py-2.5 px-3">{t("date", "Sana")}</th>
+                  <th className="py-2.5 px-3 text-right">{t("dayRevenue", "Tushum")}</th>
+                  <th className="py-2.5 px-3 text-right">{t("dayExpense", "Xarajat")}</th>
+                  <th className="py-2.5 px-3 text-right">{t("dayProfit", "Foyda")}</th>
+                  <th className="py-2.5 px-3 text-center">{t("share", "Ulush")}</th>
+                  <th className="py-2.5 px-3 text-right">{t("yourProfit", "Sizning foydangiz")}</th>
+                  <th className="py-2.5 px-3 text-right">{t("withdrawnDay", "Yechib olgan")}</th>
                 </tr>
               </thead>
               <tbody>
-                {dailyDays.map((d: any) => (
-                  <tr key={d.date} className="border-b border-gray-50 dark:border-[#332f49] last:border-0">
-                    <td className="py-2 pr-2 text-gray-600 dark:text-gray-300">{d.date}</td>
-                    <td className="py-2 pr-2 text-gray-700 dark:text-gray-200">{formatMoney(d.postProfit)}</td>
-                    <td className="py-2 pr-2 text-gray-500">{d.ownershipPct}%</td>
-                    <td className="py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{formatMoney(d.investorShare)}</td>
+                {daysDesc.map((d: any) => (
+                  <tr
+                    key={d.date}
+                    className={`border-t border-gray-50 dark:border-[#332f49] ${d.distributed > 0 ? "bg-amber-50/40 dark:bg-amber-500/5" : ""}`}
+                  >
+                    <td className="py-2.5 px-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{fmtYmd(d.date)}</td>
+                    <td className="py-2.5 px-3 text-right text-gray-700 dark:text-gray-200">{formatMoney(d.revenue)}</td>
+                    <td className="py-2.5 px-3 text-right text-rose-500 dark:text-rose-400">{d.opex > 0 ? formatMoney(d.opex) : dash}</td>
+                    <td className={`py-2.5 px-3 text-right ${d.postProfit < 0 ? "text-rose-500 dark:text-rose-400" : "text-gray-700 dark:text-gray-200"}`}>{formatMoney(d.postProfit)}</td>
+                    <td className="py-2.5 px-3 text-center text-gray-500">{d.ownershipPct}%</td>
+                    <td className={`py-2.5 px-3 text-right font-semibold ${d.investorShare < 0 ? "text-rose-500 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>{formatMoney(d.investorShare)}</td>
+                    <td className="py-2.5 px-3 text-right font-medium text-amber-600 dark:text-amber-400">
+                      {d.distributed > 0 ? formatMoney(d.distributed) : dash}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -216,7 +267,7 @@ const InvestorMyInvestment = () => {
       {/* Ledger tarixi */}
       <div className="bg-white dark:bg-[#2A263D] p-4 sm:p-5 rounded-2xl shadow-sm">
         <h3 className="text-base font-semibold text-gray-800 dark:text-white mb-3">
-          {t("ledgerHistory", "Ledger tarixi")}
+          {t("ledgerHistory", "Barcha amallar tarixi")}
         </h3>
         {items.length === 0 ? (
           <p className="text-sm text-gray-400 py-6 text-center">
@@ -254,7 +305,7 @@ const InvestorMyInvestment = () => {
                           : formatMoney(e.amount)}
                       </td>
                       <td className="py-2 text-gray-500 dark:text-gray-400">
-                        {e.note || "—"}
+                        {e.note || dash}
                       </td>
                     </tr>
                   ))}

@@ -472,7 +472,7 @@ const AppRouters = () => {
                 </RequireRole>
               ),
               children: [
-                { index: true, element: <Navigate to="overview" replace /> },
+                { index: true, element: <Navigate to="my-investment" replace /> },
                 { path: "overview", element: <InvestorOverview /> },
                 { path: "financials", element: <InvestorFinancials /> },
                 { path: "operations", element: <InvestorOperations /> },

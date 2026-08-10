@@ -56,7 +56,8 @@ export class InvestorService {
   ): { start: string; end: string } {
     const today = getUzbekistanDayRange();
     if (!startDate && !endDate) {
-      return { start: String(today.start), end: String(today.end) };
+      // Default: BUTUN biznes tarixi (filtrsiz landing bo'sh/0 ko'rinmasin).
+      return { start: '0', end: String(today.end) };
     }
     if (startDate && !endDate) {
       return {
@@ -78,17 +79,28 @@ export class InvestorService {
     return Number.isFinite(n) ? n : 0;
   }
 
+  // epoch-ms → 'YYYY-MM-DD' (Toshkent, UTC+5).
+  private toYmd(ms: number): string {
+    const uz = new Date(ms + 5 * 60 * 60 * 1000);
+    return `${uz.getUTCFullYear()}-${String(uz.getUTCMonth() + 1).padStart(2, '0')}-${String(uz.getUTCDate()).padStart(2, '0')}`;
+  }
+
   // ---- 1. Biznes umumiy ko'rinishi (buyurtma statuslari + foyda) ----
   async getOverview(startDate?: string, endDate?: string) {
     const { start, end } = this.resolveRange(startDate, endDate);
     const data = await this.cached(`overview:${start}:${end}`, async () => {
       const res: any = await this.orderService.getStats(start, end);
       const d = res?.data ?? {};
+      // "Sof foyda (davr)" — HAQIQIY sof foyda (TO'LIQ marja − OpEx), net-profit
+      // sahifasi va my-investment bilan izchil. Buyurtma sanoqlari getStats'dan.
+      const pb = await this.computeProfitBreakdown(startDate, endDate);
       return {
         acceptedCount: this.num(d.acceptedCount),
         soldAndPaid: this.num(d.soldAndPaid),
         cancelled: this.num(d.cancelled),
-        profit: this.num(d.profit),
+        profit: pb.netProfit, // sof foyda (davr)
+        grossProfit: pb.grossProfit, // yalpi marja (davr)
+        totalOpEx: pb.totalOpEx, // umumiy xarajat (davr)
         from: this.num(d.from),
         to: this.num(d.to),
       };
@@ -248,15 +260,23 @@ export class InvestorService {
   //   netProfit = sellProfit − (salary + bills + manualExpense)
   // MANUAL_INCOME va CORRECTION ATAYLAB kiritilmaydi (kelishilgan formula).
   private async computeProfitBreakdown(startDate?: string, endDate?: string) {
-    // YALPI foyda — buyurtma-asosli (to'liq), dashboard bilan bir xil.
+    // Oraliqni BIR marta hal qilamiz — gross va OpEx AYNAN bir xil oraliqda
+    // bo'lishi shart (aks holda gross=bugun, opex=butun-tarix kabi nomuvofiqlik
+    // → −390000 kabi mantiqsiz sof foyda kelib chiqadi).
     const { start, end } = this.resolveRange(startDate, endDate);
-    const statsRes: any = await this.orderService.getStats(start, end);
-    const grossProfit = this.num(statsRes?.data?.profit);
+    const sd = this.toYmd(Number(start));
+    const ed = this.toYmd(Number(end));
 
-    // OpEx — FBH manfiylari (financialBalanceAnalytics YYYY-MM-DD).
+    // YALPI marja — TO'LIQ manba (getRevenueStats raw LEFT JOIN). getStats EMAS:
+    // u relation-join sabab kam sanaydi; my-investment sahifasi bilan bir xil bo'lsin.
+    const revRes: any = await this.orderService.getRevenueStats('daily', sd, ed);
+    const series: any[] = revRes?.data?.data ?? [];
+    const grossProfit = series.reduce((a, p) => a + this.num(p.revenue), 0);
+
+    // OpEx — FBH manfiylari, AYNAN bir xil (sd..ed) oraliqda.
     const res: any = await this.cashBoxService.financialBalanceAnalytics({
-      fromDate: startDate,
-      toDate: endDate,
+      fromDate: sd,
+      toDate: ed,
     });
     const d = res?.data ?? {};
     const neg = Array.isArray(d.negativeImpact) ? d.negativeImpact : [];
@@ -397,7 +417,9 @@ export class InvestorService {
     const data = await this.cached(`unit-econ:${start}:${end}`, async () => {
       const statsRes: any = await this.orderService.getStats(start, end);
       const s = statsRes?.data ?? {};
-      const totalProfit = this.num(s.profit);
+      // Foyda — TO'LIQ marja (getStats undercount EMAS), boshqa sahifalar bilan izchil.
+      const pb = await this.computeProfitBreakdown(startDate, endDate);
+      const totalProfit = pb.grossProfit;
       const soldOrders = this.num(s.soldAndPaid);
       const grossSold = await this.getGrossSold(start, end);
       return {
