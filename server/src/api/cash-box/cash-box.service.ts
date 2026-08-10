@@ -64,6 +64,29 @@ import { ShiftRepository } from 'src/core/repository/shift.repository';
 import { getSafeLimit } from 'src/common/constants/pagination';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 
+/** Bitta virtual karta bo'yicha ledger (statement) qatori. */
+type CardLedgerKind =
+  | 'income'
+  | 'expense'
+  | 'transfer_in'
+  | 'transfer_out'
+  | 'convert_in'
+  | 'convert_out';
+
+type CardLedgerRow = {
+  id: string;
+  kind: CardLedgerKind;
+  amount: number;
+  delta: number;
+  created_at: number;
+  created_by_name: string | null;
+  counterparty: string | null;
+  comment: string | null;
+  source_type?: string;
+  payment_method?: string | null;
+  balance_after?: number;
+};
+
 @Injectable()
 export class CashBoxService
   extends BaseService<CreateCashBoxDto, DeepPartial<CashEntity>>
@@ -642,6 +665,147 @@ export class CashBoxService
    * ko'rsatadi (javobgarlik). Bu YIG'INDILAR kassa kirim/chiqimiga ta'sir
    * qilmaydi — faqat shu karta ichidagi ko'rinish.
    */
+  /**
+   * Bitta virtual karta uchun ledger qatorlarini (running balans bilan) quradi.
+   * Ekran ledgeri (getCardLedger) ham, Excel eksport (exportCardLedgerToExcel)
+   * ham AYNAN shu manbadan foydalanadi — shuning uchun ko'rsatilgan tarix bilan
+   * yuklab olingan fayl har doim bir-biriga mos keladi.
+   *
+   * `display` — sana filtri qo'llangan (ixtiyoriy) qatorlar, XRONOLOGIK
+   * tartibda (eski → yangi), har birida `balance_after` (to'liq tarix bo'yicha
+   * hisoblangan running balans) bilan.
+   */
+  private async computeCardLedgerRows(
+    cardId: string,
+    filters?: { fromDate?: string; toDate?: string },
+  ): Promise<{
+    card: CashboxCardEntity;
+    display: CardLedgerRow[];
+    summary: {
+      real_income: number;
+      real_expense: number;
+      transfer_in: number;
+      transfer_out: number;
+      convert_in: number;
+      convert_out: number;
+      current_balance: number;
+    };
+  }> {
+    const mainCashbox = await this.cashboxRepo.findOne({
+      where: { cashbox_type: Cashbox_type.MAIN },
+    });
+    if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
+
+    const card = await this.cashboxCardRepo.findOne({
+      where: { id: cardId },
+    });
+    if (!card || card.cashbox_id !== mainCashbox.id) {
+      throw new NotFoundException('Karta topilmadi');
+    }
+
+    // 1) Real kirim/chiqim (shu kartaga tegishli)
+    const histories = await this.cashboxHistoryRepo.find({
+      where: { card_id: cardId },
+      relations: ['createdByUser', 'sourceUser'],
+    });
+    // 2) Ichki o'tkazma/konvertatsiya (shu karta ishtirok etgan)
+    const movements = await this.cardMovementRepo.find({
+      where: [{ from_card_id: cardId }, { to_card_id: cardId }],
+      relations: ['fromCard', 'toCard', 'createdByUser'],
+    });
+
+    const rows: CardLedgerRow[] = [];
+    for (const h of histories) {
+      const isIncome = h.operation_type === Operation_type.INCOME;
+      const amt = h.amount ?? 0;
+      rows.push({
+        id: h.id,
+        kind: isIncome ? 'income' : 'expense',
+        amount: amt,
+        delta: isIncome ? amt : -amt,
+        created_at: h.created_at,
+        created_by_name: h.createdByUser?.name ?? null,
+        counterparty: h.sourceUser?.name ?? null,
+        comment: h.comment ?? null,
+        source_type: h.source_type,
+        payment_method: h.payment_method,
+      });
+    }
+    for (const m of movements) {
+      const base = {
+        id: m.id,
+        amount: m.amount,
+        created_at: m.created_at,
+        created_by_name: m.createdByUser?.name ?? null,
+        comment: m.comment ?? null,
+      };
+      if (m.type === CardMovementType.CARD_TO_CARD) {
+        if (m.to_card_id === cardId) {
+          rows.push({
+            ...base,
+            kind: 'transfer_in',
+            delta: m.amount,
+            counterparty: m.fromCard?.name ?? null,
+          });
+        } else {
+          rows.push({
+            ...base,
+            kind: 'transfer_out',
+            delta: -m.amount,
+            counterparty: m.toCard?.name ?? null,
+          });
+        }
+      } else if (m.type === CardMovementType.CASH_TO_CARD) {
+        rows.push({
+          ...base,
+          kind: 'convert_in',
+          delta: m.amount,
+          counterparty: 'Naqd',
+        });
+      } else if (m.type === CardMovementType.CARD_TO_CASH) {
+        rows.push({
+          ...base,
+          kind: 'convert_out',
+          delta: -m.amount,
+          counterparty: 'Naqd',
+        });
+      }
+    }
+
+    // To'liq tarix bo'yicha (sanadan qat'i nazar) running balansni hisoblash —
+    // yakuni card.balance ga teng bo'lishi kerak.
+    rows.sort((a, b) => a.created_at - b.created_at);
+    let running = 0;
+    for (const r of rows) {
+      running += r.delta;
+      r.balance_after = running;
+    }
+
+    // Ko'rsatish uchun sana filtri (ixtiyoriy) — ikkala chegara ham inklyuziv
+    let display = rows;
+    if (filters?.fromDate && filters?.toDate) {
+      const startN = Number(toUzbekistanTimestamp(filters.fromDate, false));
+      const endN = Number(toUzbekistanTimestamp(filters.toDate, true));
+      display = rows.filter(
+        (r) => r.created_at >= startN && r.created_at <= endN,
+      );
+    }
+
+    const sumBy = (pred: (r: CardLedgerRow) => boolean) =>
+      display.filter(pred).reduce((s, r) => s + r.amount, 0);
+    const summary = {
+      real_income: sumBy((r) => r.kind === 'income'),
+      real_expense: sumBy((r) => r.kind === 'expense'),
+      transfer_in: sumBy((r) => r.kind === 'transfer_in'),
+      transfer_out: sumBy((r) => r.kind === 'transfer_out'),
+      convert_in: sumBy((r) => r.kind === 'convert_in'),
+      convert_out: sumBy((r) => r.kind === 'convert_out'),
+      current_balance: card.balance,
+    };
+
+    return { card, display, summary };
+  }
+
   async getCardLedger(
     cardId: string,
     filters?: {
@@ -652,137 +816,10 @@ export class CashBoxService
     },
   ) {
     try {
-      const mainCashbox = await this.cashboxRepo.findOne({
-        where: { cashbox_type: Cashbox_type.MAIN },
-      });
-      if (!mainCashbox) throw new NotFoundException('Main cashbox not found');
-
-      const card = await this.cashboxCardRepo.findOne({
-        where: { id: cardId },
-      });
-      if (!card || card.cashbox_id !== mainCashbox.id) {
-        throw new NotFoundException('Karta topilmadi');
-      }
-
-      // 1) Real kirim/chiqim (shu kartaga tegishli)
-      const histories = await this.cashboxHistoryRepo.find({
-        where: { card_id: cardId },
-        relations: ['createdByUser', 'sourceUser'],
-      });
-      // 2) Ichki o'tkazma/konvertatsiya (shu karta ishtirok etgan)
-      const movements = await this.cardMovementRepo.find({
-        where: [{ from_card_id: cardId }, { to_card_id: cardId }],
-        relations: ['fromCard', 'toCard', 'createdByUser'],
-      });
-
-      type LedgerRow = {
-        id: string;
-        kind:
-          | 'income'
-          | 'expense'
-          | 'transfer_in'
-          | 'transfer_out'
-          | 'convert_in'
-          | 'convert_out';
-        amount: number;
-        delta: number;
-        created_at: number;
-        created_by_name: string | null;
-        counterparty: string | null;
-        comment: string | null;
-        source_type?: string;
-        payment_method?: string | null;
-        balance_after?: number;
-      };
-
-      const rows: LedgerRow[] = [];
-      for (const h of histories) {
-        const isIncome = h.operation_type === Operation_type.INCOME;
-        const amt = h.amount ?? 0;
-        rows.push({
-          id: h.id,
-          kind: isIncome ? 'income' : 'expense',
-          amount: amt,
-          delta: isIncome ? amt : -amt,
-          created_at: h.created_at,
-          created_by_name: h.createdByUser?.name ?? null,
-          counterparty: h.sourceUser?.name ?? null,
-          comment: h.comment ?? null,
-          source_type: h.source_type,
-          payment_method: h.payment_method,
-        });
-      }
-      for (const m of movements) {
-        const base = {
-          id: m.id,
-          amount: m.amount,
-          created_at: m.created_at,
-          created_by_name: m.createdByUser?.name ?? null,
-          comment: m.comment ?? null,
-        };
-        if (m.type === CardMovementType.CARD_TO_CARD) {
-          if (m.to_card_id === cardId) {
-            rows.push({
-              ...base,
-              kind: 'transfer_in',
-              delta: m.amount,
-              counterparty: m.fromCard?.name ?? null,
-            });
-          } else {
-            rows.push({
-              ...base,
-              kind: 'transfer_out',
-              delta: -m.amount,
-              counterparty: m.toCard?.name ?? null,
-            });
-          }
-        } else if (m.type === CardMovementType.CASH_TO_CARD) {
-          rows.push({
-            ...base,
-            kind: 'convert_in',
-            delta: m.amount,
-            counterparty: 'Naqd',
-          });
-        } else if (m.type === CardMovementType.CARD_TO_CASH) {
-          rows.push({
-            ...base,
-            kind: 'convert_out',
-            delta: -m.amount,
-            counterparty: 'Naqd',
-          });
-        }
-      }
-
-      // To'liq tarix bo'yicha (sanadan qat'i nazar) running balansni hisoblash —
-      // yakuni card.balance ga teng bo'lishi kerak.
-      rows.sort((a, b) => a.created_at - b.created_at);
-      let running = 0;
-      for (const r of rows) {
-        running += r.delta;
-        r.balance_after = running;
-      }
-
-      // Ko'rsatish uchun sana filtri (ixtiyoriy)
-      let display = rows;
-      if (filters?.fromDate && filters?.toDate) {
-        const startN = Number(toUzbekistanTimestamp(filters.fromDate, false));
-        const endN = Number(toUzbekistanTimestamp(filters.toDate, true));
-        display = rows.filter(
-          (r) => r.created_at >= startN && r.created_at <= endN,
-        );
-      }
-
-      const sumBy = (pred: (r: LedgerRow) => boolean) =>
-        display.filter(pred).reduce((s, r) => s + r.amount, 0);
-      const summary = {
-        real_income: sumBy((r) => r.kind === 'income'),
-        real_expense: sumBy((r) => r.kind === 'expense'),
-        transfer_in: sumBy((r) => r.kind === 'transfer_in'),
-        transfer_out: sumBy((r) => r.kind === 'transfer_out'),
-        convert_in: sumBy((r) => r.kind === 'convert_in'),
-        convert_out: sumBy((r) => r.kind === 'convert_out'),
-        current_balance: card.balance,
-      };
+      const { card, display, summary } = await this.computeCardLedgerRows(
+        cardId,
+        { fromDate: filters?.fromDate, toDate: filters?.toDate },
+      );
 
       // Eng yangisi birinchi + pagination
       const sortedDesc = [...display].sort(
@@ -2756,6 +2793,311 @@ export class CashBoxService
     const fileName = `kassa-${safeName}-${periodPart}.xlsx`;
 
     return { buffer: buffer as any, fileName };
+  }
+
+  /**
+   * Bitta virtual karta tarixini (ledger) Excel'ga eksport qiladi.
+   * - Sana berilmasa (allHistory yoki oraliq to'liq emas) — BUTUN tarix.
+   * - fromDate === toDate — bitta kun; fromDate < toDate — sana oralig'i.
+   * Ekrandagi karta ledgeri bilan AYNAN bitta manbadan (computeCardLedgerRows),
+   * shuning uchun yuklab olingan fayl ko'rinib turgan tarixga to'liq mos.
+   */
+  async exportCardLedgerToExcel(
+    cardId: string,
+    query: { fromDate?: string; toDate?: string; allHistory?: boolean },
+  ): Promise<{ buffer: Buffer; fileName: string }> {
+    const useDates = !query.allHistory && !!query.fromDate && !!query.toDate;
+    const { card, display, summary } = await this.computeCardLedgerRows(cardId, {
+      fromDate: useDates ? query.fromDate : undefined,
+      toDate: useDates ? query.toDate : undefined,
+    });
+
+    // Kirim/chiqim jamilari — kartaga tushgan (real kirim + o'tkazma kirim +
+    // naqddan) va kartadan chiqqan (real chiqim + o'tkazma chiqim + naqdga).
+    const income =
+      summary.real_income + summary.transfer_in + summary.convert_in;
+    const outcome =
+      summary.real_expense + summary.transfer_out + summary.convert_out;
+
+    const periodLabel = useDates
+      ? query.fromDate === query.toDate
+        ? `${query.fromDate}`
+        : `${query.fromDate} — ${query.toDate}`
+      : 'Umumiy tarix';
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Karta tarixi');
+    this.buildCardLedgerSheet(worksheet, {
+      cardName: card.name,
+      isDefault: card.is_default,
+      periodLabel,
+      currentBalance: card.balance ?? 0,
+      income,
+      outcome,
+      rows: display,
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    const safeName = (card.name || 'karta').replace(/[^\p{L}\p{N}_-]+/gu, '_');
+    const periodPart = useDates
+      ? query.fromDate === query.toDate
+        ? query.fromDate
+        : `${query.fromDate}_${query.toDate}`
+      : 'umumiy';
+    const fileName = `karta-${safeName}-${periodPart}.xlsx`;
+
+    return { buffer: buffer as any, fileName };
+  }
+
+  /** Karta ledger `kind`i uchun o'zbekcha yorliq + yo'nalish (kirim/chiqim). */
+  private cardKindMeta(kind: CardLedgerKind): {
+    label: string;
+    positive: boolean;
+  } {
+    switch (kind) {
+      case 'income':
+        return { label: 'Kirim', positive: true };
+      case 'expense':
+        return { label: 'Chiqim', positive: false };
+      case 'transfer_in':
+        return { label: "O'tkazma (kirim)", positive: true };
+      case 'transfer_out':
+        return { label: "O'tkazma (chiqim)", positive: false };
+      case 'convert_in':
+        return { label: 'Naqddan', positive: true };
+      case 'convert_out':
+        return { label: 'Naqdga', positive: false };
+      default:
+        return { label: kind, positive: true };
+    }
+  }
+
+  /**
+   * Bitta virtual karta ledgerini yagona jadval ko'rinishida quradi
+   * (kuryer/market kassasi varag'i — buildUserCashboxSheet — uslubida, lekin
+   * karta ledgeri qatorlariga moslashtirilgan: o'tkazma/konvertatsiya ham).
+   */
+  private buildCardLedgerSheet(
+    worksheet: ExcelJS.Worksheet,
+    data: {
+      cardName: string;
+      isDefault: boolean;
+      periodLabel: string;
+      currentBalance: number;
+      income: number;
+      outcome: number;
+      rows: CardLedgerRow[];
+    },
+  ) {
+    // Summalar MING so'mda: qiymat 1000 ga bo'linadi va formatlanadi.
+    const NUM_FMT = '#,##0.###';
+    const K = (n: number) => (Number(n) || 0) / 1000;
+    const COLS = 8; // A..H
+    const lastColLetter = 'H';
+    const border = {
+      top: { style: 'thin' as const, color: { argb: 'FFB0B0B0' } },
+      left: { style: 'thin' as const, color: { argb: 'FFB0B0B0' } },
+      bottom: { style: 'thin' as const, color: { argb: 'FFB0B0B0' } },
+      right: { style: 'thin' as const, color: { argb: 'FFB0B0B0' } },
+    };
+
+    // Ustun kengliklari: №, Sana, Amaliyot, Kontragent, Summa, Balans, Kim, Izoh
+    const widths = [6, 18, 18, 22, 18, 18, 18, 30];
+    widths.forEach((w, i) => (worksheet.getColumn(i + 1).width = w));
+
+    // ===== ROW 1: Sarlavha =====
+    worksheet.mergeCells(`A1:${lastColLetter}1`);
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `${data.cardName}${
+      data.isDefault ? ' ★ (Asosiy)' : ''
+    } — Virtual karta tarixi`;
+    titleCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF6D28D9' },
+    };
+    worksheet.getRow(1).height = 26;
+
+    // ===== ROW 2: Davr =====
+    worksheet.mergeCells(`A2:${lastColLetter}2`);
+    const subCell = worksheet.getCell('A2');
+    subCell.value = `Davr: ${data.periodLabel}    |    Summalar — ming soʻmda`;
+    subCell.font = { bold: true, size: 11, color: { argb: 'FF4B5563' } };
+    subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    subCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFEDE9FE' },
+    };
+    worksheet.getRow(2).height = 20;
+
+    // ===== ROW 3: Xulosa (Jami kirim / chiqim / sof / joriy balans) =====
+    const summaryPairs: Array<[string, string, number, string]> = [
+      ['A3', 'B3', K(data.income), 'FFDCFCE7'],
+      ['C3', 'D3', K(data.outcome), 'FFFEE2E2'],
+      ['E3', 'F3', K(data.income - data.outcome), 'FFFEF9C3'],
+      ['G3', 'H3', K(data.currentBalance), 'FFDBEAFE'],
+    ];
+    const summaryTitles = [
+      'Jami kirim',
+      'Jami chiqim',
+      'Sof oʻzgarish',
+      'Joriy balans',
+    ];
+    summaryPairs.forEach(([labelCell, valCell, value, bg], idx) => {
+      const lc = worksheet.getCell(labelCell);
+      lc.value = summaryTitles[idx];
+      lc.font = { bold: true, size: 10 };
+      lc.alignment = { horizontal: 'left', vertical: 'middle' };
+      lc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      lc.border = border;
+
+      const vc = worksheet.getCell(valCell);
+      vc.value = value;
+      vc.numFmt = NUM_FMT;
+      vc.font = { bold: true, size: 10 };
+      vc.alignment = { horizontal: 'right', vertical: 'middle' };
+      vc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      vc.border = border;
+    });
+    worksheet.getRow(3).height = 20;
+
+    // ===== ROW 5: Jadval sarlavhasi =====
+    const headerRowIdx = 5;
+    const headers = [
+      '№',
+      'Sana / vaqt',
+      'Amaliyot',
+      'Kontragent',
+      'Summa (ming soʻm)',
+      'Balans (ming soʻm)',
+      'Kim',
+      'Izoh',
+    ];
+    const headerRow = worksheet.getRow(headerRowIdx);
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF7C3AED' },
+      };
+      cell.border = border;
+    });
+    headerRow.height = 22;
+
+    // ===== DATA ROWS (xronologik: eski → yangi) =====
+    let rowIdx = headerRowIdx + 1;
+    data.rows.forEach((r, i) => {
+      const meta = this.cardKindMeta(r.kind);
+      const row = worksheet.getRow(rowIdx);
+
+      const values: Array<string | number> = [
+        i + 1,
+        this.formatUzDateTime(r.created_at),
+        meta.label,
+        r.counterparty || '-',
+        K(r.delta), // ishorali: kirim (+), chiqim (−)
+        K(r.balance_after ?? 0),
+        r.created_by_name || '-',
+        r.comment || '-',
+      ];
+      values.forEach((v, c) => {
+        const cell = row.getCell(c + 1);
+        cell.value = v;
+        cell.font = { size: 10 };
+        cell.border = border;
+        if (c === 4 || c === 5) {
+          // Summa va Balans — raqam, o'ngga
+          cell.numFmt = NUM_FMT;
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        } else if (c === 0) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else {
+          cell.alignment = {
+            horizontal: 'left',
+            vertical: 'middle',
+            wrapText: c === 7,
+          };
+        }
+      });
+      // Amaliyot + Summa ustunlari rangi (kirim yashil / chiqim qizil)
+      const argb = meta.positive ? 'FF16A34A' : 'FFDC2626';
+      row.getCell(3).font = { size: 10, bold: true, color: { argb } };
+      row.getCell(5).font = { size: 10, bold: true, color: { argb } };
+      // zebra
+      if (i % 2 === 1) {
+        for (let c = 1; c <= COLS; c++) {
+          if (c === 3 || c === 5) continue;
+          row.getCell(c).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF5F3FF' },
+          };
+        }
+      }
+      rowIdx++;
+    });
+
+    // Bo'sh tarix holati
+    if (data.rows.length === 0) {
+      worksheet.mergeCells(`A${rowIdx}:${lastColLetter}${rowIdx}`);
+      const emptyCell = worksheet.getCell(`A${rowIdx}`);
+      emptyCell.value = 'Tanlangan davr uchun maʼlumot topilmadi';
+      emptyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      emptyCell.font = { italic: true, color: { argb: 'FF9CA3AF' } };
+      emptyCell.border = border;
+      rowIdx++;
+    }
+
+    // ===== JAMI qatori =====
+    const totalRow = worksheet.getRow(rowIdx);
+    worksheet.mergeCells(`A${rowIdx}:D${rowIdx}`);
+    const totalLabel = worksheet.getCell(`A${rowIdx}`);
+    totalLabel.value = 'JAMI (sof)';
+    totalLabel.font = { bold: true, size: 11 };
+    totalLabel.alignment = { horizontal: 'right', vertical: 'middle' };
+
+    const net = data.income - data.outcome;
+    const totalAmountCell = totalRow.getCell(5);
+    totalAmountCell.value = K(net);
+    totalAmountCell.numFmt = NUM_FMT;
+    totalAmountCell.font = {
+      bold: true,
+      size: 11,
+      color: { argb: net >= 0 ? 'FF16A34A' : 'FFDC2626' },
+    };
+    totalAmountCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+    const totalBalanceCell = totalRow.getCell(6);
+    totalBalanceCell.value = K(data.currentBalance);
+    totalBalanceCell.numFmt = NUM_FMT;
+    totalBalanceCell.font = { bold: true, size: 11 };
+    totalBalanceCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+    for (let c = 1; c <= COLS; c++) {
+      const cell = totalRow.getCell(c);
+      cell.border = border;
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5E7EB' },
+      };
+    }
+    totalRow.height = 22;
+
+    // Yuqori qatorni muzlatish (sarlavha doim ko'rinadi)
+    worksheet.views = [{ state: 'frozen', ySplit: headerRowIdx }];
   }
 
   /** source_type uchun o'zbekcha yorliq (frontend bilan mos) */

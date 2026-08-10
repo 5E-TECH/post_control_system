@@ -581,6 +581,56 @@ export class CasheBoxController {
     });
   }
 
+  @ApiOperation({ summary: 'Export a single card ledger (statement) to Excel' })
+  @ApiParam({ name: 'id', description: 'Card ID' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD). Bo‘sh bo‘lsa — butun tarix',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD). Bo‘sh bo‘lsa — butun tarix',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Excel file downloaded',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('cards/:id/ledger/export')
+  async exportCardLedger(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    const { buffer, fileName } =
+      await this.cashBoxService.exportCardLedgerToExcel(id, {
+        fromDate,
+        toDate,
+        allHistory: !fromDate || !toDate,
+      });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=${encodeURIComponent(fileName)}`,
+    );
+    res.send(buffer);
+  }
+
   @ApiOperation({ summary: 'Create a new virtual card' })
   @ApiBody({ type: CreateCardDto })
   @ApiResponse({ status: 201, description: 'Card created' })
