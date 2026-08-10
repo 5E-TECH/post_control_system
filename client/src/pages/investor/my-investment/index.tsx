@@ -55,6 +55,12 @@ const InvestorMyInvestment = () => {
   const items = Array.isArray(led.items) ? led.items : [];
   const totalPages = Math.max(1, Math.ceil((led.total ?? 0) / (led.limit ?? 20)));
 
+  // "Hozir olishingiz mumkin" = ishlab topilgan − yechib olingan. Manfiy bo'lsa
+  // (ishlab topilgandan ko'proq olingan) — yechishga narsa yo'q (0), ortig'i AVANS.
+  const undistributedRaw = Number(mi.undistributed) || 0;
+  const availableToWithdraw = Math.max(0, undistributedRaw);
+  const advanceTaken = undistributedRaw < 0 ? -undistributedRaw : 0;
+
   const typeLabel: Record<string, string> = {
     capital: t("typeCapital", "Kapital kiritish"),
     capital_withdrawal: t("typeCapitalWithdrawal", "Kapital qaytarish"),
@@ -146,8 +152,14 @@ const InvestorMyInvestment = () => {
           <p className="text-3xl font-bold mt-1">{isLoading ? "…" : formatMoney(mi.distributionsPaid)}</p>
         </div>
 
-        {/* Qoldiq — olishingiz mumkin */}
-        <div className="bg-gradient-to-br from-emerald-500 to-green-600 text-white p-6 rounded-2xl shadow-lg ring-2 ring-emerald-300/40">
+        {/* Qoldiq — olishingiz mumkin (hech qachon manfiy emas; ortig'i = avans) */}
+        <div
+          className={`text-white p-6 rounded-2xl shadow-lg ${
+            advanceTaken > 0
+              ? "bg-gradient-to-br from-slate-500 to-slate-700"
+              : "bg-gradient-to-br from-emerald-500 to-green-600 ring-2 ring-emerald-300/40"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center">
               <Wallet className="w-6 h-6" />
@@ -155,7 +167,14 @@ const InvestorMyInvestment = () => {
             <span className="text-xs bg-white/20 px-2 py-1 rounded-full">{t("available", "mavjud")}</span>
           </div>
           <p className="text-sm opacity-90 mt-4">{t("availableToWithdraw", "Hozir olishingiz mumkin")}</p>
-          <p className="text-3xl font-bold mt-1">{isLoading ? "…" : formatMoney(mi.undistributed)}</p>
+          <p className="text-3xl font-bold mt-1">{isLoading ? "…" : formatMoney(availableToWithdraw)}</p>
+          {advanceTaken > 0 && (
+            <p className="text-xs mt-2 bg-white/15 rounded-lg px-2 py-1 leading-snug">
+              {t("advanceNote", "Ishlab topilgandan ko'proq olingan")}:{" "}
+              <b>{formatMoney(advanceTaken)}</b>.{" "}
+              {t("advanceNote2", "Bu qarz emas — kelgusi foydadan hisobga olinadi.")}
+            </p>
+          )}
         </div>
       </div>
 
