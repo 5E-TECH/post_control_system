@@ -88,12 +88,10 @@ const InvestorAction = () => {
   const backTo = `/user-profile/${id}`;
 
   // Noto'g'ri action yoki ruxsat yo'q → orqaga.
-  // Taqsimot endi kassadan yechiladi → maxsus kassa sahifasiga yo'naltiramiz.
+  // Eslatma: bu sahifadagi "distribution" — SOF LEDGER yozuvi (kassaga TEGMAYDI):
+  // avval yoki kassadan tashqari to'langan summani qayd etish uchun. Kassadan
+  // real to'lov alohida sahifada (/cashbox/pay-investor).
   useEffect(() => {
-    if (action === "distribution") {
-      navigate(`/cashbox/pay-investor?investorId=${id}`, { replace: true });
-      return;
-    }
     if (!meta) navigate(backTo, { replace: true });
     else if (meta.superOnly && !isSuper) navigate(backTo, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,6 +99,7 @@ const InvestorAction = () => {
 
   const [amount, setAmount] = useState("");
   const [ownershipPct, setOwnershipPct] = useState("");
+  const [basis, setBasis] = useState<"net" | "gross">("gross");
   const [date, setDate] = useState<Dayjs | null>(null);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
@@ -117,13 +116,13 @@ const InvestorAction = () => {
   const titles: Record<ActionKey, string> = {
     capital: t("recordCapital", "Kapital kiritish"),
     ownership: t("setOwnership", "Ulush o'rnatish"),
-    distribution: t("recordDistribution", "Taqsimot (dividend)"),
+    distribution: t("recordPastDistribution", "Avval to'langanni qayd etish"),
     withdrawal: t("recordWithdrawal", "Kapital qaytarish"),
   };
   const descriptions: Record<ActionKey, string> = {
     capital: t("capitalDesc", "Investor tikkan kapitalni kiriting"),
     ownership: t("ownershipDesc", "Egalik ulushi va foyda asosini belgilang"),
-    distribution: t("distributionDesc", "Investorga to'langan foydani yozing"),
+    distribution: t("distributionLedgerDesc", "Avval yoki kassadan tashqari to'langan foydani yozing — kassaga ta'sir qilmaydi"),
     withdrawal: t("withdrawalHint", "Tikkan asosiy puldan qaytarish (dividend emas)"),
   };
   const Icon = meta.icon;
@@ -150,7 +149,17 @@ const InvestorAction = () => {
       setLoading(true);
       // Basis bu yerda o'zgarmaydi (joriy saqlanadi) — u faqat investor tasdig'i orqali.
       setOwnership.mutate(
-        { id, body: { ownership_bps: Math.round(pct * 100), effective_from: dateMs, note: noteVal } },
+        {
+          id,
+          body: {
+            ownership_bps: Math.round(pct * 100),
+            effective_from: dateMs,
+            note: noteVal,
+            // Asosni FAQAT dastlabki o'rnatishда yuboramiz; mavjud investorда
+            // asos o'zgarishi investor tasdig'i orqali (backend himoyalaydi).
+            ...(s.hasOpenStake ? {} : { profit_basis: basis }),
+          },
+        },
         { onSuccess: done("ownershipSet"), onError: err },
       );
       return;
@@ -195,6 +204,14 @@ const InvestorAction = () => {
         <div className="grid lg:grid-cols-5 gap-5 items-start">
           {/* Forma (chap) */}
           <div className="lg:col-span-3 bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-5 sm:p-6 flex flex-col gap-4">
+          {action === "distribution" && (
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3 text-xs text-amber-700 dark:text-amber-300 leading-snug">
+              {t(
+                "distributionLedgerWarn",
+                "Bu — hisob-kitob yozuvi: investor AVVAL (kassadan tashqari) olgan pulni qayd etadi. Kassa balansiga ta'sir qilmaydi. Kassadan real to'lov uchun \"Taqsimot to'lash (kassadan)\" tugmasidan foydalaning.",
+              )}
+            </div>
+          )}
           {meta.kind === "ownership" ? (
             <>
               <div>
@@ -207,15 +224,44 @@ const InvestorAction = () => {
                     onChange={(e) => setOwnershipPct(e.target.value)} className={field} placeholder="5" />
                 </div>
               </div>
-              <div className="bg-gray-50 dark:bg-[#312D4B] rounded-xl p-3 border border-gray-100 dark:border-gray-700">
-                <p className="text-xs text-gray-500 dark:text-gray-400">{t("profitBasis", "Foyda asosi")}</p>
-                <p className="text-sm font-semibold text-gray-800 dark:text-white">
-                  {(s.profitBasis ?? "net") === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
-                </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  {t("basisConsentNote", "Foyda asosini o'zgartirish faqat investor tasdig'i orqali (bu sahifada o'zgarmaydi)")}
-                </p>
-              </div>
+              {!s.hasOpenStake ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    {t("profitBasis", "Foyda asosi")} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBasis("gross")}
+                      className={`h-11 rounded-xl border text-sm font-medium transition-all ${basis === "gross" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"}`}
+                    >
+                      {t("basisGross", "Yalpi marja")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBasis("net")}
+                      className={`h-11 rounded-xl border text-sm font-medium transition-all ${basis === "net" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"}`}
+                    >
+                      {t("basisNet", "Sof foyda")}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {basis === "gross"
+                      ? t("basisGrossHint", "Ulush% × pochta foydasi (xarajat ayrilmaydi)")
+                      : t("basisNetHint", "Ulush% × (pochta foydasi − xarajatlar)")}
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-gray-50 dark:bg-[#312D4B] rounded-xl p-3 border border-gray-100 dark:border-gray-700">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t("profitBasis", "Foyda asosi")}</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                    {(s.profitBasis ?? "net") === "net" ? t("basisNet", "Sof foyda") : t("basisGross", "Yalpi marja")}
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    {t("basisConsentNote", "Foyda asosini o'zgartirish faqat investor tasdig'i orqali (bu sahifada o'zgarmaydi)")}
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <div>

@@ -249,6 +249,7 @@ export class InvestorLedgerService {
         ownershipBps,
         ownershipPct: ownershipBps / 100,
         profitBasis: openStake?.profit_basis ?? 'net',
+        hasOpenStake: !!openStake, // dastlabki o'rnatish (asosni erkin tanlash) uchun
         accruedProfitShare,
         distributionsPaid,
         undistributed,
@@ -488,17 +489,30 @@ export class InvestorLedgerService {
     investorId: string,
     dto: SetOwnershipDto,
     actor?: JwtPayload,
+    opts?: { fromConsent?: boolean },
   ) {
     await this.assertInvestor(investorId);
     if (dto.ownership_bps < 0 || dto.ownership_bps > 10000) {
       throw new BadRequestException('ownership_bps 0..10000 oralig\'ida bo\'lishi kerak');
     }
     const effectiveFrom = dto.effective_from ?? Date.now();
-    // Basis berilsa — o'sha; aks holda joriy ochiq versiyanikini saqlaymiz.
     const currentOpen = await this.stakeRepo.findOne({
       where: { investor_id: investorId, effective_to: IsNull() },
     });
-    const profitBasis = dto.profit_basis ?? currentOpen?.profit_basis ?? 'net';
+    // Foyda asosi (net/gross):
+    //  - DASTLABKI ulush (hali ochiq versiya yo'q) — admin erkin tanlaydi
+    //    (himoya qilinadigan mavjud kelishuv yo'q).
+    //  - MAVJUD investor — asos FAQAT investor tasdig'i orqali o'zgaradi
+    //    (approveBasisRequest fromConsent bilan chaqiradi). To'g'ridan-to'g'ri
+    //    admin chaqiruvi asosni o'zgartira OLMAYDI: joriysi saqlanadi.
+    let profitBasis: string;
+    if (!currentOpen) {
+      profitBasis = dto.profit_basis ?? 'net';
+    } else if (opts?.fromConsent) {
+      profitBasis = dto.profit_basis ?? currentOpen.profit_basis ?? 'net';
+    } else {
+      profitBasis = currentOpen.profit_basis ?? 'net';
+    }
     await this.dataSource.transaction(async (m) => {
       const repo = m.getRepository(InvestorOwnershipStakeEntity);
       // Joriy ochiq qatorni yopamiz (tarix o'zgartirilmaydi).
@@ -619,6 +633,7 @@ export class InvestorLedgerService {
       investorId,
       { ownership_bps: bps, profit_basis: row.requested_basis as 'net' | 'gross' },
       actor,
+      { fromConsent: true },
     );
     await this.basisReqRepo.delete({ investor_id: investorId });
     this.activityLog.log({

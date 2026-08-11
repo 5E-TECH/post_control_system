@@ -148,7 +148,10 @@ const InvestorEquityPanel = ({ investorUserId }: { investorUserId: string }) => 
           </button>
         )}
         <button onClick={() => navigate(`/cashbox/pay-investor?investorId=${investorUserId}`)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white transition-colors">
-          <HandCoins className="w-4 h-4" /> {t("recordDistribution", "Taqsimot (kassadan)")}
+          <HandCoins className="w-4 h-4" /> {t("payFromCashbox", "Taqsimot to'lash (kassadan)")}
+        </button>
+        <button onClick={() => go("distribution")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-white dark:bg-[#2A263D] border border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors" title={t("recordPastDistributionHint", "Avval/tashqi to'langan summani qayd etadi — kassaga tegmaydi")}>
+          <HandCoins className="w-4 h-4" /> {t("recordPastDistribution", "Avval to'langanni qayd etish")}
         </button>
         {isSuper && (
           <button onClick={() => go("withdrawal")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-rose-500 hover:bg-rose-600 text-white transition-colors">

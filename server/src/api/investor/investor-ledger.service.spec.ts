@@ -209,12 +209,18 @@ describe('InvestorLedgerService', () => {
     ).rejects.toThrow();
   });
 
-  it('setOwnership joriy ochiqni yopib yangi (basis bilan) qo\'shadi', async () => {
+  const ownershipTx = () => ({
+    transaction: jest.fn(async (cb: any) =>
+      cb({ getRepository: () => ({ update: jest.fn(), create: jest.fn((x) => x), save: jest.fn() }) }),
+    ),
+  });
+
+  it('setOwnership: DASTLABKI ulushда (ochiq stake yo\'q) admin asosni erkin tanlaydi', async () => {
     const repoUpdate = jest.fn();
     const repoSave = jest.fn();
     const svc = makeLedger({
       userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
-      stakeRepo: { findOne: jest.fn().mockResolvedValue({ ownership_bps: 1000, profit_basis: 'net' }) },
+      stakeRepo: { findOne: jest.fn().mockResolvedValue(null) },
       dataSource: {
         transaction: jest.fn(async (cb: any) =>
           cb({ getRepository: () => ({ update: repoUpdate, create: jest.fn((x) => x), save: repoSave }) }),
@@ -224,6 +230,27 @@ describe('InvestorLedgerService', () => {
     const res: any = await svc.setOwnership('inv', { ownership_bps: 3000, profit_basis: 'gross' } as any, { id: 'admin' } as any);
     expect(repoUpdate).toHaveBeenCalled();
     expect(repoSave).toHaveBeenCalled();
+    expect(res.data.profit_basis).toBe('gross');
+  });
+
+  it('setOwnership: MAVJUD investorда to\'g\'ridan-to\'g\'ri asos O\'ZGARMAYDI (tasdiq shart)', async () => {
+    const svc = makeLedger({
+      userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
+      stakeRepo: { findOne: jest.fn().mockResolvedValue({ ownership_bps: 1000, profit_basis: 'net' }) },
+      dataSource: ownershipTx(),
+    });
+    // 'gross' so'ralsa ham joriy 'net' saqlanadi (asos loophole yopiq).
+    const res: any = await svc.setOwnership('inv', { ownership_bps: 3000, profit_basis: 'gross' } as any, { id: 'admin' } as any);
+    expect(res.data.profit_basis).toBe('net');
+  });
+
+  it('setOwnership: fromConsent bilan asos o\'zgaradi (investor tasdig\'i orqali)', async () => {
+    const svc = makeLedger({
+      userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
+      stakeRepo: { findOne: jest.fn().mockResolvedValue({ ownership_bps: 1000, profit_basis: 'net' }) },
+      dataSource: ownershipTx(),
+    });
+    const res: any = await svc.setOwnership('inv', { ownership_bps: 1000, profit_basis: 'gross' } as any, { id: 'admin' } as any, { fromConsent: true });
     expect(res.data.profit_basis).toBe('gross');
   });
 
