@@ -4619,8 +4619,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // SQL formatlar - Toshkent vaqti zonasi bilan (UTC+5)
       // PostgreSQL da timestamp ni Toshkent vaqtiga o'girish
+      // MUHIM: bitta AT TIME ZONE — timestamptz'ni to'g'ridan-to'g'ri Toshkent
+      // kalendar kuniga o'giradi (session TZ'ga bog'liq EMAS). Ilgari qo'shaloq
+      // "AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tashkent'" siljishni bekor qilib,
+      // UTC kuni bo'yicha bucketlar edi (production UTC session'da xato edi).
       const tzConvert =
-        "TO_TIMESTAMP(o.sold_at / 1000) AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tashkent'";
+        "TO_TIMESTAMP(o.sold_at / 1000) AT TIME ZONE 'Asia/Tashkent'";
 
       switch (period) {
         case 'daily':
@@ -4645,7 +4649,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         `
         SELECT
           ${groupFormat} as period,
-          TO_CHAR(TO_TIMESTAMP(MIN(o.sold_at) / 1000) AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tashkent', '${labelFormat}') as label,
+          TO_CHAR(TO_TIMESTAMP(MIN(o.sold_at) / 1000) AT TIME ZONE 'Asia/Tashkent', '${labelFormat}') as label,
           COUNT(o.id) as orders_count,
           COALESCE(SUM(
             CASE

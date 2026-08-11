@@ -43,6 +43,10 @@ import { InvestorModule } from './investor/investor.module';
       synchronize: false,
       // Connection Pool sozlamalari - yuqori yuklanish uchun
       extra: {
+        // Har bir ulanish sessiyasi TZ'sini Asia/Tashkent'ga qadaymiz — vaqt-zona
+        // bog'liq so'rovlar (kunlik hisobotlar, investor foydasi) muhitdan (dev/UTC
+        // Docker/managed Postgres) qat'i nazar bir xil natija bersin.
+        options: '-c timezone=Asia/Tashkent',
         // Maksimal ulanishlar soni (default: 10)
         max: 50,
         // Minimal ulanishlar soni

@@ -142,11 +142,12 @@ describe('InvestorLedgerService', () => {
       },
     };
     const svc = makeLedger(over);
-    const sum: any = await svc.getSummary('inv', day, day);
-    const daily: any = await svc.getDailyBreakdown('inv', day, day);
+    // Ikkalasi ham BUTUN DAVR (lifetime) — hero balansi filtrga bog'liq emas.
+    const sum: any = await svc.getSummary('inv');
+    const daily: any = await svc.getDailyBreakdown('inv');
     // Bir xil dvigatel → hero AYNAN kunlik jami bilan bir xil.
     expect(sum.data.accruedProfitShare).toBe(daily.data.totals.investorShare);
-    expect(sum.data.netProfitForRange).toBe(daily.data.totals.postProfit);
+    expect(sum.data.netProfitLifetime).toBe(daily.data.totals.postProfit);
     expect(sum.data.accruedProfitShare).toBe(26000);
     expect(sum.data.distributionsPaid).toBe(10000);
     expect(sum.data.undistributed).toBe(16000); // 26000 − 10000
@@ -168,7 +169,7 @@ describe('InvestorLedgerService', () => {
         }),
       },
     });
-    const res: any = await svc.getSummary('inv', day, day);
+    const res: any = await svc.getSummary('inv');
     const d = res.data;
     expect(d.capitalInvested).toBe(1_000_000);
     expect(d.ownershipBps).toBe(2000);
@@ -177,7 +178,7 @@ describe('InvestorLedgerService', () => {
     expect(d.distributionsPaid).toBe(100_000);
     expect(d.accruedRoiPct).toBe(11); // 110000/1000000
     expect(d.realizedRoiPct).toBe(10); // 100000/1000000
-    expect(d.netProfitForRange).toBe(550_000);
+    expect(d.netProfitLifetime).toBe(550_000);
   });
 
   it("capital 0 bo'lsa ROI null (NaN emas)", async () => {
@@ -251,6 +252,28 @@ describe('InvestorLedgerService', () => {
       dataSource: ownershipTx(),
     });
     const res: any = await svc.setOwnership('inv', { ownership_bps: 1000, profit_basis: 'gross' } as any, { id: 'admin' } as any, { fromConsent: true });
+    expect(res.data.profit_basis).toBe('gross');
+  });
+
+  it('setOwnership: BACKDATE (joriy ochiqdan oldinga) RAD etadi — tarixiy hisob himoyasi', async () => {
+    const svc = makeLedger({
+      userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
+      stakeRepo: { findOne: jest.fn().mockResolvedValue({ ownership_bps: 1000, profit_basis: 'net', effective_from: 1000 }) },
+      dataSource: ownershipTx(),
+    });
+    await expect(
+      svc.setOwnership('inv', { ownership_bps: 2000, effective_from: 500 } as any, { id: 'admin' } as any),
+    ).rejects.toThrow();
+  });
+
+  it('setOwnership: DASTLABKI ulushни istalgan o\'tmish sanaga o\'rnatish mumkin (onboarding)', async () => {
+    const svc = makeLedger({
+      userRepo: { findOne: jest.fn().mockResolvedValue({ id: 'inv', role: 'investor' }) },
+      stakeRepo: { findOne: jest.fn().mockResolvedValue(null) }, // ochiq ulush yo'q
+      dataSource: ownershipTx(),
+    });
+    const res: any = await svc.setOwnership('inv', { ownership_bps: 1000, effective_from: 500, profit_basis: 'gross' } as any, { id: 'admin' } as any);
+    expect(res.data.effective_from).toBe(500);
     expect(res.data.profit_basis).toBe('gross');
   });
 

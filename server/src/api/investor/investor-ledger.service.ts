@@ -140,7 +140,11 @@ export class InvestorLedgerService {
         ...Object.keys(opexByDay),
         ...Object.keys(distByDay),
       ]),
-    ).sort();
+    )
+      // Himoya: so'ralgan oraliqdan tashqari kun kirmasin (masalan chegara
+      // yaqinidagi kun noto'g'ri ulushga bog'lanib qolmasin).
+      .filter((p) => p >= sd && p <= ed)
+      .sort();
 
     const rows = allDates.map((period) => {
       const d = seriesByDay[period];
@@ -151,7 +155,10 @@ export class InvestorLedgerService {
       const revenue = d ? this.num(d.revenue) : 0;
       const opex = basis === 'net' ? this.num(opexByDay[period]) : 0;
       const postProfit = revenue - opex;
-      const investorShare = Math.floor((postProfit * bps) / 10000);
+      // Math.round (floor emas): floor har kuni kasrni pastga tashlab investorni
+      // ozgina kam to'lardi, zarar kunlarida esa ko'proq ayirardi (asimmetrik).
+      // round simmetrik va adolatli; hero == kunlik jadval jami saqlanadi.
+      const investorShare = Math.round((postProfit * bps) / 10000);
       const distributed = this.num(distByDay[period]);
       return {
         date: period,
@@ -196,21 +203,24 @@ export class InvestorLedgerService {
     return { stakes, openStake, days, totals, sd, ed };
   }
 
-  // Investorning shaxsiy xulosasi (o'ziga scoped). Hero pul raqamlari (ishlab
-  // topilgan foyda, taqsimlanmagan) AYNAN kunlik dvigateldan — kunlik jadval
-  // jamisi bilan HAR DOIM bir xil.
-  async getSummary(investorId: string, startDate?: string, endDate?: string) {
+  // Investorning shaxsiy xulosasi. Pul BALANSLARI (ishlab topilgan foyda,
+  // taqsimlangan, qolgan) HAR DOIM BUTUN DAVR (lifetime) bo'yicha — "hozir
+  // olishingiz mumkin" joriy holat balansi, sana filtriga bog'liq EMAS (filtr
+  // faqat kunlik jadvalga — getDailyBreakdown). Shu sabab range-scoped accrued'дан
+  // lifetime taqsimotni ayirish xatosi (manfiy/noto'g'ri "qoldiq") yuz bermaydi.
+  async getSummary(
+    investorId: string,
+    _startDate?: string,
+    _endDate?: string,
+  ) {
     const [contributions, withdrawals, distributions] = await Promise.all([
       this.capitalRepo.find({ where: { investor_id: investorId } }),
       this.withdrawalRepo.find({ where: { investor_id: investorId } }),
       this.distRepo.find({ where: { investor_id: investorId } }),
     ]);
 
-    const { openStake, totals, sd, ed } = await this.computeDaily(
-      investorId,
-      startDate,
-      endDate,
-    );
+    // BUTUN DAVR (lifetime) — sana filtri e'tiborga olinmaydi (balans joriy holat).
+    const { openStake, totals, sd, ed } = await this.computeDaily(investorId);
 
     const capitalContributed = contributions.reduce(
       (a, c) => a + this.num(c.amount),
@@ -228,9 +238,9 @@ export class InvestorLedgerService {
     );
     const ownershipBps = openStake ? openStake.ownership_bps : 0;
 
-    // Hero raqamlar AYNAN kunlik jadval jamisidan (bir xil dvigatel — farq yo'q).
+    // Lifetime accrued − lifetime taqsimot = to'g'ri "hozir olishingiz mumkin".
     const accruedProfitShare = totals.investorShare;
-    const netProfitForRange = totals.postProfit;
+    const netProfitLifetime = totals.postProfit;
     const undistributed = accruedProfitShare - distributionsPaid;
     const accruedRoiPct =
       capitalInvested > 0
@@ -250,12 +260,12 @@ export class InvestorLedgerService {
         ownershipPct: ownershipBps / 100,
         profitBasis: openStake?.profit_basis ?? 'net',
         hasOpenStake: !!openStake, // dastlabki o'rnatish (asosni erkin tanlash) uchun
-        accruedProfitShare,
-        distributionsPaid,
-        undistributed,
+        accruedProfitShare, // BUTUN DAVR bo'yicha ishlab topilgan ulush
+        distributionsPaid, // BUTUN DAVR bo'yicha yechib olingan
+        undistributed, // qolgan (lifetime − lifetime) — "hozir olishingiz mumkin"
         accruedRoiPct,
         realizedRoiPct,
-        netProfitForRange,
+        netProfitLifetime, // butun davr sof/pochta foydasi (investor ko'lamида)
         from: sd,
         to: ed,
       },
@@ -356,7 +366,7 @@ export class InvestorLedgerService {
     toTs: number,
   ): Promise<Record<string, number>> {
     const rows: any[] = await this.fbhRepo.query(
-      `SELECT TO_CHAR(TO_TIMESTAMP(h.created_at/1000) AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD') AS day,
+      `SELECT TO_CHAR(TO_TIMESTAMP(h.created_at/1000) AT TIME ZONE 'Asia/Tashkent', 'YYYY-MM-DD') AS day,
               SUM(CASE WHEN h.amount < 0 THEN (-1*h.amount) ELSE 0 END) AS opex
        FROM financial_balance_history h
        WHERE h.source_type IN ('salary','bills','manual_expense')
@@ -499,6 +509,17 @@ export class InvestorLedgerService {
     const currentOpen = await this.stakeRepo.findOne({
       where: { investor_id: investorId, effective_to: IsNull() },
     });
+    // BACKDATE HIMOYASI: yangi ulush boshi joriy ochiq ulush boshidan OLDIN
+    // bo'lsa — eski qator inverted interval (from > to) bo'lib qoladi va yangisi
+    // bilan ustma-ust tushib, allaqachon hisoblangan o'tmish ulushini jimgina
+    // buzadi. Shuning uchun rad etamiz. (Dastlabki ulush — currentOpen yo'q —
+    // istalgan o'tmish sanaga o'rnatilishi mumkin: onboarding uchun.)
+    if (currentOpen && effectiveFrom < this.num(currentOpen.effective_from)) {
+      throw new BadRequestException(
+        "Yangi ulush sanasi joriy ochiq ulush boshlangan sanadan oldin bo'la olmaydi " +
+          '(tarixiy foyda hisobini buzmaslik uchun). Kerak bo\'lsa alohida to\'g\'rilash yozuvidan foydalaning.',
+      );
+    }
     // Foyda asosi (net/gross):
     //  - DASTLABKI ulush (hali ochiq versiya yo'q) — admin erkin tanlaydi
     //    (himoya qilinadigan mavjud kelishuv yo'q).

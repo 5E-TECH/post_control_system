@@ -41,7 +41,8 @@ const InvestorMyInvestment = () => {
   const { getMyInvestment, getMyLedger, getMyDaily, getMyBasisRequest, approveBasis, rejectBasis } = useInvestor();
   const { data: basisReqRes } = getMyBasisRequest();
   const basisReq = basisReqRes?.data;
-  const { data: miRes, isLoading } = getMyInvestment({ startDate: from, endDate: to });
+  // Hero balanslari HAR DOIM lifetime (joriy holat) — sana filtriga bog'liq emas.
+  const { data: miRes, isLoading } = getMyInvestment();
   const { data: ledRes } = getMyLedger({ page, limit: 20 });
   const { data: dailyRes } = getMyDaily({ startDate: from, endDate: to });
   const daily = dailyRes?.data ?? {};
@@ -239,7 +240,7 @@ const InvestorMyInvestment = () => {
             <p className="font-bold text-emerald-600 dark:text-emerald-400 text-sm sm:text-base">{formatMoney(dailyTotals.investorShare)}</p>
           </div>
           <div className="bg-amber-50 dark:bg-amber-500/10 rounded-xl p-3">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("totalWithdrawnShort", "Jami yechib olgan")}</p>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">{t("periodWithdrawn", "Davrda yechib olgan")}</p>
             <p className="font-bold text-amber-600 dark:text-amber-400 text-sm sm:text-base">{formatMoney(dailyTotals.distributed)}</p>
           </div>
         </div>
