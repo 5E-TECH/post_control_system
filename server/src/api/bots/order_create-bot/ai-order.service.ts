@@ -511,7 +511,11 @@ export class AiOrderService {
 
     return {
       nonce: randomBytes(4).toString('hex'),
-      customer_name: raw.customer_name?.trim() || undefined,
+      // Mijoz ismi matnda bo'lmasa buyurtma bloklanmasin — "Mijoz" default
+      // qo'yiladi (operator kartada o'zgartira oladi). rawToDraft ham bot
+      // (parseOrders), ham platforma (extractDraft) uchun yagona nuqta, shuning
+      // uchun default shu yerда — preview/DTO/@IsNotEmpty hammasidan o'tadi.
+      customer_name: raw.customer_name?.trim() || 'Mijoz',
       phone_number: phone || extra,
       extra_number: phone ? extra : undefined,
       region_name: raw.region_name?.trim() || undefined,
@@ -563,7 +567,10 @@ export class AiOrderService {
     const previews: OrderPreview[] = [];
     for (const raw of res.orders) {
       const draft = this.rawToDraft(raw);
-      if (!draft.customer_name && !draft.phone_number && !draft.items.length) {
+      // Bo'sh-element skip: ism endi doim to'la ("Mijoz" default) — shuning uchun
+      // haqiqiy buyurtma signali telefon YOKI mahsulot. Ikkalasi ham yo'q bo'lsa
+      // — bu bo'sh/axlat qator (bitta ism qoldig'i), o'tkazib yuboramiz.
+      if (!draft.phone_number && !draft.items.length) {
         continue; // bo'sh element
       }
       draft.where_deliver = marketDefault; // market default (operator kartada o'zgartiradi)
