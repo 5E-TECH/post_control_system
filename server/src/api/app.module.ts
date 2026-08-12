@@ -26,6 +26,7 @@ import { IntegrationSyncModule } from './integration-sync/integration-sync.modul
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
 import { InvestorModule } from './investor/investor.module';
+import { AiFinanceModule } from './ai-finance/ai-finance.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { InvestorModule } from './investor/investor.module';
     IntegrationSyncModule,
     LdgCargoModule,
     InvestorModule,
+    AiFinanceModule,
   ],
   providers: [OrderGateaway],
 })

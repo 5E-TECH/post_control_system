@@ -20,6 +20,7 @@ import {
   User,
   FileText,
   Clock,
+  Sparkles,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
@@ -39,6 +40,7 @@ import {
   PieChart,
   Pie,
 } from "recharts";
+import AiExpenseReport from "./AiExpenseReport";
 
 const financialSourceLabels: Record<string, string> = {
   sell_profit: "Pochta foydasi",
@@ -62,7 +64,7 @@ const SkeletonBox = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg ${className}`} />
 );
 
-type Tab = "overview" | "history" | "analytics";
+type Tab = "overview" | "history" | "analytics" | "aiReport";
 
 // ==================== DETAIL POPUP ====================
 const DetailPopup = ({ item, onClose }: { item: any; onClose: () => void }) => {
@@ -281,6 +283,7 @@ const FinancialHistory: React.FC = () => {
     { key: "overview", label: "Umumiy ko'rinish", icon: <Scale size={16} /> },
     { key: "history", label: "Tarix", icon: <History size={16} /> },
     { key: "analytics", label: "Tahlil", icon: <BarChart3 size={16} /> },
+    { key: "aiReport", label: "AI hisobot", icon: <Sparkles size={16} /> },
   ];
 
   return (
@@ -344,7 +347,7 @@ const FinancialHistory: React.FC = () => {
 
       {/* ========== TABS ========== */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 mt-6">
-        <div className="grid grid-cols-3 bg-gray-100 dark:bg-[#1E1B2E] rounded-2xl p-1.5 gap-1.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 bg-gray-100 dark:bg-[#1E1B2E] rounded-2xl p-1.5 gap-1.5">
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -748,6 +751,13 @@ const FinancialHistory: React.FC = () => {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ========== AI HISOBOT TAB ========== */}
+      {activeTab === "aiReport" && (
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
+          <AiExpenseReport />
         </div>
       )}
     </div>

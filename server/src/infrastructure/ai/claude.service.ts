@@ -88,4 +88,45 @@ export class ClaudeService {
       return null;
     }
   }
+
+  /**
+   * Erkin matn (proza) javob — moliyaviy narrativ hisobot / izoh uchun.
+   * userText — BIZ hisoblagan agregat/raqamlar (ishonchli, PII yo'q), shuning
+   * uchun to'g'ridan uzatiladi. Xato/refusal bo'lsa null qaytaradi (throw yo'q).
+   * ⚠️ Model matematika QILMAYDI — faqat berilgan raqamlarni izohlaydi.
+   */
+  async ask(opts: {
+    system: string;
+    userText: string;
+    model?: string;
+    maxTokens?: number;
+  }): Promise<string | null> {
+    if (!this.client) return null;
+    try {
+      const response = await this.client.messages.create({
+        model:
+          opts.model ||
+          config.AI_FINANCE_MODEL ||
+          config.AI_ORDER_MODEL ||
+          'claude-opus-4-8',
+        max_tokens: opts.maxTokens ?? 2048,
+        system: opts.system,
+        messages: [{ role: 'user', content: opts.userText }],
+      });
+      if (response.stop_reason === 'refusal') {
+        this.logger.log('Claude refused ask request', 'ClaudeService');
+        return null;
+      }
+      const textBlock = response.content.find(
+        (b): b is Anthropic.TextBlock => b.type === 'text',
+      );
+      return textBlock?.text?.trim() || null;
+    } catch (err) {
+      this.logger.log(
+        `Claude ask error: ${(err as Error).message}`,
+        'ClaudeService',
+      );
+      return null;
+    }
+  }
 }
