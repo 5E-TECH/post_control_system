@@ -43,7 +43,18 @@ QAT'IY QOIDALAR:
 - where_deliver = yetkazish turi: "address" (uyga/manzilga yetkazilsa, "eshikkacha", "uyiga"), "center" (markazdan/pochtadan/filialdan olib ketsa yoki "olib ketadi"). Aniq bo'lmasa null.
 - is_replacement = true FAQAT matn ALMASHTIRISH/kafolat holatini bildirsa: "almashtirish", "almashtirib berish", "kafolat", "brak", "nosoz", "buzuq", "ishlamayapti", "eski ... o'rniga", "qaytarib olib yangisini". Oddiy yangi buyurtma bo'lsa false.
 - operator = MUTAXASSIS / operator / sotuvchi ismi, agar matnda ko'rsatilgan bo'lsa (masalan "Mutaxassis: #sevinch" -> "sevinch", "operator Ali" -> "Ali"). '#' belgisini olib tashla. Yo'q bo'lsa null.
-Matn o'zbek, rus yoki lotin/kirill aralash bo'lishi mumkin.`;
+Matn o'zbek, rus yoki lotin/kirill aralash bo'lishi mumkin.
+
+MISOLLAR (matn -> to'g'ri chiqish; ko'rsatilmagan maydonlar null):
+1) Matn: "Salom Dilnoza opa 3 ta atir sepgich olib berila donasi 250 ming +998901234567 Andijon Asaka temiryol kochasi 12 uy eshikkacha"
+   Chiqish: {"customer_name":"Dilnoza","phone_number":"998901234567","extra_number":null,"region_name":"Andijon","district_name":"Asaka","address":"temiryol ko'chasi 12 uy","full_address":"Andijon Asaka temiryol kochasi 12 uy","items":[{"name":"atir sepgich","quantity":3}],"total_price":750000,"comment":null,"where_deliver":"address","is_replacement":false,"operator":null}
+   Diqqat: "donasi 250 ming" BIR dona narxi -> 3 ga ko'paytirilib total_price=750000; "eshikkacha" -> where_deliver="address"; "Asaka" address ichida bo'lsa ham district_name'ga.
+2) Matn: "Mijoz Aziz 900112233, Toshkent shahri Chilonzor, blender 1 ta 320k, markazdan oladi, Mutaxassis: #sevinch"
+   Chiqish: {"customer_name":"Aziz","phone_number":"900112233","extra_number":null,"region_name":"Toshkent shahri","district_name":"Chilonzor","address":null,"full_address":"Toshkent shahri Chilonzor","items":[{"name":"blender","quantity":1}],"total_price":320000,"comment":null,"where_deliver":"center","is_replacement":false,"operator":"sevinch"}
+   Diqqat: "Toshkent shahri" (poytaxt) — "Toshkent viloyati"dan farqla; "markazdan oladi" -> where_deliver="center"; "#sevinch" -> operator="sevinch".
+3) Matn: "eski changyutgich buzuq ekan almashtirib beringlar, Kamola 933445566 Navoiy shahri vagzal 20-uy"
+   Chiqish: {"customer_name":"Kamola","phone_number":"933445566","extra_number":null,"region_name":"Navoiy","district_name":"Navoiy shahri","address":"vagzal 20-uy","full_address":"Navoiy shahri vagzal 20-uy","items":[{"name":"changyutgich","quantity":1}],"total_price":null,"comment":null,"where_deliver":null,"is_replacement":true,"operator":null}
+   Diqqat: "buzuq...almashtirib" -> is_replacement=true; narx yo'q -> total_price=null; "Navoiy shahri" district_name'ga, "vagzal 20-uy" address'ga.`;
 
 const EXTRACT_SCHEMA: Record<string, unknown> = {
   type: 'object',
@@ -123,6 +134,38 @@ const EXTRACT_MULTI_SCHEMA: Record<string, unknown> = {
 const EXTRACT_MULTI_SYSTEM = `${EXTRACT_SYSTEM}
 
 DIQQAT: Matnda BIR NECHTA buyurtma bo'lishi mumkin (har xil mijozlar / alohida buyurtmalar). Har bir ALOHIDA buyurtmani "orders" massivida alohida element qilib qaytar. Agar matnda bitta buyurtma bo'lsa — massivda bitta element bo'ladi. Buyurtmalar bo'sh qatorlar, raqamlash (1., 2., -) yoki har xil mijoz nomi/telefoni bilan ajralishi mumkin. Bitta mijozning bir nechta mahsulotini AJRATMA — u bitta buyurtma.`;
+
+// ─── LLM-disambiguation: fuzzy string-moslik noaniq qolgan mahsulotlarni
+//     Claude SEMANTIK tushunish bilan tanlaydi ("krem" -> "Yuz kremi").
+//     Xavfsiz: Claude faqat RAQAM (nomzod indeksi) qaytaradi; UUID'ni KOD
+//     nomzod ro'yxatidan oladi — model UUID to'qiy olmaydi.
+const DISAMBIG_SYSTEM = `Sen buyurtma yordamchisisan. Mijoz yozgan mahsulot nomiga market katalogidan ENG MOS nomzodni tanlaysan.
+QOIDALAR:
+- Har mahsulot uchun nomzodlar raqamlangan ([1], [2], ...). AYNAN shu mahsulotni bildiradigan nomzodning raqamini (choice) qaytar.
+- Semantik mos kel: "krem" -> "Yuz kremi" bo'lishi mumkin; "changyutgich" -> "Chang yutgich".
+- LEKIN o'lcham/model/hajm/rang aniq FARQ qilsa mos EMAS: "700 gr" != "500 gr", "A51" != "A50", "50ml" != "100ml".
+- Agar hech bir nomzod aniq mos kelmasa -> choice=0 (operator qo'lда tanlaydi).
+- Hech narsa to'qima; faqat berilgan nomzodlardan tanla.`;
+
+const DISAMBIG_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    picks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          item_index: { type: 'integer' },
+          choice: { type: 'integer' },
+        },
+        required: ['item_index', 'choice'],
+      },
+    },
+  },
+  required: ['picks'],
+};
 
 // Narx shu chegaradan KAM bo'lsa shubhali (masalan 1 mln -> 1000, 1.2 mln ->
 // 1200 kabi "ming"ni tushirib o'qish) — operator TASDIQLAMAGUNCHA kamchilik.
@@ -1125,15 +1168,70 @@ export class AiOrderService {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  // ─── 2-faza: REZOLYUTSIYA (DETERMINISTIK DB moslash) ───
+  // ─── 2-faza: REZOLYUTSIYA (DETERMINISTIK DB moslash + LLM semantik fallback) ───
+  // llmAssist (default ON): fuzzy string-moslik noaniq qoldirgan mahsulotlarni
+  // Claude semantik tanlaydi. FAQAT to'lovli oqimlardan (createForPlatform,
+  // parseOrders) chaqiriladi — bepul bot-tuzatish resolveItems'ni to'g'ridan
+  // ishlatadi, bu yerga kirmaydi.
   async resolveDraft(
     draft: AiOrderDraft,
     marketId: string,
-    cache?: { districts?: DistrictEntity[]; products?: ProductEntity[] },
+    cache?: {
+      districts?: DistrictEntity[];
+      products?: ProductEntity[];
+      llmAssist?: boolean;
+    },
   ): Promise<AiOrderDraft> {
     await this.resolveDistrict(draft, cache?.districts);
     await this.resolveItems(draft, marketId, cache?.products);
+    if (cache?.llmAssist !== false) {
+      await this.disambiguateItemsWithLlm(draft);
+    }
     return draft;
+  }
+
+  // Fuzzy noaniq qolgan (product_id yo'q, lekin nomzodlari bor) mahsulotlarni
+  // Claude'ga bir marta yuboradi: mijoz yozgan nom + raqamlangan nomzodlar ->
+  // model eng mos RAQAMni tanlaydi (yoki 0 = mos yo'q). Indeks bilan xavfsiz
+  // (UUID kod tomonda olinadi). Ambiguouslik bo'lmasa umuman chaqirilmaydi.
+  private async disambiguateItemsWithLlm(draft: AiOrderDraft): Promise<void> {
+    if (!this.claude.isEnabled()) return;
+    const targets = draft.items
+      .map((it, idx) => ({ it, idx }))
+      .filter((x) => !x.it.product_id && (x.it.candidates?.length ?? 0) > 0);
+    if (!targets.length) return;
+
+    const lines = targets
+      .map((t) => {
+        const cands = (t.it.candidates || [])
+          .map((c, ci) => `[${ci + 1}] ${c.name}`)
+          .join(', ');
+        return `${t.idx}) Mijoz yozdi: "${t.it.name}" (${t.it.quantity} dona) -> nomzodlar: ${cands}`;
+      })
+      .join('\n');
+
+    const res = await this.claude.extractJson<{
+      picks: { item_index: number; choice: number }[];
+    }>({
+      system: DISAMBIG_SYSTEM,
+      userText: lines,
+      schema: DISAMBIG_SCHEMA,
+      maxTokens: 512,
+    });
+    if (!res || !Array.isArray(res.picks)) return;
+
+    for (const pick of res.picks) {
+      const item = draft.items[pick.item_index];
+      if (!item || item.product_id) continue; // allaqachon hal bo'lgan / noto'g'ri indeks
+      const cands = item.candidates || [];
+      const k = Math.floor(Number(pick.choice));
+      if (k >= 1 && k <= cands.length) {
+        const chosen = cands[k - 1];
+        item.product_id = chosen.id;
+        item.resolved_name = chosen.name;
+        item.candidates = undefined;
+      }
+    }
   }
 
   private async resolveDistrict(
