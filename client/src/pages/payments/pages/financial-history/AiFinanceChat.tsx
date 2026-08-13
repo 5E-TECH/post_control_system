@@ -59,7 +59,7 @@ const AiFinanceChat: React.FC = () => {
       <button
         onClick={() => setOpen((o) => !o)}
         title="Elchin — moliyaviy AI yordamchingiz"
-        className="fixed bottom-6 left-6 max-[650px]:bottom-24 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/40 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+        className="fixed bottom-6 right-6 max-[650px]:bottom-24 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/40 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
       >
         {open ? (
           <X className="w-6 h-6" />
@@ -79,9 +79,9 @@ const AiFinanceChat: React.FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            style={{ transformOrigin: "bottom left" }}
+            style={{ transformOrigin: "bottom right" }}
             className="fixed z-40 flex flex-col rounded-2xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700/50 shadow-2xl overflow-hidden
-              bottom-24 left-6 w-[400px] max-w-[calc(100vw-3rem)] h-[70vh] max-h-[600px]
+              bottom-24 right-6 w-[400px] max-w-[calc(100vw-3rem)] h-[70vh] max-h-[600px]
               max-[650px]:bottom-40 max-[650px]:left-3 max-[650px]:right-3 max-[650px]:w-auto max-[650px]:h-[65vh]"
           >
             {/* Sarlavha */}
