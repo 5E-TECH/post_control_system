@@ -96,8 +96,11 @@ const AiFinanceChat: React.FC = () => {
     e.target.value = "";
   };
 
+  // Kattalashtirilganда: yuqoridagi panel (sticky header h-16, z-50) OSTIDAN
+  // boshlaymiz (top-20) va uning USTIDA turishi uchun z-[60]. Markazlash
+  // transform emas, margin bilan (framer transformi bilan urishmasin).
   const boxClass = maxed
-    ? "fixed inset-0 m-auto z-40 w-[95vw] max-w-[1000px] h-[90vh] flex flex-col rounded-2xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700/50 shadow-2xl overflow-hidden"
+    ? "fixed z-[60] top-20 bottom-4 max-[650px]:bottom-24 left-0 right-0 mx-auto w-[95vw] max-w-[1000px] flex flex-col rounded-2xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700/50 shadow-2xl overflow-hidden"
     : "fixed z-40 flex flex-col rounded-2xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700/50 shadow-2xl overflow-hidden bottom-24 right-6 w-[400px] max-w-[calc(100vw-3rem)] h-[70vh] max-h-[600px] max-[650px]:bottom-40 max-[650px]:left-3 max-[650px]:right-3 max-[650px]:w-auto max-[650px]:h-[65vh]";
 
   return (
