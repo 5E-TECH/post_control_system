@@ -67,14 +67,26 @@ const CATEGORY_SCHEMA: Record<string, unknown> = {
 const CATEGORY_SYSTEM = `Sen buxgalter yordamchisisan. Har xarajat izohiga QISQA, umumiy kategoriya biriktir.
 Tavsiya etilgan kategoriyalar: Ovqat, Transport, Yoqilg'i, Ijara, Kommunal, Aloqa/Internet, Kanstovar, Ta'mirlash, Reklama/Marketing, Soliq, Bank/komissiya, Sovg'a/mehmon, Tozalash, Boshqa.
 QOIDALAR:
-- Har izohga ENG mos bittasini tanla; ro'yxatda mos bo'lmasa qisqa yangi kategoriya o'yla.
+- IMLO XATOSINI tushun va TO'G'RI ma'noga biriktir: "benzn"/"Benzin"/"benzin" -> Yoqilg'i; "ijra"/"ijara" -> Ijara; "kanselyariya"/"kanstavar" -> Kanstovar.
+- Bir xil ma'noli TURLI yozuvlarni (sinonim, qisqartma, katta/kichik harf, kirill/lotin aralash, bo'sh joy/tinish farqi) AYNAN BITTA kategoriyaga birlashtir — kategoriya nomini HAR DOIM bir xil imlода yoz.
+- Har izohga ENG mos bittasini tanla; ro'yxatda mos bo'lmasa qisqa yangi kategoriya o'yla, lekin ortiqcha maydalab yuborma.
 - Izohsiz yoki tushunarsiz bo'lsa "Boshqa".
-- Faqat kategoriya nomini qaytar; izohni o'zgartirma. Har izoh uchun uning INDEKSini qaytar.`;
+- Faqat kategoriya nomini qaytar; izohni o'zgartirma. Har izoh uchun uning INDEKSini va kategoriya nomini qaytar.`;
 
 interface Bucket {
   label: string;
   total: number;
   bySource: Record<string, number>;
+}
+interface CategoryItem {
+  comment: string;
+  count: number;
+  total: number;
+}
+interface CategoryMember {
+  name: string;
+  count: number;
+  total: number;
 }
 interface Category {
   name: string;
@@ -82,6 +94,8 @@ interface Category {
   count: number;
   source: string;
   examples: string[];
+  items?: CategoryItem[]; // kategoriya ichi: izoh guruhlari (manual_expense/bills)
+  members?: CategoryMember[]; // kategoriya ichi: per-hodim (salary — kim qancha oldi)
 }
 
 @Injectable()
@@ -234,31 +248,133 @@ export class AiFinanceService {
     }
   }
 
-  // salary/bills = tayyor kategoriya; manual_expense izohlaridan AI klasterlaydi.
+  // Kategoriya taqsimoti + HAR kategoriya ICHI (drill-down):
+  //   salary  -> members (kim qancha maosh oldi)
+  //   bills   -> items (izoh guruhlari)
+  //   manual_expense -> AI kategoriyalar, har biriда items (izoh guruhlari)
+  // Jami byCategory = haqiqiy chiqim (500 dan ortiq izoh yoki AIга tushmagan
+  // qoldiq "Boshqa"ga qo'shiladi — hech narsa tushib qolmaydi).
   private async buildCategories(
     fromTs: number,
     toTs: number,
     totalsBySource: Record<string, number>,
   ): Promise<Category[]> {
     const cats: Category[] = [];
-    if (totalsBySource.salary > 0)
+
+    // SALARY — ichida per-hodim taqsimot (kim shu davrда qancha maosh oldi).
+    if (totalsBySource.salary > 0) {
+      const members = await this.salaryMembers(fromTs, toTs);
       cats.push({
         name: SOURCE_LABEL.salary,
         total: totalsBySource.salary,
-        count: 0,
+        count: members.reduce((s, m) => s + m.count, 0),
         source: 'salary',
         examples: [],
+        members,
       });
-    if (totalsBySource.bills > 0)
+    }
+
+    // BILLS — ichida izoh bo'yicha taqsimot.
+    if (totalsBySource.bills > 0) {
+      const items = await this.commentGroups(fromTs, toTs, 'bills');
       cats.push({
         name: SOURCE_LABEL.bills,
         total: totalsBySource.bills,
-        count: 0,
+        count: items.reduce((s, i) => s + i.count, 0),
         source: 'bills',
-        examples: [],
+        examples: items
+          .slice(0, 3)
+          .map((i) => i.comment)
+          .filter((c) => c !== '(izohsiz)'),
+        items,
+      });
+    }
+
+    // MANUAL_EXPENSE — izohlarni distinct guruhlab, AI kategoriyaга biriktiradi.
+    const rows = await this.commentGroups(fromTs, toTs, 'manual_expense', 500);
+    if (rows.length) {
+      // AI klasterlash (o'chiq/xato bo'lsa — hammasi "Qo'lda chiqimlar"ga).
+      let assignments: { index: number; category: string }[] | null = null;
+      if (this.claude.isEnabled()) {
+        const list = rows
+          .map(
+            (r, i) => `${i}) ${r.comment} — ${r.total} so'm (${r.count} marta)`,
+          )
+          .join('\n');
+        const res = await this.claude.extractJson<{
+          assignments: { index: number; category: string }[];
+        }>({
+          system: CATEGORY_SYSTEM,
+          userText: list,
+          schema: CATEGORY_SCHEMA,
+          maxTokens: 6000,
+        });
+        if (res && Array.isArray(res.assignments)) assignments = res.assignments;
+      }
+
+      const assignMap = new Map<number, string>();
+      for (const a of assignments || []) {
+        assignMap.set(
+          Math.floor(Number(a.index)),
+          (a.category || 'Boshqa').trim() || 'Boshqa',
+        );
+      }
+      const byName = new Map<string, Category>();
+      let categorizedSum = 0;
+      rows.forEach((r, i) => {
+        const name =
+          assignMap.get(i) ||
+          (assignments ? 'Boshqa' : SOURCE_LABEL.manual_expense);
+        const c: Category = byName.get(name) ?? {
+          name,
+          total: 0,
+          count: 0,
+          source: 'manual_expense',
+          examples: [],
+          items: [],
+        };
+        c.total += r.total;
+        c.count += r.count;
+        c.items!.push(r);
+        if (c.examples.length < 3 && r.comment !== '(izohsiz)') {
+          c.examples.push(r.comment);
+        }
+        byName.set(name, c);
+        categorizedSum += r.total;
       });
 
-    // manual_expense izohlarini distinct qilib olamiz (arzon — kam qator LLMga).
+      // Rekonsiliatsiya: hisoblangan yig'indi haqiqiy manual_expense'dan kam
+      // bo'lsa (500+ izoh yoki AIга tushmagan) — qoldiqни "Boshqa"ga qo'shamiz.
+      const remainder = totalsBySource.manual_expense - categorizedSum;
+      if (remainder > 0) {
+        const other: Category = byName.get('Boshqa') ?? {
+          name: 'Boshqa',
+          total: 0,
+          count: 0,
+          source: 'manual_expense',
+          examples: [],
+          items: [],
+        };
+        other.total += remainder;
+        byName.set('Boshqa', other);
+      }
+
+      for (const c of byName.values()) {
+        if (c.items) c.items.sort((a, b) => b.total - a.total);
+      }
+      cats.push(...byName.values());
+    }
+
+    return cats.sort((a, b) => b.total - a.total);
+  }
+
+  // Bitta source_type uchun izoh bo'yicha guruhlar (kategoriya ichi tarkibi).
+  private async commentGroups(
+    fromTs: number,
+    toTs: number,
+    source: string,
+    limit = 200,
+  ): Promise<CategoryItem[]> {
     const rows: Array<{
       comment: string;
       cnt: string | number;
@@ -267,61 +383,42 @@ export class AiFinanceService {
       `SELECT COALESCE(NULLIF(TRIM(comment), ''), '(izohsiz)') AS comment,
               COUNT(*)::int AS cnt, SUM(-1*amount)::bigint AS total
        FROM financial_balance_history
-       WHERE source_type = 'manual_expense' AND amount < 0
+       WHERE source_type::text = $3 AND amount < 0
          AND created_at >= $1 AND created_at <= $2
-       GROUP BY 1 ORDER BY total DESC LIMIT 200`,
+       GROUP BY 1 ORDER BY total DESC LIMIT $4`,
+      [fromTs, toTs, source, limit],
+    );
+    return rows.map((r) => ({
+      comment: r.comment,
+      count: Number(r.cnt) || 0,
+      total: Number(r.total) || 0,
+    }));
+  }
+
+  // Maosh kategoriyasi ichi: kim shu davrда qancha maosh olgan (per-hodim).
+  private async salaryMembers(
+    fromTs: number,
+    toTs: number,
+  ): Promise<CategoryMember[]> {
+    const rows: Array<{
+      name: string | null;
+      cnt: string | number;
+      total: string | number;
+    }> = await this.fbhRepo.query(
+      `SELECT u.name AS name, COUNT(*)::int AS cnt, SUM(-1*h.amount)::bigint AS total
+       FROM financial_balance_history h
+       LEFT JOIN users u ON u.id = h.related_user_id
+       WHERE h.source_type::text = 'salary' AND h.amount < 0
+         AND h.created_at >= $1 AND h.created_at <= $2
+       GROUP BY u.name
+       ORDER BY total DESC`,
       [fromTs, toTs],
     );
-    if (!rows.length) return cats.sort((a, b) => b.total - a.total);
-
-    // AI klasterlash (o'chiq/xato bo'lsa — bitta "Qo'lda chiqimlar" kategoriyasi).
-    let assignments: { index: number; category: string }[] | null = null;
-    if (this.claude.isEnabled()) {
-      const list = rows
-        .map(
-          (r, i) =>
-            `${i}) ${r.comment} — ${Number(r.total)} so'm (${Number(r.cnt)} marta)`,
-        )
-        .join('\n');
-      const res = await this.claude.extractJson<{
-        assignments: { index: number; category: string }[];
-      }>({
-        system: CATEGORY_SYSTEM,
-        userText: list,
-        schema: CATEGORY_SCHEMA,
-        maxTokens: 4000,
-      });
-      if (res && Array.isArray(res.assignments)) assignments = res.assignments;
-    }
-
-    const assignMap = new Map<number, string>();
-    for (const a of assignments || []) {
-      assignMap.set(
-        Math.floor(Number(a.index)),
-        (a.category || 'Boshqa').trim() || 'Boshqa',
-      );
-    }
-    const byName = new Map<string, Category>();
-    rows.forEach((r, i) => {
-      const name =
-        assignMap.get(i) ||
-        (assignments ? 'Boshqa' : SOURCE_LABEL.manual_expense);
-      const c: Category = byName.get(name) ?? {
-        name,
-        total: 0,
-        count: 0,
-        source: 'manual_expense',
-        examples: [],
-      };
-      c.total += Number(r.total) || 0;
-      c.count += Number(r.cnt) || 0;
-      if (c.examples.length < 3 && r.comment && r.comment !== '(izohsiz)') {
-        c.examples.push(r.comment);
-      }
-      byName.set(name, c);
-    });
-    cats.push(...byName.values());
-    return cats.sort((a, b) => b.total - a.total);
+    return rows.map((r) => ({
+      name: r.name || "Noma'lum",
+      count: Number(r.cnt) || 0,
+      total: Number(r.total) || 0,
+    }));
   }
 
   private async buildNarrative(d: {

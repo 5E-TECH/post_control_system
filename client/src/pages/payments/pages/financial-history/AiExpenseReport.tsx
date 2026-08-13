@@ -17,6 +17,9 @@ import {
   Tag,
   AlertCircle,
   Wallet,
+  ChevronDown,
+  ChevronRight,
+  User,
 } from "lucide-react";
 
 type Period = "daily" | "weekly" | "monthly" | "yearly";
@@ -47,6 +50,7 @@ const CAT_COLORS = [
 
 const AiExpenseReport: React.FC = () => {
   const [period, setPeriod] = useState<Period>("monthly");
+  const [openCat, setOpenCat] = useState<number | null>(null);
   const { getExpenseReport } = useFinancialAI();
   const { data, isLoading, isError } = getExpenseReport({ period });
   const r = data?.data;
@@ -232,39 +236,82 @@ const AiExpenseReport: React.FC = () => {
               <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
                 <Tag className="w-4 h-4 text-purple-500" /> Kategoriya bo'yicha
                 (AI)
+                <span className="text-xs font-normal text-gray-400">
+                  · ustiga bosib ichini ko'ring
+                </span>
               </div>
               <div className="space-y-3">
                 {r.byCategory.map((c: any, i: number) => {
                   const pct = r.totals?.total
                     ? Math.round((c.total / r.totals.total) * 100)
                     : 0;
+                  const isMembers = !!(c.members && c.members.length);
+                  const detail = isMembers
+                    ? c.members
+                    : c.items && c.items.length
+                      ? c.items
+                      : null;
+                  const isOpen = openCat === i;
                   return (
                     <div key={i}>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-gray-700 dark:text-gray-200 font-medium">
-                          {c.name}
-                          {c.count ? (
-                            <span className="text-gray-400 ml-1 text-xs">
-                              ({c.count})
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="text-gray-600 dark:text-gray-300">
-                          {som(c.total)} · {pct}%
-                        </span>
+                      <div
+                        onClick={() => detail && setOpenCat(isOpen ? null : i)}
+                        className={detail ? "cursor-pointer" : ""}
+                      >
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="text-gray-700 dark:text-gray-200 font-medium flex items-center gap-1 min-w-0">
+                            {detail &&
+                              (isOpen ? (
+                                <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              ) : (
+                                <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              ))}
+                            <span className="truncate">{c.name}</span>
+                            {c.count ? (
+                              <span className="text-gray-400 ml-1 text-xs shrink-0">
+                                ({c.count})
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                            {som(c.total)} · {pct}%
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: CAT_COLORS[i % CAT_COLORS.length],
+                            }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: CAT_COLORS[i % CAT_COLORS.length],
-                          }}
-                        />
-                      </div>
-                      {Array.isArray(c.examples) && c.examples.length > 0 && (
-                        <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                          {c.examples.join(" · ")}
+                      {isOpen && detail && (
+                        <div className="mt-2 ml-5 pl-3 space-y-1 border-l-2 border-gray-100 dark:border-gray-700">
+                          {detail.map((d: any, j: number) => (
+                            <div
+                              key={j}
+                              className="flex items-center justify-between text-xs gap-2"
+                            >
+                              <span className="text-gray-600 dark:text-gray-300 truncate flex items-center gap-1 min-w-0">
+                                {isMembers && (
+                                  <User className="w-3 h-3 text-gray-400 shrink-0" />
+                                )}
+                                <span className="truncate">
+                                  {isMembers ? d.name : d.comment}
+                                </span>
+                                {d.count ? (
+                                  <span className="text-gray-400 shrink-0">
+                                    · {d.count}x
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                {som(d.total)}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
