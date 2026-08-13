@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiFinanceController } from './ai-finance.controller';
 import { AiFinanceService } from './ai-finance.service';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
+import { AiFinanceReportSnapshotEntity } from 'src/core/entity/ai-finance-report-snapshot.entity';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { MyLogger } from 'src/logger/logger.service';
 
@@ -13,7 +14,12 @@ import { MyLogger } from 'src/logger/logger.service';
  * ClaudeService to'g'ridan provider (order-bot moduli kabi — InfrastructureModule yo'q).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([FinancialBalanceHistoryEntity])],
+  imports: [
+    TypeOrmModule.forFeature([
+      FinancialBalanceHistoryEntity,
+      AiFinanceReportSnapshotEntity,
+    ]),
+  ],
   controllers: [AiFinanceController],
   providers: [AiFinanceService, ClaudeService, MyLogger],
 })

@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
+import { AiFinanceReportSnapshotEntity } from 'src/core/entity/ai-finance-report-snapshot.entity';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { MyLogger } from 'src/logger/logger.service';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
@@ -99,10 +101,12 @@ interface Category {
 }
 
 @Injectable()
-export class AiFinanceService {
+export class AiFinanceService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(FinancialBalanceHistoryEntity)
     private readonly fbhRepo: Repository<FinancialBalanceHistoryEntity>,
+    @InjectRepository(AiFinanceReportSnapshotEntity)
+    private readonly snapshotRepo: Repository<AiFinanceReportSnapshotEntity>,
     private readonly claude: ClaudeService,
     private readonly logger: MyLogger,
   ) {}
@@ -111,19 +115,57 @@ export class AiFinanceService {
   // Matematikani KOD qiladi (yig'indi, peak, %); Claude faqat kategoriyalaydi
   // (izoh -> kategoriya) va izohlaydi (o'zbekcha narrativ). PII yo'q — faqat
   // xarajat summalari va izoh matni.
+  // Endpoint: standart davr -> SAQLANGAN snapshot (AI QAYTA chaqirilmaydi, tez);
+  // custom oraliq yoki snapshot yo'q bo'lsa -> jonli hisoblab (kerak bo'lsa saqlab).
   async getExpenseReport(period?: string, fromDate?: string, toDate?: string) {
     try {
       const p: Period = PERIODS.includes(period as Period)
         ? (period as Period)
         : 'monthly';
 
-      // Sana oralig'i (Tashkent). Berilmasa — davrga qarab standart.
-      const to = fromToValid(toDate) ? (toDate as string) : this.ymd(new Date());
-      const from = fromToValid(fromDate)
-        ? (fromDate as string)
-        : this.ymd(new Date(Date.now() - DEFAULT_DAYS[p] * 86400000));
-      const fromTs = toUzbekistanTimestamp(from, false);
-      const toTs = toUzbekistanTimestamp(to, true);
+      // Custom oraliq berilsa — jonli (kam ishlatiladi, AI puli ketadi).
+      if (fromToValid(fromDate) && fromToValid(toDate)) {
+        const report = await this.computeExpenseReport(p, fromDate, toDate);
+        return successRes({ ...report, cached: false });
+      }
+
+      // Standart davr — oldindan saqlangan snapshot.
+      const snap = await this.readSnapshot(p);
+      if (snap) {
+        return successRes({
+          ...snap.payload,
+          cached: true,
+          computedAt: Number(snap.computed_at),
+        });
+      }
+
+      // Snapshot hali yo'q (birinchi startup / migration) — jonli + saqlaymiz.
+      const fresh = await this.computeExpenseReport(p);
+      const computedAt = Date.now();
+      await this.saveSnapshot(p, fresh, computedAt);
+      return successRes({ ...fresh, cached: false, computedAt });
+    } catch (error) {
+      this.logger.log(
+        `getExpenseReport xato: ${(error as Error).message}`,
+        'AiFinance',
+      );
+      return catchError(error);
+    }
+  }
+
+  // Jonli hisoblash (AI kategoriya + narrativ). Snapshot uchun ham shu ishlatiladi.
+  private async computeExpenseReport(
+    p: Period,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<Record<string, any>> {
+    // Sana oralig'i (Tashkent). Berilmasa — davrga qarab standart.
+    const to = fromToValid(toDate) ? (toDate as string) : this.ymd(new Date());
+    const from = fromToValid(fromDate)
+      ? (fromDate as string)
+      : this.ymd(new Date(Date.now() - DEFAULT_DAYS[p] * 86400000));
+    const fromTs = toUzbekistanTimestamp(from, false);
+    const toTs = toUzbekistanTimestamp(to, true);
 
       // 1) Vaqt-bucketli seriya (Tashkent) + source_type breakdown.
       //    $3 = format satri (KODdan, whitelistdan — user inputidan emas).
@@ -225,7 +267,7 @@ export class AiFinanceService {
             })
           : null;
 
-      return successRes({
+      return {
         period: p,
         from,
         to,
@@ -238,14 +280,102 @@ export class AiFinanceService {
         topExpenses,
         narrative,
         aiEnabled: this.claude.isEnabled(),
-      });
-    } catch (error) {
+      };
+  }
+
+  // ─── Snapshot: oldindan hisoblangan hisobot (AI'siz ko'rish uchun) ───
+  private async readSnapshot(
+    period: Period,
+  ): Promise<AiFinanceReportSnapshotEntity | null> {
+    try {
+      return await this.snapshotRepo.findOne({ where: { period } });
+    } catch {
+      return null; // jadval hali yo'q (migration yetmagan) — jonliga tushamiz
+    }
+  }
+
+  private async saveSnapshot(
+    period: Period,
+    payload: Record<string, any>,
+    computedAt: number,
+  ): Promise<void> {
+    try {
+      const existing = await this.snapshotRepo.findOne({ where: { period } });
+      if (existing) {
+        existing.payload = payload;
+        existing.computed_at = computedAt;
+        await this.snapshotRepo.save(existing);
+      } else {
+        await this.snapshotRepo.save(
+          this.snapshotRepo.create({
+            period,
+            payload,
+            computed_at: computedAt,
+          }),
+        );
+      }
+    } catch (e) {
       this.logger.log(
-        `getExpenseReport xato: ${(error as Error).message}`,
+        `saveSnapshot (${period}) xato: ${(e as Error).message}`,
         'AiFinance',
       );
-      return catchError(error);
     }
+  }
+
+  // Barcha davrlarni qayta hisoblab saqlaydi (cron + startup + qo'lda yangilash).
+  async refreshAllSnapshots(): Promise<number> {
+    const computedAt = Date.now();
+    let ok = 0;
+    for (const p of PERIODS) {
+      try {
+        const report = await this.computeExpenseReport(p);
+        await this.saveSnapshot(p, report, computedAt);
+        ok++;
+      } catch (e) {
+        this.logger.log(
+          `refresh ${p} xato: ${(e as Error).message}`,
+          'AiFinance',
+        );
+      }
+    }
+    this.logger.log(
+      `AI xarajat snapshot yangilandi: ${ok}/${PERIODS.length}`,
+      'AiFinance',
+    );
+    return ok;
+  }
+
+  // Qo'lda yangilash endpointi uchun (superadmin/admin).
+  async refreshSnapshots() {
+    const n = await this.refreshAllSnapshots();
+    return successRes({
+      refreshed: n,
+      total: PERIODS.length,
+      computedAt: Date.now(),
+    });
+  }
+
+  // Kunlik avtomatik yangilash (Tashkent 03:00) — ko'rish AI'siz bo'lishi uchun.
+  @Cron('0 0 3 * * *', { timeZone: 'Asia/Tashkent' })
+  async refreshDailyCron(): Promise<void> {
+    await this.refreshAllSnapshots();
+  }
+
+  // Loyiha ishga tushganda: snapshot yo'q/eskirgan bo'lsa fon rejimида hisoblaydi
+  // (startupни bloklamaydi; jadval hali yo'q bo'lsa jim o'tadi).
+  onApplicationBootstrap(): void {
+    void (async () => {
+      try {
+        const snaps = await this.snapshotRepo.find();
+        const now = Date.now();
+        const fresh =
+          snaps.length >= PERIODS.length &&
+          snaps.every((s) => now - Number(s.computed_at) < 6 * 3600 * 1000);
+        if (!fresh) await this.refreshAllSnapshots();
+      } catch {
+        /* jadval hali yo'q (migration) — o'tkazib yuboramiz */
+      }
+    })();
   }
 
   // Kategoriya taqsimoti + HAR kategoriya ICHI (drill-down):

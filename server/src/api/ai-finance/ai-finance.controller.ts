@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -37,5 +37,14 @@ export class AiFinanceController {
     @Query('toDate') toDate?: string,
   ) {
     return this.aiFinance.getExpenseReport(period, fromDate, toDate);
+  }
+
+  // Qo'lda yangilash — barcha davr snapshotlarini qayta hisoblaydi (AI puli ketadi).
+  @ApiOperation({ summary: "AI xarajat snapshotlarini qo'lda yangilash" })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('expense-report/refresh')
+  refresh() {
+    return this.aiFinance.refreshSnapshots();
   }
 }

@@ -20,6 +20,8 @@ import {
   ChevronDown,
   ChevronRight,
   User,
+  RefreshCw,
+  Clock,
 } from "lucide-react";
 
 type Period = "daily" | "weekly" | "monthly" | "yearly";
@@ -27,6 +29,17 @@ type Period = "daily" | "weekly" | "monthly" | "yearly";
 const som = (n?: number) =>
   String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, " ") +
   " so'm";
+
+const fmtDate = (ms?: number) =>
+  ms
+    ? new Date(ms).toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
 const PERIODS: { key: Period; label: string }[] = [
   { key: "daily", label: "Kunlik" },
@@ -51,7 +64,7 @@ const CAT_COLORS = [
 const AiExpenseReport: React.FC = () => {
   const [period, setPeriod] = useState<Period>("monthly");
   const [openCat, setOpenCat] = useState<number | null>(null);
-  const { getExpenseReport } = useFinancialAI();
+  const { getExpenseReport, refreshExpenseReport } = useFinancialAI();
   const { data, isLoading, isError } = getExpenseReport({ period });
   const r = data?.data;
 
@@ -72,22 +85,44 @@ const AiExpenseReport: React.FC = () => {
             </p>
           </div>
         </div>
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`px-3 py-1.5 text-sm rounded-lg transition-all ${
-                period === p.key
-                  ? "bg-purple-600 text-white shadow"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+            {PERIODS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                className={`px-3 py-1.5 text-sm rounded-lg transition-all ${
+                  period === p.key
+                    ? "bg-purple-600 text-white shadow"
+                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => refreshExpenseReport.mutate()}
+            disabled={refreshExpenseReport.isPending}
+            title="Barcha davrlarni AI bilan qayta hisoblash"
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${refreshExpenseReport.isPending ? "animate-spin" : ""}`}
+            />
+          </button>
         </div>
       </div>
+
+      {/* Hisoblangan sana (saqlangan snapshot — AI qayta chaqirilmaydi) */}
+      {r?.computedAt && (
+        <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+          <Clock className="w-3 h-3" />
+          Hisoblangan: {fmtDate(r.computedAt)}
+          {r.cached === false ? " · jonli" : ""}
+          {refreshExpenseReport.isPending ? " · yangilanmoqda..." : ""}
+        </div>
+      )}
 
       {isLoading && (
         <div className="flex items-center justify-center py-16 text-gray-500 dark:text-gray-400">

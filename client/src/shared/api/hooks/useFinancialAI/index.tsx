@@ -1,11 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../..";
 
 export const financialAiKey = "financial-ai";
 
 // Moliyaviy AI — faqat-o'qish analitik surface (superadmin/admin).
 export const useFinancialAI = () => {
-  // AI xarajat hisoboti (kunlik/haftalik/oylik/yillik)
+  const client = useQueryClient();
+
+  // Barcha davr snapshotlarini qo'lda qayta hisoblash (AI puli ketadi).
+  const refreshExpenseReport = useMutation({
+    mutationFn: () => api.post("financial-ai/expense-report/refresh"),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [financialAiKey] }),
+  });
+
+  // AI xarajat hisoboti (kunlik/haftalik/oylik/yillik) — saqlangan snapshot
   const getExpenseReport = (
     params?: {
       period?: "daily" | "weekly" | "monthly" | "yearly";
@@ -23,5 +32,5 @@ export const useFinancialAI = () => {
       enabled,
     });
 
-  return { getExpenseReport };
+  return { getExpenseReport, refreshExpenseReport };
 };
