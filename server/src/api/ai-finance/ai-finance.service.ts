@@ -27,6 +27,29 @@ const SOURCE_LABEL: Record<string, string> = {
   manual_expense: "Qo'lda chiqimlar",
 };
 
+// Umumiy/manba nomlari — bular HECH QACHON kategoriya bo'lolmaydi (-> "Boshqa").
+// AI shundoq nom bersa ham yoki izohning o'zi shunday bo'lsa ham.
+const GENERIC_CATEGORY = new Set([
+  "qo'lda chiqim",
+  'qolda chiqim',
+  "qo'lda chiqimlar",
+  'qolda chiqimlar',
+  'chiqim',
+  'chiqimlar',
+  'xarajat',
+  'xarajatlar',
+  "to'lov",
+  'tolov',
+  'tulov',
+  'pul',
+  'naqd',
+  'boshqa xarajat',
+  'manual',
+  'manual_expense',
+  'other',
+  'expense',
+]);
+
 // PostgreSQL TO_CHAR formati — davr bo'yicha (Tashkent kun/hafta/oy/yil).
 const PERIOD_FMT: Record<Period, string> = {
   daily: 'YYYY-MM-DD',
@@ -1066,12 +1089,18 @@ export class AiFinanceService implements OnApplicationBootstrap {
 
       const byName = new Map<string, Category>();
       let categorizedSum = 0;
-      const manualLc = SOURCE_LABEL.manual_expense.toLowerCase();
       rows.forEach((r, i) => {
         let name = (assigned[i] || '').trim();
-        // "Qo'lda chiqim"/manba nomi yoki bo'sh — izohning o'ziga (yoki Boshqa).
-        if (!name || name.toLowerCase() === manualLc) {
-          name = r.comment && r.comment !== '(izohsiz)' ? r.comment : 'Boshqa';
+        // Generik/manba nomi yoki bo'sh -> izohning O'ZI (u ham generik/bo'sh
+        // bo'lsa "Boshqa"). "Qo'lda chiqim" hech qachon kategoriya bo'lmaydi.
+        if (!name || GENERIC_CATEGORY.has(name.toLowerCase())) {
+          const comment = (r.comment || '').trim();
+          name =
+            comment &&
+            comment !== '(izohsiz)' &&
+            !GENERIC_CATEGORY.has(comment.toLowerCase())
+              ? comment
+              : 'Boshqa';
         }
         const c: Category = byName.get(name) ?? {
           name,
