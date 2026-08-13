@@ -23,6 +23,13 @@ export const useFinancialAI = () => {
     }) => api.post("financial-ai/ask", body).then((res) => res.data),
   });
 
+  // Rasm/Excel fayl tahlili (multipart) — Elchin faylni o'qib, platforma bilan
+  // solishtirib nomuvofiqlik topadi.
+  const analyzeFile = useMutation({
+    mutationFn: (form: FormData) =>
+      api.post("financial-ai/analyze", form).then((res) => res.data),
+  });
+
   // AI xarajat hisoboti (kunlik/haftalik/oylik/yillik) — saqlangan snapshot
   const getExpenseReport = (
     params?: {
@@ -41,5 +48,5 @@ export const useFinancialAI = () => {
       enabled,
     });
 
-  return { getExpenseReport, refreshExpenseReport, askFinance };
+  return { getExpenseReport, refreshExpenseReport, askFinance, analyzeFile };
 };

@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Anthropic from '@anthropic-ai/sdk';
+import * as ExcelJS from 'exceljs';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { AiFinanceReportSnapshotEntity } from 'src/core/entity/ai-finance-report-snapshot.entity';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
@@ -196,6 +197,15 @@ const ASK_TOOLS: Anthropic.Tool[] = [
     },
   },
 ];
+
+// Fayl (rasm/Excel) tahlili + platforma bilan solishtirib nomuvofiqlik topish.
+const ANALYZE_SYSTEM = `${ASK_SYSTEM}
+
+FAYL TAHLILI:
+- Foydalanuvchi rasm yoki Excel yuklaydi. Uni diqqat bilan tahlil qil: raqamlar, sanalar, jadval qatorlari, summalar, oraliq jamlar.
+- So'ralgan davrga moslab tahlil qil (agar oraliq berilgan bo'lsa faqat shu davr).
+- NOMUVOFIQLIK/XATO TOPISH (muhim): agar foydalanuvchi platforma bilan solishtirishni so'rasa yoki fayldagi raqamlarni tekshirishni istasa — ASBOBLAR bilan platformadagi haqiqiy raqamlarni ol (get_revenue, get_expenses, get_net_profit, get_cash_position, get_order_flow, get_expense_comments) va fayldagi raqamlar bilan SOLISHTIR. Farqni ANIQ ko'rsat: qaysi qator/summa/sana, fayldagi qiymat ↔ platformadagi qiymat, farq miqdori (jadvalда). Sababini taxmin qil (masalan tushib qolgan yozuv, ikki marta hisoblangan, sana noto'g'ri).
+- Fayldagi raqamlarni TO'QIMA — faqat ko'rgan/asbobdan olganingga asoslan. Aniq bo'lmasa ayt.`;
 
 @Injectable()
 export class AiFinanceService implements OnApplicationBootstrap {
@@ -521,6 +531,167 @@ export class AiFinanceService implements OnApplicationBootstrap {
       this.logger.log(`ask xato: ${(error as Error).message}`, 'AiFinance');
       return catchError(error);
     }
+  }
+
+  // ─── Fayl (rasm/Excel) tahlili — Elchin faylni o'qib, kerak bo'lsa platforma
+  //     raqamlari bilan solishtirib nomuvofiqlikni topadi. Vision (rasm) +
+  //     Excel matnga aylantirib + tool-use (platforma solishtiruvi).
+  async analyzeFile(
+    file: Express.Multer.File | undefined,
+    question?: string,
+    fromDate?: string,
+    toDate?: string,
+  ) {
+    try {
+      if (!this.claude.isEnabled()) {
+        return successRes({
+          answer: "AI hozircha o'chiq (ANTHROPIC_API_KEY sozlanmagan).",
+          toolsUsed: [],
+          aiEnabled: false,
+        });
+      }
+      if (!file || !file.buffer) {
+        return successRes({
+          answer: "Fayl topilmadi. Rasm yoki Excel (.xlsx) yuklang.",
+          toolsUsed: [],
+          aiEnabled: true,
+        });
+      }
+
+      const mime = (file.mimetype || '').toLowerCase();
+      const nameLc = (file.originalname || '').toLowerCase();
+      const today = this.ymd(new Date());
+      const range =
+        fromToValid(fromDate) && fromToValid(toDate)
+          ? ` So'ralgan oraliq: ${fromDate} .. ${toDate}.`
+          : '';
+      const q = (question || '').trim() || 'Faylni tahlil qil.';
+      const baseText = `Bugungi sana: ${today} (Asia/Tashkent).${range}\n\nFoydalanuvchi so'rovi: ${q}`;
+
+      let content: Anthropic.ContentBlockParam[];
+
+      if (mime.startsWith('image/')) {
+        const mediaType = [
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/webp',
+        ].includes(mime)
+          ? mime
+          : 'image/jpeg';
+        content = [
+          { type: 'text', text: `${baseText}\n\nQuyidagi RASMni tahlil qil.` },
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType as
+                | 'image/jpeg'
+                | 'image/png'
+                | 'image/gif'
+                | 'image/webp',
+              data: file.buffer.toString('base64'),
+            },
+          },
+        ];
+      } else if (
+        nameLc.endsWith('.xlsx') ||
+        nameLc.endsWith('.xls') ||
+        mime.includes('spreadsheet') ||
+        mime.includes('excel')
+      ) {
+        const excelText = await this.excelToText(file.buffer);
+        content = [
+          {
+            type: 'text',
+            text: `${baseText}\n\nQuyida EXCEL fayl mazmuni (matn):\n\n${excelText}`,
+          },
+        ];
+      } else if (
+        nameLc.endsWith('.csv') ||
+        mime.includes('csv') ||
+        mime.startsWith('text/')
+      ) {
+        const txt = file.buffer.toString('utf8').slice(0, 50000);
+        content = [
+          { type: 'text', text: `${baseText}\n\nQuyida fayl mazmuni:\n\n${txt}` },
+        ];
+      } else {
+        return successRes({
+          answer:
+            "Bu fayl turi qo'llab-quvvatlanmaydi. Rasm (jpg/png) yoki Excel (.xlsx) yuboring.",
+          toolsUsed: [],
+          aiEnabled: true,
+        });
+      }
+
+      const res = await this.claude.askWithTools({
+        system: ANALYZE_SYSTEM,
+        content,
+        tools: ASK_TOOLS,
+        runTool: (name, input) => this.runFinanceTool(name, input),
+        maxTokens: 3500,
+        maxSteps: 8,
+      });
+      if (!res) {
+        return successRes({
+          answer:
+            "Kechirasiz, faylni tahlil qila olmadim. Qayta urinib ko'ring.",
+          toolsUsed: [],
+          aiEnabled: true,
+        });
+      }
+      return successRes({
+        answer: res.text,
+        toolsUsed: [...new Set(res.toolsUsed)],
+        aiEnabled: true,
+      });
+    } catch (error) {
+      this.logger.log(
+        `analyzeFile xato: ${(error as Error).message}`,
+        'AiFinance',
+      );
+      return catchError(error);
+    }
+  }
+
+  // Excel bufferni matnga aylantiradi (varaq | qatorlar). Token nazorati uchun
+  // hujayralar soni cheklangan (katta fayl birinchi qismi).
+  private async excelToText(buffer: Buffer): Promise<string> {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+    const MAX_CELLS = 9000;
+    let cells = 0;
+    const parts: string[] = [];
+    wb.eachSheet((ws) => {
+      if (cells >= MAX_CELLS) return;
+      parts.push(`### Varaq: ${ws.name}`);
+      const rowsOut: string[] = [];
+      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (cells >= MAX_CELLS || rowNumber > 2000) return;
+        const vals: string[] = [];
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          let v: unknown = cell.value;
+          if (v && typeof v === 'object') {
+            const o = v as Record<string, unknown>;
+            if ('result' in o) v = o.result; // formula -> qiymat
+            else if ('text' in o) v = o.text; // rich text
+            else if (v instanceof Date)
+              v = (v as Date).toISOString().slice(0, 10);
+            else v = JSON.stringify(v);
+          }
+          vals.push(v == null ? '' : String(v));
+          cells++;
+        });
+        rowsOut.push(vals.join(' | '));
+      });
+      parts.push(rowsOut.join('\n'));
+    });
+    let out = parts.join('\n\n');
+    if (cells >= MAX_CELLS) {
+      out += `\n\n[Eslatma: fayl katta — faqat birinchi qismi ko'rsatildi.]`;
+    }
+    return out.slice(0, 70000);
   }
 
   // successRes o'ramini ochadi (yoki xom obyektni qaytaradi).

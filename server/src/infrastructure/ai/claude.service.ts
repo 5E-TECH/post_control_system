@@ -138,7 +138,9 @@ export class ClaudeService {
    */
   async askWithTools(opts: {
     system: string;
-    userText: string;
+    userText?: string;
+    // Multimodal (rasm+matn) uchun — berilsa userText o'rniga ishlatiladi.
+    content?: Anthropic.ContentBlockParam[];
     tools: Anthropic.Tool[];
     runTool: (name: string, input: unknown) => Promise<unknown>;
     model?: string;
@@ -154,7 +156,7 @@ export class ClaudeService {
     const maxSteps = opts.maxSteps ?? 8;
     const toolsUsed: string[] = [];
     const messages: Anthropic.MessageParam[] = [
-      { role: 'user', content: opts.userText },
+      { role: 'user', content: opts.content ?? opts.userText ?? '' },
     ];
 
     try {

@@ -1,13 +1,24 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { AiFinanceService } from './ai-finance.service';
-import { AiAskDto } from './dto/ai-finance.dto';
+import { AiAnalyzeDto, AiAskDto } from './dto/ai-finance.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
@@ -58,5 +69,29 @@ export class AiFinanceController {
   @Post('ask')
   ask(@Body() dto: AiAskDto) {
     return this.aiFinance.ask(dto.question, dto.fromDate, dto.toDate);
+  }
+
+  // Fayl (rasm/Excel) tahlili + platforma bilan solishtirib nomuvofiqlik topish.
+  @ApiOperation({
+    summary: 'Rasm/Excel tahlili (nomuvofiqlik topish)',
+  })
+  @ApiConsumes('multipart/form-data')
+  @UseGuards(JwtGuard, RolesGuard, ThrottlerGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 15 * 1024 * 1024 } }),
+  )
+  @Post('analyze')
+  analyze(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: AiAnalyzeDto,
+  ) {
+    return this.aiFinance.analyzeFile(
+      file,
+      dto.question,
+      dto.fromDate,
+      dto.toDate,
+    );
   }
 }

@@ -17,3 +17,19 @@ export class AiAskDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'toDate YYYY-MM-DD bo\'lishi kerak' })
   toDate?: string;
 }
+
+// Fayl tahlili (multipart) — savol ixtiyoriy (faqat "tahlil qil" ham bo'ladi).
+export class AiAnalyzeDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(QUESTION_MAX)
+  question?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'fromDate YYYY-MM-DD bo\'lishi kerak' })
+  fromDate?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'toDate YYYY-MM-DD bo\'lishi kerak' })
+  toDate?: string;
+}
