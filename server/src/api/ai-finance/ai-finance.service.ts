@@ -53,30 +53,20 @@ const CATEGORY_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    assignments: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          index: { type: 'integer' },
-          category: { type: 'string' },
-        },
-        required: ['index', 'category'],
-      },
-    },
+    // Ixcham aligned massiv: categories[i] = i-izohning kategoriyasi.
+    // (indeks+obyektga qaraganda ancha kam token — ko'p izohда kesilmaydi.)
+    categories: { type: 'array', items: { type: 'string' } },
   },
-  required: ['assignments'],
+  required: ['categories'],
 };
 
-const CATEGORY_SYSTEM = `Sen buxgalter yordamchisisan. Har xarajat izohiga QISQA, umumiy kategoriya biriktir.
+const CATEGORY_SYSTEM = `Sen buxgalter yordamchisisan. Berilgan xarajat IZOHLARining har biriga QISQA, umumiy kategoriya biriktir.
 Tavsiya etilgan kategoriyalar: Ovqat, Transport, Yoqilg'i, Ijara, Kommunal, Aloqa/Internet, Kanstovar, Ta'mirlash, Reklama/Marketing, Soliq, Bank/komissiya, Sovg'a/mehmon, Tozalash, Boshqa.
 QOIDALAR:
 - IMLO XATOSINI tushun va TO'G'RI ma'noga biriktir: "benzn"/"Benzin"/"benzin" -> Yoqilg'i; "ijra"/"ijara" -> Ijara; "kanselyariya"/"kanstavar" -> Kanstovar.
 - Bir xil ma'noli TURLI yozuvlarni (sinonim, qisqartma, katta/kichik harf, kirill/lotin aralash, bo'sh joy/tinish farqi) AYNAN BITTA kategoriyaga birlashtir — kategoriya nomini HAR DOIM bir xil imlода yoz.
-- Har izohga ENG mos bittasini tanla; ro'yxatda mos bo'lmasa qisqa yangi kategoriya o'yla, lekin ortiqcha maydalab yuborma.
-- Izohsiz yoki tushunarsiz bo'lsa "Boshqa".
-- Faqat kategoriya nomini qaytar; izohni o'zgartirma. Har izoh uchun uning INDEKSini va kategoriya nomini qaytar.`;
+- Ro'yxatda mos bo'lmasa qisqa yangi kategoriya o'yla, lekin ortiqcha maydalab yuborma. Izohsiz/tushunarsiz -> "Boshqa".
+- CHIQISH: "categories" massivi — categories[i] i-tartibli izohning kategoriyasi. Massiv uzunligi izohlar soniga TENG va tartibi AYNAN bir xil bo'lsin. Faqat kategoriya nomlari.`;
 
 interface Bucket {
   label: string;
@@ -110,6 +100,7 @@ MA'LUMOT:
 - Raqamlarni FAQAT asboblardan ol — o'zing hisoblab yoki to'qib yubormа. Kerakli asbob(lar)ni chaqir.
 - Bugungi sana Asia/Tashkent. Sanalarni YYYY-MM-DD formatида uzat. Davr aniq aytilmasa oqilona standart ol (shu oy yoki shu yil). Taqqoslash uchun avvalgi davrni ham olib solishtir.
 - Bir nechta raqam kerak bo'lsa bir nechta asbobni chaqir.
+- XARAJAT savoli: qo'lda chiqimlar (manual_expense) bitta manba turi ostida, lekin IZOHLARI har xil (turli narsalar). Aniq narsaga qancha ketgani yoki maxsus kategoriya so'ralsa (masalan "benzinga qancha?", "reklama xarajati?") — get_expense_comments bilan IZOHLARni o'QI, imlo xato/sinonimlarni hisobga olib mos qatorlarni jamla va aniq javob ber. Umumiy kategoriya taqsimoti uchun get_expense_categories; turlar (oylik/kommunal/qo'lda) jami uchun get_expenses.
 
 JAVOB FORMATI (Markdown — chiroyli va o'qiladigan bo'lsin):
 - O'ZBEK tilida. Sonlarni bo'sh joy bilan yoz: **12 500 000 so'm**. Muhim raqamlarni **qalin** qil.
@@ -171,6 +162,18 @@ const ASK_TOOLS: Anthropic.Tool[] = [
           type: 'string',
           enum: ['daily', 'weekly', 'monthly', 'yearly'],
         },
+      },
+    },
+  },
+  {
+    name: 'get_expense_comments',
+    description:
+      "Qo'lda chiqimlarning (manual_expense) IZOHLARINI o'qish: har xil izoh guruhlari (izoh matni, necha marta, jami summa). Qo'lda chiqimlar bitta manba turi ostida bo'lsa-da izohlari HAR XIL (turli narsalar) — aynan nimaga qancha sarflanganini bilish yoki aniq savolga ('benzinga qancha ketdi?', 'ijara qancha?') javob berish uchun izohlarni O'QIB, imlo xato/sinonimlarni hisobga olib mos qatorlarni JAMLA. Ixtiyoriy sana oralig'i (berilmasa oxirgi 1 yil).",
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromDate: { type: 'string', description: 'YYYY-MM-DD' },
+        toDate: { type: 'string', description: 'YYYY-MM-DD' },
       },
     },
   },
@@ -599,6 +602,17 @@ export class AiFinanceService implements OnApplicationBootstrap {
           })),
         };
       }
+      case 'get_expense_comments': {
+        const toS = to || this.ymd(new Date());
+        const fromS = from || this.ymd(new Date(Date.now() - 365 * 86400000));
+        const groups = await this.commentGroups(
+          toUzbekistanTimestamp(fromS, false),
+          toUzbekistanTimestamp(toS, true),
+          'manual_expense',
+          150,
+        );
+        return { from: fromS, to: toS, count: groups.length, comments: groups };
+      }
       case 'get_cash_position': {
         const d = this.unwrap(await this.cashBoxService.financialBalance());
         // PII-strip: faqat skalyar yig'indilar (ism/karta massivlari yo'q).
@@ -665,38 +679,35 @@ export class AiFinanceService implements OnApplicationBootstrap {
     // MANUAL_EXPENSE — izohlarni distinct guruhlab, AI kategoriyaга biriktiradi.
     const rows = await this.commentGroups(fromTs, toTs, 'manual_expense', 500);
     if (rows.length) {
-      // AI klasterlash (o'chiq/xato bo'lsa — hammasi "Qo'lda chiqimlar"ga).
-      let assignments: { index: number; category: string }[] | null = null;
+      // AI klasterlash — izohlarni MA'NOSI bo'yicha kategoriyaga biriktiradi
+      // (imlo/sinonim birlashtirib). Ixcham aligned massiv: categories[i] =
+      // i-izohning kategoriyasi (ko'p izohда ham chiqish kesilmaydi).
+      // O'chiq/xato bo'lsa — hammasi "Qo'lda chiqimlar"ga (graceful).
+      let categories: string[] | null = null;
       if (this.claude.isEnabled()) {
         const list = rows
           .map(
             (r, i) => `${i}) ${r.comment} — ${r.total} so'm (${r.count} marta)`,
           )
           .join('\n');
-        const res = await this.claude.extractJson<{
-          assignments: { index: number; category: string }[];
-        }>({
+        const res = await this.claude.extractJson<{ categories: string[] }>({
           system: CATEGORY_SYSTEM,
           userText: list,
           schema: CATEGORY_SCHEMA,
-          maxTokens: 6000,
+          maxTokens: 8000,
         });
-        if (res && Array.isArray(res.assignments)) assignments = res.assignments;
+        if (res && Array.isArray(res.categories)) categories = res.categories;
       }
 
-      const assignMap = new Map<number, string>();
-      for (const a of assignments || []) {
-        assignMap.set(
-          Math.floor(Number(a.index)),
-          (a.category || 'Boshqa').trim() || 'Boshqa',
-        );
-      }
       const byName = new Map<string, Category>();
       let categorizedSum = 0;
       rows.forEach((r, i) => {
+        const assigned =
+          categories && typeof categories[i] === 'string'
+            ? categories[i].trim()
+            : '';
         const name =
-          assignMap.get(i) ||
-          (assignments ? 'Boshqa' : SOURCE_LABEL.manual_expense);
+          assigned || (categories ? 'Boshqa' : SOURCE_LABEL.manual_expense);
         const c: Category = byName.get(name) ?? {
           name,
           total: 0,
