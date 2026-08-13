@@ -68,7 +68,8 @@ Tavsiya etilgan kategoriyalar: Ovqat, Transport, Yoqilg'i, Ijara, Kommunal, Aloq
 QOIDALAR:
 - IMLO XATOSINI tushun va TO'G'RI ma'noga biriktir: "benzn"/"Benzin"/"benzin" -> Yoqilg'i; "ijra"/"ijara" -> Ijara; "kanselyariya"/"kanstavar" -> Kanstovar.
 - Bir xil ma'noli TURLI yozuvlarni (sinonim, qisqartma, katta/kichik harf, kirill/lotin aralash, bo'sh joy/tinish farqi) AYNAN BITTA kategoriyaga birlashtir — kategoriya nomini HAR DOIM bir xil imlода yoz.
-- Ro'yxatda mos bo'lmasa qisqa yangi kategoriya o'yla, lekin ortiqcha maydalab yuborma. Izohsiz/tushunarsiz -> "Boshqa".
+- Ro'yxatda mos bo'lmasa qisqa yangi MAZMUNLI kategoriya o'yla, lekin ortiqcha maydalab yuborma.
+- MUHIM: kategoriya har doim MAZMUNLI (aniq narsa/maqsad) bo'lsin. "Qo'lda chiqim", "Xarajat", "To'lov", "Chiqim", "Pul" kabi UMUMIY yoki manba nomini HECH QACHON berma. Faqat izoh haqiqatan bo'sh yoki tushunarsiz bo'lsagina "Boshqa".
 - CHIQISH: "categories" massivi — categories[i] i-tartibli izohning kategoriyasi. Massiv uzunligi izohlar soniga TENG va tartibi AYNAN bir xil bo'lsin. Faqat kategoriya nomlari.`;
 
 interface Bucket {
@@ -1055,38 +1056,23 @@ export class AiFinanceService implements OnApplicationBootstrap {
       });
     }
 
-    // MANUAL_EXPENSE — izohlarni distinct guruhlab, AI kategoriyaга biriktiradi.
+    // MANUAL_EXPENSE — izohlarni MA'NOSI bo'yicha kategoriyaга ajratamiz.
+    // "Qo'lda chiqim" O'ZI HECH QACHON kategoriya bo'lmaydi — har doim izoh
+    // mazmuniga qarab (Ovqat, Transport, Ijara...). AI o'chiq/xato bo'lsa
+    // izohning O'ZI kategoriya bo'ladi (baribir "Qo'lda chiqim" emas).
     const rows = await this.commentGroups(fromTs, toTs, 'manual_expense', 500);
     if (rows.length) {
-      // AI klasterlash — izohlarni MA'NOSI bo'yicha kategoriyaga biriktiradi
-      // (imlo/sinonim birlashtirib). Ixcham aligned massiv: categories[i] =
-      // i-izohning kategoriyasi (ko'p izohда ham chiqish kesilmaydi).
-      // O'chiq/xato bo'lsa — hammasi "Qo'lda chiqimlar"ga (graceful).
-      let categories: string[] | null = null;
-      if (this.claude.isEnabled()) {
-        const list = rows
-          .map(
-            (r, i) => `${i}) ${r.comment} — ${r.total} so'm (${r.count} marta)`,
-          )
-          .join('\n');
-        const res = await this.claude.extractJson<{ categories: string[] }>({
-          system: CATEGORY_SYSTEM,
-          userText: list,
-          schema: CATEGORY_SCHEMA,
-          maxTokens: 8000,
-        });
-        if (res && Array.isArray(res.categories)) categories = res.categories;
-      }
+      const assigned = await this.classifyComments(rows.map((r) => r.comment));
 
       const byName = new Map<string, Category>();
       let categorizedSum = 0;
+      const manualLc = SOURCE_LABEL.manual_expense.toLowerCase();
       rows.forEach((r, i) => {
-        const assigned =
-          categories && typeof categories[i] === 'string'
-            ? categories[i].trim()
-            : '';
-        const name =
-          assigned || (categories ? 'Boshqa' : SOURCE_LABEL.manual_expense);
+        let name = (assigned[i] || '').trim();
+        // "Qo'lda chiqim"/manba nomi yoki bo'sh — izohning o'ziga (yoki Boshqa).
+        if (!name || name.toLowerCase() === manualLc) {
+          name = r.comment && r.comment !== '(izohsiz)' ? r.comment : 'Boshqa';
+        }
         const c: Category = byName.get(name) ?? {
           name,
           total: 0,
@@ -1128,6 +1114,33 @@ export class AiFinanceService implements OnApplicationBootstrap {
     }
 
     return cats.sort((a, b) => b.total - a.total);
+  }
+
+  // Izohlarni AI bilan kategoriyaga ajratadi — CHUNKlarga bo'lib (chiqish
+  // kesilmasin, ko'p izohда ham ishonchli). Natija rows bilan bir tartibda;
+  // topolmagan/xato izoh uchun bo'sh ('') — chaqiruvchi izohning o'ziga tushiradi.
+  private async classifyComments(comments: string[]): Promise<string[]> {
+    const result: string[] = new Array(comments.length).fill('');
+    if (!this.claude.isEnabled() || !comments.length) return result;
+    const CHUNK = 120;
+    for (let start = 0; start < comments.length; start += CHUNK) {
+      const chunk = comments.slice(start, start + CHUNK);
+      const list = chunk.map((c, i) => `${i}) ${c}`).join('\n');
+      const res = await this.claude.extractJson<{ categories: string[] }>({
+        system: CATEGORY_SYSTEM,
+        userText: list,
+        schema: CATEGORY_SCHEMA,
+        maxTokens: 2500,
+      });
+      if (res && Array.isArray(res.categories)) {
+        res.categories.forEach((cat, i) => {
+          if (start + i < result.length && typeof cat === 'string') {
+            result[start + i] = cat.trim();
+          }
+        });
+      }
+    }
+    return result;
   }
 
   // Bitta source_type uchun izoh bo'yicha guruhlar (kategoriya ichi tarkibi).
