@@ -98,6 +98,7 @@ const AiFinanceChat: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -223,7 +224,12 @@ const AiFinanceChat: React.FC = () => {
 
   const removeConversation = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm("Suhbatni o'chirmoqchimisiz?")) return;
+    setConfirmDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    const id = confirmDeleteId;
+    if (!id) return;
     deleteConversation.mutate(id, {
       onSuccess: () => {
         if (id === convId) {
@@ -231,7 +237,9 @@ const AiFinanceChat: React.FC = () => {
           loadedConvRef.current = null;
           setMsgs([]);
         }
+        setConfirmDeleteId(null);
       },
+      onError: () => setConfirmDeleteId(null),
     });
   };
 
@@ -555,6 +563,56 @@ const AiFinanceChat: React.FC = () => {
               </>
             )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== Suhbatni o'chirish tasdig'i (popup) ===== */}
+      <AnimatePresence>
+        {confirmDeleteId && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setConfirmDeleteId(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.15 }}
+              className="relative w-full max-w-xs rounded-2xl bg-white dark:bg-[#2A2640] border border-gray-200 dark:border-gray-700/50 shadow-2xl p-5"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-3">
+                  <Trash2 className="w-6 h-6 text-red-500" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-800 dark:text-white">
+                  Suhbatni o'chirish
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Bu suhbat va uning barcha yozishmalari o'chiriladi. Amalni
+                  qaytarib bo'lmaydi.
+                </p>
+              </div>
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Bekor
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleteConversation.isPending}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 disabled:opacity-50 transition-colors"
+                >
+                  O'chirish
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </>
