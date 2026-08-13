@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Post,
   Query,
@@ -9,6 +10,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CurrentUser } from 'src/common/decorator/user.decorator';
+import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
@@ -67,8 +70,34 @@ export class AiFinanceController {
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('ask')
-  ask(@Body() dto: AiAskDto) {
-    return this.aiFinance.ask(dto.question, dto.fromDate, dto.toDate);
+  ask(@Body() dto: AiAskDto, @CurrentUser() user: JwtPayload) {
+    return this.aiFinance.ask(
+      dto.question,
+      dto.fromDate,
+      dto.toDate,
+      user.id,
+    );
+  }
+
+  // Foydalanuvchining Elchin bilan yozishmalar tarixi.
+  @ApiOperation({ summary: 'Elchin chat tarixi' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('chat-history')
+  chatHistory(
+    @CurrentUser() user: JwtPayload,
+    @Query('limit') limit?: string,
+  ) {
+    return this.aiFinance.getChatHistory(user.id, Number(limit) || 100);
+  }
+
+  @ApiOperation({ summary: 'Elchin chat tarixini tozalash' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Delete('chat-history')
+  clearChat(@CurrentUser() user: JwtPayload) {
+    return this.aiFinance.clearChatHistory(user.id);
   }
 
   // Fayl (rasm/Excel) tahlili + platforma bilan solishtirib nomuvofiqlik topish.
@@ -86,12 +115,14 @@ export class AiFinanceController {
   analyze(
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: AiAnalyzeDto,
+    @CurrentUser() user: JwtPayload,
   ) {
     return this.aiFinance.analyzeFile(
       file,
       dto.question,
       dto.fromDate,
       dto.toDate,
+      user.id,
     );
   }
 }

@@ -4,6 +4,7 @@ import { AiFinanceController } from './ai-finance.controller';
 import { AiFinanceService } from './ai-finance.service';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { AiFinanceReportSnapshotEntity } from 'src/core/entity/ai-finance-report-snapshot.entity';
+import { AiFinanceChatEntity } from 'src/core/entity/ai-finance-chat.entity';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { MyLogger } from 'src/logger/logger.service';
 import { OrderModule } from 'src/api/order/order.module';
@@ -20,6 +21,7 @@ import { CashBoxModule } from 'src/api/cash-box/cash-box.module';
     TypeOrmModule.forFeature([
       FinancialBalanceHistoryEntity,
       AiFinanceReportSnapshotEntity,
+      AiFinanceChatEntity,
     ]),
     // Savol-javob tool'lari uchun (OrderService, CashBoxService) — export qilingan.
     OrderModule,

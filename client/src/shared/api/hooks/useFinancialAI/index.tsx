@@ -30,6 +30,23 @@ export const useFinancialAI = () => {
       api.post("financial-ai/analyze", form).then((res) => res.data),
   });
 
+  // Elchin bilan yozishmalar tarixi (DB'да saqlanadi — har qurilmada ko'rinadi).
+  const getChatHistory = (enabled: boolean = true) =>
+    useQuery({
+      queryKey: [financialAiKey, "chat-history"],
+      queryFn: () =>
+        api.get("financial-ai/chat-history").then((res) => res.data),
+      enabled,
+    });
+
+  const clearChatHistory = useMutation({
+    mutationFn: () => api.delete("financial-ai/chat-history"),
+    onSuccess: () =>
+      client.invalidateQueries({
+        queryKey: [financialAiKey, "chat-history"],
+      }),
+  });
+
   // AI xarajat hisoboti (kunlik/haftalik/oylik/yillik) — saqlangan snapshot
   const getExpenseReport = (
     params?: {
@@ -48,5 +65,12 @@ export const useFinancialAI = () => {
       enabled,
     });
 
-  return { getExpenseReport, refreshExpenseReport, askFinance, analyzeFile };
+  return {
+    getExpenseReport,
+    refreshExpenseReport,
+    askFinance,
+    analyzeFile,
+    getChatHistory,
+    clearChatHistory,
+  };
 };

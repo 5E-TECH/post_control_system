@@ -6,6 +6,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import * as ExcelJS from 'exceljs';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { AiFinanceReportSnapshotEntity } from 'src/core/entity/ai-finance-report-snapshot.entity';
+import { AiFinanceChatEntity } from 'src/core/entity/ai-finance-chat.entity';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { OrderService } from 'src/api/order/order.service';
 import { CashBoxService } from 'src/api/cash-box/cash-box.service';
@@ -214,6 +215,8 @@ export class AiFinanceService implements OnApplicationBootstrap {
     private readonly fbhRepo: Repository<FinancialBalanceHistoryEntity>,
     @InjectRepository(AiFinanceReportSnapshotEntity)
     private readonly snapshotRepo: Repository<AiFinanceReportSnapshotEntity>,
+    @InjectRepository(AiFinanceChatEntity)
+    private readonly chatRepo: Repository<AiFinanceChatEntity>,
     private readonly claude: ClaudeService,
     private readonly orderService: OrderService,
     private readonly cashBoxService: CashBoxService,
@@ -490,7 +493,12 @@ export class AiFinanceService implements OnApplicationBootstrap {
   // ─── AI savol-javob (tool-use) — bu yerда haqiqiy AI puli ketadi ───
   // Model kerakli asboblarni O'ZI chaqiradi; raqamlar kanonik servislardan
   // keladi (model to'qimaydi). PII yo'q (cash-position skalyarga siqiladi).
-  async ask(question: string, fromDate?: string, toDate?: string) {
+  async ask(
+    question: string,
+    fromDate?: string,
+    toDate?: string,
+    userId?: string,
+  ) {
     try {
       if (!this.claude.isEnabled()) {
         return successRes({
@@ -522,11 +530,10 @@ export class AiFinanceService implements OnApplicationBootstrap {
           aiEnabled: true,
         });
       }
-      return successRes({
-        answer: res.text,
-        toolsUsed: [...new Set(res.toolsUsed)],
-        aiEnabled: true,
-      });
+      const answer = res.text;
+      const tools = [...new Set(res.toolsUsed)];
+      await this.saveChat(userId, question, answer, tools, null);
+      return successRes({ answer, toolsUsed: tools, aiEnabled: true });
     } catch (error) {
       this.logger.log(`ask xato: ${(error as Error).message}`, 'AiFinance');
       return catchError(error);
@@ -541,6 +548,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
     question?: string,
     fromDate?: string,
     toDate?: string,
+    userId?: string,
   ) {
     try {
       if (!this.claude.isEnabled()) {
@@ -641,11 +649,16 @@ export class AiFinanceService implements OnApplicationBootstrap {
           aiEnabled: true,
         });
       }
-      return successRes({
-        answer: res.text,
-        toolsUsed: [...new Set(res.toolsUsed)],
-        aiEnabled: true,
-      });
+      const answer = res.text;
+      const tools = [...new Set(res.toolsUsed)];
+      await this.saveChat(
+        userId,
+        q,
+        answer,
+        tools,
+        file.originalname || 'fayl',
+      );
+      return successRes({ answer, toolsUsed: tools, aiEnabled: true });
     } catch (error) {
       this.logger.log(
         `analyzeFile xato: ${(error as Error).message}`,
@@ -692,6 +705,68 @@ export class AiFinanceService implements OnApplicationBootstrap {
       out += `\n\n[Eslatma: fayl katta — faqat birinchi qismi ko'rsatildi.]`;
     }
     return out.slice(0, 70000);
+  }
+
+  // ─── Chat tarixi (DB'да saqlash — muhim ma'lumotlar yo'qolmasin) ───
+  private async saveChat(
+    userId: string | undefined,
+    question: string,
+    answer: string,
+    tools: string[],
+    fileName: string | null,
+  ): Promise<void> {
+    if (!userId || !answer) return;
+    try {
+      await this.chatRepo.save(
+        this.chatRepo.create({
+          user_id: userId,
+          question: (question || '').slice(0, 4000),
+          answer: answer.slice(0, 20000),
+          tools: tools && tools.length ? tools : null,
+          file_name: fileName || null,
+        }),
+      );
+    } catch (e) {
+      this.logger.log(
+        `saveChat xato: ${(e as Error).message}`,
+        'AiFinance',
+      );
+    }
+  }
+
+  // Foydalanuvchining yozishmalar tarixi (xronologik — eskisidan yangisiga).
+  async getChatHistory(userId: string, limit = 100) {
+    try {
+      const take = Math.min(Math.max(Number(limit) || 100, 1), 200);
+      const rows = await this.chatRepo.find({
+        where: { user_id: userId },
+        order: { created_at: 'DESC' },
+        take,
+      });
+      rows.reverse();
+      return successRes(
+        rows.map((r) => ({
+          id: r.id,
+          question: r.question,
+          answer: r.answer,
+          tools: r.tools || [],
+          file_name: r.file_name || null,
+          created_at: Number(r.created_at),
+        })),
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // Foydalanuvchining yozishmalar tarixini tozalash.
+  async clearChatHistory(userId: string) {
+    try {
+      await this.chatRepo.delete({ user_id: userId });
+      return successRes({ cleared: true });
+    } catch (error) {
+      return catchError(error);
+    }
   }
 
   // successRes o'ramini ochadi (yoki xom obyektni qaytaradi).

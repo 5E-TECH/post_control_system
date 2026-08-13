@@ -13,6 +13,7 @@ import {
   Paperclip,
   FileSpreadsheet,
   Image as ImageIcon,
+  Trash2,
 } from "lucide-react";
 import AiResponseRenderer from "./AiResponseRenderer";
 
@@ -30,20 +31,44 @@ const ACCEPT = "image/*,.xlsx,.xls,.csv";
 // Pastki-o'ng suzuvchi Elchin: dumaloq FAB + ochiluvchi (kattalashtiriladigan)
 // chat oynasi. Rasm/Excel biriktirib tahlil qildirish mumkin.
 const AiFinanceChat: React.FC = () => {
-  const { askFinance, analyzeFile } = useFinancialAI();
+  const { askFinance, analyzeFile, getChatHistory, clearChatHistory } =
+    useFinancialAI();
   const [open, setOpen] = useState(false);
   const [maxed, setMaxed] = useState(false);
   const [q, setQ] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [file, setFile] = useState<File | null>(null);
+  const [loadedHistory, setLoadedHistory] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const pending = askFinance.isPending || analyzeFile.isPending;
 
+  // Yozishmalar tarixini ochilganда bir marta DB'дан yuklaymiz (keyin lokal qo'shiladi).
+  const { data: histData } = getChatHistory(open && !loadedHistory);
+  useEffect(() => {
+    if (!open || loadedHistory || !histData?.data) return;
+    const restored: Msg[] = [];
+    for (const ex of histData.data as any[]) {
+      restored.push({
+        role: "user",
+        text: ex.question,
+        file: ex.file_name || undefined,
+      });
+      restored.push({ role: "ai", text: ex.answer, tools: ex.tools || [] });
+    }
+    setMsgs(restored);
+    setLoadedHistory(true);
+  }, [open, loadedHistory, histData]);
+
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, pending, open]);
+
+  const clearHistory = () => {
+    if (!window.confirm("Yozishmalar tarixini o'chirmoqchimisiz?")) return;
+    clearChatHistory.mutate(undefined, { onSuccess: () => setMsgs([]) });
+  };
 
   const pushAi = (res: any) => {
     const d = res?.data;
@@ -146,6 +171,16 @@ const AiFinanceChat: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {msgs.length > 0 && (
+                  <button
+                    onClick={clearHistory}
+                    disabled={clearChatHistory.isPending}
+                    title="Tarixni tozalash"
+                    className="p-1.5 rounded-lg hover:bg-white/15 transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => setMaxed((v) => !v)}
                   title={maxed ? "Kichraytirish" : "Kattalashtirish"}
