@@ -58,7 +58,7 @@ const AiFinanceChat: React.FC = () => {
       {/* ===== FAB (pastki-chap, fix, dumaloq) ===== */}
       <button
         onClick={() => setOpen((o) => !o)}
-        title="Moliyaviy AI yordamchi"
+        title="Elchin — moliyaviy AI yordamchingiz"
         className="fixed bottom-6 left-6 max-[650px]:bottom-24 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/40 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
       >
         {open ? (
@@ -91,9 +91,9 @@ const AiFinanceChat: React.FC = () => {
                   <Sparkles className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold">Moliyaviy AI yordamchi</h3>
+                  <h3 className="text-sm font-semibold">Elchin</h3>
                   <p className="text-[11px] text-white/70">
-                    Biznesni tahlil qiluvchi maslahatchi
+                    Moliyaviy AI maslahatchingiz
                   </p>
                 </div>
               </div>
