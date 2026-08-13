@@ -757,11 +757,13 @@ const FinancialHistory: React.FC = () => {
 
       {/* ========== AI HISOBOT TAB ========== */}
       {activeTab === "aiReport" && (
-        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-          <AiFinanceChat />
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-6">
           <AiExpenseReport />
         </div>
       )}
+
+      {/* Pastki-chap suzuvchi AI yordamchi (butun moliyaviy balans sahifasida) */}
+      <AiFinanceChat />
     </div>
   );
 };

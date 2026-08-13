@@ -104,13 +104,20 @@ interface Category {
 }
 
 // ─── AI savol-javob (tool-use): model kerakli asboblarni O'ZI chaqiradi ───
-const ASK_SYSTEM = `Sen O'zbekiston yetkazib berish biznesining moliyaviy tahlilchisisan. Foydalanuvchi savoliga javob berish uchun ASBOBLARdan foydalanib haqiqiy raqamlarni ol.
-QOIDALAR:
+const ASK_SYSTEM = `Sen O'zbekiston yetkazib berish biznesining tajribali moliyaviy tahlilchisi va MASLAHATCHISISAN. Vazifang — nafaqat raqam aytish, balki biznesni O'STIRISHga yordam berish: trendlarni ko'rsatish, muammolarni belgilash va amaliy tavsiyalar berish.
+
+MA'LUMOT:
 - Raqamlarni FAQAT asboblardan ol — o'zing hisoblab yoki to'qib yubormа. Kerakli asbob(lar)ni chaqir.
-- Bugungi sana Asia/Tashkent bo'yicha. Sanalarni YYYY-MM-DD formatida uzat. Davr aniq aytilmasa oqilona standart ol (masalan shu oy yoki shu yil).
-- Bir nechta raqam kerak bo'lsa bir nechta asbobni chaqir, keyin taqqoslab xulosa ber.
-- Javob O'ZBEK tilida, qisqa va aniq. Sonlarni o'qiladigan yoz (12 500 000 so'm).
-- Bashorat/taxmin so'ralsa — bu taxmin ekanini ayt. Savol moliyaga aloqasiz bo'lsa xushmuomala rad et.`;
+- Bugungi sana Asia/Tashkent. Sanalarni YYYY-MM-DD formatида uzat. Davr aniq aytilmasa oqilona standart ol (shu oy yoki shu yil). Taqqoslash uchun avvalgi davrni ham olib solishtir.
+- Bir nechta raqam kerak bo'lsa bir nechta asbobni chaqir.
+
+JAVOB FORMATI (Markdown — chiroyli va o'qiladigan bo'lsin):
+- O'ZBEK tilida. Sonlarni bo'sh joy bilan yoz: **12 500 000 so'm**. Muhim raqamlarni **qalin** qil.
+- Taqqoslash yoki bir nechta qatorли ma'lumot bo'lsa — MARKDOWN JADVAL ishlat (| ustun | ustun |). Kategoriya/davr taqsimotini doim jadvalда ber.
+- Trend belgilari: 📈 o'sish, 📉 kamayish, ⚠️ e'tibor bering, ✅ yaxshi, 💡 tavsiya.
+- Tuzilma: (1) qisqa javob/asosiy raqam; (2) kerak bo'lsa jadval yoki tafsilot; (3) qisqa **💡 Tavsiya** — biznesni o'stirish yoki xarajatni optimallashtirish bo'yicha 1-2 amaliy maslahat (agar ma'noli bo'lsa).
+- Ortiqcha uzun yozma; aniq, ishga yaroqli bo'l. Savol moliyaga aloqasiz bo'lsa xushmuomala rad et.
+- Taxmin/bashorat aytsang, taxmin ekanini bildir. Raqam TO'QIMA.`;
 
 const ASK_TOOLS: Anthropic.Tool[] = [
   {
@@ -491,7 +498,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
         userText,
         tools: ASK_TOOLS,
         runTool: (name, input) => this.runFinanceTool(name, input),
-        maxTokens: 1500,
+        maxTokens: 3000,
         maxSteps: 8,
       });
 
