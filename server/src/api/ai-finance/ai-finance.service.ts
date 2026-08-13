@@ -540,6 +540,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
         userId,
         conversationId,
         question,
+        answer,
       );
       await this.saveChat(userId, convId, question, answer, tools, null);
       return successRes({
@@ -666,7 +667,12 @@ export class AiFinanceService implements OnApplicationBootstrap {
       }
       const answer = res.text;
       const tools = [...new Set(res.toolsUsed)];
-      const convId = await this.ensureConversation(userId, conversationId, q);
+      const convId = await this.ensureConversation(
+        userId,
+        conversationId,
+        q,
+        answer,
+      );
       await this.saveChat(
         userId,
         convId,
@@ -737,6 +743,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
     userId: string | undefined,
     conversationId: string | undefined,
     firstQuestion: string,
+    firstAnswer?: string,
   ): Promise<string | null> {
     if (!userId) return null;
     try {
@@ -746,9 +753,8 @@ export class AiFinanceService implements OnApplicationBootstrap {
         });
         if (c) return c.id;
       }
-      const title =
-        (firstQuestion || 'Yangi suhbat').replace(/\s+/g, ' ').trim().slice(0, 60) ||
-        'Yangi suhbat';
+      // Yangi suhbat — mazmunga qarab AI mazmunli sarlavha beradi.
+      const title = await this.generateTitle(firstQuestion, firstAnswer);
       const created = await this.convRepo.save(
         this.convRepo.create({ user_id: userId, title }),
       );
@@ -759,6 +765,35 @@ export class AiFinanceService implements OnApplicationBootstrap {
         'AiFinance',
       );
       return null;
+    }
+  }
+
+  // Suhbat MAZMUNIga qarab qisqa (3-5 so'z) o'zbekcha sarlavha (AI). Xato/o'chiq
+  // bo'lsa birinchi savolning qisqartmasi.
+  private async generateTitle(
+    question: string,
+    answer?: string,
+  ): Promise<string> {
+    const fallback =
+      (question || 'Yangi suhbat').replace(/\s+/g, ' ').trim().slice(0, 60) ||
+      'Yangi suhbat';
+    if (!this.claude.isEnabled()) return fallback;
+    try {
+      const ctx = `Savol: ${question || '-'}\n${answer ? `Javob (qisqacha): ${answer.slice(0, 500)}` : ''}`;
+      const t = await this.claude.ask({
+        system: `Quyidagi moliyaviy suhbatga 3-5 so'zli QISQA, mazmunli sarlavha ber (o'zbekcha). Faqat sarlavhani qaytar — tirnoq, nuqta yoki izohsiz. Masalan: Sentyabr sof foyda; Excel nomuvofiqlik tekshiruvi; Kategoriya bo'yicha xarajat; Kassa naqd holati.`,
+        userText: ctx,
+        maxTokens: 32,
+      });
+      if (!t) return fallback;
+      const clean = t
+        .split('\n')[0]
+        .replace(/["'«».]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return clean.slice(0, 60) || fallback;
+    } catch {
+      return fallback;
     }
   }
 
