@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Param,
   Post,
   Query,
   UploadedFile,
@@ -76,28 +77,39 @@ export class AiFinanceController {
       dto.fromDate,
       dto.toDate,
       user.id,
+      dto.conversationId,
     );
   }
 
-  // Foydalanuvchining Elchin bilan yozishmalar tarixi.
-  @ApiOperation({ summary: 'Elchin chat tarixi' })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
+  // ─── Suhbatlar (sessiyalar) — alohida chat + tarix ro'yxati ───
+  @ApiOperation({ summary: 'Elchin suhbatlari royxati' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Get('chat-history')
-  chatHistory(
-    @CurrentUser() user: JwtPayload,
-    @Query('limit') limit?: string,
-  ) {
-    return this.aiFinance.getChatHistory(user.id, Number(limit) || 100);
+  @Get('conversations')
+  conversations(@CurrentUser() user: JwtPayload) {
+    return this.aiFinance.getConversations(user.id);
   }
 
-  @ApiOperation({ summary: 'Elchin chat tarixini tozalash' })
+  @ApiOperation({ summary: 'Bitta suhbatning yozishmalari' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
-  @Delete('chat-history')
-  clearChat(@CurrentUser() user: JwtPayload) {
-    return this.aiFinance.clearChatHistory(user.id);
+  @Get('conversations/:id/messages')
+  conversationMessages(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.aiFinance.getConversationMessages(user.id, id);
+  }
+
+  @ApiOperation({ summary: 'Suhbatni ochirish' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Delete('conversations/:id')
+  deleteConversation(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.aiFinance.deleteConversation(user.id, id);
   }
 
   // Fayl (rasm/Excel) tahlili + platforma bilan solishtirib nomuvofiqlik topish.
@@ -123,6 +135,7 @@ export class AiFinanceController {
       dto.fromDate,
       dto.toDate,
       user.id,
+      dto.conversationId,
     );
   }
 }

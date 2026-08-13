@@ -7,6 +7,7 @@ import * as ExcelJS from 'exceljs';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { AiFinanceReportSnapshotEntity } from 'src/core/entity/ai-finance-report-snapshot.entity';
 import { AiFinanceChatEntity } from 'src/core/entity/ai-finance-chat.entity';
+import { AiFinanceConversationEntity } from 'src/core/entity/ai-finance-conversation.entity';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { OrderService } from 'src/api/order/order.service';
 import { CashBoxService } from 'src/api/cash-box/cash-box.service';
@@ -217,6 +218,8 @@ export class AiFinanceService implements OnApplicationBootstrap {
     private readonly snapshotRepo: Repository<AiFinanceReportSnapshotEntity>,
     @InjectRepository(AiFinanceChatEntity)
     private readonly chatRepo: Repository<AiFinanceChatEntity>,
+    @InjectRepository(AiFinanceConversationEntity)
+    private readonly convRepo: Repository<AiFinanceConversationEntity>,
     private readonly claude: ClaudeService,
     private readonly orderService: OrderService,
     private readonly cashBoxService: CashBoxService,
@@ -498,6 +501,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
     fromDate?: string,
     toDate?: string,
     userId?: string,
+    conversationId?: string,
   ) {
     try {
       if (!this.claude.isEnabled()) {
@@ -532,8 +536,18 @@ export class AiFinanceService implements OnApplicationBootstrap {
       }
       const answer = res.text;
       const tools = [...new Set(res.toolsUsed)];
-      await this.saveChat(userId, question, answer, tools, null);
-      return successRes({ answer, toolsUsed: tools, aiEnabled: true });
+      const convId = await this.ensureConversation(
+        userId,
+        conversationId,
+        question,
+      );
+      await this.saveChat(userId, convId, question, answer, tools, null);
+      return successRes({
+        answer,
+        toolsUsed: tools,
+        aiEnabled: true,
+        conversationId: convId,
+      });
     } catch (error) {
       this.logger.log(`ask xato: ${(error as Error).message}`, 'AiFinance');
       return catchError(error);
@@ -549,6 +563,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
     fromDate?: string,
     toDate?: string,
     userId?: string,
+    conversationId?: string,
   ) {
     try {
       if (!this.claude.isEnabled()) {
@@ -651,14 +666,21 @@ export class AiFinanceService implements OnApplicationBootstrap {
       }
       const answer = res.text;
       const tools = [...new Set(res.toolsUsed)];
+      const convId = await this.ensureConversation(userId, conversationId, q);
       await this.saveChat(
         userId,
+        convId,
         q,
         answer,
         tools,
         file.originalname || 'fayl',
       );
-      return successRes({ answer, toolsUsed: tools, aiEnabled: true });
+      return successRes({
+        answer,
+        toolsUsed: tools,
+        aiEnabled: true,
+        conversationId: convId,
+      });
     } catch (error) {
       this.logger.log(
         `analyzeFile xato: ${(error as Error).message}`,
@@ -707,9 +729,42 @@ export class AiFinanceService implements OnApplicationBootstrap {
     return out.slice(0, 70000);
   }
 
-  // ─── Chat tarixi (DB'да saqlash — muhim ma'lumotlar yo'qolmasin) ───
+  // ─── Suhbatlar (sessiyalar) + yozishmalar tarixi (DB'да) ───
+
+  // Mavjud suhbatni tekshiradi (egasi bo'lsa) yoki YANGISINI yaratadi (title =
+  // birinchi savol). Chat ochib yangi topshiriq berish uchun.
+  private async ensureConversation(
+    userId: string | undefined,
+    conversationId: string | undefined,
+    firstQuestion: string,
+  ): Promise<string | null> {
+    if (!userId) return null;
+    try {
+      if (conversationId) {
+        const c = await this.convRepo.findOne({
+          where: { id: conversationId, user_id: userId },
+        });
+        if (c) return c.id;
+      }
+      const title =
+        (firstQuestion || 'Yangi suhbat').replace(/\s+/g, ' ').trim().slice(0, 60) ||
+        'Yangi suhbat';
+      const created = await this.convRepo.save(
+        this.convRepo.create({ user_id: userId, title }),
+      );
+      return created.id;
+    } catch (e) {
+      this.logger.log(
+        `ensureConversation xato: ${(e as Error).message}`,
+        'AiFinance',
+      );
+      return null;
+    }
+  }
+
   private async saveChat(
     userId: string | undefined,
+    conversationId: string | null,
     question: string,
     answer: string,
     tools: string[],
@@ -720,30 +775,68 @@ export class AiFinanceService implements OnApplicationBootstrap {
       await this.chatRepo.save(
         this.chatRepo.create({
           user_id: userId,
+          conversation_id: conversationId,
           question: (question || '').slice(0, 4000),
           answer: answer.slice(0, 20000),
           tools: tools && tools.length ? tools : null,
           file_name: fileName || null,
         }),
       );
+      // Suhbatning oxirgi faollik vaqtini yangilaymiz (ro'yxatда tepada tursin).
+      if (conversationId) {
+        await this.convRepo.update(
+          { id: conversationId },
+          { updated_at: Date.now() },
+        );
+      }
     } catch (e) {
-      this.logger.log(
-        `saveChat xato: ${(e as Error).message}`,
-        'AiFinance',
-      );
+      this.logger.log(`saveChat xato: ${(e as Error).message}`, 'AiFinance');
     }
   }
 
-  // Foydalanuvchining yozishmalar tarixi (xronologik — eskisidan yangisiga).
-  async getChatHistory(userId: string, limit = 100) {
+  // Foydalanuvchi suhbatlari ro'yxati (oxirgi faol tepada) + xabar soni.
+  async getConversations(userId: string) {
     try {
-      const take = Math.min(Math.max(Number(limit) || 100, 1), 200);
-      const rows = await this.chatRepo.find({
+      const rows = await this.convRepo.find({
         where: { user_id: userId },
-        order: { created_at: 'DESC' },
-        take,
+        order: { updated_at: 'DESC' },
+        take: 100,
       });
-      rows.reverse();
+      const counts = await this.chatRepo
+        .createQueryBuilder('c')
+        .select('c.conversation_id', 'cid')
+        .addSelect('COUNT(*)', 'cnt')
+        .where('c.user_id = :u', { u: userId })
+        .andWhere('c.conversation_id IS NOT NULL')
+        .groupBy('c.conversation_id')
+        .getRawMany();
+      const cntMap = new Map<string, number>();
+      for (const c of counts) cntMap.set(c.cid, Number(c.cnt));
+      return successRes(
+        rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          updatedAt: Number(r.updated_at),
+          messageCount: cntMap.get(r.id) || 0,
+        })),
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  // Bitta suhbatning yozishmalari (xronologik). Egasi tekshiriladi.
+  async getConversationMessages(userId: string, conversationId: string) {
+    try {
+      const conv = await this.convRepo.findOne({
+        where: { id: conversationId, user_id: userId },
+      });
+      if (!conv) return successRes([]);
+      const rows = await this.chatRepo.find({
+        where: { conversation_id: conversationId },
+        order: { created_at: 'ASC' },
+        take: 200,
+      });
       return successRes(
         rows.map((r) => ({
           id: r.id,
@@ -759,11 +852,16 @@ export class AiFinanceService implements OnApplicationBootstrap {
     }
   }
 
-  // Foydalanuvchining yozishmalar tarixini tozalash.
-  async clearChatHistory(userId: string) {
+  // Bitta suhbatni (va yozishmalarini) o'chirish.
+  async deleteConversation(userId: string, conversationId: string) {
     try {
-      await this.chatRepo.delete({ user_id: userId });
-      return successRes({ cleared: true });
+      const conv = await this.convRepo.findOne({
+        where: { id: conversationId, user_id: userId },
+      });
+      if (!conv) return successRes({ deleted: false });
+      await this.chatRepo.delete({ conversation_id: conversationId });
+      await this.convRepo.delete({ id: conversationId });
+      return successRes({ deleted: true });
     } catch (error) {
       return catchError(error);
     }

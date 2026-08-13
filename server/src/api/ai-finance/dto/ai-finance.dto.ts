@@ -1,4 +1,11 @@
-import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 // AI savol uzunligi chegarasi — Claude'ga cheksiz matn ketmasin (xarajat/DoS).
 const QUESTION_MAX = 2000;
@@ -16,6 +23,10 @@ export class AiAskDto {
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'toDate YYYY-MM-DD bo\'lishi kerak' })
   toDate?: string;
+
+  @IsOptional()
+  @IsUUID()
+  conversationId?: string;
 }
 
 // Fayl tahlili (multipart) — savol ixtiyoriy (faqat "tahlil qil" ham bo'ladi).
@@ -32,4 +43,8 @@ export class AiAnalyzeDto {
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'toDate YYYY-MM-DD bo\'lishi kerak' })
   toDate?: string;
+
+  @IsOptional()
+  @IsUUID()
+  conversationId?: string;
 }

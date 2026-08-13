@@ -20,6 +20,7 @@ export const useFinancialAI = () => {
       question: string;
       fromDate?: string;
       toDate?: string;
+      conversationId?: string;
     }) => api.post("financial-ai/ask", body).then((res) => res.data),
   });
 
@@ -30,20 +31,31 @@ export const useFinancialAI = () => {
       api.post("financial-ai/analyze", form).then((res) => res.data),
   });
 
-  // Elchin bilan yozishmalar tarixi (DB'да saqlanadi — har qurilmada ko'rinadi).
-  const getChatHistory = (enabled: boolean = true) =>
+  // Suhbatlar (sessiyalar) ro'yxati — DB'да, har qurilmada ko'rinadi.
+  const getConversations = (enabled: boolean = true) =>
     useQuery({
-      queryKey: [financialAiKey, "chat-history"],
+      queryKey: [financialAiKey, "conversations"],
       queryFn: () =>
-        api.get("financial-ai/chat-history").then((res) => res.data),
+        api.get("financial-ai/conversations").then((res) => res.data),
       enabled,
     });
 
-  const clearChatHistory = useMutation({
-    mutationFn: () => api.delete("financial-ai/chat-history"),
+  // Bitta suhbatning yozishmalari.
+  const getConversationMessages = (id: string | null) =>
+    useQuery({
+      queryKey: [financialAiKey, "conversation", id],
+      queryFn: () =>
+        api
+          .get(`financial-ai/conversations/${id}/messages`)
+          .then((res) => res.data),
+      enabled: !!id,
+    });
+
+  const deleteConversation = useMutation({
+    mutationFn: (id: string) => api.delete(`financial-ai/conversations/${id}`),
     onSuccess: () =>
       client.invalidateQueries({
-        queryKey: [financialAiKey, "chat-history"],
+        queryKey: [financialAiKey, "conversations"],
       }),
   });
 
@@ -70,7 +82,8 @@ export const useFinancialAI = () => {
     refreshExpenseReport,
     askFinance,
     analyzeFile,
-    getChatHistory,
-    clearChatHistory,
+    getConversations,
+    getConversationMessages,
+    deleteConversation,
   };
 };

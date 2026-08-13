@@ -8,9 +8,14 @@ import { Column, Entity, Index } from 'typeorm';
  */
 @Entity('ai_finance_chat')
 @Index('IDX_AFC_USER_CREATED', ['user_id', 'created_at'])
+@Index('IDX_AFC_CONV', ['conversation_id'])
 export class AiFinanceChatEntity extends BaseEntity {
   @Column({ type: 'uuid' })
   user_id: string;
+
+  // Qaysi suhbatga tegishli (ai_finance_conversation). Eski qatorларда null.
+  @Column({ type: 'uuid', nullable: true })
+  conversation_id: string | null;
 
   @Column({ type: 'text' })
   question: string;
