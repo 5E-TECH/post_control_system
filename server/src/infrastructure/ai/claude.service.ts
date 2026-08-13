@@ -129,4 +129,92 @@ export class ClaudeService {
       return null;
     }
   }
+
+  /**
+   * Tool-use (function calling) tsikli — model kerakli "asbob"larni O'ZI chaqiradi,
+   * biz runTool bilan haqiqiy funksiyani bajaramiz, natijani modelga qaytaramiz;
+   * model yakuniy matn javob bergunча (yoki maxSteps'gача) davom etadi.
+   * Xato/refusal bo'lsa null. Raqamlar ASBOBlardan keladi — model to'qimaydi.
+   */
+  async askWithTools(opts: {
+    system: string;
+    userText: string;
+    tools: Anthropic.Tool[];
+    runTool: (name: string, input: unknown) => Promise<unknown>;
+    model?: string;
+    maxTokens?: number;
+    maxSteps?: number;
+  }): Promise<{ text: string; toolsUsed: string[] } | null> {
+    if (!this.client) return null;
+    const model =
+      opts.model ||
+      config.AI_FINANCE_MODEL ||
+      config.AI_ORDER_MODEL ||
+      'claude-opus-4-8';
+    const maxSteps = opts.maxSteps ?? 8;
+    const toolsUsed: string[] = [];
+    const messages: Anthropic.MessageParam[] = [
+      { role: 'user', content: opts.userText },
+    ];
+
+    try {
+      for (let step = 0; step < maxSteps; step++) {
+        const response = await this.client.messages.create({
+          model,
+          max_tokens: opts.maxTokens ?? 1500,
+          system: opts.system,
+          tools: opts.tools,
+          messages,
+        });
+
+        if (response.stop_reason === 'refusal') {
+          this.logger.log('Claude refused askWithTools', 'ClaudeService');
+          return null;
+        }
+
+        const toolUses = response.content.filter(
+          (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+        );
+
+        // Model asbob chaqirdi — bajarib, natijani qaytaramiz va davom etamiz.
+        if (response.stop_reason === 'tool_use' && toolUses.length) {
+          messages.push({ role: 'assistant', content: response.content });
+          const results: Anthropic.ToolResultBlockParam[] = [];
+          for (const tu of toolUses) {
+            toolsUsed.push(tu.name);
+            let result: unknown;
+            try {
+              result = await opts.runTool(tu.name, tu.input);
+            } catch (e) {
+              result = { error: (e as Error).message };
+            }
+            results.push({
+              type: 'tool_result',
+              tool_use_id: tu.id,
+              content: JSON.stringify(result ?? null),
+            });
+          }
+          messages.push({ role: 'user', content: results });
+          continue;
+        }
+
+        // Yakuniy matn javob.
+        const textBlock = response.content.find(
+          (b): b is Anthropic.TextBlock => b.type === 'text',
+        );
+        return { text: textBlock?.text?.trim() || '', toolsUsed };
+      }
+      // maxSteps tugadi — ko'p qadam.
+      return {
+        text: "Savolga to'liq javob berib bo'lmadi (juda ko'p qadam). Savolni aniqroq bering.",
+        toolsUsed,
+      };
+    } catch (err) {
+      this.logger.log(
+        `Claude askWithTools error: ${(err as Error).message}`,
+        'ClaudeService',
+      );
+      return null;
+    }
+  }
 }

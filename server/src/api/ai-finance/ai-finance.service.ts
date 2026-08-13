@@ -2,9 +2,12 @@ import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import Anthropic from '@anthropic-ai/sdk';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { AiFinanceReportSnapshotEntity } from 'src/core/entity/ai-finance-report-snapshot.entity';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
+import { OrderService } from 'src/api/order/order.service';
+import { CashBoxService } from 'src/api/cash-box/cash-box.service';
 import { MyLogger } from 'src/logger/logger.service';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
@@ -100,6 +103,90 @@ interface Category {
   members?: CategoryMember[]; // kategoriya ichi: per-hodim (salary — kim qancha oldi)
 }
 
+// ─── AI savol-javob (tool-use): model kerakli asboblarni O'ZI chaqiradi ───
+const ASK_SYSTEM = `Sen O'zbekiston yetkazib berish biznesining moliyaviy tahlilchisisan. Foydalanuvchi savoliga javob berish uchun ASBOBLARdan foydalanib haqiqiy raqamlarni ol.
+QOIDALAR:
+- Raqamlarni FAQAT asboblardan ol — o'zing hisoblab yoki to'qib yubormа. Kerakli asbob(lar)ni chaqir.
+- Bugungi sana Asia/Tashkent bo'yicha. Sanalarni YYYY-MM-DD formatida uzat. Davr aniq aytilmasa oqilona standart ol (masalan shu oy yoki shu yil).
+- Bir nechta raqam kerak bo'lsa bir nechta asbobni chaqir, keyin taqqoslab xulosa ber.
+- Javob O'ZBEK tilida, qisqa va aniq. Sonlarni o'qiladigan yoz (12 500 000 so'm).
+- Bashorat/taxmin so'ralsa — bu taxmin ekanini ayt. Savol moliyaga aloqasiz bo'lsa xushmuomala rad et.`;
+
+const ASK_TOOLS: Anthropic.Tool[] = [
+  {
+    name: 'get_revenue',
+    description:
+      "Davr bo'yicha YALPI foyda (pochta marjasi) va buyurtmalar soni. period + ixtiyoriy sana oralig'i.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        period: {
+          type: 'string',
+          enum: ['daily', 'weekly', 'monthly', 'yearly'],
+        },
+        fromDate: { type: 'string', description: 'YYYY-MM-DD' },
+        toDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+    },
+  },
+  {
+    name: 'get_net_profit',
+    description:
+      "SOF foyda = yalpi foyda − OpEx (oylik+kommunal+qo'lda chiqim). Ixtiyoriy sana oralig'i.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromDate: { type: 'string', description: 'YYYY-MM-DD' },
+        toDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+    },
+  },
+  {
+    name: 'get_expenses',
+    description:
+      "XARAJATlar turlar (oylik/kommunal/qo'lda chiqim) bo'yicha taqsimlangan. Ixtiyoriy sana oralig'i.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromDate: { type: 'string', description: 'YYYY-MM-DD' },
+        toDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+    },
+  },
+  {
+    name: 'get_expense_categories',
+    description:
+      "AI xarajat hisoboti: kategoriya bo'yicha taqsimot, jami va peaks (qaysi davr eng yuqori/past). period beriladi.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        period: {
+          type: 'string',
+          enum: ['daily', 'weekly', 'monthly', 'yearly'],
+        },
+      },
+    },
+  },
+  {
+    name: 'get_cash_position',
+    description:
+      "HOZIRGI naqd holat: kassa (naqd+karta), kuryerlar jami, marketlar jami, sof pozitsiya. Parametrsiz.",
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_order_flow',
+    description:
+      "Buyurtma oqimi: qabul qilingan, bekor qilingan, sotilgan/to'langan soni. Ixtiyoriy sana oralig'i.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromDate: { type: 'string', description: 'YYYY-MM-DD' },
+        toDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+    },
+  },
+];
+
 @Injectable()
 export class AiFinanceService implements OnApplicationBootstrap {
   constructor(
@@ -108,6 +195,8 @@ export class AiFinanceService implements OnApplicationBootstrap {
     @InjectRepository(AiFinanceReportSnapshotEntity)
     private readonly snapshotRepo: Repository<AiFinanceReportSnapshotEntity>,
     private readonly claude: ClaudeService,
+    private readonly orderService: OrderService,
+    private readonly cashBoxService: CashBoxService,
     private readonly logger: MyLogger,
   ) {}
 
@@ -376,6 +465,152 @@ export class AiFinanceService implements OnApplicationBootstrap {
         /* jadval hali yo'q (migration) — o'tkazib yuboramiz */
       }
     })();
+  }
+
+  // ─── AI savol-javob (tool-use) — bu yerда haqiqiy AI puli ketadi ───
+  // Model kerakli asboblarni O'ZI chaqiradi; raqamlar kanonik servislardan
+  // keladi (model to'qimaydi). PII yo'q (cash-position skalyarga siqiladi).
+  async ask(question: string, fromDate?: string, toDate?: string) {
+    try {
+      if (!this.claude.isEnabled()) {
+        return successRes({
+          answer: "AI hozircha o'chiq (ANTHROPIC_API_KEY sozlanmagan).",
+          toolsUsed: [],
+          aiEnabled: false,
+        });
+      }
+      const today = this.ymd(new Date());
+      const range =
+        fromToValid(fromDate) && fromToValid(toDate)
+          ? ` Foydalanuvchi tanlagan oraliq: ${fromDate} .. ${toDate}.`
+          : '';
+      const userText = `Bugungi sana: ${today} (Asia/Tashkent).${range}\n\nSavol: ${question}`;
+
+      const res = await this.claude.askWithTools({
+        system: ASK_SYSTEM,
+        userText,
+        tools: ASK_TOOLS,
+        runTool: (name, input) => this.runFinanceTool(name, input),
+        maxTokens: 1500,
+        maxSteps: 8,
+      });
+
+      if (!res) {
+        return successRes({
+          answer: "Kechirasiz, hozir javob bera olmadim. Qayta urinib ko'ring.",
+          toolsUsed: [],
+          aiEnabled: true,
+        });
+      }
+      return successRes({
+        answer: res.text,
+        toolsUsed: [...new Set(res.toolsUsed)],
+        aiEnabled: true,
+      });
+    } catch (error) {
+      this.logger.log(`ask xato: ${(error as Error).message}`, 'AiFinance');
+      return catchError(error);
+    }
+  }
+
+  // successRes o'ramini ochadi (yoki xom obyektni qaytaradi).
+  private unwrap(res: unknown): any {
+    return res &&
+      typeof res === 'object' &&
+      'data' in (res as Record<string, unknown>) &&
+      'statusCode' in (res as Record<string, unknown>)
+      ? (res as { data: unknown }).data
+      : res;
+  }
+
+  // Asboblarni haqiqiy kanonik servislarga bog'laydi (raqamlar shu yerdan).
+  private async runFinanceTool(
+    name: string,
+    input: unknown,
+  ): Promise<unknown> {
+    const inp = (input || {}) as {
+      period?: string;
+      fromDate?: string;
+      toDate?: string;
+    };
+    const from = fromToValid(inp.fromDate) ? inp.fromDate : undefined;
+    const to = fromToValid(inp.toDate) ? inp.toDate : undefined;
+    const period = PERIODS.includes(inp.period as Period)
+      ? (inp.period as Period)
+      : 'monthly';
+
+    switch (name) {
+      case 'get_revenue': {
+        const d = this.unwrap(
+          await this.orderService.getRevenueStats(period, from, to),
+        );
+        return { summary: d?.summary, series: d?.data };
+      }
+      case 'get_net_profit': {
+        const rev = this.unwrap(
+          await this.orderService.getRevenueStats('daily', from, to),
+        );
+        const gross = Number(rev?.summary?.totalRevenue) || 0;
+        const an = this.unwrap(
+          await this.cashBoxService.financialBalanceAnalytics({
+            fromDate: from,
+            toDate: to,
+          }),
+        );
+        const opex = ((an?.negativeImpact as any[]) || [])
+          .filter((x) =>
+            ['salary', 'bills', 'manual_expense'].includes(x.source_type),
+          )
+          .reduce((s: number, x) => s + Math.abs(Number(x.total_amount) || 0), 0);
+        return {
+          grossProfit: gross,
+          totalOpEx: opex,
+          netProfit: gross - opex,
+          from: from || null,
+          to: to || null,
+        };
+      }
+      case 'get_expenses': {
+        const an = this.unwrap(
+          await this.cashBoxService.financialBalanceAnalytics({
+            fromDate: from,
+            toDate: to,
+          }),
+        );
+        return { negativeImpact: an?.negativeImpact, totals: an?.totals };
+      }
+      case 'get_expense_categories': {
+        const d = this.unwrap(await this.getExpenseReport(period));
+        return {
+          period: d?.period,
+          totals: d?.totals,
+          peaks: d?.peaks,
+          byCategory: ((d?.byCategory as any[]) || []).map((c) => ({
+            name: c.name,
+            total: c.total,
+            count: c.count,
+          })),
+        };
+      }
+      case 'get_cash_position': {
+        const d = this.unwrap(await this.cashBoxService.financialBalance());
+        // PII-strip: faqat skalyar yig'indilar (ism/karta massivlari yo'q).
+        return {
+          currentSituation: d?.currentSituation,
+          kassa: d?.main?.balance,
+          naqd: d?.main?.balance_cash,
+          karta: d?.main?.balance_card,
+          marketsTotal: d?.markets?.marketsTotalBalans,
+          couriersTotal: d?.couriers?.couriersTotalBalanse,
+          difference: d?.difference,
+        };
+      }
+      case 'get_order_flow': {
+        return this.unwrap(await this.orderService.getStats(from, to));
+      }
+      default:
+        return { error: `noma'lum asbob: ${name}` };
+    }
   }
 
   // Kategoriya taqsimoti + HAR kategoriya ICHI (drill-down):

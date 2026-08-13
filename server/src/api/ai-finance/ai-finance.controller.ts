@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -6,6 +7,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { AiFinanceService } from './ai-finance.service';
+import { AiAskDto } from './dto/ai-finance.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { Roles } from 'src/common/enums';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
@@ -46,5 +48,15 @@ export class AiFinanceController {
   @Post('expense-report/refresh')
   refresh() {
     return this.aiFinance.refreshSnapshots();
+  }
+
+  // AI savol-javob (tool-use) — bu yerда AI puli ketadi. Throttle bilan cheklangan.
+  @ApiOperation({ summary: 'Moliyaviy AI savol-javob (tabiiy til)' })
+  @UseGuards(JwtGuard, RolesGuard, ThrottlerGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Post('ask')
+  ask(@Body() dto: AiAskDto) {
+    return this.aiFinance.ask(dto.question, dto.fromDate, dto.toDate);
   }
 }

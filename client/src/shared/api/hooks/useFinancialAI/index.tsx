@@ -14,6 +14,15 @@ export const useFinancialAI = () => {
       client.invalidateQueries({ queryKey: [financialAiKey] }),
   });
 
+  // AI savol-javob (tool-use) — tabiiy tilda moliyaviy savollar.
+  const askFinance = useMutation({
+    mutationFn: (body: {
+      question: string;
+      fromDate?: string;
+      toDate?: string;
+    }) => api.post("financial-ai/ask", body).then((res) => res.data),
+  });
+
   // AI xarajat hisoboti (kunlik/haftalik/oylik/yillik) — saqlangan snapshot
   const getExpenseReport = (
     params?: {
@@ -32,5 +41,5 @@ export const useFinancialAI = () => {
       enabled,
     });
 
-  return { getExpenseReport, refreshExpenseReport };
+  return { getExpenseReport, refreshExpenseReport, askFinance };
 };
