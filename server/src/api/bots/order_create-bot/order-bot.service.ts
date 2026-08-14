@@ -634,11 +634,22 @@ export class OrderBotService {
       // Tugmalar HAR DOIM yakuniy holatga moslanadi (o'tgan bo'lsa ham, allaqachon
       // ko'rilgan bo'lsa ham) — "✅ bosilgach tugmalar o'zgarmaydi" bug'i shu bilan
       // hal bo'ladi (bir marta o'tkazib yuborilsa ham tuzatiladi).
-      const statusText = order.deleted_at
-        ? '❌ Buyurtma bekor qilindi'
-        : order.status === Order_status.NEW
+      //
+      // `transitioned` — SHU bosishda holat o'zgardimi? Agar YO'Q (0 qator), demak
+      // buyurtma allaqachon yakuniy holatda edi: foydalanuvchiga "endi bajardingiz"
+      // emas, "allaqachon" deb aniq javob beramiz (chalg'itmaslik uchun).
+      let statusText: string;
+      if (order.deleted_at) {
+        statusText = transitioned
+          ? '❌ Buyurtma bekor qilindi'
+          : '❌ Buyurtma allaqachon bekor qilingan';
+      } else if (order.status === Order_status.NEW) {
+        statusText = transitioned
           ? '✅ Buyurtma tasdiqlandi'
-          : "Bu buyurtma allaqachon ko'rib chiqilgan";
+          : '✅ Buyurtma allaqachon tasdiqlangan';
+      } else {
+        statusText = "Bu buyurtma allaqachon ko'rib chiqilgan";
+      }
 
       const statusButton = {
         text: this.statusButtonLabel(order),

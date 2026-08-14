@@ -7,6 +7,9 @@ export enum Roles {
   CUSTOMER = 'customer',
   OPERATOR = 'operator',
   LOGIST = 'logist',
+  // Faqat o'qish uchun ulushdor (equity investor) roli. Hozircha hech qanday
+  // endpointga ulanmagan — INVESTOR surface Faza 1'da qo'shiladi.
+  INVESTOR = 'investor',
 }
 
 export enum Status {
@@ -41,6 +44,9 @@ export enum Source_type {
   CANCEL = 'cancel',
   EXTRA_COST = 'extra_cost',
   BILLS = 'bills',
+  // Investorga foyda taqsimoti (kassadan chiqim; OpEx EMAS). DB enumida
+  // allaqachon mavjud. financial_balance_history'ga YOZILMAYDI.
+  INVESTOR_PAYOUT = 'investor_payout',
 }
 
 export enum Order_status {

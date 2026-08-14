@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -15,14 +15,20 @@ import {
   CirclePlus,
   Search,
   X,
+  Download,
 } from "lucide-react";
-import { Select, message } from "antd";
+import { Select, DatePicker, Pagination, message } from "antd";
 import TextArea from "antd/es/input/TextArea";
+import dayjs from "dayjs";
 import type { AxiosError } from "axios";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { SELECT_CLS, SELECT_POPUP_CLS } from "../../../../shared/ui/select-styles";
 import PaymentPopup from "../../../../shared/ui/paymentPopup";
+import CustomCalendar from "../../../../shared/components/customDate";
+import { BASE_URL } from "../../../../shared/const";
+
+const { RangePicker } = DatePicker;
 
 const KIND = {
   income: { label: "Kirim", pos: true },
@@ -67,12 +73,99 @@ const CardDetail = () => {
     useCashBox();
   const { getMarkets } = useMarket();
 
-  const { data, isFetching, refetch } = getCardLedger(id || null, undefined, !!id);
+  // ===== Sana oralig'i filtri + sahifalash =====
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Sana faqat ikkala chegara ham tanlangandagina serverga yuboriladi
+  // (backend ledger filtri fromDate + toDate juftligini talab qiladi).
+  const ledgerParams: {
+    fromDate?: string;
+    toDate?: string;
+    page: number;
+    limit: number;
+  } = { page, limit: 50 };
+  if (from && to) {
+    ledgerParams.fromDate = from;
+    ledgerParams.toDate = to;
+  }
+
+  const setRange = (nextFrom: string, nextTo: string) => {
+    setFrom(nextFrom);
+    setTo(nextTo);
+    setPage(1);
+  };
+
+  const { data, isFetching, refetch } = getCardLedger(
+    id || null,
+    ledgerParams,
+    !!id,
+  );
   const [show, setShow] = useState(true);
 
   const card = data?.data?.card;
   const rows: any[] = data?.data?.rows || [];
   const s = data?.data?.summary || {};
+  const pagination = data?.data?.pagination || {
+    total: rows.length,
+    page: 1,
+    limit: 50,
+    totalPages: 1,
+  };
+
+  // Excel eksport — joriy sana oralig'ini hurmat qiladi. Sana tanlanmasa —
+  // kartaning butun tarixi eksport qilinadi.
+  const handleExportExcel = async () => {
+    if (!id) return;
+    try {
+      setIsExporting(true);
+
+      const exportParams = new URLSearchParams();
+      if (from && to) {
+        exportParams.append("fromDate", from);
+        exportParams.append("toDate", to);
+      }
+
+      const response = await fetch(
+        `${BASE_URL}cashbox/cards/${id}/ledger/export?${exportParams.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
+          },
+        },
+      );
+      if (!response.ok) throw new Error("Export failed");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeName = (card?.name || "karta").replace(/\s+/g, "_");
+      const periodPart =
+        from && to ? (from === to ? from : `${from}-${to}`) : "umumiy";
+      a.href = url;
+      a.download = `karta-${safeName}-${periodPart}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      message.success("Excel fayl yuklandi!");
+    } catch {
+      message.error("Excel yuklab olishda xatolik!");
+    } finally {
+      setIsExporting(false);
+    }
+  };
   const totalIn =
     (s.real_income || 0) + (s.transfer_in || 0) + (s.convert_in || 0);
   const totalOut =
@@ -281,6 +374,104 @@ const CardDetail = () => {
             </div>
           </div>
 
+          {/* Sana oralig'i filtri */}
+          <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 p-4 sm:p-5 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <Clock size={16} className="text-white" />
+                </div>
+                <div>
+                  {from === "" ? (
+                    <>
+                      <h3 className="font-bold text-sm text-gray-800 dark:text-white">
+                        Butun tarix
+                      </h3>
+                      <p className="text-[11px] text-gray-400">
+                        Barcha harakatlar (sana tanlanmagan)
+                      </p>
+                    </>
+                  ) : from === to ? (
+                    <>
+                      <h3 className="font-bold text-sm text-gray-800 dark:text-white">
+                        {from}
+                      </h3>
+                      <p className="text-[11px] text-gray-400">
+                        Bir kunlik harakatlar
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="font-bold text-sm text-gray-800 dark:text-white">
+                        {from} — {to}
+                      </h3>
+                      <p className="text-[11px] text-gray-400">
+                        Oraliq harakatlari
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                {isMobile ? (
+                  <CustomCalendar
+                    from={from ? dayjs(from) : null}
+                    to={to ? dayjs(to) : null}
+                    setFrom={(date: any) =>
+                      setRange(date.format("YYYY-MM-DD"), to)
+                    }
+                    setTo={(date: any) =>
+                      setRange(from, date.format("YYYY-MM-DD"))
+                    }
+                  />
+                ) : (
+                  <RangePicker
+                    value={[from ? dayjs(from) : null, to ? dayjs(to) : null]}
+                    onChange={(dates) => {
+                      setRange(
+                        dates?.[0] ? dates[0].format("YYYY-MM-DD") : "",
+                        dates?.[1] ? dates[1].format("YYYY-MM-DD") : "",
+                      );
+                    }}
+                    placeholder={["Boshlanish sanasi", "Tugash sanasi"]}
+                    format="YYYY-MM-DD"
+                    size="large"
+                    className="w-full !rounded-xl !border-gray-200 dark:!border-gray-700 hover:!border-purple-400 focus:!border-purple-500"
+                  />
+                )}
+              </div>
+              {(from || to) && (
+                <button
+                  onClick={() => setRange("", "")}
+                  title="Sanani tozalash"
+                  className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 hover:bg-red-200 dark:hover:bg-red-900/50 transition-all cursor-pointer flex-shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              )}
+              <button
+                onClick={handleExportExcel}
+                disabled={isExporting}
+                title={
+                  from
+                    ? `Excel — ${from}${to && to !== from ? ` — ${to}` : ""}`
+                    : "Excel — butun tarix"
+                }
+                className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-medium transition-all cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              >
+                {isExporting ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+                <span className="max-sm:hidden">Excel</span>
+              </button>
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700/50 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700/50 flex items-center justify-between">
               <h2 className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
@@ -301,7 +492,11 @@ const CardDetail = () => {
                 <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
                   <Clock className="opacity-50" size={28} />
                 </div>
-                <p className="text-sm font-medium">Hali harakat yo'q</p>
+                <p className="text-sm font-medium">
+                  {from || to
+                    ? "Tanlangan davr uchun harakat topilmadi"
+                    : "Hali harakat yo'q"}
+                </p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-gray-800 max-h-[640px] overflow-y-auto">
@@ -375,6 +570,24 @@ const CardDetail = () => {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Sahifalash — bir necha kun/hafta oldingi harakatlarni ko'rish */}
+            {pagination.total > pagination.limit && (
+              <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-xs text-gray-400">
+                  Jami {Number(pagination.total).toLocaleString("uz-UZ")} ta
+                  harakat
+                </span>
+                <Pagination
+                  current={pagination.page}
+                  total={pagination.total}
+                  pageSize={pagination.limit}
+                  showSizeChanger={false}
+                  size="small"
+                  onChange={(p) => setPage(p)}
+                />
               </div>
             )}
           </div>

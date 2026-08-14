@@ -7,6 +7,7 @@ import { AllExceptionsFilter } from 'src/infrastructure/lib/exception/all.except
 import { requestContextMiddleware } from 'src/common/middleware/request-context.middleware';
 import config from 'src/config';
 import * as express from 'express';
+import helmet from 'helmet';
 import { MyLogger } from 'src/logger/logger.service';
 import { AppModule } from './app.module';
 
@@ -88,6 +89,18 @@ export default class Application {
 
     // Public folder (agar bo'lsa)
     app.use(express.static('public'));
+
+    // 🛡️ Xavfsizlik headerlari (helmet) — KONSERVATIV sozlama.
+    // CSP va COEP ATAYLAB o'chirilgan: statik/rasm/CDN yuklanishini buzmaslik uchun.
+    // CORP=cross-origin — /uploads rasmlari boshqa origin (frontend/bot)dan yuklanaversin.
+    // Beradi: HSTS (prod), X-Content-Type-Options, frameguard, va h.k.
+    app.use(
+      helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+      }),
+    );
 
     // Global filters, pipes, cors
     app.useGlobalFilters(new AllExceptionsFilter());

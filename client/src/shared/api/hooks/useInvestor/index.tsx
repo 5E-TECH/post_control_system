@@ -1,0 +1,149 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "../..";
+
+// Investor (ulushdor) faqat-o'qish aggregat endpointlari uchun React Query hooklar.
+// Barcha so'rov `api` orqali (baseURL /api/v1/, Bearer avto). Javob envelope:
+// { statusCode, message, data } — iste'molchi `res.data?.data` o'qiydi.
+export const investorKey = "investor";
+
+interface RangeParams {
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+}
+interface RevenueParams extends RangeParams {
+  period?: "daily" | "weekly" | "monthly" | "yearly";
+}
+
+export const useInvestor = () => {
+  const qc = useQueryClient();
+  const getOverview = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "overview", params],
+      queryFn: () =>
+        api.get("investor/overview", { params }).then((res) => res.data),
+    });
+
+  const getRevenue = (params: RevenueParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "revenue", params],
+      queryFn: () =>
+        api.get("investor/revenue", { params }).then((res) => res.data),
+    });
+
+  const getOrderFlow = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "order-flow", params],
+      queryFn: () =>
+        api.get("investor/order-flow", { params }).then((res) => res.data),
+    });
+
+  const getRegions = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "regions", params],
+      queryFn: () =>
+        api.get("investor/regions", { params }).then((res) => res.data),
+    });
+
+  const getLeaderboards = () =>
+    useQuery({
+      queryKey: [investorKey, "leaderboards"],
+      queryFn: () =>
+        api.get("investor/leaderboards").then((res) => res.data),
+    });
+
+  const getCashPosition = () =>
+    useQuery({
+      queryKey: [investorKey, "cash-position"],
+      queryFn: () =>
+        api.get("investor/cash-position").then((res) => res.data),
+    });
+
+  const getNetProfit = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "net-profit", params],
+      queryFn: () =>
+        api.get("investor/net-profit", { params }).then((res) => res.data),
+    });
+
+  const getOpEx = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "opex", params],
+      queryFn: () =>
+        api.get("investor/opex", { params }).then((res) => res.data),
+    });
+
+  const getUnitEconomics = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "unit-economics", params],
+      queryFn: () =>
+        api.get("investor/unit-economics", { params }).then((res) => res.data),
+    });
+
+  const getMyInvestment = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "my-investment", params],
+      queryFn: () =>
+        api.get("investor/my-investment", { params }).then((res) => res.data),
+    });
+
+  const getMyLedger = (params: { page?: number; limit?: number } = {}) =>
+    useQuery({
+      queryKey: [investorKey, "my-ledger", params],
+      queryFn: () =>
+        api
+          .get("investor/my-investment/ledger", { params })
+          .then((res) => res.data),
+    });
+
+  const getMyDaily = (params: RangeParams = {}) =>
+    useQuery({
+      queryKey: [investorKey, "my-daily", params],
+      queryFn: () =>
+        api
+          .get("investor/my-investment/daily", { params })
+          .then((res) => res.data),
+    });
+
+  // Foyda-asosi taklifi (investor tasdig'i)
+  const getMyBasisRequest = () =>
+    useQuery({
+      queryKey: [investorKey, "basis-req"],
+      queryFn: () =>
+        api.get("investor/my-investment/basis-request").then((r) => r.data),
+    });
+  const approveBasis = useMutation({
+    mutationFn: () => api.post("investor/my-investment/basis-request/approve"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [investorKey] }),
+  });
+  const rejectBasis = useMutation({
+    mutationFn: () => api.post("investor/my-investment/basis-request/reject"),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [investorKey] }),
+  });
+
+  // Imperativ Excel eksport (blob) — react-query emas.
+  const exportBusiness = (params: RangeParams = {}) =>
+    api.get("investor/export", { params, responseType: "blob" });
+
+  const exportMyInvestment = (params: RangeParams = {}) =>
+    api.get("investor/my-investment/export", { params, responseType: "blob" });
+
+  return {
+    getOverview,
+    getRevenue,
+    getOrderFlow,
+    getRegions,
+    getLeaderboards,
+    getCashPosition,
+    getNetProfit,
+    getOpEx,
+    getUnitEconomics,
+    getMyInvestment,
+    getMyLedger,
+    getMyDaily,
+    getMyBasisRequest,
+    approveBasis,
+    rejectBasis,
+    exportBusiness,
+    exportMyInvestment,
+  };
+};

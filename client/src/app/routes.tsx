@@ -56,6 +56,9 @@ const CreateRegistrator = lazy(
 const CreateLogist = lazy(
   () => import("../pages/users/pages/create-logist")
 );
+const CreateInvestor = lazy(
+  () => import("../pages/users/pages/create-investor")
+);
 const CreateOrder = lazy(
   () => import("../pages/orders/pages/superadmin/create-order")
 );
@@ -141,6 +144,13 @@ const OperatorEarnings = lazy(() => import("../pages/operator-earnings"));
 const OperatorOrders = lazy(() => import("../pages/operator-orders"));
 const CourierBulk = lazy(() => import("../pages/courier-bulk"));
 const MyRegion = lazy(() => import("../pages/my-region"));
+const Investor = lazy(() => import("../pages/investor"));
+const InvestorOverview = lazy(() => import("../pages/investor/overview"));
+const InvestorFinancials = lazy(() => import("../pages/investor/financials"));
+const InvestorOperations = lazy(() => import("../pages/investor/operations"));
+const InvestorMyInvestment = lazy(() => import("../pages/investor/my-investment"));
+const InvestorAction = lazy(() => import("../pages/investor-action"));
+const CashboxPayInvestor = lazy(() => import("../pages/cashbox-pay-investor"));
 
 const AppRouters = () => {
   return useRoutes([
@@ -260,6 +270,14 @@ const AppRouters = () => {
                     { path: "courier", element: <CreateCourier /> },
                     { path: "market", element: <CreateMarket /> },
                     { path: "logist", element: <CreateLogist /> },
+                    {
+                      path: "investor",
+                      element: (
+                        <RequireRole roles={["superadmin"]}>
+                          <CreateInvestor />
+                        </RequireRole>
+                      ),
+                    },
                   ],
                 },
               ],
@@ -321,7 +339,14 @@ const AppRouters = () => {
               children: [{ path: "create/:id", element: <ProductCreate /> }],
             },
             { path: "send-message", element: <SendMessage /> },
-            { path: "m-balance", element: <FinancialHistory /> },
+            {
+              path: "m-balance",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <FinancialHistory />
+                </RequireRole>
+              ),
+            },
             // Logs endi Settings ichida — eski URL redirect
             { path: "logs", element: <Navigate to="/settings/logs" replace /> },
             {
@@ -445,6 +470,44 @@ const AppRouters = () => {
             {
               path: "my-orders",
               element: <OperatorOrders />,
+            },
+            {
+              path: "investor",
+              element: (
+                <RequireRole roles={["investor", "superadmin"]}>
+                  <Investor />
+                </RequireRole>
+              ),
+              children: [
+                { index: true, element: <Navigate to="my-investment" replace /> },
+                { path: "overview", element: <InvestorOverview /> },
+                { path: "financials", element: <InvestorFinancials /> },
+                { path: "operations", element: <InvestorOperations /> },
+                { path: "my-investment", element: <InvestorMyInvestment /> },
+              ],
+            },
+            {
+              // Eski standalone sahifa — endi boshqaruv foydalanuvchi detalida.
+              path: "investor-admin",
+              element: <Navigate to="/all-users" replace />,
+            },
+            {
+              // Investor equity amali — alohida sahifa (kapital/ulush/taqsimot/qaytarish).
+              path: "investor-equity/:id/:action",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <InvestorAction />
+                </RequireRole>
+              ),
+            },
+            {
+              // Kassadan investorga foyda to'lash — alohida sahifa.
+              path: "cashbox/pay-investor",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <CashboxPayInvestor />
+                </RequireRole>
+              ),
             },
           ],
         },

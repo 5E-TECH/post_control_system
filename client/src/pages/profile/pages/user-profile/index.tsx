@@ -27,6 +27,7 @@ import {
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { setUserData } from "../../../../shared/lib/features/login/authSlice";
 import CourierRegionBreakdown from "./CourierRegionBreakdown";
+import InvestorEquityPanel from "./InvestorEquityPanel";
 import { AiBalanceContent } from "../../../users/components/users/ai-balance-modal";
 
 const UserProfile = () => {
@@ -904,6 +905,13 @@ const UserProfile = () => {
         {user?.role === "courier" &&
           (user?.is_super_courier || user?.serves_all_regions) && (
             <CourierRegionBreakdown courierId={user.id} />
+          )}
+
+        {/* Investor equity boshqaruvi (superadmin: hammasi, admin: faqat taqsimot) */}
+        {user?.role === "investor" &&
+          (currentUserRole === "superadmin" ||
+            currentUserRole === "admin") && (
+            <InvestorEquityPanel investorUserId={user.id} />
           )}
       </div>
 

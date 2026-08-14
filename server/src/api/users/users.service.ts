@@ -47,6 +47,8 @@ import {
 } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { CreateInvestorDto } from './dto/create-investor.dto';
+import { UpdateInvestorDto } from './dto/update-investor.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { CreateLogistDto } from './dto/create-logist.dto';
 import { UpdateLogistDto } from './dto/update-logist.dto';
@@ -195,6 +197,121 @@ export class UserService implements OnModuleInit {
       return catchError(error);
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  // Faqat-o'qish investor (ulushdor) akkaunti. createAdmin patteni bo'yicha,
+  // lekin oyliksiz. Kapital/ulush/taqsimot Faza 3 equity-ledger orqali kiritiladi.
+  async createInvestor(
+    createInvestorDto: CreateInvestorDto,
+    actor?: JwtPayload,
+  ): Promise<object> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const { password, phone_number, name } = createInvestorDto;
+      const exist = await queryRunner.manager.findOne(UserEntity, {
+        where: { phone_number },
+      });
+      if (exist) {
+        throw new ConflictException(
+          `User with ${phone_number} number already exists`,
+        );
+      }
+      const hashedPassword = await this.bcrypt.encrypt(password);
+      const investor = queryRunner.manager.create(UserEntity, {
+        name,
+        phone_number,
+        password: hashedPassword,
+        role: Roles.INVESTOR,
+      });
+      await queryRunner.manager.save(investor);
+      await queryRunner.commitTransaction();
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: investor.id,
+        action: 'created',
+        new_value: { name: investor.name, role: investor.role },
+        description: `Investor yaratildi: ${investor.name}`,
+        user: actor,
+      });
+      // Parol hashini javobda qaytarmaymiz.
+      const { password: _pw, ...safe } = investor;
+      return successRes(safe, 201, 'New Investor created');
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      return catchError(error);
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // Investor akkauntini tahrirlash — ism/telefon/parol/status.
+  // Faqat role=INVESTOR foydalanuvchiga tegadi (boshqa rolni bu yerda emas).
+  async updateInvestor(
+    id: string,
+    updateInvestorDto: UpdateInvestorDto,
+    currentUser: JwtPayload,
+  ) {
+    try {
+      const { password, phone_number, name, status } = updateInvestorDto;
+
+      const user = await this.userRepo.findOne({
+        where: { id, role: Roles.INVESTOR },
+      });
+      if (!user) {
+        throw new NotFoundException('Investor topilmadi');
+      }
+
+      // Statusni faqat SuperAdmin o'zgartira oladi (bloklash/faollashtirish).
+      if (status && currentUser.role !== Roles.SUPERADMIN) {
+        throw new BadRequestException('Faqat SuperAdmin statusni o\'zgartira oladi');
+      }
+
+      // Telefon boshqa (customer bo'lmagan) foydalanuvchida band emasligini tekshiramiz.
+      if (phone_number && phone_number !== user.phone_number) {
+        const existPhone = await this.userRepo.findOne({
+          where: {
+            phone_number,
+            role: Not(Roles.CUSTOMER),
+            id: Not(id),
+          },
+        });
+        if (existPhone) {
+          throw new ConflictException(
+            `User with ${phone_number} already exist`,
+          );
+        }
+      }
+
+      const beforeStatus = user.status;
+      if (name !== undefined) user.name = name;
+      if (phone_number !== undefined) user.phone_number = phone_number;
+      if (status !== undefined) user.status = status;
+      if (password) {
+        user.password = await this.bcrypt.encrypt(password);
+      }
+      await this.userRepo.save(user);
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: user.id,
+        action: 'updated',
+        old_value: { status: beforeStatus },
+        new_value: {
+          name: user.name,
+          status: user.status,
+          password_changed: Boolean(password),
+        },
+        description: `Investor yangilandi: ${user.name}`,
+        user: currentUser,
+      });
+
+      const { password: _pw, ...safe } = user;
+      return successRes(safe, 200, 'Investor updated');
+    } catch (error) {
+      return catchError(error);
     }
   }
 

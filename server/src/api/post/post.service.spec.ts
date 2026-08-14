@@ -10,6 +10,7 @@ import { RegionEntity } from 'src/core/entity/region.entity';
 import { DataSource } from 'typeorm';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
+import { BotService } from '../bots/notify-bot/bot.service';
 import { Order_status, Post_status } from 'src/common/enums';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
@@ -117,6 +118,10 @@ describe('PostService — Return Requests', () => {
             createShipmentForOrder: jest.fn(),
             resetForRedelivery: jest.fn(),
           },
+        },
+        {
+          provide: BotService,
+          useValue: { sendMessageToGroup: jest.fn() },
         },
       ],
     }).compile();

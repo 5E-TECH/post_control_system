@@ -1,7 +1,9 @@
 import { memo, useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { useChart } from "../../shared/api/hooks/useChart";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { buildAdminPath } from "../../shared/const";
 import {
   CheckCircle,
   DollarSign,
@@ -49,6 +51,13 @@ const Dashboards = () => {
   // Redux'dan role va id olish
   const role = useSelector((state: RootState) => state.roleSlice.role);
   const currentUserId = useSelector((state: RootState) => state.roleSlice.id);
+
+  // Investor bosh dashboard'dan foydalanmaydi — to'g'ridan-to'g'ri o'zining
+  // equity (investitsiya) sahifasiga yo'naltiramiz. Aks holda login'dan keyin
+  // bo'sh dashboard'da qolib ketardi.
+  if (role === "investor") {
+    return <Navigate to={buildAdminPath("investor")} replace />;
+  }
 
   let data: any;
   let isLoading: boolean = false;

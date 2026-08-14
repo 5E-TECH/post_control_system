@@ -19,6 +19,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "audit:roles": "node scripts/audit-roles.mjs",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js -d src/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate src/migrations/$npm_config_name",
     "migration:create": "ts-node ./node_modules/typeorm/cli.js migration:create src/migrations/$npm_config_name",
@@ -27,7 +28,8 @@
     "migration:show": "npm run typeorm -- migration:show",
     "db:backup": "bash scripts/db-backup.sh",
     "db:check-cashbox": "ts-node -r tsconfig-paths/register scripts/check-cashbox-invariant.ts",
-    "db:check-cards": "ts-node -r tsconfig-paths/register scripts/check-card-invariant.ts"
+    "db:check-cards": "ts-node -r tsconfig-paths/register scripts/check-card-invariant.ts",
+    "db:check-investor-ledger": "ts-node -r tsconfig-paths/register scripts/check-investor-ledger-invariant.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
@@ -40,6 +42,7 @@
     "@nestjs/platform-socket.io": "^11.1.6",
     "@nestjs/schedule": "^6.1.0",
     "@nestjs/swagger": "^11.2.0",
+    "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.6",
     "@ngrok/ngrok": "^1.5.2",
@@ -56,6 +59,7 @@
     "escpos-usb": "^3.0.0-alpha.4",
     "exceljs": "^4.4.0",
     "fs-extra": "^11.3.2",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "mqtt": "^5.14.1",
     "multer": "^2.0.1",

@@ -611,8 +611,18 @@ describe('OrderBotService', () => {
       });
 
       await service.processOrderAction('cancel', order.id, ctx);
-      // Soft-delete: deleted_at TypeORM softDelete chaqiriqi orqali yoziladi
-      expect(queryRunnerFactory.qr.manager.softDelete).toHaveBeenCalled();
+      // Atomik shartli o'tish: softDelete o'rniga deleted_at ni to'g'ridan-to'g'ri
+      // yozadigan conditional UPDATE ishlatiladi (TOCTOU/poyga yo'q — faqat CREATED
+      // va o'chirilmagan buyurtmagina bekor bo'ladi).
+      expect(queryRunnerFactory.qr.manager.update).toHaveBeenCalledWith(
+        OrderEntity,
+        expect.objectContaining({
+          id: order.id,
+          status: Order_status.CREATED,
+        }),
+        expect.objectContaining({ deleted_at: expect.any(Date) }),
+      );
+      expect(order.deleted_at).toBeInstanceOf(Date);
     });
 
     it('returns early if order already processed', async () => {
@@ -623,6 +633,9 @@ describe('OrderBotService', () => {
         market_id: order.user_id,
         group_type: Group_type.CREATE,
       });
+      // Buyurtma allaqachon NEW — atomik "WHERE status=CREATED" UPDATE hech
+      // qatorga tegmaydi (affected=0), demak bu bosish holatni o'zgartirmaydi.
+      queryRunnerFactory.qr.manager.update.mockResolvedValueOnce({ affected: 0 });
 
       const ctx = makeCtx({ chat: { id: 500 } });
       const res: any = await service.processOrderAction(

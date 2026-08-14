@@ -23,6 +23,7 @@ import {
 import { CashBoxService } from './cash-box.service';
 import { UpdateCashBoxDto } from './dto/update-cash-box.dto';
 import { SalaryDto } from './dto/salary.dto';
+import { PayInvestorDto } from './dto/pay-investor.dto';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import {
   Cashbox_type,
@@ -463,6 +464,17 @@ export class CasheBoxController {
     return this.cashBoxService.paySalary(user, salaryDto);
   }
 
+  @ApiOperation({ summary: 'Kassadan investorga foyda taqsimoti to\'lash' })
+  @ApiBody({ type: PayInvestorDto })
+  @ApiResponse({ status: 200, description: 'Investor payout paid' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('pay-investor')
+  payInvestor(@CurrentUser() user: JwtPayload, @Body() dto: PayInvestorDto) {
+    return this.cashBoxService.payInvestor(user, dto);
+  }
+
   @ApiOperation({ summary: 'Get my own salary payment history' })
   @ApiQuery({ name: 'fromDate', required: false, type: String })
   @ApiQuery({ name: 'toDate', required: false, type: String })
@@ -567,6 +579,56 @@ export class CasheBoxController {
       page,
       limit,
     });
+  }
+
+  @ApiOperation({ summary: 'Export a single card ledger (statement) to Excel' })
+  @ApiParam({ name: 'id', description: 'Card ID' })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'Start date (YYYY-MM-DD). Bo‘sh bo‘lsa — butun tarix',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: false,
+    type: String,
+    description: 'End date (YYYY-MM-DD). Bo‘sh bo‘lsa — butun tarix',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Excel file downloaded',
+    content: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('cards/:id/ledger/export')
+  async exportCardLedger(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    const { buffer, fileName } =
+      await this.cashBoxService.exportCardLedgerToExcel(id, {
+        fromDate,
+        toDate,
+        allHistory: !fromDate || !toDate,
+      });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=${encodeURIComponent(fileName)}`,
+    );
+    res.send(buffer);
   }
 
   @ApiOperation({ summary: 'Create a new virtual card' })
