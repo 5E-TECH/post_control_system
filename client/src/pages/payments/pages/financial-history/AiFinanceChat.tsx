@@ -23,6 +23,7 @@ import {
   History,
   ChevronLeft,
   MessageSquare,
+  AlertTriangle,
 } from "lucide-react";
 import AiResponseRenderer from "./AiResponseRenderer";
 
@@ -522,6 +523,13 @@ const AiFinanceChat: React.FC = () => {
                         <X className="w-4 h-4" />
                       </button>
                     </div>
+                    <p className="mt-1.5 flex items-start gap-1 text-[11px] leading-tight text-amber-600 dark:text-amber-400">
+                      <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span>
+                        Fayl tahlil uchun tashqi AI xizmatiga yuboriladi. Mijoz ismi,
+                        telefon raqami kabi shaxsiy ma'lumotlarni yubormang.
+                      </span>
+                    </p>
                   </div>
                 )}
 
