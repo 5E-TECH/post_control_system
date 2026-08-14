@@ -339,7 +339,14 @@ const AppRouters = () => {
               children: [{ path: "create/:id", element: <ProductCreate /> }],
             },
             { path: "send-message", element: <SendMessage /> },
-            { path: "m-balance", element: <FinancialHistory /> },
+            {
+              path: "m-balance",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <FinancialHistory />
+                </RequireRole>
+              ),
+            },
             // Logs endi Settings ichida — eski URL redirect
             { path: "logs", element: <Navigate to="/settings/logs" replace /> },
             {
