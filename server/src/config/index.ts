@@ -29,7 +29,15 @@ export default {
 
   // AI (Claude) — bo'sh bo'lsa AI oqimi o'chiriladi, WebApp forma ishlayveradi
   ANTHROPIC_API_KEY: String(process.env.ANTHROPIC_API_KEY || ''),
-  AI_ORDER_MODEL: String(process.env.AI_ORDER_MODEL || 'claude-haiku-4-5'),
+  // Ekstraksiya sifati "haqiqiy AI" hissi uchun kritik — kuchli model tanlanadi.
+  // Opus 4.8 aralash o'zbek/rus matn, noaniq manzil (Toshkent shahri/viloyati) va
+  // narx×son hisobida Haiku'dan sezilarli aniqroq. Structured output (json_schema)
+  // qo'llanadi; thinking default o'chiq (tez, arzon ekstraksiya). Har buyurtma AI
+  // xarajati ~185 so'm (sen 300 olasan) — foyda saqlanadi.
+  AI_ORDER_MODEL: String(process.env.AI_ORDER_MODEL || 'claude-opus-4-8'),
+  // Moliyaviy AI (xarajat hisoboti, savol-javob, insight) modeli — sifat uchun
+  // Opus 4.8. Faqat superadmin/admin ishlatadi (ichki asbob, charj yo'q).
+  AI_FINANCE_MODEL: String(process.env.AI_FINANCE_MODEL || 'claude-opus-4-8'),
   // Bir AI buyurtma narxi (so'm) — market ai_price_per_order null bo'lsa shu
   // global default ishlatiladi. Har market uchun UI'da alohida belgilanadi.
   AI_PRICE_PER_ORDER: Number(process.env.AI_PRICE_PER_ORDER || 300),

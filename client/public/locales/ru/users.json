@@ -41,5 +41,16 @@
   "marketDescription": "Введите данные маркета",
   "clear": "Очистка",
   "active": "активный",
-  "inactive": "неактивный"
+  "inactive": "неактивный",
+  "investor": "Инвестор",
+  "investorTitle": "Создание инвестора",
+  "investorDescription": "Введите данные инвестора и начальную инвестицию",
+  "investorCreated": "Инвестор успешно создан",
+  "createError": "Ошибка при создании",
+  "initialCapital": "Начальный капитал (сум)",
+  "ownershipPct": "Доля (%)",
+  "ownershipRange": "Доля в пределах 0..100",
+  "startDate": "Дата начала",
+  "selectDate": "Выберите дату",
+  "startDateHint": "Укажите прошлую дату — система автоматически посчитает прибыль с того дня"
 }

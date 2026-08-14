@@ -32,7 +32,10 @@ import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { AcceptRoles } from 'src/common/decorator/roles.decorator';
 import { CurrentUser } from 'src/common/decorator/user.decorator';
 import { JwtPayload } from 'src/common/utils/types/user.type';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { CreateInvestorDto } from './dto/create-investor.dto';
+import { UpdateInvestorDto } from './dto/update-investor.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { SelfGuard } from 'src/common/guards/self.guard';
 import { UpdateSelfDto } from './dto/self-update.dto';
@@ -91,6 +94,49 @@ export class UsersController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.userService.createAdmin(createAdminDto, user);
+  }
+
+  @ApiOperation({
+    summary: 'Create investor user',
+    description:
+      "Yangi faqat-o'qish investor (ulushdor) akkaunti yaratish (SuperAdmin only)",
+  })
+  @ApiResponse({ status: 201, description: 'Investor created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - SuperAdmin required' })
+  @ApiResponse({ status: 409, description: 'Phone number already exists' })
+  @ApiResponse({ status: 422, description: 'Validation error' })
+  @ApiBody({ type: CreateInvestorDto })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN)
+  @Post('investor')
+  createInvestor(
+    @Body() createInvestorDto: CreateInvestorDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.createInvestor(createInvestorDto, user);
+  }
+
+  @ApiOperation({
+    summary: 'Update investor user',
+    description: "Investor akkauntini tahrirlash — ism/telefon/parol/status (SuperAdmin only)",
+  })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiBody({ type: UpdateInvestorDto })
+  @ApiResponse({ status: 200, description: 'Investor updated successfully' })
+  @ApiResponse({ status: 404, description: 'Investor not found' })
+  @ApiResponse({ status: 409, description: 'Phone number already exists' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN)
+  @Patch('investor/:id')
+  updateInvestor(
+    @Param('id') id: string,
+    @Body() updateInvestorDto: UpdateInvestorDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.updateInvestor(id, updateInvestorDto, user);
   }
 
   @ApiOperation({
@@ -251,6 +297,10 @@ export class UsersController {
       },
     },
   })
+  // 🛡️ Brute-force himoyasi: har IP'dan 60 soniyada 10 ta login urinishi.
+  // Faqat shu endpointga (global emas) — boshqa amallar throttle qilinmaydi.
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('signin')
   async signIn(
     @Body() signInuser: SignInUserDto,
@@ -262,6 +312,8 @@ export class UsersController {
 
   @ApiOperation({ summary: 'Login with telegram' })
   @ApiResponse({ status: 200, description: 'Loggen in with telegram' })
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('telegram/signin')
   telegramLogin(@Body() initData: TelegramInitData, @Req() req: Request) {
     return this.userService.loginTelegram(initData, req);
@@ -751,6 +803,7 @@ export class UsersController {
     Roles.MARKET,
     Roles.OPERATOR,
     Roles.LOGIST,
+    Roles.INVESTOR,
   )
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload) {
@@ -840,6 +893,7 @@ export class UsersController {
     Roles.MARKET,
     Roles.LOGIST,
     Roles.OPERATOR,
+    Roles.INVESTOR,
   )
   @Patch('self')
   selfUpdate(

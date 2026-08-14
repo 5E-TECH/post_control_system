@@ -24,6 +24,10 @@ export default function RequireRole({
 
   if (role && roles.includes(role)) return <>{children}</>;
 
+  // Investor uchun /dashboardga emas, o'z bo'limiga yo'naltiramiz (redirect loop bo'lmasligi uchun).
+  if (role === "investor")
+    return <Navigate to="/investor/overview" replace />;
+
   const settingsAllowed = role === "admin" || role === "superadmin";
   return <Navigate to={settingsAllowed ? "/settings/integrations" : "/"} replace />;
 }

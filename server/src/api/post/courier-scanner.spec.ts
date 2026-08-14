@@ -10,6 +10,7 @@ import { RegionEntity } from 'src/core/entity/region.entity';
 import { DataSource } from 'typeorm';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
+import { BotService } from '../bots/notify-bot/bot.service';
 import { Order_status, Post_status } from 'src/common/enums';
 import { HttpException } from '@nestjs/common';
 
@@ -83,6 +84,10 @@ describe('PostService — Courier Scanner & Return Request (yangi qo\'shilgan)',
         {
           provide: LdgShipmentService,
           useValue: { createShipmentForOrder: jest.fn() },
+        },
+        {
+          provide: BotService,
+          useValue: { sendMessageToGroup: jest.fn() },
         },
       ],
     }).compile();
@@ -163,15 +168,18 @@ describe('PostService — Courier Scanner & Return Request (yangi qo\'shilgan)',
       const { qr, manager } = createQueryRunnerMock();
       dataSourceMock.createQueryRunner.mockReturnValue(qr);
       manager.findOne
-        .mockResolvedValueOnce({
-          id: uuid(1),
-          post_id: uuid(80),
-          status: Order_status.WAITING,
-        })
+        // 1) orderRef — token bo'yicha yengil lookup (id + post_id)
+        .mockResolvedValueOnce({ id: uuid(1), post_id: uuid(80) })
+        // 2) post — lock bilan
         .mockResolvedValueOnce({
           id: uuid(80),
           courier_id: courierUser.id,
           status: Post_status.SENT,
+        })
+        // 3) order — post lock'dan keyin qayta o'qish (eng yangi status shu yerdan)
+        .mockResolvedValueOnce({
+          id: uuid(1),
+          status: Order_status.WAITING,
         });
 
       await expectHttpStatus(
@@ -184,17 +192,20 @@ describe('PostService — Courier Scanner & Return Request (yangi qo\'shilgan)',
       const { qr, manager } = createQueryRunnerMock();
       dataSourceMock.createQueryRunner.mockReturnValue(qr);
       manager.findOne
-        .mockResolvedValueOnce({
-          id: uuid(1),
-          post_id: uuid(80),
-          status: Order_status.ON_THE_ROAD,
-          customer: { name: 'Test Mijoz' },
-        })
+        // 1) orderRef — yengil lookup
+        .mockResolvedValueOnce({ id: uuid(1), post_id: uuid(80) })
+        // 2) post — lock bilan
         .mockResolvedValueOnce({
           id: uuid(80),
           courier_id: courierUser.id,
           status: Post_status.SENT,
           qr_code_token: 'post-token',
+        })
+        // 3) order — qayta o'qish (status + customer shu yerdan)
+        .mockResolvedValueOnce({
+          id: uuid(1),
+          status: Order_status.ON_THE_ROAD,
+          customer: { name: 'Test Mijoz' },
         });
       // Hali 2 ta order ON_THE_ROAD
       manager.count.mockResolvedValueOnce(2);
@@ -227,17 +238,20 @@ describe('PostService — Courier Scanner & Return Request (yangi qo\'shilgan)',
       const { qr, manager } = createQueryRunnerMock();
       dataSourceMock.createQueryRunner.mockReturnValue(qr);
       manager.findOne
-        .mockResolvedValueOnce({
-          id: uuid(1),
-          post_id: uuid(80),
-          status: Order_status.ON_THE_ROAD,
-          customer: { name: 'Mijoz' },
-        })
+        // 1) orderRef — yengil lookup
+        .mockResolvedValueOnce({ id: uuid(1), post_id: uuid(80) })
+        // 2) post — lock bilan
         .mockResolvedValueOnce({
           id: uuid(80),
           courier_id: courierUser.id,
           status: Post_status.SENT,
           qr_code_token: 'post-token',
+        })
+        // 3) order — qayta o'qish
+        .mockResolvedValueOnce({
+          id: uuid(1),
+          status: Order_status.ON_THE_ROAD,
+          customer: { name: 'Mijoz' },
         });
       // Hech qancha qolmadi — oxirgisi
       manager.count.mockResolvedValueOnce(0);
@@ -263,17 +277,20 @@ describe('PostService — Courier Scanner & Return Request (yangi qo\'shilgan)',
       const { qr, manager } = createQueryRunnerMock();
       dataSourceMock.createQueryRunner.mockReturnValue(qr);
       manager.findOne
-        .mockResolvedValueOnce({
-          id: uuid(1),
-          post_id: uuid(80),
-          status: Order_status.ON_THE_ROAD,
-          customer: null,
-        })
+        // 1) orderRef — yengil lookup
+        .mockResolvedValueOnce({ id: uuid(1), post_id: uuid(80) })
+        // 2) post — lock bilan
         .mockResolvedValueOnce({
           id: uuid(80),
           courier_id: courierUser.id,
           status: Post_status.SENT,
           qr_code_token: 'pt',
+        })
+        // 3) order — qayta o'qish
+        .mockResolvedValueOnce({
+          id: uuid(1),
+          status: Order_status.ON_THE_ROAD,
+          customer: null,
         });
       manager.count.mockResolvedValueOnce(3);
 

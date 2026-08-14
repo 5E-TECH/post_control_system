@@ -12,6 +12,7 @@ import MarketSidebar from "./components/MarketSidebar";
 import RegistratorSidebar from "./components/RegistratorSidebar";
 import LogistSidebar from "./components/LogistSidebar";
 import OperatorSidebar from "./components/OperatorSidebar";
+import InvestorSidebar from "./components/InvestorSidebar";
 import type { UserRole } from "../shared/enums/Roles";
 import RenderMediaSidebar from "../shared/components/render-media-sidebar/RenderMediaSidebar";
 import { LdgBulkProgress } from "../shared/components/ldg-bulk-progress";
@@ -48,6 +49,9 @@ const DashboardLayout = () => {
       break;
     case "operator":
       sidebar = <OperatorSidebar />;
+      break;
+    case "investor":
+      sidebar = <InvestorSidebar />;
       break;
     default:
       sidebar = null;

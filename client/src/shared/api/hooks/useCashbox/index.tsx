@@ -225,6 +225,17 @@ export const useCashBox = () => {
     },
   });
 
+  // Kassadan investorga foyda taqsimoti
+  const payInvestor = useMutation({
+    mutationFn: (data: { investor_id: string; amount: number; type?: string; comment?: string; card_id?: string; note?: string }) =>
+      api.post("cashbox/pay-investor", data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [cashbox] });
+      client.invalidateQueries({ queryKey: ["investor"] });
+      client.invalidateQueries({ queryKey: ["investor-admin"] });
+    },
+  });
+
   // Admin: tanlangan ishchining maosh to'lovlari tarixi
   const getSalaryHistory = (
     userId: string | undefined,
@@ -265,6 +276,7 @@ export const useCashBox = () => {
     cashboxSpand,
     cashboxFill,
     paySalary,
+    payInvestor,
     // Virtual karta hooklari
     getCards,
     getCardMovements,

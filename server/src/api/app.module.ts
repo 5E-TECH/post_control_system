@@ -2,6 +2,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import config from 'src/config';
 import { UsersModule } from './users/users.module';
 import { ProductModule } from './product/product.module';
@@ -24,10 +25,16 @@ import { ExternalIntegrationModule } from './external-integration/external-integ
 import { IntegrationSyncModule } from './integration-sync/integration-sync.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
+import { InvestorModule } from './investor/investor.module';
+import { AiFinanceModule } from './ai-finance/ai-finance.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    // Rate-limiting infratuzilmasi. GLOBAL guard QO'YILMAGAN (shtatli bulk
+    // amallar buzilmasin) — faqat login endpointida @Throttle+ThrottlerGuard
+    // ishlatiladi (brute-force himoyasi). ttl millisekundda.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: config.DB_URL,
@@ -37,6 +44,10 @@ import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
       synchronize: false,
       // Connection Pool sozlamalari - yuqori yuklanish uchun
       extra: {
+        // Har bir ulanish sessiyasi TZ'sini Asia/Tashkent'ga qadaymiz — vaqt-zona
+        // bog'liq so'rovlar (kunlik hisobotlar, investor foydasi) muhitdan (dev/UTC
+        // Docker/managed Postgres) qat'i nazar bir xil natija bersin.
+        options: '-c timezone=Asia/Tashkent',
         // Maksimal ulanishlar soni (default: 10)
         max: 50,
         // Minimal ulanishlar soni
@@ -72,6 +83,8 @@ import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
     ExternalIntegrationModule,
     IntegrationSyncModule,
     LdgCargoModule,
+    InvestorModule,
+    AiFinanceModule,
   ],
   providers: [OrderGateaway],
 })

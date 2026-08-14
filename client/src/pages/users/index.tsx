@@ -70,7 +70,7 @@ const Users = () => {
 
   if (isChecked) return <Outlet />;
 
-  const roles = ["superadmin", "admin", "registrator", "market", "courier"];
+  const roles = ["superadmin", "admin", "registrator", "market", "courier", "investor"];
   const status = ["active", "inactive"];
 
   const handleFilterChange = (name: keyof IUserFilter, value: string) => {

@@ -22,5 +22,6 @@ import { DistrictCourierEntity } from 'src/core/entity/district-courier.entity';
   ],
   controllers: [RegionController],
   providers: [RegionService],
+  exports: [RegionService],
 })
 export class RegionModule {}

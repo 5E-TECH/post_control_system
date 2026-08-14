@@ -19,9 +19,16 @@ export class RolesGuard implements CanActivate {
       ROLES_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (!requiredRoles) return true;
+    // FAIL-CLOSED: RolesGuard bilan himoyalangan endpoint majburiy ravishda
+    // @AcceptRoles(...) e'lon qilishi shart. Dekorator yo'q yoki bo'sh bo'lsa —
+    // hech kimga ruxsat berilmaydi (avvalgi fail-open `return true` xatosi tuzatildi).
+    if (!requiredRoles || requiredRoles.length === 0) {
+      throw new ForbiddenException(
+        'Endpointda rol siyosati aniqlanmagan (fail-closed)',
+      );
+    }
     const { user } = context.switchToHttp().getRequest();
-    if (!requiredRoles.includes(user?.role)) {
+    if (!user?.role || !requiredRoles.includes(user.role)) {
       throw new ForbiddenException('Forbidden user');
     }
     return true;
