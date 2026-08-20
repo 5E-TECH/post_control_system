@@ -54,6 +54,8 @@ const TOOL_LABEL: Record<string, string> = {
   get_income_comments: "Kirim izohlari",
   get_cash_position: "Naqd holat",
   get_order_flow: "Buyurtma oqimi",
+  get_shifts: "Smenalar",
+  get_shift_transactions: "Smena yozuvlari",
 };
 
 const ACCEPT = "image/*,.xlsx,.xls,.csv";

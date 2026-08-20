@@ -200,6 +200,7 @@ MA'LUMOT:
 - Bir nechta raqam kerak bo'lsa bir nechta asbobni chaqir.
 - XARAJAT savoli: qo'lda chiqimlar (manual_expense) bitta manba turi ostida, lekin IZOHLARI har xil (turli narsalar). Aniq narsaga qancha ketgani yoki maxsus kategoriya so'ralsa (masalan "benzinga qancha?", "reklama xarajati?") — get_expense_comments bilan IZOHLARni o'QI, imlo xato/sinonimlarni hisobga olib mos qatorlarni jamla va aniq javob ber. Umumiy kategoriya taqsimoti uchun get_expense_categories; turlar (oylik/kommunal/qo'lda) jami uchun get_expenses.
 - KIRIM (daromad) savoli: get_income — kirimni TURLAR bo'yicha beradi: "Sotuvdan foyda" (sell_profit — buyurtmalardan pochta marjasi) va "Qo'lda kirim" (manual_income — qo'lда kiritilgan daromad). Qo'lda kirimning IZOHLARI (nimadan kelgani) uchun get_income_comments. Eslatma: get_revenue faqat sotuv/pochta marjasini beradi; umumiy kirimni get_income'dan ol. "Kirim qancha?", "daromad qancha?", "foyda vs xarajat" kabi savollarга get_income (kerak bo'lsa get_expenses bilan birga) ishlat.
+- SMENA (kassa smenasi) savoli: "joriy/oxirgi smena", "oldingi smena", "smena hisobi to'g'rimi", "smena bo'yicha kirim/chiqim" — AVVAL get_shifts bilan smenalarni ol (joriy ochiq + oxirgilari), kerakli smenani aniqla (joriy=ochiq, oldingi=oxirgi yopilgan); KEYIN get_shift_transactions bilan o'sha smenaning satr-darajа yozuvlarini ol. MUHIM: smena = aniq SOAT oynasi (opened_at..closed_at), kun EMAS — sana asboblari (get_expenses/get_income) smenaга mos kelmasligi mumkin, smena uchun aynan smena asboblarини ishlat.
 
 JAVOB FORMATI (Markdown — chiroyli va o'qiladigan bo'lsin):
 - O'ZBEK tilida. Sonlarni bo'sh joy bilan yoz: **12 500 000 so'm**. Muhim raqamlarni **qalin** qil.
@@ -318,6 +319,34 @@ const ASK_TOOLS: Anthropic.Tool[] = [
       },
     },
   },
+  {
+    name: 'get_shifts',
+    description:
+      "SMENA (kassa smenasi) ro'yxati: hozir OCHIQ smena + oxirgi yopilganlar. Har biri: id, holati (open/closed), ochilish/yopilish vaqti (ms), kim ochgan/yopgan, ochilish/yopilish qoldig'i, smena kirim/chiqimi (yopilganда). 'Joriy/oxirgi smena', 'oldingi smena' so'ralsa AVVAL shuni chaqir — kerakli smena id/oynasini shundan ol.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'integer',
+          description: 'nechta smena (default 6, max 20)',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_shift_transactions',
+    description:
+      "Bitta SMENA ichidagi kassa harakatlari SATR-DARAJАDA (aniq SOAT oynasида, kun emas): har yozuv — vaqti, kirim/chiqim, summa, naqd/karta, izoh, kim kiritdi, buyurtma raqami. shift: 'current' (ochiq smena) | 'previous' (oxirgi yopilgan) | aniq smena id. Excel qoralamani platforma bilan SATR-MA-SATR solishtirib xatolarni (tushib qolgan / ikki marta / summa noto'g'ri / naqd-karta adashgan) topish uchun shuni ishlat. Jami subtotal'lar butun smena bo'yicha aniq.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        shift: {
+          type: 'string',
+          description: "'current' | 'previous' | smena id (uuid)",
+        },
+      },
+    },
+  },
 ];
 
 // Fayl (rasm/Excel) tahlili + platforma bilan solishtirib nomuvofiqlik topish.
@@ -326,7 +355,8 @@ const ANALYZE_SYSTEM = `${ASK_SYSTEM}
 FAYL TAHLILI:
 - Foydalanuvchi rasm yoki Excel yuklaydi. Uni diqqat bilan tahlil qil: raqamlar, sanalar, jadval qatorlari, summalar, oraliq jamlar.
 - So'ralgan davrga moslab tahlil qil (agar oraliq berilgan bo'lsa faqat shu davr).
-- NOMUVOFIQLIK/XATO TOPISH (muhim): agar foydalanuvchi platforma bilan solishtirishni so'rasa yoki fayldagi raqamlarni tekshirishni istasa — ASBOBLAR bilan platformadagi haqiqiy raqamlarni ol (get_revenue, get_expenses, get_net_profit, get_cash_position, get_order_flow, get_expense_comments) va fayldagi raqamlar bilan SOLISHTIR. Farqni ANIQ ko'rsat: qaysi qator/summa/sana, fayldagi qiymat ↔ platformadagi qiymat, farq miqdori (jadvalда). Sababini taxmin qil (masalan tushib qolgan yozuv, ikki marta hisoblangan, sana noto'g'ri).
+- NOMUVOFIQLIK/XATO TOPISH (muhim): agar foydalanuvchi platforma bilan solishtirishni so'rasa yoki fayldagi raqamlarni tekshirishni istasa — ASBOBLAR bilan platformadagi haqiqiy raqamlarni ol (get_revenue, get_expenses, get_income, get_net_profit, get_cash_position, get_order_flow, get_expense_comments, get_income_comments) va fayldagi raqamlar bilan SOLISHTIR. Farqni ANIQ ko'rsat: qaysi qator/summa/sana, fayldagi qiymat ↔ platformadagi qiymat, farq miqdori (jadvalда). Sababini taxmin qil (masalan tushib qolgan yozuv, ikki marta hisoblangan, sana noto'g'ri).
+- SMENA hisobini solishtirish (ENG MUHIM stsenariy): foydalanuvchi "oxirgi/oldingi smena" Excel qoralamasini tizim bilan tekshirishni so'rasa — AVVAL get_shifts bilan smenani top (joriy=ochiq, oldingi=oxirgi yopilgan), KEYIN get_shift_transactions bilan o'sha smenaning HAQIQIY satr-darajа yozuvlarini ol. Fayldagi HAR QATORNI platforma yozuvi bilan solishtir va quyidagilarni ANIQ ko'rsat (jadval: holat, izoh/vaqt, fayl qiymati ↔ platforma qiymati, farq): (1) faylда bor, tizimda YO'Q (tushib qolgan); (2) tizimда bor, faylда yo'q; (3) summa FARQ qiladi; (4) naqd/karta turi noto'g'ri; (5) IKKI marta kiritilgan. Oxirida jami kirim/chiqim (naqd+karta) fayl ↔ tizim taqqoslamasini ber. Faqat asbob bergan haqiqiy yozuvlarga asoslan — TO'QIMA.
 - Fayldagi raqamlarni TO'QIMA — faqat ko'rgan/asbobdan olganingga asoslan. Aniq bo'lmasa ayt.`;
 
 @Injectable()
@@ -1166,6 +1196,20 @@ export class AiFinanceService implements OnApplicationBootstrap {
       }
       case 'get_order_flow': {
         return this.unwrap(await this.orderService.getStats(from, to));
+      }
+      case 'get_shifts': {
+        const raw = (input || {}) as { limit?: number };
+        return this.cashBoxService.getRecentShiftsForAi(
+          Number(raw.limit) || 6,
+        );
+      }
+      case 'get_shift_transactions': {
+        const raw = (input || {}) as { shift?: string };
+        const sel =
+          typeof raw.shift === 'string' && raw.shift.trim()
+            ? raw.shift.trim()
+            : 'current';
+        return this.cashBoxService.getShiftTransactionsForAi(sel);
       }
       default:
         return { error: `noma'lum asbob: ${name}` };
