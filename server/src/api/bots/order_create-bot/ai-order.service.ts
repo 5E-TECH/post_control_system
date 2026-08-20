@@ -10,7 +10,12 @@ import { OrderService } from 'src/api/order/order.service';
 import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { AiBalanceService } from 'src/api/ai-balance/ai-balance.service';
 import { MyLogger } from 'src/logger/logger.service';
-import { Roles, Where_deliver, Order_status } from 'src/common/enums';
+import {
+  Roles,
+  Where_deliver,
+  Order_status,
+  OrderCreatedSource,
+} from 'src/common/enums';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateOrderByBotDto } from 'src/api/order/dto/create-order-bot.dto';
 import { CreateOrderDto } from 'src/api/order/dto/create-order.dto';
@@ -390,7 +395,11 @@ export class AiOrderService {
         where_deliver: Where_deliver.CENTER,
       } as CreateOrderDto;
 
-      const order = await this.orderService.createOrder(dto, user);
+      const order = await this.orderService.createOrder(
+        dto,
+        user,
+        OrderCreatedSource.AI,
+      );
       return { ok: true, order, balance: charge?.balance };
     } catch (err) {
       // createOrder xato berdi (masalan add_order o'chiq / operator telefoni
@@ -1022,7 +1031,14 @@ export class AiOrderService {
           operator_phone: defaultOperatorPhone,
           replaced_order_id: o.replaced_order_id,
         } as CreateOrderDto;
-        const res = (await this.orderService.createOrder(dto, user)) as {
+        // Kanal manbasi: bot oqimi -> 'bot', web platforma AI -> 'ai'.
+        const createdSource =
+          source === 'bot' ? OrderCreatedSource.BOT : OrderCreatedSource.AI;
+        const res = (await this.orderService.createOrder(
+          dto,
+          user,
+          createdSource,
+        )) as {
           data?: { order_number?: number; id?: string };
         };
         created.add(sig);
