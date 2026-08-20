@@ -38,6 +38,14 @@ export default {
   // Moliyaviy AI (xarajat hisoboti, savol-javob, insight) modeli — sifat uchun
   // Opus 4.8. Faqat superadmin/admin ishlatadi (ichki asbob, charj yo'q).
   AI_FINANCE_MODEL: String(process.env.AI_FINANCE_MODEL || 'claude-opus-4-8'),
+  // MEXANIK/mayda AI vazifalari modeli — tuman indeks tanlash, mahsulot
+  // moslashtirish, izoh kategoriyalash (yopiq ro'yxatdan RAQAM tanlash). Bular
+  // oddiy klassifikatsiya, arzon model (Haiku 4.5) bemalol uddalaydi va ~5
+  // barobar arzon. Ekstraksiya + chat/tahlil baribir AI_ORDER/FINANCE_MODEL
+  // (Opus) da qoladi. Bo'sh bo'lsa Haiku 4.5.
+  AI_CLASSIFY_MODEL: String(
+    process.env.AI_CLASSIFY_MODEL || 'claude-haiku-4-5',
+  ),
   // Bir AI buyurtma narxi (so'm) — market ai_price_per_order null bo'lsa shu
   // global default ishlatiladi. Har market uchun UI'da alohida belgilanadi.
   AI_PRICE_PER_ORDER: Number(process.env.AI_PRICE_PER_ORDER || 300),

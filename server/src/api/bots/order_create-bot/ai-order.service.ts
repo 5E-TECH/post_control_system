@@ -15,6 +15,7 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateOrderByBotDto } from 'src/api/order/dto/create-order-bot.dto';
 import { CreateOrderDto } from 'src/api/order/dto/create-order.dto';
 import { AiDraftItem, AiOrderDraft } from './session.interface';
+import config from 'src/config';
 
 const MAX_CANDIDATE_BUTTONS = 5;
 
@@ -1265,10 +1266,49 @@ export class AiOrderService {
         return;
       }
     }
-    // 2-urinish (fallback): to'liq ro'yxat. Viloyat berilmagan (viloyatsiz
-    // o'xshash nomlar) YOKI viloyat noto'g'ri infer qilingan bo'lsa — Opus butun
-    // mamlakat bo'yicha geografik bilim bilan to'g'ri tuman+viloyatni tanlaydi.
+    // 2-urinish (fallback): viloyat berilmagan/noto'g'ri infer qilingan bo'lsa.
+    // 200+ tumandan arzon model (Haiku) ishonchli tanlashi uchun avval NOM/manzil
+    // o'xshashligi bo'yicha qisqa nomzodlar ro'yxatini (top-K) tuzamiz — imlo
+    // xatoli tuman ham ro'yxatga tushadi, model to'g'risini tanlaydi (arzonroq
+    // ham). Shortlist chiqmasa (juda g'alati nom) — oxirgi chora to'liq ro'yxat.
+    const shortlist = this.shortlistDistricts(draft, districts);
+    if (shortlist.length) {
+      await this.llmPickDistrict(draft, shortlist, placeText);
+      return; // shortlistдан hal bo'ldi yoki noaniq (0) — operator tanlaydi
+    }
     await this.llmPickDistrict(draft, districts, placeText);
+  }
+
+  // Manzil matniga (yozilgan tuman nomi + to'liq manzil) NOM/substring
+  // o'xshashligi bo'yicha eng yaqin K ta tumanni tanlaydi — LLM fallback'ini
+  // 200+ dan qisqa ishonchli ro'yxatga toraytiradi. Imlo xatoli nom ham
+  // (past ball bilan) ro'yxatga tushadi. Umumiy — har case uchun alohida qoida yo'q.
+  private shortlistDistricts(
+    draft: AiOrderDraft,
+    districts: DistrictEntity[],
+    k = 30,
+  ): DistrictEntity[] {
+    const nameQ = this.normGeo(draft.district_name || '');
+    const corpus = this.normGeo(
+      `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`,
+    ).replace(/\s+/g, '');
+    if (!nameQ && corpus.length < 4) return [];
+
+    const scored = districts
+      .map((d) => {
+        const dn = this.normGeo(d.name);
+        const dnFlat = dn.replace(/\s+/g, '');
+        let s = 0;
+        if (nameQ) s = Math.max(s, this.simRatio(dn, nameQ));
+        if (corpus.length >= 4 && dnFlat.length >= 4) {
+          s = Math.max(s, this.bestSubstringSim(corpus, dnFlat));
+        }
+        return { d, s };
+      })
+      .filter((x) => x.s > 0.3)
+      .sort((a, b) => b.s - a.s);
+
+    return scored.slice(0, k).map((x) => x.d);
   }
 
   // Berilgan pool ustida bitta LLM tanlash: raqamlangan ro'yxat -> model indeks
@@ -1292,6 +1332,7 @@ export class AiOrderService {
       system: DISTRICT_LLM_SYSTEM,
       userText,
       schema: DISTRICT_LLM_SCHEMA,
+      model: config.AI_CLASSIFY_MODEL,
       maxTokens: 64,
     });
     if (!res) return false;
@@ -1334,6 +1375,7 @@ export class AiOrderService {
       system: DISAMBIG_SYSTEM,
       userText: lines,
       schema: DISAMBIG_SCHEMA,
+      model: config.AI_CLASSIFY_MODEL,
       maxTokens: 512,
     });
     if (!res || !Array.isArray(res.picks)) return;

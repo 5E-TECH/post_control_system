@@ -14,6 +14,7 @@ import { CashBoxService } from 'src/api/cash-box/cash-box.service';
 import { MyLogger } from 'src/logger/logger.service';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
+import config from 'src/config';
 
 type Period = 'daily' | 'weekly' | 'monthly' | 'yearly';
 const PERIODS: Period[] = ['daily', 'weekly', 'monthly', 'yearly'];
@@ -26,6 +27,14 @@ const SOURCE_LABEL: Record<string, string> = {
   bills: 'Kommunal / hisob-fakturalar',
   manual_expense: "Qo'lda chiqimlar",
 };
+
+// KIRIM manba turlari (FinancialSource_type — DB'da kichik harf):
+// sell_profit = sotuvdan pochta foydasi, manual_income = qo'lda kirim.
+const INCOME_LABEL: Record<string, string> = {
+  sell_profit: 'Sotuvdan foyda (pochta marjasi)',
+  manual_income: "Qo'lda kirim",
+};
+const INCOME_SOURCES = ['sell_profit', 'manual_income'];
 
 // Umumiy/manba nomlari — bular HECH QACHON kategoriya bo'lolmaydi (-> "Boshqa").
 // AI shundoq nom bersa ham yoki izohning o'zi shunday bo'lsa ham.
@@ -73,27 +82,89 @@ const DEFAULT_DAYS: Record<Period, number> = {
   yearly: 1825,
 };
 
-// AI kategoriya klasterlash sxemasi (extractJson uchun) — model faqat RAQAM
-// (izoh indeksi) + kategoriya nomini qaytaradi; summa KOD tomonда hisoblanadi.
+// ─── YOPIQ (fixed) kategoriya taksonomiyasi ───
+// Muammo: erkin matnli kategoriya + bo'laklarni alohida klassifikatsiya = bir
+// xil narsa turli nomlar oladi, har izoh yangi kategoriya bo'ladi (50+ maydalash).
+// Yechim: AI faqat shu TAYYOR ro'yxatdan RAQAM (indeks) tanlaydi — yangi
+// kategoriya o'ylab TOPOLMAYDI. Fragmentatsiya IMKONSIZ, chiqish ancha arzon.
+// "Boshqa" HAR DOIM oxirgi element bo'lsin (OTHER_INDEX shunga tayanadi).
+const CATEGORY_LABELS = [
+  'Ovqat',
+  'Transport',
+  "Yoqilg'i",
+  'Ijara',
+  'Kommunal',
+  'Aloqa/Internet',
+  'Kanstovar',
+  "Ta'mirlash",
+  'Reklama/Marketing',
+  'Soliq',
+  'Bank/komissiya',
+  "Sovg'a/mehmon",
+  'Tozalash',
+  'Ombor/qadoqlash',
+  'Boshqa',
+];
+const OTHER_INDEX = CATEGORY_LABELS.length - 1; // "Boshqa"
+
+// Deterministik kalit-so'z old-filtri: aniq (bir ma'noli) izohlarni AI'siz
+// kategoriyaga biriktiradi — arzon va izchil. Faqat ISHONCHLI kalitlar (noaniq
+// so'z yo'q); topilmasa null -> AI (Haiku) yopiq taksonomiya bilan hal qiladi.
+// Tartib muhim: birinchi mos kelgan g'olib.
+const CATEGORY_KEYWORDS: Array<{ idx: number; words: string[] }> = [
+  { idx: 2, words: ['benzin', 'benzn', 'dizel', 'solyar', 'metan', 'propan', 'ai-92', 'ai-95', 'ai92', 'ai95', 'yoqilg', 'zapravka', 'gaz ball'] },
+  { idx: 3, words: ['ijara', 'ijra', 'arenda'] },
+  { idx: 5, words: ['internet', 'aloqa', 'uzmobile', 'beeline', 'ucell', 'mobiuz', 'simkarta', 'tarif puli'] },
+  { idx: 8, words: ['reklama', 'marketing', 'target', 'smm', 'banner', 'listovka', 'bloger', 'instagram reklama'] },
+  { idx: 9, words: ['soliq', 'nalog', 'patent'] },
+  { idx: 10, words: ['komissiya', 'komissya', 'ekvayring', 'terminal haqi', 'bank xizmat'] },
+  { idx: 12, words: ['tozalash', 'uborka', 'farrosh', 'tozalik'] },
+  { idx: 13, words: ['ombor', 'qadoq', 'upakovka', 'skotch', 'karobka', 'korobka', 'paket', 'sklad'] },
+  { idx: 6, words: ['kanstavar', 'kanstovar', 'kanselyar', 'ruchka', 'daftar', 'papka'] },
+  { idx: 1, words: ['taksi', 'yol kira', 'yolkira', 'yo l kira', 'avtobus', 'dostavka'] },
+  { idx: 0, words: ['ovqat', 'ovkat', 'tushlik', 'nonushta', 'tamaddi', 'choyxona', 'restoran'] },
+  { idx: 7, words: ["ta'mir", 'tamir', 'remont', 'usta ', 'zapchast', 'ehtiyot qism'] },
+];
+
+// AI kategoriya klasterlash sxemasi — model har izoh uchun yopiq ro'yxatdan
+// RAQAM (indeks) qaytaradi; nom KOD tomonда CATEGORY_LABELS'dan olinadi.
 const CATEGORY_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    // Ixcham aligned massiv: categories[i] = i-izohning kategoriyasi.
-    // (indeks+obyektga qaraganda ancha kam token — ko'p izohда kesilmaydi.)
-    categories: { type: 'array', items: { type: 'string' } },
+    // indexes[i] = i-izohning kategoriya indeksi (0..OTHER_INDEX).
+    indexes: {
+      type: 'array',
+      items: { type: 'integer', minimum: 0, maximum: OTHER_INDEX },
+    },
   },
-  required: ['categories'],
+  required: ['indexes'],
 };
 
-const CATEGORY_SYSTEM = `Sen buxgalter yordamchisisan. Berilgan xarajat IZOHLARining har biriga QISQA, umumiy kategoriya biriktir.
-Tavsiya etilgan kategoriyalar: Ovqat, Transport, Yoqilg'i, Ijara, Kommunal, Aloqa/Internet, Kanstovar, Ta'mirlash, Reklama/Marketing, Soliq, Bank/komissiya, Sovg'a/mehmon, Tozalash, Boshqa.
+const CATEGORY_SYSTEM = `Sen buxgalter yordamchisisan. Har bir xarajat IZOHini quyidagi TAYYOR kategoriya ro'yxatidan AYNAN BITTASIGA biriktir. Faqat ro'yxatdagi RAQAMni (indeks) tanla — YANGI kategoriya O'YLAB TOPMA, ro'yxatdan tashqari nom BERMA.
+
+KATEGORIYALAR:
+0) Ovqat — ovqat, tushlik, nonushta, choyxona, restoran, mehmon uchun taom
+1) Transport — taksi, yo'l kira, avtobus, yetkazish/dostavka haqi
+2) Yoqilg'i — benzin, dizel, gaz(balon), metan, propan, AI-92/95, zapravka
+3) Ijara — ofis/do'kon/ombor ijarasi, arenda
+4) Kommunal — svet/elektr, suv puli, gaz puli, issiqlik, kommunal to'lov
+5) Aloqa/Internet — internet, mobil aloqa, telefon, tarif, simkarta
+6) Kanstovar — ruchka, qog'oz, daftar, papka, kanselyariya buyumlari
+7) Ta'mirlash — remont, usta, zapchast, ehtiyot qism, tuzatish
+8) Reklama/Marketing — reklama, target, SMM, banner, listovka, bloger
+9) Soliq — soliq, nalog, patent, davlat yig'imi
+10) Bank/komissiya — bank xizmati, komissiya, terminal/ekvayring haqi
+11) Sovg'a/mehmon — sovg'a, gul, tug'ilgan kun, mehmon (taomdan tashqari)
+12) Tozalash — tozalash, uborka, farrosh, tozalik vositalari
+13) Ombor/qadoqlash — qadoqlash, upakovka, skotch, karobka, paket, ombor jihozi
+14) Boshqa — yuqoridagilarga umuman tushmasa YOKI izoh bo'sh/tushunarsiz bo'lsa
+
 QOIDALAR:
-- IMLO XATOSINI tushun va TO'G'RI ma'noga biriktir: "benzn"/"Benzin"/"benzin" -> Yoqilg'i; "ijra"/"ijara" -> Ijara; "kanselyariya"/"kanstavar" -> Kanstovar.
-- Bir xil ma'noli TURLI yozuvlarni (sinonim, qisqartma, katta/kichik harf, kirill/lotin aralash, bo'sh joy/tinish farqi) AYNAN BITTA kategoriyaga birlashtir — kategoriya nomini HAR DOIM bir xil imlода yoz.
-- Ro'yxatda mos bo'lmasa qisqa yangi MAZMUNLI kategoriya o'yla, lekin ortiqcha maydalab yuborma.
-- MUHIM: kategoriya har doim MAZMUNLI (aniq narsa/maqsad) bo'lsin. "Qo'lda chiqim", "Xarajat", "To'lov", "Chiqim", "Pul" kabi UMUMIY yoki manba nomini HECH QACHON berma. Faqat izoh haqiqatan bo'sh yoki tushunarsiz bo'lsagina "Boshqa".
-- CHIQISH: "categories" massivi — categories[i] i-tartibli izohning kategoriyasi. Massiv uzunligi izohlar soniga TENG va tartibi AYNAN bir xil bo'lsin. Faqat kategoriya nomlari.`;
+- IMLO XATO / sinonim / qisqartma / kirill-lotin farqini tushun: "benzn"->2, "ijra"->3, "kanselyariya"->6.
+- Bir xil ma'noli turli yozuvlarni AYNAN bitta raqamga biriktir.
+- Aniq bir kategoriyaga tushmasa yoki izoh tushunarsiz/bo'sh bo'lsa -> 14 (Boshqa). "Boshqa"ni kam ishlat — imkoni bo'lsa mazmunli kategoriyaga joyla.
+- CHIQISH: "indexes" massivi — indexes[i] i-tartibli izohning kategoriya RAQAMI. Massiv uzunligi izohlar soniga TENG va tartibi AYNAN bir xil bo'lsin. Faqat 0..14 oralig'idagi butun sonlar.`;
 
 interface Bucket {
   label: string;
@@ -128,6 +199,7 @@ MA'LUMOT:
 - Bugungi sana Asia/Tashkent. Sanalarni YYYY-MM-DD formatида uzat. Davr aniq aytilmasa oqilona standart ol (shu oy yoki shu yil). Taqqoslash uchun avvalgi davrni ham olib solishtir.
 - Bir nechta raqam kerak bo'lsa bir nechta asbobni chaqir.
 - XARAJAT savoli: qo'lda chiqimlar (manual_expense) bitta manba turi ostida, lekin IZOHLARI har xil (turli narsalar). Aniq narsaga qancha ketgani yoki maxsus kategoriya so'ralsa (masalan "benzinga qancha?", "reklama xarajati?") — get_expense_comments bilan IZOHLARni o'QI, imlo xato/sinonimlarni hisobga olib mos qatorlarni jamla va aniq javob ber. Umumiy kategoriya taqsimoti uchun get_expense_categories; turlar (oylik/kommunal/qo'lda) jami uchun get_expenses.
+- KIRIM (daromad) savoli: get_income — kirimni TURLAR bo'yicha beradi: "Sotuvdan foyda" (sell_profit — buyurtmalardan pochta marjasi) va "Qo'lda kirim" (manual_income — qo'lда kiritilgan daromad). Qo'lda kirimning IZOHLARI (nimadan kelgani) uchun get_income_comments. Eslatma: get_revenue faqat sotuv/pochta marjasini beradi; umumiy kirimni get_income'dan ol. "Kirim qancha?", "daromad qancha?", "foyda vs xarajat" kabi savollarга get_income (kerak bo'lsa get_expenses bilan birga) ishlat.
 
 JAVOB FORMATI (Markdown — chiroyli va o'qiladigan bo'lsin):
 - O'ZBEK tilida. Sonlarni bo'sh joy bilan yoz: **12 500 000 so'm**. Muhim raqamlarni **qalin** qil.
@@ -170,6 +242,30 @@ const ASK_TOOLS: Anthropic.Tool[] = [
     name: 'get_expenses',
     description:
       "XARAJATlar turlar (oylik/kommunal/qo'lda chiqim) bo'yicha taqsimlangan. Ixtiyoriy sana oralig'i.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromDate: { type: 'string', description: 'YYYY-MM-DD' },
+        toDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+    },
+  },
+  {
+    name: 'get_income',
+    description:
+      "KIRIM (daromad) turlar bo'yicha: 'Sotuvdan foyda' (sell_profit — buyurtmalardan pochta marjasi) va 'Qo'lda kirim' (manual_income). Jami kirim va har tur ulushi. Ixtiyoriy sana oralig'i.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromDate: { type: 'string', description: 'YYYY-MM-DD' },
+        toDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+    },
+  },
+  {
+    name: 'get_income_comments',
+    description:
+      "Qo'lda kirimlarning (manual_income) IZOHLARI: har xil izoh guruhlari (izoh matni, necha marta, jami summa) — kirim aynan nimadan kelgani. Ixtiyoriy sana oralig'i (berilmasa oxirgi 1 yil).",
     input_schema: {
       type: 'object',
       properties: {
@@ -249,6 +345,13 @@ export class AiFinanceService implements OnApplicationBootstrap {
     private readonly cashBoxService: CashBoxService,
     private readonly logger: MyLogger,
   ) {}
+
+  // Izoh -> kategoriya indeksi keshi (jarayon hayoti davomida). Bir xil izoh
+  // (masalan "benzin") har snapshot/davrда QAYTA AI'ga yuborilmaydi — narx
+  // keskin tushadi. Distinct izohlar bilan chegaralangan; xavfsizlik uchun
+  // o'lchov cheklangan (juda o'sib ketsa tozalanadi).
+  private readonly categoryCache = new Map<string, number>();
+  private static readonly CATEGORY_CACHE_MAX = 20000;
 
   // ─── Xarajat AI-hisoboti: vaqt-bucketli seriya + AI kategoriya + narrativ ───
   // Matematikani KOD qiladi (yig'indi, peak, %); Claude faqat kategoriyalaydi
@@ -807,6 +910,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
       const t = await this.claude.ask({
         system: `Quyidagi moliyaviy suhbatga 3-5 so'zli QISQA, mazmunli sarlavha ber (o'zbekcha). Faqat sarlavhani qaytar — tirnoq, nuqta yoki izohsiz. Masalan: Sentyabr sof foyda; Excel nomuvofiqlik tekshiruvi; Kategoriya bo'yicha xarajat; Kassa naqd holati.`,
         userText: ctx,
+        model: config.AI_CLASSIFY_MODEL,
         maxTokens: 32,
       });
       if (!t) return fallback;
@@ -992,6 +1096,37 @@ export class AiFinanceService implements OnApplicationBootstrap {
         );
         return { negativeImpact: an?.negativeImpact, totals: an?.totals };
       }
+      case 'get_income': {
+        const an = this.unwrap(
+          await this.cashBoxService.financialBalanceAnalytics({
+            fromDate: from,
+            toDate: to,
+          }),
+        );
+        const byType = ((an?.positiveImpact as any[]) || [])
+          .filter((x) => INCOME_SOURCES.includes(x.source_type))
+          .map((x) => ({
+            source_type: x.source_type,
+            label: INCOME_LABEL[x.source_type] || x.source_type,
+            total: Math.abs(Number(x.total_amount) || 0),
+            count: Number(x.transaction_count) || 0,
+          }))
+          .sort((a, b) => b.total - a.total);
+        const total = byType.reduce((s, x) => s + x.total, 0);
+        return { from: from || null, to: to || null, total, byType };
+      }
+      case 'get_income_comments': {
+        const toS = to || this.ymd(new Date());
+        const fromS = from || this.ymd(new Date(Date.now() - 365 * 86400000));
+        const groups = await this.commentGroups(
+          toUzbekistanTimestamp(fromS, false),
+          toUzbekistanTimestamp(toS, true),
+          'manual_income',
+          150,
+          'income',
+        );
+        return { from: fromS, to: toS, count: groups.length, comments: groups };
+      }
       case 'get_expense_categories': {
         const d = this.unwrap(await this.getExpenseReport(period));
         return {
@@ -1145,49 +1280,107 @@ export class AiFinanceService implements OnApplicationBootstrap {
     return cats.sort((a, b) => b.total - a.total);
   }
 
-  // Izohlarni AI bilan kategoriyaga ajratadi — CHUNKlarga bo'lib (chiqish
-  // kesilmasin, ko'p izohда ham ishonchli). Natija rows bilan bir tartibda;
-  // topolmagan/xato izoh uchun bo'sh ('') — chaqiruvchi izohning o'ziga tushiradi.
+  // Izohlarni YOPIQ taksonomiyaga (CATEGORY_LABELS) ajratadi. Uch bosqich:
+  //   1) kesh — avval ko'rilgan izoh qayta hisoblanmaydi (bepul);
+  //   2) kalit-so'z old-filtri — aniq izohlar AI'siz (bepul, izchil);
+  //   3) qolgan noaniqlar — Haiku (arzon model) yopiq ro'yxatdan RAQAM tanlaydi.
+  // Natija rows bilan bir tartibda; nom CATEGORY_LABELS'dan. AI o'chiq/xato
+  // bo'lsa faqat kalit-so'z topilmaganlar bo'sh ('') — chaqiruvchi izohga tushiradi.
   private async classifyComments(comments: string[]): Promise<string[]> {
     const result: string[] = new Array(comments.length).fill('');
-    if (!this.claude.isEnabled() || !comments.length) return result;
-    const CHUNK = 120;
-    for (let start = 0; start < comments.length; start += CHUNK) {
-      const chunk = comments.slice(start, start + CHUNK);
-      const list = chunk.map((c, i) => `${i}) ${c}`).join('\n');
-      const res = await this.claude.extractJson<{ categories: string[] }>({
-        system: CATEGORY_SYSTEM,
-        userText: list,
-        schema: CATEGORY_SCHEMA,
-        maxTokens: 2500,
-      });
-      if (res && Array.isArray(res.categories)) {
-        res.categories.forEach((cat, i) => {
-          if (start + i < result.length && typeof cat === 'string') {
-            result[start + i] = cat.trim();
-          }
+    if (!comments.length) return result;
+
+    // 1) + 2): kesh va kalit-so'z bilan hal bo'lganlarni ajratamiz.
+    const keys = comments.map((c) => this.normComment(c));
+    const need: number[] = []; // AIга yuboriladigan indekslar
+    for (let i = 0; i < comments.length; i++) {
+      const key = keys[i];
+      if (!key || key === '(izohsiz)') {
+        result[i] = CATEGORY_LABELS[OTHER_INDEX];
+        continue;
+      }
+      const cached = this.categoryCache.get(key);
+      if (cached !== undefined) {
+        result[i] = CATEGORY_LABELS[cached] || CATEGORY_LABELS[OTHER_INDEX];
+        continue;
+      }
+      const kw = keywordCategoryIndex(key);
+      if (kw !== null) {
+        result[i] = CATEGORY_LABELS[kw];
+        this.cacheCategory(key, kw);
+        continue;
+      }
+      need.push(i);
+    }
+
+    // 3): qolganlarni arzon model (Haiku) yopiq ro'yxatdan indeks bilan tanlaydi.
+    if (this.claude.isEnabled() && need.length) {
+      const CHUNK = 150;
+      for (let start = 0; start < need.length; start += CHUNK) {
+        const slice = need.slice(start, start + CHUNK);
+        const list = slice
+          .map((idx, k) => `${k}) ${comments[idx]}`)
+          .join('\n');
+        const res = await this.claude.extractJson<{ indexes: number[] }>({
+          system: CATEGORY_SYSTEM,
+          userText: list,
+          schema: CATEGORY_SCHEMA,
+          model: config.AI_CLASSIFY_MODEL,
+          maxTokens: 1500,
         });
+        if (res && Array.isArray(res.indexes)) {
+          slice.forEach((origIdx, k) => {
+            const raw = Math.floor(Number(res.indexes[k]));
+            const ci = raw >= 0 && raw < CATEGORY_LABELS.length ? raw : OTHER_INDEX;
+            result[origIdx] = CATEGORY_LABELS[ci];
+            this.cacheCategory(keys[origIdx], ci);
+          });
+        }
       }
     }
     return result;
   }
 
+  // Izohni kesh/kalit-so'z uchun normallashtiradi (kichik harf, apostrof olib
+  // tashlanadi, bo'sh joylar bir xil) — "Benzin", "benzin ", "benzn" bir kalit.
+  private normComment(s: string): string {
+    return (s || '')
+      .toLowerCase()
+      .replace(/[`ʼʻ'‘’ʹ]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Keshga yozadi; hajmi juda oshsa (turli izohlar ko'p) tozalab yuboradi.
+  private cacheCategory(key: string, idx: number): void {
+    if (this.categoryCache.size >= AiFinanceService.CATEGORY_CACHE_MAX) {
+      this.categoryCache.clear();
+    }
+    this.categoryCache.set(key, idx);
+  }
+
   // Bitta source_type uchun izoh bo'yicha guruhlar (kategoriya ichi tarkibi).
+  // direction: 'expense' (amount<0) yoki 'income' (amount>0). SQL shartlari
+  // KODдан (whitelist) — user inputidan emas (injection yo'q).
   private async commentGroups(
     fromTs: number,
     toTs: number,
     source: string,
     limit = 200,
+    direction: 'expense' | 'income' = 'expense',
   ): Promise<CategoryItem[]> {
+    const amountCond = direction === 'income' ? 'amount > 0' : 'amount < 0';
+    const sumExpr =
+      direction === 'income' ? 'SUM(amount)::bigint' : 'SUM(-1*amount)::bigint';
     const rows: Array<{
       comment: string;
       cnt: string | number;
       total: string | number;
     }> = await this.fbhRepo.query(
       `SELECT COALESCE(NULLIF(TRIM(comment), ''), '(izohsiz)') AS comment,
-              COUNT(*)::int AS cnt, SUM(-1*amount)::bigint AS total
+              COUNT(*)::int AS cnt, ${sumExpr} AS total
        FROM financial_balance_history
-       WHERE source_type::text = $3 AND amount < 0
+       WHERE source_type::text = $3 AND ${amountCond}
          AND created_at >= $1 AND created_at <= $2
        GROUP BY 1 ORDER BY total DESC LIMIT $4`,
       [fromTs, toTs, source, limit],
@@ -1280,4 +1473,17 @@ QOIDALAR:
 // YYYY-MM-DD ekanini yengil tekshirish (aks holda standart oraliqqa tushamiz).
 function fromToValid(s?: string): boolean {
   return !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+// Deterministik kalit-so'z -> kategoriya indeksi. Normallashtirilgan izoh
+// (normComment) beriladi. Aniq (bir ma'noli) kalit topilsa indeks, aks holda
+// null (-> AI hal qiladi). Faqat ishonchli kalitlar — noaniqlik AI'ga qoladi.
+function keywordCategoryIndex(norm: string): number | null {
+  if (!norm) return null;
+  for (const { idx, words } of CATEGORY_KEYWORDS) {
+    for (const w of words) {
+      if (norm.includes(w)) return idx;
+    }
+  }
+  return null;
 }
