@@ -27,11 +27,48 @@ const MAX_CANDIDATE_BUTTONS = 5;
 // Kirill (o'zbek + rus) -> lotin transliteratsiya. Foydalanuvchi kirill yozsa ham
 // DB (lotin) nomlariga mos kelishi uchun. Case-by-case emas — umumiy.
 const CYR_LATIN: Record<string, string> = {
-  а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'j',
-  з: 'z', и: 'i', й: 'y', к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', о: 'o',
-  п: 'p', р: 'r', с: 's', т: 't', у: 'u', ў: 'o', ф: 'f', х: 'x', ҳ: 'h',
-  ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sh', ъ: '', ы: 'i', ь: '', э: 'e', ю: 'yu',
-  я: 'ya', ә: 'a', ө: 'o', ү: 'u', ҷ: 'j', ұ: 'u',
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  ғ: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'yo',
+  ж: 'j',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  қ: 'q',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ў: 'o',
+  ф: 'f',
+  х: 'x',
+  ҳ: 'h',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'sh',
+  ъ: '',
+  ы: 'i',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya',
+  ә: 'a',
+  ө: 'o',
+  ү: 'u',
+  ҷ: 'j',
+  ұ: 'u',
 };
 
 const EXTRACT_SYSTEM = `Sen O'zbekistondagi yetkazib berish platformasining buyurtma yordamchisisan.
@@ -336,7 +373,9 @@ export class AiOrderService {
     let charge: { reason: string; balance: number; price: number } | null =
       null;
     if (!exempt) {
-      charge = await this.aiBalance.chargeForOrder(marketId, { actor: user.id });
+      charge = await this.aiBalance.chargeForOrder(marketId, {
+        actor: user.id,
+      });
       if (charge.reason !== 'ok') {
         return {
           ok: false,
@@ -450,7 +489,11 @@ export class AiOrderService {
       enabled: state.enabled,
       balance: state.balance,
       price: state.price,
-      reason: available ? undefined : !state.enabled ? 'disabled' : 'insufficient',
+      reason: available
+        ? undefined
+        : !state.enabled
+          ? 'disabled'
+          : 'insufficient',
     };
   }
 
@@ -501,6 +544,7 @@ export class AiOrderService {
       system: EXTRACT_SYSTEM,
       userText: text,
       schema: EXTRACT_SCHEMA,
+      meta: { feature: 'order_extract', requestArea: 'order' },
     });
     if (!raw) return null;
     return this.rawToDraft(raw);
@@ -561,6 +605,7 @@ export class AiOrderService {
       userText: text,
       schema: EXTRACT_MULTI_SCHEMA,
       maxTokens: 16000, // ko'p buyurtma (30+) JSON'i kesilib qolmasin
+      meta: { feature: 'order_extract_multi', requestArea: 'order' },
     });
     if (!res || !Array.isArray(res.orders)) return [];
 
@@ -653,7 +698,11 @@ export class AiOrderService {
     is_replacement?: boolean;
     total_price?: number;
     price_confirmed?: boolean;
-    items: { name: string; product_id?: string; candidates?: { id: string }[] }[];
+    items: {
+      name: string;
+      product_id?: string;
+      candidates?: { id: string }[];
+    }[];
   }): string[] {
     const issues: string[] = [];
     if (!p.customer_name) issues.push("mijoz ismi yo'q");
@@ -1026,7 +1075,9 @@ export class AiOrderService {
           district_id: o.district_id,
           comment: o.comment,
           where_deliver:
-            o.where_deliver ?? marketRow?.default_tariff ?? Where_deliver.CENTER,
+            o.where_deliver ??
+            marketRow?.default_tariff ??
+            Where_deliver.CENTER,
           operator: o.operator,
           operator_phone: defaultOperatorPhone,
           replaced_order_id: o.replaced_order_id,
@@ -1259,15 +1310,15 @@ export class AiOrderService {
     districts: DistrictEntity[],
   ): Promise<void> {
     if (!this.claude.isEnabled()) return;
-    const placeText = `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`.trim();
+    const placeText =
+      `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`.trim();
     if (!placeText) return; // umuman joy matni yo'q — tekshiradigan narsa yo'q
 
     // Xavfli (LLM tekshiruvi kerak) qachonki: tuman hal bo'lmagan; YOKI matnda
     // viloyat aytilmagan (region_name yo'q) — deterministik butun-mamlakat fuzzy
     // noto'g'ri viloyatga tushirgan bo'lishi mumkin; YOKI viloyat aytilgan-u DB
     // viloyatiga tushmagan (region_id yo'q) — tuman qidiruvi cheklanmagan.
-    const risky =
-      !draft.district_id || !draft.region_name || !draft.region_id;
+    const risky = !draft.district_id || !draft.region_name || !draft.region_id;
     if (!risky) return; // viloyat ham, tuman ham ishonchli hal bo'lgan — ishonamiz
 
     // 1-urinish: viloyat ISHONCHLI ma'lum bo'lsa (ekstraksiya region_name
@@ -1278,7 +1329,10 @@ export class AiOrderService {
       const regionPool = districts.filter(
         (d) => d.region_id === draft.region_id,
       );
-      if (regionPool.length && (await this.llmPickDistrict(draft, regionPool, placeText))) {
+      if (
+        regionPool.length &&
+        (await this.llmPickDistrict(draft, regionPool, placeText))
+      ) {
         return;
       }
     }
@@ -1350,6 +1404,7 @@ export class AiOrderService {
       schema: DISTRICT_LLM_SCHEMA,
       model: config.AI_CLASSIFY_MODEL,
       maxTokens: 64,
+      meta: { feature: 'order_district', requestArea: 'order' },
     });
     if (!res) return false;
     const k = Math.floor(Number(res.choice));
@@ -1360,7 +1415,9 @@ export class AiOrderService {
     draft.district_resolved_name = d.name;
     draft.region_id = d.region_id;
     draft.region_label = d.region?.name || draft.region_label;
-    draft.district_label = d.region?.name ? `${d.region.name}, ${d.name}` : d.name;
+    draft.district_label = d.region?.name
+      ? `${d.region.name}, ${d.name}`
+      : d.name;
     draft.district_candidates = undefined;
     return true;
   }
@@ -1393,6 +1450,7 @@ export class AiOrderService {
       schema: DISAMBIG_SCHEMA,
       model: config.AI_CLASSIFY_MODEL,
       maxTokens: 512,
+      meta: { feature: 'order_item_match', requestArea: 'order' },
     });
     if (!res || !Array.isArray(res.picks)) return;
 
@@ -1831,7 +1889,8 @@ export class AiOrderService {
     let digits = String(input).replace(/\D/g, '');
     // Davlat kodi (998...) yoki trunk prefiks (0.../8...) — milliy 9 raqamga
     // keltiramiz ("+998 90...", "0 90...", "8 90..." hammasi qabul qilinsin).
-    if (digits.length === 12 && digits.startsWith('998')) digits = digits.slice(3);
+    if (digits.length === 12 && digits.startsWith('998'))
+      digits = digits.slice(3);
     else if (
       digits.length === 10 &&
       (digits.startsWith('0') || digits.startsWith('8'))
@@ -1851,10 +1910,7 @@ export class AiOrderService {
   // "Toshkent shahri" != "Toshkent viloyati" farqini saqlash uchun.
   private lightNorm(s: string): string {
     // translit: kirill->lotin + diakritik + apostrof (universal).
-    return this.translit(s)
-      .replace(/kh/g, 'x')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return this.translit(s).replace(/kh/g, 'x').replace(/\s+/g, ' ').trim();
   }
 
   private normGeo(s: string): string {
@@ -1896,9 +1952,7 @@ export class AiOrderService {
     if (!draft.district_id && !draft.district_candidates?.length)
       missing.push('tuman');
     if (!draft.items.length) missing.push('mahsulot');
-    else if (
-      draft.items.some((i) => !i.product_id && !i.candidates?.length)
-    )
+    else if (draft.items.some((i) => !i.product_id && !i.candidates?.length))
       missing.push('katalogda topilmagan mahsulot');
     if (draft.total_price == null) missing.push('narx');
     return missing;
@@ -1971,7 +2025,12 @@ export class AiOrderService {
               callback_data: `order_ai:pickdistrict:${draft.nonce}:${idx}`,
             },
           ]),
-          [{ text: '❌ Bekor', callback_data: `order_ai:cancel:${draft.nonce}` }],
+          [
+            {
+              text: '❌ Bekor',
+              callback_data: `order_ai:cancel:${draft.nonce}`,
+            },
+          ],
         ],
       },
     };
@@ -1996,7 +2055,12 @@ export class AiOrderService {
               callback_data: `order_ai:pickproduct:${draft.nonce}:${itemIndex}:${idx}`,
             },
           ]),
-          [{ text: '❌ Bekor', callback_data: `order_ai:cancel:${draft.nonce}` }],
+          [
+            {
+              text: '❌ Bekor',
+              callback_data: `order_ai:cancel:${draft.nonce}`,
+            },
+          ],
         ],
       },
     };
@@ -2040,7 +2104,10 @@ export class AiOrderService {
       operator: operator.user.name,
     };
 
-    const res = (await this.orderService.createOrderByBot(dto, operator.jwt)) as {
+    const res = (await this.orderService.createOrderByBot(
+      dto,
+      operator.jwt,
+    )) as {
       statusCode?: number;
       message?: string;
     };
@@ -2057,6 +2124,9 @@ export class AiOrderService {
         message: 'ℹ️ Bu buyurtma allaqachon yaratilgan (dublikat).',
       };
     }
-    return { ok: false, message: `❌ ${res?.message || 'Buyurtma yaratilmadi'}` };
+    return {
+      ok: false,
+      message: `❌ ${res?.message || 'Buyurtma yaratilmadi'}`,
+    };
   }
 }

@@ -49,4 +49,8 @@ export default {
   // Bir AI buyurtma narxi (so'm) — market ai_price_per_order null bo'lsa shu
   // global default ishlatiladi. Har market uchun UI'da alohida belgilanadi.
   AI_PRICE_PER_ORDER: Number(process.env.AI_PRICE_PER_ORDER || 300),
+  // USD -> so'm kursi — AI real xarajatini (Anthropic hisobi USD'да) so'mga
+  // aylantirish uchun (ai_usage_log + AI dashboard). Kurs o'zgarsa .env'дан
+  // yangilanadi; eski yozuvlar o'z kursini saqlaydi (audit uchun qatorда yoziladi).
+  AI_USD_UZS_RATE: Number(process.env.AI_USD_UZS_RATE || 12800),
 };

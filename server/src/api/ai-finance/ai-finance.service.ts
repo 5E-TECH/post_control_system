@@ -112,18 +112,100 @@ const OTHER_INDEX = CATEGORY_LABELS.length - 1; // "Boshqa"
 // so'z yo'q); topilmasa null -> AI (Haiku) yopiq taksonomiya bilan hal qiladi.
 // Tartib muhim: birinchi mos kelgan g'olib.
 const CATEGORY_KEYWORDS: Array<{ idx: number; words: string[] }> = [
-  { idx: 2, words: ['benzin', 'benzn', 'dizel', 'solyar', 'metan', 'propan', 'ai-92', 'ai-95', 'ai92', 'ai95', 'yoqilg', 'zapravka', 'gaz ball'] },
+  {
+    idx: 2,
+    words: [
+      'benzin',
+      'benzn',
+      'dizel',
+      'solyar',
+      'metan',
+      'propan',
+      'ai-92',
+      'ai-95',
+      'ai92',
+      'ai95',
+      'yoqilg',
+      'zapravka',
+      'gaz ball',
+    ],
+  },
   { idx: 3, words: ['ijara', 'ijra', 'arenda'] },
-  { idx: 5, words: ['internet', 'aloqa', 'uzmobile', 'beeline', 'ucell', 'mobiuz', 'simkarta', 'tarif puli'] },
-  { idx: 8, words: ['reklama', 'marketing', 'target', 'smm', 'banner', 'listovka', 'bloger', 'instagram reklama'] },
+  {
+    idx: 5,
+    words: [
+      'internet',
+      'aloqa',
+      'uzmobile',
+      'beeline',
+      'ucell',
+      'mobiuz',
+      'simkarta',
+      'tarif puli',
+    ],
+  },
+  {
+    idx: 8,
+    words: [
+      'reklama',
+      'marketing',
+      'target',
+      'smm',
+      'banner',
+      'listovka',
+      'bloger',
+      'instagram reklama',
+    ],
+  },
   { idx: 9, words: ['soliq', 'nalog', 'patent'] },
-  { idx: 10, words: ['komissiya', 'komissya', 'ekvayring', 'terminal haqi', 'bank xizmat'] },
+  {
+    idx: 10,
+    words: [
+      'komissiya',
+      'komissya',
+      'ekvayring',
+      'terminal haqi',
+      'bank xizmat',
+    ],
+  },
   { idx: 12, words: ['tozalash', 'uborka', 'farrosh', 'tozalik'] },
-  { idx: 13, words: ['ombor', 'qadoq', 'upakovka', 'skotch', 'karobka', 'korobka', 'paket', 'sklad'] },
-  { idx: 6, words: ['kanstavar', 'kanstovar', 'kanselyar', 'ruchka', 'daftar', 'papka'] },
-  { idx: 1, words: ['taksi', 'yol kira', 'yolkira', 'yo l kira', 'avtobus', 'dostavka'] },
-  { idx: 0, words: ['ovqat', 'ovkat', 'tushlik', 'nonushta', 'tamaddi', 'choyxona', 'restoran'] },
-  { idx: 7, words: ["ta'mir", 'tamir', 'remont', 'usta ', 'zapchast', 'ehtiyot qism'] },
+  {
+    idx: 13,
+    words: [
+      'ombor',
+      'qadoq',
+      'upakovka',
+      'skotch',
+      'karobka',
+      'korobka',
+      'paket',
+      'sklad',
+    ],
+  },
+  {
+    idx: 6,
+    words: ['kanstavar', 'kanstovar', 'kanselyar', 'ruchka', 'daftar', 'papka'],
+  },
+  {
+    idx: 1,
+    words: ['taksi', 'yol kira', 'yolkira', 'yo l kira', 'avtobus', 'dostavka'],
+  },
+  {
+    idx: 0,
+    words: [
+      'ovqat',
+      'ovkat',
+      'tushlik',
+      'nonushta',
+      'tamaddi',
+      'choyxona',
+      'restoran',
+    ],
+  },
+  {
+    idx: 7,
+    words: ["ta'mir", 'tamir', 'remont', 'usta ', 'zapchast', 'ehtiyot qism'],
+  },
 ];
 
 // AI kategoriya klasterlash sxemasi — model har izoh uchun yopiq ro'yxatdan
@@ -304,7 +386,7 @@ const ASK_TOOLS: Anthropic.Tool[] = [
   {
     name: 'get_cash_position',
     description:
-      "HOZIRGI naqd holat: kassa (naqd+karta), kuryerlar jami, marketlar jami, sof pozitsiya. Parametrsiz.",
+      'HOZIRGI naqd holat: kassa (naqd+karta), kuryerlar jami, marketlar jami, sof pozitsiya. Parametrsiz.',
     input_schema: { type: 'object', properties: {} },
   },
   {
@@ -439,14 +521,14 @@ export class AiFinanceService implements OnApplicationBootstrap {
     const fromTs = toUzbekistanTimestamp(from, false);
     const toTs = toUzbekistanTimestamp(to, true);
 
-      // 1) Vaqt-bucketli seriya (Tashkent) + source_type breakdown.
-      //    $3 = format satri (KODdan, whitelistdan — user inputidan emas).
-      const rows: Array<{
-        bucket: string;
-        source_type: string;
-        total: string | number;
-      }> = await this.fbhRepo.query(
-        `SELECT TO_CHAR(TO_TIMESTAMP(created_at/1000) AT TIME ZONE 'Asia/Tashkent', $3) AS bucket,
+    // 1) Vaqt-bucketli seriya (Tashkent) + source_type breakdown.
+    //    $3 = format satri (KODdan, whitelistdan — user inputidan emas).
+    const rows: Array<{
+      bucket: string;
+      source_type: string;
+      total: string | number;
+    }> = await this.fbhRepo.query(
+      `SELECT TO_CHAR(TO_TIMESTAMP(created_at/1000) AT TIME ZONE 'Asia/Tashkent', $3) AS bucket,
                 source_type,
                 SUM(CASE WHEN amount < 0 THEN (-1*amount) ELSE 0 END)::bigint AS total
          FROM financial_balance_history
@@ -455,104 +537,104 @@ export class AiFinanceService implements OnApplicationBootstrap {
            AND created_at >= $1 AND created_at <= $2
          GROUP BY bucket, source_type
          ORDER BY bucket`,
-        [fromTs, toTs, PERIOD_FMT[p]],
-      );
+      [fromTs, toTs, PERIOD_FMT[p]],
+    );
 
-      const bucketsMap = new Map<string, Bucket>();
-      const totalsBySource: Record<string, number> = {
-        salary: 0,
-        bills: 0,
-        manual_expense: 0,
+    const bucketsMap = new Map<string, Bucket>();
+    const totalsBySource: Record<string, number> = {
+      salary: 0,
+      bills: 0,
+      manual_expense: 0,
+    };
+    for (const r of rows) {
+      const total = Number(r.total) || 0;
+      const b: Bucket = bucketsMap.get(r.bucket) ?? {
+        label: r.bucket,
+        total: 0,
+        bySource: { salary: 0, bills: 0, manual_expense: 0 },
       };
-      for (const r of rows) {
-        const total = Number(r.total) || 0;
-        const b: Bucket = bucketsMap.get(r.bucket) ?? {
-          label: r.bucket,
-          total: 0,
-          bySource: { salary: 0, bills: 0, manual_expense: 0 },
-        };
-        b.bySource[r.source_type] = (b.bySource[r.source_type] || 0) + total;
-        b.total += total;
-        bucketsMap.set(r.bucket, b);
-        totalsBySource[r.source_type] =
-          (totalsBySource[r.source_type] || 0) + total;
-      }
-      const series = [...bucketsMap.values()].sort((a, b) =>
-        a.label.localeCompare(b.label),
-      );
-      const grandTotal = series.reduce((s, b) => s + b.total, 0);
+      b.bySource[r.source_type] = (b.bySource[r.source_type] || 0) + total;
+      b.total += total;
+      bucketsMap.set(r.bucket, b);
+      totalsBySource[r.source_type] =
+        (totalsBySource[r.source_type] || 0) + total;
+    }
+    const series = [...bucketsMap.values()].sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+    const grandTotal = series.reduce((s, b) => s + b.total, 0);
 
-      // 2) Peaks — qaysi davr eng yuqori/past (KOD hisoblaydi).
-      let peaks: {
-        highest: { label: string; total: number } | null;
-        lowest: { label: string; total: number } | null;
-      } = { highest: null, lowest: null };
-      if (series.length) {
-        const sorted = [...series].sort((a, b) => b.total - a.total);
-        const hi = sorted[0];
-        const lo = sorted[sorted.length - 1];
-        peaks = {
-          highest: { label: hi.label, total: hi.total },
-          lowest: { label: lo.label, total: lo.total },
-        };
-      }
+    // 2) Peaks — qaysi davr eng yuqori/past (KOD hisoblaydi).
+    let peaks: {
+      highest: { label: string; total: number } | null;
+      lowest: { label: string; total: number } | null;
+    } = { highest: null, lowest: null };
+    if (series.length) {
+      const sorted = [...series].sort((a, b) => b.total - a.total);
+      const hi = sorted[0];
+      const lo = sorted[sorted.length - 1];
+      peaks = {
+        highest: { label: hi.label, total: hi.total },
+        lowest: { label: lo.label, total: lo.total },
+      };
+    }
 
-      // 3) Kategoriya taqsimoti (salary/bills tayyor; manual_expense AI-klaster).
-      const byCategory = await this.buildCategories(fromTs, toTs, totalsBySource);
+    // 3) Kategoriya taqsimoti (salary/bills tayyor; manual_expense AI-klaster).
+    const byCategory = await this.buildCategories(fromTs, toTs, totalsBySource);
 
-      // 4) Eng katta 10 xarajat.
-      const topRows: Array<{
-        created_at: string | number;
-        source_type: string;
-        amount: string | number;
-        comment: string | null;
-      }> = await this.fbhRepo.query(
-        `SELECT created_at, source_type, (-1*amount)::bigint AS amount, comment
+    // 4) Eng katta 10 xarajat.
+    const topRows: Array<{
+      created_at: string | number;
+      source_type: string;
+      amount: string | number;
+      comment: string | null;
+    }> = await this.fbhRepo.query(
+      `SELECT created_at, source_type, (-1*amount)::bigint AS amount, comment
          FROM financial_balance_history
          WHERE source_type IN ('salary','bills','manual_expense')
            AND amount < 0 AND created_at >= $1 AND created_at <= $2
          ORDER BY amount ASC
          LIMIT 10`,
-        [fromTs, toTs],
-      );
-      const topExpenses = topRows.map((t) => ({
-        date: this.toYmd(Number(t.created_at)),
-        source_type: t.source_type,
-        source_label: SOURCE_LABEL[t.source_type] || t.source_type,
-        amount: Number(t.amount) || 0,
-        comment: t.comment || null,
-      }));
+      [fromTs, toTs],
+    );
+    const topExpenses = topRows.map((t) => ({
+      date: this.toYmd(Number(t.created_at)),
+      source_type: t.source_type,
+      source_label: SOURCE_LABEL[t.source_type] || t.source_type,
+      amount: Number(t.amount) || 0,
+      comment: t.comment || null,
+    }));
 
-      // 5) AI narrativ (raqamlar KODdan; Claude faqat izohlaydi). Bo'sh davrда
-      //    (xarajat yo'q) LLM behuda chaqirilmaydi.
-      const narrative =
-        grandTotal > 0
-          ? await this.buildNarrative({
-              p,
-              from,
-              to,
-              series,
-              totalsBySource,
-              grandTotal,
-              peaks,
-              byCategory,
-            })
-          : null;
+    // 5) AI narrativ (raqamlar KODdan; Claude faqat izohlaydi). Bo'sh davrда
+    //    (xarajat yo'q) LLM behuda chaqirilmaydi.
+    const narrative =
+      grandTotal > 0
+        ? await this.buildNarrative({
+            p,
+            from,
+            to,
+            series,
+            totalsBySource,
+            grandTotal,
+            peaks,
+            byCategory,
+          })
+        : null;
 
-      return {
-        period: p,
-        from,
-        to,
-        currency: 'UZS',
-        totals: { total: grandTotal, bySource: totalsBySource },
-        sourceLabels: SOURCE_LABEL,
-        series,
-        peaks,
-        byCategory,
-        topExpenses,
-        narrative,
-        aiEnabled: this.claude.isEnabled(),
-      };
+    return {
+      period: p,
+      from,
+      to,
+      currency: 'UZS',
+      totals: { total: grandTotal, bySource: totalsBySource },
+      sourceLabels: SOURCE_LABEL,
+      series,
+      peaks,
+      byCategory,
+      topExpenses,
+      narrative,
+      aiEnabled: this.claude.isEnabled(),
+    };
   }
 
   // ─── Snapshot: oldindan hisoblangan hisobot (AI'siz ko'rish uchun) ───
@@ -682,6 +764,12 @@ export class AiFinanceService implements OnApplicationBootstrap {
         runTool: (name, input) => this.runFinanceTool(name, input),
         maxTokens: 3000,
         maxSteps: 8,
+        meta: {
+          feature: 'finance_chat',
+          requestArea: 'finance',
+          userId: userId ?? null,
+          conversationId: conversationId ?? null,
+        },
       });
 
       if (!res) {
@@ -733,7 +821,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
       }
       if (!file || !file.buffer) {
         return successRes({
-          answer: "Fayl topilmadi. Rasm yoki Excel (.xlsx) yuklang.",
+          answer: 'Fayl topilmadi. Rasm yoki Excel (.xlsx) yuklang.',
           toolsUsed: [],
           aiEnabled: true,
         });
@@ -795,7 +883,10 @@ export class AiFinanceService implements OnApplicationBootstrap {
       ) {
         const txt = file.buffer.toString('utf8').slice(0, 50000);
         content = [
-          { type: 'text', text: `${baseText}\n\nQuyida fayl mazmuni:\n\n${txt}` },
+          {
+            type: 'text',
+            text: `${baseText}\n\nQuyida fayl mazmuni:\n\n${txt}`,
+          },
         ];
       } else {
         return successRes({
@@ -813,6 +904,12 @@ export class AiFinanceService implements OnApplicationBootstrap {
         runTool: (name, input) => this.runFinanceTool(name, input),
         maxTokens: 3500,
         maxSteps: 8,
+        meta: {
+          feature: 'finance_file',
+          requestArea: 'finance',
+          userId: userId ?? null,
+          conversationId: conversationId ?? null,
+        },
       });
       if (!res) {
         return successRes({
@@ -872,10 +969,11 @@ export class AiFinanceService implements OnApplicationBootstrap {
           let v: unknown = cell.value;
           if (v && typeof v === 'object') {
             const o = v as Record<string, unknown>;
-            if ('result' in o) v = o.result; // formula -> qiymat
-            else if ('text' in o) v = o.text; // rich text
-            else if (v instanceof Date)
-              v = (v as Date).toISOString().slice(0, 10);
+            if ('result' in o)
+              v = o.result; // formula -> qiymat
+            else if ('text' in o)
+              v = o.text; // rich text
+            else if (v instanceof Date) v = v.toISOString().slice(0, 10);
             else v = JSON.stringify(v);
           }
           vals.push(v == null ? '' : String(v));
@@ -911,7 +1009,11 @@ export class AiFinanceService implements OnApplicationBootstrap {
         if (c) return c.id;
       }
       // Yangi suhbat — mazmunga qarab AI mazmunli sarlavha beradi.
-      const title = await this.generateTitle(firstQuestion, firstAnswer);
+      const title = await this.generateTitle(
+        firstQuestion,
+        firstAnswer,
+        userId,
+      );
       const created = await this.convRepo.save(
         this.convRepo.create({ user_id: userId, title }),
       );
@@ -930,6 +1032,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
   private async generateTitle(
     question: string,
     answer?: string,
+    userId?: string,
   ): Promise<string> {
     const fallback =
       (question || 'Yangi suhbat').replace(/\s+/g, ' ').trim().slice(0, 60) ||
@@ -942,6 +1045,11 @@ export class AiFinanceService implements OnApplicationBootstrap {
         userText: ctx,
         model: config.AI_CLASSIFY_MODEL,
         maxTokens: 32,
+        meta: {
+          feature: 'finance_title',
+          requestArea: 'finance',
+          userId: userId ?? null,
+        },
       });
       if (!t) return fallback;
       const clean = t
@@ -1071,10 +1179,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
   }
 
   // Asboblarni haqiqiy kanonik servislarga bog'laydi (raqamlar shu yerdan).
-  private async runFinanceTool(
-    name: string,
-    input: unknown,
-  ): Promise<unknown> {
+  private async runFinanceTool(name: string, input: unknown): Promise<unknown> {
     const inp = (input || {}) as {
       period?: string;
       fromDate?: string;
@@ -1108,7 +1213,10 @@ export class AiFinanceService implements OnApplicationBootstrap {
           .filter((x) =>
             ['salary', 'bills', 'manual_expense'].includes(x.source_type),
           )
-          .reduce((s: number, x) => s + Math.abs(Number(x.total_amount) || 0), 0);
+          .reduce(
+            (s: number, x) => s + Math.abs(Number(x.total_amount) || 0),
+            0,
+          );
         return {
           grossProfit: gross,
           totalOpEx: opex,
@@ -1199,9 +1307,7 @@ export class AiFinanceService implements OnApplicationBootstrap {
       }
       case 'get_shifts': {
         const raw = (input || {}) as { limit?: number };
-        return this.cashBoxService.getRecentShiftsForAi(
-          Number(raw.limit) || 6,
-        );
+        return this.cashBoxService.getRecentShiftsForAi(Number(raw.limit) || 6);
       }
       case 'get_shift_transactions': {
         const raw = (input || {}) as { shift?: string };
@@ -1362,20 +1468,20 @@ export class AiFinanceService implements OnApplicationBootstrap {
       const CHUNK = 150;
       for (let start = 0; start < need.length; start += CHUNK) {
         const slice = need.slice(start, start + CHUNK);
-        const list = slice
-          .map((idx, k) => `${k}) ${comments[idx]}`)
-          .join('\n');
+        const list = slice.map((idx, k) => `${k}) ${comments[idx]}`).join('\n');
         const res = await this.claude.extractJson<{ indexes: number[] }>({
           system: CATEGORY_SYSTEM,
           userText: list,
           schema: CATEGORY_SCHEMA,
           model: config.AI_CLASSIFY_MODEL,
           maxTokens: 1500,
+          meta: { feature: 'finance_category', requestArea: 'finance' },
         });
         if (res && Array.isArray(res.indexes)) {
           slice.forEach((origIdx, k) => {
             const raw = Math.floor(Number(res.indexes[k]));
-            const ci = raw >= 0 && raw < CATEGORY_LABELS.length ? raw : OTHER_INDEX;
+            const ci =
+              raw >= 0 && raw < CATEGORY_LABELS.length ? raw : OTHER_INDEX;
             result[origIdx] = CATEGORY_LABELS[ci];
             this.cacheCategory(keys[origIdx], ci);
           });
@@ -1502,6 +1608,7 @@ QOIDALAR:
       system,
       userText: JSON.stringify(ctx),
       maxTokens: 900,
+      meta: { feature: 'finance_report', requestArea: 'finance' },
     });
   }
 
