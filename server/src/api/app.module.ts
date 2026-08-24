@@ -27,6 +27,7 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
 import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
 import { InvestorModule } from './investor/investor.module';
 import { AiFinanceModule } from './ai-finance/ai-finance.module';
+import { AiUsageModule } from './ai-usage/ai-usage.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { AiFinanceModule } from './ai-finance/ai-finance.module';
     LdgCargoModule,
     InvestorModule,
     AiFinanceModule,
+    AiUsageModule,
   ],
   providers: [OrderGateaway],
 })

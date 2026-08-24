@@ -1,16 +1,21 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiUsageLogEntity } from 'src/core/entity/ai-usage-log.entity';
+import { OrderEntity } from 'src/core/entity/order.entity';
 import { AiUsageService } from './ai-usage.service';
+import { AiUsageController } from './ai-usage.controller';
 import { MyLogger } from 'src/logger/logger.service';
 
 /**
- * AI real xarajat jurnali (ai_usage_log). ClaudeService har chaqiruvda token
- * usage'ini AiUsageService.record() orqali shu jadvalga yozadi. AI ishlatadigan
- * modullar (order-bot, ai-finance) shu moduldan AiUsageService'ni oladi.
+ * AI real xarajat jurnali (ai_usage_log) + AI dashboard.
+ * - ClaudeService har chaqiruvda token usage'ini AiUsageService.record() orqali
+ *   shu jadvalga yozadi (order-bot, ai-finance modullari import qiladi).
+ * - AiUsageController (superadmin/admin) dashboard agregatlarini beradi;
+ *   AI buyurtma sanashi uchun OrderEntity repo ham kerak.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([AiUsageLogEntity])],
+  imports: [TypeOrmModule.forFeature([AiUsageLogEntity, OrderEntity])],
+  controllers: [AiUsageController],
   providers: [AiUsageService, MyLogger],
   exports: [AiUsageService],
 })
