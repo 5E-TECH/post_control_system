@@ -242,7 +242,7 @@ KATEGORIYALAR:
 0) Ovqat — ovqat, tushlik, nonushta, choyxona, restoran, mehmon uchun taom
 1) Transport — taksi, yo'l kira, avtobus, yetkazish/dostavka haqi
 2) Yoqilg'i — benzin, dizel, gaz(balon), metan, propan, AI-92/95, zapravka
-3) Ijara — ofis/do'kon/ombor ijarasi, arenda
+3) Ijara — IJARA to'lovi (arenda): ofis, ombor yoki do'kon IJARASI. FAQAT "ijara"/"arenda" to'lovi — do'kondan XARID bu yerga EMAS
 4) Kommunal — svet/elektr, suv puli, gaz puli, issiqlik, kommunal to'lov
 5) Aloqa/Internet — internet, mobil aloqa, telefon, tarif, simkarta
 6) Kanstovar — ruchka, qog'oz, daftar, papka, kanselyariya buyumlari
@@ -258,6 +258,7 @@ KATEGORIYALAR:
 QOIDALAR:
 - IMLO XATO / sinonim / qisqartma / kirill-lotin farqini tushun: "benzn"->2, "ijra"->3, "kanselyariya"->6.
 - Bir xil ma'noli turli yozuvlarni AYNAN bitta raqamga biriktir.
+- "do'kon"/"magazin"/"market" O'ZI kategoriya EMAS — bu xarid JOYI, u yerga NIMA olingani noma'lum. Faqat "ijara"/"arenda" so'zi bo'lsagina Ijara (3). Mazmuni ko'rinmasa (masalan yolg'iz "do'kon") -> 14 (Boshqa), Ijaraga TORTMA.
 - Aniq bir kategoriyaga tushmasa yoki izoh tushunarsiz/bo'sh bo'lsa -> 14 (Boshqa). "Boshqa"ni kam ishlat — imkoni bo'lsa mazmunli kategoriyaga joyla.
 - CHIQISH: "indexes" massivi — indexes[i] i-tartibli izohning kategoriya RAQAMI. Massiv uzunligi izohlar soniga TENG va tartibi AYNAN bir xil bo'lsin. Faqat 0..14 oralig'idagi butun sonlar.`;
 
