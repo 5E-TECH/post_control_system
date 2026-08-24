@@ -12,6 +12,7 @@ import {
   Settings,
   Repeat,
   Megaphone,
+  Sparkles,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -39,6 +40,7 @@ const AdminSidebar = () => {
     { to: "/all-users", icon: <UserRound />, label: t("users") },
     { to: "/payments", icon: <CreditCard />, label: t("payments") },
     { to: "/m-balance", icon: <Scale />, label: t("balance") },
+    { to: "/ai-dashboard", icon: <Sparkles />, label: t("ai_dashboard") },
     { to: "/regions", icon: <MapPinned />, label: t("region") },
     { to: "/send-message", icon: <Megaphone />, label: "Bildirishnomalar" },
     { to: "/settings", icon: <Settings />, label: t("settings") },

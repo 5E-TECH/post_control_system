@@ -131,6 +131,7 @@ const CourierOldMails = lazy(
   () => import("../pages/mails/components/courier/old-mails")
 );
 const FinancialHistory = lazy(() => import("../pages/payments/pages/financial-history"));
+const AiDashboard = lazy(() => import("../pages/ai-dashboard"));
 const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
 const Integrations = lazy(
   () => import("../pages/integrations/IntegrationsRoot"),
@@ -344,6 +345,14 @@ const AppRouters = () => {
               element: (
                 <RequireRole roles={["superadmin", "admin"]}>
                   <FinancialHistory />
+                </RequireRole>
+              ),
+            },
+            {
+              path: "ai-dashboard",
+              element: (
+                <RequireRole roles={["superadmin", "admin"]}>
+                  <AiDashboard />
                 </RequireRole>
               ),
             },
