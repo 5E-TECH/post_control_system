@@ -195,11 +195,18 @@ const CATEGORY_KEYWORDS: Array<{ idx: number; words: string[] }> = [
     words: [
       'ovqat',
       'ovkat',
+      'ovqatlanish',
       'tushlik',
+      'obed',
       'nonushta',
       'tamaddi',
+      'choy',
       'choyxona',
+      'kofe',
+      'qahva',
+      'kafe',
       'restoran',
+      'restaran',
     ],
   },
   {
