@@ -215,9 +215,15 @@ const CATEGORY_SCHEMA: Record<string, unknown> = {
   additionalProperties: false,
   properties: {
     // indexes[i] = i-izohning kategoriya indeksi (0..OTHER_INDEX).
+    // MUHIM: structured output (json_schema) integer'da minimum/maximum'ni
+    // QO'LLAB-QUVVATLAMAYDI (API 400 beradi) — diapazon description'da va
+    // system promptda beriladi, chegaradan tashqari qiymatni KOD clamp qiladi.
     indexes: {
       type: 'array',
-      items: { type: 'integer', minimum: 0, maximum: OTHER_INDEX },
+      items: {
+        type: 'integer',
+        description: `Kategoriya indeksi (0 dan ${OTHER_INDEX} gacha; noaniq bo'lsa ${OTHER_INDEX} = Boshqa).`,
+      },
     },
   },
   required: ['indexes'],
