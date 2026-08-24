@@ -168,7 +168,7 @@ const AiDashboard: React.FC = () => {
   const maxFeatureCost = Math.max(1, ...byFeature.map((f) => f.costUzs));
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 text-gray-800 dark:text-[#E7E3FCE5]">
+    <div className="space-y-5 text-gray-800 dark:text-[#E7E3FCE5]">
       {/* Sarlavha + oraliq */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
