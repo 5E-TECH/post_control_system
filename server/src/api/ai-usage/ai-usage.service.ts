@@ -4,10 +4,10 @@ import { Repository } from 'typeorm';
 import { AiUsageLogEntity } from 'src/core/entity/ai-usage-log.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { MyLogger } from 'src/logger/logger.service';
+import { UzsRateService } from './uzs-rate.service';
 import { successRes, catchError } from 'src/infrastructure/lib/response';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
 import { OrderCreatedSource } from 'src/common/enums';
-import config from 'src/config';
 
 /**
  * Bitta model uchun narx (USD / 1M token). cacheWrite = in*1.25, cacheRead = in*0.1
@@ -65,6 +65,7 @@ export class AiUsageService {
     @InjectRepository(OrderEntity)
     private readonly orderRepo: Repository<OrderEntity>,
     private readonly logger: MyLogger,
+    private readonly uzsRate: UzsRateService,
   ) {}
 
   /**
@@ -109,7 +110,8 @@ export class AiUsageService {
   }
 
   private async persist(input: AiUsageRecordInput): Promise<void> {
-    const rate = Number(config.AI_USD_UZS_RATE) || 0;
+    // Amaldagi CBU kursi (kunlik kesh); CBU ishlamasa env/default fallback.
+    const rate = await this.uzsRate.getRate();
     const costUsd = AiUsageService.computeCostUsd(input);
     const costUzs = Math.round(costUsd * rate);
 
@@ -371,7 +373,7 @@ export class AiUsageService {
       return successRes({
         from,
         to,
-        usdUzsRate: Number(config.AI_USD_UZS_RATE) || 0,
+        usdUzsRate: await this.uzsRate.getRate(),
         summary: {
           totalCostUsd,
           totalCostUzs,

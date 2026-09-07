@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiUsageLogEntity } from 'src/core/entity/ai-usage-log.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { AiUsageService } from './ai-usage.service';
+import { UzsRateService } from './uzs-rate.service';
 import { AiUsageController } from './ai-usage.controller';
 import { MyLogger } from 'src/logger/logger.service';
 
@@ -16,7 +17,7 @@ import { MyLogger } from 'src/logger/logger.service';
 @Module({
   imports: [TypeOrmModule.forFeature([AiUsageLogEntity, OrderEntity])],
   controllers: [AiUsageController],
-  providers: [AiUsageService, MyLogger],
+  providers: [AiUsageService, UzsRateService, MyLogger],
   exports: [AiUsageService],
 })
 export class AiUsageModule {}
