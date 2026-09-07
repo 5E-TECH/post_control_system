@@ -35,6 +35,12 @@ export default {
   // qo'llanadi; thinking default o'chiq (tez, arzon ekstraksiya). Har buyurtma AI
   // xarajati ~185 so'm (sen 300 olasan) — foyda saqlanadi.
   AI_ORDER_MODEL: String(process.env.AI_ORDER_MODEL || 'claude-opus-4-8'),
+  // Rasm orqali buyurtma (vision) ekstraksiya modeli — rasmдаги matnни o'qib
+  // buyurtма ma'lumotini ajratadi. Aniqlik/narx muvozanati uchun Sonnet 4.6.
+  // Vision qo'llaydigan model bo'lishi SHART (Opus/Sonnet; Haiku ham vision).
+  AI_ORDER_VISION_MODEL: String(
+    process.env.AI_ORDER_VISION_MODEL || 'claude-sonnet-4-6',
+  ),
   // Moliyaviy AI (xarajat hisoboti, savol-javob, insight) modeli — sifat uchun
   // Opus 4.8. Faqat superadmin/admin ishlatadi (ichki asbob, charj yo'q).
   AI_FINANCE_MODEL: String(process.env.AI_FINANCE_MODEL || 'claude-opus-4-8'),

@@ -7,7 +7,10 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderService } from 'src/api/order/order.service';
-import { ClaudeService } from 'src/infrastructure/ai/claude.service';
+import {
+  ClaudeService,
+  ClaudeImageInput,
+} from 'src/infrastructure/ai/claude.service';
 import { AiBalanceService } from 'src/api/ai-balance/ai-balance.service';
 import { MyLogger } from 'src/logger/logger.service';
 import {
@@ -180,6 +183,15 @@ const EXTRACT_MULTI_SCHEMA: Record<string, unknown> = {
 const EXTRACT_MULTI_SYSTEM = `${EXTRACT_SYSTEM}
 
 DIQQAT: Matnda BIR NECHTA buyurtma bo'lishi mumkin (har xil mijozlar / alohida buyurtmalar). Har bir ALOHIDA buyurtmani "orders" massivida alohida element qilib qaytar. Agar matnda bitta buyurtma bo'lsa — massivda bitta element bo'ladi. Buyurtmalar bo'sh qatorlar, raqamlash (1., 2., -) yoki har xil mijoz nomi/telefoni bilan ajralishi mumkin. Bitta mijozning bir nechta mahsulotini AJRATMA — u bitta buyurtma.`;
+
+// Rasm (vision) orqali ko'p-buyurtma ekstraksiya. Matnли versiyaga rasmни
+// o'qish yo'riqnomasi qo'shiladi. Sxema BIR XIL (RawExtraction).
+const EXTRACT_MULTI_VISION_SYSTEM = `${EXTRACT_MULTI_SYSTEM}
+
+MANBA — RASM: Ma'lumot foydalanuvchi yuborgan RASM(lar) ichida (buyurtma varag'i, qo'lyozma, skrinshot yoki chek bo'lishi mumkin). Rasmдаги matnни diqqat bilan o'qib, mijoz ismi, telefon(lar), manzil/tuman, mahsulot(lar) va narxni ajrat.
+- Telefon raqamlarини xato o'qimaslikка e'tibor ber (raqamlar aniq bo'lsin).
+- Rasm noaniq/o'qib bo'lmaydigan joyni TO'QIMA — o'sha maydonni bo'sh qoldir (operator to'ldiradi).
+- Rasmда buyurtма bo'lmasa (tasodifiy rasm) — bo'sh "orders": [] qaytar.`;
 
 // ─── LLM-disambiguation: fuzzy string-moslik noaniq qolgan mahsulotlarni
 //     Claude SEMANTIK tushunish bilan tanlaydi ("krem" -> "Yuz kremi").
@@ -599,13 +611,22 @@ export class AiOrderService {
     text: string,
     marketId: string,
     defaultTariff?: Where_deliver,
+    images?: ClaudeImageInput[],
   ): Promise<OrderPreview[]> {
+    // Rasm(lar) berilsa vision model bilan (Sonnet) — rasmдаги matn o'qiladi.
+    // Faqat matn bo'lsa odatдаги Opus ekstraksiya modeli.
+    const hasImages = !!images?.length;
     const res = await this.claude.extractJson<{ orders: RawExtraction[] }>({
-      system: EXTRACT_MULTI_SYSTEM,
-      userText: text,
+      system: hasImages ? EXTRACT_MULTI_VISION_SYSTEM : EXTRACT_MULTI_SYSTEM,
+      userText: hasImages && !text ? '(rasm ichidagi ma\'lumotdan o\'qing)' : text,
       schema: EXTRACT_MULTI_SCHEMA,
       maxTokens: 16000, // ko'p buyurtma (30+) JSON'i kesilib qolmasin
-      meta: { feature: 'order_extract_multi', requestArea: 'order' },
+      model: hasImages ? config.AI_ORDER_VISION_MODEL : undefined,
+      images,
+      meta: {
+        feature: hasImages ? 'order_extract_image' : 'order_extract_multi',
+        requestArea: 'order',
+      },
     });
     if (!res || !Array.isArray(res.orders)) return [];
 
@@ -873,6 +894,7 @@ export class AiOrderService {
     text: string,
     user: JwtPayload,
     bodyMarketId?: string,
+    images?: ClaudeImageInput[],
   ): Promise<{
     ok: boolean;
     reason?: string;
@@ -936,6 +958,7 @@ export class AiOrderService {
       text,
       marketId,
       marketRow?.default_tariff,
+      images,
     );
     if (!orders.length) {
       // AI o'qiy olmadi (bizning xatomiz) — qayta-tahlil uchun yechilgan pulni

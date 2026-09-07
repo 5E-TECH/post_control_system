@@ -17,6 +17,16 @@ export interface ClaudeUsageMeta {
 }
 
 /**
+ * extractJson uchun rasm kirishi (vision). Claude rasmдаги matnни o'qib
+ * (masalan buyurtма varag'i / skrinshot) ma'lumot ajratadi. base64 kodlangan
+ * bo'lishi kerak; mediaType Anthropic qo'llagan turlardan biri.
+ */
+export interface ClaudeImageInput {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+  dataBase64: string;
+}
+
+/**
  * Claude (Anthropic) uchun yupqa wrapper.
  *
  * - ANTHROPIC_API_KEY bo'lmasa AI o'chiq hisoblanadi (isEnabled()=false);
@@ -84,22 +94,38 @@ export class ClaudeService {
     model?: string;
     maxTokens?: number;
     meta?: ClaudeUsageMeta;
+    // Vision: rasm(lar) berilsa, Claude ularдаги matnни o'qib ma'lumot ajratadi.
+    images?: ClaudeImageInput[];
   }): Promise<T | null> {
     if (!this.client) return null;
 
     const model = opts.model || config.AI_ORDER_MODEL || 'claude-haiku-4-5';
     try {
+      // Foydalanuvchi bloki: rasm(lar) + matn. Matn DATA sifatida (instruksiya
+      // emas — prompt-injection himoyasi). Rasm bo'lmasa oddiy matn (backward
+      // compat). Rasm modeli vision qo'llashi kerak (chaqiruvchi model beradi).
+      const textBlockContent = `<user_message>\n${opts.userText}\n</user_message>`;
+      const content: Anthropic.ContentBlockParam[] | string = opts.images?.length
+        ? [
+            ...opts.images.map(
+              (img): Anthropic.ImageBlockParam => ({
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: img.mediaType,
+                  data: img.dataBase64,
+                },
+              }),
+            ),
+            { type: 'text', text: textBlockContent },
+          ]
+        : textBlockContent;
+
       const response = await this.client.messages.create({
         model,
         max_tokens: opts.maxTokens ?? 1024,
         system: opts.system,
-        // Manzil/mijoz matni DATA sifatida — instruksiya emas (prompt-injection):
-        messages: [
-          {
-            role: 'user',
-            content: `<user_message>\n${opts.userText}\n</user_message>`,
-          },
-        ],
+        messages: [{ role: 'user', content }],
         output_config: {
           format: { type: 'json_schema', schema: opts.schema },
         },

@@ -3,6 +3,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -19,6 +20,27 @@ import { Where_deliver } from 'src/common/enums';
 
 // AI matn uzunligi chegarasi — Claude'ga cheksiz matn ketmasligi uchun (DoS/xarajat).
 const AI_TEXT_MAX = 4000;
+// Rasm base64 uzunlik chegarasi (~5.5MB binar) — Claude limiti va DoS/xarajat
+// himoyasi. Bittа so'rovда ko'pi bilan 5 rasm.
+const AI_IMAGE_B64_MAX = 7_500_000;
+const AI_IMAGE_MAX_COUNT = 5;
+const AI_IMAGE_MEDIA_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
+
+// Rasm orqali buyurtma (vision) — base64 kodlangan rasm + turi.
+export class AiOrderImageDto {
+  @IsIn(AI_IMAGE_MEDIA_TYPES)
+  media_type: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(AI_IMAGE_B64_MAX)
+  data_base64: string;
+}
 
 export class AiCreateOrderDto {
   // Erkin matn (mijoz, telefon, tuman, mahsulotlar, narx...)
@@ -34,11 +56,19 @@ export class AiCreateOrderDto {
 }
 
 // AI matnni tahlil qilish (bir yoki bir nechta buyurtma) — yaratmaydi, charge yo'q.
+// text YOKI images bo'lishi kerak (controller tekshiradi); rasm bo'lsa matn ixtiyoriy.
 export class AiParseOrderDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(AI_TEXT_MAX)
-  text: string;
+  text?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(AI_IMAGE_MAX_COUNT)
+  @ValidateNested({ each: true })
+  @Type(() => AiOrderImageDto)
+  images?: AiOrderImageDto[];
 
   @IsOptional()
   @IsUUID()
