@@ -42,9 +42,13 @@ export default {
   AI_ORDER_VISION_MODEL: String(
     process.env.AI_ORDER_VISION_MODEL || 'claude-sonnet-4-6',
   ),
-  // Moliyaviy AI (xarajat hisoboti, savol-javob, insight) modeli — sifat uchun
-  // Opus 4.8. Faqat superadmin/admin ishlatadi (ichki asbob, charj yo'q).
-  AI_FINANCE_MODEL: String(process.env.AI_FINANCE_MODEL || 'claude-opus-4-8'),
+  // Moliyaviy AI (Elchin: xarajat hisoboti, savol-javob, fayl tahlili) modeli.
+  // Sonnet 4.6 — matematikani KOD qiladi, model faqat tayyor raqamlarni izohlaydi
+  // (til vazifasi), shuning uchun Sonnet Opus bilan deyarli teng VA ~1.7x arzon;
+  // prompt caching bilan yana arzon. Kerak bo'lsa .env orqali Opus'ga ko'tariladi.
+  AI_FINANCE_MODEL: String(
+    process.env.AI_FINANCE_MODEL || 'claude-sonnet-4-6',
+  ),
   // MEXANIK/mayda AI vazifalari modeli — tuman indeks tanlash, mahsulot
   // moslashtirish, izoh kategoriyalash (yopiq ro'yxatdan RAQAM tanlash). Bular
   // oddiy klassifikatsiya, arzon model (Haiku 4.5) bemalol uddalaydi va ~5

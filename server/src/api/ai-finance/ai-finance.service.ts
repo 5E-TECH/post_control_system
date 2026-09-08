@@ -1620,6 +1620,9 @@ QOIDALAR:
 - Ortiqcha kirish jumlasiz, to'g'ridan mazmun. Markdown ishlatishing mumkin.`;
     return this.claude.ask({
       system,
+      // Moliyaviy hisobot ham Elchin modeli (AI_FINANCE_MODEL) bilan — order
+      // modeliga bog'lanib qolmasin (ask() default'i AI_ORDER_MODEL edi).
+      model: config.AI_FINANCE_MODEL,
       userText: JSON.stringify(ctx),
       maxTokens: 900,
       meta: { feature: 'finance_report', requestArea: 'finance' },
