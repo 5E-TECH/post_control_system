@@ -19,13 +19,25 @@ import {
   AiOrderService,
   OrderPreview,
   PRICE_CONFIRM_THRESHOLD,
+  ResolvedOperator,
 } from './ai-order.service';
 import { AiBalanceService } from 'src/api/ai-balance/ai-balance.service';
 import { MyContext, AiOrderDraft } from './session.interface';
+import { ClaudeImageInput } from 'src/infrastructure/ai/claude.service';
+import { MyLogger } from 'src/logger/logger.service';
 import config from 'src/config';
 
 const TOKEN_REGEX = /^group_token-.+/i;
 const BUTTON_LABELS = ['➕ Yangi buyurtma', '➕ Add order'];
+// Rasm hajmi chegarasi — Claude ~5MB/rasm limiti (DoS/xarajat himoyasi).
+const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+// Claude vision qo'llaydigan rasm formatlari (rasm-hujjat mime tekshiruvi uchun).
+const CLAUDE_IMAGE_MIME = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
 
 const getHttpStatus = (err: unknown): number => {
   const candidate =
@@ -48,16 +60,54 @@ const getErrorMessage = (err: unknown): string => {
 
 @Update()
 export class OrderBotUpdate {
-  // Foydalanuvchi bo'yicha qayta-kirish qulfi: bir vaqtda kelgan bir nechta
-  // erkin matn parallel Claude chaqiruvi qilib draftni ustma-ust yozmasligi
-  // uchun. JS bir oqimli — has()+add() await'siz atomik.
-  private readonly aiBusy = new Set<number>();
+  // Foydalanuvchi bo'yicha KETMA-KET NAVBAT: bir vaqtda kelgan bir nechta xabar
+  // (matn/rasm) parallel Claude chaqiruvi qilib draftni ustma-ust yozmasligi VA
+  // DROP bo'lmasligi uchun — hammasi kelgan tartibда birma-bir bajariladi.
+  // aiQueues: foydalanuvchi -> oxirgi ish promise'i (zanjir). aiPending: kutayotgan
+  // ishlar soni (navbat cheklovi uchun). Sessiya telegraf in-memory store'да SHARED
+  // (bir ref) — shuning uchun ishlar orasida holat (previews/step) ko'rinib turadi.
+  private readonly aiQueues = new Map<number, Promise<void>>();
+  private readonly aiPending = new Map<number, number>();
+  private static readonly MAX_QUEUE = 12;
+
+  // Ishni foydalanuvchi navbatiga qo'shadi (avvalgisi tugagach bajariladi).
+  // Navbat to'lgan bo'lsa false qaytaradi (chaqiruvchi ogohlantiradi). Ish o'zi
+  // xato bersa navbat buzilmaydi (log qilinadi). Handler bu metoddan keyin DARROV
+  // qaytadi — ish keyin (navbatда) bajariladi; ctx/sessiya shared bo'lgani uchun
+  // xavfsiz.
+  private enqueueAi(uid: number, task: () => Promise<void>): boolean {
+    const pending = this.aiPending.get(uid) ?? 0;
+    if (pending >= OrderBotUpdate.MAX_QUEUE) return false;
+    this.aiPending.set(uid, pending + 1);
+    const prev = this.aiQueues.get(uid) ?? Promise.resolve();
+    const next = prev
+      .then(() => task())
+      .catch((e) => {
+        this.logger.error(
+          `AI navbat ishi xatosi: ${(e as Error).message}`,
+          undefined,
+          'OrderBotUpdate',
+        );
+      })
+      .finally(() => {
+        const left = (this.aiPending.get(uid) ?? 1) - 1;
+        if (left <= 0) {
+          this.aiPending.delete(uid);
+          if (this.aiQueues.get(uid) === next) this.aiQueues.delete(uid);
+        } else {
+          this.aiPending.set(uid, left);
+        }
+      });
+    this.aiQueues.set(uid, next);
+    return true;
+  }
 
   constructor(
     @InjectBot(config.ORDER_BOT_NAME) private readonly bot: Telegraf<MyContext>,
     private readonly orderBotService: OrderBotService,
     private readonly aiOrderService: AiOrderService,
     private readonly aiBalanceService: AiBalanceService,
+    private readonly logger: MyLogger,
   ) {}
 
   @Start()
@@ -295,14 +345,9 @@ export class OrderBotUpdate {
     const uid = ctx.from?.id;
     if (uid == null) return;
 
-    // Qayta-kirish qulfi (has+add await'dan OLDIN — atomik)
-    if (this.aiBusy.has(uid)) {
-      await ctx.reply("⏳ Oldingi xabaringiz o'qilmoqda, biroz kuting...");
-      return;
-    }
-    this.aiBusy.add(uid);
-
-    try {
+    // DROP EMAS: xabar navbatga qo'shiladi va kelgan tartibда bajariladi. Bir
+    // nechta buyurtмани ketma-ket yuborsa — hammasi o'qiladi (ustma-ust yozilmaydi).
+    const accepted = this.enqueueAi(uid, async () => {
       const operator = await this.aiOrderService.resolveOperator(uid);
       if (!operator) return; // ro'yxatdan o'tmagan — jim
 
@@ -313,106 +358,298 @@ export class OrderBotUpdate {
         return;
       }
 
-      try {
-        await ctx.sendChatAction('typing');
-      } catch {
-        /* ignore */
-      }
-
-      // Ko'rinadigan loading — AI o'qiyotganini bildirish uchun (parse tugagach
-      // o'chiriladi). sendChatAction('typing') ~5s'dan keyin so'nadi, bu esa
-      // javob kelguncha turadi.
-      let loadingMsgId: number | undefined;
-      try {
-        const m = await ctx.reply('🤖 AI buyurtmalarni o\'qimoqda, biroz kuting…');
-        loadingMsgId = m.message_id;
-      } catch {
-        /* ignore */
-      }
-
-      // ── Ko'p-buyurtma tahlil (platformadagi bilan bir xil oqim).
-      // Bitta matndan bir yoki bir nechta buyurtma ajratiladi; pul PARSE'da EMAS,
-      // har YARATILGAN buyurtma uchun "✅ Yaratish" bosilganda yechiladi.
-      const res = await this.aiOrderService.parseForUser(
-        text,
-        operator.jwt,
-        operator.marketId,
+      await this.runAiParse(ctx, operator, text);
+    });
+    if (!accepted) {
+      await ctx.reply(
+        "⏳ Juda ko'p xabar navbatда. Avvalgilarini o'qib bo'lay, biroz kuting.",
       );
+    }
+  }
 
-      // Loading'ni o'chiramiz (natija — karta yoki xato — endi ko'rsatiladi).
-      if (loadingMsgId != null) {
-        try {
-          await ctx.deleteMessage(loadingMsgId);
-        } catch {
-          /* ignore */
-        }
+  // Matn YOKI rasm(lar)dan buyurtma(lar)ni tahlil qilib, preview kartalarni
+  // ko'rsatadi. onAiText/onAiPhoto/onAiDocument shu yagona oqimni ishlatadi.
+  // Chaqiruvchi (enqueueAi) navbatni boshqaradi — bu metod ketma-ket chaqiriladi.
+  private async runAiParse(
+    ctx: MyContext,
+    operator: ResolvedOperator,
+    text: string,
+    images?: ClaudeImageInput[],
+  ) {
+    try {
+      await ctx.sendChatAction('typing');
+    } catch {
+      /* ignore */
+    }
+
+    // Ko'rinadigan loading — AI o'qiyotganini bildirish uchun (parse tugagach
+    // o'chiriladi). sendChatAction('typing') ~5s'dan keyin so'nadi, bu esa
+    // javob kelguncha turadi.
+    let loadingMsgId: number | undefined;
+    try {
+      const m = await ctx.reply('🤖 AI buyurtmalarni o\'qimoqda, biroz kuting…');
+      loadingMsgId = m.message_id;
+    } catch {
+      /* ignore */
+    }
+
+    // ── Ko'p-buyurtma tahlil (platformadagi bilan bir xil oqim).
+    // Matn/rasmdan bir yoki bir nechta buyurtma ajratiladi; pul PARSE'da EMAS,
+    // har YARATILGAN buyurtma uchun "✅ Yaratish" bosilganda yechiladi.
+    const res = await this.aiOrderService.parseForUser(
+      text,
+      operator.jwt,
+      operator.marketId,
+      images,
+    );
+
+    // Loading'ni o'chiramiz (natija — karta yoki xato — endi ko'rsatiladi).
+    if (loadingMsgId != null) {
+      try {
+        await ctx.deleteMessage(loadingMsgId);
+      } catch {
+        /* ignore */
       }
+    }
 
-      if (!res.ok) {
-        const webApp = { reply_markup: this.orderBotService.openWebApp() };
-        if (res.reason === 'insufficient') {
-          await ctx.reply(
-            `💳 AI balans yetarli emas (kerak: ${this.formatSom(
-              res.price || 0,
-            )} so'm, qoldi: ${this.formatSom(res.balance || 0)} so'm).\n` +
-              "To'lov qilib qayta urinib ko'ring yoki WebApp formasidan foydalaning.",
-            webApp,
-          );
-        } else if (res.reason === 'disabled' || res.reason === 'ai_off') {
-          await ctx.reply(
-            '🤖 Bu market uchun AI yoqilmagan. Iltimos, WebApp formasidan foydalaning.',
-            webApp,
-          );
-        } else if (res.reason === 'ai_error') {
-          await ctx.reply(
-            '🤖 AI hozir javob bera olmadi. Biroz kutib qayta yuboring yoki WebApp formasidan foydalaning.',
-            webApp,
-          );
-        } else {
-          await ctx.reply(
-            "❌ Buyurtmani o'qib bo'lmadi. WebApp formasidan foydalaning.",
-            webApp,
-          );
-        }
-        return;
-      }
-
-      const previews = res.orders || [];
-      if (!previews.length) {
+    if (!res.ok) {
+      const webApp = { reply_markup: this.orderBotService.openWebApp() };
+      if (res.reason === 'insufficient') {
         await ctx.reply(
-          '🤖 Matndan buyurtma topilmadi. Mijoz ismi, telefon, manzil, mahsulot va narxni yozing.',
+          `💳 AI balans yetarli emas (kerak: ${this.formatSom(
+            res.price || 0,
+          )} so'm, qoldi: ${this.formatSom(res.balance || 0)} so'm).\n` +
+            "To'lov qilib qayta urinib ko'ring yoki WebApp formasidan foydalaning.",
+          webApp,
+        );
+      } else if (res.reason === 'disabled' || res.reason === 'ai_off') {
+        await ctx.reply(
+          '🤖 Bu market uchun AI yoqilmagan. Iltimos, WebApp formasidan foydalaning.',
+          webApp,
+        );
+      } else if (res.reason === 'ai_error') {
+        await ctx.reply(
+          '🤖 AI hozir javob bera olmadi. Biroz kutib qayta yuboring yoki WebApp formasidan foydalaning.',
+          webApp,
+        );
+      } else {
+        await ctx.reply(
+          "❌ Buyurtmani o'qib bo'lmadi. WebApp formasidan foydalaning.",
+          webApp,
+        );
+      }
+      return;
+    }
+
+    const previews = res.orders || [];
+    if (!previews.length) {
+      await ctx.reply(
+        images?.length
+          ? '🤖 Rasmdan buyurtma topilmadi. Rasm aniqroq bo\'lsin yoki mijoz ismi, telefon, manzil, mahsulot va narxni yozing.'
+          : '🤖 Matndan buyurtma topilmadi. Mijoz ismi, telefon, manzil, mahsulot va narxni yozing.',
+        { reply_markup: this.orderBotService.openWebApp() },
+      );
+      return;
+    }
+
+    // ── KARTALARNI TO'PLASH (accumulation): agar hali yaratilmagan (ready) faol
+    // partiya bo'lsa, yangi buyurtmalarni SHU partiyaga qo'shamiz (bir xil nonce),
+    // shunda AVVALGI kartalar ham ishlab turadi. Shu tufayli bir nechta buyurtmani
+    // ketma-ket yuborsa — hammasini alohida-alohida yaratish mumkin (nonce eskirmaydi).
+    // Faol partiya bo'lmasa (hammasi yaratilgan/yo'q) — yangi partiya boshlanadi.
+    const existing = ctx.session.order_previews || [];
+    const existingNonce = ctx.session.previews_nonce;
+    const hasActiveBatch = !!existingNonce && existing.some((p) => p.ready);
+
+    const nonce = hasActiveBatch
+      ? (existingNonce as string)
+      : randomBytes(4).toString('hex');
+    const baseIndex = hasActiveBatch ? existing.length : 0;
+    const fullList = hasActiveBatch ? [...existing, ...previews] : previews;
+
+    ctx.session.order_previews = fullList;
+    ctx.session.previews_nonce = nonce;
+    ctx.session.step = 'ready';
+    // Eski bir-buyurtma oqimi qoldiqlarini tozalaymiz (chalkashmasin).
+    ctx.session.order_draft = undefined;
+    ctx.session.draft_raw = undefined;
+
+    // Faqat YANGI kartalarni chiqaramiz (global indeks bilan — eskilar joyida qoladi).
+    for (let j = 0; j < previews.length; j++) {
+      const globalIdx = baseIndex + j;
+      const p = previews[j];
+      const cardText = this.formatBotCard(p, globalIdx, fullList.length);
+      await ctx.reply(cardText, {
+        reply_markup: this.cardKeyboard(p.ready, nonce, globalIdx),
+      });
+    }
+
+    // Jonli xulosa — TO'LIQ ro'yxat bo'yicha. To'plash bo'lsa avvalgi xulosani
+    // o'chirib, yangisini eng pastda ko'rsatamiz (doim oxirida tursin).
+    if (
+      hasActiveBatch &&
+      ctx.session.summary_msg_id != null &&
+      ctx.chat?.id != null
+    ) {
+      try {
+        await ctx.telegram.deleteMessage(
+          ctx.chat.id,
+          ctx.session.summary_msg_id,
+        );
+      } catch {
+        /* ignore (eski/o'chirilgan) */
+      }
+    }
+    const summaryText = await this.buildSummaryText(fullList, operator.marketId);
+    const sm = await ctx.reply(summaryText);
+    ctx.session.summary_msg_id = sm.message_id;
+  }
+
+  // ── RASM orqali buyurtma: foydalanuvchi rasm (buyurtma varag'i / skrinshot)
+  // tashlasa, Claude vision undagi matnni o'qib buyurtma(lar)ni ajratadi.
+  // Har rasm ALOHIDA xabar bo'lib keladi (albom bo'lsa har biri alohida parse).
+  @On('photo')
+  async onAiPhoto(@Ctx() ctx: MyContext) {
+    if (ctx.chat?.type !== 'private') return;
+    if (!this.aiOrderService.isEnabled()) return; // AI o'chiq — WebApp ishlaydi
+
+    const step = ctx.session.step;
+    // Matndagi kabi: token/telefon kutilayotganda rasmni AI'ga bermaymiz.
+    if (step === 'waiting_for_token' || step === 'waiting_for_phone') return;
+
+    const message = ctx.message as Message.PhotoMessage | undefined;
+    const photos = message?.photo;
+    if (!photos?.length) return;
+    const caption =
+      message && 'caption' in message ? (message.caption || '').trim() : '';
+
+    const uid = ctx.from?.id;
+    if (uid == null) return;
+
+    // DROP EMAS: navbatga qo'shiladi (bir nechta rasm ketma-ket yuborilsa — albom
+    // ham — hammasi tartib bilan o'qiladi, kartalar to'planadi).
+    const accepted = this.enqueueAi(uid, async () => {
+      const operator = await this.aiOrderService.resolveOperator(uid);
+      if (!operator) return; // ro'yxatdan o'tmagan — jim
+
+      // Limit ostidagi ENG KATTA o'lchamni tanlaymiz (Claude ~5MB/rasm limiti).
+      const sorted = [...photos].sort(
+        (a, b) => (b.file_size || 0) - (a.file_size || 0),
+      );
+      const chosen =
+        sorted.find((p) => (p.file_size || 0) <= PHOTO_MAX_BYTES) ||
+        sorted.at(-1);
+      if (!chosen) return;
+
+      const image = await this.downloadTelegramImage(ctx, chosen.file_id);
+      if (!image) {
+        await ctx.reply(
+          "🤖 Rasmni yuklab bo'lmadi. Qayta yuboring yoki matn bilan yozing.",
           { reply_markup: this.orderBotService.openWebApp() },
         );
         return;
       }
 
-      // Kartalar keyingi "✅ Yaratish" bosilganda ishlatiladi — session'da saqlaymiz.
-      // previews_nonce eski kartalardan (yangi tahlildan keyin) yaratishni bloklaydi.
-      const nonce = randomBytes(4).toString('hex');
-      ctx.session.order_previews = previews;
-      ctx.session.previews_nonce = nonce;
-      ctx.session.step = 'ready';
-      // Eski bir-buyurtma oqimi qoldiqlarini tozalaymiz (chalkashmasin).
-      ctx.session.order_draft = undefined;
-      ctx.session.draft_raw = undefined;
+      await this.runAiParse(ctx, operator, caption, [image]);
+    });
+    if (!accepted) {
+      await ctx.reply(
+        "⏳ Juda ko'p rasm navbatда. Avvalgilarini o'qib bo'lay, biroz kuting.",
+      );
+    }
+  }
 
-      for (let i = 0; i < previews.length; i++) {
-        const p = previews[i];
-        const cardText = this.formatBotCard(p, i, previews.length);
-        await ctx.reply(cardText, {
-          reply_markup: this.cardKeyboard(p.ready, nonce, i),
-        });
+  // ── RASM HUJJAT sifatida (siqilmasдan) yuborilsa. Oddiy surat Telegram
+  // tomonidan avtomatik siqiladi (kichik keladi); hujjat esa asl/katta bo'lishi
+  // mumkin. Yaroqli format + <=5MB bo'lsa qabul qilamiz; katta yoki Claude
+  // qo'llamaydigan format (HEIC va h.k.) bo'lsa — SURAT sifatida yuborishni
+  // so'raymiz (Telegram o'zi jpeg'ga siqib, kichraytirib beradi).
+  @On('document')
+  async onAiDocument(@Ctx() ctx: MyContext) {
+    if (ctx.chat?.type !== 'private') return;
+    if (!this.aiOrderService.isEnabled()) return;
+
+    const step = ctx.session.step;
+    if (step === 'waiting_for_token' || step === 'waiting_for_phone') return;
+
+    const message = ctx.message as Message.DocumentMessage | undefined;
+    const doc = message?.document;
+    if (!doc) return;
+    const mime = (doc.mime_type || '').toLowerCase();
+    // Faqat rasm-hujjatlar bilan ishlaymiz; boshqa fayllarga (pdf, doc...) jim.
+    if (!mime.startsWith('image/')) return;
+
+    const caption =
+      message && 'caption' in message ? (message.caption || '').trim() : '';
+    const uid = ctx.from?.id;
+    if (uid == null) return;
+
+    // Claude qo'llaydigan formatlar. Boshqasi (masalan HEIC) -> surat sifatida so'raymiz.
+    if (!CLAUDE_IMAGE_MIME.includes(mime)) {
+      await ctx.reply(
+        "🤖 Bu rasm formatini o'qiy olmadim. Iltimos rasmni 📷 SURAT sifatida (fayl sifatida emas) yuboring — u avtomatik moslashtiriladi.",
+      );
+      return;
+    }
+    // Katta hujjat: Telegram siqishига yo'naltiramiz (serverda kichraytirmaymiz).
+    if ((doc.file_size || 0) > PHOTO_MAX_BYTES) {
+      await ctx.reply(
+        "🤖 Rasm katta (5MB dan oshiq). Iltimos uni 📷 SURAT sifatida yuboring — Telegram avtomatik kichraytiradi va o'qib beraman.",
+      );
+      return;
+    }
+
+    // DROP EMAS: navbatga qo'shiladi (ketma-ket bajariladi).
+    const accepted = this.enqueueAi(uid, async () => {
+      const operator = await this.aiOrderService.resolveOperator(uid);
+      if (!operator) return;
+
+      const image = await this.downloadTelegramImage(
+        ctx,
+        doc.file_id,
+        mime as ClaudeImageInput['mediaType'],
+      );
+      if (!image) {
+        await ctx.reply(
+          "🤖 Rasmni yuklab bo'lmadi. 📷 Surat sifatida yuboring yoki matn bilan yozing.",
+          { reply_markup: this.orderBotService.openWebApp() },
+        );
+        return;
       }
 
-      // Jonli xulosa — har tasdiq/tuzatishdan keyin YANGILANADI (id saqlanadi).
-      const summaryText = await this.buildSummaryText(
-        previews,
-        operator.marketId,
+      await this.runAiParse(ctx, operator, caption, [image]);
+    });
+    if (!accepted) {
+      await ctx.reply(
+        "⏳ Juda ko'p rasm navbatда. Avvalgilarini o'qib bo'lay, biroz kuting.",
       );
-      const sm = await ctx.reply(summaryText);
-      ctx.session.summary_msg_id = sm.message_id;
-    } finally {
-      this.aiBusy.delete(uid);
+    }
+  }
+
+  // Telegram rasmini yuklab, Claude vision uchun base64 ClaudeImageInput qaytaradi.
+  // Telegram siqilgan surati JPEG; rasm-hujjat (document) uchun mediaType beriladi.
+  // Xato/katta bo'lsa null (chaqiruvchi xabar beradi).
+  private async downloadTelegramImage(
+    ctx: MyContext,
+    fileId: string,
+    mediaType: ClaudeImageInput['mediaType'] = 'image/jpeg',
+  ): Promise<ClaudeImageInput | null> {
+    try {
+      const link = await ctx.telegram.getFileLink(fileId);
+      const resp = await fetch(link.href);
+      if (!resp.ok) throw new Error(`getFile HTTP ${resp.status}`);
+      const buf = Buffer.from(await resp.arrayBuffer());
+      if (!buf.length || buf.length > PHOTO_MAX_BYTES) {
+        throw new Error(`rasm hajmi mos emas (${buf.length} bayt)`);
+      }
+      return { mediaType, dataBase64: buf.toString('base64') };
+    } catch (err) {
+      this.logger.error(
+        `Telegram rasm yuklash xatosi: ${(err as Error).message}`,
+        undefined,
+        'OrderBotUpdate',
+      );
+      return null;
     }
   }
 

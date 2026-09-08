@@ -7,25 +7,71 @@ import { DistrictEntity } from 'src/core/entity/district.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { OrderService } from 'src/api/order/order.service';
-import { ClaudeService } from 'src/infrastructure/ai/claude.service';
+import {
+  ClaudeService,
+  ClaudeImageInput,
+} from 'src/infrastructure/ai/claude.service';
 import { AiBalanceService } from 'src/api/ai-balance/ai-balance.service';
 import { MyLogger } from 'src/logger/logger.service';
-import { Roles, Where_deliver, Order_status } from 'src/common/enums';
+import {
+  Roles,
+  Where_deliver,
+  Order_status,
+  OrderCreatedSource,
+} from 'src/common/enums';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { CreateOrderByBotDto } from 'src/api/order/dto/create-order-bot.dto';
 import { CreateOrderDto } from 'src/api/order/dto/create-order.dto';
 import { AiDraftItem, AiOrderDraft } from './session.interface';
+import config from 'src/config';
 
 const MAX_CANDIDATE_BUTTONS = 5;
 
 // Kirill (o'zbek + rus) -> lotin transliteratsiya. Foydalanuvchi kirill yozsa ham
 // DB (lotin) nomlariga mos kelishi uchun. Case-by-case emas — umumiy.
 const CYR_LATIN: Record<string, string> = {
-  а: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'j',
-  з: 'z', и: 'i', й: 'y', к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', о: 'o',
-  п: 'p', р: 'r', с: 's', т: 't', у: 'u', ў: 'o', ф: 'f', х: 'x', ҳ: 'h',
-  ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sh', ъ: '', ы: 'i', ь: '', э: 'e', ю: 'yu',
-  я: 'ya', ә: 'a', ө: 'o', ү: 'u', ҷ: 'j', ұ: 'u',
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  ғ: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'yo',
+  ж: 'j',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  қ: 'q',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ў: 'o',
+  ф: 'f',
+  х: 'x',
+  ҳ: 'h',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'sh',
+  ъ: '',
+  ы: 'i',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya',
+  ә: 'a',
+  ө: 'o',
+  ү: 'u',
+  ҷ: 'j',
+  ұ: 'u',
 };
 
 const EXTRACT_SYSTEM = `Sen O'zbekistondagi yetkazib berish platformasining buyurtma yordamchisisan.
@@ -33,7 +79,9 @@ Foydalanuvchi (operator yoki market) yozgan yoki mijozdan forward qilingan erkin
 QAT'IY QOIDALAR:
 - Faqat matnda ANIQ bor ma'lumotni chiqar. Yo'q bo'lsa null qoldiring — HECH NARSA TO'QIB CHIQARMA.
 - Mahsulotlar uchun faqat NOMINI va sonini (quantity) yoz; ID/narx to'qima. Son ko'rsatilmagan bo'lsa 1.
-- region_name = VILOYAT nomi (masalan "Andijon", "Navoiy"). MUHIM: agar matnda "shahri" yoki "viloyati" so'zi yozilgan bo'lsa, uni HAM qo'shib yoz — ayniqsa Toshkent uchun: "Toshkent shahri" (poytaxt) va "Toshkent viloyati" (atrofdagi tumanlar) ikki XIL joy, farqla. GEOGRAFIK INFERENCE: agar matnda viloyat YOZILMAGAN bo'lsa-yu, tuman/shahar/shaharcha/qishloq nomi bor bo'lsa — O'zbekiston geografiyasi bo'yicha u QAYSI VILOYATda ekanini o'zing aniqlab region_name'ga yoz (masalan "Chilonzor" -> "Toshkent shahri", "Xo'jaobod" -> "Andijon", "Asaka" -> "Andijon", "Xonobod" -> o'z viloyati). Bu KRITIK: o'xshash nomli tumanlar (Xo'jaobod/Andijon va Xonobod/boshqa viloyat) noto'g'ri viloyatga adashib tushmasligi uchun har doim tumanni to'g'ri viloyatga bog'la. Viloyatni ishonch bilan aniqlay olmasang null qoldir.
+- region_name = VILOYAT nomi (masalan "Andijon", "Navoiy"). MUHIM: agar matnda "shahri" yoki "viloyati" so'zi yozilgan bo'lsa, uni HAM qo'shib yoz — ayniqsa Toshkent uchun: "Toshkent shahri" (poytaxt) va "Toshkent viloyati" (atrofdagi tumanlar) ikki XIL joy, farqla.
+  ⚠️ ANIQ AYTILGAN VILOYAT USTUN: agar mijoz viloyat/shaharни ANIQ yozgan bo'lsa (masalan "Toshkent shahri", "Andijon viloyati"), region_name AYNAN o'sha bo'ladi — tuman nomi boshqa viloyatni eslatsa HAM, viloyatni O'ZGARTIRMA. Ya'ni "Toshkent shahri Xonobod" -> region_name="Toshkent shahri" (Xonobod Andijonда bo'lsa ham, viloyatni Andijonга KO'CHIRMA); district_name="Xonobod" (yozilganicha), keyin tizim shu viloyatда tekshiradi, topolmasa operator to'ldiradi.
+  GEOGRAFIK INFERENCE (faqat VILOYAT YOZILMAGANda): matnda viloyat umuman yo'q bo'lsa-yu, tuman/shahar/shaharcha/qishloq nomi bor bo'lsa — O'zbekiston geografiyasi bo'yicha u QAYSI VILOYATda ekanini o'zing aniqlab region_name'ga yoz (masalan "Chilonzor" -> "Toshkent shahri", "Xo'jaobod" -> "Andijon", "Asaka" -> "Andijon"). O'xshash nomli tumanlarni (Xo'jaobod/Andijon va boshqa viloyatdagi o'xshash nom) ADASHTIRMA. Viloyatni ishonch bilan aniqlay olmasang null qoldir — LEKIN district_name'ni baribir yozilganicha yoz (tizim o'zi qidiradi).
 - district_name = yetkazish JOYI — TUMAN yoki SHAHAR nomi (masalan "Asaka", "Chilonzor", "Navoiy shahri", "Zarafshon shahri", "Nurota"). MUHIM: joy manzil ichida bo'lsa ham (masalan "Navoiy shahri vagzal xududi 20-uy") — shahar/tuman nomini ("Navoiy shahri") ajratib district_name'ga yoz, faqat qolgan ko'cha/uy qismini ("vagzal xududi 20-uy") address'ga yoz. SHAHAR ham district_name'ga tushadi, address'ga EMAS. SHAHARCHA/QISHLOQ/MAHALLA (MFY)/mavze: agar mijoz TUMAN emas, uning ichidagi kichik joyni (shaharcha, qishloq, mahalla, MFY) yozsa — u qaysi TUMANga qarashli ekanini geografik biliming bilan aniqlab, TUMAN nomini district_name'ga yoz (kichik joy nomini EMAS); asl kichik joy nomini full_address/address'da qoldir.
 - full_address = MANZILNING TO'LIQ MATNI — viloyat, tuman/shahar, ko'cha, uy — HAMMASI, matnda qanday yozilgan bo'lsa AYNAN o'sha holicha ko'chir (o'zgartirma, tarjima qilma, hech narsani tushirib qoldirma). Kirill bo'lsa kirill, lotin bo'lsa lotin. Bu maydon rezolyutsiya uchun zaxira.
 - total_price = BUTUN buyurtma narxi RAQAM sifatida (masalan "250 ming" -> 250000, "2.5 mln" -> 2500000, "300k" -> 300000). "ming"=1000, "mln"/"million"=1000000 ga ko'paytir. MUHIM: agar narx BIR DONA uchun berilsa ("donasi", "bittasi", "har biri", "tasi X so'm") — uni MAHSULOT SONIGA KO'PAYTIRIB butun narxni yoz (masalan "3 dona, donasi 2 mln" -> 6000000). Aniq bo'lmasa null.
@@ -57,7 +105,10 @@ MISOLLAR (matn -> to'g'ri chiqish; ko'rsatilmagan maydonlar null):
    Diqqat: "buzuq...almashtirib" -> is_replacement=true; narx yo'q -> total_price=null; "Navoiy shahri" district_name'ga, "vagzal 20-uy" address'ga.
 4) Matn: "Nozima 901112233 xojaobd paxtaobod mfy 5-uy, muzlatgich 1 ta 4 mln 200"
    Chiqish: {"customer_name":"Nozima","phone_number":"901112233","extra_number":null,"region_name":"Andijon","district_name":"Xo'jaobod","address":"paxtaobod mfy 5-uy","full_address":"xojaobd paxtaobod mfy 5-uy","items":[{"name":"muzlatgich","quantity":1}],"total_price":4200000,"comment":null,"where_deliver":null,"is_replacement":false,"operator":null}
-   Diqqat: viloyat yozilmagan — "xojaobd" (imlo) -> "Xo'jaobod" tuman, uni geografik bilim bilan "Andijon" viloyatiga bog'la; "paxtaobod mfy" — bu MAHALLA (tuman emas), district_name'ga QO'YMA, address'ga qoldir; "4 mln 200" -> 4200000.`;
+   Diqqat: viloyat yozilmagan — "xojaobd" (imlo) -> "Xo'jaobod" tuman, uni geografik bilim bilan "Andijon" viloyatiga bog'la; "paxtaobod mfy" — bu MAHALLA (tuman emas), district_name'ga QO'YMA, address'ga qoldir; "4 mln 200" -> 4200000.
+5) Matn: "Bobur 998901112233 Toshkent shahri Xonobod, adapter 1 ta 90000"
+   Chiqish: {"customer_name":"Bobur","phone_number":"998901112233","extra_number":null,"region_name":"Toshkent shahri","district_name":"Xonobod","address":null,"full_address":"Toshkent shahri Xonobod","items":[{"name":"adapter","quantity":1}],"total_price":90000,"comment":null,"where_deliver":null,"is_replacement":false,"operator":null}
+   Diqqat: mijoz "Toshkent shahri"ni ANIQ yozgan — region_name AYNAN "Toshkent shahri"; "Xonobod" nomi Andijonni eslatsa HAM viloyatni Andijonga KO'CHIRMA. district_name="Xonobod" yozilganicha (tizim Toshkent ichida qidiradi, topolmasa operator to'ldiradi). Aniq aytilgan viloyatni tuman nomiga qarab hech qachon o'zgartirma.`;
 
 const EXTRACT_SCHEMA: Record<string, unknown> = {
   type: 'object',
@@ -138,6 +189,15 @@ const EXTRACT_MULTI_SYSTEM = `${EXTRACT_SYSTEM}
 
 DIQQAT: Matnda BIR NECHTA buyurtma bo'lishi mumkin (har xil mijozlar / alohida buyurtmalar). Har bir ALOHIDA buyurtmani "orders" massivida alohida element qilib qaytar. Agar matnda bitta buyurtma bo'lsa — massivda bitta element bo'ladi. Buyurtmalar bo'sh qatorlar, raqamlash (1., 2., -) yoki har xil mijoz nomi/telefoni bilan ajralishi mumkin. Bitta mijozning bir nechta mahsulotini AJRATMA — u bitta buyurtma.`;
 
+// Rasm (vision) orqali ko'p-buyurtma ekstraksiya. Matnли versiyaga rasmни
+// o'qish yo'riqnomasi qo'shiladi. Sxema BIR XIL (RawExtraction).
+const EXTRACT_MULTI_VISION_SYSTEM = `${EXTRACT_MULTI_SYSTEM}
+
+MANBA — RASM: Ma'lumot foydalanuvchi yuborgan RASM(lar) ichida (buyurtma varag'i, qo'lyozma, skrinshot yoki chek bo'lishi mumkin). Rasmдаги matnни diqqat bilan o'qib, mijoz ismi, telefon(lar), manzil/tuman, mahsulot(lar) va narxni ajrat.
+- Telefon raqamlarини xato o'qimaslikка e'tibor ber (raqamlar aniq bo'lsin).
+- Rasm noaniq/o'qib bo'lmaydigan joyni TO'QIMA — o'sha maydonni bo'sh qoldir (operator to'ldiradi).
+- Rasmда buyurtма bo'lmasa (tasodifiy rasm) — bo'sh "orders": [] qaytar.`;
+
 // ─── LLM-disambiguation: fuzzy string-moslik noaniq qolgan mahsulotlarni
 //     Claude SEMANTIK tushunish bilan tanlaydi ("krem" -> "Yuz kremi").
 //     Xavfsiz: Claude faqat RAQAM (nomzod indeksi) qaytaradi; UUID'ni KOD
@@ -177,11 +237,12 @@ const DISAMBIG_SCHEMA: Record<string, unknown> = {
 //     tomonda o'sha indeksdan olinadi — model UUID/tuman to'qiy olmaydi.
 const DISTRICT_LLM_SYSTEM = `Sen O'zbekiston geografiyasini yaxshi biladigan yetkazib berish yordamchisisan. Mijoz manzilidan yetkazish TUMAN yoki SHAHRINI aniqlaysan.
 QOIDALAR:
-- Quyidagi tuman/shaharlar raqamlangan ro'yxat sifatida beriladi ([N] Viloyat — Tuman/Shahar). Manzilga TO'G'RI keladiganning raqamini (choice) qaytar.
+- Quyidagi tuman/shaharlar raqamlangan ro'yxat sifatida beriladi ([N] Viloyat — Tuman/Shahar). Manzilga AYNAN TO'G'RI keladiganning raqamini (choice) qaytar.
 - IMLO XATOSINI tuzat: "xojaobd" -> "Xo'jaobod", "chilonzr" -> "Chilonzor".
 - SHAHARCHA / QISHLOQ / MAHALLA (MFY) / mavze yozilgan bo'lsa — u QAYSI tumanga qarashli ekanini O'Z BILIMING bilan aniqlab, o'sha tumanni tanla.
-- VILOYAT yozilmagan bo'lsa ham, tuman nomidan qaysi viloyatда ekanini bil va AYNAN to'g'ri viloyatdagi tumanni tanla. O'xshash nomli tumanlarni ARALASHTIRMA (masalan Andijondagi "Xo'jaobod" ni boshqa viloyatdagi o'xshash nomli tuman bilan almashtirma).
-- Ro'yxatda mos tuman umuman bo'lmasa yoki bir nechta bir xil ehtimolli variant bo'lsa (aniq ajrata olmasang) -> choice=0.
+- ⚠️ ENG MUHIM — VILOYAT MOSLIGI: agar manzilda VILOYAT aytilgan bo'lsa ("Viloyat (agar aytilgan bo'lsa)" qatorida), FAQAT O'SHA VILOYATdagi tumanni tanla. Boshqa viloyatdagi o'xshash nomli tumanni HECH QACHON tanlama. Ro'yxatda o'sha viloyatда mos tuman bo'lmasa -> choice=0 (boshqa viloyatdan OLMA). Masalan manzil "Toshkent shahri Xonobod" bo'lsa va ro'yxatда Toshkentда "Xonobod" bo'lmasa — Andijondagi "Xo'jaobod"ni tanlama, choice=0 qaytar.
+- VILOYAT aytilmagan bo'lsa, tuman nomidan qaysi viloyatда ekanini bil va AYNAN to'g'ri viloyatdagi tumanni tanla. O'xshash nomli tumanlarni ARALASHTIRMA.
+- ISHONCH BO'LMASA — TO'QIMA: mos tuman umuman bo'lmasa, YOKI bir nechta bir xil ehtimolli variant bo'lsa (aniq ajrata olmasang), YOKI faqat taxminan o'xshasa -> choice=0. Noto'g'ri tanlashдан ko'ra 0 (operator to'ldiradi) YAXSHIROQ.
 - Hech narsa to'qima; faqat ro'yxatdagi raqamlardan tanla.`;
 
 const DISTRICT_LLM_SCHEMA: Record<string, unknown> = {
@@ -280,14 +341,16 @@ export class AiOrderService {
     private readonly logger: MyLogger,
   ) {}
 
-  // Parse (tahlil) throttle: bir buyurtmani ko'p marta qayta tahlil qilish
-  // Claude'ni behuda ishlatadi. Har market uchun BEPUL tahlillar soni; undan
-  // ortig'i 1 buyurtma narxida yechiladi (telegram botdagi 3-urinish mantig'i).
+  // Parse (tahlil) throttle: bir matnni ko'p marta QAYTA tahlil qilish Claude'ni
+  // behuda ishlatadi. Har market uchun 30 daqiqada BEPUL tahlillar soni; undan
+  // ortig'i 1 buyurtma narxida yechiladi. Limit 10 — normal ko'p-buyurtma oqimi
+  // (har buyurtmani alohida xabar qilib yuborish) jarima olmasin, faqat haqiqiy
+  // suiiste'mol (bir matnni 10+ marta qayta yuborish) cheklansin.
   private readonly parseAttempts = new Map<
     string,
     { count: number; ts: number }
   >();
-  private static readonly PARSE_FREE_LIMIT = 3;
+  private static readonly PARSE_FREE_LIMIT = 10;
   private static readonly PARSE_WINDOW_MS = 30 * 60 * 1000;
 
   isEnabled(): boolean {
@@ -330,7 +393,9 @@ export class AiOrderService {
     let charge: { reason: string; balance: number; price: number } | null =
       null;
     if (!exempt) {
-      charge = await this.aiBalance.chargeForOrder(marketId, { actor: user.id });
+      charge = await this.aiBalance.chargeForOrder(marketId, {
+        actor: user.id,
+      });
       if (charge.reason !== 'ok') {
         return {
           ok: false,
@@ -389,7 +454,11 @@ export class AiOrderService {
         where_deliver: Where_deliver.CENTER,
       } as CreateOrderDto;
 
-      const order = await this.orderService.createOrder(dto, user);
+      const order = await this.orderService.createOrder(
+        dto,
+        user,
+        OrderCreatedSource.AI,
+      );
       return { ok: true, order, balance: charge?.balance };
     } catch (err) {
       // createOrder xato berdi (masalan add_order o'chiq / operator telefoni
@@ -440,7 +509,11 @@ export class AiOrderService {
       enabled: state.enabled,
       balance: state.balance,
       price: state.price,
-      reason: available ? undefined : !state.enabled ? 'disabled' : 'insufficient',
+      reason: available
+        ? undefined
+        : !state.enabled
+          ? 'disabled'
+          : 'insufficient',
     };
   }
 
@@ -491,6 +564,7 @@ export class AiOrderService {
       system: EXTRACT_SYSTEM,
       userText: text,
       schema: EXTRACT_SCHEMA,
+      meta: { feature: 'order_extract', requestArea: 'order' },
     });
     if (!raw) return null;
     return this.rawToDraft(raw);
@@ -545,12 +619,22 @@ export class AiOrderService {
     text: string,
     marketId: string,
     defaultTariff?: Where_deliver,
+    images?: ClaudeImageInput[],
   ): Promise<OrderPreview[]> {
+    // Rasm(lar) berilsa vision model bilan (Sonnet) — rasmдаги matn o'qiladi.
+    // Faqat matn bo'lsa odatдаги Opus ekstraksiya modeli.
+    const hasImages = !!images?.length;
     const res = await this.claude.extractJson<{ orders: RawExtraction[] }>({
-      system: EXTRACT_MULTI_SYSTEM,
-      userText: text,
+      system: hasImages ? EXTRACT_MULTI_VISION_SYSTEM : EXTRACT_MULTI_SYSTEM,
+      userText: hasImages && !text ? '(rasm ichidagi ma\'lumotdan o\'qing)' : text,
       schema: EXTRACT_MULTI_SCHEMA,
       maxTokens: 16000, // ko'p buyurtma (30+) JSON'i kesilib qolmasin
+      model: hasImages ? config.AI_ORDER_VISION_MODEL : undefined,
+      images,
+      meta: {
+        feature: hasImages ? 'order_extract_image' : 'order_extract_multi',
+        requestArea: 'order',
+      },
     });
     if (!res || !Array.isArray(res.orders)) return [];
 
@@ -643,7 +727,11 @@ export class AiOrderService {
     is_replacement?: boolean;
     total_price?: number;
     price_confirmed?: boolean;
-    items: { name: string; product_id?: string; candidates?: { id: string }[] }[];
+    items: {
+      name: string;
+      product_id?: string;
+      candidates?: { id: string }[];
+    }[];
   }): string[] {
     const issues: string[] = [];
     if (!p.customer_name) issues.push("mijoz ismi yo'q");
@@ -814,6 +902,7 @@ export class AiOrderService {
     text: string,
     user: JwtPayload,
     bodyMarketId?: string,
+    images?: ClaudeImageInput[],
   ): Promise<{
     ok: boolean;
     reason?: string;
@@ -877,6 +966,7 @@ export class AiOrderService {
       text,
       marketId,
       marketRow?.default_tariff,
+      images,
     );
     if (!orders.length) {
       // AI o'qiy olmadi (bizning xatomiz) — qayta-tahlil uchun yechilgan pulni
@@ -1016,12 +1106,21 @@ export class AiOrderService {
           district_id: o.district_id,
           comment: o.comment,
           where_deliver:
-            o.where_deliver ?? marketRow?.default_tariff ?? Where_deliver.CENTER,
+            o.where_deliver ??
+            marketRow?.default_tariff ??
+            Where_deliver.CENTER,
           operator: o.operator,
           operator_phone: defaultOperatorPhone,
           replaced_order_id: o.replaced_order_id,
         } as CreateOrderDto;
-        const res = (await this.orderService.createOrder(dto, user)) as {
+        // Kanal manbasi: bot oqimi -> 'bot', web platforma AI -> 'ai'.
+        const createdSource =
+          source === 'bot' ? OrderCreatedSource.BOT : OrderCreatedSource.AI;
+        const res = (await this.orderService.createOrder(
+          dto,
+          user,
+          createdSource,
+        )) as {
           data?: { order_number?: number; id?: string };
         };
         created.add(sig);
@@ -1242,15 +1341,15 @@ export class AiOrderService {
     districts: DistrictEntity[],
   ): Promise<void> {
     if (!this.claude.isEnabled()) return;
-    const placeText = `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`.trim();
+    const placeText =
+      `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`.trim();
     if (!placeText) return; // umuman joy matni yo'q — tekshiradigan narsa yo'q
 
     // Xavfli (LLM tekshiruvi kerak) qachonki: tuman hal bo'lmagan; YOKI matnda
     // viloyat aytilmagan (region_name yo'q) — deterministik butun-mamlakat fuzzy
     // noto'g'ri viloyatga tushirgan bo'lishi mumkin; YOKI viloyat aytilgan-u DB
     // viloyatiga tushmagan (region_id yo'q) — tuman qidiruvi cheklanmagan.
-    const risky =
-      !draft.district_id || !draft.region_name || !draft.region_id;
+    const risky = !draft.district_id || !draft.region_name || !draft.region_id;
     if (!risky) return; // viloyat ham, tuman ham ishonchli hal bo'lgan — ishonamiz
 
     // 1-urinish: viloyat ISHONCHLI ma'lum bo'lsa (ekstraksiya region_name
@@ -1258,17 +1357,61 @@ export class AiOrderService {
     // (kichik, arzon; imlo xatosi bilan topilmagan tumanni topadi).
     const trustRegion = !!draft.region_name && !!draft.region_id;
     if (trustRegion) {
+      // Viloyat ISHONCHLI — FAQAT shu viloyat ichida so'raymiz va shu bilan
+      // TO'XTAYMIZ. Model 0 (mos yo'q) qaytarsa tuman bo'sh qoladi (operator
+      // to'ldiradi); BOSHQA viloyatga O'TMAYMIZ. Bu "Toshkent Xonobod ->
+      // Andijon Xo'jaobod" cross-region xatosini butunlay yopadi.
       const regionPool = districts.filter(
         (d) => d.region_id === draft.region_id,
       );
-      if (regionPool.length && (await this.llmPickDistrict(draft, regionPool, placeText))) {
-        return;
+      if (regionPool.length) {
+        await this.llmPickDistrict(draft, regionPool, placeText);
       }
+      return;
     }
-    // 2-urinish (fallback): to'liq ro'yxat. Viloyat berilmagan (viloyatsiz
-    // o'xshash nomlar) YOKI viloyat noto'g'ri infer qilingan bo'lsa — Opus butun
-    // mamlakat bo'yicha geografik bilim bilan to'g'ri tuman+viloyatni tanlaydi.
+    // Viloyat BERILMAGAN/noaniq bo'lsagina butun mamlakat bo'ylab qidiramiz.
+    // 200+ tumandan arzon model ishonchli tanlashi uchun avval NOM/manzil
+    // o'xshashligi bo'yicha qisqa nomzodlar ro'yxatini (top-K) tuzamiz — imlo
+    // xatoli tuman ham ro'yxatga tushadi, model to'g'risini (yoki 0) tanlaydi.
+    // Shortlist chiqmasa (juda g'alati nom) — oxirgi chora to'liq ro'yxat.
+    const shortlist = this.shortlistDistricts(draft, districts);
+    if (shortlist.length) {
+      await this.llmPickDistrict(draft, shortlist, placeText);
+      return; // shortlistдан hal bo'ldi yoki noaniq (0) — operator tanlaydi
+    }
     await this.llmPickDistrict(draft, districts, placeText);
+  }
+
+  // Manzil matniga (yozilgan tuman nomi + to'liq manzil) NOM/substring
+  // o'xshashligi bo'yicha eng yaqin K ta tumanni tanlaydi — LLM fallback'ini
+  // 200+ dan qisqa ishonchli ro'yxatga toraytiradi. Imlo xatoli nom ham
+  // (past ball bilan) ro'yxatga tushadi. Umumiy — har case uchun alohida qoida yo'q.
+  private shortlistDistricts(
+    draft: AiOrderDraft,
+    districts: DistrictEntity[],
+    k = 30,
+  ): DistrictEntity[] {
+    const nameQ = this.normGeo(draft.district_name || '');
+    const corpus = this.normGeo(
+      `${draft.district_name || ''} ${draft.full_address || draft.address || ''}`,
+    ).replace(/\s+/g, '');
+    if (!nameQ && corpus.length < 4) return [];
+
+    const scored = districts
+      .map((d) => {
+        const dn = this.normGeo(d.name);
+        const dnFlat = dn.replace(/\s+/g, '');
+        let s = 0;
+        if (nameQ) s = Math.max(s, this.simRatio(dn, nameQ));
+        if (corpus.length >= 4 && dnFlat.length >= 4) {
+          s = Math.max(s, this.bestSubstringSim(corpus, dnFlat));
+        }
+        return { d, s };
+      })
+      .filter((x) => x.s > 0.3)
+      .sort((a, b) => b.s - a.s);
+
+    return scored.slice(0, k).map((x) => x.d);
   }
 
   // Berilgan pool ustida bitta LLM tanlash: raqamlangan ro'yxat -> model indeks
@@ -1292,7 +1435,9 @@ export class AiOrderService {
       system: DISTRICT_LLM_SYSTEM,
       userText,
       schema: DISTRICT_LLM_SCHEMA,
+      model: config.AI_CLASSIFY_MODEL,
       maxTokens: 64,
+      meta: { feature: 'order_district', requestArea: 'order' },
     });
     if (!res) return false;
     const k = Math.floor(Number(res.choice));
@@ -1303,7 +1448,9 @@ export class AiOrderService {
     draft.district_resolved_name = d.name;
     draft.region_id = d.region_id;
     draft.region_label = d.region?.name || draft.region_label;
-    draft.district_label = d.region?.name ? `${d.region.name}, ${d.name}` : d.name;
+    draft.district_label = d.region?.name
+      ? `${d.region.name}, ${d.name}`
+      : d.name;
     draft.district_candidates = undefined;
     return true;
   }
@@ -1334,7 +1481,9 @@ export class AiOrderService {
       system: DISAMBIG_SYSTEM,
       userText: lines,
       schema: DISAMBIG_SCHEMA,
+      model: config.AI_CLASSIFY_MODEL,
       maxTokens: 512,
+      meta: { feature: 'order_item_match', requestArea: 'order' },
     });
     if (!res || !Array.isArray(res.picks)) return;
 
@@ -1413,14 +1562,25 @@ export class AiOrderService {
       }
     }
 
+    // VILOYAT ISHONCHLI aniqlangan bo'lsa — tuman qidiruvini FAQAT shu viloyat
+    // ichida olib boramiz. Bu KRITIK cross-region xatoni oldini oladi: masalan
+    // "Toshkent shahri Xonobod" — Toshkentda "Xonobod" yo'q bo'lsa, Andijondagi
+    // o'xshash tuman (Xo'jaobod/Xonobod) OLINMAYDI; tuman bo'sh qoladi (operator
+    // to'ldiradi), viloyat esa Toshkent bo'lib SAQLANADI. Viloyat berilmagan/
+    // noaniq bo'lsagina butun mamlakat bo'ylab qidiramiz (tuman viloyatni tiklaydi).
+    const regionLocked = !!draft.region_id;
+    const searchPool = regionLocked
+      ? districts.filter((d) => d.region_id === draft.region_id)
+      : districts;
+
     // 1-usul: district_name bo'yicha (aniq base-nom, keyin qism-mos).
     let matches: DistrictEntity[] = [];
     if (draft.district_name) {
       const q = this.normGeo(draft.district_name);
       if (q) {
-        matches = districts.filter((d) => this.normGeo(d.name) === q);
+        matches = searchPool.filter((d) => this.normGeo(d.name) === q);
         if (!matches.length) {
-          matches = districts.filter((d) => {
+          matches = searchPool.filter((d) => {
             const dn = this.normGeo(d.name);
             return dn.length > 2 && (dn.includes(q) || q.includes(dn));
           });
@@ -1450,7 +1610,7 @@ export class AiOrderService {
       );
       if (corpus) {
         const padded = ` ${corpus} `;
-        const found = districts
+        const found = searchPool
           .map((d) => ({ d, dn: this.normGeo(d.name) }))
           .filter((x) => x.dn.length >= 4 && padded.includes(` ${x.dn} `))
           .sort((a, b) => b.dn.length - a.dn.length);
@@ -1468,11 +1628,9 @@ export class AiOrderService {
     if (!matches.length && draft.district_name) {
       const base = this.normGeo(draft.district_name);
       if (base.length >= 3) {
-        const inRegion = draft.region_id
-          ? districts.filter((d) => d.region_id === draft.region_id)
-          : [];
-        const pool = inRegion.length ? inRegion : districts;
-        const scored = pool
+        // Viloyat qulf: ishonchli viloyat bo'lsa shu viloyat ichida (bo'sh
+        // bo'lsa cross-region OLMAYMIZ); aks holda butun ro'yxat.
+        const scored = searchPool
           .map((d) => ({ d, s: this.simRatio(this.normGeo(d.name), base) }))
           .filter((x) => x.s >= 0.72)
           .sort((a, b) => b.s - a.s);
@@ -1515,13 +1673,10 @@ export class AiOrderService {
         })
         .join('');
       if (corpus.length >= 4) {
-        const inRegion = draft.region_id
-          ? districts.filter((d) => d.region_id === draft.region_id)
-          : [];
-        const pool = inRegion.length ? inRegion : districts;
+        // Viloyat qulf: ishonchli viloyat bo'lsa shu viloyat ichida qidiramiz.
         let bestScore = 0;
         let bestDs: DistrictEntity[] = [];
-        for (const d of pool) {
+        for (const d of searchPool) {
           const dn = this.normGeo(d.name).replace(/\s+/g, '');
           if (dn.length < 4) continue;
           const sc = this.bestSubstringSim(corpus, dn);
@@ -1773,7 +1928,8 @@ export class AiOrderService {
     let digits = String(input).replace(/\D/g, '');
     // Davlat kodi (998...) yoki trunk prefiks (0.../8...) — milliy 9 raqamga
     // keltiramiz ("+998 90...", "0 90...", "8 90..." hammasi qabul qilinsin).
-    if (digits.length === 12 && digits.startsWith('998')) digits = digits.slice(3);
+    if (digits.length === 12 && digits.startsWith('998'))
+      digits = digits.slice(3);
     else if (
       digits.length === 10 &&
       (digits.startsWith('0') || digits.startsWith('8'))
@@ -1793,10 +1949,7 @@ export class AiOrderService {
   // "Toshkent shahri" != "Toshkent viloyati" farqini saqlash uchun.
   private lightNorm(s: string): string {
     // translit: kirill->lotin + diakritik + apostrof (universal).
-    return this.translit(s)
-      .replace(/kh/g, 'x')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return this.translit(s).replace(/kh/g, 'x').replace(/\s+/g, ' ').trim();
   }
 
   private normGeo(s: string): string {
@@ -1838,9 +1991,7 @@ export class AiOrderService {
     if (!draft.district_id && !draft.district_candidates?.length)
       missing.push('tuman');
     if (!draft.items.length) missing.push('mahsulot');
-    else if (
-      draft.items.some((i) => !i.product_id && !i.candidates?.length)
-    )
+    else if (draft.items.some((i) => !i.product_id && !i.candidates?.length))
       missing.push('katalogda topilmagan mahsulot');
     if (draft.total_price == null) missing.push('narx');
     return missing;
@@ -1913,7 +2064,12 @@ export class AiOrderService {
               callback_data: `order_ai:pickdistrict:${draft.nonce}:${idx}`,
             },
           ]),
-          [{ text: '❌ Bekor', callback_data: `order_ai:cancel:${draft.nonce}` }],
+          [
+            {
+              text: '❌ Bekor',
+              callback_data: `order_ai:cancel:${draft.nonce}`,
+            },
+          ],
         ],
       },
     };
@@ -1938,7 +2094,12 @@ export class AiOrderService {
               callback_data: `order_ai:pickproduct:${draft.nonce}:${itemIndex}:${idx}`,
             },
           ]),
-          [{ text: '❌ Bekor', callback_data: `order_ai:cancel:${draft.nonce}` }],
+          [
+            {
+              text: '❌ Bekor',
+              callback_data: `order_ai:cancel:${draft.nonce}`,
+            },
+          ],
         ],
       },
     };
@@ -1982,7 +2143,10 @@ export class AiOrderService {
       operator: operator.user.name,
     };
 
-    const res = (await this.orderService.createOrderByBot(dto, operator.jwt)) as {
+    const res = (await this.orderService.createOrderByBot(
+      dto,
+      operator.jwt,
+    )) as {
       statusCode?: number;
       message?: string;
     };
@@ -1999,6 +2163,9 @@ export class AiOrderService {
         message: 'ℹ️ Bu buyurtma allaqachon yaratilgan (dublikat).',
       };
     }
-    return { ok: false, message: `❌ ${res?.message || 'Buyurtma yaratilmadi'}` };
+    return {
+      ok: false,
+      message: `❌ ${res?.message || 'Buyurtma yaratilmadi'}`,
+    };
   }
 }

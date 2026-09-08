@@ -1,7 +1,30 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import config from 'src/config';
 import { MyLogger } from 'src/logger/logger.service';
+import { AiUsageService } from 'src/api/ai-usage/ai-usage.service';
+
+/**
+ * AI xarajat yozuvi uchun kontekst — chaqiruvchi (order-AI / Elchin) beradi.
+ * feature: aniq amal, requestArea: koarse guruh (dashboard filtri).
+ */
+export interface ClaudeUsageMeta {
+  feature: string;
+  requestArea?: string;
+  orderId?: string | null;
+  userId?: string | null;
+  conversationId?: string | null;
+}
+
+/**
+ * extractJson uchun rasm kirishi (vision). Claude rasmдаги matnни o'qib
+ * (masalan buyurtма varag'i / skrinshot) ma'lumot ajratadi. base64 kodlangan
+ * bo'lishi kerak; mediaType Anthropic qo'llagan turlardan biri.
+ */
+export interface ClaudeImageInput {
+  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+  dataBase64: string;
+}
 
 /**
  * Claude (Anthropic) uchun yupqa wrapper.
@@ -16,13 +39,62 @@ import { MyLogger } from 'src/logger/logger.service';
 export class ClaudeService {
   private readonly client: Anthropic | null;
 
-  constructor(private readonly logger: MyLogger) {
+  constructor(
+    private readonly logger: MyLogger,
+    // Ixtiyoriy — AI xarajat jurnali. Berilmasa (modul import qilmagan bo'lsa)
+    // yozuv o'tkazib yuboriladi; ClaudeService baribir ishlayveradi.
+    @Optional() private readonly aiUsage?: AiUsageService,
+  ) {
     const apiKey = (config.ANTHROPIC_API_KEY || '').trim();
     this.client = apiKey ? new Anthropic({ apiKey }) : null;
   }
 
   isEnabled(): boolean {
     return this.client !== null;
+  }
+
+  /**
+   * Bitta javob (bitta chaqiruv) usage'ini jurnalga yozadi — fire-and-forget.
+   * meta berilmasa yoki AiUsageService yo'q bo'lsa jimgina o'tkazib yuboradi.
+   */
+  private recordUsage(
+    response: Anthropic.Message,
+    model: string,
+    meta?: ClaudeUsageMeta,
+  ): void {
+    if (!meta || !this.aiUsage) return;
+    const u = response.usage;
+    this.aiUsage.record({
+      feature: meta.feature,
+      requestArea: meta.requestArea,
+      model,
+      inputTokens: u?.input_tokens ?? 0,
+      outputTokens: u?.output_tokens ?? 0,
+      cacheCreationTokens: u?.cache_creation_input_tokens ?? 0,
+      cacheReadTokens: u?.cache_read_input_tokens ?? 0,
+      steps: 1,
+      orderId: meta.orderId,
+      userId: meta.userId,
+      conversationId: meta.conversationId,
+    });
+  }
+
+  /**
+   * System-prompt'ni PROMPT CACHING bilan uzatadi. Katta, o'zgarmas system
+   * (ekstraksiya ~4200 token, moliya prompti) takroriy chaqiruvlarda ~90% arzon
+   * o'qiladi (cache_read = input*0.1). Anthropic minimal kesh chegarasidan
+   * (~1024 token) kichik promptlarni JIMGINA kesh qilmaydi — xato bermaydi,
+   * shunchaki oddiy narxda ketadi (kichik DISTRICT/CATEGORY promptlari uchun
+   * xavfsiz). Kesh 5 daqiqa (ephemeral) — hajmli oqimda deyarli doim issiq.
+   */
+  private cachedSystem(system: string): Anthropic.TextBlockParam[] {
+    return [
+      {
+        type: 'text',
+        text: system,
+        cache_control: { type: 'ephemeral' },
+      },
+    ];
   }
 
   /**
@@ -39,25 +111,46 @@ export class ClaudeService {
     schema: Record<string, unknown>;
     model?: string;
     maxTokens?: number;
+    meta?: ClaudeUsageMeta;
+    // Vision: rasm(lar) berilsa, Claude ularдаги matnни o'qib ma'lumot ajratadi.
+    images?: ClaudeImageInput[];
   }): Promise<T | null> {
     if (!this.client) return null;
 
+    const model = opts.model || config.AI_ORDER_MODEL || 'claude-haiku-4-5';
     try {
+      // Foydalanuvchi bloki: rasm(lar) + matn. Matn DATA sifatida (instruksiya
+      // emas — prompt-injection himoyasi). Rasm bo'lmasa oddiy matn (backward
+      // compat). Rasm modeli vision qo'llashi kerak (chaqiruvchi model beradi).
+      const textBlockContent = `<user_message>\n${opts.userText}\n</user_message>`;
+      const content: Anthropic.ContentBlockParam[] | string = opts.images?.length
+        ? [
+            ...opts.images.map(
+              (img): Anthropic.ImageBlockParam => ({
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: img.mediaType,
+                  data: img.dataBase64,
+                },
+              }),
+            ),
+            { type: 'text', text: textBlockContent },
+          ]
+        : textBlockContent;
+
       const response = await this.client.messages.create({
-        model: opts.model || config.AI_ORDER_MODEL || 'claude-haiku-4-5',
+        model,
         max_tokens: opts.maxTokens ?? 1024,
-        system: opts.system,
-        // Manzil/mijoz matni DATA sifatida — instruksiya emas (prompt-injection):
-        messages: [
-          {
-            role: 'user',
-            content: `<user_message>\n${opts.userText}\n</user_message>`,
-          },
-        ],
+        system: this.cachedSystem(opts.system),
+        messages: [{ role: 'user', content }],
         output_config: {
           format: { type: 'json_schema', schema: opts.schema },
         },
       });
+
+      // Tokenlar sarflandi (natija valid bo'lmasa ham) — xarajatni yozamiz.
+      this.recordUsage(response, model, opts.meta);
 
       // Refusal yoki max_tokens — chiqish to'liq/valid bo'lmasligi mumkin
       if (response.stop_reason === 'refusal') {
@@ -100,19 +193,22 @@ export class ClaudeService {
     userText: string;
     model?: string;
     maxTokens?: number;
+    meta?: ClaudeUsageMeta;
   }): Promise<string | null> {
     if (!this.client) return null;
+    const model =
+      opts.model ||
+      config.AI_FINANCE_MODEL ||
+      config.AI_ORDER_MODEL ||
+      'claude-opus-4-8';
     try {
       const response = await this.client.messages.create({
-        model:
-          opts.model ||
-          config.AI_FINANCE_MODEL ||
-          config.AI_ORDER_MODEL ||
-          'claude-opus-4-8',
+        model,
         max_tokens: opts.maxTokens ?? 2048,
-        system: opts.system,
+        system: this.cachedSystem(opts.system),
         messages: [{ role: 'user', content: opts.userText }],
       });
+      this.recordUsage(response, model, opts.meta);
       if (response.stop_reason === 'refusal') {
         this.logger.log('Claude refused ask request', 'ClaudeService');
         return null;
@@ -146,6 +242,7 @@ export class ClaudeService {
     model?: string;
     maxTokens?: number;
     maxSteps?: number;
+    meta?: ClaudeUsageMeta;
   }): Promise<{ text: string; toolsUsed: string[] } | null> {
     if (!this.client) return null;
     const model =
@@ -158,16 +255,29 @@ export class ClaudeService {
     const messages: Anthropic.MessageParam[] = [
       { role: 'user', content: opts.content ?? opts.userText ?? '' },
     ];
+    // Barcha qadamlar usage'i BITTA jurnal qatoriga yig'iladi (foydalanuvchiga
+    // ko'rinadigan bitta savol = bitta xarajat). finally'da yoziladi — xato/
+    // erta chiqishda ham sarflangan token yo'qolmaydi.
+    let inTok = 0;
+    let outTok = 0;
+    let cacheC = 0;
+    let cacheR = 0;
+    let steps = 0;
 
     try {
       for (let step = 0; step < maxSteps; step++) {
         const response = await this.client.messages.create({
           model,
           max_tokens: opts.maxTokens ?? 1500,
-          system: opts.system,
+          system: this.cachedSystem(opts.system),
           tools: opts.tools,
           messages,
         });
+        steps++;
+        inTok += response.usage?.input_tokens ?? 0;
+        outTok += response.usage?.output_tokens ?? 0;
+        cacheC += response.usage?.cache_creation_input_tokens ?? 0;
+        cacheR += response.usage?.cache_read_input_tokens ?? 0;
 
         if (response.stop_reason === 'refusal') {
           this.logger.log('Claude refused askWithTools', 'ClaudeService');
@@ -217,6 +327,23 @@ export class ClaudeService {
         'ClaudeService',
       );
       return null;
+    } finally {
+      // Sarflangan token — muvaffaqiyat/xato/erta chiqishdan qat'i nazar yoziladi.
+      if (opts.meta && this.aiUsage && steps > 0) {
+        this.aiUsage.record({
+          feature: opts.meta.feature,
+          requestArea: opts.meta.requestArea,
+          model,
+          inputTokens: inTok,
+          outputTokens: outTok,
+          cacheCreationTokens: cacheC,
+          cacheReadTokens: cacheR,
+          steps,
+          orderId: opts.meta.orderId,
+          userId: opts.meta.userId,
+          conversationId: opts.meta.conversationId,
+        });
+      }
     }
   }
 }

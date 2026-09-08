@@ -20,6 +20,7 @@ import {
   Group_type,
   Operation_type,
   Order_status,
+  OrderCreatedSource,
   Post_status,
   Replacement_state,
   Roles,
@@ -272,6 +273,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   async createOrder(
     createOrderDto: CreateOrderDto,
     user: JwtPayload,
+    // Buyurtma manbasi (audit/tracking + AI dashboard). Default 'manual' (web
+    // forma). AI oqimi 'ai', bot 'bot' uzatadi.
+    source: OrderCreatedSource = OrderCreatedSource.MANUAL,
   ): Promise<object> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -478,6 +482,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         replacement_state: replacedOrder
           ? Replacement_state.AWAITING_OLD_PICKUP
           : null,
+        created_source: source,
       });
 
       await queryRunner.manager.save(newOrder);
@@ -526,6 +531,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           ? `Buyurtma #${newOrder.order_number} yaratildi (ALMASHTIRISH — eski #${replacedOrder.order_number} o'rniga) — ${total_price} so'm`
           : `Buyurtma #${newOrder.order_number} yaratildi — ${total_price} so'm`,
         user,
+        metadata: { source },
       });
 
       return successRes(newOrder, 201, 'New order created');
@@ -808,6 +814,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         status: Order_status.CREATED,
         qr_code_token,
         comment,
+        created_source: OrderCreatedSource.BOT,
       });
       await queryRunner.manager.save(newOrder);
 
@@ -882,6 +889,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         },
         description: `Buyurtma #${order.order_number} Telegram bot orqali yaratildi — ${order.total_price} so'm`,
         user,
+        metadata: { source: OrderCreatedSource.BOT },
       });
 
       // Tranzaksiyadan TASHQARIDA (lock ushlamay): guruh-tasdiqlashga yo'naltirish.

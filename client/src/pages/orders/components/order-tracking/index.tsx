@@ -164,6 +164,23 @@ const WHERE_DELIVER_LABELS: Record<string, string> = {
   address: "Uygacha",
 };
 
+// Buyurtma yaratilish manbasi — tracking'da ko'rsatish uchun o'zbekcha yorliq
+// + rang. 'telegram_bot' eski loglar uchun (yangi loglar 'bot').
+const SOURCE_LABELS: Record<string, string> = {
+  manual: "Qo'lda kiritildi",
+  ai: "AI orqali",
+  bot: "Bot orqali",
+  telegram_bot: "Bot orqali",
+};
+const SOURCE_BADGE: Record<string, string> = {
+  manual:
+    "bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-200 border-gray-200 dark:border-gray-600",
+  ai: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-700",
+  bot: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border-sky-200 dark:border-sky-700",
+  telegram_bot:
+    "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border-sky-200 dark:border-sky-700",
+};
+
 // *_id yoniga *_name kelganda, xom UUID qatorini yashiramiz.
 const ID_NAME_SIBLING: Record<string, string> = {
   district_id: "district_name",
@@ -201,6 +218,9 @@ const formatValue = (key: string, value: any): string => {
   }
   if (key === "where_deliver" && typeof value === "string") {
     return WHERE_DELIVER_LABELS[value] || value;
+  }
+  if (key === "source" && typeof value === "string") {
+    return SOURCE_LABELS[value] || value;
   }
   if (key === "items_changed") {
     return value ? "O'zgartirildi" : "—";
@@ -418,7 +438,16 @@ const OrderTracking = ({ orderId }: { orderId: string }) => {
               const Icon = config.icon;
               const diffs = getValueDiffs(log.old_value, log.new_value);
               const metadata = log.metadata || {};
-              const metadataKeys = Object.keys(metadata);
+              // Yaratilish manbasi (AI/qo'lda/bot) — 'created' yozuvida alohida
+              // badge. metadata.source (yangi) yoki new_value.source (eski bot loglari).
+              const createdSource: string | undefined =
+                log.action === "created"
+                  ? metadata.source || log.new_value?.source
+                  : undefined;
+              // Manbani metadata chiplaridan chiqarib tashlaymiz (badge'da bor).
+              const metadataKeys = Object.keys(metadata).filter(
+                (k) => !(log.action === "created" && k === "source"),
+              );
 
               return (
                 <div
@@ -441,11 +470,21 @@ const OrderTracking = ({ orderId }: { orderId: string }) => {
                   <div
                     className={`mt-3 w-full rounded-xl border bg-gray-50/60 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700/60 p-3 ring-1 ${config.ringColor}`}
                   >
-                    {/* Action label + sana */}
-                    <div className="flex items-center justify-between gap-2 mb-2">
+                    {/* Action label + manba badge */}
+                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                       <span className="text-[11px] px-2 py-0.5 rounded-md font-semibold bg-white dark:bg-gray-900/50 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
                         {config.label}
                       </span>
+                      {createdSource && (
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
+                            SOURCE_BADGE[createdSource] || SOURCE_BADGE.manual
+                          }`}
+                          title="Buyurtma qanday yaratilgani"
+                        >
+                          {SOURCE_LABELS[createdSource] || createdSource}
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-2 font-mono">
