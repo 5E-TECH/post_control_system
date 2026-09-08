@@ -31,6 +31,13 @@ const TOKEN_REGEX = /^group_token-.+/i;
 const BUTTON_LABELS = ['➕ Yangi buyurtma', '➕ Add order'];
 // Rasm hajmi chegarasi — Claude ~5MB/rasm limiti (DoS/xarajat himoyasi).
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+// Claude vision qo'llaydigan rasm formatlari (rasm-hujjat mime tekshiruvi uchun).
+const CLAUDE_IMAGE_MIME = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
 
 const getHttpStatus = (err: unknown): number => {
   const candidate =
@@ -473,7 +480,7 @@ export class OrderBotUpdate {
         sorted.find((p) => (p.file_size || 0) <= PHOTO_MAX_BYTES) || sorted.at(-1);
       if (!chosen) return;
 
-      const image = await this.downloadTelegramPhoto(ctx, chosen.file_id);
+      const image = await this.downloadTelegramImage(ctx, chosen.file_id);
       if (!image) {
         await ctx.reply(
           "🤖 Rasmni yuklab bo'lmadi. Qayta yuboring yoki matn bilan yozing.",
@@ -488,11 +495,82 @@ export class OrderBotUpdate {
     }
   }
 
+  // ── RASM HUJJAT sifatida (siqilmasдan) yuborilsa. Oddiy surat Telegram
+  // tomonidan avtomatik siqiladi (kichik keladi); hujjat esa asl/katta bo'lishi
+  // mumkin. Yaroqli format + <=5MB bo'lsa qabul qilamiz; katta yoki Claude
+  // qo'llamaydigan format (HEIC va h.k.) bo'lsa — SURAT sifatida yuborishni
+  // so'raymiz (Telegram o'zi jpeg'ga siqib, kichraytirib beradi).
+  @On('document')
+  async onAiDocument(@Ctx() ctx: MyContext) {
+    if (ctx.chat?.type !== 'private') return;
+    if (!this.aiOrderService.isEnabled()) return;
+
+    const step = ctx.session.step;
+    if (step === 'waiting_for_token' || step === 'waiting_for_phone') return;
+
+    const message = ctx.message as Message.DocumentMessage | undefined;
+    const doc = message?.document;
+    if (!doc) return;
+    const mime = (doc.mime_type || '').toLowerCase();
+    // Faqat rasm-hujjatlar bilan ishlaymiz; boshqa fayllarga (pdf, doc...) jim.
+    if (!mime.startsWith('image/')) return;
+
+    const caption =
+      message && 'caption' in message ? (message.caption || '').trim() : '';
+    const uid = ctx.from?.id;
+    if (uid == null) return;
+
+    // Claude qo'llaydigan formatlar. Boshqasi (masalan HEIC) -> surat sifatida so'raymiz.
+    if (!CLAUDE_IMAGE_MIME.includes(mime)) {
+      await ctx.reply(
+        "🤖 Bu rasm formatini o'qiy olmadim. Iltimos rasmni 📷 SURAT sifatida (fayl sifatida emas) yuboring — u avtomatik moslashtiriladi.",
+      );
+      return;
+    }
+    // Katta hujjat: Telegram siqishига yo'naltiramiz (serverda kichraytirmaymiz).
+    if ((doc.file_size || 0) > PHOTO_MAX_BYTES) {
+      await ctx.reply(
+        "🤖 Rasm katta (5MB dan oshiq). Iltimos uni 📷 SURAT sifatida yuboring — Telegram avtomatik kichraytiradi va o'qib beraman.",
+      );
+      return;
+    }
+
+    if (this.aiBusy.has(uid)) {
+      await ctx.reply("⏳ Oldingi xabaringiz o'qilmoqda, biroz kuting...");
+      return;
+    }
+    this.aiBusy.add(uid);
+
+    try {
+      const operator = await this.aiOrderService.resolveOperator(uid);
+      if (!operator) return;
+
+      const image = await this.downloadTelegramImage(
+        ctx,
+        doc.file_id,
+        mime as ClaudeImageInput['mediaType'],
+      );
+      if (!image) {
+        await ctx.reply(
+          "🤖 Rasmni yuklab bo'lmadi. 📷 Surat sifatida yuboring yoki matn bilan yozing.",
+          { reply_markup: this.orderBotService.openWebApp() },
+        );
+        return;
+      }
+
+      await this.runAiParse(ctx, operator, caption, [image]);
+    } finally {
+      this.aiBusy.delete(uid);
+    }
+  }
+
   // Telegram rasmini yuklab, Claude vision uchun base64 ClaudeImageInput qaytaradi.
-  // Telegram siqilgan rasmlari JPEG. Xato/katta bo'lsa null (chaqiruvchi xabar beradi).
-  private async downloadTelegramPhoto(
+  // Telegram siqilgan surati JPEG; rasm-hujjat (document) uchun mediaType beriladi.
+  // Xato/katta bo'lsa null (chaqiruvchi xabar beradi).
+  private async downloadTelegramImage(
     ctx: MyContext,
     fileId: string,
+    mediaType: ClaudeImageInput['mediaType'] = 'image/jpeg',
   ): Promise<ClaudeImageInput | null> {
     try {
       const link = await ctx.telegram.getFileLink(fileId);
@@ -502,7 +580,7 @@ export class OrderBotUpdate {
       if (!buf.length || buf.length > PHOTO_MAX_BYTES) {
         throw new Error(`rasm hajmi mos emas (${buf.length} bayt)`);
       }
-      return { mediaType: 'image/jpeg', dataBase64: buf.toString('base64') };
+      return { mediaType, dataBase64: buf.toString('base64') };
     } catch (err) {
       this.logger.error(
         `Telegram rasm yuklash xatosi: ${(err as Error).message}`,
