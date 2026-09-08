@@ -36,14 +36,18 @@ const OrderItems = () => {
   const marketId = market?.id;
   const { getProductsByMarket, getMyProducts } = useProduct();
 
+  // limit: 0 -> backend BARCHA mahsulotni qaytaradi (getSafeLimit: 0 => MAX_FETCH_ALL).
+  // Pagination YO'Q: 100+ mahsulot bo'lsa ham hammasi yuklanadi, operator qidirib
+  // yoki tanlab topadi (Select showSearch client tomonda filtrlaydi).
   const myProductsQuery = getMyProducts(
-    undefined,
+    { limit: 0 },
     user.role === "market" || user.role === "operator"
   );
 
   const marketProductsQuery = getProductsByMarket(
     marketId as string,
-    user.role !== "market" && user.role !== "operator"
+    user.role !== "market" && user.role !== "operator",
+    { limit: 0 }
   );
 
   const data =

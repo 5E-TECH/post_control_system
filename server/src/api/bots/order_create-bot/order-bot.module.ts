@@ -21,6 +21,7 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { MyLogger } from 'src/logger/logger.service';
 import { OrderModule } from 'src/api/order/order.module';
 import { AiBalanceModule } from 'src/api/ai-balance/ai-balance.module';
+import { AiUsageModule } from 'src/api/ai-usage/ai-usage.module';
 
 @Module({
   imports: [
@@ -64,6 +65,8 @@ import { AiBalanceModule } from 'src/api/ai-balance/ai-balance.module';
     // AI-balans (charge/state) botda ishlatiladi; ai-balance esa topup'да
     // BotNotifyService'ni chaqiradi — sikl forwardRef bilan yopiladi.
     forwardRef(() => AiBalanceModule),
+    // Order-AI real xarajatini (ai_usage_log) yozish uchun.
+    AiUsageModule,
   ],
   controllers: [BotBroadcastController],
   providers: [

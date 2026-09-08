@@ -37,10 +37,26 @@ type Msg = {
 
 const SUGGESTIONS = [
   "Shu oy sof foydam qancha?",
+  "Shu oy kirim va xarajat qancha?",
   "Xarajatni qaysi kategoriya bo'yicha kamaytiray?",
   "Oxirgi 3 oy foyda trendi qanday?",
-  "Excelni platforma bilan solishtir, farqni top",
 ];
+
+// AI ishlatgan asbob (tool) nomlarini o'zbekcha chiroyli yorliqqa aylantiradi —
+// aks holda xom nom (get_income) ko'rinadi. Ro'yxatda bo'lmasa xom nom qoladi.
+const TOOL_LABEL: Record<string, string> = {
+  get_revenue: "Sotuv foydasi",
+  get_net_profit: "Sof foyda",
+  get_expenses: "Xarajatlar",
+  get_expense_categories: "Xarajat kategoriyalari",
+  get_expense_comments: "Xarajat izohlari",
+  get_income: "Kirimlar",
+  get_income_comments: "Kirim izohlari",
+  get_cash_position: "Naqd holat",
+  get_order_flow: "Buyurtma oqimi",
+  get_shifts: "Smenalar",
+  get_shift_transactions: "Smena yozuvlari",
+};
 
 const ACCEPT = "image/*,.xlsx,.xls,.csv";
 
@@ -451,7 +467,7 @@ const AiFinanceChat: React.FC = () => {
                                   key={t}
                                   className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-900/20 text-purple-500 dark:text-purple-300"
                                 >
-                                  {t}
+                                  {TOOL_LABEL[t] || t}
                                 </span>
                               ))}
                             </div>

@@ -12,8 +12,10 @@ import {
   Header,
   Inject,
   forwardRef,
+  BadRequestException,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { ClaudeImageInput } from 'src/infrastructure/ai/claude.service';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -150,7 +152,20 @@ export class OrderController {
   )
   @Post('ai-parse')
   aiParse(@Body() dto: AiParseOrderDto, @CurrentUser() user: JwtPayload) {
-    return this.aiOrderService.parseForUser(dto.text, user, dto.market_id);
+    const text = (dto.text || '').trim();
+    const images = (dto.images || []).map((img) => ({
+      mediaType: img.media_type as ClaudeImageInput['mediaType'],
+      dataBase64: img.data_base64,
+    }));
+    if (!text && !images.length) {
+      throw new BadRequestException('Matn yoki rasm yuboring');
+    }
+    return this.aiOrderService.parseForUser(
+      text,
+      user,
+      dto.market_id,
+      images.length ? images : undefined,
+    );
   }
 
   @ApiOperation({ summary: 'Tasdiqlangan AI buyurtmalarni yaratish' })

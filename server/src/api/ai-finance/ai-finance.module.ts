@@ -10,6 +10,7 @@ import { ClaudeService } from 'src/infrastructure/ai/claude.service';
 import { MyLogger } from 'src/logger/logger.service';
 import { OrderModule } from 'src/api/order/order.module';
 import { CashBoxModule } from 'src/api/cash-box/cash-box.module';
+import { AiUsageModule } from 'src/api/ai-usage/ai-usage.module';
 
 /**
  * Moliyaviy AI — faqat-o'qish analitik surface (superadmin/admin).
@@ -28,6 +29,8 @@ import { CashBoxModule } from 'src/api/cash-box/cash-box.module';
     // Savol-javob tool'lari uchun (OrderService, CashBoxService) — export qilingan.
     OrderModule,
     CashBoxModule,
+    // Elchin chat/hisobot xarajatini (ai_usage_log) yozish uchun.
+    AiUsageModule,
   ],
   controllers: [AiFinanceController],
   providers: [AiFinanceService, ClaudeService, MyLogger],

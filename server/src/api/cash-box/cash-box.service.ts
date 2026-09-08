@@ -3786,6 +3786,181 @@ export class CashBoxService
     }
   }
 
+  // ─── Elchin (AI) uchun smena asboblari — faqat O'QISH ───
+  // Bitta smena entity'sini AI uchun ixcham xulosaga aylantiradi. Ochiq smenада
+  // jami kirim/chiqim faqat yopilganда yoziladi (closeShift) — shuning uchun
+  // ochiq smena uchun ular null (finalized:false); aniq raqamlar
+  // getShiftTransactionsForAi'да satr-darajа jonli hisoblanadi.
+  private shiftSummaryForAi(s: ShiftEntity): Record<string, unknown> {
+    const closed = s.status === ShiftStatus.CLOSED;
+    return {
+      id: s.id,
+      status: s.status,
+      finalized: closed,
+      opened_at: Number(s.opened_at),
+      closed_at: s.closed_at ? Number(s.closed_at) : null,
+      opened_by: s.openedByUser?.name || null,
+      closed_by: s.closedByUser?.name || null,
+      opening_balance: {
+        cash: Number(s.opening_balance_cash),
+        card: Number(s.opening_balance_card),
+      },
+      closing_balance: closed
+        ? {
+            cash: Number(s.closing_balance_cash),
+            card: Number(s.closing_balance_card),
+          }
+        : null,
+      income: closed
+        ? {
+            cash: Number(s.total_income_cash),
+            card: Number(s.total_income_card),
+            total: Number(s.total_income_cash) + Number(s.total_income_card),
+          }
+        : null,
+      expense: closed
+        ? {
+            cash: Number(s.total_expense_cash),
+            card: Number(s.total_expense_card),
+            total: Number(s.total_expense_cash) + Number(s.total_expense_card),
+          }
+        : null,
+      comment: s.comment || null,
+    };
+  }
+
+  // epoch-ms -> Tashkent HH:MM (DST yo'q, doim +5) — loyiha konvensiyasi.
+  private hhmmTashkent(ms: number): string {
+    return new Date(ms + 5 * 3600 * 1000).toISOString().slice(11, 16);
+  }
+
+  // Oxirgi smenalar: hozir OCHIQ smena + oxirgi yopilganlar (opened_at DESC).
+  // AI "joriy/oxirgi smena", "oldingi smena"ni aniqlab, kerakli smena
+  // id/oynasini shundan oladi.
+  async getRecentShiftsForAi(
+    limit = 6,
+  ): Promise<{ shifts: Record<string, unknown>[] }> {
+    const take = Math.min(Math.max(Math.floor(limit) || 6, 1), 20);
+    const rows = await this.shiftRepo.find({
+      relations: ['openedByUser', 'closedByUser'],
+      order: { opened_at: 'DESC' },
+      take,
+    });
+    return { shifts: rows.map((s) => this.shiftSummaryForAi(s)) };
+  }
+
+  // Bitta smena ichidagi MAIN kassa harakatlari SATR-DARAJАDA (aniq soat
+  // oynasида: opened_at..closed_at|hozir). selector: 'current' (ochiq),
+  // 'previous'/'last' (oxirgi yopilgan), yoki smena id. Jami subtotal'lar BUTUN
+  // smena bo'yicha; satrlar token nazorati uchun cheklangan (CAP).
+  async getShiftTransactionsForAi(
+    selector?: string,
+  ): Promise<Record<string, unknown>> {
+    const sel = (selector || 'current').trim().toLowerCase();
+    let shift: ShiftEntity | null = null;
+    if (sel === 'current' || sel === 'open' || sel === 'joriy') {
+      shift = await this.shiftRepo.findOne({
+        where: { status: ShiftStatus.OPEN },
+        relations: ['openedByUser', 'closedByUser'],
+        order: { opened_at: 'DESC' },
+      });
+    } else if (
+      sel === 'previous' ||
+      sel === 'last' ||
+      sel === 'oldingi' ||
+      sel === 'oxirgi'
+    ) {
+      shift = await this.shiftRepo.findOne({
+        where: { status: ShiftStatus.CLOSED },
+        relations: ['openedByUser', 'closedByUser'],
+        order: { closed_at: 'DESC' },
+      });
+    } else if (/^[0-9a-f-]{36}$/i.test(sel)) {
+      shift = await this.shiftRepo.findOne({
+        where: { id: selector as string },
+        relations: ['openedByUser', 'closedByUser'],
+      });
+    } else {
+      shift = await this.shiftRepo.findOne({
+        where: { status: ShiftStatus.OPEN },
+        relations: ['openedByUser', 'closedByUser'],
+        order: { opened_at: 'DESC' },
+      });
+    }
+    if (!shift) return { found: false, reason: sel };
+
+    const mainCashbox = await this.cashboxRepo.findOne({
+      where: { cashbox_type: Cashbox_type.MAIN },
+    });
+    if (!mainCashbox) return { found: false, reason: 'no_main_cashbox' };
+
+    const from = Number(shift.opened_at);
+    const to = shift.closed_at ? Number(shift.closed_at) : Date.now();
+    const histories = await this.cashboxHistoryRepo.find({
+      where: {
+        cashbox_id: mainCashbox.id,
+        created_at: Between(from, to),
+      },
+      relations: ['createdByUser', 'sourceUser', 'order'],
+      order: { created_at: 'ASC' },
+    });
+
+    // Jami subtotal'lar — BUTUN smena bo'yicha (satrlar cheklansa ham to'g'ri).
+    let incomeCash = 0;
+    let incomeCard = 0;
+    let expenseCash = 0;
+    let expenseCard = 0;
+    for (const tx of histories) {
+      const amount = Number(tx.amount) || 0;
+      const isCash = tx.payment_method === PaymentMethod.CASH;
+      if (tx.operation_type === Operation_type.INCOME) {
+        if (isCash) incomeCash += amount;
+        else incomeCard += amount;
+      } else {
+        if (isCash) expenseCash += amount;
+        else expenseCard += amount;
+      }
+    }
+
+    const CAP = 300;
+    const lines = histories.slice(0, CAP).map((tx) => ({
+      at: Number(tx.created_at),
+      time: this.hhmmTashkent(Number(tx.created_at)),
+      operation:
+        tx.operation_type === Operation_type.INCOME ? 'income' : 'expense',
+      amount: Number(tx.amount) || 0,
+      // Platforma smena hisobi (closeShift) NAQDdan boshqa hammasini "karta"
+      // guruhiga qo'shadi — solishtirishда mos bo'lishi uchun shu mantiq.
+      method: tx.payment_method === PaymentMethod.CASH ? 'cash' : 'card',
+      raw_method: tx.payment_method || null,
+      source_type: tx.source_type,
+      comment: tx.comment || null,
+      by: tx.createdByUser?.name || null,
+      order_number: tx.order?.order_number ?? null,
+      counterparty: tx.sourceUser?.name || null,
+    }));
+
+    return {
+      found: true,
+      shift: this.shiftSummaryForAi(shift),
+      window: { from, to },
+      totals: {
+        income: { cash: incomeCash, card: incomeCard, total: incomeCash + incomeCard },
+        expense: {
+          cash: expenseCash,
+          card: expenseCard,
+          total: expenseCash + expenseCard,
+        },
+        count: histories.length,
+      },
+      transactions: lines,
+      truncated:
+        histories.length > CAP
+          ? { shown: CAP, total: histories.length }
+          : null,
+    };
+  }
+
   /**
    * Open a new shift
    */

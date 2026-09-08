@@ -74,6 +74,16 @@ export enum Where_deliver {
   ADDRESS = 'address',
 }
 
+// Buyurtma qanday yaratilgani (audit/tracking + AI dashboard):
+//   MANUAL — web forma orqali qo'lda kiritilgan
+//   AI     — web platforma AI oqimi (matndan ekstraksiya)
+//   BOT    — Telegram bot orqali (AI yordamida bo'lsa ham kanal = bot)
+export enum OrderCreatedSource {
+  MANUAL = 'manual',
+  AI = 'ai',
+  BOT = 'bot',
+}
+
 export enum Post_status {
   NEW = 'new',
   SENT = 'sent',

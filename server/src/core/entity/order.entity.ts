@@ -1,5 +1,10 @@
 import { BaseEntity } from 'src/common/database/BaseEntity';
-import { Order_status, Where_deliver, Replacement_state } from 'src/common/enums';
+import {
+  Order_status,
+  Where_deliver,
+  Replacement_state,
+  OrderCreatedSource,
+} from 'src/common/enums';
 import {
   Column,
   Entity,
@@ -27,6 +32,7 @@ import {
 @Index('IDX_ORDER_CREATED_AT', ['created_at'])
 @Index('IDX_ORDER_STATUS_USER', ['status', 'user_id'])
 @Index('IDX_ORDER_STATUS_CREATED', ['status', 'created_at'])
+@Index('IDX_ORDER_SOURCE_CREATED', ['created_source', 'created_at'])
 // Dashboard statistika uchun indexlar
 @Index('IDX_ORDER_SOLD_AT', ['sold_at'])
 @Index('IDX_ORDER_STATUS_SOLD', ['status', 'sold_at'])
@@ -208,6 +214,11 @@ export class OrderEntity extends BaseEntity {
   // Tashqi saytlardan kelgan buyurtma ID si (Adosh, etc.)
   @Column({ type: 'varchar', nullable: true })
   external_id: string;
+
+  // Buyurtma qanday yaratilgani: 'manual' (web forma) | 'ai' (web AI) | 'bot'
+  // (Telegram). Eski yozuvlar -> 'manual'. AI dashboard va tracking uchun.
+  @Column({ type: 'varchar', length: 16, default: OrderCreatedSource.MANUAL })
+  created_source: OrderCreatedSource;
 
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order)
