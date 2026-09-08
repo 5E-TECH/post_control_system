@@ -34,7 +34,15 @@ const som = (n?: number | null) =>
 
 // ── Rasm orqali buyurtma (vision) — backend `order/ai-parse` chegaralari bilan mos.
 const MAX_IMAGES = 5;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB (base64 ~6.85M < backend 7.5M chegara)
+// Asl fayl sanity chegarasi (kichraytirishdan OLDIN) — juda katta faylni canvas'ga
+// yuklamaymiz. Kichraytirilgach natija baribir kichik (~200-500KB) bo'ladi.
+const MAX_SOURCE_BYTES = 30 * 1024 * 1024;
+// Shu hajmdan katta (yoki o'lchami katta) rasm kichraytiriladi; kichiklari asl
+// holida qoladi (skrinshot matni buzilmasin).
+const COMPRESS_ABOVE_BYTES = 1.5 * 1024 * 1024;
+// Kichraytirishda uzun tomon chegarasi — Claude vision ~1568px'da optimal o'qiydi.
+const MAX_IMAGE_DIM = 1568;
+const JPEG_QUALITY = 0.85;
 const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -66,6 +74,51 @@ const fileToImage = (file: File): Promise<UploadedImage> =>
     reader.onerror = () => reject(new Error("read error"));
     reader.readAsDataURL(file);
   });
+
+// Rasmni brauzerda (canvas) kichraytirib JPEG'ga qayta kodlaydi. Zamonaviy
+// telefon rasmlari 5-12MB bo'ladi — bu ularni ~200-500KB'ga tushiradi: "juda
+// katta" xatosi bo'lmaydi, Claude uchun optimal o'lcham, yuklash tez.
+// Kichik + yaroqli rasm bo'lsa asl sifat saqlanadi (skrinshot matni aniq qolsin).
+const downscaleImage = async (file: File): Promise<UploadedImage> => {
+  if (
+    file.size <= COMPRESS_ABOVE_BYTES &&
+    ALLOWED_IMAGE_TYPES.includes(file.type)
+  ) {
+    return fileToImage(file);
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("load error"));
+      el.src = url;
+    });
+    const longest = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+    const scale = Math.min(1, MAX_IMAGE_DIM / longest);
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("no canvas ctx");
+    // Shaffof PNG -> JPEG da qora fon bo'lmasligi uchun oq fon.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+    const base64 = dataUrl.split(",")[1] || "";
+    return {
+      media_type: "image/jpeg",
+      data_base64: base64,
+      preview: dataUrl,
+      name: file.name,
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
 
 // Telefonni +998XXXXXXXXX ga keltiradi (davlat kodi/trunk prefiksni yechadi);
 // noto'g'ri bo'lsa "" qaytaradi. Backend DTO ham shu formatni talab qiladi.
@@ -376,12 +429,13 @@ const AiCreateOrder = () => {
         message.error(`${f.name}: faqat JPG, PNG, GIF yoki WEBP`);
         continue;
       }
-      if (f.size > MAX_IMAGE_BYTES) {
-        message.error(`${f.name}: rasm 5MB dan katta`);
+      if (f.size > MAX_SOURCE_BYTES) {
+        message.error(`${f.name}: rasm juda katta (30MB dan oshmasin)`);
         continue;
       }
       try {
-        valid.push(await fileToImage(f));
+        // Katta rasm avtomatik kichraytiriladi (5MB xatosi bo'lmaydi).
+        valid.push(await downscaleImage(f));
       } catch {
         message.error(`${f.name}: o'qib bo'lmadi`);
       }
