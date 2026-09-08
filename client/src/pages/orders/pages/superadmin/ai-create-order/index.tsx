@@ -22,6 +22,8 @@ import {
   Truck,
   Repeat,
   Plus,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import type { RootState } from "../../../../../app/store";
 import { api } from "../../../../../shared/api";
@@ -29,6 +31,41 @@ import { buildAdminPath } from "../../../../../shared/const";
 
 const som = (n?: number | null) =>
   (Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+// ── Rasm orqali buyurtma (vision) — backend `order/ai-parse` chegaralari bilan mos.
+const MAX_IMAGES = 5;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB (base64 ~6.85M < backend 7.5M chegara)
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+
+type UploadedImage = {
+  media_type: string;
+  data_base64: string; // sof base64 (data: prefiksi olib tashlangan)
+  preview: string; // ko'rsatish uchun to'liq data URL
+  name: string;
+};
+
+// Faylni base64 ga o'giradi (data URL prefiksini yechib, sof base64 qoldiradi).
+const fileToImage = (file: File): Promise<UploadedImage> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = reader.result as string; // data:image/...;base64,XXXX
+      const base64 = url.split(",")[1] || "";
+      resolve({
+        media_type: file.type,
+        data_base64: base64,
+        preview: url,
+        name: file.name,
+      });
+    };
+    reader.onerror = () => reject(new Error("read error"));
+    reader.readAsDataURL(file);
+  });
 
 // Telefonni +998XXXXXXXXX ga keltiradi (davlat kodi/trunk prefiksni yechadi);
 // noto'g'ri bo'lsa "" qaytaradi. Backend DTO ham shu formatni talab qiladi.
@@ -316,9 +353,44 @@ const AiCreateOrder = () => {
   }, [isAdmin, market, navigate]);
 
   const [text, setText] = useState("");
+  // Rasm orqali buyurtma (vision) — yuklangan rasmlar base64 holida ai-parse'ga
+  // yuboriladi (backend Claude vision bilan o'qiydi). Backend chegaralari bilan mos.
+  const [images, setImages] = useState<UploadedImage[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [created, setCreated] = useState<CreatedRow[]>([]);
   const [parseErr, setParseErr] = useState<ParseResponse | null>(null);
+
+  // Tanlangan rasm(lar)ni tekshirib, base64 ga o'girib state'ga qo'shadi.
+  const handleFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const slots = MAX_IMAGES - images.length;
+    if (slots <= 0) {
+      message.warning(`Ko'pi bilan ${MAX_IMAGES} ta rasm`);
+      return;
+    }
+    const picked = Array.from(files).slice(0, slots);
+    const valid: UploadedImage[] = [];
+    for (const f of picked) {
+      if (!ALLOWED_IMAGE_TYPES.includes(f.type)) {
+        message.error(`${f.name}: faqat JPG, PNG, GIF yoki WEBP`);
+        continue;
+      }
+      if (f.size > MAX_IMAGE_BYTES) {
+        message.error(`${f.name}: rasm 5MB dan katta`);
+        continue;
+      }
+      try {
+        valid.push(await fileToImage(f));
+      } catch {
+        message.error(`${f.name}: o'qib bo'lmadi`);
+      }
+    }
+    if (valid.length) setImages((prev) => [...prev, ...valid]);
+  };
+
+  const removeImage = (idx: number) =>
+    setImages((prev) => prev.filter((_, i) => i !== idx));
   // Yaratilgan buyurtmalar imzosi — qayta tahlilда ular qayta chiqib, ikkinchi
   // marta yaratilib qolmasin (dublikat himoya).
   const createdSigs = useRef<Set<string>>(new Set());
@@ -355,7 +427,16 @@ const AiCreateOrder = () => {
   const parseM = useMutation({
     mutationFn: () =>
       api
-        .post("order/ai-parse", { text: text.trim(), market_id: market?.id })
+        .post("order/ai-parse", {
+          text: text.trim() || undefined,
+          market_id: market?.id,
+          images: images.length
+            ? images.map(({ media_type, data_base64 }) => ({
+                media_type,
+                data_base64,
+              }))
+            : undefined,
+        })
         .then((r) => r.data as ParseResponse),
     onSuccess: (data) => {
       if (data.ok && data.orders?.length) {
@@ -456,9 +537,10 @@ const AiCreateOrder = () => {
         setCreated((prev) => [...okRows, ...prev]);
         message.success(`✅ ${okRows.length} ta buyurtma yaratildi`);
         qc.invalidateQueries();
-        // Matnni tozalaymiz — xuddi shu matnni qayta tahlil qilib buyurtmani
-        // ikkinchi marta yaratib qo'ymaslik uchun (parse tugmasi ham o'chadi).
+        // Matn + rasmlarni tozalaymiz — xuddi shu matn/rasmni qayta tahlil qilib
+        // buyurtmani ikkinchi marta yaratib qo'ymaslik uchun (parse tugmasi ham o'chadi).
         setText("");
+        setImages([]);
         setParseErr(null);
       }
       // Yaratilganlarni olib tashlaymiz, muvaffaqiyatsizlarga xato belgisini qo'yamiz.
@@ -694,7 +776,8 @@ const AiCreateOrder = () => {
                     Buyurtma matni
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Bir yoki bir nechta buyurtmani alohida qatorlarda yozing
+                    Buyurtmani matn bilan yozing yoki rasm (varaq/skrinshot)
+                    yuklang
                   </p>
                 </div>
               </div>
@@ -711,15 +794,71 @@ const AiCreateOrder = () => {
                   }
                   className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-y leading-relaxed min-h-[120px] max-h-[70vh]"
                 />
+
+                {/* Rasm orqali buyurtma — yuklangan rasmlar (vision) */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleFiles(e.target.files);
+                    e.target.value = ""; // bir xil faylni qayta tanlash mumkin bo'lsin
+                  }}
+                />
+                {images.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {images.map((img, i) => (
+                      <div
+                        key={i}
+                        className="relative w-20 h-20 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-600 group"
+                      >
+                        <img
+                          src={img.preview}
+                          alt={img.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(i)}
+                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 hover:bg-red-600 text-white flex items-center justify-center transition-colors"
+                          title="O'chirish"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <span className="text-xs text-gray-400">
-                    {text.length}/4000 belgi
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={images.length >= MAX_IMAGES || parseM.isPending}
+                      className={`h-9 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium border transition-all ${
+                        images.length >= MAX_IMAGES || parseM.isPending
+                          ? "border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                          : "border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 cursor-pointer"
+                      }`}
+                      title="Buyurtma varag'i / skrinshot rasmini yuklang"
+                    >
+                      <ImagePlus className="w-4 h-4" /> Rasm
+                      {images.length > 0 ? ` (${images.length}/${MAX_IMAGES})` : ""}
+                    </button>
+                    <span className="text-xs text-gray-400">
+                      {text.length}/4000 belgi
+                    </span>
+                  </div>
                   <button
                     onClick={handleParse}
-                    disabled={!text.trim() || parseM.isPending}
+                    disabled={
+                      (!text.trim() && !images.length) || parseM.isPending
+                    }
                     className={`h-11 px-6 rounded-xl flex items-center gap-2 text-sm font-medium transition-all ${
-                      !text.trim() || parseM.isPending
+                      (!text.trim() && !images.length) || parseM.isPending
                         ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                         : "bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-lg hover:shadow-purple-500/25 cursor-pointer"
                     }`}
