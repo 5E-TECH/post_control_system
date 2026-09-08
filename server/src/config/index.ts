@@ -29,12 +29,13 @@ export default {
 
   // AI (Claude) — bo'sh bo'lsa AI oqimi o'chiriladi, WebApp forma ishlayveradi
   ANTHROPIC_API_KEY: String(process.env.ANTHROPIC_API_KEY || ''),
-  // Ekstraksiya sifati "haqiqiy AI" hissi uchun kritik — kuchli model tanlanadi.
-  // Opus 4.8 aralash o'zbek/rus matn, noaniq manzil (Toshkent shahri/viloyati) va
-  // narx×son hisobida Haiku'dan sezilarli aniqroq. Structured output (json_schema)
-  // qo'llanadi; thinking default o'chiq (tez, arzon ekstraksiya). Har buyurtma AI
-  // xarajati ~185 so'm (sen 300 olasan) — foyda saqlanadi.
-  AI_ORDER_MODEL: String(process.env.AI_ORDER_MODEL || 'claude-opus-4-8'),
+  // Ekstraksiya modeli. Sonnet 4.6 aralash o'zbek/rus matn, noaniq manzil va
+  // narx×son hisobida yetarli aniq VA Opus'dan ~1.7x arzon (marja saqlanadi:
+  // prompt caching bilan ~1 buyurtma ~120-160 so'm, 300 olasan). Aniqlik
+  // pasaymasligi uchun tuman/viloyat rezolyutsiyasi kuchaytirildi (viloyat
+  // cheklovi + LLM xavfsizlik to'ri). Structured output (json_schema); thinking
+  // default o'chiq. Kerak bo'lsa .env orqali Opus'ga ko'tarish mumkin.
+  AI_ORDER_MODEL: String(process.env.AI_ORDER_MODEL || 'claude-sonnet-4-6'),
   // Rasm orqali buyurtma (vision) ekstraksiya modeli — rasmдаги matnни o'qib
   // buyurtма ma'lumotini ajratadi. Aniqlik/narx muvozanati uchun Sonnet 4.6.
   // Vision qo'llaydigan model bo'lishi SHART (Opus/Sonnet; Haiku ham vision).

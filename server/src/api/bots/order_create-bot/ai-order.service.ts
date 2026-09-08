@@ -79,7 +79,9 @@ Foydalanuvchi (operator yoki market) yozgan yoki mijozdan forward qilingan erkin
 QAT'IY QOIDALAR:
 - Faqat matnda ANIQ bor ma'lumotni chiqar. Yo'q bo'lsa null qoldiring — HECH NARSA TO'QIB CHIQARMA.
 - Mahsulotlar uchun faqat NOMINI va sonini (quantity) yoz; ID/narx to'qima. Son ko'rsatilmagan bo'lsa 1.
-- region_name = VILOYAT nomi (masalan "Andijon", "Navoiy"). MUHIM: agar matnda "shahri" yoki "viloyati" so'zi yozilgan bo'lsa, uni HAM qo'shib yoz — ayniqsa Toshkent uchun: "Toshkent shahri" (poytaxt) va "Toshkent viloyati" (atrofdagi tumanlar) ikki XIL joy, farqla. GEOGRAFIK INFERENCE: agar matnda viloyat YOZILMAGAN bo'lsa-yu, tuman/shahar/shaharcha/qishloq nomi bor bo'lsa — O'zbekiston geografiyasi bo'yicha u QAYSI VILOYATda ekanini o'zing aniqlab region_name'ga yoz (masalan "Chilonzor" -> "Toshkent shahri", "Xo'jaobod" -> "Andijon", "Asaka" -> "Andijon", "Xonobod" -> o'z viloyati). Bu KRITIK: o'xshash nomli tumanlar (Xo'jaobod/Andijon va Xonobod/boshqa viloyat) noto'g'ri viloyatga adashib tushmasligi uchun har doim tumanni to'g'ri viloyatga bog'la. Viloyatni ishonch bilan aniqlay olmasang null qoldir.
+- region_name = VILOYAT nomi (masalan "Andijon", "Navoiy"). MUHIM: agar matnda "shahri" yoki "viloyati" so'zi yozilgan bo'lsa, uni HAM qo'shib yoz — ayniqsa Toshkent uchun: "Toshkent shahri" (poytaxt) va "Toshkent viloyati" (atrofdagi tumanlar) ikki XIL joy, farqla.
+  ⚠️ ANIQ AYTILGAN VILOYAT USTUN: agar mijoz viloyat/shaharни ANIQ yozgan bo'lsa (masalan "Toshkent shahri", "Andijon viloyati"), region_name AYNAN o'sha bo'ladi — tuman nomi boshqa viloyatni eslatsa HAM, viloyatni O'ZGARTIRMA. Ya'ni "Toshkent shahri Xonobod" -> region_name="Toshkent shahri" (Xonobod Andijonда bo'lsa ham, viloyatni Andijonга KO'CHIRMA); district_name="Xonobod" (yozilganicha), keyin tizim shu viloyatда tekshiradi, topolmasa operator to'ldiradi.
+  GEOGRAFIK INFERENCE (faqat VILOYAT YOZILMAGANda): matnda viloyat umuman yo'q bo'lsa-yu, tuman/shahar/shaharcha/qishloq nomi bor bo'lsa — O'zbekiston geografiyasi bo'yicha u QAYSI VILOYATda ekanini o'zing aniqlab region_name'ga yoz (masalan "Chilonzor" -> "Toshkent shahri", "Xo'jaobod" -> "Andijon", "Asaka" -> "Andijon"). O'xshash nomli tumanlarni (Xo'jaobod/Andijon va boshqa viloyatdagi o'xshash nom) ADASHTIRMA. Viloyatni ishonch bilan aniqlay olmasang null qoldir — LEKIN district_name'ni baribir yozilganicha yoz (tizim o'zi qidiradi).
 - district_name = yetkazish JOYI — TUMAN yoki SHAHAR nomi (masalan "Asaka", "Chilonzor", "Navoiy shahri", "Zarafshon shahri", "Nurota"). MUHIM: joy manzil ichida bo'lsa ham (masalan "Navoiy shahri vagzal xududi 20-uy") — shahar/tuman nomini ("Navoiy shahri") ajratib district_name'ga yoz, faqat qolgan ko'cha/uy qismini ("vagzal xududi 20-uy") address'ga yoz. SHAHAR ham district_name'ga tushadi, address'ga EMAS. SHAHARCHA/QISHLOQ/MAHALLA (MFY)/mavze: agar mijoz TUMAN emas, uning ichidagi kichik joyni (shaharcha, qishloq, mahalla, MFY) yozsa — u qaysi TUMANga qarashli ekanini geografik biliming bilan aniqlab, TUMAN nomini district_name'ga yoz (kichik joy nomini EMAS); asl kichik joy nomini full_address/address'da qoldir.
 - full_address = MANZILNING TO'LIQ MATNI — viloyat, tuman/shahar, ko'cha, uy — HAMMASI, matnda qanday yozilgan bo'lsa AYNAN o'sha holicha ko'chir (o'zgartirma, tarjima qilma, hech narsani tushirib qoldirma). Kirill bo'lsa kirill, lotin bo'lsa lotin. Bu maydon rezolyutsiya uchun zaxira.
 - total_price = BUTUN buyurtma narxi RAQAM sifatida (masalan "250 ming" -> 250000, "2.5 mln" -> 2500000, "300k" -> 300000). "ming"=1000, "mln"/"million"=1000000 ga ko'paytir. MUHIM: agar narx BIR DONA uchun berilsa ("donasi", "bittasi", "har biri", "tasi X so'm") — uni MAHSULOT SONIGA KO'PAYTIRIB butun narxni yoz (masalan "3 dona, donasi 2 mln" -> 6000000). Aniq bo'lmasa null.
@@ -103,7 +105,10 @@ MISOLLAR (matn -> to'g'ri chiqish; ko'rsatilmagan maydonlar null):
    Diqqat: "buzuq...almashtirib" -> is_replacement=true; narx yo'q -> total_price=null; "Navoiy shahri" district_name'ga, "vagzal 20-uy" address'ga.
 4) Matn: "Nozima 901112233 xojaobd paxtaobod mfy 5-uy, muzlatgich 1 ta 4 mln 200"
    Chiqish: {"customer_name":"Nozima","phone_number":"901112233","extra_number":null,"region_name":"Andijon","district_name":"Xo'jaobod","address":"paxtaobod mfy 5-uy","full_address":"xojaobd paxtaobod mfy 5-uy","items":[{"name":"muzlatgich","quantity":1}],"total_price":4200000,"comment":null,"where_deliver":null,"is_replacement":false,"operator":null}
-   Diqqat: viloyat yozilmagan — "xojaobd" (imlo) -> "Xo'jaobod" tuman, uni geografik bilim bilan "Andijon" viloyatiga bog'la; "paxtaobod mfy" — bu MAHALLA (tuman emas), district_name'ga QO'YMA, address'ga qoldir; "4 mln 200" -> 4200000.`;
+   Diqqat: viloyat yozilmagan — "xojaobd" (imlo) -> "Xo'jaobod" tuman, uni geografik bilim bilan "Andijon" viloyatiga bog'la; "paxtaobod mfy" — bu MAHALLA (tuman emas), district_name'ga QO'YMA, address'ga qoldir; "4 mln 200" -> 4200000.
+5) Matn: "Bobur 998901112233 Toshkent shahri Xonobod, adapter 1 ta 90000"
+   Chiqish: {"customer_name":"Bobur","phone_number":"998901112233","extra_number":null,"region_name":"Toshkent shahri","district_name":"Xonobod","address":null,"full_address":"Toshkent shahri Xonobod","items":[{"name":"adapter","quantity":1}],"total_price":90000,"comment":null,"where_deliver":null,"is_replacement":false,"operator":null}
+   Diqqat: mijoz "Toshkent shahri"ni ANIQ yozgan — region_name AYNAN "Toshkent shahri"; "Xonobod" nomi Andijonni eslatsa HAM viloyatni Andijonga KO'CHIRMA. district_name="Xonobod" yozilganicha (tizim Toshkent ichida qidiradi, topolmasa operator to'ldiradi). Aniq aytilgan viloyatni tuman nomiga qarab hech qachon o'zgartirma.`;
 
 const EXTRACT_SCHEMA: Record<string, unknown> = {
   type: 'object',
@@ -232,11 +237,12 @@ const DISAMBIG_SCHEMA: Record<string, unknown> = {
 //     tomonda o'sha indeksdan olinadi — model UUID/tuman to'qiy olmaydi.
 const DISTRICT_LLM_SYSTEM = `Sen O'zbekiston geografiyasini yaxshi biladigan yetkazib berish yordamchisisan. Mijoz manzilidan yetkazish TUMAN yoki SHAHRINI aniqlaysan.
 QOIDALAR:
-- Quyidagi tuman/shaharlar raqamlangan ro'yxat sifatida beriladi ([N] Viloyat — Tuman/Shahar). Manzilga TO'G'RI keladiganning raqamini (choice) qaytar.
+- Quyidagi tuman/shaharlar raqamlangan ro'yxat sifatida beriladi ([N] Viloyat — Tuman/Shahar). Manzilga AYNAN TO'G'RI keladiganning raqamini (choice) qaytar.
 - IMLO XATOSINI tuzat: "xojaobd" -> "Xo'jaobod", "chilonzr" -> "Chilonzor".
 - SHAHARCHA / QISHLOQ / MAHALLA (MFY) / mavze yozilgan bo'lsa — u QAYSI tumanga qarashli ekanini O'Z BILIMING bilan aniqlab, o'sha tumanni tanla.
-- VILOYAT yozilmagan bo'lsa ham, tuman nomidan qaysi viloyatда ekanini bil va AYNAN to'g'ri viloyatdagi tumanni tanla. O'xshash nomli tumanlarni ARALASHTIRMA (masalan Andijondagi "Xo'jaobod" ni boshqa viloyatdagi o'xshash nomli tuman bilan almashtirma).
-- Ro'yxatda mos tuman umuman bo'lmasa yoki bir nechta bir xil ehtimolli variant bo'lsa (aniq ajrata olmasang) -> choice=0.
+- ⚠️ ENG MUHIM — VILOYAT MOSLIGI: agar manzilda VILOYAT aytilgan bo'lsa ("Viloyat (agar aytilgan bo'lsa)" qatorida), FAQAT O'SHA VILOYATdagi tumanni tanla. Boshqa viloyatdagi o'xshash nomli tumanni HECH QACHON tanlama. Ro'yxatda o'sha viloyatда mos tuman bo'lmasa -> choice=0 (boshqa viloyatdan OLMA). Masalan manzil "Toshkent shahri Xonobod" bo'lsa va ro'yxatда Toshkentда "Xonobod" bo'lmasa — Andijondagi "Xo'jaobod"ni tanlama, choice=0 qaytar.
+- VILOYAT aytilmagan bo'lsa, tuman nomidan qaysi viloyatда ekanini bil va AYNAN to'g'ri viloyatdagi tumanni tanla. O'xshash nomli tumanlarni ARALASHTIRMA.
+- ISHONCH BO'LMASA — TO'QIMA: mos tuman umuman bo'lmasa, YOKI bir nechta bir xil ehtimolli variant bo'lsa (aniq ajrata olmasang), YOKI faqat taxminan o'xshasa -> choice=0. Noto'g'ri tanlashдан ko'ra 0 (operator to'ldiradi) YAXSHIROQ.
 - Hech narsa to'qima; faqat ro'yxatdagi raqamlardan tanla.`;
 
 const DISTRICT_LLM_SCHEMA: Record<string, unknown> = {
@@ -1349,21 +1355,23 @@ export class AiOrderService {
     // (kichik, arzon; imlo xatosi bilan topilmagan tumanni topadi).
     const trustRegion = !!draft.region_name && !!draft.region_id;
     if (trustRegion) {
+      // Viloyat ISHONCHLI — FAQAT shu viloyat ichida so'raymiz va shu bilan
+      // TO'XTAYMIZ. Model 0 (mos yo'q) qaytarsa tuman bo'sh qoladi (operator
+      // to'ldiradi); BOSHQA viloyatga O'TMAYMIZ. Bu "Toshkent Xonobod ->
+      // Andijon Xo'jaobod" cross-region xatosini butunlay yopadi.
       const regionPool = districts.filter(
         (d) => d.region_id === draft.region_id,
       );
-      if (
-        regionPool.length &&
-        (await this.llmPickDistrict(draft, regionPool, placeText))
-      ) {
-        return;
+      if (regionPool.length) {
+        await this.llmPickDistrict(draft, regionPool, placeText);
       }
+      return;
     }
-    // 2-urinish (fallback): viloyat berilmagan/noto'g'ri infer qilingan bo'lsa.
-    // 200+ tumandan arzon model (Haiku) ishonchli tanlashi uchun avval NOM/manzil
+    // Viloyat BERILMAGAN/noaniq bo'lsagina butun mamlakat bo'ylab qidiramiz.
+    // 200+ tumandan arzon model ishonchli tanlashi uchun avval NOM/manzil
     // o'xshashligi bo'yicha qisqa nomzodlar ro'yxatini (top-K) tuzamiz — imlo
-    // xatoli tuman ham ro'yxatga tushadi, model to'g'risini tanlaydi (arzonroq
-    // ham). Shortlist chiqmasa (juda g'alati nom) — oxirgi chora to'liq ro'yxat.
+    // xatoli tuman ham ro'yxatga tushadi, model to'g'risini (yoki 0) tanlaydi.
+    // Shortlist chiqmasa (juda g'alati nom) — oxirgi chora to'liq ro'yxat.
     const shortlist = this.shortlistDistricts(draft, districts);
     if (shortlist.length) {
       await this.llmPickDistrict(draft, shortlist, placeText);
@@ -1552,14 +1560,25 @@ export class AiOrderService {
       }
     }
 
+    // VILOYAT ISHONCHLI aniqlangan bo'lsa — tuman qidiruvini FAQAT shu viloyat
+    // ichida olib boramiz. Bu KRITIK cross-region xatoni oldini oladi: masalan
+    // "Toshkent shahri Xonobod" — Toshkentda "Xonobod" yo'q bo'lsa, Andijondagi
+    // o'xshash tuman (Xo'jaobod/Xonobod) OLINMAYDI; tuman bo'sh qoladi (operator
+    // to'ldiradi), viloyat esa Toshkent bo'lib SAQLANADI. Viloyat berilmagan/
+    // noaniq bo'lsagina butun mamlakat bo'ylab qidiramiz (tuman viloyatni tiklaydi).
+    const regionLocked = !!draft.region_id;
+    const searchPool = regionLocked
+      ? districts.filter((d) => d.region_id === draft.region_id)
+      : districts;
+
     // 1-usul: district_name bo'yicha (aniq base-nom, keyin qism-mos).
     let matches: DistrictEntity[] = [];
     if (draft.district_name) {
       const q = this.normGeo(draft.district_name);
       if (q) {
-        matches = districts.filter((d) => this.normGeo(d.name) === q);
+        matches = searchPool.filter((d) => this.normGeo(d.name) === q);
         if (!matches.length) {
-          matches = districts.filter((d) => {
+          matches = searchPool.filter((d) => {
             const dn = this.normGeo(d.name);
             return dn.length > 2 && (dn.includes(q) || q.includes(dn));
           });
@@ -1589,7 +1608,7 @@ export class AiOrderService {
       );
       if (corpus) {
         const padded = ` ${corpus} `;
-        const found = districts
+        const found = searchPool
           .map((d) => ({ d, dn: this.normGeo(d.name) }))
           .filter((x) => x.dn.length >= 4 && padded.includes(` ${x.dn} `))
           .sort((a, b) => b.dn.length - a.dn.length);
@@ -1607,11 +1626,9 @@ export class AiOrderService {
     if (!matches.length && draft.district_name) {
       const base = this.normGeo(draft.district_name);
       if (base.length >= 3) {
-        const inRegion = draft.region_id
-          ? districts.filter((d) => d.region_id === draft.region_id)
-          : [];
-        const pool = inRegion.length ? inRegion : districts;
-        const scored = pool
+        // Viloyat qulf: ishonchli viloyat bo'lsa shu viloyat ichida (bo'sh
+        // bo'lsa cross-region OLMAYMIZ); aks holda butun ro'yxat.
+        const scored = searchPool
           .map((d) => ({ d, s: this.simRatio(this.normGeo(d.name), base) }))
           .filter((x) => x.s >= 0.72)
           .sort((a, b) => b.s - a.s);
@@ -1654,13 +1671,10 @@ export class AiOrderService {
         })
         .join('');
       if (corpus.length >= 4) {
-        const inRegion = draft.region_id
-          ? districts.filter((d) => d.region_id === draft.region_id)
-          : [];
-        const pool = inRegion.length ? inRegion : districts;
+        // Viloyat qulf: ishonchli viloyat bo'lsa shu viloyat ichida qidiramiz.
         let bestScore = 0;
         let bestDs: DistrictEntity[] = [];
-        for (const d of pool) {
+        for (const d of searchPool) {
           const dn = this.normGeo(d.name).replace(/\s+/g, '');
           if (dn.length < 4) continue;
           const sc = this.bestSubstringSim(corpus, dn);

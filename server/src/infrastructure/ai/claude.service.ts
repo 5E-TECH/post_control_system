@@ -80,6 +80,24 @@ export class ClaudeService {
   }
 
   /**
+   * System-prompt'ni PROMPT CACHING bilan uzatadi. Katta, o'zgarmas system
+   * (ekstraksiya ~4200 token, moliya prompti) takroriy chaqiruvlarda ~90% arzon
+   * o'qiladi (cache_read = input*0.1). Anthropic minimal kesh chegarasidan
+   * (~1024 token) kichik promptlarni JIMGINA kesh qilmaydi — xato bermaydi,
+   * shunchaki oddiy narxda ketadi (kichik DISTRICT/CATEGORY promptlari uchun
+   * xavfsiz). Kesh 5 daqiqa (ephemeral) — hajmli oqimda deyarli doim issiq.
+   */
+  private cachedSystem(system: string): Anthropic.TextBlockParam[] {
+    return [
+      {
+        type: 'text',
+        text: system,
+        cache_control: { type: 'ephemeral' },
+      },
+    ];
+  }
+
+  /**
    * Erkin matndan berilgan JSON sxemasiga mos strukturani ajratadi.
    * @returns sxemaga mos obyekt yoki null (o'chiq/xato/refusal/parse xatosi)
    *
@@ -124,7 +142,7 @@ export class ClaudeService {
       const response = await this.client.messages.create({
         model,
         max_tokens: opts.maxTokens ?? 1024,
-        system: opts.system,
+        system: this.cachedSystem(opts.system),
         messages: [{ role: 'user', content }],
         output_config: {
           format: { type: 'json_schema', schema: opts.schema },
@@ -187,7 +205,7 @@ export class ClaudeService {
       const response = await this.client.messages.create({
         model,
         max_tokens: opts.maxTokens ?? 2048,
-        system: opts.system,
+        system: this.cachedSystem(opts.system),
         messages: [{ role: 'user', content: opts.userText }],
       });
       this.recordUsage(response, model, opts.meta);
@@ -251,7 +269,7 @@ export class ClaudeService {
         const response = await this.client.messages.create({
           model,
           max_tokens: opts.maxTokens ?? 1500,
-          system: opts.system,
+          system: this.cachedSystem(opts.system),
           tools: opts.tools,
           messages,
         });
