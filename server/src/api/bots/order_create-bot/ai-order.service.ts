@@ -341,14 +341,16 @@ export class AiOrderService {
     private readonly logger: MyLogger,
   ) {}
 
-  // Parse (tahlil) throttle: bir buyurtmani ko'p marta qayta tahlil qilish
-  // Claude'ni behuda ishlatadi. Har market uchun BEPUL tahlillar soni; undan
-  // ortig'i 1 buyurtma narxida yechiladi (telegram botdagi 3-urinish mantig'i).
+  // Parse (tahlil) throttle: bir matnni ko'p marta QAYTA tahlil qilish Claude'ni
+  // behuda ishlatadi. Har market uchun 30 daqiqada BEPUL tahlillar soni; undan
+  // ortig'i 1 buyurtma narxida yechiladi. Limit 10 — normal ko'p-buyurtma oqimi
+  // (har buyurtmani alohida xabar qilib yuborish) jarima olmasin, faqat haqiqiy
+  // suiiste'mol (bir matnni 10+ marta qayta yuborish) cheklansin.
   private readonly parseAttempts = new Map<
     string,
     { count: number; ts: number }
   >();
-  private static readonly PARSE_FREE_LIMIT = 3;
+  private static readonly PARSE_FREE_LIMIT = 10;
   private static readonly PARSE_WINDOW_MS = 30 * 60 * 1000;
 
   isEnabled(): boolean {
