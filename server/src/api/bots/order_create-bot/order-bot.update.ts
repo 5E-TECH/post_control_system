@@ -60,10 +60,47 @@ const getErrorMessage = (err: unknown): string => {
 
 @Update()
 export class OrderBotUpdate {
-  // Foydalanuvchi bo'yicha qayta-kirish qulfi: bir vaqtda kelgan bir nechta
-  // erkin matn parallel Claude chaqiruvi qilib draftni ustma-ust yozmasligi
-  // uchun. JS bir oqimli — has()+add() await'siz atomik.
-  private readonly aiBusy = new Set<number>();
+  // Foydalanuvchi bo'yicha KETMA-KET NAVBAT: bir vaqtda kelgan bir nechta xabar
+  // (matn/rasm) parallel Claude chaqiruvi qilib draftni ustma-ust yozmasligi VA
+  // DROP bo'lmasligi uchun — hammasi kelgan tartibда birma-bir bajariladi.
+  // aiQueues: foydalanuvchi -> oxirgi ish promise'i (zanjir). aiPending: kutayotgan
+  // ishlar soni (navbat cheklovi uchun). Sessiya telegraf in-memory store'да SHARED
+  // (bir ref) — shuning uchun ishlar orasida holat (previews/step) ko'rinib turadi.
+  private readonly aiQueues = new Map<number, Promise<void>>();
+  private readonly aiPending = new Map<number, number>();
+  private static readonly MAX_QUEUE = 12;
+
+  // Ishni foydalanuvchi navbatiga qo'shadi (avvalgisi tugagach bajariladi).
+  // Navbat to'lgan bo'lsa false qaytaradi (chaqiruvchi ogohlantiradi). Ish o'zi
+  // xato bersa navbat buzilmaydi (log qilinadi). Handler bu metoddan keyin DARROV
+  // qaytadi — ish keyin (navbatда) bajariladi; ctx/sessiya shared bo'lgani uchun
+  // xavfsiz.
+  private enqueueAi(uid: number, task: () => Promise<void>): boolean {
+    const pending = this.aiPending.get(uid) ?? 0;
+    if (pending >= OrderBotUpdate.MAX_QUEUE) return false;
+    this.aiPending.set(uid, pending + 1);
+    const prev = this.aiQueues.get(uid) ?? Promise.resolve();
+    const next = prev
+      .then(() => task())
+      .catch((e) => {
+        this.logger.error(
+          `AI navbat ishi xatosi: ${(e as Error).message}`,
+          undefined,
+          'OrderBotUpdate',
+        );
+      })
+      .finally(() => {
+        const left = (this.aiPending.get(uid) ?? 1) - 1;
+        if (left <= 0) {
+          this.aiPending.delete(uid);
+          if (this.aiQueues.get(uid) === next) this.aiQueues.delete(uid);
+        } else {
+          this.aiPending.set(uid, left);
+        }
+      });
+    this.aiQueues.set(uid, next);
+    return true;
+  }
 
   constructor(
     @InjectBot(config.ORDER_BOT_NAME) private readonly bot: Telegraf<MyContext>,
@@ -308,14 +345,9 @@ export class OrderBotUpdate {
     const uid = ctx.from?.id;
     if (uid == null) return;
 
-    // Qayta-kirish qulfi (has+add await'dan OLDIN — atomik)
-    if (this.aiBusy.has(uid)) {
-      await ctx.reply("⏳ Oldingi xabaringiz o'qilmoqda, biroz kuting...");
-      return;
-    }
-    this.aiBusy.add(uid);
-
-    try {
+    // DROP EMAS: xabar navbatga qo'shiladi va kelgan tartibда bajariladi. Bir
+    // nechta buyurtмани ketma-ket yuborsa — hammasi o'qiladi (ustma-ust yozilmaydi).
+    const accepted = this.enqueueAi(uid, async () => {
       const operator = await this.aiOrderService.resolveOperator(uid);
       if (!operator) return; // ro'yxatdan o'tmagan — jim
 
@@ -327,14 +359,17 @@ export class OrderBotUpdate {
       }
 
       await this.runAiParse(ctx, operator, text);
-    } finally {
-      this.aiBusy.delete(uid);
+    });
+    if (!accepted) {
+      await ctx.reply(
+        "⏳ Juda ko'p xabar navbatда. Avvalgilarini o'qib bo'lay, biroz kuting.",
+      );
     }
   }
 
   // Matn YOKI rasm(lar)dan buyurtma(lar)ni tahlil qilib, preview kartalarni
-  // ko'rsatadi. onAiText (matn) va onAiPhoto (rasm) shu yagona oqimni ishlatadi.
-  // Chaqiruvchi aiBusy qulfini boshqaradi (bu metod qulfga tegmaydi).
+  // ko'rsatadi. onAiText/onAiPhoto/onAiDocument shu yagona oqimni ishlatadi.
+  // Chaqiruvchi (enqueueAi) navbatni boshqaradi — bu metod ketma-ket chaqiriladi.
   private async runAiParse(
     ctx: MyContext,
     operator: ResolvedOperator,
@@ -417,26 +452,55 @@ export class OrderBotUpdate {
       return;
     }
 
-    // Kartalar keyingi "✅ Yaratish" bosilganda ishlatiladi — session'da saqlaymiz.
-    // previews_nonce eski kartalardan (yangi tahlildan keyin) yaratishni bloklaydi.
-    const nonce = randomBytes(4).toString('hex');
-    ctx.session.order_previews = previews;
+    // ── KARTALARNI TO'PLASH (accumulation): agar hali yaratilmagan (ready) faol
+    // partiya bo'lsa, yangi buyurtmalarni SHU partiyaga qo'shamiz (bir xil nonce),
+    // shunda AVVALGI kartalar ham ishlab turadi. Shu tufayli bir nechta buyurtmani
+    // ketma-ket yuborsa — hammasini alohida-alohida yaratish mumkin (nonce eskirmaydi).
+    // Faol partiya bo'lmasa (hammasi yaratilgan/yo'q) — yangi partiya boshlanadi.
+    const existing = ctx.session.order_previews || [];
+    const existingNonce = ctx.session.previews_nonce;
+    const hasActiveBatch = !!existingNonce && existing.some((p) => p.ready);
+
+    const nonce = hasActiveBatch
+      ? (existingNonce as string)
+      : randomBytes(4).toString('hex');
+    const baseIndex = hasActiveBatch ? existing.length : 0;
+    const fullList = hasActiveBatch ? [...existing, ...previews] : previews;
+
+    ctx.session.order_previews = fullList;
     ctx.session.previews_nonce = nonce;
     ctx.session.step = 'ready';
     // Eski bir-buyurtma oqimi qoldiqlarini tozalaymiz (chalkashmasin).
     ctx.session.order_draft = undefined;
     ctx.session.draft_raw = undefined;
 
-    for (let i = 0; i < previews.length; i++) {
-      const p = previews[i];
-      const cardText = this.formatBotCard(p, i, previews.length);
+    // Faqat YANGI kartalarni chiqaramiz (global indeks bilan — eskilar joyida qoladi).
+    for (let j = 0; j < previews.length; j++) {
+      const globalIdx = baseIndex + j;
+      const p = previews[j];
+      const cardText = this.formatBotCard(p, globalIdx, fullList.length);
       await ctx.reply(cardText, {
-        reply_markup: this.cardKeyboard(p.ready, nonce, i),
+        reply_markup: this.cardKeyboard(p.ready, nonce, globalIdx),
       });
     }
 
-    // Jonli xulosa — har tasdiq/tuzatishdan keyin YANGILANADI (id saqlanadi).
-    const summaryText = await this.buildSummaryText(previews, operator.marketId);
+    // Jonli xulosa — TO'LIQ ro'yxat bo'yicha. To'plash bo'lsa avvalgi xulosani
+    // o'chirib, yangisini eng pastda ko'rsatamiz (doim oxirida tursin).
+    if (
+      hasActiveBatch &&
+      ctx.session.summary_msg_id != null &&
+      ctx.chat?.id != null
+    ) {
+      try {
+        await ctx.telegram.deleteMessage(
+          ctx.chat.id,
+          ctx.session.summary_msg_id,
+        );
+      } catch {
+        /* ignore (eski/o'chirilgan) */
+      }
+    }
+    const summaryText = await this.buildSummaryText(fullList, operator.marketId);
     const sm = await ctx.reply(summaryText);
     ctx.session.summary_msg_id = sm.message_id;
   }
@@ -462,13 +526,9 @@ export class OrderBotUpdate {
     const uid = ctx.from?.id;
     if (uid == null) return;
 
-    if (this.aiBusy.has(uid)) {
-      await ctx.reply("⏳ Oldingi xabaringiz o'qilmoqda, biroz kuting...");
-      return;
-    }
-    this.aiBusy.add(uid);
-
-    try {
+    // DROP EMAS: navbatga qo'shiladi (bir nechta rasm ketma-ket yuborilsa — albom
+    // ham — hammasi tartib bilan o'qiladi, kartalar to'planadi).
+    const accepted = this.enqueueAi(uid, async () => {
       const operator = await this.aiOrderService.resolveOperator(uid);
       if (!operator) return; // ro'yxatdan o'tmagan — jim
 
@@ -477,7 +537,8 @@ export class OrderBotUpdate {
         (a, b) => (b.file_size || 0) - (a.file_size || 0),
       );
       const chosen =
-        sorted.find((p) => (p.file_size || 0) <= PHOTO_MAX_BYTES) || sorted.at(-1);
+        sorted.find((p) => (p.file_size || 0) <= PHOTO_MAX_BYTES) ||
+        sorted.at(-1);
       if (!chosen) return;
 
       const image = await this.downloadTelegramImage(ctx, chosen.file_id);
@@ -490,8 +551,11 @@ export class OrderBotUpdate {
       }
 
       await this.runAiParse(ctx, operator, caption, [image]);
-    } finally {
-      this.aiBusy.delete(uid);
+    });
+    if (!accepted) {
+      await ctx.reply(
+        "⏳ Juda ko'p rasm navbatда. Avvalgilarini o'qib bo'lay, biroz kuting.",
+      );
     }
   }
 
@@ -535,13 +599,8 @@ export class OrderBotUpdate {
       return;
     }
 
-    if (this.aiBusy.has(uid)) {
-      await ctx.reply("⏳ Oldingi xabaringiz o'qilmoqda, biroz kuting...");
-      return;
-    }
-    this.aiBusy.add(uid);
-
-    try {
+    // DROP EMAS: navbatga qo'shiladi (ketma-ket bajariladi).
+    const accepted = this.enqueueAi(uid, async () => {
       const operator = await this.aiOrderService.resolveOperator(uid);
       if (!operator) return;
 
@@ -559,8 +618,11 @@ export class OrderBotUpdate {
       }
 
       await this.runAiParse(ctx, operator, caption, [image]);
-    } finally {
-      this.aiBusy.delete(uid);
+    });
+    if (!accepted) {
+      await ctx.reply(
+        "⏳ Juda ko'p rasm navbatда. Avvalgilarini o'qib bo'lay, biroz kuting.",
+      );
     }
   }
 
