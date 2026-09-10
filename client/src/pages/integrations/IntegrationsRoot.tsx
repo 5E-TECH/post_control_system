@@ -1,12 +1,16 @@
 import { Tabs } from "antd";
 import { Truck, Globe } from "lucide-react";
 import IntegrationsPage from "./index";
-import { LdgCargoTab } from "./components/LdgCargoTab";
+import { ProvidersTab } from "./components/providers/ProvidersTab";
 
 /**
  * Integratsiyalar root — 2 ta tab:
- *   1. Tashqi saytlar (mavjud external-integration boshqaruvi)
- *   2. LDG Cargo (yetkazib berish provayderi sozlamalari)
+ *   1. Tashqi saytlar — buyurtma MANBALARI (do'kon/market ulanishlari)
+ *   2. Yetkazuvchilar — cargo provayderlari (LDG, Elchi, ...)
+ *
+ * Ikkinchi tab avval "LDG Cargo" deb atalgan va faqat LDG'ni ko'rsatardi.
+ * Endi u provayder tanlovi bilan keladi: LDG paneli o'zgarmagan holda ichida
+ * qoldi, Elchi ikkinchi variant bo'lib qo'shildi.
  *
  * Settings parent ichida render qilinadi — shuning uchun outer wrapper
  * (background, padding) tashqaridan keladi.
@@ -28,14 +32,14 @@ export default function IntegrationsRoot() {
           children: <IntegrationsPage />,
         },
         {
-          key: "ldg",
+          key: "providers",
           label: (
             <span className="flex items-center gap-2">
               <Truck className="w-4 h-4" />
-              LDG Cargo
+              Yetkazuvchilar
             </span>
           ),
-          children: <LdgCargoTab />,
+          children: <ProvidersTab />,
         },
       ]}
     />

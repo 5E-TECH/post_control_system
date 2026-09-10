@@ -88,6 +88,11 @@ import { buildAdminPath } from "../../../../../shared/const";
 import { debounce } from "../../../../../shared/helpers/DebounceFunc";
 import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
 import ReplacementBadge from "../../../../../shared/components/replacement-badge";
+import {
+  useElchiDispatch,
+  ELCHI_PROVIDER,
+  type ElchiGatePreview,
+} from "../../../../../shared/api/hooks/useElchiDispatch";
 
 const MailDetail = () => {
   const dispatch = useDispatch();
@@ -308,6 +313,63 @@ const MailDetail = () => {
   const [superCouriers, setSuperCouriers] = useState<any[]>([]);
   const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
 
+  // ══════════════════ ELCHI (virtual kuryer) ══════════════════
+  const {
+    previewGate,
+    useDispatchStatus: useElchiDispatchStatus,
+    retryDispatch,
+  } = useElchiDispatch();
+
+  const [gatePreview, setGatePreview] = useState<ElchiGatePreview | null>(null);
+  /** Jo'natilgandan keyin holat oynasi ochiladigan pochta. */
+  const [elchiDispatchPostId, setElchiDispatchPostId] = useState<string | null>(
+    null,
+  );
+  /** Serverga jo'natilgan buyurtmalar soni — "nechtasi qoldi"ni bilish uchun. */
+  const [elchiExpected, setElchiExpected] = useState(0);
+  const {
+    data: elchiDispatch,
+    refetch: refetchElchiDispatch,
+    isFetching: isElchiFetching,
+  } = useElchiDispatchStatus(elchiDispatchPostId ?? undefined, elchiExpected);
+
+  const elchiDelivered = elchiDispatch?.delivered ?? 0;
+  const elchiFailed = elchiDispatch?.failed ?? 0;
+  const elchiPending = Math.max(0, elchiExpected - elchiDelivered - elchiFailed);
+
+  /** Tanlangan kuryer obyekti — ikkala ro'yxatdan qidiriladi. */
+  const selectedCourier = useMemo(
+    () =>
+      [...couriers, ...superCouriers].find(
+        (c) => c?.id === selectedCourierId,
+      ),
+    [couriers, superCouriers, selectedCourierId],
+  );
+  const isElchiSelected =
+    selectedCourier?.external_provider === ELCHI_PROVIDER;
+  const gateBlocked = gatePreview?.blocked?.length ?? 0;
+
+  /**
+   * Elchi tanlanganda darvozani OLDINDAN tekshiramiz.
+   *
+   * Server qoidasi "hammasi yoki hech biri" — bitta ruxsatsiz tuman BUTUN
+   * pochtani rad etadi. Operator tugmani bosishdan oldin qaysi buyurtma
+   * to'sayotganini ko'rishi kerak, aks holda sabab noaniq xato bo'lib chiqadi.
+   */
+  useEffect(() => {
+    if (!isElchiSelected || selectedIds.length === 0) {
+      setGatePreview(null);
+      return;
+    }
+    previewGate.mutate(selectedIds, {
+      onSuccess: (res) => setGatePreview(res),
+      // Tekshiruv o'zi yiqilsa TO'SMAYMIZ — haqiqiy darvoza baribir
+      // serverda ishlaydi, UI shunchaki oldindan ogohlantira olmaydi.
+      onError: () => setGatePreview(null),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isElchiSelected, selectedCourierId, selectedIds]);
+
 
 
   const handleClick = (id: string) => {
@@ -326,10 +388,14 @@ const MailDetail = () => {
           setSuperCouriers(res?.data?.superCouriers || []);
           setIsShow(true);
         } else {
-          const courierId = res?.data?.couriers?.[0]?.id;
+          // Yagona kuryer avtomatik tanlanadi — u Elchi vakili ham
+          // bo'lishi mumkin, shu bois obyektning o'zini ushlab qolamiz.
+          const chosenCourier = res?.data?.couriers?.[0];
+          const chosenIsElchi =
+            chosenCourier?.external_provider === ELCHI_PROVIDER;
           const post = {
             orderIds: selectedIds,
-            courierId,
+            courierId: chosenCourier?.id,
           };
 
           sendCouriersToPost(
@@ -378,14 +444,18 @@ const MailDetail = () => {
                     date: res?.data?.updatedPost?.created_at,
                   });
 
-                  generateCourierReceipt({
-                    qrCodeToken: res?.data?.updatedPost?.qr_code_token,
-                    courierName: courierName || "",
-                    regionName: res?.data?.updatedPost?.region?.name || "",
-                    courierPhone: res?.data?.updatedPost?.courier?.phone_number || "",
-                    orderCount: res?.data?.postTotalInfo?.total,
-                    date: res?.data?.updatedPost?.created_at,
-                  });
+                  // Virtual kuryer (Elchi) uchun qog'oz chek yo'q.
+                  if (!chosenIsElchi) {
+                    generateCourierReceipt({
+                      qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+                      courierName: courierName || "",
+                      regionName: res?.data?.updatedPost?.region?.name || "",
+                      courierPhone:
+                        res?.data?.updatedPost?.courier?.phone_number || "",
+                      orderCount: res?.data?.postTotalInfo?.total,
+                      date: res?.data?.updatedPost?.created_at,
+                    });
+                  }
 
                   handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
                 } catch (error) {
@@ -395,7 +465,12 @@ const MailDetail = () => {
                   dispatch(resetDownload());
                 }
 
-                navigate(buildAdminPath("mails"));
+                if (chosenIsElchi) {
+                  setElchiExpected(sentCount);
+                  setElchiDispatchPostId(id);
+                } else {
+                  navigate(buildAdminPath("mails"));
+                }
               },
               onError: (err: any) =>
                 handleApiError(
@@ -416,6 +491,31 @@ const MailDetail = () => {
   };
 
   const navigate = useNavigate();
+
+  /** Elchi holat oynasini yopib, pochtalar ro'yxatiga qaytadi. */
+  const closeElchiDispatch = () => {
+    setElchiDispatchPostId(null);
+    setElchiExpected(0);
+    navigate(buildAdminPath("mails"));
+  };
+
+  /**
+   * Yetmagan buyurtmani qayta uzatish.
+   *
+   * Idempotent — Elchi tomonda posilka bo'lsa yangisi ochilmaydi, shu bois
+   * tugmani takror bosish xavfsiz.
+   */
+  const handleRetryDispatch = (orderId: string) => {
+    retryDispatch.mutate(orderId, {
+      onSuccess: () => {
+        handleSuccess("Buyurtma Elchi'ga qayta jo'natildi");
+        refetchElchiDispatch();
+      },
+      onError: (err) =>
+        handleApiError(err, "Elchi'ga qayta jo'natish muvaffaqiyatsiz"),
+    });
+  };
+
   const handleConfirmCouriers = () => {
     if (!selectedCourierId) {
       handleWarning("Kuryer tanlanmagan", "Kuryer tanlab keyin jo'nata olasiz");
@@ -456,14 +556,19 @@ const MailDetail = () => {
               date: res?.data?.updatedPost?.created_at,
             });
 
-            generateCourierReceipt({
-              qrCodeToken: res?.data?.updatedPost?.qr_code_token,
-              courierName: courierName || "",
-              regionName: res?.data?.updatedPost?.region?.name || "",
-              courierPhone: res?.data?.updatedPost?.courier?.phone_number || "",
-              orderCount: res?.data?.postTotalInfo?.total,
-              date: res?.data?.updatedPost?.created_at,
-            });
+            // Virtual kuryer (Elchi) jismoniy shaxs EMAS — qog'oz chekni
+            // imzolatadigan odam yo'q, shu bois chek chiqarilmaydi.
+            if (!isElchiSelected) {
+              generateCourierReceipt({
+                qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+                courierName: courierName || "",
+                regionName: res?.data?.updatedPost?.region?.name || "",
+                courierPhone:
+                  res?.data?.updatedPost?.courier?.phone_number || "",
+                orderCount: res?.data?.postTotalInfo?.total,
+                date: res?.data?.updatedPost?.created_at,
+              });
+            }
 
             handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
           } catch (error) {
@@ -472,7 +577,18 @@ const MailDetail = () => {
             dispatch(resetDownload());
           }
 
-          navigate(buildAdminPath("mails"));
+          // Elchi'ga uzatish FON rejimida ketadi — "jo'natildi" xabari hali
+          // Elchi qabul qildi degani EMAS. Shu bois ro'yxatga qaytmasdan
+          // haqiqiy holatni ko'rsatuvchi oynani ochamiz.
+          if (isElchiSelected) {
+            setIsShow(false);
+            setElchiExpected(
+              Number(res?.data?.postTotalInfo?.total ?? selectedIds.length),
+            );
+            setElchiDispatchPostId(id as string);
+          } else {
+            navigate(buildAdminPath("mails"));
+          }
         },
         onError: (err: any) =>
           handleApiError(err, "Kuryerlarga jo'natishda xatolik yuz berdi."),
@@ -1061,8 +1177,13 @@ const MailDetail = () => {
                         }`} />
                       </div>
                       <div>
-                        <h2 className="font-semibold text-gray-800 dark:text-white">
+                        <h2 className="font-semibold text-gray-800 dark:text-white flex items-center gap-2">
                           {courier?.name}
+                          {courier?.external_provider === ELCHI_PROVIDER && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500 text-white">
+                              ELCHI
+                            </span>
+                          )}
                         </h2>
                         <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                           <Phone className="w-3 h-3" />
@@ -1120,6 +1241,11 @@ const MailDetail = () => {
                                   LDG
                                 </span>
                               )}
+                              {courier?.external_provider === ELCHI_PROVIDER && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500 text-white">
+                                  ELCHI
+                                </span>
+                              )}
                             </h2>
                             <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                               <Phone className="w-3 h-3" />
@@ -1139,10 +1265,55 @@ const MailDetail = () => {
                 </div>
               )}
 
+              {/* ═══════ ELCHI DARVOZASI — jo'natishdan OLDINGI tekshiruv ═══════ */}
+              {isElchiSelected && (
+                <div className="mt-3">
+                  {previewGate.isPending ? (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 text-sm text-gray-600 dark:text-gray-300">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Elchi darvozasi tekshirilmoqda...
+                    </div>
+                  ) : gateBlocked > 0 ? (
+                    <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/60">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
+                        <AlertTriangle className="w-4 h-4" />
+                        {gateBlocked} ta buyurtma Elchi darvozasidan o'tmaydi
+                      </div>
+                      <p className="mt-1 text-xs text-red-500 dark:text-red-300">
+                        Tumani ruxsat ro'yxatida yo'q. Qoida — hammasi yoki hech
+                        biri: bittasi to'sib tursa butun pochta jo'natilmaydi.
+                      </p>
+                      <ul className="mt-2 space-y-1 max-h-28 overflow-y-auto">
+                        {gatePreview?.blocked?.map((item) => (
+                          <li
+                            key={item.order_id}
+                            className="text-xs text-gray-700 dark:text-gray-200 flex items-center gap-1"
+                          >
+                            <XCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                            <span className="font-medium">{item.label}</span>
+                            <span className="text-gray-400">·</span>
+                            <span>{item.district_name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                        Yechim: shu tumanlarni Elchi sozlamalarida yoqing yoki bu
+                        buyurtmalarni tanlovdan chiqaring.
+                      </p>
+                    </div>
+                  ) : gatePreview ? (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/60 text-sm text-emerald-700 dark:text-emerald-400">
+                      <CheckCircle className="w-4 h-4" />
+                      {gatePreview.allowed} ta buyurtma Elchi darvozasidan o'tadi
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
               <button
-                disabled={isPending}
+                disabled={isPending || (isElchiSelected && gateBlocked > 0)}
                 onClick={handleConfirmCouriers}
-                className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-4"
+                className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
               >
                 {isPending ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -1151,6 +1322,153 @@ const MailDetail = () => {
                 )}
                 Tasdiqlash
               </button>
+            </div>
+          </div>
+        </Popup>
+      )}
+
+      {/* ═══════════ ELCHI'GA UZATISH HOLATI ═══════════ */}
+      {elchiDispatchPostId && (
+        <Popup isShow={true} onClose={closeElchiDispatch}>
+          <div className="w-[calc(100vw-32px)] sm:w-[460px] max-w-[460px] bg-white dark:bg-[#2A263D] rounded-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 sm:px-6 py-4">
+              <h1 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                <Globe className="w-5 h-5" />
+                Elchi'ga uzatilmoqda
+              </h1>
+              <p className="text-xs sm:text-sm text-white/80">
+                Pochta jo'natildi. Endi har bir buyurtma Elchi'ga alohida
+                uzatiladi.
+              </p>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl p-3 bg-gray-50 dark:bg-gray-800/60 text-center">
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Jami
+                  </p>
+                  <p className="text-lg font-bold text-gray-800 dark:text-white">
+                    {elchiExpected}
+                  </p>
+                </div>
+                <div className="rounded-xl p-3 bg-emerald-50 dark:bg-emerald-900/20 text-center">
+                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                    Yetdi
+                  </p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                    {elchiDelivered}
+                  </p>
+                </div>
+                <div
+                  className={`rounded-xl p-3 text-center ${
+                    elchiFailed > 0
+                      ? "bg-red-50 dark:bg-red-900/20"
+                      : "bg-gray-50 dark:bg-gray-800/60"
+                  }`}
+                >
+                  <p
+                    className={`text-[11px] ${
+                      elchiFailed > 0
+                        ? "text-red-500 dark:text-red-400"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}
+                  >
+                    Yetmadi
+                  </p>
+                  <p
+                    className={`text-lg font-bold ${
+                      elchiFailed > 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-gray-800 dark:text-white"
+                    }`}
+                  >
+                    {elchiFailed}
+                  </p>
+                </div>
+              </div>
+
+              {elchiPending > 0 && (
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {elchiPending} ta buyurtma navbatda...
+                </div>
+              )}
+
+              {elchiPending === 0 && elchiFailed === 0 && elchiExpected > 0 && (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/60 text-sm text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle className="w-4 h-4" />
+                  Barcha buyurtmalar Elchi'ga yetdi
+                </div>
+              )}
+
+              {elchiFailed > 0 && (
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/60">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-400">
+                    <AlertTriangle className="w-4 h-4" />
+                    Elchi'ga yetmagan buyurtmalar
+                  </div>
+                  <p className="mt-1 text-xs text-red-500 dark:text-red-300">
+                    Ular BeePostda qoladi — Elchi ularni ko'rmaydi. Sababi
+                    tuzatilgach qayta jo'nating.
+                  </p>
+                  <ul className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                    {elchiDispatch?.items
+                      ?.filter((item) => !item.elchi_shipment_id)
+                      ?.map((item) => (
+                        <li
+                          key={item.order_id}
+                          className="text-xs bg-white dark:bg-[#2A263D] rounded-lg p-2 border border-red-100 dark:border-red-900/40"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-gray-500 dark:text-gray-400">
+                              {item.order_id.slice(0, 8)}
+                            </span>
+                            <button
+                              disabled={retryDispatch.isPending}
+                              onClick={() => handleRetryDispatch(item.order_id)}
+                              className="px-2 py-1 rounded-md bg-indigo-500 text-white text-[11px] font-medium disabled:opacity-50 flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              Qayta jo'natish
+                            </button>
+                          </div>
+                          {item.last_error && (
+                            <p className="mt-1 text-[11px] text-red-500 dark:text-red-300 break-words">
+                              {item.last_error}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                Uzatish fon rejimida ketadi — bu oynani yopsangiz ham jarayon
+                to'xtamaydi. Holatni keyin Elchi sozlamalari sahifasidan ham
+                ko'rish mumkin.
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  disabled={isElchiFetching}
+                  onClick={() => refetchElchiDispatch()}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${isElchiFetching ? "animate-spin" : ""}`}
+                  />
+                  Yangilash
+                </button>
+                <button
+                  onClick={closeElchiDispatch}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-sm font-medium flex items-center justify-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  Yopish
+                </button>
+              </div>
             </div>
           </div>
         </Popup>
