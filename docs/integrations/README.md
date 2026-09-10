@@ -14,6 +14,9 @@
 | **[02-amocrm-kommo.md](02-amocrm-kommo.md)** | amoCRM/Kommo to'liq rejasi (13 bo'lim) — **CRM = buyurtma manbai** (inbound intake asosiy + outbound feedback) | amoCRM ustida ishlaydigan dasturchi |
 | **[03-google-sheets.md](03-google-sheets.md)** | Google Sheets to'liq rejasi (13 bo'lim) — **faqat outbound** hisobot/oyna | Sheets ustida ishlaydigan dasturchi |
 | **[04-intake-texnik-eslatmalar.md](04-intake-texnik-eslatmalar.md)** | CRM→buyurtma intake implementatsiyasi uchun texnik ground-truth (`receiveExternalOrders`, `ldg-webhook`, SOATO, kod file:line) | CRM intake yozadigan dasturchi |
+| **[05-elchi.md](05-elchi.md)** | **Elchi Pochta** integratsiyasi (2026-09-07) — PCS'dan pochtani Elchi'ga jo'natish, Elchi kuryerlari sotishi/bekor qilishi. Alohida model: *CRM emas, **yetkazish pudratchisi*** (LDG qolipi) | Elchi integratsiyasini yozadigan dasturchi |
+| **[06-platforma.md](06-platforma.md)** | **Integratsiya platformasi** (2026-09-08) — kategoriyali ulanish arxitekturasi: 3 rol (CARRIER · SOURCE · MIRROR) × 2 rejim (SPEC · ADAPTER). Yangi hamkor **kodsiz** ulanadi | **Yangi integratsiya boshlashdan oldin shuni o'qing** |
+| **[07-pilot.md](07-pilot.md)** | **Pilot ijro rejasi** (2026-09-08) — BeePost'dan bitta hududni Elchi'ga jo'natib real test; darvoza (router EMAS), pul tekshiruvi, **12 ta qabul mezoni** | **Ishni boshlaydigan dasturchi** |
 
 Har bir tizim rejasi bir xil 13-bo'limli tuzilishga ega: maqsad/yo'nalish · ma'lumot oqimi · auth · arxitekturaga ulanish · field/status mapping · API chaqiruvlari · kod hook nuqtalari · ishonchlilik · xavfsizlik · bosqichma-bosqich joriy etish · sinov · xavflar/savollar · ish hajmi bahosi.
 
