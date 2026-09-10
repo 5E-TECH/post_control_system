@@ -1,0 +1,405 @@
+/// <reference types="jest" />
+import { ElchiConfigService } from './elchi-config.service';
+
+/**
+ * Elchi sozlash servisi — sozlama maskalash, SOATO moslash va DARVOZA.
+ *
+ * Eng muhim ikki invariant shu yerda qulflangan:
+ *   1. `syncDistricts` HECH QACHON `is_enabled`ga tegmaydi — moslash texnik
+ *      amal, jo'natishga ruxsat esa operatorning ataylab qilgan qarori.
+ *      Aks holda "moslashni yangilash" tugmasi darvozani bilvosita ochib
+ *      yuborishi mumkin edi.
+ *   2. Qo'lda moslangan qator avtomatik moslash tomonidan ustidan YOZILMAYDI.
+ */
+function buildSvc(over: {
+  config?: unknown;
+  elchiDistricts?: Array<Record<string, unknown>>;
+  courier?: Record<string, unknown> | null;
+  getTariffImpl?: jest.Mock;
+  ourDistricts?: Array<Record<string, unknown>>;
+  mapRows?: Array<Record<string, unknown>>;
+} = {}) {
+  const saved: any[] = [];
+  const svc: any = Object.create(ElchiConfigService.prototype);
+
+  svc.repo = {
+    findOne: jest.fn().mockResolvedValue(over.config ?? { id: 'cfg-1' }),
+    create: jest.fn((x: unknown) => x),
+    save: jest.fn((x: unknown) => Promise.resolve(x)),
+  };
+  svc.mapRepo = {
+    find: jest.fn().mockResolvedValue(over.mapRows ?? []),
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn((x: unknown) => x),
+    save: jest.fn((x: any) => {
+      saved.push(x);
+      return Promise.resolve({ id: 'row-1', ...x });
+    }),
+  };
+  svc.districtRepo = {
+    find: jest.fn().mockResolvedValue(over.ourDistricts ?? []),
+  };
+  svc.userRepo = {
+    findOne: jest.fn().mockResolvedValue((over as any).courier ?? null),
+  };
+  svc.api = {
+    getDistricts: jest.fn().mockResolvedValue(over.elchiDistricts ?? []),
+    ping: jest.fn().mockResolvedValue({ authenticated: true }),
+    getTariff:
+      (over as any).getTariffImpl ??
+      jest.fn((_id: string, where: string) =>
+        Promise.resolve({
+          market_tariff: where === 'center' ? 15000 : 20000,
+        }),
+      ),
+  };
+  svc.activityLog = { log: jest.fn().mockResolvedValue(undefined) };
+  svc.logger = { warn: jest.fn(), error: jest.fn() };
+
+  return { svc, saved };
+}
+
+describe('ElchiConfigService — getSafe (sirlar sizmaydi)', () => {
+  it('maxfiy maydonlar QAYTARILMAYDI, faqat *_set bayroqlari', async () => {
+    const { svc } = buildSvc({
+      config: {
+        id: 'cfg-1',
+        is_active: true,
+        api_base_url: 'https://api.elchi.uz',
+        api_key: 'super-secret-key',
+        webhook_secret: 'hmac-secret',
+        webhook_secret_previous: null,
+      },
+    });
+
+    const safe: any = await svc.getSafe();
+
+    expect(safe.api_key).toBeUndefined();
+    expect(safe.webhook_secret).toBeUndefined();
+    expect(safe.webhook_secret_previous).toBeUndefined();
+    expect(safe.api_key_set).toBe(true);
+    expect(safe.webhook_secret_set).toBe(true);
+    expect(safe.webhook_secret_previous_set).toBe(false);
+    // Maxfiy bo'lmagan maydonlar ko'rinadi.
+    expect(safe.api_base_url).toBe('https://api.elchi.uz');
+    expect(safe.is_active).toBe(true);
+  });
+});
+
+describe('ElchiConfigService — syncDistricts (SOATO moslash)', () => {
+  it('SOATO bo‘yicha moslaydi va DARVOZANI OCHMAYDI', async () => {
+    const { svc, saved } = buildSvc({
+      ourDistricts: [{ id: 'd-1', name: 'Chilonzor', sato_code: '1726269' }],
+      elchiDistricts: [
+        { id: '482', name: 'Chilonzor', region_id: '17', sato_code: '1726269' },
+      ],
+    });
+
+    const res: any = await svc.syncDistricts();
+
+    expect(res.matched).toBe(1);
+    expect(saved[0]).toEqual(
+      expect.objectContaining({
+        district_id: 'd-1',
+        elchi_district_id: '482',
+        elchi_region_id: '17',
+        sato_code: '1726269',
+        matched_automatically: true,
+      }),
+    );
+    // INVARIANT 1: `is_enabled` umuman BERILMAYDI -> entity default `false`.
+    expect(saved[0]).not.toHaveProperty('is_enabled');
+  });
+
+  it('QO‘LDA moslangan qator ustidan yozilmaydi', async () => {
+    const { svc, saved } = buildSvc({
+      ourDistricts: [{ id: 'd-1', name: 'Chilonzor', sato_code: '1726269' }],
+      elchiDistricts: [
+        { id: '999', name: 'Boshqa', region_id: '17', sato_code: '1726269' },
+      ],
+      mapRows: [
+        {
+          id: 'row-1',
+          district_id: 'd-1',
+          elchi_district_id: '482', // operator qo'lda tanlagan
+          matched_automatically: false,
+          is_enabled: true,
+        },
+      ],
+    });
+
+    const res: any = await svc.syncDistricts();
+
+    expect(res.kept_manual).toBe(1);
+    expect(res.matched).toBe(0);
+    expect(saved).toHaveLength(0);
+  });
+
+  it('avtomatik qator Elchi id o‘zgarsa yangilanadi, is_enabled TEGILMAYDI', async () => {
+    const existing = {
+      id: 'row-1',
+      district_id: 'd-1',
+      elchi_district_id: '482',
+      elchi_region_id: '17',
+      sato_code: '1726269',
+      matched_automatically: true,
+      is_enabled: true, // operator ruxsat bergan
+    };
+    const { svc, saved } = buildSvc({
+      ourDistricts: [{ id: 'd-1', name: 'Chilonzor', sato_code: '1726269' }],
+      elchiDistricts: [
+        { id: '777', name: 'Chilonzor', region_id: '18', sato_code: '1726269' },
+      ],
+      mapRows: [existing],
+    });
+
+    const res: any = await svc.syncDistricts();
+
+    expect(res.refreshed).toBe(1);
+    expect(saved[0].elchi_district_id).toBe('777');
+    expect(saved[0].elchi_region_id).toBe('18');
+    // INVARIANT 1: ruxsat o'z holida qoladi — sync uni o'chirmaydi ham, yoqmaydi ham.
+    expect(saved[0].is_enabled).toBe(true);
+  });
+
+  it('mos SOATO topilmagan tumanlar javobda qaytariladi', async () => {
+    const { svc, saved } = buildSvc({
+      ourDistricts: [
+        { id: 'd-1', name: 'Yangi tuman', sato_code: '9999999' },
+        { id: 'd-2', name: 'Kodsiz tuman', sato_code: null },
+      ],
+      elchiDistricts: [
+        { id: '482', name: 'Chilonzor', region_id: '17', sato_code: '1726269' },
+      ],
+    });
+
+    const res: any = await svc.syncDistricts();
+
+    expect(res.matched).toBe(0);
+    expect(res.unmatched).toHaveLength(2);
+    expect(res.unmatched.map((u: any) => u.district_id)).toEqual(['d-1', 'd-2']);
+    expect(saved).toHaveLength(0);
+  });
+
+  it('Elchi tomonda takroriy SOATO -> birinchisi olinadi va ogohlantiriladi', async () => {
+    const { svc, saved } = buildSvc({
+      ourDistricts: [{ id: 'd-1', name: 'Chilonzor', sato_code: '1726269' }],
+      elchiDistricts: [
+        { id: '482', name: 'Chilonzor', region_id: '17', sato_code: '1726269' },
+        { id: '483', name: 'Chilonzor-2', region_id: '17', sato_code: '1726269' },
+      ],
+    });
+
+    const res: any = await svc.syncDistricts();
+
+    expect(res.matched).toBe(1);
+    expect(saved[0].elchi_district_id).toBe('482');
+    // Jimgina o'tkazib yubormaymiz — Elchi ma'lumotida dublikat bor degani.
+    expect(svc.logger.warn).toHaveBeenCalled();
+  });
+});
+
+describe('ElchiConfigService — DARVOZA', () => {
+  it('moslama yo‘q -> jo‘natishga ruxsat YO‘Q', async () => {
+    const { svc } = buildSvc();
+    svc.mapRepo.findOne = jest.fn().mockResolvedValue(null);
+
+    await expect(svc.isDistrictAllowed('d-1')).resolves.toBe(false);
+  });
+
+  it('bo‘sh district id -> ruxsat YO‘Q (so‘rov ham yuborilmaydi)', async () => {
+    const { svc } = buildSvc();
+    await expect(svc.isDistrictAllowed('')).resolves.toBe(false);
+    expect(svc.mapRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('yoqilgan, lekin Elchi tumani belgilanmagan -> ruxsat YO‘Q', async () => {
+    const { svc } = buildSvc();
+    svc.mapRepo.findOne = jest
+      .fn()
+      .mockResolvedValue({ id: 'row-1', elchi_district_id: null });
+
+    await expect(svc.isDistrictAllowed('d-1')).resolves.toBe(false);
+  });
+
+  it('moslangan + yoqilgan -> RUXSAT', async () => {
+    const { svc } = buildSvc();
+    svc.mapRepo.findOne = jest
+      .fn()
+      .mockResolvedValue({ id: 'row-1', elchi_district_id: '482' });
+
+    await expect(svc.isDistrictAllowed('d-1')).resolves.toBe(true);
+  });
+
+  it('setDistrictEnabled: moslama yo‘q -> xato', async () => {
+    const { svc } = buildSvc();
+    svc.mapRepo.findOne = jest.fn().mockResolvedValue(null);
+
+    await expect(svc.setDistrictEnabled('d-1', true)).rejects.toThrow(
+      /moslamasi yo'q/,
+    );
+  });
+
+  it('setDistrictEnabled: Elchi tumaniga moslanmagan holda YOQIB bo‘lmaydi', async () => {
+    const { svc } = buildSvc();
+    svc.mapRepo.findOne = jest.fn().mockResolvedValue({
+      id: 'row-1',
+      district_id: 'd-1',
+      elchi_district_id: null,
+      is_enabled: false,
+    });
+
+    await expect(svc.setDistrictEnabled('d-1', true)).rejects.toThrow(
+      /moslanmagan/,
+    );
+  });
+
+  it('setDistrictEnabled: o‘chirish moslamasiz ham ishlaydi (xavfsiz yo‘nalish)', async () => {
+    const { svc } = buildSvc();
+    svc.mapRepo.findOne = jest.fn().mockResolvedValue({
+      id: 'row-1',
+      district_id: 'd-1',
+      elchi_district_id: null,
+      is_enabled: true,
+    });
+
+    const res: any = await svc.setDistrictEnabled('d-1', false);
+    expect(res.is_enabled).toBe(false);
+  });
+
+  it('resolveElchiGeo: yoqilmagan tuman -> null', async () => {
+    const { svc } = buildSvc();
+    svc.mapRepo.findOne = jest.fn().mockResolvedValue(null);
+
+    await expect(svc.resolveElchiGeo('d-1')).resolves.toBeNull();
+  });
+
+  it('resolveElchiGeo: yoqilgan tuman -> Elchi hudud id‘lari', async () => {
+    const { svc } = buildSvc();
+    svc.mapRepo.findOne = jest.fn().mockResolvedValue({
+      elchi_district_id: '482',
+      elchi_region_id: '17',
+    });
+
+    await expect(svc.resolveElchiGeo('d-1')).resolves.toEqual({
+      elchi_district_id: '482',
+      elchi_region_id: '17',
+    });
+  });
+});
+
+
+describe('ElchiConfigService — TAYYORLIK va TARIF MOSLIGI', () => {
+  const fullConfig = {
+    id: 'cfg-1',
+    api_base_url: 'https://api.elchi.uz',
+    api_key: 'k',
+    webhook_secret: 's',
+    elchi_market_id: '500',
+    elchi_courier_user_id: 'c-1',
+  };
+
+  it('tariflar TENG -> tayyorlik bandi o‘tadi', async () => {
+    const { svc } = buildSvc({
+      config: fullConfig,
+      // Bizdagi kuryer tarifi Elchi bilan bir xil (20000 / 15000).
+      courier: {
+        id: 'c-1',
+        name: 'Elchi',
+        status: 'active',
+        tariff_home: 20000,
+        tariff_center: 15000,
+      },
+      mapRows: [{ id: 'r1', is_enabled: true }],
+    });
+    svc.mapRepo.count = jest.fn().mockResolvedValue(1);
+
+    const res: any = await svc.getReadiness();
+    const tariff = res.checks.find((c: any) => c.key === 'tariff_match');
+
+    expect(tariff.ok).toBe(true);
+    expect(tariff.detail).toMatch(/mos/);
+  });
+
+  // ⚠️ ASOSIY HIMOYA: mos kelmasa hech qanday xato chiqmaydi, farq jimgina
+  // to'planadi. Shu bois mashina solishtiradi va OCHIQ aytadi.
+  it('tariflar MOS KELMASA -> ochiq nomuvofiqlik xabari', async () => {
+    const { svc } = buildSvc({
+      config: fullConfig,
+      courier: {
+        id: 'c-1',
+        name: 'Elchi',
+        status: 'active',
+        tariff_home: 25000, // Elchi'da 20000
+        tariff_center: 15000,
+      },
+    });
+    svc.mapRepo.count = jest.fn().mockResolvedValue(1);
+
+    const res: any = await svc.getReadiness();
+    const tariff = res.checks.find((c: any) => c.key === 'tariff_match');
+
+    expect(tariff.ok).toBe(false);
+    expect(tariff.detail).toMatch(/NOMUVOFIQ/);
+    expect(tariff.detail).toMatch(/25000/);
+    expect(tariff.detail).toMatch(/20000/);
+    expect(res.ready).toBe(false);
+    expect(svc.logger.error).toHaveBeenCalled();
+  });
+
+  it("Elchi tarifini o'qib bo'lmasa -> band muvaffaqiyatsiz, tekshiruv yiqilmaydi", async () => {
+    const { svc } = buildSvc({
+      config: fullConfig,
+      courier: { id: 'c-1', name: 'E', status: 'active', tariff_home: 1 },
+      getTariffImpl: jest.fn().mockRejectedValue(new Error('Elchi 503')),
+    });
+    svc.mapRepo.count = jest.fn().mockResolvedValue(0);
+
+    const res: any = await svc.getReadiness();
+    const tariff = res.checks.find((c: any) => c.key === 'tariff_match');
+
+    expect(tariff.ok).toBe(false);
+    expect(tariff.detail).toMatch(/Elchi 503/);
+  });
+
+  it("sozlanmagan -> ready=false va yetishmayotgan bandlar ko'rinadi", async () => {
+    const { svc } = buildSvc({ config: { id: 'cfg-1' } });
+    svc.mapRepo.count = jest.fn().mockResolvedValue(0);
+
+    const res: any = await svc.getReadiness();
+
+    expect(res.ready).toBe(false);
+    const failed = res.checks.filter((c: any) => !c.ok).map((c: any) => c.key);
+    expect(failed).toEqual(
+      expect.arrayContaining([
+        'api_base_url',
+        'api_key',
+        'webhook_secret',
+        'elchi_market_id',
+        'virtual_courier',
+        'districts',
+      ]),
+    );
+  });
+
+  it("hech bir tuman yoqilmagan -> tayyor EMAS (xavfsiz standart)", async () => {
+    const { svc } = buildSvc({
+      config: fullConfig,
+      courier: {
+        id: 'c-1', name: 'E', status: 'active',
+        tariff_home: 20000, tariff_center: 15000,
+      },
+    });
+    // 3 ta moslangan, lekin 0 tasi yoqilgan.
+    svc.mapRepo.count = jest
+      .fn()
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(0);
+
+    const res: any = await svc.getReadiness();
+    const districts = res.checks.find((c: any) => c.key === 'districts');
+
+    expect(districts.ok).toBe(false);
+    expect(districts.detail).toMatch(/ruxsat berilgan: 0/);
+  });
+});
