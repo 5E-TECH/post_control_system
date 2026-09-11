@@ -682,3 +682,87 @@ describe('ElchiConfigService — VILOYAT darvozasi', () => {
     await expect(svc.setRegionEnabled(REGION, true)).rejects.toThrow();
   });
 });
+
+/**
+ * TAKRORIY SOATO — bog'lanish sakramasligi kerak.
+ *
+ * Elchi bazasida bir joy ikki nom bilan yozilgan bo'lishi mumkin (1724206 →
+ * "Oqoltin" va "Akaltyn"). Ilgari "massivdagi birinchisi" olinardi, API
+ * javobining tartibi esa kafolatlanmagan — ya'ni keyingi sinxronda mavjud
+ * bog'lanish sababsiz boshqasiga ko'chib ketardi.
+ */
+describe('ElchiConfigService — takroriy SOATO barqaror hal qilinadi', () => {
+  const DUP = [
+    { id: '149', name: 'Oqoltin', sato_code: '1724206', region_id: '9' },
+    { id: '145', name: 'Akaltyn', sato_code: '1724206', region_id: '9' },
+  ];
+  const OURS = [{ id: 'd-oq', name: 'Oqoltin', sato_code: '1724206' }];
+
+  it("TC1: mavjud bog'lanish SAQLANADI — tartib teskari bo'lsa ham", async () => {
+    const { svc } = buildSvc({
+      // Elchi javobida "Akaltyn" BIRINCHI keladi...
+      elchiDistricts: [DUP[1], DUP[0]],
+      ourDistricts: OURS,
+      // ...lekin biz allaqachon #149 ga bog'langanmiz.
+      mapRows: [
+        {
+          id: 'm1',
+          district_id: 'd-oq',
+          elchi_district_id: '149',
+          elchi_region_id: '9',
+          sato_code: '1724206',
+          matched_automatically: true,
+          is_enabled: true,
+        },
+      ],
+    });
+
+    const res: any = await svc.syncDistricts();
+
+    // ⭐ Hech narsa o'zgarmasligi kerak — aks holda bog'lanish har
+    // sinxronda sakrab turardi.
+    expect(res.refreshed).toBe(0);
+    expect(res.matched).toBe(0);
+  });
+
+  it("TC2: yangi moslashda TO'G'RI O'ZBEKCHA nom olinadi (id emas)", async () => {
+    const { svc, saved } = buildSvc({
+      elchiDistricts: [DUP[0], DUP[1]],
+      ourDistricts: OURS,
+      mapRows: [],
+    });
+
+    await svc.syncDistricts();
+
+    // ⭐ #145 "Akaltyn" id bo'yicha kichikroq, lekin u ruscha
+    // transliteratsiya. To'g'ri nom — "Oqoltin" (#149).
+    expect(saved[0].elchi_district_id).toBe('149');
+  });
+
+  it('TC3: teskari tartibda ham AYNI natija (tartibga bog\'liq emas)', async () => {
+    const { svc, saved } = buildSvc({
+      elchiDistricts: [DUP[1], DUP[0]],
+      ourDistricts: OURS,
+      mapRows: [],
+    });
+
+    await svc.syncDistricts();
+
+    expect(saved[0].elchi_district_id).toBe('149');
+  });
+
+  it("TC4: takrorsiz SOATO xulqi O'ZGARMAYDI", async () => {
+    const { svc, saved } = buildSvc({
+      elchiDistricts: [
+        { id: '28', name: 'Andijon', sato_code: '1703203', region_id: '3' },
+      ],
+      ourDistricts: [{ id: 'd-a', name: 'Andijon tumani', sato_code: '1703203' }],
+      mapRows: [],
+    });
+
+    const res: any = await svc.syncDistricts();
+
+    expect(res.matched).toBe(1);
+    expect(saved[0].elchi_district_id).toBe('28');
+  });
+});

@@ -35,6 +35,35 @@ export interface ElchiDistrictSyncResult {
   unmatched: Array<{ district_id: string; name: string; sato_code: string | null }>;
 }
 
+/**
+ * Tuman nomini solishtirish uchun normallashtiradi: qo'shimchalar
+ * (`tumani`/`shahri`) tushadi, apostrof variantlari va `x`/`h` tenglashadi.
+ */
+function normalizeDistrictName(name: unknown): string {
+  return String(name ?? '')
+    .toLowerCase()
+    .replace(/(tumani|tuman|shahri|shahar)/g, '')
+    .replace(/x/g, 'h')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Nom lotin-o'zbek imlosiga qanchalik o'xshashligi.
+ *
+ * Takroriy SOATO'da ikki yozuv bir joyni bildiradi, lekin biri eski ruscha
+ * transliteratsiya bo'ladi ("Akaltyn"), ikkinchisi to'g'ri o'zbekcha nom
+ * ("Oqoltin"). Tanlov id yoki massiv tartibiga tayansa, NOTO'G'RI nom
+ * tanlanib qolishi mumkin — shuning uchun imlo belgilariga qaraymiz.
+ */
+function uzbekLatinScore(name: unknown): number {
+  const s = String(name ?? '');
+  let score = 0;
+  if (/[oOgG]['ʻʼ`]/.test(s)) score += 2; // o', g'
+  if (/q/i.test(s)) score += 1; // ruscha transliteratsiyada `k` bo'lardi
+  if (/(yn|yy|iy)$/i.test(s)) score -= 1; // "-yn" ruscha oxirlanish
+  return score;
+}
+
 @Injectable()
 export class ElchiConfigService {
   private readonly logger = new Logger(ElchiConfigService.name);
@@ -441,21 +470,92 @@ export class ElchiConfigService {
       this.mapRepo.find(),
     ]);
 
-    // Elchi tomonidagi SOATO → tuman indeksi. Bir SOATO bir necha marta
-    // kelsa BIRINCHISI olinadi va bu holat log qilinadi (Elchi ma'lumotida
-    // dublikat bor degani — jimgina o'tkazib yubormaymiz).
-    const bySato = new Map<string, { id: string; region_id: string }>();
+    /**
+     * Elchi tomonidagi SOATO → tuman(lar) indeksi.
+     *
+     * ⚠️ Bir SOATO bir necha marta kelishi MUMKIN — Elchi bazasida bir joy
+     * ikki nom bilan yozilgan bo'lishi mumkin (masalan `1724206` uchun
+     * "Oqoltin" va "Akaltyn").
+     *
+     * Ilgari bunda "massivdagi BIRINCHISI" olinardi. Bu yashirin xato edi:
+     * API javobining tartibi KAFOLATLANMAGAN, ya'ni keyingi moslashda
+     * ikkinchi nomzod birinchi kelib qolsa, tizim mavjud bog'lanishni
+     * sababsiz BOSHQASIGA ko'chirardi. Yetkazish manzili o'zgarmasdi
+     * (SOATO bir xil), lekin Elchi hisobotida bitta tuman ikkiga bo'linardi
+     * va bog'lanish har sinxronda sakrab turardi.
+     *
+     * Endi barcha nomzodlar saqlanadi va tanlov `resolveRemote` da
+     * BARQAROR qilinadi.
+     */
+    const bySato = new Map<
+      string,
+      Array<{ id: string; region_id: string; name: string }>
+    >();
     for (const d of elchiDistricts) {
       const code = String(d.sato_code ?? '').trim();
       if (!code) continue;
-      if (bySato.has(code)) {
+      const entry = {
+        id: String(d.id),
+        region_id: String(d.region_id),
+        name: String(d.name ?? ''),
+      };
+      const list = bySato.get(code);
+      if (list) {
+        list.push(entry);
         this.logger.warn(
-          `Elchi tumanlarida takroriy SOATO: ${code} (birinchisi olindi)`,
+          `Elchi tumanlarida takroriy SOATO: ${code} — ${list.length} ta nomzod`,
         );
-        continue;
+      } else {
+        bySato.set(code, [entry]);
       }
-      bySato.set(code, { id: String(d.id), region_id: String(d.region_id) });
     }
+    /**
+     * Barqaror tartib. Uch bosqichli, ataylab shu ketma-ketlikda:
+     *
+     *  1. Bizda ham AYNI nom bilan turgan yozuv — eng ishonchli belgi.
+     *  2. Lotin-o'zbek imlosi (`q`, `o'`, `g'`) — ruscha transliteratsiya
+     *     emas. `1724206` uchun aynan shu holat: "Oqoltin" to'g'ri nom,
+     *     "Akaltyn" esa eski ruscha yozuv. Eng kichik id bo'yicha tanlasak,
+     *     yangi muhitda NOTO'G'RI nom tanlanardi.
+     *  3. Id — hech narsa ajratmasa, hech bo'lmasa natija TAKRORLANUVCHI
+     *     bo'lsin (API javobining tartibi kafolatlanmagan).
+     */
+    const ourNameBySato = new Map(
+      ourDistricts.map((d) => [
+        String(d.sato_code ?? '').trim(),
+        normalizeDistrictName(d.name),
+      ]),
+    );
+    for (const [code, list] of bySato.entries()) {
+      const ourName = ourNameBySato.get(code);
+      list.sort((a, b) => {
+        const an = normalizeDistrictName(a.name);
+        const bn = normalizeDistrictName(b.name);
+        if (ourName) {
+          const am = an === ourName ? 0 : 1;
+          const bm = bn === ourName ? 0 : 1;
+          if (am !== bm) return am - bm;
+        }
+        const au = uzbekLatinScore(a.name);
+        const bu = uzbekLatinScore(b.name);
+        if (au !== bu) return bu - au;
+        return Number(a.id) - Number(b.id);
+      });
+    }
+
+    /**
+     * Nomzodlardan BITTASINI tanlaydi.
+     *
+     * Mavjud moslama nomzodlardan biriga allaqachon ishora qilayotgan bo'lsa —
+     * O'SHA saqlanadi. Ya'ni bir marta o'rnatilgan bog'lanish takroriy
+     * sinxronlarda sakramaydi. Aks holda yuqoridagi tartib bo'yicha eng
+     * yaxshisi olinadi.
+     */
+    const resolveRemote = (
+      candidates: Array<{ id: string; region_id: string; name: string }>,
+      currentId?: string | null,
+    ) =>
+      candidates.find((c) => c.id === String(currentId ?? '')) ?? candidates[0];
 
     const rowByDistrict = new Map(
       existingRows.map((row) => [String(row.district_id), row]),
@@ -470,8 +570,11 @@ export class ElchiConfigService {
 
     for (const ours of ourDistricts) {
       const code = String(ours.sato_code ?? '').trim();
-      const remote = code ? bySato.get(code) : undefined;
       const existing = rowByDistrict.get(String(ours.id));
+      const candidates = code ? bySato.get(code) : undefined;
+      const remote = candidates?.length
+        ? resolveRemote(candidates, existing?.elchi_district_id)
+        : undefined;
 
       if (!remote) {
         result.unmatched.push({
