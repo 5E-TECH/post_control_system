@@ -403,3 +403,146 @@ describe('ElchiConfigService — TAYYORLIK va TARIF MOSLIGI', () => {
     expect(districts.detail).toMatch(/ruxsat berilgan: 0/);
   });
 });
+
+/**
+ * QO'LDA MOSLASH — 2026-09-11 real testda paydo bo'lgan ehtiyoj.
+ *
+ * Avtomatik moslash SOATO bo'yicha ishlaydi, lekin Elchi produksiyasida
+ * tumanlarning `sato_code` qiymati HAQIQIY SOATO emas — o'rinbosar satr
+ * (`REG-03-DIS-02`). PCS'da esa haqiqiy kod (`1703224`). Kesishma NOL:
+ * `syncDistricts` 184 tumandan hech birini moslay olmadi.
+ */
+describe('ElchiConfigService — tumanni qo\'lda moslash', () => {
+  const withDistrict = (over: any = {}) => {
+    const built = buildSvc(over);
+    built.svc.districtRepo.findOne = jest
+      .fn()
+      .mockResolvedValue({ id: 'd-1', name: 'Asaka tumani', sato_code: '1703224' });
+    return built;
+  };
+
+  it('yangi qator yaratadi va QO\'LDA deb belgilaydi', async () => {
+    const { svc, saved } = withDistrict();
+    const row: any = await svc.setDistrictMapping('d-1', '29', '3');
+
+    expect(row.elchi_district_id).toBe('29');
+    expect(row.elchi_region_id).toBe('3');
+    // Eng muhimi: `syncDistricts` shu bayroqqa qarab qatorni saqlab qoladi.
+    expect(saved[0].matched_automatically).toBe(false);
+  });
+
+  it('DARVOZAGA TEGMAYDI — moslash texnik amal, ruxsat alohida qaror', async () => {
+    const { svc, saved } = withDistrict();
+    await svc.setDistrictMapping('d-1', '29', '3');
+    expect(saved[0].is_enabled).toBe(false);
+  });
+
+  it('mavjud qatorni yangilaydi, darvozasini o\'zgartirmaydi', async () => {
+    const { svc, saved } = withDistrict();
+    svc.mapRepo.findOne = jest.fn().mockResolvedValue({
+      id: 'row-1',
+      district_id: 'd-1',
+      elchi_district_id: '11',
+      is_enabled: true,
+      matched_automatically: true,
+    });
+
+    await svc.setDistrictMapping('d-1', '29', '3');
+
+    expect(saved[0].elchi_district_id).toBe('29');
+    expect(saved[0].is_enabled).toBe(true); // ochiq darvoza ochiq qoladi
+    expect(saved[0].matched_automatically).toBe(false);
+  });
+
+  it('bo\'sh Elchi tumani RAD ETILADI', async () => {
+    const { svc } = withDistrict();
+    await expect(svc.setDistrictMapping('d-1', '   ', null)).rejects.toThrow();
+  });
+
+  it('mavjud bo\'lmagan tuman RAD ETILADI', async () => {
+    const { svc } = buildSvc();
+    svc.districtRepo.findOne = jest.fn().mockResolvedValue(null);
+    await expect(svc.setDistrictMapping('yo-q', '29', null)).rejects.toThrow();
+  });
+});
+
+/**
+ * MARKET OCHISH — tarif KURYERDAN olinadi (M4).
+ *
+ * PCS'dagi vakil-kuryer tarifi va Elchi'dagi market tarifi TENG bo'lishi
+ * shart; ikki joyga qo'lda kiritish aynan farqni tug'diradi.
+ */
+describe('ElchiConfigService — market ochish', () => {
+  const ready = (courier: any) =>
+    buildSvc({
+      config: {
+        id: 'cfg-1',
+        api_base_url: 'https://api.elchi.uz',
+        api_key: 'k',
+        elchi_courier_user_id: 'c-1',
+      },
+      courier,
+    });
+
+  it('tarifni KURYERDAN oladi va Elchi\'ga yuboradi', async () => {
+    const { svc } = ready({
+      id: 'c-1',
+      phone_number: '+998900000000',
+      tariff_home: 25000,
+      tariff_center: 15000,
+    });
+    svc.api.provisionMarket = jest
+      .fn()
+      .mockResolvedValue({ elchi_market_id: 'm-77' });
+
+    const res: any = await svc.provisionMarket();
+
+    const sent = svc.api.provisionMarket.mock.calls[0][0];
+    expect(sent.tariff_home).toBe(25000);
+    expect(sent.tariff_center).toBe(15000);
+    // Barqaror kalit — takroriy chaqiruv yangi market ochmasin.
+    expect(sent.external_seller_id).toBe('cfg-1');
+    expect(res.elchi_market_id).toBe('m-77');
+  });
+
+  it('NOL tarif RAD ETILADI — Elchi bepul yetkazib qo\'yardi (M4)', async () => {
+    const { svc } = ready({
+      id: 'c-1',
+      phone_number: '+998900000000',
+      tariff_home: 0,
+      tariff_center: 15000,
+    });
+    svc.api.provisionMarket = jest.fn();
+
+    await expect(svc.provisionMarket()).rejects.toThrow(/tarif/i);
+    expect(svc.api.provisionMarket).not.toHaveBeenCalled();
+  });
+
+  it('kuryer biriktirilmagan bo\'lsa RAD ETILADI', async () => {
+    const { svc } = buildSvc({
+      config: { id: 'cfg-1', api_base_url: 'https://x', api_key: 'k' },
+    });
+    svc.api.provisionMarket = jest.fn();
+
+    await expect(svc.provisionMarket()).rejects.toThrow(/kuryer/i);
+    expect(svc.api.provisionMarket).not.toHaveBeenCalled();
+  });
+
+  it('kalit yoki manzil yo\'q bo\'lsa RAD ETILADI', async () => {
+    const { svc } = buildSvc({ config: { id: 'cfg-1' } });
+    svc.api.provisionMarket = jest.fn();
+    await expect(svc.provisionMarket()).rejects.toThrow();
+    expect(svc.api.provisionMarket).not.toHaveBeenCalled();
+  });
+
+  it('javobda market id bo\'lmasa SAQLAMAYDI', async () => {
+    const { svc } = ready({
+      id: 'c-1',
+      phone_number: '+998900000000',
+      tariff_home: 25000,
+      tariff_center: 15000,
+    });
+    svc.api.provisionMarket = jest.fn().mockResolvedValue({});
+    await expect(svc.provisionMarket()).rejects.toThrow(/elchi_market_id/i);
+  });
+});

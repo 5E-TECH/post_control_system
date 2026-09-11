@@ -14,7 +14,9 @@ import {
   IsArray,
   IsBoolean,
   IsOptional,
+  IsString,
   IsUUID,
+  MaxLength,
 } from 'class-validator';
 import { JwtGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -42,6 +44,21 @@ class GatePreviewDto {
 class SetDistrictGateDto {
   @IsBoolean()
   is_enabled!: boolean;
+}
+
+/**
+ * Tumanni QO'LDA moslash — avtomatik SOATO moslash ishlamaganda.
+ * Elchi tuman id'si satr (uning bazasida bigint), UUID emas.
+ */
+class SetDistrictMappingDto {
+  @IsString()
+  @MaxLength(64)
+  elchi_district_id!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  elchi_region_id?: string;
 }
 
 class ReclaimControlDto {
@@ -136,6 +153,36 @@ export class ElchiConfigController {
   @Post('districts/sync')
   async syncDistricts(@CurrentUser() user: JwtPayload) {
     return this.configService.syncDistricts(user);
+  }
+
+  @ApiOperation({
+    summary:
+      "Tumanni QO'LDA moslash. Avtomatik moslash SOATO bo'yicha ishlaydi, " +
+      "lekin Elchi tomonda haqiqiy SOATO bo'lmasa (o'rinbosar kod) shu yo'l " +
+      "ishlatiladi. DARVOZAGA TEGMAYDI.",
+  })
+  @Patch('districts/:districtId/mapping')
+  async setDistrictMapping(
+    @Param('districtId', ParseUUIDPipe) districtId: string,
+    @Body() dto: SetDistrictMappingDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.configService.setDistrictMapping(
+      districtId,
+      dto.elchi_district_id,
+      dto.elchi_region_id ?? null,
+      user,
+    );
+  }
+
+  @ApiOperation({
+    summary:
+      "Elchi'da BeePost market akkauntini ochish. Tarif VAKIL-KURYERDAN " +
+      'olinadi (M4: ikki tomonda teng bo\'lishi shart). Idempotent.',
+  })
+  @Post('config/provision-market')
+  async provisionMarket(@CurrentUser() user: JwtPayload) {
+    return this.configService.provisionMarket(user);
   }
 
   @ApiOperation({

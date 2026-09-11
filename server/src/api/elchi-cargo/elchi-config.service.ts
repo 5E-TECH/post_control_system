@@ -541,6 +541,170 @@ export class ElchiConfigService {
    * Moslama yo'q bo'lsa yoqib bo'lmaydi — aks holda jo'natishda Elchi
    * `district_id`si bo'lmagan posilka yaratishga urinilardi.
    */
+  /**
+   * TUMANNI QO'LDA MOSLASH.
+   *
+   * NEGA KERAK BO'LDI (2026-09-11, real testda aniqlandi): avtomatik moslash
+   * SOATO bo'yicha ishlaydi, lekin Elchi produksiyasida tumanlarning
+   * `sato_code` qiymati HAQIQIY SOATO emas — o'rinbosar satr
+   * (`REG-03-DIS-02` ko'rinishida). PCS'da esa haqiqiy kod (`1703224`).
+   * Kesishma nol, ya'ni `syncDistricts` 184 tumandan hech birini moslay
+   * olmadi.
+   *
+   * Bu metod o'sha holatdan chiqish yo'li: operator Elchi tumanini qo'lda
+   * ko'rsatadi. `matched_automatically = false` qo'yiladi, shuning uchun
+   * keyingi avtomatik moslash bu qatorni USTIDAN YOZMAYDI.
+   *
+   * ⚠️ DARVOZAGA TEGMAYDI. Moslash — texnik amal; jo'natishga ruxsat esa
+   * alohida, ataylab qilinadigan qaror (`setDistrictEnabled`).
+   */
+  async setDistrictMapping(
+    districtId: string,
+    elchiDistrictId: string,
+    elchiRegionId: string | null,
+    user?: JwtPayload,
+  ): Promise<ElchiDistrictMapEntity> {
+    const district = await this.districtRepo.findOne({
+      where: { id: districtId },
+    });
+    if (!district) {
+      throw new NotFoundException('Tuman topilmadi');
+    }
+
+    const remoteId = String(elchiDistrictId ?? '').trim();
+    if (!remoteId) {
+      throw new BadRequestException("Elchi tumani ko'rsatilmagan");
+    }
+
+    let row = await this.mapRepo.findOne({
+      where: { district_id: districtId },
+    });
+    if (!row) {
+      row = this.mapRepo.create({
+        district_id: districtId,
+        sato_code: district.sato_code ?? null,
+        is_enabled: false,
+      });
+    }
+
+    const before = {
+      elchi_district_id: row.elchi_district_id,
+      elchi_region_id: row.elchi_region_id,
+    };
+
+    row.elchi_district_id = remoteId;
+    row.elchi_region_id = String(elchiRegionId ?? '').trim() || null;
+    // Qo'lda qo'yilgani BELGILANADI — `syncDistricts` buni saqlab qoladi.
+    row.matched_automatically = false;
+
+    const saved = await this.mapRepo.save(row);
+
+    await this.activityLog.log({
+      entity_type: 'elchi_district_map',
+      entity_id: saved.id,
+      action: 'district_mapped_manually',
+      old_value: before,
+      new_value: {
+        elchi_district_id: saved.elchi_district_id,
+        elchi_region_id: saved.elchi_region_id,
+      },
+      description: `${district.name} tumani Elchi tumaniga qo'lda moslandi`,
+      user,
+    });
+
+    return saved;
+  }
+
+  /**
+   * ELCHI'DA "BeePost" MARKET AKKAUNTINI OCHISH.
+   *
+   * ⚠️ TARIF KURYERDAN OLINADI, qo'lda kiritilmaydi. Sabab (M4): PCS'dagi
+   * vakil-kuryer tarifi va Elchi'dagi market tarifi TENG bo'lishi shart —
+   * aks holda biz bir summani, Elchi boshqasini ushlab qoladi va ikki daftar
+   * ajraladi. Ikki joyga qo'lda kiritish esa aynan shu farqni tug'diradi.
+   *
+   * Shu bois avval kuryer biriktiriladi, keyin market ochiladi.
+   *
+   * Idempotent: Elchi `external_seller_id` bo'yicha ikkinchi market ochmaydi,
+   * mavjudini qaytaradi.
+   */
+  async provisionMarket(
+    user?: JwtPayload,
+  ): Promise<{ elchi_market_id: string; tariff_home: number; tariff_center: number }> {
+    const config = await this.getOrCreate();
+
+    if (!config.api_base_url || !config.api_key) {
+      throw new BadRequestException(
+        "Avval Elchi manzili va API kalitini kiriting",
+      );
+    }
+    if (!config.elchi_courier_user_id) {
+      throw new BadRequestException(
+        "Avval vakil-kuryerni biriktiring — market tarifi o'sha kuryerdan olinadi",
+      );
+    }
+
+    const courier = await this.userRepo.findOne({
+      where: { id: config.elchi_courier_user_id },
+    });
+    if (!courier) {
+      throw new NotFoundException('Vakil-kuryer topilmadi');
+    }
+
+    const tariffHome = Number(courier.tariff_home ?? 0);
+    const tariffCenter = Number(courier.tariff_center ?? 0);
+    /**
+     * Nol tarif RAD ETILADI. Elchi yuborilmagan tarifni 0 deb oladi va bepul
+     * yetkazadi — butun naqd bizning balansga tushadi, Elchi esa hech nima
+     * ushlab qolmaydi (M4). Bu jimgina pul xatosi bo'lardi.
+     */
+    if (tariffHome <= 0 || tariffCenter <= 0) {
+      throw new BadRequestException(
+        `Vakil-kuryer tarifi nol (uy: ${tariffHome}, markaz: ${tariffCenter}) — ` +
+          'avval kuryer tarifini to‘g‘rilang',
+      );
+    }
+
+    const response = await this.api.provisionMarket({
+      // Barqaror kalit: sozlama qatorining o'zi. Takroriy chaqiruv yangi
+      // market ochmaydi.
+      external_seller_id: config.id,
+      name: 'BeePost',
+      phone: courier.phone_number,
+      tariff_home: tariffHome,
+      tariff_center: tariffCenter,
+    });
+
+    const marketId = String(response?.elchi_market_id ?? '').trim();
+    if (!marketId) {
+      throw new BadRequestException(
+        `Elchi javobida elchi_market_id yo'q: ${JSON.stringify(response).slice(0, 200)}`,
+      );
+    }
+
+    config.elchi_market_id = marketId;
+    await this.repo.save(config);
+
+    await this.activityLog.log({
+      entity_type: 'elchi_config',
+      entity_id: config.id,
+      action: 'elchi_market_provisioned',
+      new_value: {
+        elchi_market_id: marketId,
+        tariff_home: tariffHome,
+        tariff_center: tariffCenter,
+      },
+      description: "Elchi'da BeePost market akkaunti ochildi",
+      user,
+    });
+
+    return {
+      elchi_market_id: marketId,
+      tariff_home: tariffHome,
+      tariff_center: tariffCenter,
+    };
+  }
+
   async setDistrictEnabled(
     districtId: string,
     enabled: boolean,
