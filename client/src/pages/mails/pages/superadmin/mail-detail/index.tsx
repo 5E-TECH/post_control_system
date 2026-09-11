@@ -467,7 +467,15 @@ const MailDetail = () => {
 
                 if (chosenIsElchi) {
                   setElchiExpected(sentCount);
-                  setElchiDispatchPostId(id);
+                  /**
+                   * ⚠️ JAVOBDAGI pochta id'si olinadi, marshrutdagi EMAS.
+                   *
+                   * Qisman jo'natishda server YANGI pochta yaratadi: tanlangan
+                   * buyurtmalar unga ko'chadi, qolganlari eski pochtada
+                   * qoladi. Elchi yozuvlari yangi pochtaga bog'lanadi, shu
+                   * bois eski id bilan so'rasak holat abadiy "0/N" ko'rinardi.
+                   */
+                  setElchiDispatchPostId(res?.data?.updatedPost?.id ?? id);
                 } else {
                   navigate(buildAdminPath("mails"));
                 }
@@ -585,7 +593,9 @@ const MailDetail = () => {
             setElchiExpected(
               Number(res?.data?.postTotalInfo?.total ?? selectedIds.length),
             );
-            setElchiDispatchPostId(id as string);
+            // Qisman jo'natishda server YANGI pochta yaratadi — sabab
+            // yuqorida, avtomatik oqim izohida.
+            setElchiDispatchPostId(res?.data?.updatedPost?.id ?? (id as string));
           } else {
             navigate(buildAdminPath("mails"));
           }
