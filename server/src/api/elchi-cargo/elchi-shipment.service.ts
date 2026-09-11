@@ -371,10 +371,25 @@ export class ElchiShipmentService {
         district_id: geo.elchi_district_id,
         where_deliver:
           order.where_deliver === Where_deliver.CENTER ? 'center' : 'address',
+        /**
+         * `external_product_id` — PCS mahsulot UUID'i.
+         *
+         * Elchi shu id bo'yicha o'z katalogida mahsulotni topadi; yo'q bo'lsa
+         * AVTOMATIK yaratadi, bor bo'lsa qayta ishlatadi. Shu sabab bir xil
+         * mahsulot Elchi'da bir marta yaratiladi va uning hisobotlarida
+         * to'g'ri guruhlanadi.
+         *
+         * Id NOM bilan birga yuboriladi, lekin bog'lanish IDga tayanadi: nom
+         * o'zgarsa (imlo tuzatildi, brend qo'shildi) Elchi tomonida YANGI
+         * mahsulot paydo bo'lmasligi kerak.
+         */
         items: (order.items ?? [])
           .map((item) => ({
             name: String(item.product?.name ?? '').trim(),
             quantity: Number(item.quantity ?? 1),
+            external_product_id: item.product?.id
+              ? String(item.product.id)
+              : undefined,
           }))
           .filter((item) => item.name.length > 0 && item.quantity > 0),
         cod_amount: cod,

@@ -69,7 +69,15 @@ export interface ElchiCreateShipmentRequest {
   region_id?: string | null;
   district_id: string;
   where_deliver?: 'center' | 'address';
-  items?: Array<{ name: string; quantity: number }>;
+  items?: Array<{
+    name: string;
+    quantity: number;
+    /**
+     * PCS mahsulot UUID'i. Elchi katalogida mahsulotni topish/yaratish shu
+     * bo'yicha bajariladi (nom bo'yicha emas — nom o'zgaruvchan).
+     */
+    external_product_id?: string;
+  }>;
   cod_amount: number;
   subtotal?: number;
 }
