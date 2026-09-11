@@ -4,6 +4,7 @@ import { api } from "../..";
 const ELCHI_CONFIG_KEY = "elchi-config";
 const ELCHI_READINESS_KEY = "elchi-readiness";
 const ELCHI_DISTRICTS_KEY = "elchi-districts";
+const ELCHI_REGIONS_KEY = "elchi-regions";
 
 /**
  * Elchi sozlamalarining XAVFSIZ ko'rinishi.
@@ -63,6 +64,37 @@ export interface ElchiDistrictMapRow {
   district?: { id: string; name: string } | null;
 }
 
+/**
+ * VILOYAT darajasidagi darvoza manzarasi.
+ *
+ * `total` — viloyatdagi JAMI tuman, `mapped` — Elchi bilan moslangani,
+ * `enabled` — darvozasi ochig'i.
+ *
+ * ⚠️ `fully_open` `enabled === total` bo'lgandagina `true`. Moslanmagan
+ * tumanni ochib bo'lmaydi, lekin u ham pochtani to'sadi — shuning uchun
+ * solishtiruv `mapped` bilan EMAS, `total` bilan.
+ */
+export interface ElchiRegionGateRow {
+  region_id: string;
+  region_name: string;
+  total: number;
+  mapped: number;
+  enabled: number;
+  fully_open: boolean;
+  unmapped_names: string[];
+}
+
+export interface ElchiRegionGateResult {
+  region_id: string;
+  region_name: string;
+  total: number;
+  mapped: number;
+  changed: number;
+  enabled_after: number;
+  unmapped_names: string[];
+  fully_open: boolean;
+}
+
 /** Javob qobig'ini himoyalangan ochish (`{data}` bo'lishi ham, bo'lmasligi ham mumkin). */
 const unwrap = <T,>(raw: unknown): T =>
   ((raw as { data?: T })?.data ?? raw) as T;
@@ -105,6 +137,15 @@ export const useElchiConfig = () => {
       api
         .get("elchi/districts")
         .then((res) => unwrap<ElchiDistrictMapRow[]>(res.data) ?? []),
+  });
+
+  /** Viloyatlar kesimidagi darvoza holati (moslanmagan tumanlar bilan). */
+  const regions = useQuery({
+    queryKey: [ELCHI_REGIONS_KEY],
+    queryFn: () =>
+      api
+        .get("elchi/regions")
+        .then((res) => unwrap<ElchiRegionGateRow[]>(res.data) ?? []),
   });
 
   const updateConfig = useMutation({
@@ -153,6 +194,25 @@ export const useElchiConfig = () => {
     },
   });
 
+  /**
+   * BUTUN VILOYAT darvozasi. Elchi BeePost uchun "super kuryer" — operator
+   * viloyat pochtasini butunligicha jo'nata olishi kerak, 16 ta tumanni
+   * bittalab yoqib chiqmasdan.
+   */
+  const setRegionGate = useMutation({
+    mutationFn: (params: { regionId: string; is_enabled: boolean }) =>
+      api
+        .patch(`elchi/regions/${params.regionId}/gate`, {
+          is_enabled: params.is_enabled,
+        })
+        .then((res) => unwrap<ElchiRegionGateResult>(res.data)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [ELCHI_REGIONS_KEY] });
+      client.invalidateQueries({ queryKey: [ELCHI_DISTRICTS_KEY] });
+      invalidateAll();
+    },
+  });
+
   const reconcileAll = useMutation({
     mutationFn: () => api.post("elchi/reconcile").then((res) => res.data),
   });
@@ -161,11 +221,13 @@ export const useElchiConfig = () => {
     config,
     readiness,
     districts,
+    regions,
     updateConfig,
     testConnection,
     bindCourier,
     syncDistricts,
     setDistrictGate,
+    setRegionGate,
     reconcileAll,
   };
 };

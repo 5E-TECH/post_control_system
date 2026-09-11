@@ -546,3 +546,139 @@ describe('ElchiConfigService — market ochish', () => {
     await expect(svc.provisionMarket()).rejects.toThrow(/elchi_market_id/i);
   });
 });
+
+/**
+ * VILOYAT DARVOZASI.
+ *
+ * Elchi — BeePost uchun "super kuryer": operator butun viloyat pochtasini
+ * jo'nata olishi kerak, 16 ta tumanni bittalab yoqmasdan.
+ *
+ * Eng muhim shart: viloyatda MOSLANMAGAN tuman qolsa, buni jimgina o'tkazib
+ * yuborish mumkin emas. Darvoza "hammasi yoki hech biri" ishlagani uchun bitta
+ * moslanmagan tuman butun viloyat pochtasini to'sadi.
+ */
+function buildRegionSvc(
+  districts: Array<{ id: string; name: string }>,
+  mapRows: Array<{
+    id: string;
+    district_id: string;
+    elchi_district_id: string | null;
+    is_enabled: boolean;
+  }>,
+) {
+  const updates: any[] = [];
+  const svc: any = Object.create(ElchiConfigService.prototype);
+  svc.districtRepo = {
+    find: jest.fn().mockResolvedValue(
+      districts.map((d) => ({ ...d, region: { name: 'Andijon viloyati' } })),
+    ),
+  };
+  svc.mapRepo = {
+    find: jest.fn().mockResolvedValue(mapRows),
+    update: jest.fn((where: any, patch: any) => {
+      updates.push({ where, patch });
+      return Promise.resolve({ affected: where.id?._value?.length ?? 0 });
+    }),
+  };
+  svc.activityLog = { log: jest.fn().mockResolvedValue(undefined) };
+  svc.logger = { warn: jest.fn(), error: jest.fn() };
+  return { svc, updates };
+}
+
+describe('ElchiConfigService — VILOYAT darvozasi', () => {
+  const REGION = 'reg-1';
+
+  it("TC1: viloyat ochilganda moslangan tumanlarning HAMMASI yoqiladi", async () => {
+    const { svc, updates } = buildRegionSvc(
+      [
+        { id: 'd1', name: 'Asaka' },
+        { id: 'd2', name: 'Baliqchi' },
+        { id: 'd3', name: 'Marhamat' },
+      ],
+      [
+        { id: 'm1', district_id: 'd1', elchi_district_id: '10', is_enabled: false },
+        { id: 'm2', district_id: 'd2', elchi_district_id: '11', is_enabled: false },
+        { id: 'm3', district_id: 'd3', elchi_district_id: '12', is_enabled: false },
+      ],
+    );
+
+    const res = await svc.setRegionEnabled(REGION, true);
+
+    expect(res.changed).toBe(3);
+    expect(res.enabled_after).toBe(3);
+    expect(res.fully_open).toBe(true);
+    expect(updates).toHaveLength(1); // bitta ommaviy UPDATE, 3 ta emas
+  });
+
+  it("TC2: MOSLANMAGAN tuman ochilmaydi va JIMGINA o'tmaydi", async () => {
+    const { svc } = buildRegionSvc(
+      [
+        { id: 'd1', name: 'Asaka' },
+        { id: 'd2', name: 'Andijon shahri' },
+      ],
+      [
+        { id: 'm1', district_id: 'd1', elchi_district_id: '10', is_enabled: false },
+        // d2 uchun moslama YO'Q — Elchi'da bunday tuman mavjud emas
+      ],
+    );
+
+    const res = await svc.setRegionEnabled(REGION, true);
+
+    expect(res.changed).toBe(1);
+    expect(res.unmapped_names).toEqual(['Andijon shahri']);
+    // ⭐ Asosiy shart: 1 ta tuman ochilgan bo'lsa-da, viloyat TO'LIQ emas —
+    // "Andijon shahri"dan bitta buyurtma butun pochtani to'sadi.
+    expect(res.fully_open).toBe(false);
+  });
+
+  it('TC3: qayta bosilsa hech narsa yozilmaydi (idempotent)', async () => {
+    const { svc, updates } = buildRegionSvc(
+      [{ id: 'd1', name: 'Asaka' }],
+      [{ id: 'm1', district_id: 'd1', elchi_district_id: '10', is_enabled: true }],
+    );
+
+    const res = await svc.setRegionEnabled(REGION, true);
+
+    expect(res.changed).toBe(0);
+    expect(updates).toHaveLength(0);
+  });
+
+  it('TC4: yopish — moslanganlarning hammasi bloklanadi', async () => {
+    const { svc } = buildRegionSvc(
+      [
+        { id: 'd1', name: 'Asaka' },
+        { id: 'd2', name: 'Baliqchi' },
+      ],
+      [
+        { id: 'm1', district_id: 'd1', elchi_district_id: '10', is_enabled: true },
+        { id: 'm2', district_id: 'd2', elchi_district_id: '11', is_enabled: true },
+      ],
+    );
+
+    const res = await svc.setRegionEnabled(REGION, false);
+
+    expect(res.changed).toBe(2);
+    expect(res.enabled_after).toBe(0);
+    expect(res.fully_open).toBe(false);
+  });
+
+  it("TC5: moslamasi bor-u Elchi tumani belgilanmagan qator OCHILMAYDI", async () => {
+    // Tumanlik qoida bilan bir xil: `elchi_district_id` yo'q bo'lsa yoqib
+    // bo'lmaydi — aks holda dispatch'da "qayerga jo'natish" noaniq bo'lardi.
+    const { svc } = buildRegionSvc(
+      [{ id: 'd1', name: 'Buvaida' }],
+      [{ id: 'm1', district_id: 'd1', elchi_district_id: null, is_enabled: false }],
+    );
+
+    const res = await svc.setRegionEnabled(REGION, true);
+
+    expect(res.changed).toBe(0);
+    expect(res.mapped).toBe(0);
+    expect(res.unmapped_names).toEqual(['Buvaida']);
+  });
+
+  it("TC6: tumani yo'q viloyat — 404", async () => {
+    const { svc } = buildRegionSvc([], []);
+    await expect(svc.setRegionEnabled(REGION, true)).rejects.toThrow();
+  });
+});

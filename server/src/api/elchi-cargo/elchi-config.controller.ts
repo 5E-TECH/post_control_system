@@ -203,6 +203,30 @@ export class ElchiConfigController {
     );
   }
 
+  @ApiOperation({
+    summary:
+      "VILOYATLAR bo'yicha darvoza manzarasi — har viloyatda jami / " +
+      "moslangan / ochiq tumanlar soni va moslanmaganlar ro'yxati.",
+  })
+  @Get('regions')
+  async listRegionGate() {
+    return this.configService.listRegionGate();
+  }
+
+  @ApiOperation({
+    summary:
+      "DARVOZA: BUTUN VILOYAT pochtasini Elchi'ga jo'natishga ruxsat berish " +
+      "yoki bloklash. Moslanmagan tumanlar ochilmaydi — javobda qaytariladi.",
+  })
+  @Patch('regions/:regionId/gate')
+  async setRegionGate(
+    @Param('regionId', ParseUUIDPipe) regionId: string,
+    @Body() dto: SetDistrictGateDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.configService.setRegionEnabled(regionId, dto.is_enabled, user);
+  }
+
   // ===================== JO'NATISHDAN OLDIN / KEYIN =====================
 
   @ApiOperation({

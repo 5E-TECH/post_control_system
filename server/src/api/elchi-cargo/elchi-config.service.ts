@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Not, Repository } from 'typeorm';
+import { DataSource, In, Not, Repository } from 'typeorm';
 import { ElchiConfigEntity } from 'src/core/entity/elchi-config.entity';
 import { ElchiDistrictMapEntity } from 'src/core/entity/elchi-district-map.entity';
 import { DistrictEntity } from 'src/core/entity/district.entity';
@@ -702,6 +702,170 @@ export class ElchiConfigService {
       elchi_market_id: marketId,
       tariff_home: tariffHome,
       tariff_center: tariffCenter,
+    };
+  }
+
+  /**
+   * VILOYATLAR bo'yicha darvoza manzarasi.
+   *
+   * NEGA KERAK. Tumanlar jadvali faqat MOSLANGAN qatorlarni ko'rsatadi
+   * (`elchi_district_map` da moslanmagan tuman uchun qator umuman yo'q).
+   * Natijada operator viloyatda nechta tuman "ko'rinmas" qolganini bilmasdi.
+   * Darvoza esa "hammasi yoki hech biri": pochtada bitta ruxsatsiz tuman
+   * bo'lsa BUTUN pochta bloklanadi. Ya'ni aynan ko'rinmaydigan tumanlar
+   * jo'natishni to'sardi va sababi ekranda yo'q edi.
+   *
+   * Shu bois bu yerda TUMANLAR jadvalidan boshlanadi (moslama emas) — har bir
+   * viloyatning to'liq surati chiqadi: jami / moslangan / ochiq.
+   */
+  async listRegionGate(): Promise<
+    Array<{
+      region_id: string;
+      region_name: string;
+      total: number;
+      mapped: number;
+      enabled: number;
+      /** Viloyatning HAMMA tumani ochiq — pochtasini butunligicha jo'natsa bo'ladi. */
+      fully_open: boolean;
+      /** Moslanmagani bor — ular ochib bo'lmaydi va pochtani to'sadi. */
+      unmapped_names: string[];
+    }>
+  > {
+    const rows = await this.districtRepo
+      .createQueryBuilder('d')
+      .innerJoin('region', 'r', 'r.id = d.region_id')
+      .leftJoin(
+        'elchi_district_map',
+        'm',
+        'm.district_id = d.id AND m.elchi_district_id IS NOT NULL',
+      )
+      .select('r.id', 'region_id')
+      .addSelect('r.name', 'region_name')
+      .addSelect('COUNT(d.id)', 'total')
+      .addSelect('COUNT(m.id)', 'mapped')
+      .addSelect('COUNT(m.id) FILTER (WHERE m.is_enabled)', 'enabled')
+      .addSelect(
+        "COALESCE(ARRAY_AGG(d.name) FILTER (WHERE m.id IS NULL), '{}')",
+        'unmapped_names',
+      )
+      .groupBy('r.id')
+      .addGroupBy('r.name')
+      .orderBy('r.name', 'ASC')
+      .getRawMany<{
+        region_id: string;
+        region_name: string;
+        total: string;
+        mapped: string;
+        enabled: string;
+        unmapped_names: string[];
+      }>();
+
+    return rows.map((r) => {
+      const total = Number(r.total);
+      const enabled = Number(r.enabled);
+      return {
+        region_id: r.region_id,
+        region_name: r.region_name,
+        total,
+        mapped: Number(r.mapped),
+        enabled,
+        // ⚠️ `enabled === mapped` YETARLI EMAS: moslanmagan tuman ham
+        // pochtani to'sadi. Shuning uchun solishtiruv JAMI bilan.
+        fully_open: total > 0 && enabled === total,
+        unmapped_names: r.unmapped_names ?? [],
+      };
+    });
+  }
+
+  /**
+   * DARVOZA — BUTUN VILOYAT uchun.
+   *
+   * Elchi BeePost uchun "super kuryer": operator butun viloyat pochtasini
+   * jo'nata olishi kerak, tumanlarni bittalab yoqib chiqmasdan.
+   *
+   * Bu yerda viloyatning O'Z `is_enabled` ustuni ATAYLAB yaratilmadi. Aks
+   * holda ikkita haqiqat manbai paydo bo'lardi ("viloyat ochiq, lekin tuman
+   * yopiq — qaysi biri kuchli?"). Jo'natish qarori hamisha BUYURTMA TUMANI
+   * bo'yicha hal bo'ladi, shuning uchun yagona manba — tuman. Viloyat
+   * darajasi esa shu tumanlar ustidan ommaviy amal.
+   *
+   * Moslanmagan tuman OCHILMAYDI (tumanlik qoida bilan bir xil) — u javobda
+   * alohida qaytariladi, chunki operator uni ko'rishi shart: darvoza
+   * "hammasi yoki hech biri" bo'lgani uchun bitta moslanmagan tuman butun
+   * viloyat pochtasini to'sadi.
+   */
+  async setRegionEnabled(
+    regionId: string,
+    enabled: boolean,
+    user?: JwtPayload,
+  ): Promise<{
+    region_id: string;
+    region_name: string;
+    total: number;
+    mapped: number;
+    changed: number;
+    enabled_after: number;
+    unmapped_names: string[];
+    fully_open: boolean;
+  }> {
+    const districts = await this.districtRepo.find({
+      where: { region_id: regionId },
+      relations: ['region'],
+    });
+    if (!districts.length) {
+      throw new NotFoundException('Viloyat topilmadi yoki tumanlari yo‘q');
+    }
+    const regionName = districts[0].region?.name ?? regionId;
+    const districtIds = districts.map((d) => d.id);
+
+    const maps = await this.mapRepo.find({
+      where: { district_id: In(districtIds) },
+    });
+    const mapped = maps.filter((m) => !!m.elchi_district_id);
+
+    // Faqat HAQIQATAN o'zgaradiganlari yoziladi — activity-log'da "12 ta
+    // o'zgardi" deb turib aslida 0 ta o'zgargan bo'lishi chalg'itadi.
+    const toChange = mapped.filter((m) => m.is_enabled !== enabled);
+    if (toChange.length) {
+      await this.mapRepo.update(
+        { id: In(toChange.map((m) => m.id)) },
+        { is_enabled: enabled },
+      );
+    }
+
+    const mappedIds = new Set(mapped.map((m) => m.district_id));
+    const unmappedNames = districts
+      .filter((d) => !mappedIds.has(d.id))
+      .map((d) => d.name);
+
+    const enabledAfter = enabled ? mapped.length : 0;
+
+    // Bitta log — har bir tuman uchun alohida emas. 16 ta yozuv jurnalni
+    // ko'mib yuboradi va amal aslida BITTA qaror edi.
+    await this.activityLog.log({
+      entity_type: 'elchi_district_map',
+      entity_id: regionId,
+      action: 'region_gate_changed',
+      old_value: { is_enabled: !enabled },
+      new_value: { is_enabled: enabled },
+      description: enabled
+        ? `${regionName}: ${toChange.length} ta tuman Elchi'ga jo'natishga ruxsat oldi` +
+          (unmappedNames.length
+            ? ` (${unmappedNames.length} ta moslanmagan tuman ochilmadi)`
+            : '')
+        : `${regionName}: ${toChange.length} ta tumanda Elchi'ga jo'natish bloklandi`,
+      user,
+    });
+
+    return {
+      region_id: regionId,
+      region_name: regionName,
+      total: districts.length,
+      mapped: mapped.length,
+      changed: toChange.length,
+      enabled_after: enabledAfter,
+      unmapped_names: unmappedNames,
+      fully_open: enabled && enabledAfter === districts.length,
     };
   }
 

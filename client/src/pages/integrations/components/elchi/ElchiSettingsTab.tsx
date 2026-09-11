@@ -16,6 +16,7 @@ import {
   message,
 } from "antd";
 import {
+  Globe2,
   KeyRound,
   MapPin,
   PlugZap,
@@ -27,6 +28,7 @@ import {
 import {
   useElchiConfig,
   type ElchiDistrictMapRow,
+  type ElchiRegionGateRow,
   type UpdateElchiConfigDto,
 } from "../../../../shared/api/hooks/useElchiConfig";
 import { useCourier } from "../../../../shared/api/hooks/useCourier";
@@ -64,6 +66,8 @@ export const ElchiSettingsTab = () => {
     bindCourier,
     syncDistricts,
     setDistrictGate,
+    regions: regionsQuery,
+    setRegionGate,
   } = useElchiConfig();
 
   const { getCourier } = useCourier();
@@ -204,6 +208,52 @@ export const ElchiSettingsTab = () => {
       message.error(e.response?.data?.message ?? "Darvozani o'zgartirib bo'lmadi");
     }
   };
+
+  /**
+   * BUTUN VILOYAT darvozasi.
+   *
+   * Natija JIM o'tmaydi: moslanmagan tuman qolsa, operator buni ko'rishi
+   * SHART. Darvoza "hammasi yoki hech biri" bo'lgani uchun bitta moslanmagan
+   * tuman butun viloyat pochtasini to'sadi — "ochdim" deb o'ylab qolib,
+   * jo'natishda blokka urilish eng yomon stsenariy.
+   */
+  const handleRegionGate = async (
+    row: ElchiRegionGateRow,
+    next: boolean,
+  ) => {
+    try {
+      const res = await setRegionGate.mutateAsync({
+        regionId: row.region_id,
+        is_enabled: next,
+      });
+      if (!next) {
+        message.success(
+          `${res.region_name}: ${res.changed} ta tuman bloklandi`,
+        );
+        return;
+      }
+      if (res.unmapped_names.length) {
+        message.warning({
+          content: `${res.region_name}: ${res.changed} ta tuman ochildi, lekin ${
+            res.unmapped_names.length
+          } ta tuman moslanmagan (${res.unmapped_names.join(", ")}) — ular pochtani to'sadi`,
+          duration: 8,
+        });
+        return;
+      }
+      message.success(
+        `${res.region_name}: ${res.changed} ta tuman ochildi — viloyat pochtasini butunligicha jo'natsa bo'ladi`,
+      );
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } } };
+      message.error(
+        e.response?.data?.message ?? "Viloyat darvozasini o'zgartirib bo'lmadi",
+      );
+    }
+  };
+
+  const regions = useMemo(() => regionsQuery.data ?? [], [regionsQuery.data]);
+  const openRegionCount = regions.filter((r) => r.fully_open).length;
 
   if (configQuery.isLoading) {
     return (
@@ -397,11 +447,113 @@ export const ElchiSettingsTab = () => {
         </p>
       </Card>
 
+      {/* ═══════ DARVOZA — VILOYATLAR ═══════ */}
+      <Card
+        title={
+          <span className="flex items-center gap-2">
+            <Globe2 className="w-4 h-4" /> Viloyatlar — darvoza
+            <Tag color={openRegionCount > 0 ? "green" : "red"}>
+              to'liq ochiq: {openRegionCount} / {regions.length}
+            </Tag>
+          </span>
+        }
+      >
+        <Alert
+          className="mb-3"
+          type="info"
+          showIcon
+          message="Elchi — BeePost uchun super kuryer"
+          description={
+            "Bu yerdan BUTUN viloyat pochtasini bir tugma bilan ochasiz — tumanlarni bittalab yoqish shart emas. " +
+            "Lekin darvoza \u201channasi yoki hech biri\u201d ishlaydi: viloyatda moslanmagan tuman qolsa, " +
+            "o\u2018sha tumandan bitta buyurtma butun pochtani to\u2018sadi. Shuning uchun \u201cto\u2018liq ochiq\u201d " +
+            "faqat JAMI tuman ochilganda yoziladi."
+          }
+        />
+
+        <Table<ElchiRegionGateRow>
+          rowKey="region_id"
+          size="small"
+          loading={regionsQuery.isLoading}
+          dataSource={regions}
+          pagination={false}
+          columns={[
+            {
+              title: "Viloyat",
+              dataIndex: "region_name",
+              render: (v: string) => <span className="font-medium">{v}</span>,
+            },
+            {
+              title: "Tumanlar",
+              width: 190,
+              render: (_: unknown, r) => (
+                <span className="text-xs">
+                  <b>{r.enabled}</b> ochiq / {r.mapped} moslangan /{" "}
+                  {r.total} jami
+                </span>
+              ),
+            },
+            {
+              title: "Holat",
+              width: 190,
+              render: (_: unknown, r) => {
+                if (r.fully_open) {
+                  return <Tag color="green">butun viloyat jo'natiladi</Tag>;
+                }
+                if (r.enabled === 0) {
+                  return <Tag>yopiq</Tag>;
+                }
+                // Qisman ochiq — eng xavfli holat, chunki operator "ochiq"
+                // deb o'ylaydi-yu, pochta blokka uriladi.
+                return (
+                  <Tag color="orange">
+                    qisman — {r.total - r.enabled} ta tuman to'sadi
+                  </Tag>
+                );
+              },
+            },
+            {
+              title: "Moslanmagan",
+              dataIndex: "unmapped_names",
+              render: (names: string[]) =>
+                names.length ? (
+                  <Tooltip title={names.join(", ")}>
+                    <Tag color="orange">{names.length} ta</Tag>
+                  </Tooltip>
+                ) : (
+                  <span className="text-xs text-gray-400">—</span>
+                ),
+            },
+            {
+              title: "Darvoza",
+              width: 130,
+              render: (_: unknown, r) => (
+                <Tooltip
+                  title={
+                    r.mapped === 0
+                      ? "Viloyatda moslangan tuman yo'q — avval SOATO bo'yicha moslang"
+                      : undefined
+                  }
+                >
+                  <Switch
+                    checked={r.enabled > 0}
+                    disabled={r.mapped === 0 || setRegionGate.isPending}
+                    onChange={(next) => handleRegionGate(r, next)}
+                    checkedChildren="ruxsat"
+                    unCheckedChildren="yopiq"
+                  />
+                </Tooltip>
+              ),
+            },
+          ]}
+        />
+      </Card>
+
       {/* ═══════ DARVOZA ═══════ */}
       <Card
         title={
           <span className="flex items-center gap-2">
-            <MapPin className="w-4 h-4" /> Pilot tumanlari — darvoza
+            <MapPin className="w-4 h-4" /> Tumanlar — nozik sozlash
             <Tag color={enabledCount > 0 ? "green" : "red"}>
               ruxsat berilgan: {enabledCount}
             </Tag>
@@ -433,8 +585,8 @@ export const ElchiSettingsTab = () => {
           className="mb-3"
           type="info"
           showIcon
-          message="Darvoza qoidasi: hammasi yoki hech biri"
-          description="Pochtada bitta ruxsatsiz tuman bo'lsa BUTUN pochta jo'natilmaydi. Moslash tugmasi darvozani OCHMAYDI — ruxsatni har bir tuman uchun o'zingiz yoqasiz."
+          message="Bu jadval faqat MOSLANGAN tumanlarni ko'rsatadi"
+          description="Viloyatni butunligicha ochish uchun yuqoridagi jadvaldan foydalaning — bu yer alohida tumanni yoqish/o'chirish uchun. Moslanmagan tumanlar bu ro'yxatda YO'Q; ular yuqorida \u201cMoslanmagan\u201d ustunida ko'rinadi. \u201cSOATO bo'yicha moslash\u201d tugmasi darvozani OCHMAYDI."
         />
 
         <Table<ElchiDistrictMapRow>
