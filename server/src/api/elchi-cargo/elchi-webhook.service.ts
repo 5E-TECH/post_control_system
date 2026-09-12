@@ -108,6 +108,37 @@ export class ElchiWebhookService {
       return { http_status: 200, message: "O'chirilgan — e'tiborsiz" };
     }
 
+    /**
+     * SINOV WEBHOOKI (`webhook.test`).
+     *
+     * Elchi adminidagi "sinov yuborish" tugmasi shu hodisani yuboradi. Uning
+     * maqsadi zanjirni tekshirish: manzil yetib boradimi, imzo mos keladimi.
+     * Buyurtma bilan hech qanday aloqasi yo'q.
+     *
+     * ⚠️ Bu shoxcha IMZO TEKSHIRUVIDAN KEYIN turadi — aks holda imzosiz
+     * so'rov ham "sinov" deb o'zini tanitib, javob olishi mumkin edi.
+     *
+     * Aniq javob qaytaramiz: ilgari bunday hodisa "posilka topilmadi"
+     * deb yopilardi va operator sinov O'TDIMI yoki imzo xatoligi bordimi —
+     * ajrata olmasdi.
+     */
+    if (String(payload.event ?? '') === 'webhook.test') {
+      await this.writeLog({
+        payload,
+        rawBody: args.rawBody,
+        signatureValid: true,
+        status: 'success',
+        errorMessage: null,
+      });
+      this.logger.log(
+        `Elchi sinov webhooki qabul qilindi (event_id=${payload.event_id ?? '-'})`,
+      );
+      return {
+        http_status: 200,
+        message: "Sinov webhooki qabul qilindi — imzo to'g'ri, zanjir ishlayapti",
+      };
+    }
+
     // ===== 2. HODISA ID (takror himoyasi kaliti) =====
     const { eventId, synthesized } = this.resolveEventId(payload, args.rawBody);
 

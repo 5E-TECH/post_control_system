@@ -352,3 +352,72 @@ describe('ElchiWebhookService — statusni qo‘llash', () => {
     expect(logUpdates[0].patch.error_message).toMatch(/DB timeout/);
   });
 });
+
+/**
+ * SINOV WEBHOOKI (`webhook.test`).
+ *
+ * Elchi adminidagi "sinov yuborish" tugmasi shu hodisani yuboradi — zanjirni
+ * tekshirish uchun: manzil yetib boradimi, imzo mos keladimi. Buyurtma bilan
+ * aloqasi yo'q.
+ *
+ * Ilgari bunday hodisa "posilka topilmadi" deb yopilardi va operator sinov
+ * O'TDIMI yoki imzo xatoligi bordimi — ajrata olmasdi.
+ */
+describe('ElchiWebhookService — sinov webhooki', () => {
+  const testPayload = (over: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      event: 'webhook.test',
+      event_id: 'test-ev-1',
+      test: true,
+      partner_id: '7',
+      occurred_at: '2026-09-12T06:00:00.000Z',
+      ...over,
+    });
+
+  it("TC1: ANIQ javob qaytaradi ('posilka topilmadi' EMAS)", async () => {
+    const { svc } = buildSvc();
+    const body = testPayload();
+
+    const res = await svc.process({ rawBody: body, signatureHeader: sign(body) });
+
+    expect(res.http_status).toBe(200);
+    expect(res.message).toMatch(/Sinov webhooki qabul qilindi/);
+    expect(res.message).not.toMatch(/topilmadi/);
+  });
+
+  it('TC2: buyurtmaga TEGMAYDI', async () => {
+    const { svc } = buildSvc();
+    const body = testPayload();
+
+    await svc.process({ rawBody: body, signatureHeader: sign(body) });
+
+    expect(svc.orderService.markDeliveredByElchi).not.toHaveBeenCalled();
+    expect(svc.orderService.markCancelledByElchi).not.toHaveBeenCalled();
+  });
+
+  it('TC3: jurnalga muvaffaqiyat sifatida yoziladi', async () => {
+    const { svc, savedLogs } = buildSvc();
+    const body = testPayload();
+
+    await svc.process({ rawBody: body, signatureHeader: sign(body) });
+
+    expect(savedLogs[0].event_type).toBe('webhook.test');
+    expect(savedLogs[0].signature_valid).toBe(true);
+    expect(savedLogs[0].status).toBe('success');
+  });
+
+  it('TC4: IMZOSI XATO sinov ham RAD ETILADI', async () => {
+    // ⭐ Sinov shoxchasi imzo tekshiruvidan KEYIN turishi shart — aks holda
+    // imzosiz so'rov ham o'zini "sinov" deb tanitib javob olardi.
+    const { svc } = buildSvc();
+    const body = testPayload();
+
+    const res = await svc.process({
+      rawBody: body,
+      signatureHeader: 'a'.repeat(64),
+    });
+
+    expect(res.http_status).toBe(401);
+    expect(res.message).not.toMatch(/Sinov webhooki qabul qilindi/);
+  });
+});
