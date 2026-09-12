@@ -96,7 +96,28 @@ export interface ElchiShipmentStatusResponse {
   shipment_id: string;
   external_order_id?: string;
   status: string;
+  /**
+   * `to_be_paid` — Elchi bizga QARZ summasi.
+   *
+   * ⚠️ Sotuvdan KEYIN Elchi bundan o'z tarifini ushlab qoladi, ya'ni qiymat
+   * `total_price − elchi_tarifi` ga aylanadi. Sotuvgacha esa biz yuborgan
+   * to'liq COD ga teng. Shu bois tarif farqini aynan shu maydondan hisoblaymiz.
+   */
   cod_amount?: number;
+  /**
+   * `paid_amount` — Elchi shu qarzning QANCHASINI ALLAQACHON TO'LAB BERGAN.
+   *
+   * ⚠️ Bu "kuryer mijozdan yiqqan pul" EMAS. Elchi kodidagi izoh shunday
+   * deyilgan, lekin haqiqatda `paid_amount` marketga to'lab berilgan qismni
+   * bildiradi va oddiy sotuvda 0 bo'lib qoladi. Nomi chalg'itadi — hisob-kitob
+   * (settlement) uchun ishlatiladi, pul solishtiruvi uchun EMAS.
+   */
+  cod_collected?: number;
+  /**
+   * Elchi tomonidagi buyurtma narxi. Biz yuborgan `cod_amount_sent` bilan
+   * teng bo'lishi SHART — farq bo'lsa kimdir Elchi tomonda narxni o'zgartirgan.
+   */
+  total_price?: number;
   tracking?: string | null;
 }
 

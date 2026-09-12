@@ -4,9 +4,13 @@ import { Repository } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
 import { ElchiConfigEntity } from 'src/core/entity/elchi-config.entity';
 import { ElchiShipmentEntity } from 'src/core/entity/elchi-shipment.entity';
+import { OrderEntity } from 'src/core/entity/order.entity';
+import { UserEntity } from 'src/core/entity/users.entity';
+import { Where_deliver } from 'src/common/enums';
 import { ElchiApiService } from './elchi-api.service';
 import { ElchiWebhookService } from './elchi-webhook.service';
 import { normalizeElchiStatus } from './utils/elchi-status.mapper';
+import { ElchiShipmentStatusResponse } from './dto/elchi-api.dto';
 
 /**
  * Elchi tomonda BOSHQA O'ZGARMAYDIGAN statuslar — bunday posilkalar
@@ -21,6 +25,14 @@ const TERMINAL_ELCHI_STATUSES = [
   'returned_to_market',
   'closed',
 ];
+
+/**
+ * Elchi tomonda "yetkazilgan/sotilgan" deb hisoblanadigan statuslar.
+ *
+ * Pul tekshiruvi FAQAT shularda ishlaydi: tarif ayni sotuvda ushlanadi,
+ * undan oldin `to_be_paid` to'liq COD ga teng bo'lib turadi.
+ */
+const SOLD_ELCHI_STATUSES = ['sold', 'paid', 'partly_paid'];
 
 /**
  * Bitta tikda tekshiriladigan posilka soni.
@@ -73,6 +85,10 @@ export class ElchiReconcileService {
     private readonly configRepo: Repository<ElchiConfigEntity>,
     @InjectRepository(ElchiShipmentEntity)
     private readonly shipmentRepo: Repository<ElchiShipmentEntity>,
+    @InjectRepository(OrderEntity)
+    private readonly orderRepo: Repository<OrderEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
     private readonly api: ElchiApiService,
     private readonly webhookService: ElchiWebhookService,
   ) {}
@@ -238,22 +254,155 @@ export class ElchiReconcileService {
         `(webhook yo'qolgan bo'lishi mumkin)`,
     );
 
-    // ⚠️ `cod_collected` ATAYLAB YUBORILMAYDI. `GET /partner/shipments/:id`
-    // javobidagi `cod_amount` — bu `to_be_paid` (to'lanishi kerak summa),
-    // webhookdagi `paid_amount` (yig'ilgan) EMAS. Ikkisini aralashtirish
-    // pul solishtiruvini buzardi. Yig'ilgan summa faqat webhookdan yoziladi.
+    /**
+     * `cod_collected` — Elchi marketga ALLAQACHON TO'LAB BERGAN qismi
+     * (`paid_amount`). Oddiy sotuvda 0 bo'ladi; hisob-kitob (settlement)
+     * uchun qayd etiladi.
+     *
+     * ⚠️ U "kuryer mijozdan yiqqan pul" EMAS — Elchi kodidagi izoh shunday
+     * deydi, lekin haqiqatda unday emas. Pul solishtiruvi shu maydonga
+     * tayanmaydi, `verifyMoney` boshqa mantiqda ishlaydi (pastda).
+     */
     const outcome = await this.webhookService.applyStatusUpdate(config, {
       event: 'shipment.status_changed',
       external_order_id: shipment.order_id,
       shipment_id: shipment.elchi_shipment_id ?? undefined,
       status: remoteStatus,
+      cod_collected: Number.isFinite(Number(remote?.cod_collected))
+        ? Number(remote?.cod_collected)
+        : undefined,
     });
 
     await this.touchSynced(shipment.id);
 
+    /**
+     * PUL TEKSHIRUVI — aynan shu yerda, statusni bilgan PAYTDA.
+     *
+     * Sotilgan posilka Elchi tomonda TERMINAL bo'ladi va boshqa hech qachon
+     * so'ralmaydi (`findOpenShipments` terminal statusni chiqarib tashlaydi).
+     * Ya'ni tekshirish uchun BITTA imkon bor — o'sha ham hozir.
+     */
+    const moneyIssue = await this.verifyMoney(shipment, remote);
+    if (moneyIssue) {
+      await this.flagMismatch(shipment.id, moneyIssue);
+      this.logger.error(
+        `ELCHI PUL NOMUVOFIQLIGI: order=${shipment.order_id} — ${moneyIssue}`,
+      );
+      return 'mismatch';
+    }
+
     if (outcome.note && /nomuvofiq/i.test(outcome.message)) return 'mismatch';
     if (outcome.status === 'success') return 'applied';
     return 'unchanged';
+  }
+
+  /**
+   * Elchi bilan PUL SHARTLARINI solishtiradi. Nomuvofiqlik matnini qaytaradi,
+   * hammasi joyida bo'lsa `null`.
+   *
+   * NEGA KERAK. Bizda buyurtma sotilganda kuryer kassasiga
+   * `total_price − PCS'dagi_Elchi_tarifi` yozildi. Elchi esa o'z bazasida
+   * `total_price − O'ZINING_tarifi` ni bizga qarz deb yozadi. Ikki tarif
+   * ajralsa (masalan Elchi narxini oshirdi, bizga aytmadi) — biz kutgan
+   * summa kelmaydi va farq HAR BUYURTMADA jimgina yo'qoladi. Hech qaysi
+   * ekranda ko'rinmaydi, chunki ikkala tomon ham o'zicha "to'g'ri" hisoblaydi.
+   *
+   * IKKI TEKSHIRUV:
+   *   A) Narx: Elchi'dagi `total_price` biz yuborgan summa bilan teng bo'lsin.
+   *      Farq bo'lsa kimdir Elchi tomonda narxni o'zgartirgan.
+   *   B) Tarif: Elchi ushlab qolgan summa (`total_price − to_be_paid`) bizdagi
+   *      vakil-kuryer tarifi bilan teng bo'lsin.
+   *
+   * ⚠️ Faqat SOTILGAN posilkada ishlaydi. Sotuvgacha `to_be_paid` to'liq COD
+   * ga teng (tarif hali ushlanmagan), shuning uchun (B) ni qo'llash SOXTA
+   * nomuvofiqlik berardi.
+   */
+  private async verifyMoney(
+    shipment: ElchiShipmentEntity,
+    remote: ElchiShipmentStatusResponse | null,
+  ): Promise<string | null> {
+    if (!remote) return null;
+    if (!SOLD_ELCHI_STATUSES.includes(normalizeElchiStatus(remote.status ?? '')))
+      return null;
+
+    const order = await this.orderRepo.findOne({
+      where: { id: shipment.order_id },
+      select: ['id', 'order_number', 'total_price', 'where_deliver'],
+    });
+    if (!order) return null;
+
+    const sent = Number(shipment.cod_amount_sent ?? 0);
+
+    // --- A) Narx o'zgarmaganmi ---
+    const remoteTotal = Number(remote.total_price ?? NaN);
+    if (Number.isFinite(remoteTotal) && Math.abs(remoteTotal - sent) > 0.01) {
+      return (
+        `narx farqi: biz ${sent} yubordik, Elchi'da ${remoteTotal} ` +
+        `(#${order.order_number})`
+      );
+    }
+
+    // --- B) Tarif tengmi ---
+    const remoteOwed = Number(remote.cod_amount ?? NaN);
+    if (!Number.isFinite(remoteOwed)) return null;
+
+    const base = Number.isFinite(remoteTotal) ? remoteTotal : sent;
+    const elchiKept = base - remoteOwed;
+
+    const expectedTariff = await this.expectedElchiTariff(order.where_deliver);
+    if (expectedTariff == null) return null;
+
+    if (Math.abs(elchiKept - expectedTariff) > 0.01) {
+      return (
+        `tarif farqi: Elchi ${elchiKept} ushlab qoldi, bizda tarif ` +
+        `${expectedTariff} (#${order.order_number}) — kuryer kassasiga ` +
+        `${base - expectedTariff} yozilgan, Elchi ${remoteOwed} qarzdor`
+      );
+    }
+
+    return null;
+  }
+
+  /**
+   * Vakil-kuryerning shu yetkazish turi uchun tarifi.
+   *
+   * Sotuv paytida kuryer kassasiga aynan shu tarif ayirilib yozilgan, shuning
+   * uchun solishtiruv ham shunga tayanishi kerak. Kuryer yoki tarif yo'q
+   * bo'lsa `null` — tekshiruv o'tkazib yuboriladi (soxta nomuvofiqlik
+   * berishdan ko'ra jim qolish yaxshi).
+   */
+  private async expectedElchiTariff(
+    whereDeliver: Where_deliver | null,
+  ): Promise<number | null> {
+    const config = await this.configRepo.findOne({
+      where: {},
+      order: { created_at: 'ASC' },
+    });
+    if (!config?.elchi_courier_user_id) return null;
+
+    const courier = await this.userRepo.findOne({
+      where: { id: config.elchi_courier_user_id },
+      select: ['id', 'tariff_home', 'tariff_center'],
+    });
+    if (!courier) return null;
+
+    const raw =
+      whereDeliver === Where_deliver.CENTER
+        ? courier.tariff_center
+        : courier.tariff_home;
+    const tariff = Number(raw ?? NaN);
+    return Number.isFinite(tariff) ? tariff : null;
+  }
+
+  /** Nomuvofiqlikni posilkaga yozadi — admin paneldagi filtr shu maydonlarni o'qiydi. */
+  private async flagMismatch(
+    shipmentId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.shipmentRepo.update(
+      { id: shipmentId },
+      { mismatch_at: Date.now(), mismatch_reason: reason },
+    );
   }
 
   /**

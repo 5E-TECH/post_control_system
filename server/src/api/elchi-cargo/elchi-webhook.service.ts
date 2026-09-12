@@ -188,10 +188,17 @@ export class ElchiWebhookService {
    * ikki yo'l vaqt o'tib AJRALIB ketadi va bir xil status ikki xil natija
    * berishi mumkin — pul aniqligi talab qilinadigan joyda bu qabul qilinmaydi.
    *
-   * `cod_collected` — FAQAT webhookdan keladi. Solishtiruvchi uni YUBORMAYDI,
-   * chunki `GET /partner/shipments/:id` javobidagi `cod_amount` — bu BOSHQA
-   * miqdor (`to_be_paid`, ya'ni to'lanishi kerak bo'lgan summa), webhookdagi
-   * `paid_amount` emas. Ikkisini aralashtirish pul solishtiruvini buzardi.
+   * `cod_collected` (= Elchi'dagi `paid_amount`) endi webhookdan HAM,
+   * solishtiruvdan HAM keladi — `GET /partner/shipments/:id` javobiga alohida
+   * maydon sifatida qo'shildi. Ilgari faqat webhookda bor edi va hamkorda
+   * webhook ishlamasa (masalan PCS lokalda) pul ma'lumoti umuman yetib
+   * bormasdi.
+   *
+   * ⚠️ NOMI CHALG'ITADI: bu "kuryer mijozdan yiqqan pul" EMAS. Elchi'da
+   * `paid_amount` — Elchi marketga QARZINING allaqachon to'langan qismi, va
+   * oddiy sotuvda 0 bo'lib qoladi. Shu bois pul NOMUVOFIQLIGI bu maydondan
+   * TOPILMAYDI; u `ElchiReconcileService.verifyMoney`da tarif va narx
+   * solishtiruvi orqali aniqlanadi.
    */
   async applyStatusUpdate(
     config: ElchiConfigEntity,
@@ -235,7 +242,9 @@ export class ElchiWebhookService {
     shipment.elchi_status_changed_at = Date.now();
     shipment.last_synced_at = Date.now();
     if (payload.cod_collected != null && Number.isFinite(payload.cod_collected)) {
-      // ⚠️ M2: bu NET summa (Elchi tarifi ayirilgan). Faqat qayd etamiz.
+      // Elchi marketga to'lab bergan qism (`paid_amount`). Faqat qayd etamiz —
+      // hisob-kitob ekrani shu yig'indini ko'rsatadi. Nomuvofiqlik tekshiruvi
+      // bu maydonga tayanmaydi (yuqoridagi izoh).
       shipment.cod_collected_reported = Number(payload.cod_collected).toFixed(2);
     }
     await this.shipmentRepo.save(shipment);
