@@ -194,7 +194,7 @@ describe('ElchiWebhookService — takror himoyasi', () => {
 });
 
 describe('ElchiWebhookService — statusni qo‘llash', () => {
-  it("sold -> sotuv oqimi + NET summa qayd etiladi", async () => {
+  it("sold -> sotuv oqimi + narx/xarajat uzatiladi", async () => {
     const { svc, savedShipments, logUpdates } = buildSvc();
     const body = payload();
 
@@ -204,12 +204,19 @@ describe('ElchiWebhookService — statusni qo‘llash', () => {
     });
 
     expect(res.http_status).toBe(200);
+    /**
+     * 4-argument — Elchi tomonidagi YAKUNIY narx va qo'shimcha xarajat.
+     * Ular berilsa PCS sotishdan oldin o'z narxini tenglashtiradi va
+     * xarajatni marketdan yechadi; aks holda eski narx bo'yicha xato summa
+     * yozilardi. Bu payloadda ular yo'q, shuning uchun `undefined`.
+     */
     expect(svc.orderService.markDeliveredByElchi).toHaveBeenCalledWith(
       'o-1',
       'c-elchi',
       240000,
+      { totalPrice: undefined, extraCost: undefined },
     );
-    // M2: qaytgan summa NET — faqat qayd etamiz, kassaga bu raqam yozilmaydi.
+    // `cod_collected` — Elchi marketga to'lab bergan qism; faqat qayd etamiz.
     expect(savedShipments[0].cod_collected_reported).toBe('240000.00');
     expect(savedShipments[0].elchi_status).toBe('sold');
     expect(logUpdates[0].patch.status).toBe('success');

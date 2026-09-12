@@ -286,6 +286,10 @@ export class ElchiWebhookService {
             shipment.order_id,
             courierId,
             payload.cod_collected,
+            {
+              totalPrice: payload.total_price,
+              extraCost: payload.extra_cost,
+            },
           )
         : mapping.terminal_action === 'cancel'
           ? await this.orderService.markCancelledByElchi(

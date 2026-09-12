@@ -6369,10 +6369,64 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
    * Idempotent: allaqachon sotilgan bo'lsa skip (webhook qayta yuborilishi
    * yoki takroriy hodisa).
    */
+  /**
+   * Elchi tomonidagi YAKUNIY narxni bizda ham qo'llaydi.
+   *
+   * Elchi kuryeri buyurtmani boshqa narxga sotishi mumkin — masalan mijoz
+   * bilan kelishib 500 000 lik narsani 450 000 ga. Ilgari PCS bundan
+   * BEXABAR qolardi: `sellOrder` o'zining eski narxi bilan hisoblab, kuryer
+   * kassasiga 485 000 yozardi, Elchi esa faqat 435 000 qarzdor bo'lardi.
+   * Farq (50 000) har buyurtmada jimgina yo'qolardi.
+   *
+   * Ham PASAYISH, ham KO'TARILISH qabul qilinadi.
+   *
+   * O'zgarish JIMGINA o'tmasligi kerak: buyurtma izohiga "qancha edi →
+   * qanchaga aylandi" avtomatik yoziladi (`sellOrder` `generateComment`
+   * orqali izohni buyurtmaga yozadi), shuning uchun operator buyurtmani
+   * ochganda kassadagi summa nega boshqacha ekanini ko'radi.
+   *
+   * Qaytaradi: izohga qo'shiladigan matn (o'zgarish bo'lmasa bo'sh satr).
+   */
+  private async acceptElchiPriceChange(
+    orderId: string,
+    remoteTotalPrice?: number | null,
+  ): Promise<string> {
+    const remote = Number(remoteTotalPrice ?? NaN);
+    // Manfiy narx — buzilgan ma'lumot, qabul qilmaymiz (0 esa haqiqiy holat:
+    // oldindan to'langan posilka).
+    if (!Number.isFinite(remote) || remote < 0) return '';
+
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      select: ['id', 'total_price'],
+    });
+    if (!order) return '';
+
+    const current = Number(order.total_price ?? 0);
+    if (Math.abs(current - remote) < 0.01) return '';
+
+    await this.orderRepo.update({ id: orderId }, { total_price: remote });
+
+    const fmt = (v: number) => v.toLocaleString('uz-UZ');
+    this.logger.warn(
+      `Elchi narxni o'zgartirdi: order=${orderId} ${current} -> ${remote}`,
+    );
+    return `!!! Elchi narxni o'zgartirdi: ${fmt(current)} -> ${fmt(remote)} so'm`;
+  }
+
   async markDeliveredByElchi(
     orderId: string,
     elchiCourierUserId: string,
     codCollected?: number,
+    /**
+     * Elchi tomonidagi YAKUNIY narx va qo'shimcha xarajat.
+     *
+     * NEGA KERAK. Elchi kuryeri buyurtmani boshqa narxga sotishi mumkin
+     * (500 000 lik narsa 450 000 ga) yoki qo'shimcha xarajat yozishi mumkin.
+     * Ilgari PCS bularni BILMASDI va o'zining eski narxi bilan sotardi —
+     * kassaga xato summa tushardi va farq jimgina qolib ketardi.
+     */
+    remote?: { totalPrice?: number | null; extraCost?: number | null },
   ): Promise<ExternalTerminalResult> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -6417,21 +6471,76 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
     }
 
+    /**
+     * NARXNI QABUL QILISH.
+     *
+     * Elchi yakuniy narxni o'zgartirgan bo'lsa, sotishdan OLDIN bizda ham
+     * yangilanadi — aks holda `sellOrder` eski narx bo'yicha hisoblab,
+     * kassaga xato summa yozardi.
+     *
+     * Ham pasayish, ham ko'tarilish qabul qilinadi. O'zgarish JIMGINA
+     * o'tmasligi uchun buyurtma izohiga avtomatik yoziladi: "qancha edi →
+     * qanchaga aylandi". Shu bilan operator buyurtmani ochganda sababni
+     * ko'radi va kassadagi summa nega boshqacha ekani tushunarli bo'ladi.
+     */
+    const priceNote = await this.acceptElchiPriceChange(
+      orderId,
+      remote?.totalPrice,
+    );
+
+    /**
+     * Elchi yozgan qo'shimcha xarajat. Chegara ikki tizimda BIR XIL
+     * (`extra-cost-limit.util.ts`), shuning uchun oddiy holatda o'tadi.
+     * O'tmasa — sotuv YIQILMAYDI, xarajatsiz sotiladi va chaqiruvchi
+     * nomuvofiqlikni belgilaydi (yetkazish xarajat qaydidan muhimroq).
+     */
+    const remoteExtra = Math.max(0, Number(remote?.extraCost ?? 0) || 0);
+
+    const sellComment = [
+      codCollected != null
+        ? `Elchi yetkazib berdi (yig'ilgan: ${codCollected})`
+        : 'Elchi yetkazib berdi',
+      priceNote,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
     try {
       await this.sellOrder(
         this.elchiActor(elchiCourierUserId),
         orderId,
-        {
-          comment:
-            codCollected != null
-              ? `Elchi yetkazib berdi (yig'ilgan: ${codCollected})`
-              : 'Elchi yetkazib berdi',
-          extraCost: 0,
-        },
+        { comment: sellComment, extraCost: remoteExtra },
         { bypassControlGuard: true },
       );
       return { kind: 'applied' };
     } catch (err) {
+      /**
+       * Qo'shimcha xarajat chegaradan oshgan bo'lsa, XARAJATSIZ qayta
+       * urinamiz. Aks holda Elchi tomondagi bitta qoida farqi tufayli
+       * buyurtma PCS'da abadiy "kutilmoqda"da qolib ketardi — yetkazilgan
+       * posilka esa pul demak.
+       */
+      if (remoteExtra > 0) {
+        try {
+          await this.sellOrder(
+            this.elchiActor(elchiCourierUserId),
+            orderId,
+            {
+              comment: `${sellComment} (Elchi xarajati ${remoteExtra} qo'llanmadi — chegaradan oshdi)`,
+              extraCost: 0,
+            },
+            { bypassControlGuard: true },
+          );
+          return {
+            kind: 'mismatch',
+            reason:
+              `Elchi qo'shimcha xarajat ${remoteExtra} yozdi, lekin PCS ` +
+              `chegarasidan oshdi — xarajatsiz sotildi, qo'lda kiriting`,
+          };
+        } catch {
+          // Ikkinchi urinish ham yiqildi — quyidagi umumiy ishlovga tushadi.
+        }
+      }
       // `sellOrder` `status=WAITING` filtrida yiqilsa — poyga (oraliqda qo'lda
       // amal bajarildi). Yangi holatni o'qib xulosa qilamiz.
       const fresh = await this.orderRepo.findOne({ where: { id: orderId } });

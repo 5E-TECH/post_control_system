@@ -53,5 +53,24 @@ export interface ElchiWebhookPayload {
    */
   cod_collected?: number;
 
+  /**
+   * Elchi tomonidagi YAKUNIY narx.
+   *
+   * Elchi kuryeri buyurtmani boshqa narxga sotishi mumkin (500 000 lik narsa
+   * 450 000 ga). Bu maydon bo'lsa, PCS sotishdan oldin o'z narxini shunga
+   * tenglashtiradi — aks holda kassaga eski narx bo'yicha xato summa
+   * tushardi. Buyurtma izohiga "qancha edi -> qanchaga" avtomatik yoziladi.
+   */
+  total_price?: number;
+
+  /**
+   * Elchi tomonida yozilgan qo'shimcha xarajat.
+   *
+   * Chegara ikki tizimda bir xil, shuning uchun oddiy holatda PCS'da ham
+   * o'tadi. O'tmasa sotuv yiqilmaydi — xarajatsiz sotiladi va nomuvofiqlik
+   * belgilanadi.
+   */
+  extra_cost?: number;
+
   occurred_at?: string;
 }

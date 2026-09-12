@@ -271,6 +271,14 @@ export class ElchiReconcileService {
       cod_collected: Number.isFinite(Number(remote?.cod_collected))
         ? Number(remote?.cod_collected)
         : undefined,
+      // Elchi yakuniy narxni o'zgartirgan bo'lsa, sotishdan OLDIN bizda ham
+      // qo'llanadi — aks holda kassaga eski narx bo'yicha xato summa tushardi.
+      total_price: Number.isFinite(Number(remote?.total_price))
+        ? Number(remote?.total_price)
+        : undefined,
+      extra_cost: Number.isFinite(Number(remote?.extra_cost))
+        ? Number(remote?.extra_cost)
+        : undefined,
     });
 
     await this.touchSynced(shipment.id);
@@ -333,12 +341,29 @@ export class ElchiReconcileService {
 
     const sent = Number(shipment.cod_amount_sent ?? 0);
 
-    // --- A) Narx o'zgarmaganmi ---
+    /**
+     * --- A) Bizning daftarimiz Elchi narxini AKS ETTIRADIMI ---
+     *
+     * ⚠️ Solishtiruv `cod_amount_sent` (jo'natishda yuborilgan summa) bilan
+     * EMAS, buyurtmaning HOZIRGI narxi bilan. Sababi: Elchi narxni
+     * o'zgartirsa (500 000 -> 450 000) biz endi uni QABUL QILAMIZ va
+     * `total_price`ni yangilaymiz. Eski summa bilan solishtirsak, har bir
+     * qabul qilingan o'zgarish SOXTA nomuvofiqlik bo'lib chiqardi.
+     *
+     * Ya'ni bu tekshiruv endi boshqa savolga javob beradi: narx o'zgarishi
+     * bizda QO'LLANDIMI? Qo'llanmagan bo'lsa (masalan buyurtma allaqachon
+     * sotilgan edi va narx yangilanmadi) — farq qoladi va belgilanadi.
+     */
+    const bookedPrice = Number(order.total_price ?? 0);
     const remoteTotal = Number(remote.total_price ?? NaN);
-    if (Number.isFinite(remoteTotal) && Math.abs(remoteTotal - sent) > 0.01) {
+    if (
+      Number.isFinite(remoteTotal) &&
+      Math.abs(remoteTotal - bookedPrice) > 0.01
+    ) {
       return (
-        `narx farqi: biz ${sent} yubordik, Elchi'da ${remoteTotal} ` +
-        `(#${order.order_number})`
+        `narx farqi: bizda ${bookedPrice}, Elchi'da ${remoteTotal} ` +
+        `(#${order.order_number}, jo'natishda ${sent} edi) — narx ` +
+        `o'zgarishi qo'llanmagan`
       );
     }
 
@@ -346,7 +371,9 @@ export class ElchiReconcileService {
     const remoteOwed = Number(remote.cod_amount ?? NaN);
     if (!Number.isFinite(remoteOwed)) return null;
 
-    const base = Number.isFinite(remoteTotal) ? remoteTotal : sent;
+    // Tarif farqini HOZIRGI narx ustida hisoblaymiz: narx o'zgarishi
+    // qabul qilingandan keyin kassaga aynan shu narx bo'yicha yozilgan.
+    const base = Number.isFinite(remoteTotal) ? remoteTotal : bookedPrice;
     const elchiKept = base - remoteOwed;
 
     const expectedTariff = await this.expectedElchiTariff(order.where_deliver);

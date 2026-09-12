@@ -118,6 +118,14 @@ export interface ElchiShipmentStatusResponse {
    * teng bo'lishi SHART — farq bo'lsa kimdir Elchi tomonda narxni o'zgartirgan.
    */
   total_price?: number;
+  /**
+   * Elchi tomonida kuryer yozgan qo'shimcha xarajat.
+   *
+   * Biz ham o'z marketimizdan shu summani yechishimiz kerak — aks holda
+   * ikki daftar shunga ajralib qoladi (bizda market hech narsa to'lamaydi).
+   * Chegara ikki tizimda bir xil, shuning uchun oddiy holatda o'tadi.
+   */
+  extra_cost?: number;
   tracking?: string | null;
 }
 
