@@ -68,6 +68,11 @@ import { FieldMapping } from 'src/core/entity/external-integration.entity';
 import { IntegrationSyncService } from '../integration-sync/integration-sync.service';
 import { OperatorEarningEntity } from 'src/core/entity/operator-earning.entity';
 import { Commission_type, FinancialSource_type } from 'src/common/enums';
+import {
+  assertExtraCostWithinLimit,
+  cancelExtraCostLimit,
+  sellExtraCostLimit,
+} from './utils/extra-cost-limit.util';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -2758,25 +2763,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : 0;
 
       if (extraCost > 0) {
-        // Uyga yetkaziladigan buyurtmalarda sotishda ortiqcha xarajat yozish mumkin emas
-        if (order.where_deliver !== Where_deliver.CENTER) {
-          throw new BadRequestException(
-            'Uyga yetkaziladigan buyurtmalarda sotishda ortiqcha xarajat yozish mumkin emas',
-          );
-        }
-        // Markazga: ortiqcha xarajat + markaz tarifi <= uy tarifi.
-        // Maxsus holat: agar uy va markaz tarifi teng bo'lsa
-        // (kuryerda farq belgilanmagan), kuryer o'z xizmat haqqicha
-        // (markaz tarifi) ortiqcha xarajat yoza oladi — aks holda
-        // bunday kuryerlar umuman extra cost yoza olmasdi.
-        const courierHomeTarif = courier.tariff_home;
-        const diff = courierHomeTarif - courierTarif;
-        const maxExtraCost = diff > 0 ? diff : Math.max(0, courierTarif);
-        if (extraCost > maxExtraCost) {
-          throw new BadRequestException(
-            `Ortiqcha xarajat maksimal ${maxExtraCost.toLocaleString('uz-UZ')} so'm bo'lishi mumkin (yetkazish tarifi: ${courierTarif.toLocaleString('uz-UZ')}, uy tarifi: ${courierHomeTarif.toLocaleString('uz-UZ')})`,
-          );
-        }
+        /**
+         * Chegara `sellExtraCostLimit`da — sotuv, bekor qilish va qisman
+         * sotuv uchun YAGONA manba (Elchi tomonidagi nusxa ham shunga mos).
+         *
+         * ⚠️ O'ZGARDI: ikki tarif teng bo'lganda avval TO'LIQ tarifgacha
+         * ruxsat berilardi, ya'ni kuryer xizmat haqini ikki baravar qilib
+         * olishi mumkin edi. Endi 50%.
+         */
+        const limit = sellExtraCostLimit({
+          whereDeliver: order.where_deliver,
+          tariffCenter: courier.tariff_center,
+          tariffHome: courier.tariff_home,
+        });
+        assertExtraCostWithinLimit(extraCost, limit, {
+          tariffCenter: Number(courier.tariff_center ?? 0),
+          tariffHome: Number(courier.tariff_home ?? 0),
+        });
         await Promise.all([
           updateCashbox(
             marketCashbox,
@@ -2979,15 +2982,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : 0;
 
       if (extraCost > 0) {
-        // Bekor qilishda kuryer o'z xizmat haqqigacha (courier_tariff) ortiqcha
-        // xarajat yozishi mumkin — sotuv bilan birga emas, mustaqil qoida.
-        // Sotuvda mantiq boshqa: extra + yetkazish ≤ uy tarifi (markaz → uy farqi).
-        // Bekor qilishda esa kuryer borib qaytdi, vaqt-yoqilg'i sarfladi —
-        // shuning uchun maksimal = o'sha buyurtma uchun belgilangan kuryer tarifi.
-        const maxExtraCost = Math.max(0, courierTarif);
-        if (extraCost > maxExtraCost) {
+        // Bekor qilish qoidasi SOTUVDAN boshqa va shunday qolishi kerak:
+        // kuryer borib qaytdi, vaqt-yoqilg'i sarfladi, lekin yetkazmadi.
+        // Shu bois maksimal = o'sha buyurtma uchun belgilangan kuryer tarifi
+        // (uyga/markazga ajratilmaydi — xarajat ikkisida ham real).
+        const limit = cancelExtraCostLimit({ courierTariff: courierTarif });
+        if (extraCost > limit.max) {
           throw new BadRequestException(
-            `Ortiqcha xarajat o'z xizmat haqqingizdan (${courierTarif.toLocaleString('uz-UZ')} so'm) oshmasligi kerak. Maksimal: ${maxExtraCost.toLocaleString('uz-UZ')} so'm`,
+            `Ortiqcha xarajat o'z xizmat haqqingizdan (${courierTarif.toLocaleString('uz-UZ')} so'm) oshmasligi kerak. Maksimal: ${limit.max.toLocaleString('uz-UZ')} so'm`,
           );
         }
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
@@ -3257,6 +3259,26 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           : order.where_deliver === Where_deliver.CENTER
             ? courier.tariff_center
             : courier.tariff_home;
+
+      /**
+       * QISMAN SOTUVDA CHEGARA — ilgari UMUMAN YO'Q EDI.
+       *
+       * Sotuv va bekor qilishda chegara bor edi, qisman sotuvda esa kuryer
+       * ISTAGAN summani yozib market kassasidan yechib olardi. Qisman sotuv —
+       * sotuvning bir turi, shuning uchun AYNI qoida qo'llanadi.
+       */
+      assertExtraCostWithinLimit(
+        Number(extraCost ?? 0),
+        sellExtraCostLimit({
+          whereDeliver: order.where_deliver,
+          tariffCenter: courier.tariff_center,
+          tariffHome: courier.tariff_home,
+        }),
+        {
+          tariffCenter: Number(courier.tariff_center ?? 0),
+          tariffHome: Number(courier.tariff_home ?? 0),
+        },
+      );
 
       // 5️⃣ Common vars
       const price = Number(totalPrice);
