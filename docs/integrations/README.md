@@ -18,6 +18,19 @@
 | **[06-platforma.md](06-platforma.md)** | **Integratsiya platformasi** (2026-09-08) — kategoriyali ulanish arxitekturasi: 3 rol (CARRIER · SOURCE · MIRROR) × 2 rejim (SPEC · ADAPTER). Yangi hamkor **kodsiz** ulanadi | **Yangi integratsiya boshlashdan oldin shuni o'qing** |
 | **[07-pilot.md](07-pilot.md)** | **Pilot ijro rejasi** (2026-09-08) — BeePost'dan bitta hududni Elchi'ga jo'natib real test; darvoza (router EMAS), pul tekshiruvi, **12 ta qabul mezoni** | **Ishni boshlaydigan dasturchi** |
 
+
+### Elchi integratsiya platformasi — BAJARILGAN ish (2026-09-13)
+
+⚠️ Yuqoridagi jadval **rejalar** (2026-07-25, kod yozilmagan). Quyidagilar esa
+**yozilgan va deploy qilingan** ishning hujjati:
+
+| Hujjat | Nima haqida | Holat |
+|---|---|---|
+| **[08-qabul-skaneri.md](08-qabul-skaneri.md)** | BeePost chekini skanerlab qabul qilish — buyurtma jo'natiladi, lekin skanergacha Elchi'ga tushmaydi | Qarorlar yozilgan; server darvozasi 2-bosqichda bajarildi |
+| **[09-marketplace.md](09-marketplace.md)** | Elchi Marketplace'ni hamkor sifatida ulash (BeePost bilan ayni yo'l) | Reja |
+| **[10-turlar-boyicha-yollar.md](10-turlar-boyicha-yollar.md)** | **Integratsiya turlari auditi — 91 topilma** va 0–7 bosqichli tuzatish rejasi. Ildiz sabab: turni farqlaydigan 9 ustun gateway DTO'da e'lon qilinmagan | 0–6 bosqich ✅ bajarildi |
+| **[11-crm-voronka.md](11-crm-voronka.md)** | **CRM voronkasidan buyurtma** (P5/P7/EI-10) — bitim kerakli bosqichga yetganda buyurtma tug'iladi | ✅ bajarildi |
+
 Har bir tizim rejasi bir xil 13-bo'limli tuzilishga ega: maqsad/yo'nalish · ma'lumot oqimi · auth · arxitekturaga ulanish · field/status mapping · API chaqiruvlari · kod hook nuqtalari · ishonchlilik · xavfsizlik · bosqichma-bosqich joriy etish · sinov · xavflar/savollar · ish hajmi bahosi.
 
 ---
