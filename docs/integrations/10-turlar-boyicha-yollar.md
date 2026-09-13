@@ -161,14 +161,22 @@ ishlaydi.
 
 ### 3.4 To'lov tizimi (Uzum, Alif, bank, nasiya)
 
-⚠️ **Bugun bu tur uchun HECH NARSA yo'q.** `role='payment'` butun backendda
-**bitta** joyda uchraydi — o'zining normalizatoridagi validatsiyada
-(`integration-service.service.ts:2525`) — va undan keyin **hech kim
-o'qimaydi**.
+✅ **1-QATLAM BAJARILDI (7-bosqich).** `role='payment'` endi o'qiladi:
+`payment_config` bo'yicha tranzaksiya, summa, holat va buyurtma havolasi
+aniqlanadi; tasdiqlangan to'lov `payment_transactions` ga yozilib
+buyurtmaga qo'llanadi. Batafsil: `12-tolov-tizimi.md`.
 
-Ustiga yagona kiruvchi webhook yo'li **posilka talab qiladi** va faqat 3
-amalni biladi (`sell`/`cancel`/`return`) — ya'ni to'lov tasdig'ini
-qo'llaydigan joy yo'q (P2).
+⚠️ **PUL HARAKATI OCHIQ.** Foydalanuvchi qarori bilan onlayn pul kassaga
+yozilmaydi va marketga qarz yozilmaydi; kuryer tarifi esa HQ'dan
+to'lanishi kerak. Bu uchtasi birgalikda kompaniya balansini faqat chiqim
+tomonga siljitadi, shu bois kuryer tarifi implementatsiya qilinmadi va
+`sellOrder` onlayn to'langan buyurtmani RAD ETADI (jimgina noto'g'ri
+hisoblashdan ko'ra to'xtash to'g'ri).
+
+⚠️ **Payme/Click uchun adapter kerak** — ular ikki fazali JSON-RPC Merchant
+API ishlatadi, bitta imzolangan webhook emas.
+
+**Ilgari mavjud bo'lmagan narsa (tarix uchun):**
 
 **Kerak bo'ladigan yangi yo'l:**
 1. Nomi
@@ -230,7 +238,7 @@ buyurtma kirish yo'li, status/pul chiqish yo'li, ko'rsatiladigan tablar.
 | **4** | **Turga xos usta** — har tur uchun alohida qadamlar, `typeKey` saqlanadi | 0-bosqichdan keyin ma'noli bo'ladi | 3 |
 | **5** | **Kargo zanjirini yopish** — avval 20 da'voni qayta tekshirish, keyin C1–C5 | Tekshirilmagan asosda kod yozish xavfli | 1 + 4 |
 | **6** | ✅ **CRM yo'li** — kiruvchi webhook → buyurtma + voronka modeli (`11-crm-voronka.md`) | Yangi mexanizm | 4 |
-| **7** | **To'lov tizimi** — to'lov tasdig'i yo'li + nasiya | Pulga tegadi, oxirgi | 5 |
+| **7** | ✅ **To'lov tizimi** — to'lov tasdig'i yo'li (`12-tolov-tizimi.md`); nasiya ko'lamdan chiqarildi | Pulga tegadi, oxirgi | 5 |
 
 **Jami ≈ 28 kun.** Minimal ishlaydigan yo'l: **0+1+2 = 7 kun** — hamkor
 (Elchi Marketplace + BeePost) to'g'ri va xavfsiz ishlaydi, skanerlash

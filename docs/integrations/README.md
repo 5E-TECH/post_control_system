@@ -30,6 +30,7 @@
 | **[09-marketplace.md](09-marketplace.md)** | Elchi Marketplace'ni hamkor sifatida ulash (BeePost bilan ayni yo'l) | Reja |
 | **[10-turlar-boyicha-yollar.md](10-turlar-boyicha-yollar.md)** | **Integratsiya turlari auditi — 91 topilma** va 0–7 bosqichli tuzatish rejasi. Ildiz sabab: turni farqlaydigan 9 ustun gateway DTO'da e'lon qilinmagan | 0–6 bosqich ✅ bajarildi |
 | **[11-crm-voronka.md](11-crm-voronka.md)** | **CRM voronkasidan buyurtma** (P5/P7/EI-10) — bitim kerakli bosqichga yetganda buyurtma tug'iladi | ✅ bajarildi |
+| **[12-tolov-tizimi.md](12-tolov-tizimi.md)** | **Onlayn to'lov** (P1/P2) — imzolangan to'lov hodisasi buyurtmaga yoziladi. Pul harakati (kassa, market qarzi, kuryer tarifi) ochiq | ✅ 1-qatlam |
 
 Har bir tizim rejasi bir xil 13-bo'limli tuzilishga ega: maqsad/yo'nalish · ma'lumot oqimi · auth · arxitekturaga ulanish · field/status mapping · API chaqiruvlari · kod hook nuqtalari · ishonchlilik · xavfsizlik · bosqichma-bosqich joriy etish · sinov · xavflar/savollar · ish hajmi bahosi.
 
