@@ -48,6 +48,7 @@ import {
 // indekssiz har skan sequential scan edi. Non-unique (tokenlar amalda noyob,
 // lekin DB darajasida majburlanmagan; dublikat bo'lsa migration buzilmasin).
 @Index('IDX_ORDER_QR_TOKEN', ['qr_code_token'])
+@Index('IDX_ORDER_CONTROL_OWNER', ['control_owner'])
 export class OrderEntity extends BaseEntity {
   // O'qiladigan global buyurtma raqami (#100042). UUID `id` qoladi — bu faqat
   // ko'rsatish/qidiruv/chek uchun qulay, ketma-ket raqam. DB sequence orqali
@@ -214,6 +215,30 @@ export class OrderEntity extends BaseEntity {
   // Tashqi saytlardan kelgan buyurtma ID si (Adosh, etc.)
   @Column({ type: 'varchar', nullable: true })
   external_id: string;
+
+  /**
+   * BOSHQARUV EGASI — buyurtma holatini KIM o'zgartirishga haqli.
+   *
+   *   `null`    — biz (BeePost). Odatdagi holat, barcha ichki oqimlar ishlaydi.
+   *   `'elchi'` — tashqi tizim (Elchi). BeePost UI'dan sotish/bekor/rollback
+   *               BLOKLANADI; holat FAQAT tashqi tizim webhooki orqali o'zgaradi.
+   *
+   * NEGA KERAK. Tashqi provayderga jo'natilgan buyurtma ikki tizimda ham
+   * ko'rinadi. Agar ikkalasi ham mustaqil "sotildi" deb yozsa, PUL IKKI
+   * DAFTARDA paydo bo'ladi: bizning kassada bir marta, provayder balansida bir
+   * marta. Bizning status guardimiz (sotish `WAITING` talab qiladi) faqat BIZ
+   * tomonni himoyalaydi — provayder tomonini emas. Shu bois har buyurtmada
+   * bir vaqtda FAQAT BITTA ega bo'ladi.
+   *
+   * ZAXIRA YO'LI. Integratsiya buzilsa yoki provayder posilkani qaytarsa, admin
+   * "boshqaruvni qaytarib olish" amali bilan `null`ga qaytaradi — bu amal ayni
+   * paytda provayder tomonidagi posilkani ham BEKOR qiladi, ya'ni ikki tomon
+   * bir vaqtda faol bo'lib qolmaydi.
+   *
+   * Eski yozuvlar `null` — backfill kerak emas.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  control_owner: string | null;
 
   // Buyurtma qanday yaratilgani: 'manual' (web forma) | 'ai' (web AI) | 'bot'
   // (Telegram). Eski yozuvlar -> 'manual'. AI dashboard va tracking uchun.

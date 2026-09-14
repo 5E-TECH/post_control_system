@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -67,6 +68,11 @@ import { FieldMapping } from 'src/core/entity/external-integration.entity';
 import { IntegrationSyncService } from '../integration-sync/integration-sync.service';
 import { OperatorEarningEntity } from 'src/core/entity/operator-earning.entity';
 import { Commission_type, FinancialSource_type } from 'src/common/enums';
+import {
+  assertExtraCostWithinLimit,
+  cancelExtraCostLimit,
+  sellExtraCostLimit,
+} from './utils/extra-cost-limit.util';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -79,6 +85,16 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
  *                 tekshirilishi kerak — masalan, biz SOLD, LDG CANCELLED)
  */
 export type LdgTerminalResult =
+  | { kind: 'applied' }
+  | { kind: 'skipped'; reason: string }
+  | { kind: 'mismatch'; reason: string };
+
+/**
+ * Tashqi provayder (Elchi) webhookidan kelgan terminal amal natijasi.
+ * Shakli `LdgTerminalResult` bilan bir xil — ataylab alohida tur, chunki LDG
+ * prod'da ishlayapti va uning turini qayta nomlash xavfli.
+ */
+export type ExternalTerminalResult =
   | { kind: 'applied' }
   | { kind: 'skipped'; reason: string }
   | { kind: 'mismatch'; reason: string };
@@ -2346,6 +2362,51 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
   }
 
   /**
+   * BOSHQARUV EGASI GUARDI — buyurtma tashqi tizim nazoratida bo'lsa, BeePost
+   * tomonidan holat o'zgartirishni to'sadi.
+   *
+   * NEGA. Tashqi provayderga (Elchi) jo'natilgan buyurtma IKKI tizimda ham
+   * ko'rinadi. Ikkalasi ham mustaqil "sotildi" yozsa, pul IKKI DAFTARDA paydo
+   * bo'ladi: bizning kassada bir marta, provayder balansida bir marta. Bizning
+   * status guardimiz (sotish `WAITING` talab qiladi) faqat BIZ tomonni
+   * himoyalaydi — provayder tomonini emas.
+   *
+   * Shu bois qoida: bir vaqtda FAQAT BITTA ega. `control_owner` to'ldirilgan
+   * bo'lsa holat faqat provayder webhooki orqali o'zgaradi.
+   *
+   * ZAXIRA YO'LI: admin "boshqaruvni qaytarib olish" amalini bajaradi — u ayni
+   * paytda provayder tomonidagi posilkani bekor qiladi va `control_owner`ni
+   * bo'shatadi. Shundan keyin bu guard o'tkazadi.
+   *
+   * `bypassControlGuard` — FAQAT ichki webhook oqimi uchun. HTTP qatlamidan
+   * berib bo'lmaydi: u DTO maydoni EMAS, alohida parametr.
+   *
+   * DIQQAT: LDG buyurtmalarida `control_owner` TO'LDIRILMAYDI — LDG prod'da
+   * ishlayapti va uning xulqi o'zgarmaydi. Guard faqat yangi provayderlarga
+   * (Elchi) taalluqli.
+   */
+  private async assertControlAllowed(
+    orderId: string,
+    action: string,
+    options?: { bypassControlGuard?: boolean },
+  ): Promise<void> {
+    if (options?.bypassControlGuard) return;
+
+    const row = await this.orderRepo.findOne({
+      where: { id: orderId },
+      select: ['id', 'control_owner'],
+    });
+    const owner = String(row?.control_owner ?? '').trim();
+    if (!owner) return;
+
+    throw new ConflictException(
+      `Bu buyurtma hozir tashqi tizim (${owner}) tomonidan boshqariladi — ` +
+        `"${action}" amali bloklangan. Avval "boshqaruvni qaytarib olish" ` +
+        `amalini bajaring.`,
+    );
+  }
+
+  /**
    * Almashtirish (kafolat-swap): eski (SOTILGAN) buyurtmani SOTUVCHI kuryerning
    * yagona BEKOR (CANCELED) postiga biriktiradi — shunda u mavjud qaytarish reli
    * orqali marketga boradi. STATUS O'ZGARMAYDI (SOLD qoladi; bekor pochta
@@ -2397,7 +2458,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await manager.save(canceledPost);
   }
 
-  async sellOrder(user: JwtPayload, id: string, sellDto: SellCancelOrderDto) {
+  async sellOrder(
+    user: JwtPayload,
+    id: string,
+    sellDto: SellCancelOrderDto,
+    options?: { bypassControlGuard?: boolean },
+  ) {
+    // Tashqi tizim nazoratidagi buyurtmani BeePostdan sotib bo'lmaydi (pul ikki
+    // daftarda paydo bo'lishining oldini oladi). Batafsil: assertControlAllowed.
+    await this.assertControlAllowed(id, 'sotish', options);
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -2693,25 +2763,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : 0;
 
       if (extraCost > 0) {
-        // Uyga yetkaziladigan buyurtmalarda sotishda ortiqcha xarajat yozish mumkin emas
-        if (order.where_deliver !== Where_deliver.CENTER) {
-          throw new BadRequestException(
-            'Uyga yetkaziladigan buyurtmalarda sotishda ortiqcha xarajat yozish mumkin emas',
-          );
-        }
-        // Markazga: ortiqcha xarajat + markaz tarifi <= uy tarifi.
-        // Maxsus holat: agar uy va markaz tarifi teng bo'lsa
-        // (kuryerda farq belgilanmagan), kuryer o'z xizmat haqqicha
-        // (markaz tarifi) ortiqcha xarajat yoza oladi — aks holda
-        // bunday kuryerlar umuman extra cost yoza olmasdi.
-        const courierHomeTarif = courier.tariff_home;
-        const diff = courierHomeTarif - courierTarif;
-        const maxExtraCost = diff > 0 ? diff : Math.max(0, courierTarif);
-        if (extraCost > maxExtraCost) {
-          throw new BadRequestException(
-            `Ortiqcha xarajat maksimal ${maxExtraCost.toLocaleString('uz-UZ')} so'm bo'lishi mumkin (yetkazish tarifi: ${courierTarif.toLocaleString('uz-UZ')}, uy tarifi: ${courierHomeTarif.toLocaleString('uz-UZ')})`,
-          );
-        }
+        /**
+         * Chegara `sellExtraCostLimit`da — sotuv, bekor qilish va qisman
+         * sotuv uchun YAGONA manba (Elchi tomonidagi nusxa ham shunga mos).
+         *
+         * ⚠️ O'ZGARDI: ikki tarif teng bo'lganda avval TO'LIQ tarifgacha
+         * ruxsat berilardi, ya'ni kuryer xizmat haqini ikki baravar qilib
+         * olishi mumkin edi. Endi 50%.
+         */
+        const limit = sellExtraCostLimit({
+          whereDeliver: order.where_deliver,
+          tariffCenter: courier.tariff_center,
+          tariffHome: courier.tariff_home,
+        });
+        assertExtraCostWithinLimit(extraCost, limit, {
+          tariffCenter: Number(courier.tariff_center ?? 0),
+          tariffHome: Number(courier.tariff_home ?? 0),
+        });
         await Promise.all([
           updateCashbox(
             marketCashbox,
@@ -2830,8 +2898,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     currentUser: JwtPayload,
     id: string,
     cancelOrderDto: SellCancelOrderDto,
-    options?: { skipNotification?: boolean },
+    options?: { skipNotification?: boolean; bypassControlGuard?: boolean },
   ) {
+    await this.assertControlAllowed(id, 'bekor qilish', options);
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -2912,15 +2982,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         : 0;
 
       if (extraCost > 0) {
-        // Bekor qilishda kuryer o'z xizmat haqqigacha (courier_tariff) ortiqcha
-        // xarajat yozishi mumkin — sotuv bilan birga emas, mustaqil qoida.
-        // Sotuvda mantiq boshqa: extra + yetkazish ≤ uy tarifi (markaz → uy farqi).
-        // Bekor qilishda esa kuryer borib qaytdi, vaqt-yoqilg'i sarfladi —
-        // shuning uchun maksimal = o'sha buyurtma uchun belgilangan kuryer tarifi.
-        const maxExtraCost = Math.max(0, courierTarif);
-        if (extraCost > maxExtraCost) {
+        // Bekor qilish qoidasi SOTUVDAN boshqa va shunday qolishi kerak:
+        // kuryer borib qaytdi, vaqt-yoqilg'i sarfladi, lekin yetkazmadi.
+        // Shu bois maksimal = o'sha buyurtma uchun belgilangan kuryer tarifi
+        // (uyga/markazga ajratilmaydi — xarajat ikkisida ham real).
+        const limit = cancelExtraCostLimit({ courierTariff: courierTarif });
+        if (extraCost > limit.max) {
           throw new BadRequestException(
-            `Ortiqcha xarajat o'z xizmat haqqingizdan (${courierTarif.toLocaleString('uz-UZ')} so'm) oshmasligi kerak. Maksimal: ${maxExtraCost.toLocaleString('uz-UZ')} so'm`,
+            `Ortiqcha xarajat o'z xizmat haqqingizdan (${courierTarif.toLocaleString('uz-UZ')} so'm) oshmasligi kerak. Maksimal: ${limit.max.toLocaleString('uz-UZ')} so'm`,
           );
         }
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
@@ -3073,7 +3142,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     user: JwtPayload,
     id: string,
     partlySoldDto: PartlySoldDto,
+    options?: { bypassControlGuard?: boolean },
   ): Promise<object> {
+    await this.assertControlAllowed(id, 'qisman sotish', options);
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -3187,6 +3259,26 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           : order.where_deliver === Where_deliver.CENTER
             ? courier.tariff_center
             : courier.tariff_home;
+
+      /**
+       * QISMAN SOTUVDA CHEGARA — ilgari UMUMAN YO'Q EDI.
+       *
+       * Sotuv va bekor qilishda chegara bor edi, qisman sotuvda esa kuryer
+       * ISTAGAN summani yozib market kassasidan yechib olardi. Qisman sotuv —
+       * sotuvning bir turi, shuning uchun AYNI qoida qo'llanadi.
+       */
+      assertExtraCostWithinLimit(
+        Number(extraCost ?? 0),
+        sellExtraCostLimit({
+          whereDeliver: order.where_deliver,
+          tariffCenter: courier.tariff_center,
+          tariffHome: courier.tariff_home,
+        }),
+        {
+          tariffCenter: Number(courier.tariff_center ?? 0),
+          tariffHome: Number(courier.tariff_home ?? 0),
+        },
+      );
 
       // 5️⃣ Common vars
       const price = Number(totalPrice);
@@ -3741,7 +3833,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     user: JwtPayload,
     id: string,
     dto?: RollbackOrderDto,
+    options?: { bypassControlGuard?: boolean },
   ) {
+    // Tashqi tizim nazoratidagi buyurtmani BeePostdan orqaga qaytarib bo'lmaydi —
+    // holatni provayder boshqaradi. Avval boshqaruvni qaytarib olish kerak.
+    await this.assertControlAllowed(id, 'orqaga qaytarish', options);
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -6217,6 +6314,375 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       user: payload,
       metadata: { source: 'ldg', ldg_status: 'RETURNED' },
     });
+    return { kind: 'applied' };
+  }
+
+  // ==================== ELCHI WEBHOOK TERMINAL AMALLARI ====================
+
+  /**
+   * Elchi nomuvofiqligini audit'ga yozadi (admin panel shu orqali topadi).
+   */
+  private logElchiMismatch(
+    order: { id: string; order_number?: number; status: string },
+    terminalAction: string,
+    reason: string,
+  ): void {
+    this.activityLog.log({
+      entity_type: 'order',
+      entity_id: order.id,
+      action: 'elchi_mismatch',
+      old_value: { status: order.status },
+      new_value: {
+        order_number: order.order_number,
+        elchi_action: terminalAction,
+      },
+      description: `⚠️ Elchi nomuvofiqligi — Buyurtma #${order.order_number}: Elchi "${terminalAction}", bizda "${orderStatusUz(
+        order.status,
+      )}". ${reason}`,
+      metadata: { source: 'elchi', terminal_action: terminalAction },
+    });
+  }
+
+  /**
+   * Elchi vakil-kuryeri nomidan `JwtPayload` yasaydi.
+   *
+   * Bu aktyor bilan `sellOrder`/`cancelOrder` chaqiriladi — shunda pul aynan
+   * Elchi virtual kuryerining kassasiga tushadi, ya'ni "Elchi bizga qancha
+   * qarz" o'z-o'zidan hisoblanadi (kuryer kassasi = qarz daftari).
+   */
+  private elchiActor(elchiCourierUserId: string): JwtPayload {
+    return {
+      id: elchiCourierUserId,
+      role: Roles.COURIER,
+      status: Status.ACTIVE,
+    } as JwtPayload;
+  }
+
+  /**
+   * Elchi `sold` (yoki `paid`/`partly_paid`) yubordi — sotuv oqimini ishga
+   * tushiradi.
+   *
+   * `bypassControlGuard: true` — buyurtma `control_owner='elchi'` bo'lgani
+   * uchun odatdagi guard uni bloklaydi. Webhook esa aynan shu holatni
+   * o'zgartirishga HAQLI yagona yo'l.
+   *
+   * Idempotent: allaqachon sotilgan bo'lsa skip (webhook qayta yuborilishi
+   * yoki takroriy hodisa).
+   */
+  /**
+   * Elchi tomonidagi YAKUNIY narxni bizda ham qo'llaydi.
+   *
+   * Elchi kuryeri buyurtmani boshqa narxga sotishi mumkin — masalan mijoz
+   * bilan kelishib 500 000 lik narsani 450 000 ga. Ilgari PCS bundan
+   * BEXABAR qolardi: `sellOrder` o'zining eski narxi bilan hisoblab, kuryer
+   * kassasiga 485 000 yozardi, Elchi esa faqat 435 000 qarzdor bo'lardi.
+   * Farq (50 000) har buyurtmada jimgina yo'qolardi.
+   *
+   * Ham PASAYISH, ham KO'TARILISH qabul qilinadi.
+   *
+   * O'zgarish JIMGINA o'tmasligi kerak: buyurtma izohiga "qancha edi →
+   * qanchaga aylandi" avtomatik yoziladi (`sellOrder` `generateComment`
+   * orqali izohni buyurtmaga yozadi), shuning uchun operator buyurtmani
+   * ochganda kassadagi summa nega boshqacha ekanini ko'radi.
+   *
+   * Qaytaradi: izohga qo'shiladigan matn (o'zgarish bo'lmasa bo'sh satr).
+   */
+  private async acceptElchiPriceChange(
+    orderId: string,
+    remoteTotalPrice?: number | null,
+  ): Promise<string> {
+    const remote = Number(remoteTotalPrice ?? NaN);
+    // Manfiy narx — buzilgan ma'lumot, qabul qilmaymiz (0 esa haqiqiy holat:
+    // oldindan to'langan posilka).
+    if (!Number.isFinite(remote) || remote < 0) return '';
+
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      select: ['id', 'total_price'],
+    });
+    if (!order) return '';
+
+    const current = Number(order.total_price ?? 0);
+    if (Math.abs(current - remote) < 0.01) return '';
+
+    await this.orderRepo.update({ id: orderId }, { total_price: remote });
+
+    const fmt = (v: number) => v.toLocaleString('uz-UZ');
+    this.logger.warn(
+      `Elchi narxni o'zgartirdi: order=${orderId} ${current} -> ${remote}`,
+    );
+    return `!!! Elchi narxni o'zgartirdi: ${fmt(current)} -> ${fmt(remote)} so'm`;
+  }
+
+  async markDeliveredByElchi(
+    orderId: string,
+    elchiCourierUserId: string,
+    codCollected?: number,
+    /**
+     * Elchi tomonidagi YAKUNIY narx va qo'shimcha xarajat.
+     *
+     * NEGA KERAK. Elchi kuryeri buyurtmani boshqa narxga sotishi mumkin
+     * (500 000 lik narsa 450 000 ga) yoki qo'shimcha xarajat yozishi mumkin.
+     * Ilgari PCS bularni BILMASDI va o'zining eski narxi bilan sotardi —
+     * kassaga xato summa tushardi va farq jimgina qolib ketardi.
+     */
+    remote?: { totalPrice?: number | null; extraCost?: number | null },
+  ): Promise<ExternalTerminalResult> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      this.logger.warn(`Elchi webhook sold: order topilmadi (${orderId})`);
+      return { kind: 'skipped', reason: 'order_not_found' };
+    }
+
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      return { kind: 'skipped', reason: `already ${order.status}` };
+    }
+
+    // NOMUVOFIQLIK: Elchi yetkazdi, bizda esa bekor/yopilgan. Bu real biznes
+    // to'qnashuvi — jimgina holatni o'zgartirib yuborsak pul xatosi bo'ladi.
+    if (
+      order.status === Order_status.CANCELLED ||
+      order.status === Order_status.CANCELLED_SENT ||
+      order.status === Order_status.CLOSED
+    ) {
+      const reason = `Elchi: yetkazildi, lekin bizda status=${order.status} (qo'lda tekshiring)`;
+      this.logger.error(`ELCHI MISMATCH sold: order=${orderId} — ${reason}`);
+      this.logElchiMismatch(order, 'sold', reason);
+      return { kind: 'mismatch', reason };
+    }
+
+    // Sotuv oqimi `WAITING` talab qiladi. Elchi'dan `sold` kelganda buyurtma
+    // bizda hali `ON_THE_ROAD`/`RECEIVED` bo'lishi mumkin (oraliq statuslar
+    // webhookda yo'qolgan bo'lsa) — avval `WAITING`ga o'tkazamiz.
+    if (
+      order.status === Order_status.ON_THE_ROAD ||
+      order.status === Order_status.RECEIVED
+    ) {
+      await this.orderRepo.update(
+        {
+          id: orderId,
+          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+        },
+        { status: Order_status.WAITING },
+      );
+    }
+
+    /**
+     * NARXNI QABUL QILISH.
+     *
+     * Elchi yakuniy narxni o'zgartirgan bo'lsa, sotishdan OLDIN bizda ham
+     * yangilanadi — aks holda `sellOrder` eski narx bo'yicha hisoblab,
+     * kassaga xato summa yozardi.
+     *
+     * Ham pasayish, ham ko'tarilish qabul qilinadi. O'zgarish JIMGINA
+     * o'tmasligi uchun buyurtma izohiga avtomatik yoziladi: "qancha edi →
+     * qanchaga aylandi". Shu bilan operator buyurtmani ochganda sababni
+     * ko'radi va kassadagi summa nega boshqacha ekani tushunarli bo'ladi.
+     */
+    const priceNote = await this.acceptElchiPriceChange(
+      orderId,
+      remote?.totalPrice,
+    );
+
+    /**
+     * Elchi yozgan qo'shimcha xarajat. Chegara ikki tizimda BIR XIL
+     * (`extra-cost-limit.util.ts`), shuning uchun oddiy holatda o'tadi.
+     * O'tmasa — sotuv YIQILMAYDI, xarajatsiz sotiladi va chaqiruvchi
+     * nomuvofiqlikni belgilaydi (yetkazish xarajat qaydidan muhimroq).
+     */
+    const remoteExtra = Math.max(0, Number(remote?.extraCost ?? 0) || 0);
+
+    const sellComment = [
+      codCollected != null
+        ? `Elchi yetkazib berdi (yig'ilgan: ${codCollected})`
+        : 'Elchi yetkazib berdi',
+      priceNote,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    try {
+      await this.sellOrder(
+        this.elchiActor(elchiCourierUserId),
+        orderId,
+        { comment: sellComment, extraCost: remoteExtra },
+        { bypassControlGuard: true },
+      );
+      return { kind: 'applied' };
+    } catch (err) {
+      /**
+       * Qo'shimcha xarajat chegaradan oshgan bo'lsa, XARAJATSIZ qayta
+       * urinamiz. Aks holda Elchi tomondagi bitta qoida farqi tufayli
+       * buyurtma PCS'da abadiy "kutilmoqda"da qolib ketardi — yetkazilgan
+       * posilka esa pul demak.
+       */
+      if (remoteExtra > 0) {
+        try {
+          await this.sellOrder(
+            this.elchiActor(elchiCourierUserId),
+            orderId,
+            {
+              comment: `${sellComment} (Elchi xarajati ${remoteExtra} qo'llanmadi — chegaradan oshdi)`,
+              extraCost: 0,
+            },
+            { bypassControlGuard: true },
+          );
+          return {
+            kind: 'mismatch',
+            reason:
+              `Elchi qo'shimcha xarajat ${remoteExtra} yozdi, lekin PCS ` +
+              `chegarasidan oshdi — xarajatsiz sotildi, qo'lda kiriting`,
+          };
+        } catch {
+          // Ikkinchi urinish ham yiqildi — quyidagi umumiy ishlovga tushadi.
+        }
+      }
+      // `sellOrder` `status=WAITING` filtrida yiqilsa — poyga (oraliqda qo'lda
+      // amal bajarildi). Yangi holatni o'qib xulosa qilamiz.
+      const fresh = await this.orderRepo.findOne({ where: { id: orderId } });
+      if (
+        fresh?.status === Order_status.SOLD ||
+        fresh?.status === Order_status.PAID ||
+        fresh?.status === Order_status.PARTLY_PAID
+      ) {
+        return { kind: 'skipped', reason: `race: now ${fresh.status}` };
+      }
+      if (
+        fresh?.status === Order_status.CANCELLED ||
+        fresh?.status === Order_status.CANCELLED_SENT ||
+        fresh?.status === Order_status.CLOSED
+      ) {
+        const reason = `Elchi: yetkazildi (poyga), lekin bizda status=${fresh.status}`;
+        this.logger.error(`ELCHI MISMATCH sold (race): order=${orderId}`);
+        this.logElchiMismatch(fresh, 'sold', reason);
+        return { kind: 'mismatch', reason };
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Elchi `cancelled` yubordi — bekor qilish oqimini ishga tushiradi.
+   * Idempotent: terminal holatni qayta o'zgartirmaymiz.
+   */
+  async markCancelledByElchi(
+    orderId: string,
+    elchiCourierUserId: string,
+  ): Promise<ExternalTerminalResult> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      this.logger.warn(`Elchi webhook cancelled: order topilmadi (${orderId})`);
+      return { kind: 'skipped', reason: 'order_not_found' };
+    }
+
+    if (
+      order.status === Order_status.CANCELLED ||
+      order.status === Order_status.CANCELLED_SENT ||
+      order.status === Order_status.CLOSED
+    ) {
+      return { kind: 'skipped', reason: `already ${order.status}` };
+    }
+
+    // NOMUVOFIQLIK: Elchi bekor qildi, lekin bizda allaqachon sotilgan —
+    // pul kassaga kirgan. Avtomatik qaytarish XAVFLI, qo'lda ko'rilishi kerak.
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      const reason = `Elchi: bekor qildi, lekin bizda status=${order.status} (pul kassada — qo'lda tekshiring)`;
+      this.logger.error(`ELCHI MISMATCH cancelled: order=${orderId}`);
+      this.logElchiMismatch(order, 'cancelled', reason);
+      return { kind: 'mismatch', reason };
+    }
+
+    if (
+      order.status === Order_status.ON_THE_ROAD ||
+      order.status === Order_status.RECEIVED
+    ) {
+      await this.orderRepo.update(
+        {
+          id: orderId,
+          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+        },
+        { status: Order_status.WAITING },
+      );
+    }
+
+    await this.cancelOrder(
+      this.elchiActor(elchiCourierUserId),
+      orderId,
+      { comment: 'Elchi bekor qildi', extraCost: 0 },
+      { bypassControlGuard: true },
+    );
+    return { kind: 'applied' };
+  }
+
+  /**
+   * Elchi `cancelled (sent)` yoki `returned_to_market` yubordi — posilka bizga
+   * QAYTISH yo'lida.
+   *
+   * ⚠️ MUHIM: bu holat `CLOSED` EMAS. Buyurtma faqat posilka jismonan yetib
+   * kelib SKANERDAN o'tganda yopiladi. LDG'da aynan shu xato bo'lgan:
+   * `RETURNED` to'g'ridan-to'g'ri `CLOSED` qilingan va hali qaytmagan
+   * posilkalar yopilgan deb belgilangan edi.
+   *
+   * Shu bois bu yerda bekor qilish oqimi ishlaydi (natija: `CANCELLED`), keyin
+   * mavjud qaytarish/skaner oqimi uni `CANCELLED_SENT` → `CLOSED` ga olib
+   * boradi.
+   */
+  async markReturnedByElchi(
+    orderId: string,
+    elchiCourierUserId: string,
+  ): Promise<ExternalTerminalResult> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      this.logger.warn(`Elchi webhook returned: order topilmadi (${orderId})`);
+      return { kind: 'skipped', reason: 'order_not_found' };
+    }
+
+    if (
+      order.status === Order_status.CANCELLED ||
+      order.status === Order_status.CANCELLED_SENT ||
+      order.status === Order_status.CLOSED
+    ) {
+      return { kind: 'skipped', reason: `already ${order.status}` };
+    }
+
+    if (
+      order.status === Order_status.SOLD ||
+      order.status === Order_status.PAID ||
+      order.status === Order_status.PARTLY_PAID
+    ) {
+      const reason = `Elchi: posilkani qaytardi, lekin bizda status=${order.status} (pul kassada — qo'lda tekshiring)`;
+      this.logger.error(`ELCHI MISMATCH returned: order=${orderId}`);
+      this.logElchiMismatch(order, 'returned', reason);
+      return { kind: 'mismatch', reason };
+    }
+
+    if (
+      order.status === Order_status.ON_THE_ROAD ||
+      order.status === Order_status.RECEIVED
+    ) {
+      await this.orderRepo.update(
+        {
+          id: orderId,
+          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+        },
+        { status: Order_status.WAITING },
+      );
+    }
+
+    await this.cancelOrder(
+      this.elchiActor(elchiCourierUserId),
+      orderId,
+      { comment: 'Elchi posilkani qaytardi', extraCost: 0 },
+      { bypassControlGuard: true },
+    );
     return { kind: 'applied' };
   }
 

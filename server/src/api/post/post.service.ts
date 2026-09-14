@@ -39,6 +39,10 @@ import { normalizeQrToken } from 'src/infrastructure/lib/qr-token/normalize';
 import { PostDto } from './dto/postId.dto';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
+import {
+  ELCHI_PROVIDER,
+  ElchiShipmentService,
+} from '../elchi-cargo/elchi-shipment.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { BotService } from '../bots/notify-bot/bot.service';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
@@ -93,6 +97,7 @@ export class PostService {
     private readonly dataSource: DataSource,
     private readonly activityLog: ActivityLogService,
     private readonly ldgShipmentService: LdgShipmentService,
+    private readonly elchiShipmentService: ElchiShipmentService,
     private readonly botService: BotService,
   ) {}
 
@@ -121,6 +126,32 @@ export class PostService {
         await new Promise((resolve) =>
           setTimeout(resolve, LDG_DISPATCH_DELAY_MS),
         );
+      }
+    })();
+  }
+
+  /**
+   * Buyurtmalarni Elchi'ga ketma-ket uzatadi (fire-and-forget).
+   *
+   * Pochta jo'natish tranzaksiyasidan KEYIN ishlaydi: Elchi javob bermasa ham
+   * pochta jo'natilgan bo'lib qoladi va buyurtmalar `ON_THE_ROAD`da turadi —
+   * keyin qo'lda qayta jo'natish yoki solishtiruvchi CRON tuzatadi. Xato
+   * `elchi_shipment.last_error`ga yoziladi.
+   *
+   * Pauza kerak EMAS: `ElchiApiService` ichida global navbat bor (600ms) —
+   * qancha oqim bo'lsa ham Elchi rate-limitidan oshmaydi.
+   */
+  private dispatchOrdersToElchi(orderIds: string[]): void {
+    void (async () => {
+      for (const orderId of orderIds) {
+        try {
+          await this.elchiShipmentService.createShipmentForOrder(orderId);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(
+            `Elchi'ga jo'natish muvaffaqiyatsiz (order=${orderId}): ${msg}`,
+          );
+        }
       }
     })();
   }
@@ -881,6 +912,22 @@ export class PostService {
           'Tanlangan buyurtmalar bu pochtada topilmadi',
         );
 
+      /**
+       * ELCHI HUDUD DARVOZASI — yozuvlardan OLDIN, tranzaksiya ichida.
+       *
+       * Bu yerda bo'lishi MUHIM: agar keyinroq tekshirsak, buyurtmalar
+       * allaqachon `ON_THE_ROAD` bo'lib qolgan bo'ladi va bloklash "yetim"
+       * buyurtmalar qoldiradi (pochtada turadi, hech kim yetkazmaydi).
+       *
+       * Qoida: hammasi yoki hech biri. Bitta ruxsatsiz tuman butun pochtani
+       * bloklaydi — qisman jo'natish ataylab YO'Q.
+       */
+      if (courier.external_provider === ELCHI_PROVIDER) {
+        await this.elchiShipmentService.assertDistrictsAllowedForPost(
+          newOrders,
+        );
+      }
+
       // Agar ba'zi orderlar allaqachon boshqa device tomonidan jo'natilgan bo'lsa,
       // faqat mavjud orderlar bilan davom etamiz (xato otmaymiz).
 
@@ -1005,6 +1052,13 @@ export class PostService {
       // jo'natishni o'zi tanlaydi — tuman bo'yicha avtomatik filtr yo'q.
       if (courier.external_provider === 'ldg') {
         this.dispatchOrdersToLdg(newOrders.map((o) => o.id));
+      }
+
+      // Elchi dispatch — LDG bilan bir xil naqsh: kuryer `external_provider`
+      // bo'yicha tanlanadi, tuman bo'yicha AVTOMATIK routing YO'Q (operator
+      // qo'lda tanlaydi, darvoza esa faqat bloklaydi).
+      if (courier.external_provider === ELCHI_PROVIDER) {
+        this.dispatchOrdersToElchi(newOrders.map((o) => o.id));
       }
 
       return successRes(

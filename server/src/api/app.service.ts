@@ -79,6 +79,13 @@ export default class Application {
       express.raw({ type: 'application/json', limit: '5mb' }),
     );
 
+    // ✅ Elchi webhook uchun ham RAW body — xuddi shu sabab (HMAC-SHA256 imzo
+    // original byte streamni talab qiladi). Bu ham express.json() dan OLDIN.
+    app.use(
+      '/api/v1/elchi/webhook',
+      express.raw({ type: 'application/json', limit: '5mb' }),
+    );
+
     // ✅ Body size limit (katta JSON payloadlar uchun - external orders)
     app.use(express.json({ limit: '50mb' }));
     app.use(express.urlencoded({ limit: '50mb', extended: true }));
