@@ -23,6 +23,8 @@ function buildSvc(
     geo?: { elchi_district_id: string; elchi_region_id: string | null } | null;
     allowedDistricts?: Set<string>;
     createShipmentImpl?: jest.Mock;
+    /** Pochtadagi buyurtmalar soni — qop hajmi zaxirasi uchun. */
+    postOrderCount?: number;
     cancelShipmentImpl?: jest.Mock;
     ordersForPreview?: Array<Record<string, unknown>>;
     shipmentsForPost?: Array<Record<string, unknown>>;
@@ -48,6 +50,12 @@ function buildSvc(
     findOne: jest.fn().mockResolvedValue(over.courier ?? null),
   };
   svc.orderRepo = {
+    /**
+     * ⚠️ `count` — QOP HAJMI zaxirasi uchun. Chaqiruvchi hajmni bermasa
+     * (qayta jo'natish yo'li), servis pochtadagi buyurtmalarni sanaydi.
+     * Mockda bo'lmasa `this.orderRepo.count is not a function` chiqadi.
+     */
+    count: jest.fn().mockResolvedValue(over.postOrderCount ?? 5),
     findOne: jest.fn().mockResolvedValue(
       over.order === undefined
         ? {
@@ -676,13 +684,51 @@ describe('⭐ createShipmentForOrder — qop (batch) ma`lumoti', () => {
     expect(callBody(createShipment).batch_ref).toBe('post-78');
   });
 
-  it('qop hajmi berilmasa `undefined` — 0 YUBORILMAYDI', async () => {
+  it('⭐ qop hajmi berilmasa POCHTADAN sanaladi (qayta jo`natish yo`li)', async () => {
+    /**
+     * ⚠️ NEGA ZAXIRA KERAK. Asosiy yo'l (`dispatchOrdersToElchi`) hajmni
+     * uzatadi, lekin QAYTA JO'NATISH bitta buyurtma bilan chaqiriladi va
+     * hajmni BILMAYDI. Zaxira bo'lmasa o'sha buyurtma Elchi tomonida
+     * `batch_size = null` bo'lib qolardi — bitta qopdagi buyurtmalar HAR
+     * XIL hajm ko'rsatardi va "11/12" hisobi ishonchsiz bo'lardi.
+     *
+     * Bu real jo'natishda ko'rindi: `dispatch-retry` dan keyin Elchi
+     * bazasida `external_batch_size` bo'sh qoldi.
+     */
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({
+      createShipmentImpl: createShipment,
+      postOrderCount: 7,
+    });
+
+    await svc.createShipmentForOrder('o-1');
+
+    expect(callBody(createShipment).batch_size).toBe(7);
+  });
+
+  it('BERILGAN hajm ustun — pochtadan sanalmaydi', async () => {
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({
+      createShipmentImpl: createShipment,
+      postOrderCount: 7,
+    });
+
+    await svc.createShipmentForOrder('o-1', undefined, { size: 12 });
+
+    // Chaqiruvchi aytgan son ANIQROQ: u aynan jo'natilayotganlarni biladi.
+    expect(callBody(createShipment).batch_size).toBe(12);
+  });
+
+  it('⭐ pochta bo`sh bo`lsa `undefined` — 0 YUBORILMAYDI', async () => {
     /**
      * 0 "qopda nol posilka" degan ma'noli da'vo bo'lardi va Elchi
      * "hech narsa yetmadi" deb ko'rsatardi.
      */
     const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
-    const { svc } = buildSvc({ createShipmentImpl: createShipment });
+    const { svc } = buildSvc({
+      createShipmentImpl: createShipment,
+      postOrderCount: 0,
+    });
 
     await svc.createShipmentForOrder('o-1');
 

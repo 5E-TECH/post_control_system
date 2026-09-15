@@ -265,6 +265,31 @@ export class ElchiShipmentService {
    * BeePost UI'dan sotish/bekor BLOKLANADI (pul ikki daftarda paydo
    * bo'lishining oldini oladi).
    */
+  /**
+   * QOP HAJMI — chaqiruvchidan kelmasa POCHTADAN sanaladi.
+   *
+   * ⚠️ NEGA ZAXIRA KERAK. Asosiy yo'l (`dispatchOrdersToElchi`) hajmni
+   * o'zi biladi va uzatadi. Lekin QAYTA JO'NATISH yo'li (`dispatch-retry`,
+   * solishtiruv) bitta buyurtma bilan chaqiriladi va hajmni BILMAYDI.
+   * Zaxira bo'lmasa o'sha buyurtma Elchi tomonida `batch_size = null`
+   * bo'lib qolardi — ya'ni bitta qopdagi buyurtmalar HAR XIL hajm
+   * ko'rsatardi va "11/12" hisobi ishonchsiz bo'lardi.
+   *
+   * Pochtadagi buyurtmalar soni to'g'ri zaxira: pochta Elchi kuryeriga
+   * biriktirilgan bo'lsa, undagi HAMMA buyurtma Elchi'ga ketadi.
+   */
+  private async resolveBatchSize(
+    postId: string | null | undefined,
+    given?: number,
+  ): Promise<number | undefined> {
+    if (given && given > 0) return given;
+    if (!postId) return undefined;
+    const count = await this.orderRepo.count({
+      where: { post_id: postId },
+    });
+    return count > 0 ? count : undefined;
+  }
+
   async createShipmentForOrder(
     orderId: string,
     actor?: JwtPayload,
@@ -446,7 +471,7 @@ export class ElchiShipmentService {
         batch_ref: order.post_id ? String(order.post_id) : undefined,
         batch_label_token:
           String(order.post?.qr_code_token ?? '').trim() || undefined,
-        batch_size: batch?.size,
+        batch_size: await this.resolveBatchSize(order.post_id, batch?.size),
       });
 
       const remoteId = String(response?.shipment_id ?? '').trim();
