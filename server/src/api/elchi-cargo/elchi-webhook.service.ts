@@ -355,10 +355,15 @@ export class ElchiWebhookService {
               shipment.order_id,
               courierId,
             )
-          : await this.orderService.markReturnedByElchi(
-              shipment.order_id,
-              courierId,
-            );
+          : mapping.terminal_action === 'rollback'
+            ? await this.orderService.markRolledBackByElchi(
+                shipment.order_id,
+                courierId,
+              )
+            : await this.orderService.markReturnedByElchi(
+                shipment.order_id,
+                courierId,
+              );
 
     if (result.kind === 'mismatch') {
       // Nomuvofiqlikni posilkaga ham yozamiz — admin paneldagi "Nomuvofiqlik"

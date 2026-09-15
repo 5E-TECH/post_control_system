@@ -768,9 +768,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // tomon ham raqamlargacha normallashtirib solishtiriladi.
         const recentDuplicate = recentCandidates.find(
           (cand) =>
-            (cand.customer?.phone_number || '')
-              .replace(/\D/g, '')
-              .slice(-9) === dedupPhone9 &&
+            (cand.customer?.phone_number || '').replace(/\D/g, '').slice(-9) ===
+              dedupPhone9 &&
             cartSignature(
               (cand.items || []).map((it) => ({
                 productId: it.productId,
@@ -1602,7 +1601,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           courier_tariff: editingOrder.courier_tariff,
         };
         const oldChanged: Record<string, any> = {};
-        const newChanged: Record<string, any> = { order_number: editingOrder.order_number };
+        const newChanged: Record<string, any> = {
+          order_number: editingOrder.order_number,
+        };
         for (const key of Object.keys(afterEdit)) {
           if (
             JSON.stringify((beforeEdit as any)[key]) !==
@@ -2454,7 +2455,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
     oldOrder.canceled_post_id = canceledPost.id;
     // Faqat dona — narx EMAS (settled revenue qayta sanalmasin)
-    canceledPost.order_quantity = (Number(canceledPost.order_quantity) || 0) + 1;
+    canceledPost.order_quantity =
+      (Number(canceledPost.order_quantity) || 0) + 1;
     await manager.save(canceledPost);
   }
 
@@ -2870,7 +2872,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           const returnGroup = await this.dataSource
             .getRepository(TelegramEntity)
             .findOne({
-              where: { market_id: order.user_id, group_type: Group_type.CANCEL },
+              where: {
+                market_id: order.user_id,
+                group_type: Group_type.CANCEL,
+              },
             });
           await this.botService.sendMessageToGroup(
             returnGroup?.group_id || null,
@@ -2924,7 +2929,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // Egalik tekshiruvi: faqat buyurtma biriktirilgan kurier bekor qila oladi
-      await this.assertCourierOwnsOrder(queryRunner.manager, order, currentUser);
+      await this.assertCourierOwnsOrder(
+        queryRunner.manager,
+        order,
+        currentUser,
+      );
 
       // Holat qo'riqlovchisi: allaqachon yakunlangan/moliyaviy hisoblangan
       // buyurtmani qayta bekor qilishga yo'l qo'ymaymiz. Aks holda SOLD buyurtma
@@ -3859,10 +3868,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // Egalik tekshiruvi: kurier faqat o'ziga biriktirilgan buyurtmani
       // qaytara oladi. SUPERADMIN uchun cheklov yo'q.
-      if (
-        user.role === Roles.COURIER &&
-        order.post?.courier_id !== user.id
-      ) {
+      if (user.role === Roles.COURIER && order.post?.courier_id !== user.id) {
         throw new ForbiddenException('Bu buyurtma sizga tegishli emas');
       }
 
@@ -6009,7 +6015,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           },
           description: `Buyurtma #${o.order_number} "${integration.name}" integratsiyasidan qabul qilindi — ${o.total_price} so'm`,
           user,
-          metadata: { source: 'external_integration', integration: integration.name },
+          metadata: {
+            source: 'external_integration',
+            integration: integration.name,
+          },
         });
       }
 
@@ -6298,7 +6307,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     );
     if ((res.affected ?? 0) === 0) {
       const fresh = await this.orderRepo.findOne({ where: { id: orderId } });
-      return { kind: 'skipped', reason: `race: now ${fresh?.status ?? 'unknown'}` };
+      return {
+        kind: 'skipped',
+        reason: `race: now ${fresh?.status ?? 'unknown'}`,
+      };
     }
 
     this.activityLog.log({
@@ -6635,6 +6647,89 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
    * mavjud qaytarish/skaner oqimi uni `CANCELLED_SENT` → `CLOSED` ga olib
    * boradi.
    */
+  /**
+   * ELCHI SOTUVNI ORQAGA QAYTARDI (rollback) — qabul mezoni №5.
+   *
+   * ⚠️ NIMA BUZILGAN EDI. Elchi sotilgan buyurtmani `WAITING`ga qaytarsa,
+   * webhook kelardi, imzo tekshirilardi, jurnalga "success" yozilardi — va
+   * SHU YERDA TO'XTARDI. `waiting` statusining `terminal_action` i `null`
+   * edi, ya'ni buyurtma holatiga tegilmasdi va `mismatch_at` ham
+   * qo'yilmasdi. Natija: PCS'da buyurtma SOLD qolardi, pul virtual kuryer
+   * kassasida qolardi, Elchi'da esa WAITING. Hech kim bilmasdi — hujjat
+   * buni R1 (pul desinxroni) deb atagan.
+   *
+   * ⚠️ NEGA `waiting` STATUSIGA TERMINAL AMAL QO'YISH XAVFSIZ.
+   * `waiting` ODDIY OQIMDA HAM keladi (kuryer pochtani qabul qilganda).
+   * Shuning uchun rollback STATUSDAN emas, O'TISHDAN aniqlanadi: faqat
+   * BIZDA allaqachon sotilgan bo'lsa qaytarish bajariladi. Oldinga
+   * yo'nalishdagi `waiting` — `skipped`, ya'ni hech narsa qilinmaydi.
+   *
+   * ⚠️ NEGA AVTOMATIK QAYTARISH (bekor qilishdan FARQLI). `markCancelledByElchi`
+   * ataylab avtomatik qaytarmaydi va nomuvofiqlik deb belgilaydi — chunki
+   * "Elchi bekor qildi, biz sotdik" holatida KIM HAQ ekani noaniq. Rollback
+   * esa boshqacha: Elchi O'ZINING sotuvini bekor qiladi, va bizdagi SOLD
+   * aynan o'sha sotuvdan kelgan. Ya'ni Elchi o'z holati bo'yicha haqiqat
+   * manbai va taxmin qilinadigan narsa yo'q.
+   *
+   * `bypassControlGuard` aynan shu yo'l uchun mavjud: `assertControlAllowed`
+   * tashqi tizim nazoratidagi buyurtmani qaytarishni to'sadi, lekin bu
+   * yerda buyruq o'sha tashqi tizimning O'ZIDAN keladi.
+   */
+  async markRolledBackByElchi(
+    orderId: string,
+    elchiCourierUserId: string,
+  ): Promise<ExternalTerminalResult> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      this.logger.warn(`Elchi webhook rollback: order topilmadi (${orderId})`);
+      return { kind: 'skipped', reason: 'order_not_found' };
+    }
+
+    /**
+     * ODDIY OQIM — hech narsa qilinmaydi. Bu eng muhim shox: busiz har bir
+     * "kuryer pochtani qabul qildi" hodisasi rollback'ni ishga tushirardi.
+     */
+    if (
+      order.status !== Order_status.SOLD &&
+      order.status !== Order_status.PAID &&
+      order.status !== Order_status.PARTLY_PAID
+    ) {
+      return { kind: 'skipped', reason: `oldinga oqim (${order.status})` };
+    }
+
+    try {
+      /**
+       * Tizim nomidan bajariladi (odam emas), shu bois SUPERADMIN roli:
+       * kuryer roli bo'lsa egalik va status tekshiruvlari noto'g'ri
+       * ishlardi. Qaytarishning o'zi tranzaksiya va pessimistik lock
+       * bilan himoyalangan.
+       */
+      await this.rollbackOrderToWaiting(
+        {
+          id: elchiCourierUserId,
+          role: Roles.SUPERADMIN,
+        } as JwtPayload,
+        orderId,
+        { comment: 'Elchi sotuvni orqaga qaytardi (webhook)' } as never,
+        { bypassControlGuard: true },
+      );
+      this.logger.log(`Elchi rollback qo'llandi: order=${orderId}`);
+      return { kind: 'applied' };
+    } catch (error) {
+      /**
+       * Qaytarish yiqilsa JIM QOLMAYMIZ — nomuvofiqlik deb belgilanadi va
+       * admin panelidagi "Nomuvofiqlik" filtriga tushadi. Aks holda pul
+       * kassada, Elchi'da esa WAITING bo'lib, farq jimgina qolardi.
+       */
+      const reason = `Elchi rollback qo'llanmadi: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+      this.logger.error(`ELCHI MISMATCH rollback: order=${orderId}`);
+      this.logElchiMismatch(order, 'rollback', reason);
+      return { kind: 'mismatch', reason };
+    }
+  }
+
   async markReturnedByElchi(
     orderId: string,
     elchiCourierUserId: string,
@@ -6719,7 +6814,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         failed.push({
           id: orderId,
           reason:
-            "Almashtirish buyurtmasi — eskisini olib, bittalab soting (avto-sotilmaydi)",
+            'Almashtirish buyurtmasi — eskisini olib, bittalab soting (avto-sotilmaydi)',
         });
         continue;
       }
@@ -6960,7 +7055,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }));
 
       return successRes(
-        { data: items, total, page, limit, totalPages: Math.ceil(total / limit) },
+        {
+          data: items,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
         200,
         'Replacement returns',
       );

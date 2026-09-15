@@ -32,7 +32,7 @@ describe('verifyElchiSignature', () => {
     expect(res.usedPreviousSecret).toBe(true);
   });
 
-  it("`sha256=` prefiksi bilan ham qabul qiladi", () => {
+  it('`sha256=` prefiksi bilan ham qabul qiladi', () => {
     const res = verifyElchiSignature(
       body,
       `sha256=${sign(body, SECRET)}`,
@@ -70,20 +70,41 @@ describe('verifyElchiSignature', () => {
 });
 
 describe('mapElchiStatus', () => {
-  it("oraliq statuslar terminal EMAS", () => {
+  it('oraliq statuslar terminal EMAS', () => {
     for (const s of ['created', 'new', 'received']) {
       const m = mapElchiStatus(s)!;
       expect(m.order_status).toBe(Order_status.ON_THE_ROAD);
       expect(m.terminal_action).toBeNull();
     }
-    for (const s of ['on the road', 'waiting', 'waiting_customer']) {
+    for (const s of ['on the road', 'waiting_customer']) {
       const m = mapElchiStatus(s)!;
       expect(m.order_status).toBe(Order_status.WAITING);
       expect(m.terminal_action).toBeNull();
     }
   });
 
-  it("sold / paid / partly_paid -> sotuv oqimi", () => {
+  it('⭐ `waiting` — ROLLBACK amali, lekin SHARTLI (qabul mezoni №5)', () => {
+    /**
+     * `waiting` IKKI XIL ma'noda keladi:
+     *   oldinga — kuryer pochtani qabul qildi (oddiy oqim);
+     *   orqaga  — Elchi sotilgan buyurtmani qaytardi.
+     *
+     * Ilgari `terminal_action: null` edi, ya'ni rollback UMUMAN
+     * qo'llanmasdi: PCS'da buyurtma SOLD qolardi, pul kassada qolardi,
+     * Elchi'da esa WAITING — hech kim bilmasdi.
+     *
+     * Endi amal bor, lekin ajratish `markRolledBackByElchi` ichida:
+     * faqat BIZDA sotilgan bo'lsa qaytariladi, aks holda `skipped`.
+     * Shu bois oddiy oqim BUZILMAYDI.
+     */
+    const m = mapElchiStatus('waiting')!;
+    expect(m.order_status).toBe(Order_status.WAITING);
+    expect(m.terminal_action).toBe('rollback');
+    // Terminal EMAS: buyurtma yana sotilishi mumkin (mezon №6).
+    expect(m.is_terminal).toBe(false);
+  });
+
+  it('sold / paid / partly_paid -> sotuv oqimi', () => {
     for (const s of ['sold', 'paid', 'partly_paid']) {
       const m = mapElchiStatus(s)!;
       expect(m.order_status).toBe(Order_status.SOLD);
@@ -122,11 +143,21 @@ describe('mapElchiStatus', () => {
 
   // MODUL INVARIANTI: hech qanday Elchi statusi bizni CLOSED qila olmaydi.
   // CLOSED faqat skaner oqimidan qo'yiladi (LDG'da aynan shu xato bo'lgan).
-  it("HECH BIR status CLOSED bermaydi", () => {
+  it('HECH BIR status CLOSED bermaydi', () => {
     const all = [
-      'created', 'new', 'received', 'on the road', 'waiting',
-      'waiting_customer', 'sold', 'paid', 'partly_paid', 'cancelled',
-      'cancelled (sent)', 'returned_to_market', 'closed',
+      'created',
+      'new',
+      'received',
+      'on the road',
+      'waiting',
+      'waiting_customer',
+      'sold',
+      'paid',
+      'partly_paid',
+      'cancelled',
+      'cancelled (sent)',
+      'returned_to_market',
+      'closed',
     ];
     for (const s of all) {
       const m = mapElchiStatus(s);
