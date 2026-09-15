@@ -268,10 +268,25 @@ export class ElchiShipmentService {
   async createShipmentForOrder(
     orderId: string,
     actor?: JwtPayload,
+    /**
+     * QOP (batch) ma'lumoti — bitta pochtada ketayotgan posilkalar guruhi.
+     *
+     * ⚠️ `batchSize` CHAQIRUVCHIDAN keladi, bu yerda sanalmaydi. Sabab:
+     * jo'natish har posilka uchun alohida chaqiriladi va bu yerda "qopda
+     * jami nechta" degan ma'lumot YO'Q. Chaqiruvchi (`dispatchOrdersToElchi`)
+     * uni biladi — u butun ro'yxatni oladi.
+     */
+    batch?: { size?: number },
   ): Promise<ElchiShipmentEntity> {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
-      relations: ['items', 'items.product', 'customer', 'district'],
+      /**
+       * ⚠️ `post` relationi QOP YORLIG'I uchun kerak. Elchi tomonida
+       * operator qop ustidagi umumiy yorliqni skanerlaydi va butun qop
+       * qabul qilinadi — busiz u 12 posilkani bittalab skanerlashga
+       * majbur bo'lardi.
+       */
+      relations: ['items', 'items.product', 'customer', 'district', 'post'],
     });
     if (!order) {
       throw new NotFoundException(`Order topilmadi: ${orderId}`);
@@ -416,6 +431,22 @@ export class ElchiShipmentService {
          * bois bu holat faqat haqiqiy to'qnashuvda yuz beradi.
          */
         label_token: String(order.qr_code_token ?? '').trim() || undefined,
+        /**
+         * QOP — Elchi kiruvchi ekranida guruhlash va qop yorlig'ini
+         * skanerlash uchun.
+         *
+         * `batch_ref`         — bizdagi pochta id'si (guruhlash kaliti)
+         * `batch_label_token` — POCHTA ustidagi QR (bitta skan, butun qop)
+         * `batch_size`        — shu qopda ketayotgan posilka soni
+         *
+         * ⚠️ `post.qr_code_token` — aynan bizning pochta stikerida chop
+         * etiladigan token. Boshqa qiymat yuborilsa Elchi operatori
+         * skanerlagan yorliq mos kelmasdi.
+         */
+        batch_ref: order.post_id ? String(order.post_id) : undefined,
+        batch_label_token:
+          String(order.post?.qr_code_token ?? '').trim() || undefined,
+        batch_size: batch?.size,
       });
 
       const remoteId = String(response?.shipment_id ?? '').trim();

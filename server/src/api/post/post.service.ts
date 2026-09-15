@@ -143,9 +143,26 @@ export class PostService {
    */
   private dispatchOrdersToElchi(orderIds: string[]): void {
     void (async () => {
+      /**
+       * QOP HAJMI — Elchi operatori "12 posilka kelayotgan edi, 11 tasi
+       * yetdi" holatini ko'rishi uchun.
+       *
+       * ⚠️ AYNAN SHU YERDA sanaladi, `createShipmentForOrder` ichida emas:
+       * u har posilka uchun alohida chaqiriladi va "qopda jami nechta"
+       * degan ma'lumot faqat bu yerda — butun ro'yxat qo'lda.
+       *
+       * ⚠️ Elchi tomonida bu qiymat BIZ AYTGAN son bo'lib saqlanadi va
+       * ular sanagan son bilan solishtiriladi. Shu bois jo'natishga
+       * ketayotgan HAQIQIY son berilishi kerak.
+       */
+      const batch = { size: orderIds.length };
       for (const orderId of orderIds) {
         try {
-          await this.elchiShipmentService.createShipmentForOrder(orderId);
+          await this.elchiShipmentService.createShipmentForOrder(
+            orderId,
+            undefined,
+            batch,
+          );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           this.logger.warn(
@@ -1459,9 +1476,7 @@ export class PostService {
         throw new NotFoundException('Buyurtma topilmadi');
       }
       if (!order.post_id) {
-        throw new BadRequestException(
-          'Bu buyurtma pochtaga biriktirilmagan',
-        );
+        throw new BadRequestException('Bu buyurtma pochtaga biriktirilmagan');
       }
 
       const post = await queryRunner.manager.findOne(PostEntity, {
@@ -1553,9 +1568,7 @@ export class PostService {
         );
       }
       if (!order.return_requested) {
-        throw new BadRequestException(
-          "Bu buyurtmada qaytarish so'rovi yo'q",
-        );
+        throw new BadRequestException("Bu buyurtmada qaytarish so'rovi yo'q");
       }
 
       order.return_requested = false;
@@ -1770,7 +1783,11 @@ export class PostService {
       }
 
       return successRes(
-        { post_id: canceledPost.id, count: orderIds.length, order_ids: orderIds },
+        {
+          post_id: canceledPost.id,
+          count: orderIds.length,
+          order_ids: orderIds,
+        },
         200,
         `${orderIds.length} ta bekor qilingan buyurtma pochtaga yuborildi`,
       );

@@ -91,6 +91,16 @@ export interface ElchiCreateShipmentRequest {
    * Elchi tomonda noyoblik tekshiriladi: band bo'lsa 409.
    */
   label_token?: string;
+  /**
+   * QOP (batch) — bitta pochtada ketayotgan posilkalar guruhi.
+   *
+   * Elchi kiruvchi ekranida guruhlash uchun, va eng muhimi: operator QOP
+   * ustidagi umumiy yorliqni skanerlaganda butun qop qabul qilinadi.
+   * Busiz u 12 posilkani bittalab skanerlashga majbur bo'lardi.
+   */
+  batch_ref?: string;
+  batch_label_token?: string;
+  batch_size?: number;
 }
 
 export interface ElchiCreateShipmentResponse {

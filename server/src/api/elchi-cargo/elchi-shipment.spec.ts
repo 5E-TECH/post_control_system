@@ -33,18 +33,16 @@ function buildSvc(
   const svc: any = Object.create(ElchiShipmentService.prototype);
 
   svc.configRepo = {
-    findOne: jest
-      .fn()
-      .mockResolvedValue(
-        over.config === undefined
-          ? {
-              id: 'cfg',
-              is_active: true,
-              elchi_market_id: '500',
-              elchi_courier_user_id: null,
-            }
-          : over.config,
-      ),
+    findOne: jest.fn().mockResolvedValue(
+      over.config === undefined
+        ? {
+            id: 'cfg',
+            is_active: true,
+            elchi_market_id: '500',
+            elchi_courier_user_id: null,
+          }
+        : over.config,
+    ),
   };
   svc.userRepo = {
     findOne: jest.fn().mockResolvedValue(over.courier ?? null),
@@ -595,5 +593,99 @@ describe('⭐ createShipmentForOrder — yorliq tokeni (label_token)', () => {
     await svc.createShipmentForOrder('o-1');
 
     expect(createShipment.mock.calls[0][0].label_token).toBeUndefined();
+  });
+});
+
+/**
+ * QOP (batch) MA'LUMOTI — Elchi kiruvchi ekranida guruhlash va qop
+ * yorlig'ini skanerlash uchun.
+ *
+ * ⚠️ NEGA KERAK. Elchi operatori 12 posilkani BITTALAB skanerlashga majbur
+ * edi, va "12 kelayotgan edi, 11 yetdi" holatini KO'RMASDI. Endi qop
+ * ustidagi umumiy yorliq bitta skan bilan butun qopni qabul qiladi.
+ */
+describe('⭐ createShipmentForOrder — qop (batch) ma`lumoti', () => {
+  const callBody = (mock: jest.Mock) => mock.mock.calls[0][0];
+
+  it('⭐ `batch_label_token` = POCHTA stikeridagi token', async () => {
+    /**
+     * ⚠️ Aynan `post.qr_code_token` — bizning pochta stikerida chop
+     * etiladigan token. Boshqa qiymat yuborilsa Elchi operatori
+     * skanerlagan yorliq mos kelmasdi.
+     */
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({
+      createShipmentImpl: createShipment,
+      order: {
+        id: 'o-1',
+        order_number: 11,
+        status: Order_status.RECEIVED,
+        post_id: 'post-77',
+        post: { id: 'post-77', qr_code_token: 'QOP-STIKER-77' },
+        district_id: 'd-1',
+        district: { name: 'Chilonzor' },
+        where_deliver: Where_deliver.CENTER,
+        to_be_paid: 0,
+        total_price: 100000,
+        customer: { name: 'Test', phone_number: '+998901112233' },
+        items: [],
+        qr_code_token: 'PCS-LABEL-11',
+      },
+    });
+
+    await svc.createShipmentForOrder('o-1', undefined, { size: 12 });
+
+    const body = callBody(createShipment);
+    expect(body.batch_label_token).toBe('QOP-STIKER-77');
+    expect(body.batch_ref).toBe('post-77');
+    expect(body.batch_size).toBe(12);
+    // Posilka yorlig'i ALOHIDA maydon — ikkisi aralashmasligi kerak.
+    expect(body.label_token).toBe('PCS-LABEL-11');
+  });
+
+  it('pochta tokeni yo`q bo`lsa `undefined` — bo`sh satr yuborilmaydi', async () => {
+    /**
+     * Bo'sh satr yuborilsa Elchi tomonida barcha qopsiz posilkalar BITTA
+     * soxta qopga yig'ilib qolardi — va qop skani ularning hammasini
+     * qabul qilib yuborardi.
+     */
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({
+      createShipmentImpl: createShipment,
+      order: {
+        id: 'o-1',
+        order_number: 12,
+        status: Order_status.RECEIVED,
+        post_id: 'post-78',
+        post: { id: 'post-78', qr_code_token: '   ' },
+        district_id: 'd-1',
+        district: { name: 'Chilonzor' },
+        where_deliver: Where_deliver.CENTER,
+        to_be_paid: 0,
+        total_price: 100000,
+        customer: { name: 'Test', phone_number: '+998901112233' },
+        items: [],
+        qr_code_token: 'PCS-LABEL-12',
+      },
+    });
+
+    await svc.createShipmentForOrder('o-1', undefined, { size: 3 });
+
+    expect(callBody(createShipment).batch_label_token).toBeUndefined();
+    // `batch_ref` esa qoladi — guruhlash pochta id'si bilan ham ishlaydi.
+    expect(callBody(createShipment).batch_ref).toBe('post-78');
+  });
+
+  it('qop hajmi berilmasa `undefined` — 0 YUBORILMAYDI', async () => {
+    /**
+     * 0 "qopda nol posilka" degan ma'noli da'vo bo'lardi va Elchi
+     * "hech narsa yetmadi" deb ko'rsatardi.
+     */
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({ createShipmentImpl: createShipment });
+
+    await svc.createShipmentForOrder('o-1');
+
+    expect(callBody(createShipment).batch_size).toBeUndefined();
   });
 });
