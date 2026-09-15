@@ -18,15 +18,17 @@ import { ElchiReconcileService } from './elchi-reconcile.service';
  *   - hammasi mos bo'lsa SOXTA nomuvofiqlik chiqmaydi;
  *   - qo'llash mantiqi webhook bilan AYNI (`applyStatusUpdate`).
  */
-function buildSvc(over: {
-  config?: unknown;
-  shipments?: Array<Record<string, unknown>>;
-  remoteStatus?: string | ((id: string) => string);
-  getShipmentImpl?: jest.Mock;
-  applyImpl?: jest.Mock;
-  order?: Record<string, unknown> | null;
-  courier?: Record<string, unknown> | null;
-} = {}) {
+function buildSvc(
+  over: {
+    config?: unknown;
+    shipments?: Array<Record<string, unknown>>;
+    remoteStatus?: string | ((id: string) => string);
+    getShipmentImpl?: jest.Mock;
+    applyImpl?: jest.Mock;
+    order?: Record<string, unknown> | null;
+    courier?: Record<string, unknown> | null;
+  } = {},
+) {
   const touched: string[] = [];
   const applyCalls: any[] = [];
   const svc: any = Object.create(ElchiReconcileService.prototype);
@@ -73,11 +75,13 @@ function buildSvc(over: {
     ),
   };
   svc.userRepo = {
-    findOne: jest.fn().mockResolvedValue(
-      over.courier === undefined
-        ? { id: 'c-1', tariff_center: 15000, tariff_home: 25000 }
-        : over.courier,
-    ),
+    findOne: jest
+      .fn()
+      .mockResolvedValue(
+        over.courier === undefined
+          ? { id: 'c-1', tariff_center: 15000, tariff_home: 25000 }
+          : over.courier,
+      ),
   };
   svc.api = {
     getShipment:
@@ -206,7 +210,7 @@ describe('ElchiReconcileService — solishtirish', () => {
     expect(touched).toContain('s-1');
   });
 
-  it("status normalizatsiya bilan solishtiriladi (SOLD == sold)", async () => {
+  it('status normalizatsiya bilan solishtiriladi (SOLD == sold)', async () => {
     const { svc, applyCalls } = buildSvc({
       shipments: [shipment({ elchi_status: 'SOLD' })],
       remoteStatus: '  sold ',
@@ -218,7 +222,7 @@ describe('ElchiReconcileService — solishtirish', () => {
     expect(applyCalls).toHaveLength(0);
   });
 
-  it("Elchi status qaytarmasa -> tegilmaydi, belgi yangilanadi", async () => {
+  it('Elchi status qaytarmasa -> tegilmaydi, belgi yangilanadi', async () => {
     const { svc, applyCalls, touched } = buildSvc({
       shipments: [shipment()],
       remoteStatus: '',
@@ -232,9 +236,12 @@ describe('ElchiReconcileService — solishtirish', () => {
   });
 
   // Bitta muammoli posilka navbatni bloklab qo'ymasligi kerak.
-  it("bitta posilka xato bersa -> qolganlari tekshirilishda davom etadi", async () => {
+  it('bitta posilka xato bersa -> qolganlari tekshirilishda davom etadi', async () => {
     const { svc, touched } = buildSvc({
-      shipments: [shipment({ id: 's-1' }), shipment({ id: 's-2', order_id: 'o-2' })],
+      shipments: [
+        shipment({ id: 's-1' }),
+        shipment({ id: 's-2', order_id: 'o-2' }),
+      ],
       getShipmentImpl: jest.fn((id: string) => {
         void id;
         return Promise.reject(new Error('Elchi 500'));
@@ -278,7 +285,11 @@ describe('ElchiReconcileService — bitta posilkani sinxronlash', () => {
     const { svc } = buildSvc({ shipments: [] });
     svc.shipmentRepo.findOne = jest
       .fn()
-      .mockResolvedValue({ id: 's-1', order_id: 'o-1', elchi_shipment_id: null });
+      .mockResolvedValue({
+        id: 's-1',
+        order_id: 'o-1',
+        elchi_shipment_id: null,
+      });
 
     const res = await svc.reconcileOne('o-1');
 
@@ -369,7 +380,9 @@ describe('ElchiReconcileService — pul nomuvofiqligi', () => {
     // jimgina yo'qolardi.
     const { svc, svcShipmentUpdate } = buildSvc({
       shipments: [ship()],
-      getShipmentImpl: jest.fn().mockResolvedValue(sold({ cod_amount: 480000 })),
+      getShipmentImpl: jest
+        .fn()
+        .mockResolvedValue(sold({ cod_amount: 480000 })),
     });
 
     const res = await svc.reconcileBatch();
@@ -407,7 +420,9 @@ describe('ElchiReconcileService — pul nomuvofiqligi', () => {
         total_price: 500000,
         where_deliver: 'address',
       },
-      getShipmentImpl: jest.fn().mockResolvedValue(sold({ cod_amount: 475000 })),
+      getShipmentImpl: jest
+        .fn()
+        .mockResolvedValue(sold({ cod_amount: 475000 })),
     });
 
     const res = await svc.reconcileBatch();
@@ -415,7 +430,7 @@ describe('ElchiReconcileService — pul nomuvofiqligi', () => {
     expect(res.mismatched).toBe(0);
   });
 
-  it("TC5: SOTILMAGAN posilkada tarif tekshirilMAYDI (soxta oldini olish)", async () => {
+  it('TC5: SOTILMAGAN posilkada tarif tekshirilMAYDI (soxta oldini olish)', async () => {
     // ⭐ Sotuvgacha `to_be_paid` to'liq COD ga teng — tarif hali ushlanmagan.
     // Bu holatda (B) tekshiruvini qo'llasak, HAR BIR yo'ldagi posilka
     // "tarif farqi 0 != 15000" deb nomuvofiq bo'lib chiqardi.
@@ -459,5 +474,120 @@ describe('ElchiReconcileService — pul nomuvofiqligi', () => {
     const res = await svc.reconcileBatch();
 
     expect(res.mismatched).toBe(0);
+  });
+});
+
+/**
+ * HAQIQIY PUL MAYDONLARI CRON YO'LIDAN HAM O'TISHI SHART (audit M2).
+ *
+ * ⚠️ NEGA BU TEST MAJBURIY. Hozir BeePost hamkorida `webhook_url` BO'SH,
+ * ya'ni status ma'lumoti FAQAT shu CRON orqali keladi. Agar yangi pul
+ * maydonlari faqat webhook yo'lida uzatilsa, hisob-kitob paneli abadiy
+ * bo'sh qolardi — va "tuzatdik" degan XATO ISHONCH paydo bo'lardi.
+ *
+ * Bu ikki yo'l ajralib ketishining klassik holati: biri tuzatiladi,
+ * ikkinchisi esa jimgina eski holatda qoladi.
+ */
+describe('⭐ ElchiReconcileService — pul maydonlari CRON orqali ham uzatiladi', () => {
+  const remoteSold = (over: Record<string, unknown> = {}) => ({
+    status: 'sold',
+    cod_collected: 0,
+    total_price: 500000,
+    extra_cost: 0,
+    collected_from_customer: 500000,
+    elchi_fee: 15000,
+    ...over,
+  });
+
+  it("⭐ `collected_from_customer` va `elchi_fee` qo'llash payloadiga tushadi", async () => {
+    const { svc, applyCalls } = buildSvc({
+      shipments: [
+        {
+          id: 's1',
+          order_id: 'o1',
+          elchi_shipment_id: 'e1',
+          elchi_status: 'waiting',
+        },
+      ],
+      getShipmentImpl: jest.fn().mockResolvedValue(remoteSold()),
+    });
+
+    await svc.reconcileBatch();
+
+    expect(applyCalls).toHaveLength(1);
+    expect(applyCalls[0]).toMatchObject({
+      collected_from_customer: 500000,
+      elchi_fee: 15000,
+    });
+  });
+
+  it("⭐ 0 SAQLANADI — onlayn to'langan buyurtmada naqd yig'ilmaydi", async () => {
+    /**
+     * 0 ni "yo'q" deb tashlab yuborish eng oson xato: onlayn to'langan
+     * buyurtmada kuryer naqd YIG'MAYDI va 0 HAQIQIY javob. U tushib
+     * qolsa panel eski, yolg'on maydonga qaytib qolardi.
+     */
+    const { svc, applyCalls } = buildSvc({
+      shipments: [
+        {
+          id: 's2',
+          order_id: 'o2',
+          elchi_shipment_id: 'e2',
+          elchi_status: 'waiting',
+        },
+      ],
+      getShipmentImpl: jest
+        .fn()
+        .mockResolvedValue(remoteSold({ collected_from_customer: 0 })),
+    });
+
+    await svc.reconcileBatch();
+
+    expect(applyCalls[0].collected_from_customer).toBe(0);
+  });
+
+  it("⭐ `null` ham saqlanadi — 'hali hisoblanmagan' 0 dan FARQ qiladi", async () => {
+    const { svc, applyCalls } = buildSvc({
+      shipments: [
+        {
+          id: 's3',
+          order_id: 'o3',
+          elchi_shipment_id: 'e3',
+          elchi_status: 'waiting',
+        },
+      ],
+      getShipmentImpl: jest
+        .fn()
+        .mockResolvedValue(
+          remoteSold({ collected_from_customer: null, elchi_fee: null }),
+        ),
+    });
+
+    await svc.reconcileBatch();
+
+    expect(applyCalls[0].collected_from_customer).toBeNull();
+    expect(applyCalls[0].elchi_fee).toBeNull();
+  });
+
+  it('Elchi maydonni UMUMAN yubormasa — undefined, yiqilmaydi', async () => {
+    // Eski Elchi versiyasi bilan moslik.
+    const { svc, applyCalls } = buildSvc({
+      shipments: [
+        {
+          id: 's4',
+          order_id: 'o4',
+          elchi_shipment_id: 'e4',
+          elchi_status: 'waiting',
+        },
+      ],
+      getShipmentImpl: jest.fn().mockResolvedValue({
+        status: 'sold',
+        total_price: 500000,
+      }),
+    });
+
+    await svc.reconcileBatch();
+
+    expect(applyCalls[0].collected_from_customer).toBeUndefined();
   });
 });

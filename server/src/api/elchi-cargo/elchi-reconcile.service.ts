@@ -209,18 +209,20 @@ export class ElchiReconcileService {
   private async findOpenShipments(
     limit: number,
   ): Promise<ElchiShipmentEntity[]> {
-    return this.shipmentRepo
-      .createQueryBuilder('s')
-      .where('s.elchi_shipment_id IS NOT NULL')
-      // NULL statusni ham olamiz: jo'natilgan-u, hali hech qanday xabar
-      // kelmagan posilka — aynan eng shubhali holat.
-      .andWhere(
-        '(s.elchi_status IS NULL OR LOWER(s.elchi_status) NOT IN (:...terminal))',
-        { terminal: TERMINAL_ELCHI_STATUSES },
-      )
-      .orderBy('s.last_synced_at', 'ASC', 'NULLS FIRST')
-      .limit(limit)
-      .getMany();
+    return (
+      this.shipmentRepo
+        .createQueryBuilder('s')
+        .where('s.elchi_shipment_id IS NOT NULL')
+        // NULL statusni ham olamiz: jo'natilgan-u, hali hech qanday xabar
+        // kelmagan posilka — aynan eng shubhali holat.
+        .andWhere(
+          '(s.elchi_status IS NULL OR LOWER(s.elchi_status) NOT IN (:...terminal))',
+          { terminal: TERMINAL_ELCHI_STATUSES },
+        )
+        .orderBy('s.last_synced_at', 'ASC', 'NULLS FIRST')
+        .limit(limit)
+        .getMany()
+    );
   }
 
   /**
@@ -271,6 +273,30 @@ export class ElchiReconcileService {
       cod_collected: Number.isFinite(Number(remote?.cod_collected))
         ? Number(remote?.cod_collected)
         : undefined,
+      /**
+       * HAQIQIY PUL MAYDONLARI (audit M2) — WEBHOOK BILAN AYNI.
+       *
+       * ⚠️ BU YERDA UZATILMASA TUZATISH YARIM QOLARDI. Hozir BeePost
+       * hamkorida `webhook_url` bo'sh, ya'ni status ma'lumoti FAQAT shu
+       * CRON orqali keladi. Agar maydonlar faqat webhook yo'lida
+       * saqlangan bo'lsa, hisob-kitob paneli abadiy bo'sh qolardi va
+       * "tuzatdik" degan xato ishonch paydo bo'lardi.
+       *
+       * `null` SAQLANADI, `undefined` ga aylantirilmaydi: 0 va `null`
+       * boshqa ma'noda (0 = naqd yig'ilmadi, null = hali hisoblanmagan).
+       */
+      collected_from_customer:
+        remote?.collected_from_customer === null
+          ? null
+          : Number.isFinite(Number(remote?.collected_from_customer))
+            ? Number(remote?.collected_from_customer)
+            : undefined,
+      elchi_fee:
+        remote?.elchi_fee === null
+          ? null
+          : Number.isFinite(Number(remote?.elchi_fee))
+            ? Number(remote?.elchi_fee)
+            : undefined,
       // Elchi yakuniy narxni o'zgartirgan bo'lsa, sotishdan OLDIN bizda ham
       // qo'llanadi — aks holda kassaga eski narx bo'yicha xato summa tushardi.
       total_price: Number.isFinite(Number(remote?.total_price))
@@ -330,7 +356,9 @@ export class ElchiReconcileService {
     remote: ElchiShipmentStatusResponse | null,
   ): Promise<string | null> {
     if (!remote) return null;
-    if (!SOLD_ELCHI_STATUSES.includes(normalizeElchiStatus(remote.status ?? '')))
+    if (
+      !SOLD_ELCHI_STATUSES.includes(normalizeElchiStatus(remote.status ?? ''))
+    )
       return null;
 
     const order = await this.orderRepo.findOne({
