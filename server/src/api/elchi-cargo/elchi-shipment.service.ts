@@ -68,13 +68,11 @@ export class ElchiShipmentService {
     });
     if (!config) {
       throw new ServiceUnavailableException(
-        "Elchi sozlamalari topilmadi — avval sozlamalarni kiriting",
+        'Elchi sozlamalari topilmadi — avval sozlamalarni kiriting',
       );
     }
     if (!config.is_active) {
-      throw new ServiceUnavailableException(
-        "Elchi integratsiyasi o'chirilgan",
-      );
+      throw new ServiceUnavailableException("Elchi integratsiyasi o'chirilgan");
     }
 
     // Virtual kuryer bloklangan bo'lsa dispatch ham to'xtaydi — operator uchun
@@ -93,7 +91,7 @@ export class ElchiShipmentService {
 
     if (!config.elchi_market_id) {
       throw new ServiceUnavailableException(
-        "Elchi market akkaunti sozlanmagan (elchi_market_id)",
+        'Elchi market akkaunti sozlanmagan (elchi_market_id)',
       );
     }
 
@@ -235,12 +233,7 @@ export class ElchiShipmentService {
   }> {
     const rows = await this.shipmentRepo.find({
       where: { post_id: postId },
-      select: [
-        'order_id',
-        'elchi_shipment_id',
-        'last_error',
-        'send_attempts',
-      ],
+      select: ['order_id', 'elchi_shipment_id', 'last_error', 'send_attempts'],
     });
 
     const items = rows.map((row) => ({
@@ -399,6 +392,30 @@ export class ElchiShipmentService {
         // kutgandan boshqacha chiqadi (oldindan to'langan buyurtmada esa
         // umuman xato bo'ladi).
         subtotal: cod,
+        /**
+         * YORLIQ TOKENI — JISMONIY YORLIQNI ELCHI TOMONIDA SKANERLASH UCHUN.
+         *
+         * ⚠️ NIMA BUZILGAN EDI. Bu maydon YUBORILMASDI. Oqibati: Elchi o'z
+         * tasodifiy `qr_code_token` ini yaratardi, jismoniy yorliqda esa
+         * BIZNING tokenimiz turardi. Elchi'ning "Kiruvchi buyurtmalar"
+         * ekranida operator qopdagi yorliqni skanerlaganda, Elchi uni
+         * o'zining ro'yxatida topa OLMASDI va "topilmadi" deb javob berardi.
+         * Ya'ni posilkalarni skaner bilan qabul qilish UMUMAN ishlamasdi.
+         *
+         * Elchi `label_token` ni olsa, uni buyurtmaning `qr_code_token` i
+         * sifatida saqlaydi — ya'ni bizning yorlig'imiz ularning skanerida
+         * ishlaydi. Mexanizm ularda allaqachon bor edi, biz uzatmagandik.
+         *
+         * ⚠️ AYNI QIYMAT bo'lishi SHART: `order.qr_code_token` — PCS
+         * yorlig'ida chop etiladigan token (`IDX_ORDER_QR_TOKEN` bo'yicha
+         * bizning skanerimiz ham shuni izlaydi). Boshqa qiymat yuborilsa
+         * muammo shunchaki ikkinchi tomonga ko'chardi.
+         *
+         * Elchi tomonda noyoblik tekshiriladi: token boshqa buyurtmada band
+         * bo'lsa 409 qaytadi. PCS tokenlari buyurtma bo'yicha noyob, shu
+         * bois bu holat faqat haqiqiy to'qnashuvda yuz beradi.
+         */
+        label_token: String(order.qr_code_token ?? '').trim() || undefined,
       });
 
       const remoteId = String(response?.shipment_id ?? '').trim();

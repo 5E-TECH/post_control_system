@@ -80,6 +80,17 @@ export interface ElchiCreateShipmentRequest {
   }>;
   cod_amount: number;
   subtotal?: number;
+  /**
+   * BIZNING jismoniy yorliqdagi QR token (`order.qr_code_token`).
+   *
+   * Elchi uni buyurtmaning `qr_code_token` i sifatida saqlaydi — ya'ni
+   * BIZNING yorlig'imiz ULARNING skanerida ishlaydi. Yuborilmasa Elchi o'z
+   * tasodifiy tokenini yaratadi va ularning "Kiruvchi buyurtmalar" ekranida
+   * qopdagi yorliq skanerlanmaydi ("topilmadi").
+   *
+   * Elchi tomonda noyoblik tekshiriladi: band bo'lsa 409.
+   */
+  label_token?: string;
 }
 
 export interface ElchiCreateShipmentResponse {

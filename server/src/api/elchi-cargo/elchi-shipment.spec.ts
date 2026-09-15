@@ -14,28 +14,37 @@ import { Order_status, Status, Where_deliver } from 'src/common/enums';
  *   - qaytarib olish AVVAL Elchi posilkasini bekor qiladi, keyin boshqaruvni
  *     bo'shatadi — ikki tomon bir vaqtda faol bo'lib qolmaydi.
  */
-function buildSvc(over: {
-  config?: unknown;
-  courier?: unknown;
-  order?: Record<string, unknown> | null;
-  shipment?: Record<string, unknown> | null;
-  geo?: { elchi_district_id: string; elchi_region_id: string | null } | null;
-  allowedDistricts?: Set<string>;
-  createShipmentImpl?: jest.Mock;
-  cancelShipmentImpl?: jest.Mock;
-  ordersForPreview?: Array<Record<string, unknown>>;
-  shipmentsForPost?: Array<Record<string, unknown>>;
-} = {}) {
+function buildSvc(
+  over: {
+    config?: unknown;
+    courier?: unknown;
+    order?: Record<string, unknown> | null;
+    shipment?: Record<string, unknown> | null;
+    geo?: { elchi_district_id: string; elchi_region_id: string | null } | null;
+    allowedDistricts?: Set<string>;
+    createShipmentImpl?: jest.Mock;
+    cancelShipmentImpl?: jest.Mock;
+    ordersForPreview?: Array<Record<string, unknown>>;
+    shipmentsForPost?: Array<Record<string, unknown>>;
+  } = {},
+) {
   const savedShipments: any[] = [];
   const orderUpdates: any[] = [];
   const svc: any = Object.create(ElchiShipmentService.prototype);
 
   svc.configRepo = {
-    findOne: jest.fn().mockResolvedValue(
-      over.config === undefined
-        ? { id: 'cfg', is_active: true, elchi_market_id: '500', elchi_courier_user_id: null }
-        : over.config,
-    ),
+    findOne: jest
+      .fn()
+      .mockResolvedValue(
+        over.config === undefined
+          ? {
+              id: 'cfg',
+              is_active: true,
+              elchi_market_id: '500',
+              elchi_courier_user_id: null,
+            }
+          : over.config,
+      ),
   };
   svc.userRepo = {
     findOne: jest.fn().mockResolvedValue(over.courier ?? null),
@@ -48,6 +57,8 @@ function buildSvc(over: {
             order_number: 100042,
             status: Order_status.RECEIVED,
             post_id: 'p-1',
+            // JISMONIY YORLIQDAGI token — Elchi ga `label_token` bolib ketadi.
+            qr_code_token: 'PCS-LABEL-XYZ',
             district_id: 'd-1',
             district: { name: 'Chilonzor' },
             address: 'Chilonzor 12',
@@ -387,7 +398,6 @@ describe('ElchiShipmentService — boshqaruvni qaytarib olish', () => {
   });
 });
 
-
 describe('ElchiShipmentService — DARVOZA oldindan tekshiruvi (P5b)', () => {
   it('hammasi ruxsat etilgan -> bloklangan yo‘q', async () => {
     const { svc } = buildSvc({
@@ -440,7 +450,12 @@ describe('ElchiShipmentService — DARVOZA oldindan tekshiruvi (P5b)', () => {
   // aks holda UI "joyida" deb ko'rsatib, jo'natishda xato chiqardi.
   it('oldindan tekshiruv va guard bir xil natija beradi', async () => {
     const orders = [
-      { id: 'o-1', order_number: 1, district_id: 'd-9', district: { name: 'X' } },
+      {
+        id: 'o-1',
+        order_number: 1,
+        district_id: 'd-9',
+        district: { name: 'X' },
+      },
     ];
     const { svc } = buildSvc({
       allowedDistricts: new Set(['d-1']),
@@ -450,9 +465,9 @@ describe('ElchiShipmentService — DARVOZA oldindan tekshiruvi (P5b)', () => {
     const preview: any = await svc.previewGate(['o-1']);
     expect(preview.blocked).toHaveLength(1);
 
-    await expect(
-      svc.assertDistrictsAllowedForPost(orders),
-    ).rejects.toThrow(/#1 \(X\)/);
+    await expect(svc.assertDistrictsAllowedForPost(orders)).rejects.toThrow(
+      /#1 \(X\)/,
+    );
   });
 });
 
@@ -460,9 +475,24 @@ describe('ElchiShipmentService — jo‘natish holati (P5b)', () => {
   it('yetgan va yetmagan buyurtmalar sanaladi', async () => {
     const { svc } = buildSvc({
       shipmentsForPost: [
-        { order_id: 'o-1', elchi_shipment_id: '9001', last_error: null, send_attempts: 1 },
-        { order_id: 'o-2', elchi_shipment_id: null, last_error: 'Elchi 503', send_attempts: 2 },
-        { order_id: 'o-3', elchi_shipment_id: '9003', last_error: null, send_attempts: 1 },
+        {
+          order_id: 'o-1',
+          elchi_shipment_id: '9001',
+          last_error: null,
+          send_attempts: 1,
+        },
+        {
+          order_id: 'o-2',
+          elchi_shipment_id: null,
+          last_error: 'Elchi 503',
+          send_attempts: 2,
+        },
+        {
+          order_id: 'o-3',
+          elchi_shipment_id: '9003',
+          last_error: null,
+          send_attempts: 1,
+        },
       ],
     });
 
@@ -479,5 +509,91 @@ describe('ElchiShipmentService — jo‘natish holati (P5b)', () => {
     const { svc } = buildSvc({ shipmentsForPost: [] });
     const res: any = await svc.getDispatchStatusForPost('p-1');
     expect(res).toMatchObject({ total: 0, delivered: 0, failed: 0 });
+  });
+});
+
+/**
+ * YORLIQ TOKENI — ELCHI SKANERIDA ISHLASHI UCHUN (real sinovda topilgan bug).
+ *
+ * ⚠️ NIMA BUZILGAN EDI. `label_token` UMUMAN YUBORILMASDI. Elchi o'z
+ * tasodifiy `qr_code_token` ini yaratardi, jismoniy yorliqda esa BIZNING
+ * tokenimiz turardi. Elchi ning "Kiruvchi buyurtmalar" ekranida operator
+ * qopdagi yorliqni skanerlaganda Elchi uni ro'yxatida topa OLMASDI va
+ * "topilmadi" deb javob berardi — ya'ni posilkalarni skaner bilan qabul
+ * qilish UMUMAN ishlamasdi.
+ *
+ * Mexanizm Elchi da allaqachon bor edi (`label_token` -> buyurtmaning
+ * `qr_code_token` i), biz uzatmagandik.
+ */
+describe('⭐ createShipmentForOrder — yorliq tokeni (label_token)', () => {
+  it('⭐ `label_token` = PCS yorliq tokeni yuboriladi', async () => {
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({ createShipmentImpl: createShipment });
+
+    await svc.createShipmentForOrder('o-1');
+
+    const body = createShipment.mock.calls[0][0];
+    expect(body.label_token).toBe('PCS-LABEL-XYZ');
+  });
+
+  it('⭐ AYNI qiymat — bizning skanerimiz ham shuni izlaydi', async () => {
+    /**
+     * Boshqa qiymat yuborilsa muammo shunchaki ikkinchi tomonga ko'chardi:
+     * Elchi skaneri ishlardi, bizniki esa yo'q.
+     */
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({
+      createShipmentImpl: createShipment,
+      order: {
+        id: 'o-1',
+        order_number: 7,
+        status: Order_status.RECEIVED,
+        post_id: 'p-1',
+        district_id: 'd-1',
+        district: { name: 'Chilonzor' },
+        where_deliver: Where_deliver.CENTER,
+        to_be_paid: 0,
+        total_price: 100000,
+        customer: { name: 'Test', phone_number: '+998901112233' },
+        items: [],
+        qr_code_token: 'BOSHQA-TOKEN-999',
+      },
+    });
+
+    await svc.createShipmentForOrder('o-1');
+
+    expect(createShipment.mock.calls[0][0].label_token).toBe(
+      'BOSHQA-TOKEN-999',
+    );
+  });
+
+  it('token bo`sh bo`lsa `undefined` — bo`sh satr YUBORILMAYDI', async () => {
+    /**
+     * Bo'sh satr yuborilsa Elchi uni "token berilgan" deb qabul qilib,
+     * noyoblik tekshiruvini bo'sh qiymat bo'yicha bajarardi va ikkinchi
+     * posilkada 409 chiqardi. `undefined` esa "token yo'q" degani.
+     */
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({
+      createShipmentImpl: createShipment,
+      order: {
+        id: 'o-1',
+        order_number: 8,
+        status: Order_status.RECEIVED,
+        post_id: 'p-1',
+        district_id: 'd-1',
+        district: { name: 'Chilonzor' },
+        where_deliver: Where_deliver.CENTER,
+        to_be_paid: 0,
+        total_price: 100000,
+        customer: { name: 'Test', phone_number: '+998901112233' },
+        items: [],
+        qr_code_token: '   ',
+      },
+    });
+
+    await svc.createShipmentForOrder('o-1');
+
+    expect(createShipment.mock.calls[0][0].label_token).toBeUndefined();
   });
 });
