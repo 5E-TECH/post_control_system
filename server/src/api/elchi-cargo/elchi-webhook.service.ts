@@ -7,10 +7,7 @@ import { ElchiShipmentEntity } from 'src/core/entity/elchi-shipment.entity';
 import { ElchiWebhookLogEntity } from 'src/core/entity/elchi-webhook-log.entity';
 import { OrderService } from '../order/order.service';
 import { verifyElchiSignature } from './utils/elchi-signature.util';
-import {
-  elchiStatusLabel,
-  mapElchiStatus,
-} from './utils/elchi-status.mapper';
+import { elchiStatusLabel, mapElchiStatus } from './utils/elchi-status.mapper';
 import {
   ElchiWebhookPayload,
   ElchiWebhookStatus,
@@ -135,7 +132,8 @@ export class ElchiWebhookService {
       );
       return {
         http_status: 200,
-        message: "Sinov webhooki qabul qilindi — imzo to'g'ri, zanjir ishlayapti",
+        message:
+          "Sinov webhooki qabul qilindi — imzo to'g'ri, zanjir ishlayapti",
       };
     }
 
@@ -175,8 +173,10 @@ export class ElchiWebhookService {
       }
       logRow =
         existing ??
-        this.logRepo.create({ event_id: eventId, received_at: Date.now() } as
-          ElchiWebhookLogEntity);
+        this.logRepo.create({
+          event_id: eventId,
+          received_at: Date.now(),
+        } as ElchiWebhookLogEntity);
     }
 
     // ===== 4. ISHLASH =====
@@ -272,11 +272,39 @@ export class ElchiWebhookService {
     shipment.elchi_status = rawStatus || shipment.elchi_status;
     shipment.elchi_status_changed_at = Date.now();
     shipment.last_synced_at = Date.now();
-    if (payload.cod_collected != null && Number.isFinite(payload.cod_collected)) {
+    if (
+      payload.cod_collected != null &&
+      Number.isFinite(payload.cod_collected)
+    ) {
       // Elchi marketga to'lab bergan qism (`paid_amount`). Faqat qayd etamiz —
       // hisob-kitob ekrani shu yig'indini ko'rsatadi. Nomuvofiqlik tekshiruvi
       // bu maydonga tayanmaydi (yuqoridagi izoh).
-      shipment.cod_collected_reported = Number(payload.cod_collected).toFixed(2);
+      shipment.cod_collected_reported = Number(payload.cod_collected).toFixed(
+        2,
+      );
+    }
+    /**
+     * HAQIQIY PUL MAYDONLARI (audit M2).
+     *
+     * ⚠️ `!= null` ISHLATILADI, `Number.isFinite` bilan birga — chunki 0
+     * HAQIQIY qiymat: onlayn to'langan buyurtmada kuryer NAQD YIG'MAYDI,
+     * ya'ni `collected_from_customer = 0` to'g'ri javob. `!payload.x`
+     * tekshiruvi 0 ni "yo'q" deb o'tkazib yuborardi va panel eski, yolg'on
+     * maydonga qaytib qolardi.
+     */
+    if (
+      payload.collected_from_customer != null &&
+      Number.isFinite(Number(payload.collected_from_customer))
+    ) {
+      shipment.collected_from_customer_reported = Number(
+        payload.collected_from_customer,
+      ).toFixed(2);
+    }
+    if (
+      payload.elchi_fee != null &&
+      Number.isFinite(Number(payload.elchi_fee))
+    ) {
+      shipment.elchi_fee_reported = Number(payload.elchi_fee).toFixed(2);
     }
     await this.shipmentRepo.save(shipment);
 

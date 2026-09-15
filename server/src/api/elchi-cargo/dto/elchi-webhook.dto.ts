@@ -13,11 +13,7 @@ export const ELCHI_SIGNATURE_HEADER = 'x-elchi-signature';
 
 /** Webhook jurnalidagi qayta ishlash holati. */
 export type ElchiWebhookStatus =
-  | 'success'
-  | 'failed'
-  | 'skipped'
-  | 'invalid_signature'
-  | 'replay';
+  'success' | 'failed' | 'skipped' | 'invalid_signature' | 'replay';
 
 export interface ElchiWebhookPayload {
   /** Hozircha yagona qiymat: `shipment.status_changed`. */
@@ -52,6 +48,27 @@ export interface ElchiWebhookPayload {
    * bo'lishi kutiladi.
    */
   cod_collected?: number;
+
+  /**
+   * HAQIQIY yig'ilgan naqd (audit M2 tuzatishi) — `cod_collected` o'rniga.
+   *
+   * ⚠️ Yuqoridagi izoh "NET qiymat" deb taxmin qilgan, lekin haqiqat
+   * yomonroq: Elchi u yerga `order.paid_amount` ni soladi — market qarzining
+   * avto-to'langan qismini, oddiy sotuvda 0. Ya'ni ayirma tarifga teng
+   * BO'LMAYDI, butun COD chiqadi.
+   *
+   * Endi Elchi sotuv snapshotidan aniq qiymat yuboradi.
+   *
+   * ⚠️ `0` HAQIQIY: mijoz onlayn to'lagan bo'lsa kuryer naqd yig'maydi.
+   * `null` — hali sotilmagan yoki Elchi bu maydonni yubormagan (eski posilka).
+   */
+  collected_from_customer?: number | null;
+
+  /** Elchi ushlab qolgan tarif (sotuv snapshoti). */
+  elchi_fee?: number | null;
+
+  /** Elchi bizga qarzi: `collected_from_customer - elchi_fee`. */
+  market_amount?: number | null;
 
   /**
    * Elchi tomonidagi YAKUNIY narx.

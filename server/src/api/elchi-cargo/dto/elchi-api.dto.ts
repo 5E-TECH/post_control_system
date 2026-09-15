@@ -114,6 +114,21 @@ export interface ElchiShipmentStatusResponse {
    */
   cod_collected?: number;
   /**
+   * HAQIQIY yig'ilgan naqd — kuryer mijozdan olgan pul (sotuv snapshoti).
+   *
+   * ⚠️ Yuqoridagi `cod_collected` NING O'RNINI BOSADI. U nomi yolg'on
+   * bo'lgani uchun panelda uch xato ko'rsatkich chiqargan (audit M2).
+   *
+   * ⚠️ `0` HAQIQIY QIYMAT: mijoz onlayn to'lagan bo'lsa kuryer naqd
+   * yig'maydi. `null` esa "hali sotilmagan / Elchi yubormagan" degani —
+   * ikkisini aralashtirmaslik kerak.
+   */
+  collected_from_customer?: number | null;
+  /** Elchi ushlab qolgan tarif (sotuv snapshoti). */
+  elchi_fee?: number | null;
+  /** Elchi bizga qarzi: `collected_from_customer - elchi_fee`. */
+  market_amount?: number | null;
+  /**
    * Elchi tomonidagi buyurtma narxi. Biz yuborgan `cod_amount_sent` bilan
    * teng bo'lishi SHART — farq bo'lsa kimdir Elchi tomonda narxni o'zgartirgan.
    */

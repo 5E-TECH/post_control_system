@@ -78,6 +78,42 @@ export class ElchiShipmentEntity extends BaseEntity {
   })
   cod_collected_reported: string | null;
 
+  /**
+   * HAQIQIY yig'ilgan naqd — Elchi `collected_from_customer` da yuboradi.
+   *
+   * ⚠️ NEGA YANGI USTUN KERAK BO'LDI (audit M2). Yuqoridagi
+   * `cod_collected_reported` nomi YOLG'ON: Elchi u yerga `order.paid_amount`
+   * ni soladi, ya'ni market qarzining avto-to'langan qismini, va oddiy
+   * sotuvda u 0. Biz esa uni "Elchi yig'gan pul" deb panelda ko'rsatardik —
+   * shuning uchun "Elchi bizga qarz" MANFIY, "Elchi ushlagan" esa tarif
+   * o'rniga BUTUN COD chiqardi.
+   *
+   * ⚠️ `null` MA'NOLI: Elchi bu maydonni hali yubormagan (eski posilka) yoki
+   * buyurtma hali sotilmagan. 0 ga aylantirilmaydi.
+   */
+  @Column({
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    nullable: true,
+  })
+  collected_from_customer_reported: string | null;
+
+  /**
+   * Elchi ushlab qolgan tarif — `elchi_fee` maydonidan.
+   *
+   * Ilgari bu qiymat AYIRMA bilan taxmin qilinardi (`jo'natilgan − yig'ilgan`)
+   * va yig'ilgan 0 bo'lgani uchun butun COD chiqardi. Endi Elchi tarifning
+   * SOTUVDA ISHLATILGAN snapshotini o'zi aytadi.
+   */
+  @Column({
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    nullable: true,
+  })
+  elchi_fee_reported: string | null;
+
   // ===== JO'NATISH HOLATI =====
 
   @Column({ type: 'int', default: 0 })

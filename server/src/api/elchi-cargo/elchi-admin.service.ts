@@ -25,11 +25,7 @@ export interface PaginatedResult<T> {
 }
 
 export type ShipmentFilter =
-  | 'all'
-  | 'pending'
-  | 'error'
-  | 'delivered'
-  | 'mismatch';
+  'all' | 'pending' | 'error' | 'delivered' | 'mismatch';
 
 /**
  * Elchi admin paneli uchun O'QISH va QO'LDA amallar servisi.
@@ -303,10 +299,10 @@ export class ElchiAdminService {
       relations: ['order'],
     });
     if (!shipment) {
-      throw new NotFoundException("Elchi posilkasi topilmadi");
+      throw new NotFoundException('Elchi posilkasi topilmadi');
     }
     if (!shipment.mismatch_at) {
-      return { success: true, message: 'Nomuvofiqlik belgisi yo\'q edi' };
+      return { success: true, message: "Nomuvofiqlik belgisi yo'q edi" };
     }
 
     const previousReason = shipment.mismatch_reason;
@@ -409,7 +405,7 @@ export class ElchiAdminService {
     if (!log.signature_valid) {
       throw new BadRequestException(
         "Imzosi noto'g'ri webhookni qayta ishlab bo'lmaydi — xom tana " +
-          'saqlanmagani uchun imzoni qayta tekshirib bo\'lmaydi',
+          "saqlanmagani uchun imzoni qayta tekshirib bo'lmaydi",
       );
     }
     if (log.status === 'success') {
@@ -526,8 +522,14 @@ export class ElchiAdminService {
      */
     const periodCollected = await this.shipmentRepo
       .createQueryBuilder('s')
-      .select('COALESCE(SUM(s.cod_collected_reported), 0)', 'sum')
+      /**
+       * ⚠️ HAQIQIY maydon (audit M2). Ilgari `cod_collected_reported` edi —
+       * u Elchi'ning `order.paid_amount` qiymati, "yig'ilgan pul" EMAS.
+       */
+      .select('COALESCE(SUM(s.collected_from_customer_reported), 0)', 'sum')
       .addSelect('COUNT(*)', 'cnt')
+      /** Tarif endi TAXMIN qilinmaydi — Elchi o'zi aytadi. */
+      .addSelect('COALESCE(SUM(s.elchi_fee_reported), 0)', 'fee')
       /**
        * AYNI SHU qatorlar bo'yicha jo'natilgan summa ham olinadi.
        *
@@ -537,12 +539,18 @@ export class ElchiAdminService {
        * ko'rsatardi — ya'ni panel pul haqida yolg'on aytardi.
        */
       .addSelect('COALESCE(SUM(s.cod_amount_sent), 0)', 'sent_for_collected')
-      .where('s.cod_collected_reported IS NOT NULL')
+      .where('s.collected_from_customer_reported IS NOT NULL')
+      .andWhere('s.elchi_fee_reported IS NOT NULL')
       .andWhere('s.elchi_status_changed_at BETWEEN :from AND :to', {
         from,
         to,
       })
-      .getRawOne<{ sum: string; cnt: string; sent_for_collected: string }>();
+      .getRawOne<{
+        sum: string;
+        cnt: string;
+        fee: string;
+        sent_for_collected: string;
+      }>();
 
     const periodPaid = await this.paymentRepo
       .createQueryBuilder('p')
@@ -567,9 +575,13 @@ export class ElchiAdminService {
         paid_by_elchi: Number(periodPaid?.sum ?? 0),
         dispatched_count: Number(periodSent?.cnt ?? 0),
         collected_count: Number(periodCollected?.cnt ?? 0),
-        elchi_fee:
-          Number(periodCollected?.sent_for_collected ?? 0) -
-          Number(periodCollected?.sum ?? 0),
+        /**
+         * ⚠️ AYIRMA BILAN TAXMIN QILINMAYDI (audit M2). Ilgari
+         * `jo'natilgan − yig'ilgan` edi; yig'ilgan 0 bo'lgani uchun tarif
+         * o'rniga BUTUN COD chiqardi. Endi Elchi tarifning sotuvda
+         * ishlatilgan snapshotini o'zi yuboradi.
+         */
+        elchi_fee: Number(periodCollected?.fee ?? 0),
       },
       overall,
       payments: payments.map((p) => ({
@@ -583,40 +595,85 @@ export class ElchiAdminService {
     };
   }
 
-  /** Butun vaqt bo'yicha pul qoldig'i — qarz shu yerdan chiqadi. */
+  /**
+   * Butun vaqt bo'yicha pul qoldig'i — qarz shu yerdan chiqadi.
+   *
+   * ⚠️ QAYTA YOZILDI (audit M2). Ilgari qarz `cod_collected_reported` dan
+   * hisoblanardi, u esa Elchi'ning `order.paid_amount` qiymati — "kuryer
+   * yig'gan pul" EMAS, market qarzining avto-to'langan qismi, oddiy sotuvda
+   * 0. Natijada uchta ko'rsatkich jimgina yolg'on edi:
+   *
+   *   "Elchi yig'gan"   = 0
+   *   "Elchi bizga qarz" = 0 - to'lovlar = MANFIY
+   *   "Elchi ushlagan"   = jo'natilgan - 0 = BUTUN COD (tarif emas)
+   *
+   * Endi Elchi ANIQ nomli ikki maydon yuboradi va qarz shulardan chiqadi.
+   *
+   * ⚠️ ESKI POSILKALAR YANGI QIYMAT BILAN ARALASHTIRILMAYDI. Ularda
+   * `collected_from_customer_reported IS NULL`, va `COALESCE` bilan eski
+   * yolg'on qiymatga qaytish rost bilan yolg'onni bir yig'indiga qo'shardi.
+   * Ular `unreported_count` da alohida sanaladi — panel "N posilka bo'yicha
+   * ma'lumot yo'q" deb ochiq aytadi.
+   */
   private async sumMoney(): Promise<{
     cod_sent: number;
     cod_collected: number;
+    elchi_fee: number;
     paid_by_elchi: number;
     debt: number;
+    unreported_count: number;
   }> {
-    const [sent, collected, paid] = await Promise.all([
+    const [sent, reported, paid, unreported] = await Promise.all([
       this.shipmentRepo
         .createQueryBuilder('s')
         .select('COALESCE(SUM(s.cod_amount_sent), 0)', 'sum')
         .where('s.elchi_shipment_id IS NOT NULL')
         .getRawOne<{ sum: string }>(),
+      /**
+       * Ikki maydon BIR SO'ROVDA va IKKISI HAM bo'lishi sharti bilan —
+       * biri bor, ikkinchisi yo'q qator yig'indini buzardi (tarifsiz
+       * yig'ilgan pul butun qarzga aylanardi).
+       */
       this.shipmentRepo
         .createQueryBuilder('s')
-        .select('COALESCE(SUM(s.cod_collected_reported), 0)', 'sum')
-        .where('s.cod_collected_reported IS NOT NULL')
-        .getRawOne<{ sum: string }>(),
+        .select(
+          'COALESCE(SUM(s.collected_from_customer_reported), 0)',
+          'collected',
+        )
+        .addSelect('COALESCE(SUM(s.elchi_fee_reported), 0)', 'fee')
+        .where('s.collected_from_customer_reported IS NOT NULL')
+        .andWhere('s.elchi_fee_reported IS NOT NULL')
+        .getRawOne<{ collected: string; fee: string }>(),
       this.paymentRepo
         .createQueryBuilder('p')
         .select('COALESCE(SUM(p.amount), 0)', 'sum')
         .getRawOne<{ sum: string }>(),
+      this.shipmentRepo
+        .createQueryBuilder('s')
+        .select('COUNT(*)', 'cnt')
+        .where('s.elchi_shipment_id IS NOT NULL')
+        .andWhere(
+          '(s.collected_from_customer_reported IS NULL OR s.elchi_fee_reported IS NULL)',
+        )
+        .getRawOne<{ cnt: string }>(),
     ]);
 
     const codSent = Number(sent?.sum ?? 0);
-    const codCollected = Number(collected?.sum ?? 0);
+    const codCollected = Number(reported?.collected ?? 0);
+    const elchiFee = Number(reported?.fee ?? 0);
     const paidByElchi = Number(paid?.sum ?? 0);
 
     return {
       cod_sent: codSent,
       cod_collected: codCollected,
+      elchi_fee: elchiFee,
       paid_by_elchi: paidByElchi,
-      // Elchi yig'gan, lekin hali bizga bermagan pul.
-      debt: codCollected - paidByElchi,
+      /**
+       * Elchi yig'gan, o'z tarifini ushlab qolgan, qolganini bizga berishi
+       * kerak — shundan allaqachon to'lagani ayiriladi.
+       */
+      debt: codCollected - elchiFee - paidByElchi,
+      unreported_count: Number(unreported?.cnt ?? 0),
     };
   }
 
