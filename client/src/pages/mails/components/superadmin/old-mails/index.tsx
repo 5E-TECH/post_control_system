@@ -5,7 +5,21 @@ import { useTranslation } from "react-i18next";
 import { DatePicker, Pagination, Select, type PaginationProps } from "antd";
 import dayjs from "dayjs";
 import { useParamsHook } from "../../../../../shared/hooks/useParams";
-import { ChevronRight, Loader2, Clock, CheckCircle, XCircle, Calendar, Archive, User, MapPin, Filter, X, Printer, FileSpreadsheet } from "lucide-react";
+import {
+  ChevronRight,
+  Loader2,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Calendar,
+  Archive,
+  User,
+  MapPin,
+  Filter,
+  X,
+  Printer,
+  FileSpreadsheet,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../../../shared/api";
 import { useSelector } from "react-redux";
@@ -13,6 +27,7 @@ import type { RootState } from "../../../../../app/store";
 import { generateCourierReceipt } from "../../../../../shared/helpers/generate-courier-receipt";
 import { exportPostOrdersToExcel } from "../../../../../shared/helpers/export-post-orders-excel";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
+import { ELCHI_PROVIDER } from "../../../../../shared/api/hooks/useElchiDispatch";
 
 interface FilterRegion {
   id: string;
@@ -34,11 +49,22 @@ const statusOptions = [
   { value: "canceled_received", label: "Qaytarilgan" },
 ];
 
-const statusConfig: Record<string, { badge: string; icon: typeof CheckCircle; label: string }> = {
+const statusConfig: Record<
+  string,
+  { badge: string; icon: typeof CheckCircle; label: string }
+> = {
   sent: { badge: "bg-blue-500/80", icon: CheckCircle, label: "Jo'natilgan" },
-  received: { badge: "bg-emerald-500/80", icon: CheckCircle, label: "Qabul qilingan" },
+  received: {
+    badge: "bg-emerald-500/80",
+    icon: CheckCircle,
+    label: "Qabul qilingan",
+  },
   canceled: { badge: "bg-red-500/80", icon: XCircle, label: "Bekor qilingan" },
-  canceled_received: { badge: "bg-orange-500/80", icon: XCircle, label: "Qaytarilgan" },
+  canceled_received: {
+    badge: "bg-orange-500/80",
+    icon: XCircle,
+    label: "Qaytarilgan",
+  },
   new: { badge: "bg-gray-500/80", icon: Clock, label: "Yangi" },
 };
 
@@ -77,8 +103,8 @@ const OldMails = () => {
         const orders: any[] = Array.isArray(payload)
           ? payload
           : Array.isArray(payload?.allOrdersByPostId)
-          ? payload.allOrdersByPostId
-          : [];
+            ? payload.allOrdersByPostId
+            : [];
         if (!orders.length) {
           handleWarning(
             "Bu pochtada buyurtmalar topilmadi",
@@ -95,7 +121,7 @@ const OldMails = () => {
           // mos bo'lishi uchun rejected yo'lda orders.length ishlatamiz.
           totalOrders: isRejected
             ? orders.length
-            : post?.order_quantity ?? orders.length,
+            : (post?.order_quantity ?? orders.length),
           date: post?.created_at,
         });
         handleSuccess("Excel tayyor");
@@ -116,6 +142,25 @@ const OldMails = () => {
   const handleReprintReceipt = useCallback(
     async (e: MouseEvent<HTMLButtonElement>, post: any) => {
       e.stopPropagation();
+      /**
+       * ⚠️ VIRTUAL KURYERGA QOG'OZ CHEK CHIQARILMAYDI.
+       *
+       * Kuryer cheki — kuryer IMZOLAYDIGAN hujjat: "shu pochtani qabul
+       * qildim". "Elchi" esa odam emas, tashqi provayder — imzolaydigan
+       * hech kim yo'q va chek ma'nosiz qog'oz bo'lardi.
+       *
+       * Jo'natish ekranidagi ikki yo'lda bu darvoza bor edi, LEKIN bu
+       * uchinchi yo'l (eski pochtalar ro'yxatidagi "qayta chop etish")
+       * darvozasiz qolgan edi — auditda topildi. Bu yerda `external_provider`
+       * ro'yxat javobida keladi (`relations: ['region', 'courier']`).
+       */
+      if (post?.courier?.external_provider === ELCHI_PROVIDER) {
+        handleApiError(
+          null,
+          "Bu pochta tashqi provayderga (Elchi) jo'natilgan — kuryer cheki chop etilmaydi",
+        );
+        return;
+      }
       if (!post?.qr_code_token) {
         handleApiError(null, "Bu pochtada QR kod topilmadi");
         return;
@@ -218,14 +263,20 @@ const OldMails = () => {
   };
 
   // Prefetch post data on hover
-  const prefetchPost = useCallback((postId: string, status: string) => {
-    const path = ["canceled", "canceled_received"].includes(status) ? "rejected/" : "";
-    queryClient.prefetchQuery({
-      queryKey: [post, postId, path, undefined],
-      queryFn: () => api.get(`post/orders/${path}${postId}`).then((res) => res.data),
-      staleTime: 1000 * 60 * 3,
-    });
-  }, [queryClient]);
+  const prefetchPost = useCallback(
+    (postId: string, status: string) => {
+      const path = ["canceled", "canceled_received"].includes(status)
+        ? "rejected/"
+        : "";
+      queryClient.prefetchQuery({
+        queryKey: [post, postId, path, undefined],
+        queryFn: () =>
+          api.get(`post/orders/${path}${postId}`).then((res) => res.data),
+        staleTime: 1000 * 60 * 3,
+      });
+    },
+    [queryClient],
+  );
 
   const page = Number(getParam("page") || 1);
   const limit = Number(getParam("limit") || 8);
@@ -243,8 +294,8 @@ const OldMails = () => {
   const posts = Array.isArray(data?.data?.data)
     ? data?.data?.data
     : Array.isArray(data?.data)
-    ? data?.data
-    : [];
+      ? data?.data
+      : [];
 
   const total = data?.data?.total || posts.length;
 
@@ -255,7 +306,7 @@ const OldMails = () => {
 
   const onShowSizeChange: PaginationProps["onShowSizeChange"] = (
     _current,
-    newLimit
+    newLimit,
   ) => {
     if (newLimit === 8) removeParam("limit");
     else setParam("limit", newLimit);
@@ -396,7 +447,9 @@ const OldMails = () => {
           <div className="text-center">
             <Clock className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-              {hasFilter ? "Filtr bo'yicha pochta topilmadi" : "Eski pochtalar yo'q"}
+              {hasFilter
+                ? "Filtr bo'yicha pochta topilmadi"
+                : "Eski pochtalar yo'q"}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {hasFilter
@@ -407,112 +460,128 @@ const OldMails = () => {
         </div>
       ) : (
         <>
-      {/* Posts Grid */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {posts.map((post: any) => {
-            const config = getStatusConfig(post?.status);
-            const StatusIcon = config.icon;
+          {/* Posts Grid */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {posts.map((post: any) => {
+                const config = getStatusConfig(post?.status);
+                const StatusIcon = config.icon;
 
-            return (
-              <div
-                key={post?.id}
-                onMouseEnter={() => prefetchPost(post?.id, post?.status)}
-                onClick={() =>
-                  navigate(`/mails/${post?.id}?status=${post?.status}`, {
-                    state: { regionName: post?.region?.name, hideSend: true },
-                  })
-                }
-                className="bg-gradient-to-br from-slate-600 to-gray-700 rounded-2xl p-5 cursor-pointer hover:shadow-xl hover:from-slate-500 hover:to-gray-600 transition-all group opacity-90"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                    <Archive className="w-6 h-6 text-white/80" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-white ${config.badge}`}>
-                      <StatusIcon className="w-3 h-3" />
-                      {config.label}
-                    </span>
-                    <ChevronRight className="w-5 h-5 text-white/50 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-
-                <h3 className="text-xl font-bold text-white/90 mb-3 line-clamp-1">
-                  {post?.region?.name}
-                </h3>
-
-                {post?.courier?.name && (
-                  <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg bg-white/10">
-                    <User className="w-4 h-4 text-white/60" />
-                    <span className="text-white/80 text-sm font-medium">{post.courier.name}</span>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-white/60 text-sm">Buyurtmalar:</span>
-                    <span className="text-white/90 font-semibold text-base">{post?.order_quantity} ta</span>
-                  </div>
-                  {canSeePrice && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/60 text-sm">Summa:</span>
-                      <span className="text-white/90 font-bold text-base">
-                        {new Intl.NumberFormat("uz-UZ").format(Number(post?.post_total_price) || 0)} so'm
-                      </span>
-                    </div>
-                  )}
-                  {post?.created_at && (
-                    <div className="flex items-center gap-1 text-white/50 text-xs pt-2 border-t border-white/10">
-                      <Calendar className="w-3 h-3" />
-                      {formatDate(post.created_at)}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-4 flex items-center gap-2">
-                  <button
-                    onClick={(e) => handleDownloadExcel(e, post)}
-                    disabled={!!excelLoadingId}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-white text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                return (
+                  <div
+                    key={post?.id}
+                    onMouseEnter={() => prefetchPost(post?.id, post?.status)}
+                    onClick={() =>
+                      navigate(`/mails/${post?.id}?status=${post?.status}`, {
+                        state: {
+                          regionName: post?.region?.name,
+                          hideSend: true,
+                        },
+                      })
+                    }
+                    className="bg-gradient-to-br from-slate-600 to-gray-700 rounded-2xl p-5 cursor-pointer hover:shadow-xl hover:from-slate-500 hover:to-gray-600 transition-all group opacity-90"
                   >
-                    {excelLoadingId === post?.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <FileSpreadsheet className="w-4 h-4" />
-                    )}
-                    Excel
-                  </button>
-                  {["sent", "received"].includes(post?.status?.toLowerCase()) &&
-                    post?.qr_code_token && (
-                      <button
-                        onClick={(e) => handleReprintReceipt(e, post)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-colors"
-                      >
-                        <Printer className="w-4 h-4" />
-                        Chek
-                      </button>
-                    )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+                        <Archive className="w-6 h-6 text-white/80" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-white ${config.badge}`}
+                        >
+                          <StatusIcon className="w-3 h-3" />
+                          {config.label}
+                        </span>
+                        <ChevronRight className="w-5 h-5 text-white/50 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
 
-      {/* Pagination */}
-      <div className="flex justify-center py-4 flex-shrink-0 border-t border-gray-100 dark:border-gray-700/50 mt-4">
-        <Pagination
-          showSizeChanger
-          current={page}
-          total={total}
-          pageSize={limit}
-          onChange={onChange}
-          onShowSizeChange={onShowSizeChange}
-          pageSizeOptions={["8", "16", "32", "64"]}
-          className="cursor-pointer"
-        />
-      </div>
+                    <h3 className="text-xl font-bold text-white/90 mb-3 line-clamp-1">
+                      {post?.region?.name}
+                    </h3>
+
+                    {post?.courier?.name && (
+                      <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg bg-white/10">
+                        <User className="w-4 h-4 text-white/60" />
+                        <span className="text-white/80 text-sm font-medium">
+                          {post.courier.name}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white/60 text-sm">
+                          Buyurtmalar:
+                        </span>
+                        <span className="text-white/90 font-semibold text-base">
+                          {post?.order_quantity} ta
+                        </span>
+                      </div>
+                      {canSeePrice && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/60 text-sm">Summa:</span>
+                          <span className="text-white/90 font-bold text-base">
+                            {new Intl.NumberFormat("uz-UZ").format(
+                              Number(post?.post_total_price) || 0,
+                            )}{" "}
+                            so'm
+                          </span>
+                        </div>
+                      )}
+                      {post?.created_at && (
+                        <div className="flex items-center gap-1 text-white/50 text-xs pt-2 border-t border-white/10">
+                          <Calendar className="w-3 h-3" />
+                          {formatDate(post.created_at)}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2">
+                      <button
+                        onClick={(e) => handleDownloadExcel(e, post)}
+                        disabled={!!excelLoadingId}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-white text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {excelLoadingId === post?.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <FileSpreadsheet className="w-4 h-4" />
+                        )}
+                        Excel
+                      </button>
+                      {["sent", "received"].includes(
+                        post?.status?.toLowerCase(),
+                      ) &&
+                        post?.qr_code_token && (
+                          <button
+                            onClick={(e) => handleReprintReceipt(e, post)}
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-medium transition-colors"
+                          >
+                            <Printer className="w-4 h-4" />
+                            Chek
+                          </button>
+                        )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex justify-center py-4 flex-shrink-0 border-t border-gray-100 dark:border-gray-700/50 mt-4">
+            <Pagination
+              showSizeChanger
+              current={page}
+              total={total}
+              pageSize={limit}
+              onChange={onChange}
+              onShowSizeChange={onShowSizeChange}
+              pageSizeOptions={["8", "16", "32", "64"]}
+              className="cursor-pointer"
+            />
+          </div>
         </>
       )}
     </div>

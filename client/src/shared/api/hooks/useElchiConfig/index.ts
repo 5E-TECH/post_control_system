@@ -4,6 +4,7 @@ import { api } from "../..";
 const ELCHI_CONFIG_KEY = "elchi-config";
 const ELCHI_READINESS_KEY = "elchi-readiness";
 const ELCHI_DISTRICTS_KEY = "elchi-districts";
+const ELCHI_REMOTE_DISTRICTS_KEY = "elchi-remote-districts";
 const ELCHI_REGIONS_KEY = "elchi-regions";
 
 /**
@@ -96,7 +97,7 @@ export interface ElchiRegionGateResult {
 }
 
 /** Javob qobig'ini himoyalangan ochish (`{data}` bo'lishi ham, bo'lmasligi ham mumkin). */
-const unwrap = <T,>(raw: unknown): T =>
+const unwrap = <T>(raw: unknown): T =>
   ((raw as { data?: T })?.data ?? raw) as T;
 
 export const useElchiConfig = () => {
@@ -213,6 +214,73 @@ export const useElchiConfig = () => {
     },
   });
 
+  /**
+   * TUMANNI QO'LDA MOSLASH.
+   *
+   * ⚠️ NEGA KERAK. Avtomatik moslash SOATO kodi bo'yicha ishlaydi, lekin
+   * Elchi tomonda haqiqiy SOATO bo'lmasa (o'rinbosar kod ishlatilgan bo'lsa)
+   * moslash topilmaydi va o'sha tumandagi buyurtmalar jo'natilmaydi.
+   * Backend endpointi bor edi, LEKIN frontend undan foydalanmaydi — ya'ni
+   * operator bu holatni UI dan tuzata olmasdi va har safar dasturchi kerak
+   * bo'lardi (auditda topildi).
+   *
+   * ⚠️ DARVOZAGA TEGMAYDI — moslash va ruxsat IKKI xil narsa. Moslangan
+   * tuman avtomatik ochilib ketmaydi.
+   */
+  /**
+   * ELCHI TOMONIDAGI tumanlar — qo'lda moslash oynasi uchun.
+   *
+   * `enabled: false` bilan boshlanadi: bu Elchi API'siga tashqi so'rov, va
+   * u faqat operator moslash oynasini OCHGANDA kerak. Har sozlama sahifasi
+   * ochilishida so'rov yuborish keraksiz yuk bo'lardi.
+   */
+  const remoteDistricts = useQuery({
+    queryKey: [ELCHI_REMOTE_DISTRICTS_KEY],
+    queryFn: () =>
+      api.get("elchi/remote-districts").then((res) =>
+        unwrap<
+          Array<{
+            id: string;
+            name: string;
+            region_id: string;
+            sato_code: string | null;
+          }>
+        >(res.data),
+      ),
+    enabled: false,
+  });
+
+  const setDistrictMapping = useMutation({
+    mutationFn: (params: {
+      districtId: string;
+      elchi_district_id: string;
+      elchi_region_id?: string | null;
+    }) =>
+      api
+        .patch(`elchi/districts/${params.districtId}/mapping`, {
+          elchi_district_id: params.elchi_district_id,
+          elchi_region_id: params.elchi_region_id ?? null,
+        })
+        .then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [ELCHI_DISTRICTS_KEY] });
+      invalidateAll();
+    },
+  });
+
+  /**
+   * ELCHI'DA BEEPOST MARKET AKKAUNTINI OCHISH.
+   *
+   * Busiz posilka yaratib bo'lmaydi — `elchi_market_id` qattiq darvoza.
+   * Idempotent: qayta bosilsa mavjudini qaytaradi. Tarif VAKIL-KURYERDAN
+   * olinadi, ya'ni ikki tomonda teng bo'ladi (M4).
+   */
+  const provisionMarket = useMutation({
+    mutationFn: () =>
+      api.post("elchi/config/provision-market").then((res) => res.data),
+    onSuccess: invalidateAll,
+  });
+
   const reconcileAll = useMutation({
     mutationFn: () => api.post("elchi/reconcile").then((res) => res.data),
   });
@@ -228,6 +296,9 @@ export const useElchiConfig = () => {
     syncDistricts,
     setDistrictGate,
     setRegionGate,
+    setDistrictMapping,
+    provisionMarket,
+    remoteDistricts,
     reconcileAll,
   };
 };
