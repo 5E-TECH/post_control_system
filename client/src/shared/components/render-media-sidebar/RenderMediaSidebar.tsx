@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   UserRound,
   MapPin,
+  Zap,
 } from "lucide-react";
 import { buildAdminPath } from "../../const";
 import { useExtraCost } from "../../api/hooks/useExtraCost";
@@ -39,9 +40,22 @@ const NavBadge = ({ count }: { count: number }) => {
   );
 };
 
-// Nav item uchun umumiy stil
+/**
+ * Nav item uchun umumiy stil.
+ *
+ * ⚠️ O'LCHAM TASODIFIY EMAS. Kuryer navida endi 6 ta ikonka va markazdagi
+ * skaner bor:
+ *
+ *   48px bo'lsa:  6×48 + 56 + 16 = 376px  → 360px telefonda SIG'MAYDI
+ *   44px bo'lsa:  6×44 + 56 + 16 = 336px  → 360px da sig'adi
+ *   40px (<380):  6×40 + 48 + 16 = 304px  → 320px ekranda ham sig'adi
+ *
+ * 44px — barmoq uchun qabul qilingan eng kichik o'lcham; undan pastga
+ * FAQAT juda tor ekranlarda tushamiz, chunki u yerda gorizontal skroll
+ * yoki ikonkalarning bir-biriga kirib ketishi bundan ham yomon.
+ */
 const getNavItemClass = (isActive: boolean) => `
-  flex items-center justify-center w-12 h-11 rounded-xl transition-all duration-200
+  flex items-center justify-center w-11 h-11 max-[380px]:w-10 rounded-xl transition-all duration-200
   ${isActive
     ? "bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] text-white shadow-lg shadow-purple-500/30"
     : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/50"
@@ -183,7 +197,13 @@ const Navbar = ({ role }: { role: string }) => {
       case "courier":
         return (
           <div className={navContainerClass}>
-            <div className="flex justify-between items-center px-4 py-2 relative">
+            {/* ⚠️ 3 + SKANER + 3. Avval chapda 2 ta, o'ngda 3 ta ikonka bor
+                edi va markazdagi skaner o'rtada turmasdi — nav ko'zga
+                qiyshiq ko'rinardi. "Tezkor amal" shu yerga qo'shildi:
+                u kuryer kuniga bir necha marta ochadigan sahifa, lekin
+                telefonda unga yo'l UMUMAN yo'q edi (sidebar <650px da
+                ko'rinmaydi). */}
+            <div className="flex justify-between items-center px-2 py-2 relative">
             <NavLink
               to={buildAdminPath()}
               className={({ isActive }) => getNavItemClass(isActive)}
@@ -196,13 +216,19 @@ const Navbar = ({ role }: { role: string }) => {
             >
               <ShoppingBag className="w-6 h-6" />
             </NavLink>
+            <NavLink
+              to={buildAdminPath("courier-bulk")}
+              className={({ isActive }) => getNavItemClass(isActive)}
+            >
+              <Zap className="w-6 h-6" />
+            </NavLink>
 
             {/* QR Scanner - Markazda va yuqoriga chiqib turadi */}
             <NavLink
               to={buildAdminPath("scan")}
-              className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] text-white shadow-lg shadow-purple-500/40 -mt-8 border-4 border-[#1e1e2d]"
+              className="flex items-center justify-center w-14 h-14 max-[380px]:w-12 max-[380px]:h-12 shrink-0 rounded-full bg-gradient-to-r from-[#ccb5ff] to-[#8247ff] text-white shadow-lg shadow-purple-500/40 -mt-8 border-4 border-[#1e1e2d]"
             >
-              <QrCode className="w-7 h-7" />
+              <QrCode className="w-7 h-7 max-[380px]:w-6 max-[380px]:h-6" />
             </NavLink>
 
             <NavLink

@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Zap,
+  Camera,
   ScanLine,
   XCircle,
   Clock,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { Modal } from "antd";
 import { useTranslation } from "react-i18next";
+import CourierCameraScanner from "../../shared/components/courier-camera-scanner";
 import { useOrder } from "../../shared/api/hooks/useOrder";
 import { useApiNotification } from "../../shared/hooks/useApiNotification";
 import { normalizeQrToken } from "../../shared/helpers/normalizeQrToken";
@@ -181,6 +183,16 @@ const CourierBulkPage = () => {
   const [cancelIds, setCancelIds] = useState<Set<string>>(new Set());
   const [keepIds, setKeepIds] = useState<Set<string>>(new Set());
   const [scanMode, setScanMode] = useState<ScanMode>("cancel");
+  /**
+   * TELEFON KAMERASI BILAN SKANERLASH.
+   *
+   * ⚠️ Busiz bu sahifa FAQAT hardware (USB/Bluetooth) skaner bilan ishlardi:
+   * global `keypress` tinglagichi klaviatura-emulyatsiya qiluvchi skanerni
+   * kutadi. Kuryer esa kun bo'yi telefonda ishlaydi va uning qo'lida
+   * hardware skaner yo'q — ya'ni tezkor amal telefonda umuman
+   * ishlatib bo'lmasdi.
+   */
+  const [cameraOpen, setCameraOpen] = useState(false);
   // confirmType: null = yopiq, "cancel-only" = faqat bekor, "full" = bekor + sotish
   const [confirmType, setConfirmType] = useState<"cancel-only" | "full" | null>(
     null,
@@ -416,6 +428,30 @@ const CourierBulkPage = () => {
       if (timer) clearTimeout(timer);
     };
   }, [handleToken, confirmOpen, progress.isProcessing, result]);
+
+  /**
+   * KAMERA SKANI — yuborish oynasi ochiq bo'lsa QABUL QILINMAYDI.
+   *
+   * ⚠️ Klaviatura tinglagichi bu tekshiruvni O'ZIDA qiladi (`confirmOpen ||
+   * isProcessing || result` bo'lsa `return`), lekin kamera `handleToken` ni
+   * TO'G'RIDAN-TO'G'RI chaqiradi va o'sha to'siqni chetlab o'tardi. Natijada
+   * kuryer "yuborish" tasdig'ini ko'rib turganda skanerlashda davom etsa,
+   * ro'yxat ostidan o'zgarib ketardi — ya'ni u ko'rgan son bilan yuborilgan
+   * son mos kelmasdi.
+   */
+  const handleCameraToken = useCallback(
+    (token: string) => {
+      if (confirmOpen || progress.isProcessing || result) return;
+      handleToken(token);
+    },
+    [confirmOpen, progress.isProcessing, result, handleToken],
+  );
+
+  // Yuborish boshlanganda kamera O'ZI yopiladi — kuryer to'liq ekranli
+  // kamerada qolib, jarayonni umuman ko'rmay qolmasin.
+  useEffect(() => {
+    if (confirmOpen || progress.isProcessing || result) setCameraOpen(false);
+  }, [confirmOpen, progress.isProcessing, result]);
 
   const getOrderStatus = (id: string): "cancel" | "keep" | "sell" => {
     if (cancelIds.has(id)) return "cancel";
@@ -723,21 +759,40 @@ const CourierBulkPage = () => {
             </button>
           </div>
 
-          {/* Skan zonasi — vizual indikator, klaviatura handler global */}
+          {/* ⚠️ TELEFON KAMERASI — kuryer uchun ASOSIY yo'l.
+              Uning qo'lida hardware skaner yo'q; busiz bu sahifa telefonda
+              umuman ishlatib bo'lmasdi. */}
+          <button
+            type="button"
+            onClick={() => setCameraOpen(true)}
+            className={`w-full h-14 rounded-xl flex items-center justify-center gap-2 text-white font-semibold transition-all active:scale-[0.99] ${
+              scanMode === "cancel"
+                ? "bg-rose-500 shadow-lg shadow-rose-500/30"
+                : "bg-amber-500 shadow-lg shadow-amber-500/30"
+            }`}
+          >
+            <Camera className="w-5 h-5" />
+            {scanMode === "cancel"
+              ? "Kamera bilan skanerlash — BEKOR"
+              : "Kamera bilan skanerlash — QOLDIRISH"}
+          </button>
+
+          {/* Skan zonasi — HARDWARE skaner indikatori (klaviatura handler global).
+              Telefonda hardware skaner yo'q, shuning uchun u kichik ko'rinadi. */}
           <div
-            className={`h-14 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${
+            className={`mt-2 h-11 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 px-3 transition-all ${
               scanMode === "cancel"
                 ? "border-rose-300 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-900/10"
                 : "border-amber-300 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-900/10"
             }`}
           >
             <ScanLine
-              className={`w-5 h-5 ${
+              className={`w-4 h-4 shrink-0 ${
                 scanMode === "cancel" ? "text-rose-500" : "text-amber-500"
               }`}
             />
             <span
-              className={`text-sm font-medium ${
+              className={`truncate text-xs sm:text-sm font-medium ${
                 scanMode === "cancel" ? "text-rose-700" : "text-amber-700"
               }`}
             >
@@ -853,8 +908,15 @@ const CourierBulkPage = () => {
           )}
         </div>
 
-        {/* Pastki — Yakunlash tugmasi */}
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-lg p-4 sticky bottom-3 border border-gray-100 dark:border-gray-800">
+        {/* Pastki — Yakunlash tugmasi
+         *
+         * ⚠️ `max-[650px]:bottom-20` — MOBIL NAV USTIDA turishi uchun.
+         * `sticky bottom-3` skroll oynasining pastidan 12px da yopishadi,
+         * mobil nav esa EKRANGA (fixed) yopishgan va ~60px balandlikda —
+         * ya'ni telefonda "Yakunlash" tugmalari nav ostida qolib, kuryer
+         * ularni umuman bosa olmasdi.
+         */}
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-lg p-4 sticky bottom-3 max-[650px]:bottom-20 border border-gray-100 dark:border-gray-800">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3 text-xs flex-wrap">
               <span className="text-rose-600 font-medium">
@@ -1167,6 +1229,66 @@ const CourierBulkPage = () => {
           )}
         </Modal>
       </div>
+
+      {/* ══════════════ TELEFON KAMERASI BILAN SKANERLASH ══════════════
+       *
+       * ⚠️ REJIM KAMERADA KO'RINIB TURISHI SHART. Bitta skan rejimga qarab
+       * buyurtmani BEKOR qiladi yoki QOLDIRADI — ikkalasi butunlay boshqa
+       * pul oqibati. Kuryer to'liq ekranli kamerada turganda qaysi rejimda
+       * ekanini ko'rmasa, o'nlab buyurtmani noto'g'ri savatga qo'yib
+       * yuborishi mumkin edi. Shuning uchun sarlavha, ramka rangi va
+       * pastdagi almashtirgich — uchalasi ham rejimni ko'rsatadi.
+       *
+       * Natija (qabul qilindi / xato) sahifadagi `flash` qatlami orqali
+       * ko'rinadi: u `z-[100]`, kamera esa `z-[90]` — ya'ni kamera ustida
+       * chiqadi va kuryer har skanning javobini ko'radi.
+       */}
+      <CourierCameraScanner
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onToken={handleCameraToken}
+        successCount={stats.cancel.count + stats.keep.count}
+        tone={scanMode === "cancel" ? "rose" : "amber"}
+        statusText={
+          scanMode === "cancel" ? "BEKOR QILISH rejimi" : "QOLDIRISH rejimi"
+        }
+        hint={
+          scanMode === "cancel"
+            ? "QR kodni ramka ichiga tuting — buyurtma BEKOR ro'yxatiga qo'shiladi"
+            : "QR kodni ramka ichiga tuting — buyurtma QOLDIRISH ro'yxatiga qo'shiladi"
+        }
+        errorHint="Kameraga ruxsat bering yoki hardware skanerdan foydalaning"
+        footer={
+          /* Rejimni KAMERANI YOPMASDAN almashtirish — kuryer odatda avval
+             bir to'p "bekor", keyin bir to'p "qoldirish" skanerlaydi. */
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setScanMode("cancel")}
+              className={`h-12 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                scanMode === "cancel"
+                  ? "bg-rose-500 text-white"
+                  : "bg-white/10 border border-white/20 text-white/70"
+              }`}
+            >
+              <XCircle className="w-4 h-4" />
+              Bekor ({stats.cancel.count})
+            </button>
+            <button
+              type="button"
+              onClick={() => setScanMode("keep")}
+              className={`h-12 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                scanMode === "keep"
+                  ? "bg-amber-500 text-white"
+                  : "bg-white/10 border border-white/20 text-white/70"
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              Qoldirish ({stats.keep.count})
+            </button>
+          </div>
+        }
+      />
     </div>
   );
 };
