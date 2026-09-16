@@ -27,6 +27,7 @@ import { ExtraCostModule } from './extra-cost/extra-cost.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
 import { ElchiCargoModule } from './elchi-cargo/elchi-cargo.module';
+import { MarketplaceModule } from './marketplace/marketplace.module';
 import { InvestorModule } from './investor/investor.module';
 import { AiFinanceModule } from './ai-finance/ai-finance.module';
 import { AiUsageModule } from './ai-usage/ai-usage.module';
@@ -88,6 +89,7 @@ import { AiUsageModule } from './ai-usage/ai-usage.module';
     ExtraCostModule,
     LdgCargoModule,
     ElchiCargoModule,
+    MarketplaceModule,
     InvestorModule,
     AiFinanceModule,
     AiUsageModule,
