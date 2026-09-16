@@ -156,9 +156,37 @@ Ikki kalit bir vaqtda faol bo'la oladi:
 X-BeePost-Signature: t=1789480740,v1=<yangi kalit bilan>,v2=<eski kalit bilan>
 ```
 
-Qabul qiluvchi **`v1` yoki `v2`** dan biri mos kelsa qabul qiladi. Aylantirish tartibi:
-yangi kalit qo'shiladi → ikki kalit 24 soat birga ishlaydi → eski o'chiriladi.
-**Uzilish bo'lmaydi.**
+Aylantirish tartibi: yangi kalit qo'shiladi → ikki kalit 24 soat birga ishlaydi →
+eski o'chiriladi. **Uzilish bo'lmaydi.**
+
+#### 🔴 Tekshirish qoidasi — bu joyda xato qilish oson
+
+> **O'zingizdagi HAR BIR kalitni HAR BIR imzo maydoniga (`v1` VA `v2`) qarshi
+> tekshiring.** Maydon nomini kalit bilan bog'lamang.
+
+```js
+// ❌ NOTO'G'RI — pozitsion bog'lash
+if (hmac(mening_kalitim, base) === parts.v1) ok();
+
+// ✅ TO'G'RI — har kalit har maydonga
+for (const key of [mening_kalitim, mening_eski_kalitim]) {
+  for (const field of ['v1', 'v2']) {
+    if (parts[field] && timingSafeEqual(hmac(key, base), parts[field])) ok();
+  }
+}
+```
+
+**Nega:** aylantirishning butun maqsadi — tomonlar **bir vaqtda** kalit
+almashtirmasligi. Biz yangi kalitga o'tib, uni `v1` ga qo'yamiz; siz hali
+eski kalitdasiz. Pozitsion tekshiruvda siz eski kalitni `v1` ga qarshi
+solishtirib **rad etasiz** — va aylantirish har safar uzilish beradi.
+
+Narxi: ko'pi bilan 2 kalit × 2 maydon = 4 ta HMAC. E'tiborsiz.
+
+> ℹ️ Bu qoida BeePost tomonida lokal e2e sinovda topildi: dastlabki
+> implementatsiya aynan pozitsion edi va aylantirish ssenariysi yiqildi.
+> Sizda ham shu xato bo'lishi ehtimoli yuqori — mock server (§11) buni
+> tekshiradi.
 
 ### 3.5 Namuna (Node.js)
 
@@ -484,8 +512,12 @@ Biz buni kunlik solishtiramiz. Farq chiqsa — ikkala tomonga ogohlantirish.
 
 ## 5. BIZ BERADIGAN ENDPOINTLAR — faqat O'QISH
 
-Bazaviy manzil: `https://<beepost-domain>/api/v1/marketplace`
+Bazaviy manzil: `https://<beepost-domain>/api/v1/marketplace/{slug}`
 Autentifikatsiya: `X-Api-Key` (imzo shart emas).
+
+`{slug}` — BeePost sizga beradigan ulanish nomi (masalan `uzum`). U URL'da
+turadi, chunki kalitlar bazada shifrlangan saqlanadi va faqat kalit bo'yicha
+qidirib bo'lmaydi.
 
 > 🔴 **Yozuv endpointi yo'q.** Siz bizning tizimga posilka qo'sha olmaysiz, statusni
 > o'zgartira olmaysiz, bekor qila olmaysiz. Bu **ataylab** shunday: posilka BeePost
@@ -493,7 +525,7 @@ Autentifikatsiya: `X-Api-Key` (imzo shart emas).
 
 ---
 
-### 5.1 `GET /parcels/:external_parcel_id` — bizdagi holat
+### 5.1 `GET /{slug}/parcels/{external_parcel_id}` — bizdagi holat
 
 ```json
 {
@@ -517,18 +549,17 @@ Autentifikatsiya: `X-Api-Key` (imzo shart emas).
 ```
 
 Bir nechta posilkani birdan so'rash:
-```
-GET /parcels?ids=PCL-8842-1,PCL-8843-1&limit=200
-```
+⚠️ Bir nechta posilkani birdan so'rash v1 da YO'Q — bittalab so'rang yoki
+§4.5 dagi o'z solishtiruv endpointingizdan foydalaning.
 
 ---
 
-### 5.2 `GET /ledger` — bizdagi daftar
+### 5.2 `GET /{slug}/ledger` — bizdagi daftar
 
 ```
-GET /ledger                                  // umumiy balans + oxirgi yozuvlar
-GET /ledger?seller_id=SLR-77                 // bitta sotuvchi bo'yicha
-GET /ledger?from=1789400000000&to=1789500000000&cursor=
+GET /uzum/ledger                                  // umumiy balans + oxirgi yozuvlar
+GET /uzum/ledger?seller_id=SLR-77                 // bitta sotuvchi bo'yicha
+GET /uzum/ledger?from=1789400000000&to=1789500000000&limit=200&cursor=
 ```
 
 ```json
@@ -576,14 +607,19 @@ GET /ledger?from=1789400000000&to=1789500000000&cursor=
 
 ---
 
-### 5.3 `GET /events?since_seq=&external_parcel_id=` — yo'qolgan hodisani qayta olish
+### 5.3 `GET /{slug}/events?since_seq=` — yo'qolgan hodisani qayta olish
 
 `seq`da uzilish sezsangiz (145 dan keyin 147 keldi) — yetishmaganini shu yerdan oling.
 
 ```
-GET /events?external_parcel_id=PCL-8842-1&since_seq=145
-GET /events?since_seq=8840&limit=200
+GET /uzum/events?external_parcel_id=PCL-8842-1&since_seq=145
+GET /uzum/events?since_seq=8840&limit=200
 ```
+
+⚠️ Faqat **yuborilgan** hodisalar qaytariladi. Navbatda turgan yoki tashlangan
+qatorlar ko'rsatilmaydi — aks holda siz ularni «yetib kelgan» deb hisoblab,
+keyin haqiqiy yuborishda dublikat sifatida rad etardingiz va hodisa jimgina
+yo'qolardi.
 
 Javob — §4.4 dagi konvertlarning massivi:
 ```json

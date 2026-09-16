@@ -954,7 +954,33 @@ Bular marketplace ishi emas, lekin **usiz ikki daftar teng yura olmaydi**.
 
 | **B10** | **NestJS DI dublikat-provider tuzog'i** | `DashboardModule` `OrderService`ni **o'z provideri** sifatida qayta e'lon qiladi → NestJS ikkinchi nusxasini quradi | `OrderService` konstruktoriga yangi bog'liqlik (bizning outbox/hodisa servisimiz) qo'shilsa, uni beradigan modul **`DashboardModule`ga HAM** import qilinishi shart. Aks holda `tsc` ham, testlar ham ko'rmaydi — xato **faqat prod deploy'da** chiqadi. 2026-09-16 da `ExtraCostApplierService` bilan aynan shunday bo'lgan. Qulf: `order-service-di.spec.ts` |
 
-**B1, B2, B3, B4** — ishni boshlashdan oldin majburiy.
+✅ **B1 BAJARILDI** — `order.service.ts` dagi 6 ta nuqta atomik
+(`applyCashboxDelta`). Haqiqiy bazada poyga sinovi: eski yo'l 150 000 yo'qotdi,
+yangi to'g'ri hisobladi. QOLDI: `cash-box.service.ts` (11 nuqta, admin amallari)
+va `ExtraCostApplier.writeOne` inline yo'li.
+
+✅ **B2, B4 BAJARILDI** — DB darajasidagi unique cheklovlar + qabul
+idempotentligi (14 ta cheklov sinovi o'tdi).
+
+✅ **B3 BAJARILDI** — outbox qatori pul bilan BITTA tranzaksiyada
+(`MarketplaceSyncService`). To'rtta ilgak ulangan: sotuv, bekor, qisman sotuv,
+rollback.
+
+✅ **B7, B9 BAJARILDI** — tarif qabulda muzlatiladi va `where_deliver`
+ularning payload'idan olinadi.
+
+✅ **B10 hal qilindi** — `MarketplaceModule` `OrderModule` va `DashboardModule`
+ga qo'shildi, `CTOR_DEP_MODULES` yangilandi, DI grafi haqiqiy kompilyatsiyada
+tekshirildi.
+
+✅ **B8 BAJARILDI** — `PATCH order/:id` da marketplace buyurtmasining
+`market_tariff` ini qo'lda o'zgartirish RAD ETILADI. `where_deliver`
+o'zgarishi esa bloklanmaydi (mijoz «uyga olib keling» deyishi normal), lekin
+tarif AMALDAGI shartnomadan qayta muzlatiladi va `parcel.fee_changed`
+hodisasi yuboriladi. ⚠️ `courier_tariff` ATAYLAB bloklanmaydi — u
+`net_to_marketplace` formulasiga kirmaydi.
+
+⏳ **B5, B6** — ochiq.
 **B10** — 3-bosqichda `OrderService`ga bog'liqlik qo'shilganda **darhol** tekshiriladi.
 **B7, B8, B9** — tarif shartnomasi bilan birga, **1-bosqichda** (pul aniqligining asosi).
 **B5, B6** — 4-bosqichgacha.
@@ -966,12 +992,12 @@ Bular marketplace ishi emas, lekin **usiz ikki daftar teng yura olmaydi**.
 | # | Bosqich | Ish | Natija | Kun |
 |---|---|---|---|---|
 | **0** | **Kelishuv + kontrakt** | Kontrakt yakunlandi (§19); ✅ **mock server YOZILDI** — `server/scripts/local/marketplace-mock/` (kontrakt tekshiruvchisi, 11 sinov posilkasi, chaos rejimi); ularning dasturchilariga topshiriladi | Kontrakt muzlatildi | **1** *(mock tayyor)* |
-| **1** | **Poydevor + blokerlar** | B1–B4 tuzatish; **B7–B9 tarif shartnomasi** (`marketplace_tariff` + versiya + qabulda muzlatish + qo'lda o'zgartirishni bloklash); 6 ta jadval + migratsiya; `order` ustunlari; sekret shifrlash; admin konfiguratsiya ekrani | Sozlash mumkin | **4–5** |
-| **2** | **Skan + qabul** | Server tomonda skan, sessiya, `marketplace_parcel`, qattiq xato tasnifi + circuit breaker, savepoint, token normalizatsiya, **ko'p qutili posilka** | **Qop skanerlanadi va qabul qilinadi** | **4** |
-| **3** | **Outbox dvigateli + status hodisalari** | Outbox + worker + `event_id` + `seq` + serializatsiya + backoff + 4xx tasnifi; `accepted`/`dispatched`/`delivered`/`cancelled`/`rolled_back`/`fee_changed` | **Ikki tomonda status sinxron** ⬅ *birinchi demo* | **4–5** |
-| **4** | **Pul + har-sotuvchi daftar** | `marketplace_ledger_entry`; `extra_cost`; qisman sotuv; **prepaid (manfiy `net`)**; bekor qoidasi; B5. ⚠️ Kassa **push funneli QURILMAYDI** (§7.4) | **Pul sinxron** | **3–4** |
-| **5** | **Hisob-kitob + o'qish API** | `marketplace_settlement`; sotuvchi bo'yicha to'lov ekrani; `settlement.paid`; kunlik `ledger.snapshot`; **3 ta o'qish endpointi + API-kalit guard**; FIFO yo'lini bloklash | **Kassalar teng yuradi** | **3** |
-| **6** | **Solishtiruv + panel** | 15-daqiqalik CRON; mismatch kartasi; **«Marketplace — hisob-kitob» tabi** (§7.5): balans, solishtiruv kartasi, sotuvchilar jadvali, **tarif holati**, hodisa monitori, to'lov eslatmasi | **Operatsion jihatdan boshqariladi** | **3–4** |
+| **1** | **Poydevor + blokerlar** | ✅ 8 jadval + migratsiya · ✅ `order` ustunlari (`integration_id`, `external_seller_id`, `extra_cost_net`) · ✅ B4 unique · ✅ sekret shifrlash (AES-256-GCM) · ✅ `marketplace_tariff` versiyalash · ⏳ B1–B3, B7–B9 (`order.service.ts` — parallel ish merge'ini kutadi) · ✅ **sozlash backendi**: `MarketplaceConfigService` + admin-only controller (`marketplace/config/...`), band-slug + SSRF tekshiruvi, tarif versiyalash, kalit aylantirish (`previous` ga ko'chadi — uzilishsiz), ulanish sinovi, **sekretlar javobda maskalanadi**, tayyorlik checklisti — tugallanmagan ulanish YOQILMAYDI · ✅ marshrut to'qnashuvi qulfi (statik test) · ✅ **admin ekrani**: «Integratsiyalar → Marketplace» tabi (`MarketplaceRoot` + `MarketplaceSettingsTab` + yaratish oynasi) — tayyorlik checklisti, master kalit (tugallanmagan bo'lsa bloklangan), ulanish sinovi, kalit aylantirish (bir martalik ko'rsatish + nusxalash), tarif versiyalari va tarixi, daftar invarianti kartasi | Sozlash mumkin | **4–5** *(BAJARILDI)* |
+| **2** | **Skan + qabul** | ✅ server tomonda skan + sessiya · ✅ qattiq xato tasnifi + circuit breaker · ✅ per-row savepoint · ✅ token normalizatsiya · ✅ ko'p qutili to'liqlik · ✅ qabul idempotentligi · ✅ **tarif qabulda muzlatiladi (B7–B9 marketplace yo'li uchun yopildi)** · ✅ controller + modul (DI tekshirilgan) · ✅ **operator ekrani** (`/marketplace-intake`): skaner-klaviatura kiritish + avto-fokus, sessiya SERVERDAN tiklanadi, ko'p qutili to'liqlik ogohlantirishi, bloker/ogohlantirish ajratilgan, oxirgisini qaytarish, sababli rad etish, barqaror idempotentlik kaliti, natija oynasi (buyurtma raqamlari + yiqilganlar) · ✅ `GET marketplace/available` — registrator uchun (sozlash ro'yxati admin-only edi) | **Qop skanerlanadi va qabul qilinadi** | **4** *(BAJARILDI)* |
+| **3** | **Outbox dvigateli + status hodisalari** | ✅ tranzaksion outbox + atomik `seq` (`next_seq`) · ✅ worker: advisory lock, posilka bo'yicha serializatsiya, `seq` qo'riqchisi, 8 urinishli backoff (~4 soat), 4xx=qayta urinmaslik, stale tiklash, kill-switch navbatni ham to'xtatadi · ✅ `parcel.accepted` ulandi · ⏳ `delivered`/`cancelled`/`rolled_back` — **`order.service.ts` merge'ini kutadi** | **Ikki tomonda status sinxron** ⬅ *birinchi demo* | **4–5** *(dvigatel BAJARILDI)* |
+| **4** | **Pul + har-sotuvchi daftar** | ✅ pul utili (muzlatilgan tarif · prepaid manfiy `net` · bekor qoidasi · teskari yozuv/B5) · ✅ `MarketplaceLedgerService` (idempotent langar, atomik seq + qulf, `seller_balance_after`, invariant tekshiruvi, sotuvchi jamlanmasi) · ⏳ kassa nuqtalariga ilgak. ⚠️ Kassa **push funneli QURILMAYDI** (§7.4) | **Pul sinxron** | **3–4** |
+| **5** | **Hisob-kitob + o'qish API** | ✅ `marketplace_settlement` + taqsimotli to'lov (yig'indi tekshiruvi) · ✅ `settlement.paid` hodisasi · ✅ **FIFO yo'li marketplace marketi uchun bloklandi** · ✅ 3 ta o'qish endpointi + `X-Api-Key` guard (doimiy vaqtli, IP ro'yxati, slug enumeratsiyasiga qarshi) · ✅ band slug ro'yxati · ✅ kunlik `ledger.snapshot` (6-bosqichda) | **Kassalar teng yuradi** | **3** |
+| **6** | **Solishtiruv + panel** | ✅ 15-daq posilka solishtiruvi (status + `seq` uzilishi + **yo'qolgan hodisani qayta navbatga qo'yish**) · ✅ kunlik daftar solishtiruvi (invariant + ularning balansi + `ledger.snapshot`) · ✅ nomuvofiqlik kartasi endpointlari · ✅ qo'lda ishga tushirish · ✅ **frontend panel** — «Integratsiyalar → Marketplace» uch sub-tab: Sozlamalar / Hisob-kitob (sotuvchilar qoldig'i, taqsimotli to'lov, qoldiqdan ortiq to'lov BLOKLANGAN, manfiy qoldiqli sotuvchilar alohida) / Solishtiruv (nomuvofiqlik jadvali, «hal qilindi», qo'lda solishtiruv natijasi); ulanish tanlovi uch tab uchun YAGONA | **Operatsion jihatdan boshqariladi** | **3–4** *(BAJARILDI)* |
 | **7** | **Uchdan-uchga sinov** | Sandbox; 15 ta qabul mezoni (§16); prepaid/bekor/qisman/ko'p-quti ssenariylari; xaos sinovi (ular o'chirilgan holatda) | **Ishga tayyor** | **2** |
 
 **Jami: 20–25 dev-kun** (PCS). Ular tomoni: ~8–12 kun (7 endpoint + hodisa qabuli + daftar).

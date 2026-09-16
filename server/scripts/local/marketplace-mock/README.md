@@ -77,7 +77,7 @@ Va MUST qoidalarini **majburlaydi**:
 |---|---|
 | Imzo majburiy (`POST`) | Imzosiz/yomon imzo → **401**, `ping`dan tashqari |
 | Vaqt oynasi 300s | Eski `t` → **401** |
-| Ikki kalitli aylantirish | `v1` yoki `v2` — biri mos kelsa qabul |
+| Ikki kalitli aylantirish | **Har kalit har maydonga** (`v1` VA `v2`) — pozitsion EMAS. Bu qoida shu mock bilan e2e sinovda topilgan: pozitsion tekshiruvda aylantirish har safar uziladi |
 | `event_id` dedup | Takror → `200 {applied:false, reason:"DUPLICATE"}` |
 | `seq` tartibi | Eskirgan → `200 {applied:false, reason:"STALE_SEQ", current_seq}` |
 | `batch_id` idempotentligi | Ayni batch → **ayni javob**, holat o'zgarmaydi |

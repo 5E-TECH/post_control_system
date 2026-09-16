@@ -110,19 +110,23 @@ function verifySignature(header, rawBody) {
   }
 
   const base = `${t}.${rawBody}`;
-  const candidates = [
-    { key: CFG.secret, field: 'v1' },
-    ...(CFG.secretPrev ? [{ key: CFG.secretPrev, field: 'v2' }] : []),
-  ];
 
-  for (const c of candidates) {
-    const given = parts[c.field];
-    if (!given) continue;
-    const want = crypto.createHmac('sha256', c.key).update(base).digest('hex');
-    const a = Buffer.from(given, 'hex');
+  // ⚠️ HAR SEKRET HAR MAYDONGA qarshi tekshiriladi (`v1` VA `v2`) — pozitsiya
+  // bo'yicha EMAS. Aks holda kalit aylantirish ishlamaydi: jo'natuvchi yangi
+  // kalitni `v1` ga qo'yadi, qabul qiluvchi esa hali faqat eskisini biladi.
+  // Aylantirishning maqsadi tomonlar bir vaqtda almashtirmasligi edi.
+  const secrets = [CFG.secret, CFG.secretPrev].filter(Boolean);
+  for (const key of secrets) {
+    const want = crypto.createHmac('sha256', key).update(base).digest('hex');
     const b = Buffer.from(want, 'hex');
-    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
-      return { ok: true, matched: c.field };
+    for (const field of ['v1', 'v2']) {
+      const given = parts[field];
+      if (!given) continue;
+      let a;
+      try { a = Buffer.from(given, 'hex'); } catch { continue; }
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+        return { ok: true, matched: field };
+      }
     }
   }
   return { ok: false, why: 'imzo mos kelmadi' };
