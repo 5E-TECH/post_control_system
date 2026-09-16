@@ -11,6 +11,7 @@ import { UserEntity } from 'src/core/entity/users.entity';
 import { ShiftEntity } from 'src/core/entity/shift.entity';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { InvestorDistributionEntity } from 'src/core/entity/investor-distribution.entity';
+import { MarketplaceIntegrationEntity } from 'src/core/entity/marketplace-integration.entity';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { InvestorDistributionEntity } from 'src/core/entity/investor-distributio
       ShiftEntity,
       FinancialBalanceHistoryEntity,
       InvestorDistributionEntity,
+      MarketplaceIntegrationEntity,
     ]),
   ],
   controllers: [CasheBoxController],

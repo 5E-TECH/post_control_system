@@ -87,6 +87,7 @@ describe("OrderService ni QAYTA e'lon qilgan modullar", () => {
     'ExternalIntegrationModule', // ExternalIntegrationService
     'IntegrationSyncModule', // IntegrationSyncService
     'ExtraCostModule', // ExtraCostApplierService
+    'MarketplaceModule', // MarketplaceSyncService
   ];
 
   it("TC1: OrderModule konstruktor bog'liqliklarini beruvchi modullarni import qiladi", () => {

@@ -24,9 +24,11 @@ import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
 import { IntegrationSyncModule } from '../integration-sync/integration-sync.module';
 import { ExtraCostModule } from '../extra-cost/extra-cost.module';
+import { MarketplaceModule } from '../marketplace/marketplace.module';
 
 @Module({
   imports: [
+    MarketplaceModule,
     TypeOrmModule.forFeature([
       OrderEntity,
       OrderItemEntity,

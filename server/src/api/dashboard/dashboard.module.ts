@@ -21,9 +21,11 @@ import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
 import { IntegrationSyncModule } from '../integration-sync/integration-sync.module';
 import { ExtraCostModule } from '../extra-cost/extra-cost.module';
+import { MarketplaceModule } from '../marketplace/marketplace.module';
 
 @Module({
   imports: [
+    MarketplaceModule,
     TypeOrmModule.forFeature([
       OrderItemEntity,
       OrderEntity,
