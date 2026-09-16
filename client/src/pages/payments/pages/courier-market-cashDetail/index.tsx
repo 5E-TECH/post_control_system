@@ -10,6 +10,7 @@ import type { RootState } from "../../../../app/store";
 import { useTranslation } from "react-i18next";
 import CustomCalendar from "../../../../shared/components/customDate";
 import { Wallet, Clock, X, ArrowLeftRight, List } from "lucide-react";
+import { useExtraCost } from "../../../../shared/api/hooks/useExtraCost";
 
 const { RangePicker } = DatePicker;
 
@@ -67,6 +68,17 @@ const CashDetailMarketCourier = () => {
 
   const raw = Number(data?.data?.myCashbox?.balance || 0);
 
+  // ⚠️ KURYER KAMOMADI MUAMMOSI. Xarajat tasdiqlanmaguncha pul kassaga
+  // yozilmaydi, ya'ni kuryer balansi "to'liq qarz" ko'rsatadi va u kassirga
+  // borganda raqamlar to'g'ri kelmagandek tuyuladi. Shu qator aynan o'sha
+  // farqni tushuntiradi.
+  const { getCourierRequests } = useExtraCost();
+  const { data: myRequests } = getCourierRequests(
+    { limit: 1 },
+    role === "courier",
+  );
+  const pendingExtraCost = Number(myRequests?.pending_total ?? 0);
+
   return (
     <div className="min-h-full bg-gradient-to-br from-gray-50 via-purple-50/30 to-gray-50 dark:from-[#1E1B2E] dark:via-[#251F3D] dark:to-[#1E1B2E] px-4 sm:px-6 py-6">
       <div className="max-w-screen-2xl mx-auto flex gap-8 lg:gap-16 max-lg:flex-col">
@@ -94,6 +106,24 @@ const CashDetailMarketCourier = () => {
             show={show}
             setShow={setShow}
           />
+
+          {role === "courier" && pendingExtraCost > 0 && (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/40 dark:bg-amber-900/15">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-amber-700 dark:text-amber-400">
+                  Tasdiq kutilmoqda
+                </span>
+                <span className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                  {pendingExtraCost.toLocaleString("uz-UZ")} so'm
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-amber-700 dark:text-amber-400">
+                Bu summa hali balansingizga kirmagan. Market tasdiqlagandan
+                keyin hisobingizga o'tkaziladi — naqdni kassaga{" "}
+                <b>to'liq</b> topshirasiz.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right Section - Filters & History */}

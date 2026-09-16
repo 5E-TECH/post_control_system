@@ -772,6 +772,11 @@ export class UserService implements OnModuleInit {
           'user.require_operator_phone',
           'user.default_operator_phone',
           'user.secondary_operator_phone',
+          // Qo'shimcha xarajat nazorati — admin ro'yxatdan toggle holatini
+          // ko'rishi kerak. Select ro'yxati OQ RO'YXAT bo'lgani uchun yangi
+          // ustun bu yerga qo'shilmasa, UI'da har doim "o'chiq" ko'rinardi.
+          'user.extra_cost_proof_required',
+          'user.extra_cost_auto_approve_under',
           'cashbox', // cashboxni to'liq olish uchun
         ]);
 
@@ -1399,6 +1404,13 @@ export class UserService implements OnModuleInit {
         throw new NotFoundException('Market not found');
       }
       const beforeStatus = market.status;
+      // Qo'shimcha xarajat nazorati — PUL sozlamasi, shuning uchun o'zgarishi
+      // alohida loglanadi. `logUserMutation` faqat status/rol/parolni ko'radi,
+      // ya'ni bayroqni o'chirish aks holda JIMGINA o'tib ketardi.
+      const beforeProofRequired = market.extra_cost_proof_required;
+      const beforeAutoApproveUnder = Number(
+        market.extra_cost_auto_approve_under ?? 0,
+      );
 
       if (otherFields.phone_number) {
         const isExistPhoneNumber = await this.userRepo.findOne({
@@ -1432,6 +1444,12 @@ export class UserService implements OnModuleInit {
         beforeStatus,
         passwordChanged: !!password,
         roleLabel: 'Market',
+        actor,
+      });
+      this.logExtraCostSettingChange({
+        market: updatedMarket,
+        beforeProofRequired,
+        beforeAutoApproveUnder,
         actor,
       });
       return successRes(updatedMarket, 200, 'Market updated');
@@ -1727,6 +1745,75 @@ export class UserService implements OnModuleInit {
   // Foydalanuvchi yangilanishini loglaydi va sezgir o'zgarishlarni alohida
   // action sifatida ajratadi (bloklash, blokdan chiqarish, rol o'zgarishi,
   // parol o'zgarishi). Parol HECH QACHON saqlanmaydi — faqat flag.
+  /**
+   * Qo'shimcha xarajat nazorati sozlamasining o'zgarishini loglaydi.
+   *
+   * NEGA ALOHIDA. Bu bayroq PULNI boshqaradi: yoqilgan bo'lsa kuryer xarajati
+   * market tasdig'igacha kassaga yozilmaydi. Uni o'chirish — nazoratni
+   * o'chirish demak, va bu keyinchalik "kim, qachon o'chirgan?" degan savolga
+   * javob talab qiladi. `logUserMutation` esa faqat status/rol/parolni ko'radi.
+   *
+   * `entity_type: 'user'` — sozlama market yozuvida yashaydi, buyurtmada emas.
+   */
+  private logExtraCostSettingChange(params: {
+    market: UserEntity;
+    beforeProofRequired: boolean;
+    beforeAutoApproveUnder: number;
+    actor?: JwtPayload;
+  }): void {
+    const { market, beforeProofRequired, beforeAutoApproveUnder, actor } =
+      params;
+    const afterProofRequired = !!market.extra_cost_proof_required;
+    const afterAutoApproveUnder = Number(
+      market.extra_cost_auto_approve_under ?? 0,
+    );
+
+    const proofChanged = !!beforeProofRequired !== afterProofRequired;
+    const limitChanged = beforeAutoApproveUnder !== afterAutoApproveUnder;
+    if (!proofChanged && !limitChanged) return;
+
+    const parts: string[] = [];
+    if (proofChanged) {
+      parts.push(
+        afterProofRequired
+          ? "isbot va market tasdig'i YOQILDI"
+          : "isbot va market tasdig'i O'CHIRILDI",
+      );
+    }
+    if (limitChanged) {
+      parts.push(
+        afterAutoApproveUnder > 0
+          ? `avtomatik tasdiq chegarasi: ${afterAutoApproveUnder.toLocaleString('uz-UZ')} so'm`
+          : "avtomatik tasdiq chegarasi o'chirildi",
+      );
+    }
+
+    this.activityLog.log({
+      entity_type: 'user',
+      entity_id: market.id,
+      action: 'extra_cost_proof_flag_changed',
+      old_value: {
+        ...(proofChanged
+          ? { extra_cost_proof_required: !!beforeProofRequired }
+          : {}),
+        ...(limitChanged
+          ? { extra_cost_auto_approve_under: beforeAutoApproveUnder }
+          : {}),
+      },
+      new_value: {
+        name: market.name,
+        ...(proofChanged
+          ? { extra_cost_proof_required: afterProofRequired }
+          : {}),
+        ...(limitChanged
+          ? { extra_cost_auto_approve_under: afterAutoApproveUnder }
+          : {}),
+      },
+      description: `Qo'shimcha xarajat nazorati — ${market.name}: ${parts.join(', ')}`,
+      user: actor,
+    });
+  }
+
   private logUserMutation(params: {
     user: { id: string; name: string; role: string; status: string };
     beforeStatus?: string;

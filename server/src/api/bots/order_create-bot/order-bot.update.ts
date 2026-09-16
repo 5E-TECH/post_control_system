@@ -14,6 +14,13 @@ import {
   Update as TgUpdate,
 } from 'telegraf/typings/core/types/typegram';
 import { randomBytes } from 'crypto';
+import { forwardRef, Inject } from '@nestjs/common';
+import { ExtraCostDecisionService } from 'src/api/extra-cost/extra-cost-decision.service';
+import {
+  EC_REJECT_REASONS,
+  ExtraCostTelegramService,
+} from 'src/api/extra-cost/extra-cost-telegram.service';
+import { Roles } from 'src/common/enums';
 import { OrderBotService } from './order-bot.service';
 import {
   AiOrderService,
@@ -108,6 +115,12 @@ export class OrderBotUpdate {
     private readonly aiOrderService: AiOrderService,
     private readonly aiBalanceService: AiBalanceService,
     private readonly logger: MyLogger,
+    // ⚠️ `forwardRef` — `ExtraCostModule` ham `OrderBotModule` ni import
+    // qiladi (marketga xabar uchun). Modul sikli shu bilan yopiladi.
+    @Inject(forwardRef(() => ExtraCostDecisionService))
+    private readonly extraCostDecisions: ExtraCostDecisionService,
+    @Inject(forwardRef(() => ExtraCostTelegramService))
+    private readonly extraCostTelegram: ExtraCostTelegramService,
   ) {}
 
   @Start()
@@ -1609,6 +1622,13 @@ export class OrderBotUpdate {
     const callback = ctx.callbackQuery as { data?: string } | undefined;
     const data = callback?.data ? String(callback.data) : '';
 
+    // ⚠️ `ec:` — qo'shimcha xarajat qarori. `order:` dan OLDIN tekshiriladi,
+    // chunki quyidagi tarmoq `order:` bo'lmagan hamma narsani jimgina yopadi.
+    if (data.startsWith('ec:')) {
+      await this.handleExtraCostCallback(ctx, data);
+      return;
+    }
+
     if (data.startsWith('order_ai:')) {
       try {
         await this.handleAiCallback(ctx, data);
@@ -1661,6 +1681,123 @@ export class OrderBotUpdate {
       await ctx.answerCbQuery(response.message || '✅', { show_alert: false });
     } catch (error) {
       await ctx.answerCbQuery(getErrorMessage(error), { show_alert: true });
+    }
+  }
+
+  /**
+   * QO'SHIMCHA XARAJAT QARORI — Telegram tugmalari.
+   *
+   * Callback formati:
+   *   `ec:a:<id>`        — tasdiqlash (PUL HARAKAT QILADI)
+   *   `ec:r:<id>`        — rad etish sabablari ro'yxatini ochish
+   *   `ec:r:<id>:<kod>`  — tanlangan sabab bilan rad etish
+   *   `ec:b:<id>`        — orqaga (asosiy tugmalarga qaytish)
+   *
+   * ⚠️ AVTORIZATSIYA ODAM BO'YICHA (`from.id`), CHAT BO'YICHA EMAS.
+   * Mavjud `order:` oqimi `chat.id` ni guruhga solishtiradi — bu guruhdagi
+   * HAR KIMGA (jumladan xarajatni yozgan kuryerga) huquq berardi. Pul
+   * qarorida bu yo'l takrorlanmaydi: tugmani bosgan odam market EGASI
+   * bo'lishi shart.
+   *
+   * ⚠️ IKKINCHI QATLAM — `ExtraCostDecisionService` ning atomik darvozasi
+   * `market_id = user.id` shartini SQL ichida qo'yadi. Ya'ni bu yerdagi
+   * tekshiruv chetlab o'tilsa ham begona so'rov o'zgarmaydi.
+   */
+  private async handleExtraCostCallback(ctx: MyContext, data: string) {
+    const [, action, requestId, reasonCode] = data.split(':');
+
+    if (!action || !requestId) {
+      await ctx.answerCbQuery("Noto'g'ri buyruq", { show_alert: true });
+      return;
+    }
+
+    const owner = await this.extraCostTelegram.resolveMarketOwner(
+      ctx.from?.id,
+    );
+    if (!owner) {
+      await ctx.answerCbQuery(
+        "Bu qarorni faqat market egasi qabul qila oladi.",
+        { show_alert: true },
+      );
+      return;
+    }
+    const actor = { id: owner.id, role: Roles.MARKET } as any;
+
+    try {
+      // ── Sabablar ro'yxatini ochish ────────────────────────────────────
+      if (action === 'r' && !reasonCode) {
+        await ctx.editMessageReplyMarkup(
+          this.extraCostTelegram.reasonKeyboard(requestId),
+        );
+        await ctx.answerCbQuery('Sababni tanlang');
+        return;
+      }
+
+      // ── Orqaga ────────────────────────────────────────────────────────
+      if (action === 'b') {
+        await ctx.editMessageReplyMarkup(
+          this.extraCostTelegram.decisionKeyboard(requestId),
+        );
+        await ctx.answerCbQuery();
+        return;
+      }
+
+      // ── Rad etish (sabab bilan) ───────────────────────────────────────
+      if (action === 'r') {
+        const reason = EC_REJECT_REASONS[reasonCode];
+        if (!reason) {
+          await ctx.answerCbQuery("Noma'lum sabab", { show_alert: true });
+          return;
+        }
+        const req = await this.extraCostDecisions.reject(
+          requestId,
+          actor,
+          reason,
+        );
+        await this.finishExtraCost(
+          ctx,
+          `❌ #${req.order_number} — rad etildi\nSabab: ${reason}`,
+        );
+        await ctx.answerCbQuery('Rad etildi');
+        return;
+      }
+
+      // ── Tasdiqlash ────────────────────────────────────────────────────
+      if (action === 'a') {
+        const req = await this.extraCostDecisions.approve(requestId, actor);
+        const sum = Number(req.amount).toLocaleString('uz-UZ');
+        await this.finishExtraCost(
+          ctx,
+          `✅ #${req.order_number} — tasdiqlandi\n${sum} so'm kuryerga o'tkazildi`,
+        );
+        await ctx.answerCbQuery('Tasdiqlandi');
+        return;
+      }
+
+      await ctx.answerCbQuery("Noma'lum amal", { show_alert: true });
+    } catch (error) {
+      // 409 "allaqachon ko'rib chiqilgan" — eng ko'p uchraydigan holat
+      // (market qarorni paneldan qabul qilgan). Xabar tushunarli bo'lsin.
+      await ctx.answerCbQuery(getErrorMessage(error), { show_alert: true });
+      try {
+        await ctx.editMessageReplyMarkup(undefined);
+      } catch {
+        /* xabar o'chirilgan bo'lishi mumkin */
+      }
+    }
+  }
+
+  /** Qarordan keyin tugmalarni olib tashlab, natijani xabarga yozadi. */
+  private async finishExtraCost(ctx: MyContext, resultText: string) {
+    try {
+      await ctx.editMessageReplyMarkup(undefined);
+    } catch {
+      /* xabar juda eski bo'lsa tahrirlab bo'lmaydi */
+    }
+    try {
+      await ctx.reply(resultText);
+    } catch {
+      /* chat yopilgan */
     }
   }
 }

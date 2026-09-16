@@ -33,7 +33,8 @@ if [[ -f "$ROOT_DIR/.env" ]]; then
   }
   : "${DB_URL:=$(env_get DB_URL)}"
   : "${S3_BACKUP_BUCKET:=$(env_get S3_BACKUP_BUCKET)}"
-  export DB_URL S3_BACKUP_BUCKET
+  : "${UPLOAD_ROOT:=$(env_get UPLOAD_ROOT)}"
+  export DB_URL S3_BACKUP_BUCKET UPLOAD_ROOT
 fi
 
 if [[ -z "${DB_URL:-}" ]]; then
@@ -84,7 +85,75 @@ else
   echo "⚠️  S3_BACKUP_BUCKET o'rnatilmagan — faqat lokal backup saqlandi."
 fi
 
-# ----- 3. Lokal eski backuplarni tozalash (oxirgi 3 tasi qoladi) -----
+# ----- 3. QO'SHIMCHA XARAJAT ISBOTLARI (foto) -----
+#
+# ⚠️ NEGA pg_dump YETARLI EMAS. Isbot fayllari DISKDA yashaydi, bazada esa
+# faqat ularga havola (`extra_cost_proof.rel_path`) turadi. Faqat DB backup
+# qilinsa, tiklangandan keyin yozuv bor-u FAYL YO'Q bo'ladi — ya'ni market
+# bilan kuryer o'rtasidagi pul nizosining yagona dalili yo'qoladi.
+#
+# Inkremental emas, TO'LIQ arxiv: fayllar hech qachon o'zgartirilmaydi (faqat
+# qo'shiladi va TTL bo'yicha o'chiriladi), shuning uchun arxiv hajmi
+# bashoratli o'sadi. Siqilgan foto ~300 KB, kuniga ~200 ta ≈ 60 MB/kun.
+
+PROOF_DIR="${UPLOAD_ROOT:-}/extra-cost-proofs"
+
+if [[ -n "${UPLOAD_ROOT:-}" && -d "$PROOF_DIR" ]]; then
+  PROOF_FILENAME="proofs-backup-$TIMESTAMP.tar.gz"
+  PROOF_FILE="$BACKUP_DIR/$PROOF_FILENAME"
+  # `|| true` SHART: `set -euo pipefail` da find'ning bitta "Permission denied"
+  # xatosi ham butun skriptni to'xtatardi — DB backup allaqachon tayyor bo'lsa
+  # ham deploy to'xtab qolardi.
+  PROOF_COUNT=$(find "$PROOF_DIR" -type f 2>/dev/null | wc -l || true)
+
+  echo "🧾 Isbot fayllari arxivlanmoqda: $PROOF_COUNT ta fayl"
+
+  # ⚠️ `tar` ning 1-kodi FATAL EMAS.
+  #
+  # Kuryer aynan shu paytda isbot yuklayotgan bo'lsa (multer faylni diskka
+  # yozmoqda) yoki orfan-tozalash CRON fayl o'chirayotgan bo'lsa, tar
+  # «file changed as we read it» deb EXIT 1 qaytaradi. `set -e` da bu BUTUN
+  # backup'ni yiqitardi va deploy to'xtardi — holbuki arxiv yaratilgan va
+  # deyarli to'liq bo'ladi.
+  #
+  # 1 = ogohlantirish (fayl o'zgardi/yo'qoldi) → davom etamiz
+  # 2 = haqiqiy xato (disk to'lgan, yo'l yo'q) → to'xtaymiz
+  TAR_EXIT=0
+  tar -czf "$PROOF_FILE" -C "$UPLOAD_ROOT" extra-cost-proofs || TAR_EXIT=$?
+  if [[ "$TAR_EXIT" -ge 2 ]]; then
+    echo "❌ Isbot arxivini yaratib bo'lmadi (tar exit $TAR_EXIT)" >&2
+    exit 1
+  elif [[ "$TAR_EXIT" -eq 1 ]]; then
+    echo "⚠️  Arxivlash paytida ayrim fayllar o'zgardi/o'chdi (tar exit 1)." >&2
+    echo "    Arxiv yaratildi va ishlatsa bo'ladi — davom etilmoqda." >&2
+  fi
+
+  PROOF_SIZE=$(du -h "$PROOF_FILE" | cut -f1)
+  echo "✅ Isbot arxivi tayyor: $PROOF_FILE ($PROOF_SIZE)"
+
+  if [[ -n "${S3_BACKUP_BUCKET:-}" ]]; then
+    PROOF_S3_KEY="proof-backups/$PROOF_FILENAME"
+    echo "☁️  S3 ga yuklanmoqda: s3://$S3_BACKUP_BUCKET/$PROOF_S3_KEY"
+    if ! aws s3 cp "$PROOF_FILE" "s3://$S3_BACKUP_BUCKET/$PROOF_S3_KEY" \
+          --storage-class STANDARD_IA \
+          --only-show-errors; then
+      echo "❌ Isbot arxivini S3 ga yuklash muvaffaqiyatsiz!" >&2
+      exit 1
+    fi
+    echo "✅ Isbot arxivi S3 ga yuklandi"
+  fi
+
+  # Lokal isbot arxivlaridan oxirgi 3 tasi (DB backup bilan bir xil siyosat)
+  ( cd "$BACKUP_DIR" && ls -1t proofs-backup-*.tar.gz 2>/dev/null \
+      | tail -n +$(( ${KEEP_LOCAL_BACKUPS:-3} + 1 )) | xargs -r rm -f ) || true
+elif [[ -z "${UPLOAD_ROOT:-}" ]]; then
+  echo "⚠️  UPLOAD_ROOT o'rnatilmagan — isbot fayllari ARXIVLANMADI." >&2
+  echo "    Qo'shimcha xarajat isboti yoqilgan bo'lsa, bu MA'LUMOT YO'QOTISH xavfi." >&2
+else
+  echo "ℹ️  Isbot papkasi hali yaratilmagan ($PROOF_DIR) — o'tkazib yuborildi."
+fi
+
+# ----- 4. Lokal eski backuplarni tozalash (oxirgi 3 tasi qoladi) -----
 KEEP_LOCAL="${KEEP_LOCAL_BACKUPS:-3}"
 cd "$BACKUP_DIR"
 DELETED=$(ls -1t db-backup-*.sql.gz 2>/dev/null | tail -n +$((KEEP_LOCAL + 1)) | xargs -r rm -v || true)

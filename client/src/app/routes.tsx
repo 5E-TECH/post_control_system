@@ -132,6 +132,12 @@ const CourierOldMails = lazy(
 );
 const FinancialHistory = lazy(() => import("../pages/payments/pages/financial-history"));
 const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
+const MarketExtraCost = lazy(
+  () => import("../pages/extra-cost-requests/market"),
+);
+const CourierExtraCost = lazy(
+  () => import("../pages/extra-cost-requests/courier"),
+);
 const Integrations = lazy(
   () => import("../pages/integrations/IntegrationsRoot"),
 );
@@ -359,6 +365,26 @@ const AppRouters = () => {
               ],
             },
             { path: "cash-box", element: <CashDetailMarketCourier /> },
+            // Qo'shimcha xarajat — market tasdiqlash sahifasi.
+            // ⚠️ `RequireRole` SHART: market sahifalarining ko'pchiligi
+            // hozir himoyasiz, lekin bu sahifa PUL qarorini qabul qiladi.
+            {
+              path: "extra-cost",
+              element: (
+                <RequireRole roles={["market"]}>
+                  <MarketExtraCost />
+                </RequireRole>
+              ),
+            },
+            // Kuryer — o'z so'rovlari va holatlari.
+            {
+              path: "my-extra-cost",
+              element: (
+                <RequireRole roles={["courier"]}>
+                  <CourierExtraCost />
+                </RequireRole>
+              ),
+            },
             { path: "ai-balance", element: <MarketAiBalance /> },
             { path: "my-region", element: <MyRegion /> },
             // Rollar endi Settings ichida — eski URL redirect

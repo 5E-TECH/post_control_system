@@ -22,6 +22,7 @@ import { MyLogger } from 'src/logger/logger.service';
 import { OrderModule } from 'src/api/order/order.module';
 import { AiBalanceModule } from 'src/api/ai-balance/ai-balance.module';
 import { AiUsageModule } from 'src/api/ai-usage/ai-usage.module';
+import { ExtraCostModule } from 'src/api/extra-cost/extra-cost.module';
 
 @Module({
   imports: [
@@ -67,6 +68,10 @@ import { AiUsageModule } from 'src/api/ai-usage/ai-usage.module';
     forwardRef(() => AiBalanceModule),
     // Order-AI real xarajatini (ai_usage_log) yozish uchun.
     AiUsageModule,
+    // Qo'shimcha xarajat qarori Telegram tugmalari orqali ham qabul qilinadi
+    // (`OrderBotUpdate.handleExtraCostCallback`). `ExtraCostModule` ham
+    // bu modulni import qiladi — sikl forwardRef bilan yopiladi.
+    forwardRef(() => ExtraCostModule),
   ],
   controllers: [BotBroadcastController],
   providers: [

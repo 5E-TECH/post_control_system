@@ -73,6 +73,11 @@ import {
   cancelExtraCostLimit,
   sellExtraCostLimit,
 } from './utils/extra-cost-limit.util';
+import { resolveExtraCostPolicy } from './utils/extra-cost-policy.util';
+import { ExtraCostApplierService } from '../extra-cost/extra-cost-applier.service';
+import { ExtraCostRequestService } from '../extra-cost/extra-cost-request.service';
+import { ExtraCostRequestEntity } from 'src/core/entity/extra-cost-request.entity';
+import { ExtraCostAction } from 'src/common/enums';
 import { FinancialBalanceHistoryEntity } from 'src/core/entity/financial-balance-history.entity';
 import { calculateFinancialBalance } from 'src/common/utils/financial-balance.util';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -139,6 +144,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     private readonly externalIntegrationService: ExternalIntegrationService,
     private readonly integrationSyncService: IntegrationSyncService,
     private readonly activityLog: ActivityLogService,
+    // Qo'shimcha xarajatni kassaga yozuvchi YAGONA joy. Avval bu mantiq
+    // sotuv/qisman sotuv/bekor qilishda uch nusxada takrorlangan edi.
+    private readonly extraCostApplier: ExtraCostApplierService,
+    // Kechiktirilgan xarajat so'rovlarini yaratadi/bekor qiladi.
+    private readonly extraCostRequests: ExtraCostRequestService,
   ) {
     super(orderRepo);
   }
@@ -2502,6 +2512,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     };
 
     try {
+      // Kechiktirilgan xarajat so'rovi (bo'lsa) — commit'dan KEYIN marketga
+      // xabar yuborish uchun saqlanadi.
+      let createdExtraCostRequest: ExtraCostRequestEntity | null = null;
       // Pessimistic write lock — ikki marta sotishni bloklaydi
       const order = await queryRunner.manager.findOne(OrderEntity, {
         where: { id, status: Order_status.WAITING },
@@ -2595,10 +2608,35 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             ? courier.tariff_center
             : courier.tariff_home;
 
+      // ⚠️ `Math.trunc` SHART: kassa ustunlari `bigint`, kasrli qiymat INSERT
+      // xatosi berib BUTUN sotuvni rollback qilardi (mijoz oldida yiqilgan
+      // sotuv). DTO ham `@IsInt()` bilan himoyalangan — bu ikkinchi devor.
+      const extraCost = sellDto.extraCost
+        ? Math.trunc(Number(String(sellDto.extraCost).replace(/[^\d.-]/g, '')))
+        : 0;
+
+      // Siyosat IZOHDAN OLDIN kerak: kechiktirilgan xarajatda «pul ushlab
+      // qolingan» deb yozish YOLG'ON bo'lardi — pul hali hech qayerga
+      // yozilmagan va market rad etishi ham mumkin.
+      const extraCostPolicy = resolveExtraCostPolicy({
+        amount: extraCost,
+        market,
+        courier,
+        actionType: ExtraCostAction.SELL,
+      });
+      const extraCostDeferred = extraCostPolicy.mode === 'deferred';
+
       const finalComment = generateComment(
         order.comment || '',
         sellDto.comment || '',
-        sellDto.extraCost || 0,
+        // Kechiktirilganda summa izohga TUSHMAYDI — o'rniga aniq matn.
+        extraCostDeferred ? 0 : extraCost,
+        extraCostDeferred
+          ? [
+              `Qo'shimcha xarajat ${extraCost.toLocaleString('uz-UZ')} so'm — ` +
+                "market tasdig'iga yuborildi",
+            ]
+          : [],
       );
 
       let to_be_paid = 0;
@@ -2759,11 +2797,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // === Extra cost (agar bo'lsa) ===
-      // Telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun raqamga aylantirish
-      const extraCost = sellDto.extraCost
-        ? Number(String(sellDto.extraCost).replace(/[^\d.-]/g, ''))
-        : 0;
-
       if (extraCost > 0) {
         /**
          * Chegara `sellExtraCostLimit`da — sotuv, bekor qilish va qisman
@@ -2782,26 +2815,65 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           tariffCenter: Number(courier.tariff_center ?? 0),
           tariffHome: Number(courier.tariff_home ?? 0),
         });
-        await Promise.all([
-          updateCashbox(
-            marketCashbox,
-            Operation_type.EXPENSE,
-            extraCost,
-            order.id,
-            Source_type.EXTRA_COST,
-            finalComment,
+
+        // ⚠️ ISBOT TEKSHIRUVI PUL HARAKATIDAN OLDIN. Bu yerda xato tashlansa
+        // tranzaksiya hali hech narsa yozmagan bo'ladi; keyinroq tekshirilsa
+        // "yarim bajarilgan sotuv" xavfi tug'ilardi.
+        const extraCostProofs =
+          await this.extraCostRequests.assertProofRequirement(
+            extraCostPolicy,
+            sellDto,
             courier.id,
-          ),
-          updateCashbox(
-            courierCashbox,
-            Operation_type.EXPENSE,
-            extraCost,
-            order.id,
-            Source_type.EXTRA_COST,
-            finalComment,
-            courier.id,
-          ),
-        ]);
+          );
+
+        // Bir buyurtmada bir vaqtda faqat BITTA ochiq so'rov bo'lishi mumkin
+        // (`UQ_ECR_ORDER_OPEN`). Indeks oxirgi devor — u 500 beradi, bu
+        // tekshiruv esa kuryerga tushunarli o'zbekcha xabar.
+        if (
+          extraCostPolicy.mode === 'deferred' &&
+          (await this.extraCostRequests.hasOpenRequest(queryRunner, order.id))
+        ) {
+          throw new BadRequestException(
+            "Bu buyurtmada allaqachon tasdiq kutayotgan qo'shimcha xarajat bor",
+          );
+        }
+
+        let extraCostHistoryIds: {
+          marketHistoryId: string;
+          courierHistoryId: string;
+        } | null = null;
+
+        if (extraCostPolicy.mode === 'immediate') {
+          extraCostHistoryIds = await this.extraCostApplier.applyInline(
+            queryRunner,
+            {
+              marketCashbox,
+              courierCashbox,
+              orderId: order.id,
+              amount: extraCost,
+              comment: finalComment,
+              createdBy: courier.id,
+              marketId,
+              courierId: courier.id,
+            },
+          );
+        }
+        // `deferred` bo'lsa KASSAGA HECH NARSA YOZILMAYDI — pul faqat market
+        // tasdiqlaganda harakat qiladi.
+
+        createdExtraCostRequest = await this.extraCostRequests.record(queryRunner, {
+          order,
+          market,
+          courier,
+          policy: extraCostPolicy,
+          amount: extraCost,
+          actionType: ExtraCostAction.SELL,
+          limitMax: limit.max,
+          courierTariff: Number(courierTarif ?? 0),
+          input: sellDto,
+          proofs: extraCostProofs,
+          historyIds: extraCostHistoryIds,
+        });
       }
 
       // === MOLIYAVIY TAROZI: pochta foydasi ===
@@ -2830,6 +2902,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+      // Marketga xabar — commit'dan KEYIN, `await`SIZ. Telegram sekin yoki
+      // ishlamay qolsa ham sotuv oqimi TO'XTAMASLIGI kerak.
+      this.extraCostRequests.notifyMarketAboutRequest(
+        createdExtraCostRequest,
+        courier?.name,
+      );
 
       // Activity log
       this.activityLog.log({
@@ -2842,8 +2920,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           status: order.status,
           total_price: order.total_price,
           paid_amount: order.paid_amount,
+          // Qo'shimcha xarajat AVVAL faqat bekor qilish logida bor edi.
+          // Aynan shu bo'shliq "kuryerlar sababsiz xarajat yozmoqda"
+          // shikoyatini TEKSHIRIB BO'LMAYDIGAN qilgan: sotuvlarda kim,
+          // qachon, qancha yozgani jurnalda umuman ko'rinmasdi.
+          extra_cost: extraCost || undefined,
         },
-        description: `Buyurtma #${order.order_number} sotildi — ${order.total_price} so'm (${orderStatusUz(order.status)})`,
+        description: `Buyurtma #${order.order_number} sotildi — ${order.total_price} so'm (${orderStatusUz(order.status)})${
+          extraCost ? ` (qo'shimcha xarajat: ${extraCost} so'm)` : ''
+        }`,
         user,
       });
 
@@ -2911,6 +2996,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
+      // Kechiktirilgan xarajat so'rovi (bo'lsa) — commit'dan KEYIN marketga
+      // xabar yuborish uchun saqlanadi.
+      let createdExtraCostRequest: ExtraCostRequestEntity | null = null;
       // 1) Pessimistic write lock — relations'siz (PG outer join FOR UPDATE'ni qabul qilmaydi)
       const lockedOrder = await queryRunner.manager.findOne(OrderEntity, {
         where: { id },
@@ -2980,21 +3068,46 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
             ? courier.tariff_center
             : courier.tariff_home;
 
+      // Extra cost ni raqamga aylantirish (telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun)
+      // ⚠️ `Math.trunc` SHART — kassa ustunlari `bigint`, kasr INSERT xatosi.
+      const extraCost = cancelOrderDto.extraCost
+        ? Math.trunc(
+            Number(String(cancelOrderDto.extraCost).replace(/[^\d.-]/g, '')),
+          )
+        : 0;
+
+      // Siyosat IZOHDAN OLDIN — kechiktirilgan xarajatda «pul ushlab
+      // qolingan» deb yozish yolg'on bo'lardi (pul hali harakat qilmagan).
+      const extraCostPolicy = resolveExtraCostPolicy({
+        amount: extraCost,
+        market,
+        courier,
+        actionType: ExtraCostAction.CANCEL,
+      });
+      const extraCostDeferred = extraCostPolicy.mode === 'deferred';
+
       const finalComment = generateComment(
         order.comment,
         cancelOrderDto.comment,
-        cancelOrderDto.extraCost,
+        extraCostDeferred ? 0 : extraCost,
+        extraCostDeferred
+          ? [
+              `Qo'shimcha xarajat ${extraCost.toLocaleString('uz-UZ')} so'm — ` +
+                "market tasdig'iga yuborildi",
+            ]
+          : [],
       );
-      // Extra cost ni raqamga aylantirish (telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun)
-      const extraCost = cancelOrderDto.extraCost
-        ? Number(String(cancelOrderDto.extraCost).replace(/[^\d.-]/g, ''))
-        : 0;
 
       if (extraCost > 0) {
         // Bekor qilish qoidasi SOTUVDAN boshqa va shunday qolishi kerak:
         // kuryer borib qaytdi, vaqt-yoqilg'i sarfladi, lekin yetkazmadi.
         // Shu bois maksimal = o'sha buyurtma uchun belgilangan kuryer tarifi
         // (uyga/markazga ajratilmaydi — xarajat ikkisida ham real).
+        //
+        // ⚠️ Chegara tekshiruvi endi YAGONA util orqali o'tadi. Avval bu yerda
+        // qo'lda `if (extraCost > limit.max) throw` yozilgan edi — ya'ni
+        // `assertExtraCostWithinLimit` dan AJRALIB chiqqan nusxa. Xato matni
+        // saqlanadi (kuryerlar unga o'rgangan), lekin qaror bitta joydan.
         const limit = cancelExtraCostLimit({ courierTariff: courierTarif });
         if (extraCost > limit.max) {
           throw new BadRequestException(
@@ -3016,37 +3129,59 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         if (!courierCashbox) {
           throw new NotFoundException();
         }
-        courierCashbox.balance -= extraCost;
-        await queryRunner.manager.save(courierCashbox);
-        marketCashbox.balance -= extraCost;
-        await queryRunner.manager.save(marketCashbox);
 
-        const courierHistory = queryRunner.manager.create(
-          CashboxHistoryEntity,
-          {
-            operation_type: Operation_type.EXPENSE,
-            cashbox_id: courierCashbox.id,
-            source_type: Source_type.EXTRA_COST,
-            source_id: order.id,
-            amount: extraCost,
-            balance_after: courierCashbox.balance,
-            comment: finalComment,
-            created_by: currentUser.id,
-          },
-        );
-        await queryRunner.manager.save(courierHistory);
+        // ⚠️ ISBOT TEKSHIRUVI PUL HARAKATIDAN OLDIN.
+        const extraCostProofs =
+          await this.extraCostRequests.assertProofRequirement(
+            extraCostPolicy,
+            cancelOrderDto,
+            currentUser.id,
+          );
 
-        const marketHistory = queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.EXPENSE,
-          cashbox_id: marketCashbox.id,
-          source_type: Source_type.EXTRA_COST,
-          source_id: order.id,
+        if (
+          extraCostDeferred &&
+          (await this.extraCostRequests.hasOpenRequest(queryRunner, order.id))
+        ) {
+          throw new BadRequestException(
+            "Bu buyurtmada allaqachon tasdiq kutayotgan qo'shimcha xarajat bor",
+          );
+        }
+
+        let extraCostHistoryIds: {
+          marketHistoryId: string;
+          courierHistoryId: string;
+        } | null = null;
+
+        if (extraCostPolicy.mode === 'immediate') {
+          extraCostHistoryIds = await this.extraCostApplier.applyInline(
+            queryRunner,
+            {
+              marketCashbox,
+              courierCashbox,
+              orderId: order.id,
+              amount: extraCost,
+              comment: finalComment,
+              createdBy: currentUser.id,
+              marketId,
+              courierId: currentUser.id,
+            },
+          );
+        }
+        // `deferred` bo'lsa KASSAGA HECH NARSA YOZILMAYDI.
+
+        createdExtraCostRequest = await this.extraCostRequests.record(queryRunner, {
+          order,
+          market,
+          courier,
+          policy: extraCostPolicy,
           amount: extraCost,
-          balance_after: marketCashbox.balance,
-          comment: finalComment,
-          created_by: currentUser.id,
+          actionType: ExtraCostAction.CANCEL,
+          limitMax: limit.max,
+          courierTariff: Number(courierTarif ?? 0),
+          input: cancelOrderDto,
+          proofs: extraCostProofs,
+          historyIds: extraCostHistoryIds,
         });
-        await queryRunner.manager.save(marketHistory);
       }
 
       Object.assign(order, {
@@ -3109,6 +3244,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       await queryRunner.commitTransaction();
+      // Marketga xabar — commit'dan KEYIN, `await`SIZ. Telegram sekin yoki
+      // ishlamay qolsa ham sotuv oqimi TO'XTAMASLIGI kerak.
+      this.extraCostRequests.notifyMarketAboutRequest(
+        createdExtraCostRequest,
+        courier?.name,
+      );
 
       // Activity log
       this.activityLog.log({
@@ -3185,6 +3326,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     };
 
     try {
+      // Kechiktirilgan xarajat so'rovi (bo'lsa) — commit'dan KEYIN marketga
+      // xabar yuborish uchun saqlanadi.
+      let createdExtraCostRequest: ExtraCostRequestEntity | null = null;
       const { order_item_info, totalPrice, extraCost, comment } = partlySoldDto;
 
       // 1️⃣ Check order — avval lockni faqat order'ga qo'yamiz (PG FOR UPDATE outer join'ni rad etadi)
@@ -3302,11 +3446,104 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       // 🧩 Jami sonlar solishtiriladi
-      const totalOldQty = oldOrderItems.reduce((acc, i) => acc + i.quantity, 0);
-      const totalNewQty = order_item_info.reduce(
-        (acc, i) => acc + i.quantity,
+      //
+      // ⚠️ `Number(...)` MAJBURIY. `order_item_info` da `@ValidateNested`/
+      // `@Type` yo'q (`partly-sold.dto.ts`), ya'ni elementlar xom holda
+      // qoladi va `quantity` satr bo'lishi mumkin. U holda `0 + "1"` = `"01"`
+      // (satr ulash) bo'lib, quyidagi `totalNewQty === totalOldQty` solishtiruvi
+      // HECH QACHON to'g'ri bo'lmasdi — ya'ni yashirin chegirma darvozasi
+      // jimgina o'chib qolardi. Manfiy dona ham soxta "kamayish" yasab,
+      // aynan shu darvozani aylanib o'tardi.
+      const qtyOf = (q: unknown) => Math.max(0, Math.trunc(Number(q) || 0));
+      const totalOldQty = oldOrderItems.reduce(
+        (acc, i) => acc + qtyOf(i.quantity),
         0,
       );
+      const totalNewQty = order_item_info.reduce(
+        (acc, i) => acc + qtyOf(i.quantity),
+        0,
+      );
+
+      /**
+       * ═══════════ YASHIRIN CHEGIRMA (aylanma yo'l) DARVOZASI ═══════════
+       *
+       * MUAMMO. Kuryer mahsulot sonini O'ZGARTIRMASDAN `totalPrice` ni
+       * pasaytirsa, AYNAN qo'shimcha xarajat bilan bir xil pul natijasiga
+       * erishadi: market kamroq oladi, kuryer esa farqni o'zida qoldiradi.
+       * Lekin bu yo'lda hech qanday himoya YO'Q EDI:
+       *
+       *   `partly-sold.dto.ts` da `totalPrice` uchun faqat `@Min(0)` bor,
+       *   YUQORI CHEGARA yo'q; `const price = Number(totalPrice)` esa uni
+       *   to'g'ridan-to'g'ri ishlatadi; dona faqat `totalNewQty < totalOldQty`
+       *   bo'lsagina kamaytiriladi.
+       *
+       * Ya'ni qo'shimcha xarajatga isbot va tasdiq qo'yilsa-yu, bu yo'l ochiq
+       * qolsa, kuryerlar birinchi haftada shu yerga o'tadi va butun ish
+       * BITTA `if` bilan aylanib o'tiladi.
+       *
+       * QAROR. Chegara + majburiy sabab/kategoriya + isbot + alohida audit
+       * izi. Pul KECHIKTIRILMAYDI: buning uchun to'liq narxni kassaga yozib,
+       * keyin farqni alohida qaytarish kerak bo'lardi — bu `to_be_paid`,
+       * `paid_amount`, `autoPay`, `SELL_PROFIT` va operator daromadi hisobini
+       * butunlay o'zgartiradi, ya'ni jonli sotuv matematikasini buzish xavfi.
+       *
+       * Dona KAMAYGAN bo'lsa bu qonuniy qisman sotuv — chegara qo'llanmaydi.
+       */
+      /**
+       * ⚠️ `>=`, `===` EMAS.
+       *
+       * Dona KAMAYGAN bo'lsa — bu qonuniy qisman sotuv, narx ham tushishi
+       * tabiiy, darvoza ishlamaydi.
+       *
+       * Lekin `===` bilan cheklansak, darvozani BITTA raqam bilan o'chirib
+       * qo'yish mumkin edi: kuryer mahsulot sonini 1 dan 2 ga OSHIRIB
+       * yuborsa, `totalNewQty > totalOldQty` bo'lib shart bajarilmasdi va
+       * narxni istagancha tushirib yuborardi. Dona oshirish hech qanday
+       * ta'sir ham qilmaydi — `order_item` faqat `totalNewQty < totalOldQty`
+       * shoxida yangilanadi (:3403), ya'ni bu sof darvozadan qochish usuli.
+       */
+      const hiddenCut =
+        totalNewQty >= totalOldQty
+          ? Math.max(0, Math.trunc(oldTotalPrice - price))
+          : 0;
+
+      if (hiddenCut > 0) {
+        /**
+         * ⚠️ DARVOZA MARKET BAYROG'IGA BOG'LIQ — mustaqil emas.
+         *
+         * Buni siyosat orqali o'tkazish SHART, chunki narxni pasaytirib
+         * sotish loyihada ATAYLAB qo'llab-quvvatlanadigan oqim:
+         * `generateComment(..., ['Buyurtma arzonroqqa sotildi!'])` (:3316).
+         * Bayroq o'chiq marketlarda (bugun HAMMASI) hech narsa o'zgarmasligi
+         * kerak.
+         *
+         * ⚠️ `sellExtraCostLimit` BU YERDA ISHLATILMAYDI. U boshqa savolga
+         * javob beradi — "kuryerga yo'l xarajati uchun qancha berish mumkin".
+         * Uyga yetkazishda u har qanday summani TAQIQLAYDI
+         * (`extra-cost-limit.util.ts:51-58` `forbiddenReason`), ya'ni uni
+         * chegirmaga qo'llash mijoz bilan narx kelishilgan HAR BIR uyga
+         * yetkazishni butunlay bloklardi. Markazga yetkazishda ham chegara
+         * tarif farqi (masalan 5 000 so'm) bo'lib, 300 000 so'mlik
+         * buyurtmadagi 30 000 lik qonuniy chegirmani rad etardi.
+         *
+         * v1 da yopiladigan narsa — chegirmaning KO'RINMASLIGI: sabab
+         * majburiy bo'ladi va u activity-log'da alohida maydon sifatida
+         * chiqadi. Summa chegarasi tasdiqlash oqimi bilan birga keladi.
+         */
+        const cutPolicy = resolveExtraCostPolicy({
+          amount: hiddenCut,
+          market,
+          courier,
+          actionType: ExtraCostAction.PRICE_CUT,
+        });
+
+        if (cutPolicy.requireProof && (!comment || !comment.trim())) {
+          throw new BadRequestException(
+            "Mahsulot soni o'zgarmasdan narx pasaytirilganda sabab yozish " +
+              `shart (${hiddenCut.toLocaleString('uz-UZ')} so'm chegirma)`,
+          );
+        }
+      }
 
       // 6️⃣ Update items (faqat kamaygan holatda)
       if (totalNewQty < totalOldQty) {
@@ -3479,32 +3716,78 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       // 9️⃣ Extra cost
-      // Telefon brauzerdan kelishi mumkin bo'lgan formatlar uchun raqamga aylantirish
+      // ⚠️ `Math.trunc` SHART — kassa ustunlari `bigint`, kasr INSERT xatosi.
       const parsedExtraCost = extraCost
-        ? Number(String(extraCost).replace(/[^\d.-]/g, ''))
+        ? Math.trunc(Number(String(extraCost).replace(/[^\d.-]/g, '')))
         : 0;
 
       if (parsedExtraCost > 0) {
-        await Promise.all([
-          updateCashbox(
-            marketCashbox,
-            Operation_type.EXPENSE,
-            parsedExtraCost,
-            order.id,
-            Source_type.EXTRA_COST,
-            finalComment,
+        const extraCostPolicy = resolveExtraCostPolicy({
+          amount: parsedExtraCost,
+          market,
+          courier,
+          actionType: ExtraCostAction.PARTLY_SOLD,
+        });
+
+        // ⚠️ ISBOT TEKSHIRUVI PUL HARAKATIDAN OLDIN.
+        const extraCostProofs =
+          await this.extraCostRequests.assertProofRequirement(
+            extraCostPolicy,
+            partlySoldDto,
             courier.id,
-          ),
-          updateCashbox(
-            courierCashbox,
-            Operation_type.EXPENSE,
-            parsedExtraCost,
-            order.id,
-            Source_type.EXTRA_COST,
-            finalComment,
-            courier.id,
-          ),
-        ]);
+          );
+
+        if (
+          extraCostPolicy.mode === 'deferred' &&
+          (await this.extraCostRequests.hasOpenRequest(queryRunner, order.id))
+        ) {
+          throw new BadRequestException(
+            "Bu buyurtmada allaqachon tasdiq kutayotgan qo'shimcha xarajat bor",
+          );
+        }
+
+        let extraCostHistoryIds: {
+          marketHistoryId: string;
+          courierHistoryId: string;
+        } | null = null;
+
+        if (extraCostPolicy.mode === 'immediate') {
+          // ⚠️ Xarajat FAQAT OTA buyurtmaga yoziladi (`order.id`). Ajralib
+          // chiqadigan CANCELLED bola buyurtma hech qanday kassa yozuvi
+          // olmaydi — aks holda bitta xarajat ikki marta sanalardi.
+          extraCostHistoryIds = await this.extraCostApplier.applyInline(
+            queryRunner,
+            {
+              marketCashbox,
+              courierCashbox,
+              orderId: order.id,
+              amount: parsedExtraCost,
+              comment: finalComment,
+              createdBy: courier.id,
+              marketId: order.user_id,
+              courierId: courier.id,
+            },
+          );
+        }
+        // `deferred` bo'lsa KASSAGA HECH NARSA YOZILMAYDI.
+
+        createdExtraCostRequest = await this.extraCostRequests.record(queryRunner, {
+          order,
+          market,
+          courier,
+          policy: extraCostPolicy,
+          amount: parsedExtraCost,
+          actionType: ExtraCostAction.PARTLY_SOLD,
+          limitMax: sellExtraCostLimit({
+            whereDeliver: order.where_deliver,
+            tariffCenter: courier.tariff_center,
+            tariffHome: courier.tariff_home,
+          }).max,
+          courierTariff: Number(courierTarif ?? 0),
+          input: partlySoldDto,
+          proofs: extraCostProofs,
+          historyIds: extraCostHistoryIds,
+        });
       }
 
       // === MOLIYAVIY TAROZI: pochta foydasi (sellOrder bilan bir xil) ===
@@ -3639,6 +3922,12 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       await queryRunner.commitTransaction();
+      // Marketga xabar — commit'dan KEYIN, `await`SIZ. Telegram sekin yoki
+      // ishlamay qolsa ham sotuv oqimi TO'XTAMASLIGI kerak.
+      this.extraCostRequests.notifyMarketAboutRequest(
+        createdExtraCostRequest,
+        courier?.name,
+      );
       this.activityLog.log({
         entity_type: 'order',
         entity_id: order.id,
@@ -3649,8 +3938,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           status: order.status,
           total_price: order.total_price,
           paid_amount: order.paid_amount,
+          extra_cost: parsedExtraCost || undefined,
+          // Yashirin chegirma (dona o'zgarmay narx tushirilgan) — alohida
+          // ko'rinishi SHART, aks holda u qo'shimcha xarajat bilan bir xil
+          // pul natijasini berib, jurnalda hech qanday iz qoldirmaydi.
+          hidden_price_cut: hiddenCut || undefined,
         },
-        description: `Buyurtma #${order.order_number} qisman sotildi — ${order.total_price} so'm (${orderStatusUz(order.status)})`,
+        description: `Buyurtma #${order.order_number} qisman sotildi — ${order.total_price} so'm (${orderStatusUz(order.status)})${
+          parsedExtraCost
+            ? ` (qo'shimcha xarajat: ${parsedExtraCost} so'm)`
+            : ''
+        }${hiddenCut ? ` (narx pasaytirildi: ${hiddenCut} so'm)` : ''}`,
         user,
       });
       await this.orderBotService.syncStatusButton(order.id);
@@ -3920,6 +4218,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const rollbackComment = `[ROLLBACK] ${order.comment || ''}`;
 
+      /**
+       * ═══════ OCHIQ XARAJAT SO'ROVLARINI BEKOR QILISH ═══════
+       *
+       * ⚠️ TARTIB MUHOKAMASIZ: bu chaqiruv KASSA BLOKLARIDAN OLDIN turadi.
+       *
+       * Agar u `reverseExtraCostForCashbox` dan KEYIN qo'yilsa, poyga oynasi
+       * ochiladi: parallel ketayotgan tasdiqlash hali commit qilinmagan
+       * `EXTRA_COST` qatorlarini yozgan bo'lsa, teskari qaytarish ularni
+       * KO'RMAYDI (`net = 0`), keyin void esa 0 qator o'zgartiradi — chunki
+       * so'rov allaqachon `approved`. Natija: PUL YOZILGAN, LEKIN
+       * QAYTARILMAGAN.
+       *
+       * Void avval bo'lsa, so'rov qatori shu tranzaksiyada ERTA lock'lanadi
+       * va tasdiqlashning atomik darvozasi (`WHERE status='pending'`) uni
+       * `void` holatida ko'rib 409 qaytaradi.
+       */
+      await this.extraCostRequests.voidOpenRequests(
+        queryRunner,
+        order.id,
+        'Buyurtma orqaga qaytarildi',
+      );
+
       const marketTarif =
         order.where_deliver === Where_deliver.CENTER
           ? market.tariff_center
@@ -4070,6 +4390,26 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           extraReversalComment,
         );
       }
+
+      /**
+       * ═══════ TASDIQLANGAN SO'ROVLARNI "TESKARI QAYTARILDI" DEB BELGILASH ═══════
+       *
+       * ⚠️ KASSA BLOKLARIDAN KEYIN — yuqoridagi `void` dan farqli o'laroq.
+       *
+       * Pulni `reverseExtraCostForCashbox` allaqachon qaytardi (net-balans
+       * bo'yicha, idempotent). Bu yerda faqat SO'ROV HOLATI yangilanadi:
+       * market/kuryer sahifasida u endi "tasdiqlangan" emas, "teskari
+       * qaytarilgan" bo'lib ko'rinadi va hisobda turmaydi.
+       *
+       * Bitta chaqiruv uchala shoxni ham (SOTILGAN / QISMAN TO'LANGAN /
+       * BEKOR-YOPILGAN) qamraydi, chunki u FAQAT `approved` qatorlarga
+       * ta'sir qiladi — qaysi shox ishlaganidan qat'i nazar.
+       */
+      await this.extraCostRequests.markReversed(
+        queryRunner,
+        order.id,
+        'Buyurtma orqaga qaytarildi — xarajat teskari qaytarildi',
+      );
 
       // === Operator earning ni o'chirish (rollback) ===
       if (order.operator_id) {

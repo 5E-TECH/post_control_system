@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   Apple,
   Calendar1,
+  Receipt,
   CreditCard,
   FileText,
   House,
@@ -13,6 +14,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { buildAdminPath } from "../../const";
+import { useExtraCost } from "../../api/hooks/useExtraCost";
 
 // Umumiy nav container stili - barcha rollar uchun
 const navContainerClass = `
@@ -21,6 +23,21 @@ const navContainerClass = `
   border-t border-gray-800/50
   pb-[env(safe-area-inset-bottom,0px)]
 `;
+
+/**
+ * Ikonka ustidagi qizil raqam.
+ *
+ * ⚠️ Mobil navda YOZUV yo'q — faqat ikonka. Raqamsiz kuryer/market "ish
+ * kutmoqda"ni umuman ko'rmaydi va sahifani ochish xayoliga kelmaydi.
+ */
+const NavBadge = ({ count }: { count: number }) => {
+  if (count <= 0) return null;
+  return (
+    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-[#1e1e2d]">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+};
 
 // Nav item uchun umumiy stil
 const getNavItemClass = (isActive: boolean) => `
@@ -32,6 +49,18 @@ const getNavItemClass = (isActive: boolean) => `
 `;
 
 const Navbar = ({ role }: { role: string }) => {
+  // ⚠️ Hook'lar SHU YERDA — `renderNav` ichida chaqirilsa ular rolga bog'liq
+  // bo'lib qolardi (React qoidasi buziladi). `enabled` bayrog'i keraksiz
+  // so'rovni to'sadi.
+  const { getMarketCounts, getCourierCounts } = useExtraCost();
+  const { data: marketCounts } = getMarketCounts(role === "market");
+  const { data: courierCounts } = getCourierCounts(role === "courier");
+
+  const marketExtraCost = Number(marketCounts?.open ?? 0);
+  const courierExtraCost =
+    Number(courierCounts?.awaiting_proof ?? 0) +
+    Number(courierCounts?.unseen ?? 0);
+
   const renderNav = () => {
     switch (role) {
       case "superadmin":
@@ -188,6 +217,16 @@ const Navbar = ({ role }: { role: string }) => {
             >
               <CreditCard className="w-6 h-6" />
             </NavLink>
+            {/* Kuryer telefonda ishlaydi — mobil nav uning YAGONA yo'li. */}
+            <NavLink
+              to={buildAdminPath("my-extra-cost")}
+              className={({ isActive }) =>
+                `relative ${getNavItemClass(isActive)}`
+              }
+            >
+              <Receipt className="w-6 h-6" />
+              <NavBadge count={courierExtraCost} />
+            </NavLink>
             </div>
           </div>
         );
@@ -224,6 +263,18 @@ const Navbar = ({ role }: { role: string }) => {
               className={({ isActive }) => getNavItemClass(isActive)}
             >
               <CreditCard className="w-6 h-6" />
+            </NavLink>
+            {/* ⚠️ Mobil nav SHART: market <650px da faqat shu ikonkalar
+                orqali harakatlanadi — sidebar umuman ko'rinmaydi. Bu yerga
+                qo'shilmasa, market telefonda sahifani OCHOLMAYDI. */}
+            <NavLink
+              to={buildAdminPath("extra-cost")}
+              className={({ isActive }) =>
+                `relative ${getNavItemClass(isActive)}`
+              }
+            >
+              <Receipt className="w-6 h-6" />
+              <NavBadge count={marketExtraCost} />
             </NavLink>
             </div>
           </div>

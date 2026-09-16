@@ -127,6 +127,33 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   secondary_operator_phone: string | null;
 
+  /**
+   * Market uchun: QO'SHIMCHA XARAJAT ISBOT + TASDIQ rejimi.
+   *
+   * `false` (default) — bugungi xulq: kuryer yozgan xarajat DARHOL ikki
+   * kassaga yoziladi, market hech narsani ko'rmaydi va tasdiqlamaydi.
+   *
+   * `true` — xarajat kassaga UMUMAN yozilmaydi: `extra_cost_request` ga foto
+   * isbot bilan `PENDING` qator tushadi va pul faqat market tasdiqlaganda
+   * yoziladi. Bayroqni ADMIN yoqadi (market o'zi emas).
+   *
+   * ⚠️ Tashqi kargo (Elchi/LDG) orqali yetkazilgan buyurtmalarga
+   * QO'LLANMAYDI — u kuryerlar bizning UI'dan foydalanmaydi va foto
+   * biriktira olmaydi; gate ularni qamrasa yetkazilgan posilkalar
+   * `WAITING` da qotib qolardi.
+   */
+  @Column({ type: 'boolean', default: false })
+  extra_cost_proof_required: boolean;
+
+  /**
+   * Market uchun: shu summadan KICHIK so'rovlar avtomatik tasdiqlanadi
+   * (`0` = o'chiq). Marketning kunlik ish yukini keskin kamaytiradi —
+   * u faqat shubhali summalarni ko'radi. Isbot baribir talab qilinadi va
+   * so'rov tarixda `auto_rule` bilan qoladi.
+   */
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformerNonNull })
+  extra_cost_auto_approve_under: number;
+
   // Operator uchun komissiya sozlamalari
   @Column({ type: 'enum', enum: Commission_type, nullable: true })
   commission_type: Commission_type | null;

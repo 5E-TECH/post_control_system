@@ -23,6 +23,7 @@ import { OrderBotModule } from '../bots/order_create-bot/order-bot.module';
 import { OrderBotService } from '../bots/order_create-bot/order-bot.service';
 import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
 import { IntegrationSyncModule } from '../integration-sync/integration-sync.module';
+import { ExtraCostModule } from '../extra-cost/extra-cost.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { IntegrationSyncModule } from '../integration-sync/integration-sync.modu
     forwardRef(() => OrderBotModule),
     ExternalIntegrationModule,
     IntegrationSyncModule,
+    ExtraCostModule,
   ],
   controllers: [OrderController],
   providers: [

@@ -3,6 +3,9 @@ printer-windows/
 # uploads (runtime files)
 uploads/
 server/home/ubuntu/uploads/
+# Qo'shimcha xarajat isbotlari — dev zaxira papkasi.
+# Production'da UPLOAD_ROOT deploy papkasidan TASHQARIDA bo'ladi.
+server/.uploads-dev/
 
 # images
 *.png
@@ -15,3 +18,6 @@ server/home/ubuntu/uploads/
 # editor settings (local)
 .vscode/
 
+
+# Backup/test arxivlari — repoda saqlanmaydi
+*.tar.gz

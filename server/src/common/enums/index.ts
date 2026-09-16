@@ -139,3 +139,67 @@ export enum FinancialSource_type {
   CORRECTION = 'correction', // Tuzatish (rollback)
   BILLS = 'bills', // Hisob-fakturalar
 }
+
+// ===================== QO'SHIMCHA XARAJAT TASDIG'I =====================
+// Kuryer sotuv/bekor qilishda yozgan qo'shimcha xarajat market tasdig'idan
+// o'tadigan bo'lsa, u kassaga DARHOL yozilmaydi — `extra_cost_request`
+// jadvalida majburiyat sifatida yashaydi. Pul FAQAT `APPROVED` ga o'tishda
+// kassaga yoziladi.
+
+/** So'rov qaysi amaldan tug'ildi. */
+export enum ExtraCostAction {
+  SELL = 'sell',
+  CANCEL = 'cancel',
+  PARTLY_SOLD = 'partly_sold',
+  // Yashirin chegirma: kuryer mahsulot sonini O'ZGARTIRMASDAN narxni
+  // pasaytirdi. Puli kechiktirilmaydi (sotuv matematikasini buzmaslik uchun),
+  // lekin chegara + isbot + audit izi bilan ko'rinadigan bo'ladi.
+  PRICE_CUT = 'price_cut',
+}
+
+/**
+ * So'rov holati.
+ *
+ * ⚠️ FAQAT `APPROVED` da kassaga pul yoziladi. `REJECTED` va `VOID` hech
+ * qanday kassa yozuvi YARATMAYDI — `CORRECTION + INCOME` juftligi butun kod
+ * bazasida faqat `reverseExtraCostForCashbox` uchun band, uni bu yerda
+ * ishlatish keyingi rollback'ni buzadi.
+ */
+export enum ExtraCostStatus {
+  /** Sotuv o'tdi, lekin isbot yuklanmadi (tarmoq uzilgan). 24 soat muhlat. */
+  AWAITING_PROOF = 'awaiting_proof',
+  /** Market qaroriga tayyor. Pul kassada YO'Q. */
+  PENDING = 'pending',
+  /** Tasdiqlandi — pul kassaga yozildi. */
+  APPROVED = 'approved',
+  /** Rad etildi — kassaga 0 yozuv. */
+  REJECTED = 'rejected',
+  /** Buyurtma rollback/qayta jo'natildi — so'rov ahamiyatini yo'qotdi. */
+  VOID = 'void',
+  /** Tasdiqlangandan keyin buyurtma rollback qilindi — pul qaytarildi. */
+  REVERSED = 'reversed',
+}
+
+/** Qaror KIM/NIMA tomonidan qabul qilindi — audit va kelajakdagi qoidalar uchun. */
+export enum ExtraCostDecisionMode {
+  MARKET = 'market',
+  ADMIN_OVERRIDE = 'admin_override',
+  /** Bayroq o'chiq yoki summa avto-tasdiq chegarasidan kichik. */
+  AUTO_RULE = 'auto_rule',
+  /** Market 14 kun javob bermadi — oxirgi zaxira. */
+  AUTO_BACKSTOP = 'auto_backstop',
+  /** Tashqi provayder (Elchi) yetkazdi — bizning UI'dan isbot biriktirilmaydi. */
+  EXTERNAL_AUTO = 'external_auto',
+  /** Rollback/qayta jo'natish so'rovni bekor qildi. */
+  SYSTEM_VOID = 'system_void',
+}
+
+/** Xarajat sababi — marketga qaror uchun eng kerakli maydon, MAJBURIY. */
+export enum ExtraCostCategory {
+  TAXI = 'taxi',
+  LIFT = 'lift',
+  LOADING = 'loading',
+  REVISIT = 'revisit',
+  CUSTOMER_REQUEST = 'customer_request',
+  OTHER = 'other',
+}

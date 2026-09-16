@@ -1,12 +1,21 @@
 import { memo } from 'react';
-import { House, ShoppingBag, MailOpen, CreditCard, Zap, MapPinned } from 'lucide-react';
+import { House, ShoppingBag, MailOpen, CreditCard, Zap, MapPinned, Receipt } from 'lucide-react';
 import SidebarLink from './SidebarLink';
 import { useTranslation } from 'react-i18next';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../app/store';
+import { useExtraCost } from '../../shared/api/hooks/useExtraCost';
 
 const CourierSidebar = () => {
   const { t } = useTranslation(['sidebar']);
+
+  // Ikki xil ish bitta raqamda: isbot biriktirish KERAK bo'lganlar +
+  // ko'rilmagan qarorlar. Ikkisi ham aynan shu sahifada hal bo'ladi.
+  const { getCourierCounts } = useExtraCost();
+  const { data: extraCostCounts } = getCourierCounts();
+  const extraCostBadge =
+    Number(extraCostCounts?.awaiting_proof ?? 0) +
+    Number(extraCostCounts?.unseen ?? 0);
 
   const links = [
     { to: '/', icon: <House />, label: t('dashboard'), end: true },
@@ -18,6 +27,12 @@ const CourierSidebar = () => {
     { to: '/courier-bulk', icon: <Zap />, label: t('courier_bulk') },
     { to: '/courier-mails', icon: <MailOpen />, label: t('mails') },
     { to: '/cash-box', icon: <CreditCard />, label: t('payments') },
+    {
+      to: '/my-extra-cost',
+      icon: <Receipt />,
+      label: "Qo'shimcha xarajat",
+      badge: extraCostBadge,
+    },
     { to: '/my-region', icon: <MapPinned />, label: t('myRegion') },
   ];
     const sidebarRedux = useSelector((state: RootState) => state.sidebar);
