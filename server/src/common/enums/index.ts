@@ -82,6 +82,10 @@ export enum OrderCreatedSource {
   MANUAL = 'manual',
   AI = 'ai',
   BOT = 'bot',
+  // Marketplace posilkasi skanerlab qabul qilindi. Busiz marketplace
+  // buyurtmalari statistikada 'manual' bo'lib ko'rinardi va ularni
+  // qo'lda kiritilganidan ajratib bo'lmasdi.
+  MARKETPLACE = 'marketplace',
 }
 
 export enum Post_status {
