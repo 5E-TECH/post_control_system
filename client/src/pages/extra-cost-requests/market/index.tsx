@@ -23,7 +23,7 @@ import {
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
 import ProofMedia from "../../../shared/components/ProofMedia";
 
-type TabKey = "pending" | "overdue" | "approved" | "rejected" | "external";
+type TabKey = "pending" | "overdue" | "approved" | "rejected";
 
 const PAGE_SIZE = 20;
 
@@ -105,31 +105,30 @@ const MarketExtraCostRequests = () => {
   const overdueCount = Number(counts?.escalated ?? 0);
   const openAmount = Number(counts?.amount ?? 0);
 
-  // `external` — statusga emas, `decision_mode` ga qarab filtrlanadi,
-  // shuning uchun serverdan kengroq to'plam olib, klientda ajratamiz.
-  const clientFiltered = tab === "external";
-
   const { data, isLoading, isFetching, refetch } = getMarketRequests({
-    status: clientFiltered
-      ? undefined
-      : tab === "overdue"
-        ? undefined
-        : (tab as ExtraCostStatus),
+    status: tab === "overdue" ? undefined : (tab as ExtraCostStatus),
     escalated: tab === "overdue" ? "true" : undefined,
-    page: clientFiltered ? 1 : page,
-    limit: clientFiltered ? 100 : PAGE_SIZE,
+    page,
+    limit: PAGE_SIZE,
   });
 
   const total = Number(data?.total ?? 0);
 
+  /**
+   * ⚠️ TASHQI KARGO (Elchi/LDG) SO'ROVLARI MARKETGA KO'RSATILMAYDI.
+   *
+   * Ular avval alohida tabda turardi, lekin market uchun bu faqat shovqin
+   * edi: tasdiqlash talab qilmaydi, isbot ham yo'q (o'sha kuryerlar bizning
+   * ilovadan foydalanmaydi), ya'ni market ko'rib hech narsa qila olmasdi.
+   *
+   * Tashqi kargo xarajatlariga ham xuddi shunday isbot/tasdiq oqimi
+   * KEYINCHALIK qilinadi — o'shanda ular oddiy so'rovlar qatorida, shu
+   * yerdagi tablarda ko'rinadi va alohida tab kerak bo'lmaydi.
+   */
   const items: ExtraCostRequest[] = useMemo(() => {
     const all: ExtraCostRequest[] = data?.items ?? [];
-    if (tab === "external")
-      return all.filter((r) => r.decision_mode === "external_auto");
-    // Tashqi kargo ALOHIDA tabda ko'rsatiladi — aks holda market bir xil
-    // yozuvni ikki joyda ko'rib chalkashadi.
     return all.filter((r) => r.decision_mode !== "external_auto");
-  }, [data, tab]);
+  }, [data]);
 
   const isOpenTab = tab === "pending" || tab === "overdue";
 
@@ -138,18 +137,18 @@ const MarketExtraCostRequests = () => {
     { key: "overdue", label: "Muddati o'tgan", badge: overdueCount },
     { key: "approved", label: "Tasdiqlangan" },
     { key: "rejected", label: "Rad etilgan" },
-    // ⚠️ "Narx pasaytirilgan" TABI ATAYLAB YO'Q.
+    // ⚠️ "Narx pasaytirilgan" va "Tashqi kargo" TABLARI ATAYLAB YO'Q.
     //
-    // Yashirin chegirma (dona o'zgarmasdan narx tushirilishi) `extra_cost_request`
-    // yozuvi YARATMAYDI — u kassaga ham tegmaydi, shuning uchun tasdiqlangan
-    // so'rov sifatida yozilsa rekonsiliatsiya invarianti I1 ("tasdiqlangan
-    // so'rovda ikkala kassa yozuvi bo'lishi shart") buzilardi. Bu oqim
-    // boshqacha ushlanadi: sabab MAJBURIY va u activity-log'da
-    // `hidden_price_cut` maydoni bilan saqlanadi.
+    // Narx pasaytirish (dona o'zgarmasdan narx tushirilishi)
+    // `extra_cost_request` yozuvi YARATMAYDI — u kassaga ham tegmaydi,
+    // shuning uchun tasdiqlangan so'rov sifatida yozilsa rekonsiliatsiya
+    // invarianti I1 buzilardi. U activity-log'dagi `hidden_price_cut` da.
     //
-    // Doim bo'sh turadigan tab esa "chegirma yo'q" degan noto'g'ri xulosaga
-    // olib borardi.
-    { key: "external", label: "Tashqi kargo" },
+    // Tashqi kargo esa market uchun shovqin edi: tasdiq talab qilmaydi,
+    // isboti yo'q, market ko'rib hech narsa qila olmasdi.
+    //
+    // Doim bo'sh yoki amal talab qilmaydigan tab "hammasi joyida" degan
+    // noto'g'ri xulosaga olib boradi.
   ];
 
   const switchTab = (key: TabKey) => {
@@ -295,16 +294,6 @@ const MarketExtraCostRequests = () => {
           </button>
         ))}
       </div>
-
-      {/* Tashqi kargo izohi */}
-      {tab === "external" && (
-        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-800/40 dark:bg-blue-900/15 dark:text-blue-300">
-          Bu xarajatlar tashqi kargo (Elchi/LDG) orqali yetkazilgan
-          buyurtmalarga tegishli. Ular <b>tasdiq talab qilmaydi</b> — o'sha
-          kuryerlar bizning ilovadan foydalanmaydi va isbot biriktira olmaydi.
-          Ro'yxat faqat ko'rish uchun.
-        </div>
-      )}
 
       {/* ─────────── Bulk panel ─────────── */}
       {isOpenTab && selectableIds.length > 0 && (
@@ -549,8 +538,8 @@ const MarketExtraCostRequests = () => {
       )}
 
       {/* Sahifalash — market kuniga yuzlab so'rov ko'rishi mumkin */}
-      {!clientFiltered && total > PAGE_SIZE && (
-        <div className="mt-4 flex justify-center">
+      {total > PAGE_SIZE && (
+        <div className="mt-4 flex justify-center overflow-x-auto">
           <Pagination
             current={page}
             pageSize={PAGE_SIZE}

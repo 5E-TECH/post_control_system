@@ -24,6 +24,7 @@ import {
 import { useApiNotification } from "../../../shared/hooks/useApiNotification";
 import ProofMedia from "../../../shared/components/ProofMedia";
 import ProofPicker from "../../../shared/components/ProofPicker";
+import ProofCountdown from "../../../shared/components/ProofCountdown";
 
 type TabKey = ExtraCostStatus | "";
 
@@ -57,22 +58,6 @@ const dayTime = (ts?: number | null) => {
   } catch {
     return "—";
   }
-};
-
-/**
- * ISBOT MUHLATI — server `voidStaleAwaitingProof` CRON'i bilan BIR XIL
- * bo'lishi shart. Ajralib ketsa kuryer "6 soat bor" deb o'ylab turganda
- * so'rov allaqachon bekor bo'lgan bo'lardi.
- */
-const PROOF_DEADLINE_MS = 24 * 60 * 60 * 1000;
-
-/** Muhlatgacha qancha qolgani — o'zbekcha, qisqa. */
-const timeLeft = (createdAt?: number | null): string => {
-  const left = PROOF_DEADLINE_MS - (Date.now() - Number(createdAt ?? 0));
-  if (left <= 0) return "muddat tugadi";
-  const h = Math.floor(left / 3_600_000);
-  if (h >= 1) return `${h} soat qoldi`;
-  return `${Math.max(1, Math.floor(left / 60_000))} daqiqa qoldi`;
 };
 
 /** Har bir holat uchun kuryerga TUSHUNARLI matn va rang. */
@@ -163,6 +148,29 @@ const CourierExtraCostRequests = () => {
   const items: ExtraCostRequest[] = data?.items ?? [];
   const total = Number(data?.total ?? 0);
 
+  /**
+   * TELEFON SOATINING OG'ISHI.
+   *
+   * ⚠️ Teskari sanoq SERVER vaqtida yurishi kerak: muddatni CRON belgilaydi.
+   * Arzon Android telefonlarda soat bir necha soatga adashishi odatiy hol —
+   * og'ishsiz kuryer "6 soat bor" deb ko'rib turganda so'rov allaqachon
+   * bekor bo'lgan bo'lardi.
+   *
+   * `server_now` har so'rovda yangilanadi, ya'ni og'ish o'zi to'g'rilanadi.
+   */
+  const clockOffsetMs = data?.server_now
+    ? Number(data.server_now) - Date.now()
+    : 0;
+
+  /** Eng yaqin muddat — bannerda ko'rsatish uchun. */
+  const nearestDeadlineAt = items
+    .filter((r) => r.status === "awaiting_proof")
+    .reduce<number | null>(
+      (min, r) =>
+        min === null || Number(r.created_at) < min ? Number(r.created_at) : min,
+      null,
+    );
+
   // ⚠️ JAMI IKKIGA BO'LINDI.
   //
   // Avval bitta "Tasdiq kutilmoqda" raqami bor edi va u `awaiting_proof`
@@ -237,9 +245,19 @@ const CourierExtraCostRequests = () => {
               {awaitingTotal > 0 && ` — ${money(awaitingTotal)}`}
             </div>
             <div className="text-[11px] leading-snug text-orange-700 dark:text-orange-400">
-              Isbot biriktirmasangiz bu so'rovlar marketga yuborilmaydi va 24
-              soatdan keyin bekor bo'ladi.
+              Isbot biriktirmasangiz bu so'rovlar marketga yuborilmaydi va
+              bekor bo'ladi.
             </div>
+            {nearestDeadlineAt !== null && (
+              <div className="mt-1.5 flex items-center gap-2 text-[11px] text-orange-700 dark:text-orange-400">
+                Eng yaqini:
+                <ProofCountdown
+                  createdAt={nearestDeadlineAt}
+                  clockOffsetMs={clockOffsetMs}
+                  variant="banner"
+                />
+              </div>
+            )}
           </div>
         </button>
       )}
@@ -387,10 +405,17 @@ const CourierExtraCostRequests = () => {
 
                     {needsProof && (
                       <div className="mt-2 rounded-lg bg-orange-50 px-2.5 py-1.5 text-xs leading-snug text-orange-700 dark:bg-orange-900/20 dark:text-orange-300">
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="font-semibold">Qolgan vaqt:</span>
+                          <ProofCountdown
+                            createdAt={r.created_at}
+                            clockOffsetMs={clockOffsetMs}
+                          />
+                        </div>
                         Bu so'rov marketga <b>hali yuborilmagan</b> — isbot
-                        biriktirilishi kerak. {timeLeft(r.created_at)}.
-                        Biriktirilmasa so'rov bekor bo'ladi; sotuvingizga
-                        ta'sir qilmaydi, faqat xarajat to'lanmaydi.
+                        biriktirilishi kerak. Biriktirilmasa so'rov bekor
+                        bo'ladi; sotuvingizga ta'sir qilmaydi, faqat xarajat
+                        to'lanmaydi.
                       </div>
                     )}
                   </div>
@@ -436,7 +461,7 @@ const CourierExtraCostRequests = () => {
       )}
 
       {total > PAGE_SIZE && (
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex justify-center overflow-x-auto">
           <Pagination
             current={page}
             pageSize={PAGE_SIZE}
@@ -461,6 +486,17 @@ const CourierExtraCostRequests = () => {
         }}
         destroyOnHidden
       >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-600 dark:text-gray-300">
+            Qolgan vaqt:
+          </span>
+          {/* Kuryer aynan shu yerda ishlaydi — sanoq ko'z oldida tursin. */}
+          <ProofCountdown
+            createdAt={attaching?.created_at}
+            clockOffsetMs={clockOffsetMs}
+            variant="banner"
+          />
+        </div>
         <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
           {money(attaching?.amount)} — isbot yuborilgandan keyin so'rov{" "}
           <b>{attaching?.market_name ?? "marketga"}</b> ko'rib chiqishga

@@ -583,6 +583,22 @@ export class ExtraCostDecisionService {
       limit,
       pending_total: Number(sums?.pending ?? 0),
       awaiting_total: Number(sums?.awaiting ?? 0),
+
+      /**
+       * ⚠️ SERVER VAQTI — teskari sanoq uchun.
+       *
+       * Kuryer ekranida "isbot biriktirishga qancha qoldi" sanog'i turadi.
+       * U `created_at + 24 soat` ga qarab hisoblanadi, solishtiruv esa
+       * TELEFON soati bilan bo'lardi. Arzon Android telefonlarda soat
+       * bir necha soatga adashishi odatiy hol — natijada kuryer "6 soat
+       * bor" deb ko'rib turganda so'rov allaqachon bekor bo'lgan bo'lardi
+       * (yoki aksincha, bekorga shoshilardi).
+       *
+       * Klient shu qiymat bilan o'z soatining OG'ISHINI hisoblab, sanoqni
+       * server vaqtiga moslaydi. Muddatni kim belgilasa (CRON — server),
+       * sanoq ham o'shanning vaqtida yurishi kerak.
+       */
+      server_now: Date.now(),
     };
   }
 
