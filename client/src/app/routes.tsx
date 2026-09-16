@@ -39,6 +39,7 @@ const SendMessage = lazy(() => import("../pages/send-message"));
 const LogsPage = lazy(() => import("../pages/logs-page"));
 const Payments = lazy(() => import("../pages/payments"));
 const RolesPermissions = lazy(() => import("../pages/roles-permissions"));
+const MarketplaceIntake = lazy(() => import("../pages/marketplace-intake"));
 const Profile = lazy(() => import("../pages/profile"));
 const CreateUser = lazy(() => import("../pages/users/create-user"));
 const CreateAdmin = lazy(() => import("../pages/users/pages/create-admin"));
@@ -257,6 +258,16 @@ const AppRouters = () => {
               element: (
                 <RequireRole roles={["superadmin", "admin", "registrator"]}>
                   <ReplacementReturns />
+                </RequireRole>
+              ),
+            },
+            {
+              // Marketplace qabuli — operatorning kundalik skan ekrani.
+              // Sozlash «Integratsiyalar → Marketplace» da, bu yerda esa ish.
+              path: "marketplace-intake",
+              element: (
+                <RequireRole roles={["superadmin", "admin", "registrator"]}>
+                  <MarketplaceIntake />
                 </RequireRole>
               ),
             },

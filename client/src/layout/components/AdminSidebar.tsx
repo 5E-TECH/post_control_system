@@ -12,6 +12,7 @@ import {
   Settings,
   Repeat,
   Megaphone,
+  ScanLine,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -34,6 +35,11 @@ const AdminSidebar = () => {
       to: "/replacement-returns",
       icon: <Repeat />,
       label: "Almashtirishlar",
+    },
+    {
+      to: "/marketplace-intake",
+      icon: <ScanLine />,
+      label: "Marketplace qabuli",
     },
     { to: "/products", icon: <Apple />, label: t("products") },
     { to: "/all-users", icon: <UserRound />, label: t("users") },
