@@ -121,8 +121,8 @@ export class CreateOrderDto {
   @ApiPropertyOptional({
     description:
       'Almashtirish (kafolat-swap): bu yangi buyurtma qaysi ESKI (avval ' +
-      'yetkazilgan) buyurtma o\'rniga ketayotganini ko\'rsatadi. Eski buyurtma ' +
-      'shu mijoz va shu marketga tegishli, sotilgan bo\'lishi shart.',
+      "yetkazilgan) buyurtma o'rniga ketayotganini ko'rsatadi. Eski buyurtma " +
+      "shu mijoz va shu marketga tegishli, sotilgan bo'lishi shart.",
     type: String,
     format: 'uuid',
     example: '2c3f5b7a-1d9e-44f7-8a1b-0a1d2b3c4d5e',
