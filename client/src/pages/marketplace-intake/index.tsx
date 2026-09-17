@@ -384,6 +384,8 @@ const MarketplaceIntakePage = () => {
   const blocked = rows.filter((r) => r.blockers.length);
   const totalCod = rows.reduce((s, r) => s + Number(r.cod_amount ?? 0), 0);
   const canAccept = !!rows.length && incomplete.length === 0;
+  /** Ish boshlangach skaner kartasi ixchamlashadi — ro'yxatga joy beradi. */
+  const compact = rows.length > 0;
 
   const doAccept = async () => {
     if (!sessionId || !slug) return;
@@ -465,9 +467,18 @@ const MarketplaceIntakePage = () => {
   }
 
   return (
-    <div className="space-y-4">
+    /*
+     * ⚠️ `h-full flex flex-col` — `space-y-4` EMAS.
+     *
+     * Ro'yxat qolgan bo'sh joyni egallashi va «Qabul qilish» tugmasi
+     * DOIM ko'rinib turishi kerak. Balandlik `vh` bilan hisoblansa
+     * (`max-h-[80vh]` kabi) tepadagi skaner kartasi hisobga olinmaydi
+     * va tugma ekran ostiga tushib ketadi — operator 10 ta posilkani
+     * skanerlab, qabul tugmasini topolmaydi.
+     */
+    <div className="h-full flex flex-col gap-4">
       {/* ─────────────────────── Sarlavha ─────────────────────── */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
         <button
           onClick={() => navigate("/today-orders")}
           className="h-10 px-4 rounded-xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#352F4A] transition-all cursor-pointer"
@@ -522,26 +533,44 @@ const MarketplaceIntakePage = () => {
       <div
         className={
           pauseLeft > 0
-            ? "rounded-2xl shadow-sm p-6 border-2 transition-all border-red-400 bg-red-50 dark:bg-red-900/10 dark:border-red-700"
+            ? "rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-red-400 bg-red-50 dark:bg-red-900/10 dark:border-red-700"
             : queueLength > 0
-              ? "rounded-2xl shadow-sm p-6 border-2 transition-all border-amber-400 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-700"
-              : "rounded-2xl shadow-sm p-6 border-2 transition-all border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700"
+              ? "rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-amber-400 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-700"
+              : compact
+              ? "rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700"
+              : "rounded-2xl shadow-sm p-6 border-2 transition-all flex-shrink-0 border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700"
         }
       >
         <div className="text-center">
           {pauseLeft > 0 ? (
-            <>
-              <div className="w-20 h-20 mx-auto rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
-                <AlertCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
-              <p className="text-lg font-medium text-red-700 dark:text-red-400">
-                Skanerlash to'xtatildi — {pauseLeft} soniya
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-md mx-auto">
-                Marketplace javob bermayapti. Skaneringiz soz — muammo tashqi
-                tizimda. Sanoq tugagach o'zi tiklanadi.
-              </p>
-            </>
+              <div className="text-left">
+                <p className="text-lg font-medium text-red-700 dark:text-red-400">
+                  Skanerlash to'xtatildi — {pauseLeft} soniya
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Marketplace javob bermayapti. Skaneringiz soz — muammo tashqi
+                  tizimda. Sanoq tugagach o'zi tiklanadi.
+                </p>
+              </div>
+            </div>
+          ) : compact ? (
+            /*
+             * IXCHAM HOLAT — posilka skanerlangandan keyin.
+             *
+             * ⚠️ Katta karta ekranning yarmini egallaydi va 1080p'da
+             * ro'yxatdan atigi 2 ta posilka ko'rinadi. Ish boshlangach
+             * operatorga ro'yxat kerak, chaqiriq emas.
+             */
+            <div className="flex items-center justify-center gap-2">
+              <QrCode className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                Skaner tayyor — keyingi QR kodni skanerlang
+              </span>
+            </div>
           ) : (
             <>
               <div className="w-20 h-20 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4 animate-pulse">
@@ -557,7 +586,7 @@ const MarketplaceIntakePage = () => {
           )}
 
           {/* Kod maydoni — skaner klaviatura kabi yozadi */}
-          <div className="mt-4 max-w-xl mx-auto relative">
+          <div className="mt-3 max-w-xl mx-auto relative">
             <QrCode className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               ref={inputRef}
@@ -591,15 +620,17 @@ const MarketplaceIntakePage = () => {
             </div>
           )}
 
-          <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-            Ro'yxat serverda saqlanadi — sahifa yangilansa ham yo'qolmaydi
-          </p>
+          {!compact && (
+            <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+              Ro'yxat serverda saqlanadi — sahifa yangilansa ham yo'qolmaydi
+            </p>
+          )}
         </div>
       </div>
 
       {/* ─────────────────── Ogohlantirishlar ─────────────────── */}
       {incomplete.length > 0 && (
-        <div className="rounded-xl p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+        <div className="rounded-xl p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 flex-shrink-0">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="text-sm">
@@ -640,9 +671,17 @@ const MarketplaceIntakePage = () => {
         </div>
       )}
 
-      {/* ─────────────────── Posilkalar ro'yxati ─────────────────── */}
+      {/*
+        ─────────────────── Posilkalar ro'yxati ───────────────────
+
+        ⚠️ Balandlik EKRANGA moslanadi (`100vh - 22rem`), qat'iy `80vh`
+        EMAS. Tepada skaner kartasi (~290px) va sarlavha turadi: 80vh
+        ustiga ular qo'shilganda «Qabul qilish» tugmasi ekran ostiga
+        tushib ketardi va operator uni ko'rmasdi — o'lchandi: tugma
+        1751px da, ko'rinadigan joy 1757px.
+      */}
       {rows.length > 0 && (
-        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col border border-gray-100 dark:border-gray-700/50 max-h-[80vh]">
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col border border-gray-100 dark:border-gray-700/50 flex-1 min-h-[12rem]">
           {/* Sarlavha: sanoq + summa + qaytarish */}
           <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex items-center justify-between flex-shrink-0 flex-wrap gap-2">
             <div className="flex items-center gap-3">
