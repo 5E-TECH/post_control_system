@@ -49,6 +49,19 @@ export interface MarketplaceConfigRow {
   name: string;
   slug: string;
   market_id: string;
+  /**
+   * Biriktirilgan market — marketplace pulining KASSASI.
+   *
+   * ⚠️ Avval javobda faqat `market_id` (UUID) bor edi va ekran uni
+   * chizmasdi — admin «hech qanday marketga biriktirilmagan» deb
+   * o'ylardi.
+   */
+  market: {
+    id: string;
+    name: string;
+    phone_number: string;
+    cashbox_balance: number | null;
+  } | null;
   api_base_url: string | null;
   is_active: boolean;
   is_sandbox: boolean;

@@ -374,6 +374,29 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
               </div>
 
               <div className="text-sm space-y-1">
+                {/*
+                  ⚠️ BIRIKTIRILGAN MARKET — eng muhim bog'lanish: marketplace
+                  puli AYNAN shu marketning kassasida yuradi (sotuvda oshadi,
+                  to'laganda kamayadi).
+                */}
+                <div className="text-gray-500">
+                  Market:{" "}
+                  {cfg.market ? (
+                    <span className="font-medium text-gray-700 dark:text-gray-200">
+                      {cfg.market.name}
+                    </span>
+                  ) : (
+                    <Tag color="red">biriktirilmagan</Tag>
+                  )}
+                </div>
+                {cfg.market?.cashbox_balance != null && (
+                  <div className="text-gray-500">
+                    Kassasi:{" "}
+                    <span className="font-medium">
+                      {money(cfg.market.cashbox_balance)} so'm
+                    </span>
+                  </div>
+                )}
                 <div className="text-gray-500">
                   Slug: <span className="font-mono text-xs">{cfg.slug}</span>
                 </div>

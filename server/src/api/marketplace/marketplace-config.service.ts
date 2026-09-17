@@ -144,6 +144,24 @@ export class MarketplaceConfigService {
       where: { integration_id: r.id, effective_to: IsNull() },
     });
 
+    /**
+     * ⚠️ BIRIKTIRILGAN MARKET KO'RSATILISHI SHART.
+     *
+     * Avval javobda faqat `market_id` (UUID) bor edi va sozlash ekrani
+     * uni umuman chizmasdi. Natijada admin «integratsiya hech qanday
+     * marketga biriktirilmagan» deb o'ylardi — holbuki biriktirilgan.
+     * Bu market marketplace pulining KASSASI, ya'ni eng muhim bog'lanish.
+     */
+    const market = await this.dataSource.getRepository(UserEntity).findOne({
+      where: { id: r.market_id },
+      select: ['id', 'name', 'phone_number'],
+    });
+    const cashbox = market
+      ? await this.dataSource.getRepository(CashEntity).findOne({
+          where: { user_id: market.id, cashbox_type: Cashbox_type.FOR_MARKET },
+        })
+      : null;
+
     // ⚠️ SOZLASH CHECKLISTI. Yarim sozlangan ulanish eng yomon holat:
     // u panelda «bor» bo'lib turadi, lekin birinchi skanda yiqiladi va
     // operator sababini tushunmaydi. Shuning uchun yoqishdan OLDIN
@@ -170,6 +188,15 @@ export class MarketplaceConfigService {
       name: r.name,
       slug: r.slug,
       market_id: r.market_id,
+      /** Biriktirilgan market — marketplace pulining kassasi. */
+      market: market
+        ? {
+            id: market.id,
+            name: market.name,
+            phone_number: market.phone_number,
+            cashbox_balance: cashbox ? Number(cashbox.balance) : null,
+          }
+        : null,
       api_base_url: r.api_base_url,
       is_active: r.is_active,
       is_sandbox: r.is_sandbox,

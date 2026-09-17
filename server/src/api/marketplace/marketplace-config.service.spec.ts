@@ -120,7 +120,21 @@ function build(
   const svc = new MarketplaceConfigService(
     integrationRepo as any,
     tariffRepo as any,
-    { createQueryRunner: () => qr } as any,
+    {
+      createQueryRunner: () => qr,
+      /**
+       * ⚠️ Sozlash javobi BIRIKTIRILGAN MARKET nomini ham qaytaradi —
+       * avval faqat `market_id` (UUID) bor edi va ekran uni chizmasdi,
+       * natijada admin «marketga biriktirilmagan» deb o'ylardi.
+       */
+      getRepository: (entity: any) => ({
+        findOne: jest.fn(async () =>
+          (entity?.name ?? '') === 'CashEntity'
+            ? { id: 'cb-1', balance: 1_250_000 }
+            : { id: 'market-1', name: 'UzMarket', phone_number: '+998900000003' },
+        ),
+      }),
+    } as any,
     api as any,
     ledger as any,
     // ⚠️ Sozlash amallari (kalit aylantirish, kill-switch, `api_key`)
@@ -526,5 +540,25 @@ describe('MarketplaceConfigService — audit jurnali', () => {
     expect(activityLog.log.mock.calls[0][0].entity_type).toBe(
       'marketplace_integration',
     );
+  });
+});
+
+describe('MarketplaceConfigService — biriktirilgan market', () => {
+  it('javobda market NOMI va KASSA balansi qaytadi', async () => {
+    /**
+     * ⚠️ Avval faqat `market_id` (UUID) qaytardi va sozlash ekrani uni
+     * umuman chizmasdi. Natijada admin «integratsiya hech qanday
+     * marketga biriktirilmagan» deb o'ylardi — holbuki biriktirilgan.
+     * Bu market marketplace pulining KASSASI: sotuvda oshadi, to'lovda
+     * kamayadi. Eng muhim bog'lanishni yashirib bo'lmaydi.
+     */
+    const { svc } = build();
+    const view: any = await svc.getBySlug('uzmarket');
+
+    expect(view.market).toMatchObject({
+      name: 'UzMarket',
+      cashbox_balance: 1_250_000,
+    });
+    expect(view.market_id).toBe('market-1');
   });
 });
