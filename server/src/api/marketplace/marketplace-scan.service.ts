@@ -192,9 +192,13 @@ export class MarketplaceScanService {
     // Marketplace o'lganda operator 60 ta posilkani ketma-ket urinib
     // 60 ta xato ko'rishi shart emas (§15 #1).
     if (this.api.isPaused(slug)) {
+      // Aniq soniya ataylab: «bir daqiqadan keyin» noaniq — operator
+      // qayta-qayta urinib, o'z skaneri buzuq deb o'ylaydi.
+      const left = this.api.pausedSecondsLeft(slug);
       throw new ServiceUnavailableException(
         `Marketplace bilan aloqa uzilgan — skanerlash TO'XTATILDI. ` +
-          `Bir daqiqadan keyin qayta urining yoki sozlamani tekshiring.`,
+          `${left} soniyadan keyin avtomatik tiklanadi ` +
+          `(skaneringiz soz, muammo tashqi tizimda).`,
       );
     }
 

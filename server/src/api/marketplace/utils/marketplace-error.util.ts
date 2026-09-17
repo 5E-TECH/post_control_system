@@ -246,6 +246,18 @@ export class MarketplaceCircuitBreaker {
     return true;
   }
 
+  /**
+   * Sovish davri tugashiga qancha MILLISEKUND qolgani (yopiq bo'lsa 0).
+   *
+   * `isOpen()` dan farqli — holatni O'ZGARTIRMAYDI. Operatorga «bir
+   * daqiqadan keyin» emas, aniq «34 soniya» deb aytish uchun kerak:
+   * noaniq muddat operatorni qayta-qayta urinishga majbur qiladi.
+   */
+  msUntilClose(now = Date.now()): number {
+    if (this.openedAt === null) return 0;
+    return Math.max(0, this.cooldownMs - (now - this.openedAt));
+  }
+
   recordSuccess(): void {
     this.consecutiveFailures = 0;
     this.openedAt = null;

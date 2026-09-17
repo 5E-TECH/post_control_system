@@ -52,6 +52,15 @@ export class MarketplaceApiService {
     return this.breakerFor(slug).isOpen();
   }
 
+  /**
+   * To'xtatish tugashiga qancha SONIYA qolgani (to'xtatilmagan bo'lsa 0).
+   */
+  pausedSecondsLeft(slug: string): number {
+    const b = this.breakerFor(slug);
+    if (!b.isOpen()) return 0;
+    return Math.ceil(b.msUntilClose() / 1000);
+  }
+
   resumeQueue(slug: string): void {
     this.breakerFor(slug).recordSuccess();
   }

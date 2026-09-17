@@ -42,6 +42,23 @@ const errText = (e: unknown, fallback: string) =>
   (e as { response?: { data?: { message?: string } } })?.response?.data
     ?.message ?? fallback;
 
+const errStatus = (e: unknown): number | undefined =>
+  (e as { response?: { status?: number } })?.response?.status;
+
+/**
+ * Circuit breaker ochilganda server 503 va «N soniyadan keyin» qaytaradi.
+ *
+ * Xato kontrakti maydonlarni tekislaydi (`{message, error}` — faqat
+ * STRING), shuning uchun soniya MATNDAN olinadi. Topilmasa — breaker'ning
+ * sovish davri (60 s) zaxira sifatida ishlatiladi.
+ */
+const PAUSE_FALLBACK_SEC = 60;
+const pauseSecondsFrom = (e: unknown): number | null => {
+  if (errStatus(e) !== 503) return null;
+  const m = /(\d+)\s*soniya/.exec(errText(e, ""));
+  return m ? Number(m[1]) : PAUSE_FALLBACK_SEC;
+};
+
 /**
  * ⚠️ `crypto.randomUUID` HTTPS yoki localhost'dagina bor. Planshet HTTP
  * orqali ochilsa u `undefined` bo'ladi va qabul qilish butunlay ishlamay
@@ -186,6 +203,31 @@ const MarketplaceIntakePage = () => {
    */
   const queue = useRef<Promise<void>>(Promise.resolve());
 
+  /**
+   * SKANERLASH TO'XTATILGANI — turg'un banner.
+   *
+   * Avval faqat `message.error` chiqardi: u 3 soniyada yo'qoladi, keyin
+   * operator yana skanerlaydi, yana yo'qoladi — va skaneri buzuq deb
+   * o'ylaydi. Banner sanoq tugaguncha yoki muvaffaqiyatli skangacha
+   * turadi.
+   */
+  const [pausedUntil, setPausedUntil] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const pauseLeft =
+    pausedUntil === null
+      ? 0
+      : Math.max(0, Math.ceil((pausedUntil - nowTick) / 1000));
+
+  useEffect(() => {
+    if (pausedUntil === null) return;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [pausedUntil]);
+
+  useEffect(() => {
+    if (pausedUntil !== null && pauseLeft === 0) setPausedUntil(null);
+  }, [pausedUntil, pauseLeft]);
+
   const doScan = (raw: string) => {
     const qr = raw.trim();
     if (!qr || !sessionId) return;
@@ -208,7 +250,10 @@ const MarketplaceIntakePage = () => {
       } else {
         message.success(`${outcome.external_parcel_id} qo'shildi`);
       }
+      setPausedUntil(null); // aloqa tiklandi
     } catch (e) {
+      const sec = pauseSecondsFrom(e);
+      if (sec !== null) setPausedUntil(Date.now() + sec * 1000);
       message.error(errText(e, "Skan qilib bo'lmadi"));
     } finally {
       focusInput();
@@ -416,6 +461,15 @@ const MarketplaceIntakePage = () => {
           )
         }
       >
+        {pauseLeft > 0 && (
+          <Alert
+            type="error"
+            showIcon
+            className="mb-3"
+            message={`Skanerlash to'xtatildi — ${pauseLeft} soniya`}
+            description="Marketplace javob bermayapti. Skaneringiz soz — muammo tashqi tizimda. Sanoq tugagach o'zi tiklanadi, kodni qaytadan skanerlang."
+          />
+        )}
         <Input
           ref={inputRef}
           autoFocus

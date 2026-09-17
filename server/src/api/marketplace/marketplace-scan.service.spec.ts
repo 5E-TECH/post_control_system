@@ -93,6 +93,7 @@ function build(over: {
 
   const api = {
     isPaused: jest.fn(() => over.paused ?? false),
+    pausedSecondsLeft: jest.fn(() => (over.paused ? 42 : 0)),
     lookupParcel: over.lookup ?? jest.fn(async () => lookupOk()),
   };
 
@@ -162,7 +163,8 @@ describe('MarketplaceScanService.scan', () => {
 
   it("navbat to'xtatilgan bo'lsa TASHQI SO'ROV YUBORMAYDI", async () => {
     const { svc, api } = build({ paused: true });
-    await expect(scan(svc)).rejects.toThrow(/TO'XTATILDI/);
+    // Xabarda ANIQ soniya bo'lishi shart — «bir daqiqadan keyin» emas.
+    await expect(scan(svc)).rejects.toThrow(/TO'XTATILDI.*42 soniya/s);
     expect(api.lookupParcel).not.toHaveBeenCalled();
   });
 

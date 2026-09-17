@@ -39,11 +39,12 @@ npx --no-install ts-node -r tsconfig-paths/register \
 echo "▸ seed"
 psql -q -d "$DB_NAME" -f test/marketplace-e2e-seed.sql >/dev/null 2>&1
 
-# ⚠️ Eski mock jarayonini to'xtatamiz. Ketma-ket ishga tushirishda port
-# 4010 band qolsa, yangi mock bog'lana olmaydi va testlar ESKI holatdagi
-# mock bilan gaplashib, tushunarsiz yiqiladi.
+# ⚠️ FAQAT 4011 (e2e porti) tozalanadi — 4010 GA TEGILMAYDI.
+#   4010 da qo'lda sinov uchun mock turadi. Avval bu skript uni ham
+#   o'ldirardi va operator ekranida «Marketplace bilan aloqa yo'q»
+#   chiqib, 3 urinishdan keyin skan bloklanardi.
 if command -v fuser >/dev/null 2>&1; then
-  fuser -k 4010/tcp >/dev/null 2>&1 || true
+  fuser -k 4011/tcp >/dev/null 2>&1 || true
   sleep 0.3
 fi
 

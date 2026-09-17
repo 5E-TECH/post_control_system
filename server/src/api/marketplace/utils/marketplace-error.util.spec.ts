@@ -148,3 +148,26 @@ describe('Retry-After sarlavhasi', () => {
     expect(at({}).retryAfterMs).toBeNull();
   });
 });
+
+describe('MarketplaceCircuitBreaker.msUntilClose', () => {
+  const fail = () => ({ countsTowardBreaker: true }) as any;
+
+  it('yopiq breakerda 0 qaytaradi', () => {
+    expect(new MarketplaceCircuitBreaker().msUntilClose(1_000)).toBe(0);
+  });
+
+  it('ochilgandan keyin qolgan vaqtni beradi va holatni buzmaydi', () => {
+    const b = new MarketplaceCircuitBreaker(3, 60_000);
+    for (let i = 0; i < 3; i++) b.recordFailure(fail(), 1_000);
+    expect(b.msUntilClose(1_000)).toBe(60_000);
+    expect(b.msUntilClose(31_000)).toBe(30_000);
+    // Tekshirish O'QISH amali: breaker hamon ochiq qolishi shart.
+    expect(b.isOpen(31_000)).toBe(true);
+  });
+
+  it('sovish davri o\'tgach manfiy emas, 0 beradi', () => {
+    const b = new MarketplaceCircuitBreaker(3, 60_000);
+    for (let i = 0; i < 3; i++) b.recordFailure(fail(), 1_000);
+    expect(b.msUntilClose(999_000)).toBe(0);
+  });
+});

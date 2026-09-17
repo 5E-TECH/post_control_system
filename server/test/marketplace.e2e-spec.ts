@@ -34,7 +34,16 @@ const ADMIN_ID = '33333333-3333-4333-8333-333333333333';
 const COURIER_ID = '44444444-4444-4444-8444-444444444444';
 const MARKET_ID = '55555555-5555-4555-8555-555555555555';
 
-const MOCK_PORT = 4010;
+/**
+ * ⚠️ E2E ALOHIDA PORTDA (4011), qo'lda sinov mock'i esa 4010 da.
+ *
+ * Avval ikkalasi ham 4010 ni ishlatardi va sinov skripti eski
+ * jarayonni `fuser -k` bilan o'ldirardi — ya'ni `npm run
+ * test:marketplace-e2e` qo'lda sinab turgan mock'ni O'LDIRARDI.
+ * Operator ekranida esa «Marketplace bilan aloqa yo'q» chiqib,
+ * 3 ta urinishdan keyin skan bloklanardi (circuit breaker).
+ */
+const MOCK_PORT = Number(process.env.MP_E2E_PORT || 4011);
 const MOCK_URL = `http://localhost:${MOCK_PORT}`;
 const SLUG = 'uzmarket';
 
