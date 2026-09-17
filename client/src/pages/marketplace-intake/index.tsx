@@ -133,8 +133,13 @@ const MarketplaceIntakePage = () => {
   useEffect(() => {
     const data = session.data;
     if (!data) return;
-    setRows(
-      data.parcels
+    setRows((prev) => {
+      // ⚠️ Bloker va ogohlantirishlar SERVERDA saqlanmaydi — ular skan
+      // PAYTIDAGI xabar. Sessiya har skandan keyin qayta so'ralgani uchun
+      // bu ro'yxat ularni O'CHIRIB yuborardi: operator «tuman topilmadi»
+      // ogohlantirishini ko'rib, keyingi skanda uni yo'qotardi.
+      const seen = new Map(prev.map((r) => [r.parcel_id, r]));
+      return data.parcels
         .filter((p) => p.scan_state === "scanned")
         .map((p) => {
           const raw = (p.raw_payload ?? {}) as Record<string, unknown>;
@@ -159,22 +164,38 @@ const MarketplaceIntakePage = () => {
               String(raw.where_deliver ?? "center") === "address"
                 ? "address"
                 : "center",
-            blockers: [],
-            warnings: [],
+            blockers: seen.get(p.id)?.blockers ?? [],
+            warnings: seen.get(p.id)?.warnings ?? [],
             duplicate_in_session: false,
           } satisfies MarketplaceScanOutcome;
-        }),
-    );
+        });
+    });
   }, [session.data]);
 
   const focusInput = () => setTimeout(() => inputRef.current?.focus(), 0);
 
-  const doScan = async (raw: string) => {
+  /**
+   * ⚠️ SKANLAR KETMA-KET NAVBATDA ISHLANADI, maydon esa HECH QACHON
+   * o'chirilmaydi.
+   *
+   * Haqiqiy skaner klaviatura kabi ishlaydi va juda tez yuboradi: bitta
+   * so'rov ketayotganda ikkinchi kod keladi. Maydon `disabled` bo'lsa
+   * o'sha bosishlar JIMGINA yo'qoladi — operator posilkani skanerladim
+   * deb o'ylaydi, ro'yxatda esa u yo'q. Navbat bilan har kod o'z
+   * navbatida serverga boradi.
+   */
+  const queue = useRef<Promise<void>>(Promise.resolve());
+
+  const doScan = (raw: string) => {
     const qr = raw.trim();
     if (!qr || !sessionId) return;
     setToken("");
+    queue.current = queue.current.then(() => runScan(qr, sessionId));
+  };
+
+  const runScan = async (qr: string, sid: string) => {
     try {
-      const outcome = await scan.mutateAsync({ session_id: sessionId, qr_token: qr });
+      const outcome = await scan.mutateAsync({ session_id: sid, qr_token: qr });
       setRows((prev) => {
         // Ayni posilka qayta skanerlansa dublikat qator yaratmaymiz.
         const rest = prev.filter((r) => r.parcel_id !== outcome.parcel_id);
@@ -276,16 +297,18 @@ const MarketplaceIntakePage = () => {
         </div>
       ),
     },
-    {
-      title: "Sotuvchi",
-      dataIndex: "seller_name",
-      render: (v: string | null, r: MarketplaceScanOutcome) => (
-        <div>
-          <div className="text-sm">{v ?? "—"}</div>
-          <div className="font-mono text-xs text-gray-400">{r.seller_id ?? "—"}</div>
-        </div>
-      ),
-    },
+    /**
+     * ⚠️ SOTUVCHI USTUNI YO'Q — ataylab.
+     *
+     * Marketplace bizga faqat ID yuborishi mumkin (`SLR-77`). Operator
+     * bu ID kimligini bilmaydi va unga qarab hech narsa qilmaydi —
+     * ekranda joy egallagan foydasiz shovqin bo'lardi. Sotuvchi bilan
+     * bog'liq HAQIQIY signal («reestrda yo'q», «faol emas») «Holat»
+     * ustunidagi ogohlantirishlarda chiqadi.
+     *
+     * `seller_id` BACKENDDA saqlanadi va har hodisada marketplace'ga
+     * boradi — ular kimga qancha berishni shundan biladi.
+     */
     {
       title: "Mijoz",
       dataIndex: "customer_name",
@@ -399,7 +422,7 @@ const MarketplaceIntakePage = () => {
           size="large"
           allowClear
           value={token}
-          disabled={!sessionId || scan.isPending}
+          disabled={!sessionId}
           prefix={<QrCode className="w-4 h-4" />}
           placeholder="QR kodni skanerlang yoki kodni kiriting va Enter bosing"
           onChange={(e) => setToken(e.target.value)}

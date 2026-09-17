@@ -146,16 +146,30 @@ export function parseLookupPayload(raw: unknown): ParseResult {
   if (!Number.isFinite(codAmount) || codAmount < 0) {
     blockers.push("COD summasi noto'g'ri");
   }
+  /**
+   * Pul qaysi qutida? Ko'p qutili buyurtmada pul FAQAT birinchi qutida
+   * (qaror O1) — qolganlarida `cod_amount` ATAYLAB 0.
+   *
+   * ⚠️ Shuning uchun quyidagi «COD 0» tekshiruvi FAQAT pul qutisiga
+   * qo'llaniladi. Avval u har qutiga qo'llanilardi va natijada 3 qutili
+   * buyurtmaning 2- va 3-qutisi skanda rad etilardi: qop hech qachon
+   * to'liq bo'lmasdi, ya'ni ko'p qutili buyurtma UMUMAN qabul qilinmasdi.
+   * Buni pastdagi qoida bilan solishtiring — u aynan teskarisini talab
+   * qiladi (2+ qutida COD BO'LMASLIGI kerak); ikki qoida bir-biriga zid edi.
+   */
+  const isMoneyParcel = idx === 1;
+
   // ⚠️ Prepaid BO'LMAGAN posilkada COD 0 bo'lishi — xato belgisi.
   // Bugungi kodda bunday buyurtma yaratiladi va sotuvda market hamda
   // kuryer kassasidan tarif YECHILADI (§15 #8).
-  if (!prepaid && Number.isFinite(codAmount) && codAmount === 0) {
+  if (isMoneyParcel && !prepaid && Number.isFinite(codAmount) && codAmount === 0) {
     blockers.push(
       "COD summasi 0, lekin posilka prepaid deb belgilanmagan — noaniq holat",
     );
   }
-  // Faqat BIRINCHI qutida pul bo'lishi kerak (qaror O1).
-  if (cnt > 1 && idx > 1 && Number.isFinite(codAmount) && codAmount > 0) {
+  // Faqat BIRINCHI qutida pul bo'lishi kerak (qaror O1) — yuqoridagi
+  // `isMoneyParcel` bilan bir xil qoidaning ikkinchi tomoni.
+  if (cnt > 1 && !isMoneyParcel && Number.isFinite(codAmount) && codAmount > 0) {
     warnings.push(
       `Ko'p qutili buyurtmaning ${idx}-qutisida COD bor (${codAmount}) — pul faqat 1-qutida bo'lishi kerak`,
     );
@@ -163,8 +177,7 @@ export function parseLookupPayload(raw: unknown): ParseResult {
 
   // ── Yetkazish turi ──
   const wdRaw = s(p.where_deliver || root.where_deliver).toLowerCase();
-  const whereDeliver: 'center' | 'address' =
-    wdRaw === 'address' || wdRaw === 'home' ? 'address' : 'center';
+  const whereDeliver = normalizeWhereDeliver(wdRaw);
   if (wdRaw && !['center', 'address', 'home'].includes(wdRaw)) {
     warnings.push(`Noma'lum yetkazish turi "${wdRaw}" — «markaz» deb olindi`);
   }
@@ -213,4 +226,22 @@ export function parseLookupPayload(raw: unknown): ParseResult {
     blockers,
     warnings,
   };
+}
+
+/**
+ * YETKAZISH TURINI NORMALLASHTIRISH — YAGONA manba.
+ *
+ * ⚠️ Nega alohida funksiya. Avval skan (bu fayl) va qabul
+ * (`marketplace-intake.service.ts`) IKKI XIL mapping yozgan edi: skan
+ * `"home"` va katta harfni tushunardi, qabul esa faqat aniq `"address"`
+ * ni. Natijada operator ekranda «uygacha» ko'rib, yaratilgan buyurtma
+ * «markazgacha» bo'lardi — har posilkada 20 000 so'm jimgina farq.
+ *
+ * Kontrakt §4.2 faqat `center | address` ni e'lon qiladi; `home` — keng
+ * tarqalgan sinonim sifatida qabul qilinadi, boshqasi «markaz» bo'ladi
+ * (parser bu holatda ogohlantirish yozadi).
+ */
+export function normalizeWhereDeliver(raw: unknown): 'center' | 'address' {
+  const v = String(raw ?? '').trim().toLowerCase();
+  return v === 'address' || v === 'home' ? 'address' : 'center';
 }

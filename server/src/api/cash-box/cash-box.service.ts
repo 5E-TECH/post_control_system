@@ -1247,6 +1247,34 @@ export class CashBoxService
           throw new NotFoundException('Market cashbox topilmadi');
         }
 
+        /**
+         * ⚠️ MARKETPLACE DARVOZASI — `paymentsToMarket` dagi bilan BIR XIL
+         * sabab, lekin bu yo'l uni CHETLAB O'TARDI.
+         *
+         * CLICK_TO_MARKET market kassasidan pul yechadi va quyidagi FIFO
+         * yurishi buyurtmalarni `SOLD → PAID` qiladi. Marketplace marketida:
+         *   · kassa kamayadi, yordamchi daftarga esa HECH NARSA yozilmaydi
+         *     → `SUM(daftar) == kassa balansi` invarianti darhol buziladi
+         *     va kechalik solishtiruv «farq» deb baqiradi;
+         *   · FIFO eng eski buyurtmalarni to'laydi — ya'ni A sotuvchi uchun
+         *     berilgan pul C va D sotuvchilarining buyurtmalarini
+         *     «to'langan» qilib qo'yadi va marketplace NOTO'G'RI odamga
+         *     to'laydi.
+         *
+         * Marketplace'ga to'lov FAQAT taqsimotli hisob-kitob ekranidan.
+         */
+        const boundIntegration = await transaction.manager.findOne(
+          MarketplaceIntegrationEntity,
+          { where: { market_id } },
+        );
+        if (boundIntegration) {
+          throw new BadRequestException(
+            `Bu market «${boundIntegration.name}» marketplace'iga biriktirilgan. ` +
+              `Kuryerdan to'g'ridan-to'g'ri to'lov sotuvchilar bo'yicha ` +
+              `taqsimlanmaydi. Marketplace hisob-kitob ekranidan foydalaning.`,
+          );
+        }
+
         const allSoldOrders = await this.orderRepo
           .createQueryBuilder('o')
           .where('o.user_id = :market_id', { market_id })

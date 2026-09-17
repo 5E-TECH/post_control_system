@@ -23,11 +23,26 @@ import { ExtraCostApplierService } from './extra-cost-applier.service';
 type SavedRow = CashEntity | CashboxHistoryEntity;
 
 /** `queryRunner.manager` ning eng kichik, lekin haqiqiy xulqli taqlidi. */
-function makeQueryRunner() {
+function makeQueryRunner(balances: Record<string, number> = {}) {
   const saveOrder: SavedRow[] = [];
   let historySeq = 0;
 
   const manager = {
+    /**
+     * ⚠️ ATOMIK KASSA YANGILANISHI — `applyInline` endi `save(cashbox)`
+     * emas, `UPDATE ... RETURNING` ishlatadi (bloker B1: ikki parallel
+     * xarajat bir-birini jimgina o'chirardi).
+     *
+     * TUPLE shakli ATAYLAB: TypeORM `UPDATE` uchun `[qatorlar, soni]`
+     * qaytaradi. Mock oddiy massiv bersa, prod yo'li sinalmay qoladi va
+     * `balance_after = NaN` bo'lib bigint INSERT yiqiladi.
+     */
+    query: jest.fn(async (_sql: string, params: unknown[]) => {
+      const [amount, , cashboxId] = params as [number, number, string];
+      const id = String(cashboxId);
+      balances[id] = (balances[id] ?? 0) - Number(amount);
+      return [[{ balance: String(balances[id]) }], 1];
+    }),
     create: (_entity: unknown, data: Record<string, unknown>) => {
       // TypeORM `create` — oddiy obyekt yasaydi; DB `id` ni INSERT'da beradi,
       // bu yerda uni oldindan qo'yamiz (applier `id` ni qaytaradi).
@@ -52,7 +67,10 @@ const COURIER_ID = 'courier-1';
 
 async function apply(amount: number, extra: Record<string, unknown> = {}) {
   const svc = new ExtraCostApplierService();
-  const { queryRunner, saveOrder } = makeQueryRunner();
+  const { queryRunner, saveOrder } = makeQueryRunner({
+    'cb-market': 1_000_000,
+    'cb-courier': 500_000,
+  });
   const marketCashbox = cashbox('cb-market', 1_000_000);
   const courierCashbox = cashbox('cb-courier', 500_000);
 
@@ -80,9 +98,13 @@ describe('Applier — pul harakati', () => {
     expect(courierCashbox.balance).toBe(490_000);
   });
 
-  it('TC2: aynan 4 ta yozuv — 2 kassa saqlash + 2 tarix', async () => {
+  it('TC2: aynan 2 ta TARIX yozuvi (kassa `save` bilan YOZILMAYDI)', async () => {
+    // ⚠️ Avval 4 ta edi: 2 kassa `save` + 2 tarix. Endi kassa atomik
+    // `UPDATE ... RETURNING` bilan yangilanadi — `save(cashbox)` YO'Q,
+    // ya'ni lost update ham yo'q.
     const { saveOrder } = await apply(10_000);
-    expect(saveOrder).toHaveLength(4);
+    expect(saveOrder).toHaveLength(2);
+    expect(saveOrder.every((r) => 'operation_type' in r)).toBe(true);
   });
 
   it('TC3: tarix yozuvlari EXPENSE/extra_cost va source_id = buyurtma', async () => {

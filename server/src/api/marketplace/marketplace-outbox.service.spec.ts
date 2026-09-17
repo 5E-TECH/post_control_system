@@ -24,7 +24,8 @@ function makeManager(seqStart = 0) {
     query: jest.fn(async (sql: string) => {
       if (/UPDATE "marketplace_parcel"/.test(sql)) {
         seq += 1;
-        return [{ next_seq: String(seq) }];
+        // ⚠️ TUPLE — `UPDATE ... RETURNING` ning haqiqiy shakli.
+        return [[{ next_seq: String(seq) }], 1];
       }
       return [];
     }),

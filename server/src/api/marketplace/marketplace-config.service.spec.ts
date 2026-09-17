@@ -4,6 +4,14 @@ import { JwtPayload } from 'src/common/utils/types/user.type';
 
 const USER = { id: 'admin-1', role: 'superadmin' } as JwtPayload;
 
+/**
+ * ⚠️ Shifrlash kaliti tayyorlik checklistiga KIRADI: kalit yo'q bo'lsa
+ * sekretlar bazada OCHIQ MATN saqlanadi va ulanishni yoqib bo'lmaydi.
+ * Testlarda prod holatini taqlid qilamiz.
+ */
+process.env.MARKETPLACE_SECRET_KEY =
+  process.env.MARKETPLACE_SECRET_KEY || 'unit-test-key-0123456789abcdef';
+
 const READY = {
   id: 'int-1',
   name: 'UzMarket',
@@ -102,6 +110,7 @@ function build(
   const api = {
     ping: jest.fn(async () => opts.ping ?? { ok: true, version: '1.2', latency_ms: 42 }),
   };
+  const activityLog = { log: jest.fn() };
   const ledger = {
     verifyInvariant: jest.fn(async () => ({
       ok: true, ledger_sum: 0, cashbox_balance: 0, diff: 0,
@@ -114,8 +123,11 @@ function build(
     { createQueryRunner: () => qr } as any,
     api as any,
     ledger as any,
+    // ⚠️ Sozlash amallari (kalit aylantirish, kill-switch, `api_key`)
+    // audit jurnaliga yoziladi — «kim o'chirib qo'ydi?» savoliga javob.
+    activityLog as any,
   );
-  return { svc, integrationRepo, tariffRepo, manager, saved, api, ledger, qr, findArgs };
+  return { svc, integrationRepo, tariffRepo, manager, saved, api, ledger, qr, findArgs, activityLog };
 }
 
 const NEW_INPUT = {
@@ -302,6 +314,15 @@ describe('MarketplaceConfigService — tahrirlash', () => {
     expect(view.is_active).toBe(false);
   });
 
+  it("YOQIQ ulanishda API manzilini BO'SHATIB bo'lmaydi", async () => {
+    // ⚠️ Bo'sh satr validatsiyadan o'tib ketardi va manzil o'chib,
+    // ulanish YOQIQ qolardi — birinchi skanda tushunarsiz xato.
+    const { svc } = build({ integration: { ...READY, is_active: true } });
+    await expect(
+      svc.update('uzmarket', { api_base_url: '' }),
+    ).rejects.toThrow(/bo'shatib bo'lmaydi/i);
+  });
+
   it('tahrirlashda ham SSRF tekshiriladi', async () => {
     const { svc } = build();
     await expect(
@@ -449,5 +470,61 @@ describe("MarketplaceConfigService — operator ro'yxati", () => {
     const { svc, findArgs } = build();
     await svc.listForOperator();
     expect(findArgs[0]?.where).toEqual({ is_active: true });
+  });
+});
+
+describe('MarketplaceConfigService — sekret shifrlash', () => {
+  it('kalit YO\'Q bo\'lsa ulanishni YOQIB BO\'LMAYDI', async () => {
+    /**
+     * ⚠️ Kalitsiz transformer sekretlarni OCHIQ MATN saqlaydi (ataylab:
+     * kalitsiz server ko'tarilmasligi butun tizimni yiqitardi). Lekin
+     * ulanishni yoqishga ruxsat bersak, admin «hammasi tayyor» deb
+     * ishonch bilan ishlaydi va hamkor kaliti himoyasiz yotaveradi.
+     */
+    const saved = process.env.MARKETPLACE_SECRET_KEY;
+    const savedAlt = process.env.SECRET_ENC_KEY;
+    delete process.env.MARKETPLACE_SECRET_KEY;
+    delete process.env.SECRET_ENC_KEY;
+    jest.resetModules();
+    try {
+      const { svc } = build();
+      const view: any = await svc.getBySlug('uzmarket');
+      expect(view.checklist.encryption).toBe(false);
+      expect(view.ready).toBe(false);
+      await expect(svc.setActive('uzmarket', true)).rejects.toThrow(
+        /encryption/,
+      );
+    } finally {
+      if (saved) process.env.MARKETPLACE_SECRET_KEY = saved;
+      if (savedAlt) process.env.SECRET_ENC_KEY = savedAlt;
+    }
+  });
+});
+
+describe('MarketplaceConfigService — audit jurnali', () => {
+  it('kill-switch va kalit aylantirish YOZILADI, sekret esa YOZILMAYDI', async () => {
+    /**
+     * ⚠️ «Kim va qachon o'chirib qo'ydi?» — pul tizimida bu savolga
+     * javob bo'lishi shart. Lekin sekretning O'ZI hech qachon jurnalga
+     * tushmasligi kerak.
+     */
+    const { svc, activityLog } = build();
+    await svc.setActive('uzmarket', false, USER);
+    await svc.rotateSigningSecret('uzmarket', USER);
+    await svc.rotateInboundKey('uzmarket', USER);
+
+    const actions = activityLog.log.mock.calls.map((c: any[]) => c[0].action);
+    expect(actions).toEqual([
+      'marketplace_disabled',
+      'signing_secret_rotated',
+      'inbound_api_key_rotated',
+    ]);
+
+    const json = JSON.stringify(activityLog.log.mock.calls);
+    expect(json).not.toContain('mock-secret-v1');
+    expect(json).not.toMatch(/[0-9a-f]{64}/); // yangi sekret ham yo'q
+    expect(activityLog.log.mock.calls[0][0].entity_type).toBe(
+      'marketplace_integration',
+    );
   });
 });

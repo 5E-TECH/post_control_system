@@ -85,13 +85,8 @@ export const MarketplaceReconcileTab = ({ slug }: Props) => {
         </div>
       ),
     },
-    {
-      title: "Sotuvchi",
-      dataIndex: "seller_id",
-      render: (v: string | null) => (
-        <span className="font-mono text-xs">{v ?? "—"}</span>
-      ),
-    },
+    // ⚠️ Sotuvchi ustuni YO'Q: ular faqat ID yuborishi mumkin va u
+    // admin uchun ma'nosiz. Muammoni posilka ID si bo'yicha hal qiladi.
     {
       title: "Bizda",
       dataIndex: "scan_state",

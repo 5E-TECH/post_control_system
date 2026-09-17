@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { MarketplaceIntakeService } from './marketplace-intake.service';
 import {
   MarketplaceScanSessionStatus,
@@ -8,7 +12,11 @@ import { Where_deliver, Order_status, OrderCreatedSource } from 'src/common/enum
 import { JwtPayload } from 'src/common/utils/types/user.type';
 
 const USER = { id: 'op-1', role: 'registrator' } as JwtPayload;
-const INTEGRATION = { id: 'int-1', slug: 'uzum', market_id: 'market-1' } as any;
+// ⚠️ `is_active` SHART — qabul ham master kalitni tekshiradi (skan kabi).
+const INTEGRATION = {
+  id: 'int-1', slug: 'uzum', market_id: 'market-1', name: 'Uzum',
+  is_active: true,
+} as any;
 const TARIFF = {
   id: 't-1', integration_id: 'int-1', version: 3,
   tariff_center: 50000, tariff_home: 70000, effective_to: null,
@@ -49,6 +57,7 @@ function parcel(over: any = {}) {
 function build(opts: {
   parcels?: any[];
   session?: any;
+  integration?: any;
   tariff?: any;
   district?: any;
   confirmFails?: boolean;
@@ -75,6 +84,14 @@ function build(opts: {
       return null;
     }),
     create: jest.fn((_e: any, v: any) => ({ ...v })),
+    // Yiqilgan posilkani sessiyadan ajratish uchun ishlatiladi.
+    update: jest.fn(async () => ({})),
+    /**
+     * ⚠️ Pochta hisoblagichlari ATOMIK `UPDATE` bilan oshiriladi —
+     * «o'qi-o'zgartir-yoz» ikki operator bir vaqtda qabul qilganda
+     * bir-birining qo'shganini jimgina o'chirardi.
+     */
+    query: jest.fn(async () => []),
     save: jest.fn(async (a: any, b?: any) => {
       const v = b ?? a;
       const row = { ...v };
@@ -123,7 +140,7 @@ function build(opts: {
   };
 
   const svc = new MarketplaceIntakeService(
-    repo(INTEGRATION) as any,
+    repo(opts.integration === undefined ? INTEGRATION : opts.integration) as any,
     repo(null, opts.parcels ?? [parcel()]) as any,
     repo(session) as any,
     repo(opts.tariff === undefined ? TARIFF : opts.tariff) as any,
@@ -132,7 +149,7 @@ function build(opts: {
     outbox as any,
   );
 
-  return { svc, savedOrders, savedAll, sqlLog, api, session, manager, enqueued, outbox };
+  return { svc, manager, savedOrders, savedAll, sqlLog, api, session, enqueued, outbox };
 }
 
 const accept = (svc: MarketplaceIntakeService, key = 'idem-1') =>
@@ -295,5 +312,60 @@ describe('MarketplaceIntakeService.accept', () => {
     await expect(
       svc.accept('uzum', { session_id: 'ses-1', idempotency_key: 'k' }, { id: 'op-2' } as JwtPayload),
     ).rejects.toThrow(ConflictException);
+  });
+});
+
+describe('MarketplaceIntakeService.accept — darvozalar', () => {
+  it("MASTER KALIT o'chiq bo'lsa QABUL QILMAYDI", async () => {
+    // ⚠️ Skan `resolveIntegration` orqali o'tadi va `is_active` ni
+    // tekshiradi; qabul esa ulanishni TO'G'RIDAN-TO'G'RI o'qirdi. Ya'ni
+    // kalit o'chirilgach ham butun qop qabul qilinib, buyurtmalar
+    // yaratilaverardi — kill-switch yarim ishlardi.
+    const { svc } = build({ integration: { ...INTEGRATION, is_active: false } });
+    await expect(
+      svc.accept('uzum', { session_id: 'ses-1', idempotency_key: 'k-1' }, USER),
+    ).rejects.toThrow(ServiceUnavailableException);
+  });
+
+  it('BOSHQA ulanishning sessiyasini QABUL QILMAYDI', async () => {
+    // Busiz A marketplace sessiyasini `POST /marketplace/B/accept` ga
+    // berish mumkin edi: posilkalar A dan, tarif va daftar B dan —
+    // pul boshqa hamkorning hisobiga tushardi.
+    const { svc } = build({
+      session: {
+        id: 'ses-1', integration_id: 'BOSHQA-int', operator_id: USER.id,
+        status: MarketplaceScanSessionStatus.OPEN, accept_idempotency_key: null,
+      },
+    });
+    await expect(
+      svc.accept('uzum', { session_id: 'ses-1', idempotency_key: 'k-1' }, USER),
+    ).rejects.toThrow(/boshqa marketplace/i);
+  });
+});
+
+describe('MarketplaceIntakeService.accept — yiqilgan posilka', () => {
+  it('QABUL QILINMAGAN posilka sessiyadan AJRATILADI (qayta skanerlash mumkin)', async () => {
+    // Tuman topilmasa `createOrderForParcel` xato tashlaydi → `failed`.
+    const { svc, manager } = build({ district: null });
+    const res = await svc.accept(
+      'uzum',
+      { session_id: 'ses-1', idempotency_key: 'k-1' },
+      USER,
+    );
+    expect(res.accepted).toHaveLength(0);
+    expect(res.failed).toHaveLength(1);
+
+    /**
+     * ⚠️ Sessiya `accepted` bo'lib yopiladi. Yiqilgan posilka unga
+     * bog'langan holda qolsa, skandagi dublikat qo'riqchisi («boshqa
+     * sessiyada skanerlangan») uni ABADIY qulflab qo'yardi — posilka
+     * omborda, tizimda esa o'lik.
+     */
+    const calls = manager.update.mock.calls as any[][];
+    const detach = calls.find(
+      (c) => c[2] && 'scan_session_id' in c[2] && c[2].scan_session_id === null,
+    );
+    expect(detach).toBeDefined();
+    expect((detach as any[])[1]).toMatchObject({ scan_session_id: 'ses-1' });
   });
 });

@@ -10,6 +10,7 @@ import { RegionEntity } from 'src/core/entity/region.entity';
 import { ElchiCargoModule } from '../elchi-cargo/elchi-cargo.module';
 import { LdgCargoModule } from '../ldg-cargo/ldg-cargo.module';
 import { BotModule } from '../bots/notify-bot/bot.module';
+import { MarketplaceModule } from '../marketplace/marketplace.module';
 
 @Module({
   imports: [
@@ -23,6 +24,10 @@ import { BotModule } from '../bots/notify-bot/bot.module';
     LdgCargoModule,
     ElchiCargoModule,
     BotModule,
+    // ⚠️ Oraliq statuslarni (yo'lda / kuryerda) marketplace'ga yetkazish
+    // uchun. `PostModule` `OrderService` ni provider QILMAYDI, shuning
+    // uchun B10 dublikat-provider tuzog'i bu yerda yuzaga kelmaydi.
+    MarketplaceModule,
   ],
   controllers: [PostController],
   providers: [PostService],

@@ -998,7 +998,155 @@ hodisasi yuboriladi. ⚠️ `courier_tariff` ATAYLAB bloklanmaydi — u
 | **4** | **Pul + har-sotuvchi daftar** | ✅ pul utili (muzlatilgan tarif · prepaid manfiy `net` · bekor qoidasi · teskari yozuv/B5) · ✅ `MarketplaceLedgerService` (idempotent langar, atomik seq + qulf, `seller_balance_after`, invariant tekshiruvi, sotuvchi jamlanmasi) · ⏳ kassa nuqtalariga ilgak. ⚠️ Kassa **push funneli QURILMAYDI** (§7.4) | **Pul sinxron** | **3–4** |
 | **5** | **Hisob-kitob + o'qish API** | ✅ `marketplace_settlement` + taqsimotli to'lov (yig'indi tekshiruvi) · ✅ `settlement.paid` hodisasi · ✅ **FIFO yo'li marketplace marketi uchun bloklandi** · ✅ 3 ta o'qish endpointi + `X-Api-Key` guard (doimiy vaqtli, IP ro'yxati, slug enumeratsiyasiga qarshi) · ✅ band slug ro'yxati · ✅ kunlik `ledger.snapshot` (6-bosqichda) | **Kassalar teng yuradi** | **3** |
 | **6** | **Solishtiruv + panel** | ✅ 15-daq posilka solishtiruvi (status + `seq` uzilishi + **yo'qolgan hodisani qayta navbatga qo'yish**) · ✅ kunlik daftar solishtiruvi (invariant + ularning balansi + `ledger.snapshot`) · ✅ nomuvofiqlik kartasi endpointlari · ✅ qo'lda ishga tushirish · ✅ **frontend panel** — «Integratsiyalar → Marketplace» uch sub-tab: Sozlamalar / Hisob-kitob (sotuvchilar qoldig'i, taqsimotli to'lov, qoldiqdan ortiq to'lov BLOKLANGAN, manfiy qoldiqli sotuvchilar alohida) / Solishtiruv (nomuvofiqlik jadvali, «hal qilindi», qo'lda solishtiruv natijasi); ulanish tanlovi uch tab uchun YAGONA | **Operatsion jihatdan boshqariladi** | **3–4** *(BAJARILDI)* |
-| **7** | **Uchdan-uchga sinov** | Sandbox; 15 ta qabul mezoni (§16); prepaid/bekor/qisman/ko'p-quti ssenariylari; xaos sinovi (ular o'chirilgan holatda) | **Ishga tayyor** | **2** |
+| **7** | **Uchdan-uchga sinov** | ✅ **BAJARILDI** — haqiqiy Postgres + haqiqiy Nest ilovasi + haqiqiy mock (alohida jarayon), **25 test / 19 mezon**, `npm run test:marketplace-e2e`. Migratsiya up→down→up haqiqiy sxemada sinaldi. **6 ta haqiqiy nuqson topildi va tuzatildi** (pastdagi jadval) | **Ishga tayyor** | **2** *(BAJARILDI)* |
+
+### 7.1 Uchdan-uchga sinov TOPGAN nuqsonlar
+
+Bularning **birortasi ham** unit testlarda ko'rinmagan — hammasi faqat haqiqiy
+baza va haqiqiy HTTP oqimida chiqdi.
+
+| # | Nuqson | Ta'siri | Tuzatish |
+|---|---|---|---|
+| 1 | **Ko'p qutili buyurtmaning 2- va 3-qutisi RAD ETILARDI.** `cod_amount = 0 && !prepaid` tekshiruvi har qutiga qo'llanilardi, holbuki qaror O1 bo'yicha pul faqat 1-qutida | Har ko'p qutili buyurtma qabul qilinmasdi (mezon M16) | Tekshiruv faqat PUL QUTISIGA (`parcel_index === 1`) — `marketplace-payload.util.ts` + `marketplace-intake.service.ts` |
+| 2 | **Hech narsa ishlamasdi: `bigint "NaN"`.** TypeORM `UPDATE ... RETURNING` uchun `[rows, count]` TUPLE qaytaradi; kod `rows[0].col` o'qib `undefined` → `Number(undefined) = NaN` olardi | **Har qabul, har daftar yozuvi, har hisob-kitob yiqilardi** (4 nuqta) | Umumiy `pg-returning.util.ts` + 4 nuqtada ishlatildi; unit mock'lar prod shakliga keltirildi |
+| 3 | **PREPAID posilkada market kassasiga hech kim to'lamagan pul tushardi.** `total_price` mahsulot+yetkazishdan olinardi, kuryer esa `cod_amount` (0) yig'adi | 250 000 so'mlik posilkada market +200 000 kirim olardi | `total_price = parcel.cod_amount` |
+| 4 | **Ortiqcha xarajat daftarga tushmasdi.** U `updateCashbox` closure'idan emas, `ExtraCostApplierService.applyInline` orqali yoziladi | `SUM(daftar) == kassa` invarianti aynan xarajat qadar buzilardi | `appliedExtraCost` + ilgak xarajat blokidan KEYIN; `sellOrder` va `partlySold` |
+| 5 | **Hodisadagi `balance_after` eskirgan edi.** Daftar langari sotuv qatoriga qo'yilgan, xarajat esa keyin yoziladi | Mock `LEDGER_DRIFT` deb ushladi — marketplace bizni noto'g'ri balans deb bilardi | Langar = MARKET kassasiga OXIRGI yozilgan qator |
+| 6 | **`remote_status` hech qachon yangilanmasdi.** U skan paytida yozilib qolardi | 15-daqiqalik solishtiruv HAR yetkazilgan posilkani soxta nomuvofiq deb belgilardi — panel foydasiz bo'lardi | Worker muvaffaqiyatda `remote_status` ni ham yangilaydi (seq qo'riqchisi bilan) |
+| 7 | **`tariff_version` sotuv/bekor hodisalarida YO'Q edi** (kontrakt §12: «har hodisada») | «Qaysi tarif qo'llandi» bahsini hal qilib bo'lmasdi | `resolveTariffVersion` — posilka qabul qilingan paytdagi versiya |
+| 8 | **Tarifi yo'q kuryer bekor qilsa 500 xato** (`null.toLocaleString()`) | Kuryer mijoz oldida tushunarsiz server xatosini ko'rardi | Xabar chegara bilan bir xil null-xavfsiz qiymatni ko'rsatadi |
+
+### 7.2 Adversarial audit TOPGAN nuqsonlar (2-raund)
+
+E2e stend tayyor bo'lgach 6 lens × 2 skeptik bilan chuqur audit o'tkazildi
+(72 topilma). Quyidagilar **e2e bilan empirik isbotlandi** va tuzatildi —
+qolganlari rad etildi yoki ahamiyatsiz deb topildi.
+
+| # | Nuqson | Isbot | Tuzatish |
+|---|---|---|---|
+| 9 | **Ko'p qutili buyurtmada har quti uchun TO'LIQ tarif yechilardi.** 2- va 3-qutining narxi 0, `sellOrder` ning «0 so'mlik» shoxi esa market kassasidan to'liq tarifni yechadi | e2e: 2-quti sotilganda `−70 000` | `market_tariff`/`courier_tariff` faqat pul qutisida; qolganlarida 0 |
+| 10 | **Rollback MUZLATILGAN tarifni e'tiborsiz qoldirardi** (bloker B5 kassa tomonida ochiq edi) — `users.tariff_*` dan qayta hisoblardi | e2e: 165 000 lik buyurtmada rollbackdan keyin **49 001 so'm yo'qoldi** | `order.market_tariff`/`courier_tariff` ustun — `sellOrder` bilan bir xil naqsh |
+| 11 | **Hisob-kitob har-sotuvchi qoldiqni KAMAYTIRMASDI** — bitta umumiy yozuv `seller_id = null` bilan yozilardi | e2e: SLR-81 ga 780 000 to'langach qoldig'i hamon 780 000 | Har sotuvchiga alohida yozuv; kassa langari faqat oxirgisida (idempotentlik uchun) |
+| 12 | **Kill-switch yarim ishlardi** — `accept` `is_active` ni tekshirmasdi | unit | Qabulda ham master kalit tekshiriladi |
+| 13 | **Sessiya ulanishga bog'lanmagan edi** — A marketplace sessiyasi bilan B ga qabul qilish mumkin edi (pul boshqa hamkorga tushardi) | unit | `session.integration_id` tekshiruvi |
+| 14 | **Skan va qabul IKKI XIL `where_deliver` mapping'i yozgan edi** — skan `"home"` ni tushunardi, qabul yo'q | kod | Yagona `normalizeWhereDeliver` |
+| 15 | **«Qayta urinilmaydi» deb belgilangan hodisa har 30 soniyada qayta yuborilardi** — `retryable ? FAILED : FAILED` va `claim()` da `next_retry_at IS NULL` | unit | Yangi terminal status `dropped` (varchar — migratsiya kerak emas) |
+| 16 | **Skan maydoni so'rov ketayotganda o'chirilardi** — tez skaner yuborgan kodlar JIMGINA yo'qolardi | — | Maydon o'chirilmaydi; skanlar ketma-ket navbatda |
+| 17 | **Bloker/ogohlantirishlar har skandan keyin o'chib ketardi** (sessiya qayta so'ralgani uchun) | — | Mavjud qatorlarning belgilari saqlanadi |
+| 18 | **Ulanish yaratishda faqat 10 ta market ko'rinardi** | — | `limit: 0` |
+| 19 | **Kalit aylantirish tugmalari har adminga ko'rinardi**, endpoint esa SUPERADMIN | — | Tugmalar rolga bog'landi + tushuntirish |
+
+### 7.3 Auditni TUGATISH (3-raund)
+
+72 topilmaning hammasi JORIY kodga qarshi qayta tekshirildi (13 guruh,
+fayl bo'yicha). Natija: **21 allaqachon tuzatilgan**, **49 tasdiqlangan**,
+2 rad etilgan. Tasdiqlanganlardan quyidagilar tuzatildi.
+
+| # | Nuqson | Nega jiddiy | Tuzatish |
+|---|---|---|---|
+| 20 | **Solishtiruv eskirgan entity'ni `save` qilib `next_seq`/`last_sent_seq` ni ORQAGA surardi** | 15 daqiqalik CRON HTTP so'rovidan oldin yuklangan obyektni butunlay qayta yozadi. O'sha oynada kuryer sotsa, keyingi hodisa band `seq` ni olib `UQ_MP_OUTBOX_SEQ` ni buzadi → **kuryerning sotuvi kassa yozuvi bilan birga 500 bilan yiqiladi** | Nishonli `update` — faqat 3 ta ustun |
+| 21 | **Rollbackda xarajat kassaga qaytardi, daftarga YO'Q** | Kassa 0 ga qaytardi, daftar `−xarajat` da qolardi → sotuvchiga shu summa kam to'lanardi. Uchala shox (SOLD/PAID, PARTLY_PAID, CANCELLED) | `reverseExtraCostForCashbox` langarni qaytaradi, daftar deltasiga qo'shiladi |
+| 22 | **Tiklash yo'li O'LIK edi** — qayta navbatga qo'yilgan hodisa worker qo'riqchisiga tushib darhol `superseded` bo'lardi | Marketplace yo'qotgan hodisalarni **hech qachon** olmasdi; solishtiruvning bosh vazifasi ishlamasdi | Qayta navbatga qo'yishda `last_sent_seq` `LEAST` bilan tushiriladi |
+| 23 | **CLICK_TO_MARKET marketplace darvozasini chetlab o'tardi** | Market kassasi daftarsiz kamayadi (invariant darhol buziladi) + FIFO NOTO'G'RI sotuvchining buyurtmalarini «to'langan» qilardi | `paymentsFromCourier` ga ham darvoza |
+| 24 | **Kechiktirilgan xarajat tasdiqlanganda daftarsiz kassa** | Tasdiqlash yo'lida marketplace ilgagi yo'q | Marketplace buyurtmasida rejim har doim `immediate` |
+| 25 | **Xarajat kassani «o'qi-o'zgartir-yoz» bilan yozardi** (B1) | Ikki parallel xarajat biri-birini o'chirardi; `balance_after` xotiradagi taxmin edi — marketplace daftari aynan shundan o'qiydi | `applyInline` → `writeOneAtomic`; eski `writeOne` O'CHIRILDI |
+| 26 | **Skan sessiyasi ulanishga bog'lanmagan edi** | A sessiyasi bilan B ga skan qilish mumkin edi | `session.integration_id` tekshiruvi (qabulda ham) |
+| 27 | **Qabulda yiqilgan posilka ABADIY qotib qolardi** | Sessiya yopiladi, dublikat qo'riqchisi qayta skanni to'sadi — posilka omborda, tizimda o'lik | Yiqilganlar sessiyadan ajratiladi |
+| 28 | **`ledger.balance_after` ni kelish tartibida solishtirib bo'lmasdi** | Hodisalar posilka bo'yicha serializatsiya qilinadi, global emas — `seq 6` `seq 5` dan oldin kelib SOXTA «daftar ajraldi» berardi | Hodisaga `ledger.seq` qo'shildi; kontrakt §7.6; mock faqat KETMA-KET seq'da solishtiradi |
+
+**E2e 31 testga yetdi** (19 mezon + audit isbotlari). Uch marta ketma-ket
+ishga tushirilganda barqaror.
+
+### 7.4 Auditni TO'LIQ yopish (4-raund) + STATUS LUG'ATI
+
+72 topilmaning hammasi joriy kodga qarshi qayta baholangach (21 FIXED,
+49 CONFIRMED, 2 REFUTED), tasdiqlanganlarning deyarli hammasi tuzatildi.
+
+**Yangi imkoniyat — status lug'ati UI dan sozlanadi.** Hamkorning status
+qiymatlari oldindan noma'lum (raqam? so'z? kod?), shuning uchun ularni
+koddan taxmin qilmaymiz: admin panelida har kanonik status uchun ularning
+qiymati qo'lda kiritiladi. Xarita ikki yo'nalishda ishlaydi — chiquvchi
+hodisada ularning tili, kiruvchi javobda kanonikka qaytarish (busiz ular
+bekor qilgan posilkani qabul qilib qo'yardik). Migratsiya:
+`1749900000000-MarketplaceStatusMap`.
+
+| # | Nuqson | Nega jiddiy | Tuzatish |
+|---|---|---|---|
+| 29 | **Hodisalarda PCS ichki statuslari ketardi** (`waiting`, `on the road`) | Kontrakt §6.1 lug'atida yo'q — hamkor tushunmaydi | `pcsStatusToCanonical` + status xaritasi |
+| 30 | **Oraliq statuslar UMUMAN yuborilmasdi** | Hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi; mijozi «posilkam qayerda?» deganda javob yo'q edi | `parcel.dispatched` + `parcel.out_for_delivery` (pochta va kuryer skaneri) |
+| 31 | **Rad etish hamkorga XABAR QILINMASDI** — UI esa «xabar beriladi» deb yolg'on aytardi | Hamkor posilkani abadiy «bizda» deb bilardi | `parcel.rejected` hodisasi + qabul tasdig'ida `rejected[]` |
+| 32 | **Sotuvda market qarzi QULFSIZ balansdan hisoblanardi** | Ikki parallel sotuv bir qarzni IKKI MARTA yopardi | `SELECT ... FOR UPDATE` (market kassasi) |
+| 33 | **Ortiqcha xarajat qulfsiz kassaga yozilardi** (`writeOne`) | B1 lost update + `balance_after` xotiradagi taxmin edi (marketplace daftari aynan shundan o'qiydi) | `applyInline` → `writeOneAtomic`; eski yo'l O'CHIRILDI |
+| 34 | **Partiyada oldingi hodisa yiqilsa keyingisi o'tib ketardi** | Yiqilgani ABADIY `superseded` bo'lardi — pul hodisasi yo'qolishi mumkin | Posilka bo'yicha bloklash: qolganlari `pending` ga qaytadi |
+| 35 | **`Retry-After` e'tiborsiz qolardi** | 429 da limitni qayta-qayta urib, urinish byudjetini yeb bitirardik | Sarlavha o'qiladi (soniya va HTTP sana), 1 soatgacha cheklangan |
+| 36 | **IP oq ro'yxati CIDR'ni tushunmasdi** | Hamkor bir nechta IP dan yozsa, blok HECH QACHON mos kelmasdi — jimgina 403 | CIDR + IPv4-mapped normalizatsiya + sozlashda validatsiya |
+| 37 | **SSRF: IPv6 literal va nuqtali host o'tib ketardi** | `https://[::ffff:127.0.0.1]` bilan loopback'ga so'rov | IPv6 (unique/link-local, IPv4-mapped o'n oltilik shakli) + oxirgi nuqta |
+| 38 | **Shifrlash kaliti yo'q bo'lsa checklist «tayyor» derdi** | Sekretlar bazada OCHIQ MATN, admin bilmaydi | Checklist bandi — kalitsiz ulanish YOQILMAYDI |
+| 39 | **Sozlash amallari audit jurnaliga yozilmasdi** | «Kim o'chirib qo'ydi?» savoliga javob yo'q edi | Kill-switch, kalit aylantirish, `api_key` — jurnalga (sekretning O'ZI emas) |
+| 40 | **«Ulanishni tekshirish» IMZONI sinamasdi** | Ping ataylab imzolanmaydi — imzo xato bo'lsa faqat birinchi sotuvda bilinardi | Alohida «Imzo» tugmasi: imzolangan `webhook.test` |
+| 41 | **Sotuvchilar reestri hech qachon yangilanmasdi** | Hisob-kitobda sotuvchi faqat `SLR-77` bo'lib ko'rinardi | Kunlik CRON (`fetchSellers`, sahifalash bilan) |
+| 42 | **Undo rad etilgan posilkani ham o'chirardi** | Hamkorga «rad etildi» deb aytilgan-u, bizda iz qolmasdi | Undo faqat skanerlangan posilkaga; shartli `delete` (qabul bilan poyga yopildi) |
+| 43 | **Bitta operatorga IKKI ochiq sessiya** | Posilkalar ikki qopga bo'linib, biri qulflanib qolardi | Qisman unique indeks + `23505` da mavjudini qaytarish |
+| 44 | **Yoqiq ulanishda API manzilini bo'shatish mumkin edi** | Manzil o'chib, ulanish yoqiq qolardi — birinchi skanda tushunarsiz xato | Bo'sh satr rad etiladi |
+| 45 | **Pochta hisoblagichlari qulfsiz** | Ikki operator bir vaqtda qabul qilsa, biri ikkinchisining qo'shganini o'chirardi | Atomik `UPDATE ... + 1` |
+| 46 | **Nomuvofiqlikni tozalash egalikni tekshirmasdi** | Bir marketplace admini boshqasining belgisini o'chirardi | Yo'lda `slug`, so'rovda `integration_id` |
+| 47 | **Migratsiya qayta ishga tushirilganda buzilardi** | `.catch()` yordam bermaydi: Postgres'da tranzaksiya ichidagi xato hammasini abort qiladi | `pg_constraint` dan oldindan tekshirish |
+| 48 | **Mock boshqaruv yo'llari kalitsiz ochiq edi** | `/_mock/reset` sinov o'rtasida daftarni tozalab, natijani ma'nosiz qilardi | `X-Api-Key` talab qilinadi |
+
+**E2e 37 testga yetdi.** Status lug'ati, oraliq statuslar va imzo sinovi
+alohida qoplangan.
+
+### 7.5 HISOB-KITOB SODDALASHTIRILDI (qaror 2026-09-17)
+
+Tahlil savoli: kassa solishtiruvi ortiqchami va nomuvofiqlik ishni
+to'xtatadimi?
+
+**Javob: hech narsa to'xtamaydi.** `verifyInvariant` butun kodda faqat
+uch O'QISH joyida chaqiriladi (hisob-kitob taklifi, solishtiruv, sozlash
+sahifasi) va hech qachon xato tashlamaydi. `mismatch_at` — faqat
+ko'rsatish bayrog'i. Skan, qabul, sotuv, bekor, rollback va to'lov
+farqdan qat'i nazar ishlayveradi. Bu ATAYLAB: buxgalteriya farqi sababli
+kuryerni dala o'rtasida to'xtatib qo'yish ancha yomon bo'lardi.
+
+**Nima qoldirildi va nega:**
+
+| Bo'lak | Nega qoldi |
+|---|---|
+| Market kassasi | Yagona haqiqat manbai: «ularga qancha qarzdormiz». Oddiy marketdan farqi yo'q |
+| Hodisada `seller_id` | Boshlang'ich talab — ular kimga qancha berishni shundan biladi |
+| Yordamchi daftar + invariant | Buxgalteriya EMAS, **tuzoq signali**: «kassa qimirladi-yu, hamkorga aytilmadi». Shu sessiyada aynan u 5 ta xatoni ushladi (xarajat daftarga tushmasligi, prepaid'da soxta kirim, ko'p qutida 3× tarif, eskirgan `balance_after`, rollbackda xarajat qaytmasligi). Narxi: 1 jadval + 1 CRON |
+
+**Nima olib tashlandi:**
+
+| Nima | Nega |
+|---|---|
+| **To'lovda taqsimot** | Marketplace pulni oladi va sotuvchilariga O'ZI tarqatadi. Har to'lovda jadval to'ldirish — admin uchun bekorga ish, ularga foydasi yo'q. Endi yaxlit summa: bitta raqam + usul + chek |
+| **Frontendda sotuvchi ko'rsatish** | Biz ularning sotuvchilarini bilmaymiz, ular faqat ID yuborishi mumkin (`SLR-77`). Bunday qatorni adminga ko'rsatish foydasiz shovqin — u ID kimligini bilmaydi va unga qarab qaror qabul qila olmaydi. Hisob-kitob, skan va nomuvofiqlik ekranlaridan olib tashlandi |
+
+`seller_id` **backendda to'liq qoladi**: daftar yozuvida, har posilka
+hodisasida va kunlik `ledger.snapshot` da. Kontrakt §7.8 yangilandi —
+`settlement.paid` endi taqsimotsiz.
+
+> Oqibat: sotuvchilar kesimi endi «qancha QARZDORMIZ» emas, «qancha
+> ISHLAB TOPGAN» degani (to'lov `seller_id` siz yoziladi). Shu sabab
+> qarz **kassadan** olinadi, sotuvchilar yig'indisidan emas.
+
+#### ATAYLAB TUZATILMAGANLAR
+
+| Nuqson | Nega qoldirildi |
+|---|---|
+| **ASOSIY kassada «o'qi-o'zgartir-yoz»** (7 nuqta) | `balance_cash`/`balance_card` va virtual karta invarianti (`SUM(cards) == balance_card`) bilan chirmashgan. Alohida, o'z testlari bilan qilinadigan ish — marketplace oqimiga BEVOSITA tegmaydi (marketplace faqat MARKET kassasini ishlatadi, u allaqachon atomik) |
+| **Qisman sotuvda `items_delivered`/`items_returned`** | Marketplace buyurtmasida `order_item` ataylab yaratilmaydi (katalog FK). Operator qisman sotuvda faqat SUMMA kiritadi — element darajasidagi ma'lumot manbadan YO'Q. Pul maydonlari (`delivered_amount`/`returned_amount`) to'g'ri ketadi |
+| **`GET /{slug}/events` sahifalash nozikliklari** | O'qish API'si; hamkor uni hali ishlatmaydi. Pilotdan keyin real ehtiyojga qarab |
+
+> **Auditning 58 agenti sessiya limitiga tushdi** — ya'ni tekshiruv TO'LIQ
+> tugamagan. Yuqoridagilar e2e yoki kod o'qish bilan tasdiqlanganlar.
+> Qolgan topilmalar ro'yxati workflow jurnalida saqlangan.
+
+> **Eng qimmatli qismi mock bo'ldi.** U balansni MUSTAQIL hisoblaydi va har
+> hodisani kontrakt bilan solishtiradi. 5-nuqson (`LEDGER_DRIFT`) aynan
+> shu tufayli topildi: bizning kassa ham, daftarimiz ham to'g'ri edi —
+> faqat ULARGA yuborilgan raqam eskirgan edi.
 
 **Jami: 20–25 dev-kun** (PCS). Ular tomoni: ~8–12 kun (7 endpoint + hodisa qabuli + daftar).
 

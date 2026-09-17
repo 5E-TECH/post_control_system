@@ -7,17 +7,28 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Cashbox_type, Roles } from 'src/common/enums';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { MarketplaceIntegrationEntity } from 'src/core/entity/marketplace-integration.entity';
 import { MarketplaceTariffEntity } from 'src/core/entity/marketplace-tariff.entity';
+import { isSecretEncryptionConfigured } from 'src/common/database/encrypted.transformer';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 import { MarketplaceApiService } from './marketplace-api.service';
 import { MarketplaceLedgerService } from './marketplace-ledger.service';
-import { isReservedMarketplaceSlug } from './marketplace.enums';
+import {
+  isReservedMarketplaceSlug,
+  MarketplaceEventType,
+} from './marketplace.enums';
+import {
+  CANONICAL_STATUSES,
+  findStatusMapConflicts,
+  sanitizeStatusMap,
+} from './utils/marketplace-status.util';
 import { assertOutboundUrlSafe } from './utils/marketplace-url.util';
+import { assertValidIpAllowlist } from './guards/marketplace-api-key.guard';
 
 /**
  * ⚠️ SEKRETLAR JAVOBDA HECH QACHON QAYTARILMAYDI.
@@ -66,7 +77,33 @@ export class MarketplaceConfigService {
     private readonly dataSource: DataSource,
     private readonly api: MarketplaceApiService,
     private readonly ledger: MarketplaceLedgerService,
+    private readonly activityLog: ActivityLogService,
   ) {}
+
+  /**
+   * SOZLASH AMALLARI AUDIT JURNALIGA YOZILADI.
+   *
+   * ⚠️ Nega shart: kalit aylantirish, kill-switch va `api_key` o'zgartirish
+   * — integratsiyani butunlay to'xtatib qo'yishi mumkin bo'lgan amallar.
+   * Busiz «kim va qachon o'chirib qo'ydi?» degan savolga javob yo'q edi.
+   *
+   * ⚠️ Sekretning O'ZI hech qachon yozilmaydi — faqat amal nomi.
+   */
+  private async audit(
+    integration: MarketplaceIntegrationEntity,
+    action: string,
+    user: JwtPayload | null,
+    extra?: Record<string, unknown>,
+  ) {
+    await this.activityLog.log({
+      entity_type: 'marketplace_integration',
+      entity_id: integration.id,
+      action,
+      user: user ?? undefined,
+      description: `«${integration.name}» (${integration.slug}) — ${action}`,
+      metadata: { slug: integration.slug, ...extra },
+    });
+  }
 
   // ═══════════════════════ O'QISH ═══════════════════════
 
@@ -118,6 +155,13 @@ export class MarketplaceConfigService {
       inbound_api_key: !!r.inbound_api_key,
       tariff: !!tariff,
       market: !!r.market_id,
+      /**
+       * ⚠️ Kalit yo'q bo'lsa sekretlar bazada OCHIQ MATN. Yoqishga
+       * ruxsat bersak, admin «hammasi tayyor» deb ishonch bilan
+       * ishlaydi va hamkor kaliti himoyasiz yotaveradi.
+       * Tuzatish bitta muhit o'zgaruvchisi: `MARKETPLACE_SECRET_KEY`.
+       */
+      encryption: isSecretEncryptionConfigured(),
     };
     const ready = Object.values(checklist).every(Boolean);
 
@@ -149,6 +193,7 @@ export class MarketplaceConfigService {
             effective_from: tariff.effective_from,
           }
         : null,
+      status_map_configured: Object.keys(r.status_map ?? {}).length,
       checklist,
       ready,
     };
@@ -189,6 +234,7 @@ export class MarketplaceConfigService {
     // tekshiriladi, lekin u yerda xato operatorga «skan ishlamadi» bo'lib
     // ko'rinadi — admin esa sababini bu yerda darhol ko'radi.
     if (input.api_base_url) assertOutboundUrlSafe(input.api_base_url);
+    if (input.ip_allowlist) assertValidIpAllowlist(input.ip_allowlist);
 
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
@@ -267,9 +313,28 @@ export class MarketplaceConfigService {
    *   - `market_id` butun daftar va kassa tarixiga bog'langan — ko'chirilsa
    *     invariant buziladi va eski yozuvlar egasiz qoladi.
    */
-  async update(slug: string, patch: UpdateIntegrationInput) {
+  async update(slug: string, patch: UpdateIntegrationInput, user?: JwtPayload) {
     const integration = await this.mustFind(slug);
     if (patch.api_base_url) assertOutboundUrlSafe(patch.api_base_url);
+
+    /**
+     * ⚠️ YOQIQ ulanishda tayyorlik bandini BO'SHATIB BO'LMAYDI.
+     *
+     * Bo'sh satr validatsiyadan o'tib ketardi (`if (patch.api_base_url)`
+     * — bo'sh satr «yolg'on»), manzil o'chib, ulanish esa YOQIQ qolardi.
+     * Natijada birinchi skanda tushunarsiz xato chiqardi va sababi
+     * sozlash ekranida ko'rinmasdi.
+     */
+    if (
+      integration.is_active &&
+      patch.api_base_url !== undefined &&
+      String(patch.api_base_url).trim() === ''
+    ) {
+      throw new BadRequestException(
+        "Ulanish YOQIQ turganda API manzilini bo'shatib bo'lmaydi. " +
+          "Avval «Holat» kartasidan o'chiring.",
+      );
+    }
 
     // ⚠️ ANIQ maydonlar — `Object.assign(integration, patch)` EMAS.
     // Halqa bilan yozilsa, DTO'ga kelajakda qo'shilgan har qanday maydon
@@ -283,16 +348,27 @@ export class MarketplaceConfigService {
       integration.request_timeout_ms = patch.request_timeout_ms;
     if (patch.settlement_period_days !== undefined)
       integration.settlement_period_days = patch.settlement_period_days;
-    if (patch.ip_allowlist !== undefined)
+    if (patch.ip_allowlist !== undefined) {
+      // ⚠️ Yaroqsiz yozuv JIMGINA 403 berardi: hamkor bloklanadi, admin
+      // esa sababini bilmaydi. Shu yerda aniq xato beramiz.
+      assertValidIpAllowlist(patch.ip_allowlist);
       integration.ip_allowlist = patch.ip_allowlist;
+    }
     if (patch.is_sandbox !== undefined) integration.is_sandbox = patch.is_sandbox;
 
     await this.integrationRepo.save(integration);
+    await this.audit(integration, 'marketplace_updated', user ?? null, {
+      // ⚠️ Kalitning O'ZI emas — faqat o'zgargani fakti.
+      changed: Object.keys(patch).filter(
+        (k) => (patch as Record<string, unknown>)[k] !== undefined,
+      ),
+      api_key_changed: patch.api_key !== undefined,
+    });
     return this.present(integration);
   }
 
   /** MASTER kalit — o'chirilsa skan ham, navbat ham to'xtaydi. */
-  async setActive(slug: string, active: boolean) {
+  async setActive(slug: string, active: boolean, user?: JwtPayload) {
     const integration = await this.mustFind(slug);
     if (active) {
       const view = await this.present(integration);
@@ -308,6 +384,11 @@ export class MarketplaceConfigService {
     integration.is_active = active;
     await this.integrationRepo.save(integration);
     this.logger.warn(`${active ? "🟢 YOQILDI" : "🔴 O'CHIRILDI"}: ${slug}`);
+    await this.audit(
+      integration,
+      active ? 'marketplace_enabled' : 'marketplace_disabled',
+      user ?? null,
+    );
     return this.present(integration);
   }
 
@@ -382,6 +463,60 @@ export class MarketplaceConfigService {
     }
   }
 
+  // ═══════════════════════ STATUS XARITASI ═══════════════════════
+
+  /**
+   * Hamkorning status lug'atini QO'LDA sozlash.
+   *
+   * ⚠️ Nega qo'lda: ularning tizimi allaqachon mavjud bo'lishi va
+   * butunlay boshqa qiymatlar ishlatishi mumkin (`7`, `"dostavleno"`,
+   * `"ST-07"`). Koddan taxmin qilish — jimgina noto'g'ri status
+   * yuborish yoki ular bekor qilgan posilkani qabul qilib qo'yish demak.
+   */
+  async setStatusMap(slug: string, raw: Record<string, unknown>) {
+    const integration = await this.mustFind(slug);
+    const map = sanitizeStatusMap(raw);
+    integration.status_map = map;
+    await this.integrationRepo.save(integration);
+
+    await this.audit(integration, 'status_map_updated', null, {
+      configured: Object.keys(map ?? {}).length,
+    });
+
+    const conflicts = findStatusMapConflicts(map);
+    this.logger.warn(
+      `🗺️ ${slug}: status xaritasi yangilandi (${Object.keys(map ?? {}).length} ta)` +
+        (conflicts.length ? ` — ${conflicts.length} ta TO'QNASHUV` : ''),
+    );
+    return this.statusMapView(integration);
+  }
+
+  async getStatusMap(slug: string) {
+    return this.statusMapView(await this.mustFind(slug));
+  }
+
+  /**
+   * UI jadvali uchun: har kanonik status + sozlangan qiymat + to'qnashuv.
+   */
+  private statusMapView(integration: MarketplaceIntegrationEntity) {
+    const map = integration.status_map ?? {};
+    return {
+      slug: integration.slug,
+      rows: CANONICAL_STATUSES.map((canonical) => ({
+        canonical,
+        partner: map[canonical] ?? null,
+        /** Sozlanmagan bo'lsa kanonik nomning o'zi yuboriladi. */
+        effective: map[canonical] ?? canonical,
+      })),
+      /**
+       * ⚠️ Ikki kanonik status BIR qiymatga tushsa, ularning javobini
+       * qaytarishda qaysi biri ekanini aniqlab bo'lmaydi.
+       */
+      conflicts: findStatusMapConflicts(integration.status_map),
+      configured: Object.keys(map).length,
+    };
+  }
+
   async tariffHistory(slug: string) {
     const integration = await this.mustFind(slug);
     return this.tariffRepo.find({
@@ -399,7 +534,7 @@ export class MarketplaceConfigService {
    * ham yuboramiz (`v1` + `v2`). Marketplace qaysi kalitga o'tganidan
    * qat'i nazar imzo to'g'ri keladi — UZILISH BO'LMAYDI (kontrakt §3.4).
    */
-  async rotateSigningSecret(slug: string) {
+  async rotateSigningSecret(slug: string, user?: JwtPayload) {
     const integration = await this.mustFind(slug);
     const next = randomBytes(32).toString('hex');
     integration.signing_secret_previous = integration.signing_secret;
@@ -407,6 +542,7 @@ export class MarketplaceConfigService {
     await this.integrationRepo.save(integration);
 
     this.logger.warn(`🔑 ${slug}: imzo sekreti aylantirildi`);
+    await this.audit(integration, 'signing_secret_rotated', user ?? null);
     // ⚠️ Sekret FAQAT SHU YERDA, BIR MARTA qaytariladi. Bazada u
     // shifrlangan, panel esa faqat maskani ko'rsatadi.
     return {
@@ -418,21 +554,23 @@ export class MarketplaceConfigService {
   }
 
   /** Aylantirish oynasi yopildi — eski sekretni tozalash. */
-  async clearPreviousSecret(slug: string) {
+  async clearPreviousSecret(slug: string, user?: JwtPayload) {
     const integration = await this.mustFind(slug);
     integration.signing_secret_previous = null;
     await this.integrationRepo.save(integration);
     this.logger.warn(`🔑 ${slug}: eski imzo sekreti tozalandi`);
+    await this.audit(integration, 'signing_secret_previous_cleared', user ?? null);
     return { ok: true };
   }
 
   /** Ular BIZGA kirishi uchun kalit (faqat o'qish endpointlari). */
-  async rotateInboundKey(slug: string) {
+  async rotateInboundKey(slug: string, user?: JwtPayload) {
     const integration = await this.mustFind(slug);
     const next = randomBytes(24).toString('hex');
     integration.inbound_api_key = next;
     await this.integrationRepo.save(integration);
     this.logger.warn(`🔑 ${slug}: kiruvchi API kalit aylantirildi`);
+    await this.audit(integration, 'inbound_api_key_rotated', user ?? null);
     return {
       inbound_api_key: next,
       warning: "Bu kalit BOSHQA KO'RSATILMAYDI. Marketplace'ga uzating.",
@@ -470,6 +608,61 @@ export class MarketplaceConfigService {
         ok: false,
         kind: info?.kind ?? 'unknown',
         message: info?.message ?? (e instanceof Error ? e.message : String(e)),
+      };
+    }
+  }
+
+  /**
+   * IMZO SINOVI — `webhook.test` hodisasini YUBORIB ko'radi.
+   *
+   * ⚠️ NEGA `ping` YETARLI EMAS. `ping` ATAYLAB imzolanmaydi (kontrakt
+   * §4.1), ya'ni «Ulanishni tekshirish» tugmasi faqat «manzil javob
+   * beryapti» deydi. Imzo sekreti noto'g'ri bo'lsa admin buni BILMAYDI —
+   * xato faqat birinchi HAQIQIY hodisada, ya'ni birinchi sotuvdan keyin
+   * chiqardi va pul hodisasi navbatda qotib qolardi.
+   *
+   * Bu metod imzolangan yo'ldan (`POST /bp/v1/events`) o'tadi.
+   */
+  async sendWebhookTest(slug: string) {
+    const integration = await this.mustFind(slug);
+    if (!integration.api_base_url) {
+      return { ok: false, kind: 'config', message: 'API manzili kiritilmagan' };
+    }
+    if (!integration.signing_secret) {
+      return { ok: false, kind: 'config', message: 'Imzo sekreti kiritilmagan' };
+    }
+
+    const envelope = {
+      event_id: randomUUID(),
+      seq: 0,
+      event_type: MarketplaceEventType.WEBHOOK_TEST,
+      occurred_at: Date.now(),
+      sent_at: Date.now(),
+      integration: integration.slug,
+      actor: { type: 'system' },
+      note: "BeePost sozlash ekranidan yuborilgan imzo sinovi",
+    };
+
+    try {
+      const res = await this.api.sendEvent(integration, envelope);
+      return {
+        ok: true,
+        signed: true,
+        applied: res?.applied ?? null,
+        http_status: res?.http_status ?? null,
+      };
+    } catch (e) {
+      const info = (e as { marketplaceError?: { kind: string; message: string } })
+        .marketplaceError;
+      return {
+        ok: false,
+        signed: true,
+        kind: info?.kind ?? 'unknown',
+        // 401 bu yerda deyarli har doim IMZO xatosi.
+        message:
+          info?.kind === 'auth'
+            ? `Imzo yoki API kalit rad etildi: ${info.message}`
+            : (info?.message ?? (e instanceof Error ? e.message : String(e))),
       };
     }
   }

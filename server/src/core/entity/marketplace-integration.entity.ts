@@ -67,6 +67,23 @@ export class MarketplaceIntegrationEntity extends BaseEntity {
   ip_allowlist: string[] | null;
 
   /**
+   * STATUS XARITASI — `{ "<bizning kanonik>": "<ularning qiymati>" }`.
+   *
+   * ⚠️ Nega sozlanadigan. Hamkorning status lug'ati oldindan NOMA'LUM:
+   * so'z (`delivered`), raqam (`7`), kod (`ST-07`) bo'lishi mumkin.
+   * Koddan taxmin qilish — jimgina noto'g'ri status yuborish demak.
+   *
+   * Ikki yo'nalishda ishlatiladi:
+   *   · CHIQUVCHI — hodisadagi `status.from`/`status.to` ularning tilida;
+   *   · KIRUVCHI  — ularning javobi bizning kanonik nomga qaytariladi
+   *     (bekor qilingan posilkani qabul qilib qo'ymaslik uchun shart).
+   *
+   * `null` yoki bo'sh — kanonik nomlar o'zgarishsiz ishlatiladi.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  status_map: Record<string, string> | null;
+
+  /**
    * Shu marketplace biriktirilgan PCS marketi. Kassa, buyurtma egaligi va
    * hisob-kitob shu foydalanuvchi orqali yuritiladi (reja §7.1).
    */

@@ -17,7 +17,8 @@ function makeManager(opts: {
     query: jest.fn(async function (this: any, sql: string) {
       if (/UPDATE "marketplace_integration"/.test(sql)) {
         seq += 1;
-        return [{ next_ledger_seq: String(seq) }];
+        // ⚠️ TUPLE — `UPDATE ... RETURNING` ning haqiqiy shakli.
+        return [[{ next_ledger_seq: String(seq) }], 1];
       }
       if (/FROM "cashbox_history"/.test(sql)) {
         return opts.cashboxBalanceAfter === undefined

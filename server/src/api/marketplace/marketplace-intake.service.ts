@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
@@ -18,6 +19,11 @@ import {
 } from 'src/common/enums';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { DistrictEntity } from 'src/core/entity/district.entity';
+import { normalizeWhereDeliver } from './utils/marketplace-payload.util';
+import {
+  buildEventStatus,
+  toCanonicalStatus,
+} from './utils/marketplace-status.util';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { PostEntity } from 'src/core/entity/post.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
@@ -28,6 +34,7 @@ import { MarketplaceTariffEntity } from 'src/core/entity/marketplace-tariff.enti
 import { MarketplaceApiService } from './marketplace-api.service';
 import { MarketplaceOutboxService } from './marketplace-outbox.service';
 import {
+  MarketplaceParcelStatus,
   MarketplaceEventType,
   MarketplaceScanSessionStatus,
   MarketplaceScanState,
@@ -109,12 +116,38 @@ export class MarketplaceIntakeService {
     const integration = await this.integrationRepo.findOne({ where: { slug } });
     if (!integration) throw new NotFoundException(`Ulanish topilmadi: ${slug}`);
 
+    /**
+     * ⚠️ MASTER KALIT QABULDA HAM AMAL QILADI.
+     *
+     * Skan `resolveIntegration` orqali o'tadi va u `is_active` ni
+     * tekshiradi; qabul esa ulanishni TO'G'RIDAN-TO'G'RI o'qirdi. Ya'ni
+     * admin kalitni o'chirgach ham operator butun qopni qabul qilib,
+     * buyurtmalar yaratib yuborardi — kill-switch yarim ishlardi.
+     */
+    if (!integration.is_active) {
+      throw new ServiceUnavailableException(
+        `«${integration.name}» ulanishi o'chirilgan. Sozlamadan yoqing.`,
+      );
+    }
+
     const session = await this.sessionRepo.findOne({
       where: { id: input.session_id },
     });
     if (!session) throw new NotFoundException('Skan sessiyasi topilmadi');
     if (session.operator_id !== user.id) {
       throw new ConflictException('Bu sessiya boshqa operatorga tegishli');
+    }
+    /**
+     * ⚠️ SESSIYA SHU ULANISHNIKI BO'LISHI SHART.
+     *
+     * Bu tekshiruvsiz A marketplace sessiyasini `POST /marketplace/B/accept`
+     * ga berish mumkin edi: posilkalar A dan, tarif va daftar esa B dan
+     * olinardi — pul boshqa hamkorning hisobiga tushardi.
+     */
+    if (session.integration_id !== integration.id) {
+      throw new ConflictException(
+        'Bu sessiya boshqa marketplace ulanishiga tegishli',
+      );
     }
 
     // ── IDEMPOTENTLIK ────────────────────────────────────────────────
@@ -191,6 +224,29 @@ export class MarketplaceIntakeService {
         }
       }
 
+      /**
+       * ⚠️ YIQILGAN POSILKALARNI SESSIYADAN AJRATAMIZ.
+       *
+       * Sessiya hozir `accepted` bo'ladi. Qabul qilinmagan posilka esa
+       * `scanned` holatda, YOPILGAN sessiyaga bog'langan holda qoladi va
+       * skandagi dublikat qo'riqchisi («boshqa sessiyada skanerlangan»)
+       * uni ABADIY qulflab qo'yardi: qayta skanerlab ham, undo qilib ham
+       * bo'lmasdi — posilka jismonan omborda, tizimda esa o'lik.
+       *
+       * Bog'lanishni uzsak, operator uni yangi sessiyada qayta skanerlab
+       * sababini (tuman topilmadi, COD noto'g'ri...) hal qila oladi.
+       */
+      if (failed.length > 0) {
+        await qr.manager.update(
+          MarketplaceParcelEntity,
+          {
+            scan_session_id: session.id,
+            scan_state: MarketplaceScanState.SCANNED,
+          },
+          { scan_session_id: null, updated_at: Date.now() },
+        );
+      }
+
       session.status = MarketplaceScanSessionStatus.ACCEPTED;
       session.accept_idempotency_key = input.idempotency_key;
       session.accepted_count = accepted.length;
@@ -216,10 +272,25 @@ export class MarketplaceIntakeService {
     // Ikkalasi ham idempotent (`batch_id` va `event_id`), shuning uchun
     // ikkisi ham yetib borishi NORMAL va xavfsiz. Tez yo'l yiqilsa lokal
     // qabul BEKOR QILINMAYDI — posilka jismonan bizda.
+    /**
+     * ⚠️ RAD ETILGANLAR ham yuboriladi.
+     *
+     * Avval faqat `accepted` ketardi. Hamkor rad etilgan posilkani abadiy
+     * «bizga topshirilmoqda» deb bilib, uni qaytarib olishni ham,
+     * sotuvchiga aytishni ham bilmasdi. Kontrakt §4.3 `rejected[]` ni
+     * ataylab nazarda tutgan.
+     */
+    const rejectedRows = await this.parcelRepo.find({
+      where: {
+        scan_session_id: session.id,
+        scan_state: MarketplaceScanState.REJECTED,
+      },
+    });
+
     let confirmed = false;
-    if (accepted.length > 0) {
+    if (accepted.length > 0 || rejectedRows.length > 0) {
       try {
-        await this.api.confirmAccept(integration, {
+        const res = await this.api.confirmAccept(integration, {
           batch_id: batchId,
           accepted_at: Date.now(),
           items: accepted.map((a) => ({
@@ -227,8 +298,29 @@ export class MarketplaceIntakeService {
             beepost_order_id: a.order_id,
             beepost_order_number: a.order_number,
           })),
+          rejected: rejectedRows.map((r) => ({
+            external_parcel_id: r.external_parcel_id,
+            reason: String(r.reject_reason ?? 'OTHER'),
+            ...(r.reject_note ? { note: r.reject_note } : {}),
+          })),
         });
         confirmed = true;
+
+        /**
+         * ⚠️ Ularning `errors[]` javobi E'TIBORSIZ QOLDIRILMAYDI.
+         * «Tasdiqlandi» deb hisoblab, aslida bir nechta posilka ularda
+         * qabul qilinmagan bo'lishi mumkin — buni faqat log ko'rsatadi,
+         * keyin solishtiruv CRON ushlaydi.
+         */
+        const errors = res?.errors ?? [];
+        if (errors.length) {
+          this.logger.error(
+            `⚠️ qabul tasdig'ida ${errors.length} ta xato (batch ${batchId}): ` +
+              errors
+                .map((x) => `${x.external_parcel_id}=${x.code}`)
+                .join(', '),
+          );
+        }
       } catch (e) {
         this.logger.error(
           `❌ qabul tasdig'i yuborilmadi (batch ${batchId}): ` +
@@ -292,15 +384,21 @@ export class MarketplaceIntakeService {
     });
     if (!district) throw new Error(`Tuman topilmadi (SOATO ${districtSato})`);
 
-    if (!parcel.prepaid && parcel.cod_amount <= 0) {
+    // ⚠️ FAQAT PUL QUTISIGA — pastdagi `isMoneyParcel` bilan bir xil qoida.
+    // Ko'p qutili buyurtmaning 2- va 3-qutisida `cod_amount` ataylab 0;
+    // bu tekshiruv ularga ham qo'llanilsa, buyurtmaning qolgan qutilari
+    // qabulda «COD 0» deb yiqilardi va mijoz chala posilka olardi.
+    if (parcel.parcel_index === 1 && !parcel.prepaid && parcel.cod_amount <= 0) {
       throw new Error('COD summasi 0, lekin prepaid emas');
     }
 
     // ── Yetkazish turi ULARNING payload'idan (bloker B9) ──
     // ⚠️ `receiveExternalOrders` buni `market.default_tariff` dan oladi va
     // ularning so'zini O'QIMAYDI — har «uyga» posilkada 20 000 farq.
+    // ⚠️ SKAN bilan BIR XIL normalizator. Alohida mapping yozilsa, skan
+    // «uygacha» deb ko'rsatib, qabul «markazgacha» yaratardi (20 000 farq).
     const whereDeliver =
-      String(raw.where_deliver ?? 'center') === 'address'
+      normalizeWhereDeliver(raw.where_deliver) === 'address'
         ? Where_deliver.ADDRESS
         : Where_deliver.CENTER;
 
@@ -348,9 +446,22 @@ export class MarketplaceIntakeService {
     // ── Buyurtma ──
     // Pul FAQAT birinchi qutida (qaror O1) — qolganlari 0.
     const isMoneyParcel = parcel.parcel_index === 1;
-    const totalPrice = isMoneyParcel
-      ? parcel.declared_product_amount + parcel.declared_delivery_amount
-      : 0;
+
+    /**
+     * ⚠️ `total_price` = KURYER MIJOZDAN YIG'ADIGAN summa, ya'ni `cod_amount`.
+     *
+     * Avval bu yerda `declared_product_amount + declared_delivery_amount`
+     * turardi. Oddiy COD posilkada ikkisi teng chiqadi, shuning uchun xato
+     * ko'rinmasdi. Lekin PREPAID posilkada mahsulot summasi (masalan
+     * 250 000) qoladi-yu `cod_amount` 0 bo'ladi: kuryer HECH NARSA olmaydi,
+     * tizim esa market kassasiga 250 000 − tarif kirim yozardi — hech kim
+     * to'lamagan pul. Qisman oldindan to'langan buyurtmada ham (qaror P13:
+     * «summasi kamroq bo'lib keladi») farq xuddi shunday jimgina bo'lardi.
+     *
+     * Mahsulot/yetkazish summalari yo'qolmaydi — ular posilkada saqlanadi va
+     * hodisa payload'ida (`money.product_amount`) marketplace'ga boradi.
+     */
+    const totalPrice = isMoneyParcel ? parcel.cod_amount : 0;
 
     const comment = [
       parcel.parcel_count > 1
@@ -382,14 +493,43 @@ export class MarketplaceIntakeService {
         integration_id: integration.id,
         external_seller_id: parcel.seller_id,
         created_source: OrderCreatedSource.MARKETPLACE,
-        market_tariff: marketTariff,
+        /**
+         * ⚠️ TARIF FAQAT PUL QUTISIDA. Ko'p qutili buyurtmada yetkazish
+         * haqqi BIR MARTA olinadi (qaror O1).
+         *
+         * Nega bu muhim: 2- va 3-qutining narxi 0, `sellOrder` esa
+         * «0 so'mlik» shoxida market kassasidan TO'LIQ tarifni YECHADI.
+         * Ya'ni 3 qutili buyurtma 3 marta tarif to'lardi — uchdan-uchga
+         * sinov buni ushladi (2-quti: −70 000).
+         *
+         * `courier_tariff` ham 0: u sotuvda `order.courier_tariff` ustun
+         * ko'rilgani uchun kuryer ham bir marta haq oladi.
+         */
+        market_tariff: isMoneyParcel ? marketTariff : 0,
+        courier_tariff: isMoneyParcel ? null : 0,
       }),
     );
 
     // ── Pochta statistikasi ──
+    /**
+     * ⚠️ ATOMIK O'SISH — «o'qi-o'zgartir-yoz» EMAS.
+     *
+     * Bitta viloyatning OCHIQ pochtasi umumiy: ikki operator bir vaqtda
+     * qabul qilsa, ikkalasi ham AYNI hisoblagichni o'qib, biri
+     * ikkinchisining qo'shganini JIMGINA o'chirardi — pochtadagi
+     * buyurtma soni va summasi kam ko'rinardi.
+     */
+    await manager.query(
+      `UPDATE "post"
+          SET "post_total_price" = COALESCE("post_total_price", 0) + $2,
+              "order_quantity"   = COALESCE("order_quantity", 0) + 1,
+              "updated_at"       = $3
+        WHERE "id" = $1`,
+      [post.id, totalPrice, Date.now()],
+    );
+    // Xotiradagi nusxa keyingi posilka uchun ishlatiladi.
     post.post_total_price = Number(post.post_total_price ?? 0) + totalPrice;
     post.order_quantity = Number(post.order_quantity ?? 0) + 1;
-    await manager.save(post);
 
     // ── Posilkani bog'lash ──
     parcel.order_id = order.id;
@@ -406,7 +546,12 @@ export class MarketplaceIntakeService {
       integration,
       parcel,
       event_type: MarketplaceEventType.PARCEL_ACCEPTED,
-      status: { from: parcel.remote_status ?? null, to: 'ACCEPTED_BY_BEEPOST' },
+      // ⚠️ HAMKOR TILIGA. `from` — ularning o'z qiymati (xom saqlangan),
+      // `to` — kanonik `ACCEPTED_BY_BEEPOST` xaritadan o'tkaziladi.
+      status: buildEventStatus(integration.status_map, {
+        from: toCanonicalStatus(integration.status_map, parcel.remote_status),
+        to: MarketplaceParcelStatus.ACCEPTED_BY_BEEPOST,
+      }),
       order: { id: order.id, order_number: Number(order.order_number) },
       money: {
         currency: 'UZS',

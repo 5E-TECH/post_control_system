@@ -16,13 +16,6 @@ export const MARKETPLACE_SETTLEMENT_METHODS = [
 export type MarketplaceSettlementMethod =
   (typeof MARKETPLACE_SETTLEMENT_METHODS)[number]["value"];
 
-export interface MarketplaceSellerBalance {
-  seller_id: string | null;
-  /** Har-sotuvchi qoldig'i. Manfiy = sotuvchi BIZGA qarzdor (prepaid). */
-  balance?: number;
-  amount?: number;
-  entries: number;
-}
 
 export interface MarketplaceInvariantView {
   ok: boolean;
@@ -31,12 +24,21 @@ export interface MarketplaceInvariantView {
   diff: number;
 }
 
+/**
+ * Hisob-kitob ko'rinishi.
+ *
+ * ⚠️ SOTUVCHILAR RO'YXATI YO'Q — ataylab. Biz marketplace'ning
+ * sotuvchilarini bilmaymiz va ular bizga faqat ID yuborishi mumkin
+ * (`SLR-77`). Bunday qatorni adminga ko'rsatish foydasiz shovqin: u
+ * ID kimligini bilmaydi va unga qarab qaror qabul qila olmaydi.
+ *
+ * `seller_id` BACKENDDA qoladi — har posilka hodisasida va kunlik
+ * snapshotda marketplace'ga boradi, ular o'zi taqsimlaydi.
+ */
 export interface MarketplaceSettlementSuggest {
   integration: { slug: string; name: string };
+  /** Ularga qancha qarzdormiz — MARKET KASSASI balansi. */
   total_payable: number;
-  sellers: Array<{ seller_id: string; amount: number; entries: number }>;
-  /** Qoldig'i MANFIY sotuvchilar — ular bizga qarzdor, to'lovga kirmaydi. */
-  negative_sellers: MarketplaceSellerBalance[];
   invariant: MarketplaceInvariantView;
 }
 
@@ -105,12 +107,18 @@ export const useMarketplacePanel = (slug?: string) => {
    * rad etadi. Marketplace sotuvchilarga shu ro'yxat bo'yicha to'laydi;
    * mos kelmasa farq hech qayerda ko'rinmaydi.
    */
+  /**
+   * ⚠️ YAXLIT TO'LOV — taqsimot YO'Q.
+   *
+   * Marketplace pulni oladi va o'z sotuvchilariga O'ZI tarqatadi.
+   * Kim qancha ishlab topgani ularga posilka hodisalaridagi `seller_id`
+   * orqali allaqachon ma'lum.
+   */
   const pay = useMutation({
     mutationFn: (params: {
       slug: string;
       amount: number;
       method: MarketplaceSettlementMethod;
-      allocation: Array<{ seller_id: string; amount: number }>;
       reference?: string;
       note?: string;
     }) => {
@@ -129,9 +137,11 @@ export const useMarketplacePanel = (slug?: string) => {
   });
 
   const clearMismatch = useMutation({
+    // ⚠️ Yo'lda `slug` bor: server posilka SHU ulanishga tegishliligini
+    // tekshiradi (boshqa marketplace'ning belgisini o'chirib bo'lmaydi).
     mutationFn: (parcelId: string) =>
       api
-        .post(`marketplace/mismatches/${parcelId}/clear`)
+        .post(`marketplace/${slug}/mismatches/${parcelId}/clear`)
         .then((res) => res.data),
     onSuccess: invalidate,
   });

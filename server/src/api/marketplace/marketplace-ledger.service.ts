@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { pgReturningNumber } from 'src/common/database/pg-returning.util';
 import { EntityManager, Repository } from 'typeorm';
 import { Cashbox_type } from 'src/common/enums';
 import { CashEntity } from 'src/core/entity/cash-box.entity';
@@ -95,6 +96,7 @@ export class MarketplaceLedgerService {
       manager,
       input.integration_id,
       input.cashbox_history_id ?? null,
+      Math.trunc(input.amount),
     );
 
     // ── 4. SOTUVCHI JAMLANMASI ───────────────────────────────────────
@@ -134,17 +136,20 @@ export class MarketplaceLedgerService {
     manager: EntityManager,
     integrationId: string,
   ): Promise<number> {
-    const rows: Array<{ next_ledger_seq: string }> = await manager.query(
+    // ⚠️ `pgReturningNumber` SHART — TypeORM `UPDATE ... RETURNING` uchun
+    // `[rows, count]` tuple qaytaradi (batafsil: `pg-returning.util.ts`).
+    const raw = await manager.query(
       `UPDATE "marketplace_integration"
           SET "next_ledger_seq" = "next_ledger_seq" + 1, "updated_at" = $2
         WHERE "id" = $1
         RETURNING "next_ledger_seq"`,
       [integrationId, Date.now()],
     );
-    if (!rows?.length) {
-      throw new Error(`Integratsiya topilmadi (daftar seq): ${integrationId}`);
-    }
-    return Number(rows[0].next_ledger_seq);
+    return pgReturningNumber(
+      raw,
+      'next_ledger_seq',
+      `daftar seq (integratsiya ${integrationId})`,
+    );
   }
 
   /**
@@ -158,6 +163,7 @@ export class MarketplaceLedgerService {
     manager: EntityManager,
     integrationId: string,
     cashboxHistoryId: string | null,
+    amount: number,
   ): Promise<number> {
     if (cashboxHistoryId) {
       const rows: Array<{ balance_after: string }> = await manager.query(
@@ -166,12 +172,20 @@ export class MarketplaceLedgerService {
       );
       if (rows?.length) return Number(rows[0].balance_after);
     }
-    // Kassaga tegmaydigan texnik yozuv — oldingi balans o'zgarmaydi.
+    /**
+     * Kassa qatoriga BOG'LANMAGAN yozuv — oldingi balansdan yuramiz.
+     *
+     * ⚠️ `amount` QO'SHILADI. Avval u qo'shilmasdi va izohda «texnik
+     * yozuv, balans o'zgarmaydi» deb yozilgan edi — bu faqat summasi 0
+     * bo'lgan yozuv uchun to'g'ri. Hisob-kitob endi har sotuvchiga
+     * alohida yozuv yozadi va ularning faqat OXIRGISI kassa qatoriga
+     * bog'lanadi; qolganlari uchun yugurib boruvchi balans kerak.
+     */
     const prev = await manager.findOne(MarketplaceLedgerEntryEntity, {
       where: { integration_id: integrationId },
       order: { seq: 'DESC' },
     });
-    return prev ? Number(prev.balance_after) : 0;
+    return (prev ? Number(prev.balance_after) : 0) + amount;
   }
 
   private async lastSellerBalance(

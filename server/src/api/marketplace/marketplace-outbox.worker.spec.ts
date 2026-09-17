@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { MarketplaceOutboxWorker } from './marketplace-outbox.worker';
 import { MarketplaceOutboxStatus } from './marketplace.enums';
 
@@ -12,7 +14,13 @@ const job = (over: any = {}) =>
     aggregate_type: 'parcel',
     aggregate_id: 'p-1',
     seq: 5,
-    payload: { event_id: 'e-1', seq: 5, event_type: 'parcel.delivered' },
+    // `status.to` — worker `remote_status` nusxasini shundan yangilaydi.
+    payload: {
+      event_id: 'e-1',
+      seq: 5,
+      event_type: 'parcel.delivered',
+      status: { from: 'ACCEPTED_BY_BEEPOST', to: 'DELIVERED' },
+    },
     status: MarketplaceOutboxStatus.PROCESSING,
     attempts: 0,
     max_attempts: 8,
@@ -35,11 +43,13 @@ function build(opts: {
   };
   const parcelRepo = {
     findOne: jest.fn(async () => (opts.parcel === undefined ? { id: 'p-1', last_sent_seq: 0 } : opts.parcel)),
-    createQueryBuilder: jest.fn(() => ({
-      update: () => ({
-        set: (v: any) => ({ where: () => ({ execute: async () => { parcelUpdates.push(v); return {}; } }) }),
-      }),
-    })),
+    // ⚠️ Muvaffaqiyat yo'li endi XOM SQL ishlatadi: `last_sent_seq` bilan
+    // birga `remote_status` ni ham yangilaydi (eski nusxa solishtiruvni
+    // soxta nomuvofiqlikka to'ldirardi). Mock shu shaklni takrorlaydi.
+    query: jest.fn(async (sql: string, params: any[]) => {
+      parcelUpdates.push({ sql, params });
+      return [];
+    }),
   };
   const integrationRepo = {
     findOne: jest.fn(async () =>
@@ -67,9 +77,18 @@ describe('MarketplaceOutboxWorker.deliver', () => {
 
     expect(api.sendEvent).toHaveBeenCalled();
     expect(lastSet(updates).status).toBe(MarketplaceOutboxStatus.SENT);
+
+    const { sql, params } = parcelUpdates[0];
     // ⚠️ GREATEST — parallel yetkazishda kichikroq seq katta raqamni
     // ORQAGA SURIB yubormasin.
-    expect(String(parcelUpdates[0].last_sent_seq())).toMatch(/GREATEST/);
+    expect(sql).toMatch(/GREATEST\("last_sent_seq"/);
+    // ⚠️ `remote_status` HAM yangilanadi — aks holda solishtiruv ularning
+    // jonli statusini bizning eskirgan nusxa bilan taqqoslab, har bir
+    // yetkazilgan posilkani soxta nomuvofiq deb belgilardi.
+    expect(sql).toMatch(/"remote_status" = CASE/);
+    // Va u FAQAT seq ortda qolmaganda yoziladi.
+    expect(sql).toMatch(/\$2 >= "last_sent_seq"/);
+    expect(params[3]).toBe('DELIVERED');
   });
 
   it("yuborishda `sent_at` QO'SHADI (enqueue vaqti emas)", async () => {
@@ -136,9 +155,32 @@ describe('MarketplaceOutboxWorker.deliver', () => {
     await deliver(w, job());
 
     const set = lastSet(updates);
-    expect(set.status).toBe(MarketplaceOutboxStatus.FAILED);
+    /**
+     * ⚠️ `dropped` — `failed` EMAS, va bu MUHIM.
+     *
+     * `claim()` so'rovida `next_retry_at IS NULL` sharti bor, ya'ni
+     * `failed` + `next_retry_at = null` «HOZIR tayyor» degani. Avval
+     * bu yerda `retryable ? FAILED : FAILED` yozilgan edi (ikkala shox
+     * bir xil), shu sabab «qayta urinilmaydi» deb belgilangan hodisa
+     * aslida har 30 soniyada qayta yuborilar va urinish byudjetini
+     * yeb bitirardi.
+     */
+    expect(set.status).toBe(MarketplaceOutboxStatus.DROPPED);
     expect(set.next_retry_at).toBeNull();
     expect(set.status_reason).toMatch(/Qayta urinilmaydi/);
+  });
+
+  it("`dropped` hodisa navbatdan CHIQADI — `claim` uni olmaydi", () => {
+    // Statik qulf: `claim()` faqat `pending`/`failed` ni oladi.
+    // Agar kimdir `dropped` ni ro'yxatga qo'shsa, qayta urinish halqasi
+    // qaytadi — shuning uchun bu shart kod matnidan tekshiriladi.
+    const src = readFileSync(
+      join(__dirname, 'marketplace-outbox.worker.ts'),
+      'utf8',
+    );
+    const claim = src.slice(src.indexOf('private async claim'));
+    expect(claim).toMatch(/status" IN \('pending','failed'\)/);
+    expect(claim.slice(0, 1500)).not.toMatch(/dropped/);
   });
 
   it('urinishlar tugaganda qayta urinmaydi', async () => {
@@ -156,5 +198,35 @@ describe('MarketplaceOutboxWorker.deliver', () => {
     await deliver(w, job());
     expect(api.sendEvent).not.toHaveBeenCalled();
     expect(lastSet(updates).status).toBe(MarketplaceOutboxStatus.SKIPPED);
+  });
+});
+
+describe('MarketplaceOutboxWorker.processBatch — tartib kafolati', () => {
+  it('bir posilkaning hodisasi yiqilsa, KEYINGILARI shu siklda urinilmaydi', async () => {
+    /**
+     * ⚠️ Aks holda: `seq 5` tarmoq xatosi bilan yiqiladi, `seq 6` o'tib
+     * ketadi va `last_sent_seq` 6 bo'ladi — keyingi urinishda `seq 5`
+     * «eskirgan» deb ABADIY tashlanadi. Agar 5 da PUL hodisasi bo'lsa,
+     * hamkor pulni hech qachon ko'rmaydi.
+     */
+    const send = jest.fn(async () => {
+      throw { response: { status: 503 } };
+    });
+    const { w, updates } = build({ send });
+
+    const a = job({ id: 'ob-a', event_id: 'e-a', seq: 5 });
+    const b = job({ id: 'ob-b', event_id: 'e-b', seq: 6 });
+    (w as any).claim = async () => [a, b];
+
+    await (w as any).processBatch();
+
+    // Faqat BIRINCHISIGA urinildi.
+    expect(send).toHaveBeenCalledTimes(1);
+
+    // Ikkinchisi `pending` ga QAYTARILDI — keyingi sikl tartib bilan oladi.
+    const second = updates.filter((u: any) => u.where?.id === 'ob-b');
+    expect(second.length).toBe(1);
+    expect(second[0].set.status).toBe(MarketplaceOutboxStatus.PENDING);
+    expect(String(second[0].set.status_reason)).toMatch(/tartib/i);
   });
 });

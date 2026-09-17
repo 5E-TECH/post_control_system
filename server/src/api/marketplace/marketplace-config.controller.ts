@@ -18,6 +18,7 @@ import { MarketplaceConfigService } from './marketplace-config.service';
 import {
   CreateMarketplaceDto,
   SetMarketplaceActiveDto,
+  SetMarketplaceStatusMapDto,
   SetMarketplaceTariffDto,
   UpdateMarketplaceDto,
 } from './dto';
@@ -69,8 +70,12 @@ export class MarketplaceConfigController {
 
   @Patch(':slug')
   @ApiOperation({ summary: "Tahrirlash (slug va market o'zgarmaydi)" })
-  update(@Param('slug') slug: string, @Body() dto: UpdateMarketplaceDto) {
-    return this.config.update(slug, dto);
+  update(
+    @Param('slug') slug: string,
+    @Body() dto: UpdateMarketplaceDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.config.update(slug, dto, user);
   }
 
   @Post(':slug/active')
@@ -78,14 +83,23 @@ export class MarketplaceConfigController {
   setActive(
     @Param('slug') slug: string,
     @Body() dto: SetMarketplaceActiveDto,
+    @CurrentUser() user: JwtPayload,
   ) {
-    return this.config.setActive(slug, dto.is_active);
+    return this.config.setActive(slug, dto.is_active, user);
   }
 
   @Post(':slug/test')
   @ApiOperation({ summary: 'Ulanishni tekshirish (ping)' })
   test(@Param('slug') slug: string) {
     return this.config.testConnection(slug);
+  }
+
+  @Post(':slug/test-signature')
+  @ApiOperation({
+    summary: "IMZO sinovi — `webhook.test` hodisasini imzolab yuboradi",
+  })
+  testSignature(@Param('slug') slug: string) {
+    return this.config.sendWebhookTest(slug);
   }
 
   // ─────────────── tarif ───────────────
@@ -108,6 +122,25 @@ export class MarketplaceConfigController {
     return this.config.setTariff(slug, dto, user);
   }
 
+  // ─────────────── status xaritasi ───────────────
+
+  @Get(':slug/status-map')
+  @ApiOperation({ summary: 'Status xaritasi — har kanonik status uchun qator' })
+  getStatusMap(@Param('slug') slug: string) {
+    return this.config.getStatusMap(slug);
+  }
+
+  @Post(':slug/status-map')
+  @ApiOperation({
+    summary: "Hamkorning status lug'atini QO'LDA sozlash (raqam/so'z/kod)",
+  })
+  setStatusMap(
+    @Param('slug') slug: string,
+    @Body() dto: SetMarketplaceStatusMapDto,
+  ) {
+    return this.config.setStatusMap(slug, dto.status_map);
+  }
+
   // ─────────────── sekretlar ───────────────
   // ⚠️ Faqat SUPERADMIN: kalit aylantirish noto'g'ri paytda qilinsa
   // integratsiyani to'xtatib qo'yadi.
@@ -117,21 +150,30 @@ export class MarketplaceConfigController {
   @ApiOperation({
     summary: "Imzo sekretini aylantirish — yangi qiymat BIR MARTA qaytadi",
   })
-  rotateSigning(@Param('slug') slug: string) {
-    return this.config.rotateSigningSecret(slug);
+  rotateSigning(
+    @Param('slug') slug: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.config.rotateSigningSecret(slug, user);
   }
 
   @Post(':slug/secret/signing/clear-previous')
   @AcceptRoles(Roles.SUPERADMIN)
   @ApiOperation({ summary: 'Eski imzo sekretini tozalash (aylantirish tugagach)' })
-  clearPrevious(@Param('slug') slug: string) {
-    return this.config.clearPreviousSecret(slug);
+  clearPrevious(
+    @Param('slug') slug: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.config.clearPreviousSecret(slug, user);
   }
 
   @Post(':slug/secret/inbound/rotate')
   @AcceptRoles(Roles.SUPERADMIN)
   @ApiOperation({ summary: 'Kiruvchi API kalitni aylantirish' })
-  rotateInbound(@Param('slug') slug: string) {
-    return this.config.rotateInboundKey(slug);
+  rotateInbound(
+    @Param('slug') slug: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.config.rotateInboundKey(slug, user);
   }
 }

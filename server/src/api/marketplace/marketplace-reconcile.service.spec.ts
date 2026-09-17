@@ -24,6 +24,7 @@ function build(opts: {
 } = {}) {
   const saved: any[] = [];
   const requeued: any[] = [];
+  const seqLowered: any[] = [];
 
   const parcelRepo = {
     createQueryBuilder: jest.fn(() => {
@@ -35,7 +36,19 @@ function build(opts: {
     }),
     save: jest.fn(async (p: any) => { saved.push({ ...p }); return p; }),
     find: jest.fn(async () => []),
-    update: jest.fn(async () => ({})),
+    // ⚠️ Solishtiruv endi NISHONLI `update` ishlatadi — `save(parcel)`
+    // eskirgan entity'ni butunlay qayta yozib, `next_seq`/`last_sent_seq`
+    // ni orqaga surardi.
+    update: jest.fn(async (where: any, set: any) => {
+      saved.push({ id: where?.id, ...set });
+      return {};
+    }),
+    // Qayta navbatga qo'yishda `last_sent_seq` LEAST bilan TUSHIRILADI —
+    // aks holda worker qo'riqchisi hodisalarni darhol `superseded` qilardi.
+    query: jest.fn(async (sql: string, params: any[]) => {
+      seqLowered.push({ sql, params });
+      return [];
+    }),
   };
   const outboxRepo = {
     createQueryBuilder: jest.fn(() => {
@@ -53,7 +66,8 @@ function build(opts: {
     find: jest.fn(async () => [INTEGRATION]),
     findOne: jest.fn(async () => INTEGRATION),
     update: jest.fn(async () => ({})),
-    query: jest.fn(async () => [{ next_ledger_seq: '9' }]),
+    // ⚠️ TUPLE shakli — TypeORM `UPDATE ... RETURNING` shunday qaytaradi.
+    query: jest.fn(async () => [[{ next_ledger_seq: '9' }], 1]),
   };
   const api = {
     fetchParcelStatuses: jest.fn(async () => ({
@@ -79,11 +93,26 @@ function build(opts: {
     ]),
   };
 
+  // ⚠️ Sotuvchilar reestri kuniga bir marta ko'zgu qilinadi — usiz
+  // hisob-kitob ekranida sotuvchi faqat `SLR-77` bo'lib ko'rinardi.
+  const sellerRows: any[] = [];
+  const sellerRepo = {
+    update: jest.fn(async (where: any, patch: any) => {
+      sellerRows.push({ where, patch });
+      return { affected: 1 };
+    }),
+    create: jest.fn((v: any) => ({ ...v })),
+    save: jest.fn(async (v: any) => v),
+  };
+
   const svc = new MarketplaceReconcileService(
-    integrationRepo as any, parcelRepo as any, outboxRepo as any,
-    api as any, ledger as any,
+    integrationRepo as any, sellerRepo as any, parcelRepo as any,
+    outboxRepo as any, api as any, ledger as any,
   );
-  return { svc, saved, requeued, api, ledger, outboxRepo, integrationRepo };
+  return {
+    svc, saved, requeued, seqLowered, api, ledger, outboxRepo,
+    integrationRepo, sellerRepo, sellerRows,
+  };
 }
 
 describe('MarketplaceReconcileService.reconcileParcels', () => {
@@ -101,7 +130,7 @@ describe('MarketplaceReconcileService.reconcileParcels', () => {
     // ⚠️ Eng muhim tekshiruv: outbox 8 urinishdan keyin taslim bo'ladi.
     // Marketplace undan uzoq o'chsa, hodisa `failed` bo'lib qolardi va
     // uni HECH NARSA tiklamasdi.
-    const { svc, saved, requeued } = build({
+    const { svc, saved, requeued, seqLowered } = build({
       remoteItems: [
         { external_parcel_id: 'PCL-8842-1', status: 'OUT_FOR_DELIVERY', last_applied_seq: 2 },
       ],
@@ -112,6 +141,18 @@ describe('MarketplaceReconcileService.reconcileParcels', () => {
     expect(saved[0].mismatch_reason).toMatch(/seq orqada: ularda 2, bizda 5/);
     expect(requeued[0].status).toBe('pending');
     expect(requeued[0].attempts).toBe(0);
+
+    /**
+     * ⚠️ `last_sent_seq` TUSHIRILISHI SHART.
+     *
+     * Worker qo'riqchisi `job.seq <= parcel.last_sent_seq` bo'lsa hodisani
+     * `superseded` qiladi. Qayta navbatga qo'yilgan hodisalarning seq'i
+     * aynan shu chegaradan past — chegara tushirilmasa, butun tiklash
+     * yo'li O'LIK bo'lardi (hodisalar navbatga qaytib, darhol tashlanardi).
+     */
+    const lowered = seqLowered[0];
+    expect(lowered.sql).toMatch(/LEAST\("last_sent_seq"/);
+    expect(lowered.params[1]).toBe(2); // ularning `last_applied_seq` i
   });
 
   it('STATUS farq qilsa nomuvofiqlik yozadi', async () => {
@@ -186,5 +227,49 @@ describe('MarketplaceReconcileService.reconcileLedger', () => {
     expect(ev.event_type).toBe('ledger.snapshot');
     expect(ev.payload.snapshot.balance).toBe(42_350_000);
     expect(ev.payload.parcel).toBeUndefined();
+  });
+});
+
+describe('MarketplaceReconcileService.syncSellers', () => {
+  it('sotuvchilarni KO\'ZGU qiladi va `is_unknown` ni tozalaydi', async () => {
+    /**
+     * ⚠️ Reestr avval FAQAT skan paytida to'ldirilardi va o'shanda ham
+     * posilkadagi nom bilan — hisob-kitob ekranida sotuvchi `SLR-77`
+     * bo'lib ko'rinar, admin kimga to'layotganini bilmasdi.
+     */
+    const { svc, api, sellerRows } = build();
+    (api as any).fetchSellers = jest
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          { seller_id: 'SLR-77', name: 'Rustam Savdo', phone: '+998901112233' },
+          { seller_id: 'SLR-99', name: "Yopilgan Do'kon", is_active: false },
+        ],
+        next_cursor: 'c2',
+      })
+      .mockResolvedValueOnce({ items: [], next_cursor: null });
+
+    const r = await svc.syncSellers(INTEGRATION as any);
+
+    expect(r.synced).toBe(2);
+    expect(r.pages).toBe(2); // `next_cursor` bo'yicha sahifalandi
+    expect(sellerRows[0].patch).toMatchObject({
+      name: 'Rustam Savdo',
+      is_active: true,
+      // Skan yaratgan «noma'lum» belgisi TASDIQLANADI.
+      is_unknown: false,
+    });
+    expect(sellerRows[1].patch.is_active).toBe(false);
+  });
+
+  it('`seller_id` siz yozuvni O\'TKAZIB yuboradi', async () => {
+    const { svc, api, sellerRows } = build();
+    (api as any).fetchSellers = jest.fn().mockResolvedValue({
+      items: [{ name: 'ID siz' }, { seller_id: '  ' }],
+      next_cursor: null,
+    });
+    const r = await svc.syncSellers(INTEGRATION as any);
+    expect(r.synced).toBe(0);
+    expect(sellerRows).toHaveLength(0);
   });
 });

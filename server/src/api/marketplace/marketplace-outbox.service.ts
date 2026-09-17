@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
+import { pgReturningNumber } from 'src/common/database/pg-returning.util';
 import { randomUUID } from 'node:crypto';
 import { MarketplaceOutboxEntity } from 'src/core/entity/marketplace-outbox.entity';
 import { MarketplaceParcelEntity } from 'src/core/entity/marketplace-parcel.entity';
@@ -20,7 +21,9 @@ export interface EnqueueParcelEventInput {
   occurred_at?: number;
   status?: { from: string | null; to: string };
   money?: EventMoney;
-  ledger?: { entry_id: string; balance_after: number };
+  // `seq` — integratsiya bo'yicha GLOBAL daftar raqami; `balance_after`
+  // faqat shu tartibda solishtiriladi (batafsil: `marketplace-event.util.ts`).
+  ledger?: { entry_id: string; seq: number; balance_after: number };
   actor?: { type: string; name?: string | null };
   order?: { id: string; order_number: number } | null;
   items_delivered?: Array<{ sku: string | null; quantity: number }>;
@@ -117,17 +120,17 @@ export class MarketplaceOutboxService {
     manager: EntityManager,
     parcelId: string,
   ): Promise<number> {
-    const rows: Array<{ next_seq: string }> = await manager.query(
+    // ⚠️ `pgReturningNumber` SHART — TypeORM `UPDATE ... RETURNING` uchun
+    // `[rows, count]` tuple qaytaradi va `rows[0].next_seq` `undefined`
+    // bo'lardi (batafsil: `pg-returning.util.ts`).
+    const raw = await manager.query(
       `UPDATE "marketplace_parcel"
           SET "next_seq" = "next_seq" + 1, "updated_at" = $2
         WHERE "id" = $1
         RETURNING "next_seq"`,
       [parcelId, Date.now()],
     );
-    if (!rows?.length) {
-      throw new Error(`Posilka topilmadi (seq ajratish): ${parcelId}`);
-    }
-    return Number(rows[0].next_seq);
+    return pgReturningNumber(raw, 'next_seq', `seq ajratish (posilka ${parcelId})`);
   }
 
   /**

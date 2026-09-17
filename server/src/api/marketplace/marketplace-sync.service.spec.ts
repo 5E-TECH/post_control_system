@@ -46,6 +46,8 @@ function build(opts: { integration?: any; parcel?: any; originalEntry?: any; tar
   };
   const ledger = {
     appendEntry: jest.fn(async (_m: any, i: any) => ({
+      // `seq` — hodisadagi `ledger.seq` shundan olinadi (global tartib).
+      seq: 7,
       id: 'le-1',
       balance_after: 42_350_000,
       ...i,
@@ -106,9 +108,19 @@ describe('MarketplaceSyncService.recordOrderMoneyEvent', () => {
 
     const ev = outbox.enqueueParcelEvent.mock.calls[0][1] as any;
     expect(ev.event_type).toBe('parcel.delivered');
-    // Hodisa daftar yozuvi bilan BOG'LANADI — marketplace `balance_after`
-    // orqali o'z daftarini tekshiradi.
-    expect(ev.ledger).toEqual({ entry_id: 'le-1', balance_after: 42_350_000 });
+    /**
+     * Hodisa daftar yozuvi bilan BOG'LANADI.
+     *
+     * ⚠️ `seq` — INTEGRATSIYA bo'yicha GLOBAL raqam. Usiz marketplace
+     * `balance_after` ni kelish TARTIBIDA solishtirib, SOXTA «daftar
+     * ajraldi» xatosi berardi: hodisalar posilka bo'yicha serializatsiya
+     * qilinadi, lekin turli posilkalar orasida tartib kafolatlanmaydi.
+     */
+    expect(ev.ledger).toEqual({
+      entry_id: 'le-1',
+      seq: 7,
+      balance_after: 42_350_000,
+    });
     expect(ev.money.net_to_marketplace).toBe(145000);
     expect(ev.order).toEqual({ id: 'order-1', order_number: 100042 });
   });

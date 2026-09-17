@@ -2542,6 +2542,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       delta: number;
     } | null = null;
 
+    /**
+     * MARKET kassasidan HAQIQATAN yechilgan ortiqcha xarajat.
+     *
+     * ⚠️ NEGA ALOHIDA. Ortiqcha xarajat `updateCashbox` closure'idan EMAS,
+     * `ExtraCostApplierService.applyInline` orqali yoziladi — ya'ni
+     * `marketCashboxWrite` uni KO'RMAYDI. Shu sabab marketplace daftariga
+     * faqat sotuv kirimi tushib, xarajat tushmasdi va
+     * `SUM(daftar) == kassa balansi` invarianti aynan xarajat qadar
+     * buzilardi (uchdan-uchga sinov ushladi: kassa 285 000, daftar 300 000).
+     *
+     * `deferred` rejimda kassaga HECH NARSA yozilmaydi — u holda bu `null`
+     * qoladi va marketplace'ga ham «xarajat yechildi» deb AYTILMAYDI.
+     */
+    let appliedExtraCost: { amount: number; marketHistoryId: string } | null =
+      null;
+
     const updateCashbox = async (
       cashbox: CashEntity,
       operation: Operation_type,
@@ -2661,7 +2677,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       if (!courierCashbox)
         throw new NotFoundException('Courier cashbox not found');
 
-      const marketBalanceBefore = Number(marketCashbox.balance);
+      /**
+       * ⚠️ QARZ QARORI QULFLANGAN QATORDAN o'qiladi.
+       *
+       * Quyida `autoPay` aynan shu balansga qarab marketning QARZINI
+       * sotuv pulidan avtomatik yopadi. Balans qulfsiz o'qilsa, bir
+       * marketning ikki BOSHQA buyurtmasi bir vaqtda sotilganda ikkalasi
+       * ham AYNI qarzni ko'radi va uni IKKI MARTA yopadi — market
+       * to'lamagan pulini «to'langan» deb oladi.
+       *
+       * `FOR UPDATE` faqat MARKET kassasini qulflaydi; kuryer kassasi
+       * qulflanmaydi, shuning uchun qulf tartibi bo'yicha deadlock yo'q.
+       */
+      const lockedRows: Array<{ balance: string }> =
+        await queryRunner.manager.query(
+          `SELECT "balance" FROM "cash_box" WHERE "id" = $1 FOR UPDATE`,
+          [marketCashbox.id],
+        );
+      const marketBalanceBefore = Number(
+        lockedRows?.[0]?.balance ?? marketCashbox.balance,
+      );
+      // Xotiradagi nusxa ham eskirmasin.
+      marketCashbox.balance = marketBalanceBefore;
 
       // Agar admin oldindan custom tarif belgilagan bo'lsa, shuni ishlatamiz
       const marketTarif =
@@ -2692,6 +2729,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         amount: extraCost,
         market,
         courier,
+        // ⚠️ Marketplace buyurtmasida kechiktirish YO'Q — pul daftar bilan
+        // BIR tranzaksiyada yozilishi shart (tasdiqlash yo'lida ilgak yo'q).
+        isMarketplaceOrder: !!order.integration_id,
         actionType: ExtraCostAction.SELL,
       });
       const extraCostDeferred = extraCostPolicy.mode === 'deferred';
@@ -2836,35 +2876,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       await queryRunner.manager.save(order);
 
-      // === MARKETPLACE: daftar yozuvi + chiquvchi hodisa ===
-      //
-      // ⚠️ AYNI TRANZAKSIYADA (bloker B3). Bugungi `queueStatusSync`
-      // `commitTransaction()` DAN KEYIN, `await`siz chaqiriladi — deploy yoki
-      // crash aynan o'sha lahzada bo'lsa hodisa UMUMAN tug'ilmaydi va buni
-      // hech narsa sezmaydi.
-      //
-      // Marketplace buyurtmasi bo'lmasa metod darhol chiqadi (so'rovsiz).
-      if (this.marketplaceSync.isMarketplaceOrder(order) && marketCashboxWrite) {
-        const w = marketCashboxWrite as { history_id: string; delta: number };
-        await this.marketplaceSync.recordOrderMoneyEvent(queryRunner.manager, {
-          order,
-          event_type: MarketplaceEventType.PARCEL_DELIVERED,
-          entry_type: MarketplaceLedgerEntryType.SALE,
-          // Daftar MARKET kassasidagi haqiqiy o'zgarishni yozadi — shu bilan
-          // `SUM(daftar) == kassa balansi` invarianti saqlanadi.
-          ledger_amount: w.delta,
-          cashbox_history_id: w.history_id,
-          money: computeSaleMoney({
-            collected_from_customer: price,
-            beepost_fee: marketTarif,
-            extra_cost: extraCost,
-            where_deliver: order.where_deliver,
-          }),
-          status: { from: Order_status.WAITING, to: 'DELIVERED' },
-          actor: { type: 'courier', name: courier.name ?? null },
-        });
-      }
-
       // === Operator earning hisoblash ===
       if (order.operator_id) {
         const operatorUser = await queryRunner.manager.findOne(UserEntity, {
@@ -2956,6 +2967,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               courierId: courier.id,
             },
           );
+          // Marketplace daftari uchun: bu ichki blokdan tashqarida kerak.
+          appliedExtraCost = {
+            amount: extraCost,
+            marketHistoryId: extraCostHistoryIds.marketHistoryId,
+          };
         }
         // `deferred` bo'lsa KASSAGA HECH NARSA YOZILMAYDI — pul faqat market
         // tasdiqlaganda harakat qiladi.
@@ -2972,6 +2988,52 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           input: sellDto,
           proofs: extraCostProofs,
           historyIds: extraCostHistoryIds,
+        });
+      }
+
+      // === MARKETPLACE: daftar yozuvi + chiquvchi hodisa ===
+      //
+      // ⚠️ AYNI TRANZAKSIYADA (bloker B3). Bugungi `queueStatusSync`
+      // `commitTransaction()` DAN KEYIN, `await`siz chaqiriladi — deploy yoki
+      // crash aynan o'sha lahzada bo'lsa hodisa UMUMAN tug'ilmaydi va buni
+      // hech narsa sezmaydi.
+      //
+      // ⚠️ ORTIQCHA XARAJAT BLOKIDAN KEYIN turishi SHART. Xarajat market
+      // kassasidan alohida yo'l bilan yechiladi (`applyInline`), shuning
+      // uchun daftar summasi ham, hodisadagi `extra_cost` ham FAQAT shu
+      // yerda to'liq ma'lum bo'ladi.
+      //
+      // Marketplace buyurtmasi bo'lmasa metod darhol chiqadi (so'rovsiz).
+      if (this.marketplaceSync.isMarketplaceOrder(order) && marketCashboxWrite) {
+        const w = marketCashboxWrite as { history_id: string; delta: number };
+        // `deferred` bo'lsa pul HALI yechilmagan → 0.
+        const chargedExtra = appliedExtraCost?.amount ?? 0;
+        await this.marketplaceSync.recordOrderMoneyEvent(queryRunner.manager, {
+          order,
+          event_type: MarketplaceEventType.PARCEL_DELIVERED,
+          entry_type: MarketplaceLedgerEntryType.SALE,
+          // Daftar MARKET kassasidagi HAQIQIY umumiy o'zgarishni yozadi:
+          // sotuv kirimi MINUS yechilgan xarajat. Shu bilan
+          // `SUM(daftar) == kassa balansi` invarianti saqlanadi.
+          ledger_amount: w.delta - chargedExtra,
+          /**
+           * ⚠️ LANGAR — MARKET kassasiga OXIRGI yozilgan qator.
+           *
+           * Daftar yozuvining `balance_after` i aynan shu qatordan o'qiladi
+           * (`resolveBalanceAfter`). Xarajat sotuvdan KEYIN yoziladi, ya'ni
+           * sotuv qatorining `balance_after` i eskirgan bo'ladi: hodisada
+           * 300 000 ketardi-yu, kassada 285 000 turardi. Mock buni
+           * `LEDGER_DRIFT` deb ushladi.
+           */
+          cashbox_history_id: appliedExtraCost?.marketHistoryId ?? w.history_id,
+          money: computeSaleMoney({
+            collected_from_customer: price,
+            beepost_fee: marketTarif,
+            extra_cost: chargedExtra,
+            where_deliver: order.where_deliver,
+          }),
+          status: { from: Order_status.WAITING, to: 'DELIVERED' },
+          actor: { type: 'courier', name: courier.name ?? null },
         });
       }
 
@@ -3185,6 +3247,9 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         amount: extraCost,
         market,
         courier,
+        // ⚠️ Marketplace buyurtmasida kechiktirish YO'Q — pul daftar bilan
+        // BIR tranzaksiyada yozilishi shart (tasdiqlash yo'lida ilgak yo'q).
+        isMarketplaceOrder: !!order.integration_id,
         actionType: ExtraCostAction.CANCEL,
       });
       const extraCostDeferred = extraCostPolicy.mode === 'deferred';
@@ -3215,8 +3280,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         // ham tushishi kerak — shu bois natijani tashqi scope'ga chiqaramiz.
         const limit = cancelExtraCostLimit({ courierTariff: courierTarif });
         if (extraCost > limit.max) {
+          // ⚠️ `courierTarif` NULL bo'lishi mumkin (kuryerga hali tarif
+          // belgilanmagan). `cancelExtraCostLimit` buni xavfsiz ishlaydi,
+          // lekin xato XABARIDA `null.toLocaleString()` 500 bilan qulardi —
+          // ya'ni kuryer mijoz oldida turib tushunarsiz server xatosini
+          // ko'rardi. Chegara bilan BIR XIL qiymatni ko'rsatamiz.
+          const shown = Math.max(0, Number(courierTarif ?? 0) || 0);
           throw new BadRequestException(
-            `Ortiqcha xarajat o'z xizmat haqqingizdan (${courierTarif.toLocaleString('uz-UZ')} so'm) oshmasligi kerak. Maksimal: ${limit.max.toLocaleString('uz-UZ')} so'm`,
+            `Ortiqcha xarajat o'z xizmat haqqingizdan (${shown.toLocaleString('uz-UZ')} so'm) oshmasligi kerak. Maksimal: ${limit.max.toLocaleString('uz-UZ')} so'm`,
           );
         }
         const marketCashbox = await queryRunner.manager.findOne(CashEntity, {
@@ -3456,6 +3527,14 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       delta: number;
     } | null = null;
 
+    /**
+     * MARKET kassasidan HAQIQATAN yechilgan ortiqcha xarajat.
+     * `sellOrder` dagi bilan bir xil sabab: xarajat `applyInline` orqali
+     * yoziladi va `marketCashboxWrite` uni ko'rmaydi.
+     */
+    let appliedExtraCost: { amount: number; marketHistoryId: string } | null =
+      null;
+
     const updateCashbox = async (
       cashbox: CashEntity,
       operation: Operation_type,
@@ -3566,7 +3645,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new NotFoundException('Courier cashbox not found');
 
       // 4️⃣ Tariffs (admin oldindan belgilagan bo'lsa, shuni ishlatamiz)
-      const marketBalanceBefore = Number(marketCashbox.balance);
+      /**
+       * ⚠️ QARZ QARORI QULFLANGAN QATORDAN o'qiladi.
+       *
+       * Quyida `autoPay` aynan shu balansga qarab marketning QARZINI
+       * sotuv pulidan avtomatik yopadi. Balans qulfsiz o'qilsa, bir
+       * marketning ikki BOSHQA buyurtmasi bir vaqtda sotilganda ikkalasi
+       * ham AYNI qarzni ko'radi va uni IKKI MARTA yopadi — market
+       * to'lamagan pulini «to'langan» deb oladi.
+       *
+       * `FOR UPDATE` faqat MARKET kassasini qulflaydi; kuryer kassasi
+       * qulflanmaydi, shuning uchun qulf tartibi bo'yicha deadlock yo'q.
+       */
+      const lockedRows: Array<{ balance: string }> =
+        await queryRunner.manager.query(
+          `SELECT "balance" FROM "cash_box" WHERE "id" = $1 FOR UPDATE`,
+          [marketCashbox.id],
+        );
+      const marketBalanceBefore = Number(
+        lockedRows?.[0]?.balance ?? marketCashbox.balance,
+      );
+      // Xotiradagi nusxa ham eskirmasin.
+      marketCashbox.balance = marketBalanceBefore;
 
       const marketTarif =
         order.market_tariff != null
@@ -3703,7 +3803,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           amount: hiddenCut,
           market,
           courier,
-          actionType: ExtraCostAction.PRICE_CUT,
+          // ⚠️ Marketplace buyurtmasida kechiktirish YO'Q — pul daftar bilan
+        // BIR tranzaksiyada yozilishi shart (tasdiqlash yo'lida ilgak yo'q).
+        isMarketplaceOrder: !!order.integration_id,
+        actionType: ExtraCostAction.PRICE_CUT,
         });
 
         if (cutPolicy.requireProof && (!comment || !comment.trim())) {
@@ -3854,36 +3957,6 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       });
       await queryRunner.manager.save(order);
 
-      // === MARKETPLACE: qisman sotuv ===
-      //
-      // ⚠️ Qaror O2: tashqariga BITTA O'ZGARTIRILGAN buyurtma ko'rinadi.
-      // PCS ichida ota/bola modeli qoladi, lekin marketplace ikkinchi
-      // buyurtma yaratmaydi — u `PARTLY_DELIVERED` holatiga o'tadi va
-      // yetkazilgan/qaytgan summalarni oladi.
-      //
-      // ⚠️ Bugungi oqimda bu hodisa `completed` deb TO'LIQ ASL NARXDA
-      // ketardi — ya'ni har qisman sotuv marketplace hisobini oshirib
-      // yuborardi (reja §15 #20).
-      if (this.marketplaceSync.isMarketplaceOrder(order) && marketCashboxWrite) {
-        const w = marketCashboxWrite as { history_id: string; delta: number };
-        await this.marketplaceSync.recordOrderMoneyEvent(queryRunner.manager, {
-          order,
-          event_type: MarketplaceEventType.PARCEL_PARTLY_DELIVERED,
-          entry_type: MarketplaceLedgerEntryType.SALE,
-          ledger_amount: w.delta,
-          cashbox_history_id: w.history_id,
-          money: computePartlyDeliveredMoney({
-            delivered_amount: price,
-            returned_amount: Math.max(oldTotalPrice - price, 0),
-            beepost_fee: marketTarif,
-            extra_cost: extraCost,
-            where_deliver: order.where_deliver,
-          }),
-          status: { from: Order_status.WAITING, to: 'PARTLY_DELIVERED' },
-          actor: { type: 'courier' },
-        });
-      }
-
       // === Operator earning hisoblash (partlySold) ===
       if (order.operator_id) {
         const operatorUserPs = await queryRunner.manager.findOne(UserEntity, {
@@ -3925,7 +3998,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           amount: parsedExtraCost,
           market,
           courier,
-          actionType: ExtraCostAction.PARTLY_SOLD,
+          // ⚠️ Marketplace buyurtmasida kechiktirish YO'Q — pul daftar bilan
+        // BIR tranzaksiyada yozilishi shart (tasdiqlash yo'lida ilgak yo'q).
+        isMarketplaceOrder: !!order.integration_id,
+        actionType: ExtraCostAction.PARTLY_SOLD,
         });
 
         // ⚠️ ISBOT TEKSHIRUVI PUL HARAKATIDAN OLDIN.
@@ -3967,6 +4043,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               courierId: courier.id,
             },
           );
+          // Marketplace daftari uchun: bu ichki blokdan tashqarida kerak.
+          appliedExtraCost = {
+            amount: parsedExtraCost,
+            marketHistoryId: extraCostHistoryIds.marketHistoryId,
+          };
         }
         // `deferred` bo'lsa KASSAGA HECH NARSA YOZILMAYDI.
 
@@ -3986,6 +4067,49 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           input: partlySoldDto,
           proofs: extraCostProofs,
           historyIds: extraCostHistoryIds,
+        });
+      }
+
+      // === MARKETPLACE: qisman sotuv ===
+      //
+      // ⚠️ Qaror O2: tashqariga BITTA O'ZGARTIRILGAN buyurtma ko'rinadi.
+      // PCS ichida ota/bola modeli qoladi, lekin marketplace ikkinchi
+      // buyurtma yaratmaydi — u `PARTLY_DELIVERED` holatiga o'tadi va
+      // yetkazilgan/qaytgan summalarni oladi.
+      //
+      // ⚠️ Bugungi oqimda bu hodisa `completed` deb TO'LIQ ASL NARXDA
+      // ketardi — ya'ni har qisman sotuv marketplace hisobini oshirib
+      // yuborardi (reja §15 #20).
+      if (this.marketplaceSync.isMarketplaceOrder(order) && marketCashboxWrite) {
+        const w = marketCashboxWrite as { history_id: string; delta: number };
+        // `deferred` bo'lsa pul HALI yechilmagan → 0.
+        const chargedExtra = appliedExtraCost?.amount ?? 0;
+        await this.marketplaceSync.recordOrderMoneyEvent(queryRunner.manager, {
+          order,
+          event_type: MarketplaceEventType.PARCEL_PARTLY_DELIVERED,
+          entry_type: MarketplaceLedgerEntryType.SALE,
+          // Sotuv kirimi MINUS haqiqatan yechilgan xarajat — invariant
+          // `SUM(daftar) == kassa balansi` shu bilan saqlanadi.
+          ledger_amount: w.delta - chargedExtra,
+          /**
+           * ⚠️ LANGAR — MARKET kassasiga OXIRGI yozilgan qator.
+           *
+           * Daftar yozuvining `balance_after` i aynan shu qatordan o'qiladi
+           * (`resolveBalanceAfter`). Xarajat sotuvdan KEYIN yoziladi, ya'ni
+           * sotuv qatorining `balance_after` i eskirgan bo'ladi: hodisada
+           * 300 000 ketardi-yu, kassada 285 000 turardi. Mock buni
+           * `LEDGER_DRIFT` deb ushladi.
+           */
+          cashbox_history_id: appliedExtraCost?.marketHistoryId ?? w.history_id,
+          money: computePartlyDeliveredMoney({
+            delivered_amount: price,
+            returned_amount: Math.max(oldTotalPrice - price, 0),
+            beepost_fee: marketTarif,
+            extra_cost: chargedExtra,
+            where_deliver: order.where_deliver,
+          }),
+          status: { from: Order_status.WAITING, to: 'PARTLY_DELIVERED' },
+          actor: { type: 'courier' },
         });
       }
 
@@ -4200,7 +4324,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     cashbox: CashEntity,
     user: JwtPayload,
     comment: string,
-  ): Promise<number> {
+  ): Promise<{ net: number; history_id: string | null }> {
     const appliedRaw = await queryRunner.manager
       .createQueryBuilder(CashboxHistoryEntity, 'h')
       .select('COALESCE(SUM(h.amount), 0)', 'sum')
@@ -4222,11 +4346,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     const applied = Number(appliedRaw?.sum) || 0;
     const reversed = Number(reversedRaw?.sum) || 0;
     const net = applied - reversed;
-    if (net <= 0) return 0;
+    if (net <= 0) return { net: 0, history_id: null };
 
     // ⚠️ ATOMIK (bloker B1) — balansni DB hisoblaydi, `balance_after` ham
     // `RETURNING` dan olinadi.
-    await applyCashboxDelta(queryRunner.manager, {
+    const res = await applyCashboxDelta(queryRunner.manager, {
       cashbox,
       delta: net,
       operation: Operation_type.INCOME,
@@ -4236,7 +4360,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       comment,
       created_by: user.id,
     });
-    return net;
+    /**
+     * ⚠️ Langar QAYTARILADI. Marketplace buyurtmasida bu pul harakati
+     * yordamchi daftarda ham aks etishi SHART: aks holda kassa 0 ga
+     * qaytadi-yu, daftarda `-extra_cost` abadiy qolib ketadi va
+     * sotuvchining qoldig'i shu summaga kam to'lanadi.
+     */
+    return { net, history_id: res.history_id };
   }
 
   /**
@@ -4449,15 +4579,32 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         'Buyurtma orqaga qaytarildi',
       );
 
+      /**
+       * ⚠️ MUZLATILGAN TARIF USTUN (bloker B5) — `sellOrder` bilan BIR XIL
+       * naqsh.
+       *
+       * Avval bu yerda tarif FAQAT `users` qatoridan o'qilardi, ya'ni
+       * rollback sotuvdan BOSHQA summani qaytarardi va daftar ABADIY
+       * siljirdi. Uchdan-uchga sinov buni aniq ko'rsatdi: 165 000 lik
+       * buyurtma 50 000 tarif bilan sotilgach market tarifi o'zgartirildi
+       * (999) va rollback 164 001 yechdi — 49 001 so'm yo'qoldi.
+       *
+       * Bu marketplace'ga XOS EMAS: oddiy market tarifi sotuv bilan
+       * rollback orasida o'zgarsa ham xuddi shu siljish bo'lardi.
+       */
       const marketTarif =
-        order.where_deliver === Where_deliver.CENTER
-          ? market.tariff_center
-          : market.tariff_home;
+        order.market_tariff != null
+          ? order.market_tariff
+          : order.where_deliver === Where_deliver.CENTER
+            ? market.tariff_center
+            : market.tariff_home;
 
       const courierTarif =
-        order.where_deliver === Where_deliver.CENTER
-          ? courier.tariff_center
-          : courier.tariff_home;
+        order.courier_tariff != null
+          ? order.courier_tariff
+          : order.where_deliver === Where_deliver.CENTER
+            ? courier.tariff_center
+            : courier.tariff_home;
 
       // === ROLLBACK FOR SOLD/PAID (courier or superadmin) ===
       if (
@@ -4498,13 +4645,21 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
         // Qo'shimcha xarajat (EXTRA_COST) — IDEMPOTENT teskari qaytarish
         // (eski 5 soniyalik vaqt oynasi o'rniga net-balans bo'yicha).
-        await this.reverseExtraCostForCashbox(
+        const marketBack = await this.reverseExtraCostForCashbox(
           queryRunner,
           order.id,
           marketCashbox,
           user,
           "Qo'shimcha xarajat orqaga qaytarildi",
         );
+        // ⚠️ Xarajat qaytishi ham marketplace daftariga tushishi SHART.
+        // Langar = MARKET kassasiga OXIRGI yozilgan qator.
+        if (marketBack.net > 0 && rollbackMarketWrite) {
+          rollbackMarketWrite = {
+            history_id: marketBack.history_id ?? rollbackMarketWrite.history_id,
+            delta: rollbackMarketWrite.delta + marketBack.net,
+          };
+        }
         await this.reverseExtraCostForCashbox(
           queryRunner,
           order.id,
@@ -4553,13 +4708,21 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         });
 
         // Qo'shimcha xarajat (EXTRA_COST) — IDEMPOTENT teskari qaytarish
-        await this.reverseExtraCostForCashbox(
+        const marketBack = await this.reverseExtraCostForCashbox(
           queryRunner,
           order.id,
           marketCashbox,
           user,
           "Qo'shimcha xarajat orqaga qaytarildi",
         );
+        // ⚠️ Xarajat qaytishi ham marketplace daftariga tushishi SHART.
+        // Langar = MARKET kassasiga OXIRGI yozilgan qator.
+        if (marketBack.net > 0 && rollbackMarketWrite) {
+          rollbackMarketWrite = {
+            history_id: marketBack.history_id ?? rollbackMarketWrite.history_id,
+            delta: rollbackMarketWrite.delta + marketBack.net,
+          };
+        }
         await this.reverseExtraCostForCashbox(
           queryRunner,
           order.id,
@@ -4578,13 +4741,28 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       ) {
         const extraReversalComment =
           "Bekor qilingan buyurtmaga yozilgan qo'shimcha xarajat orqaga qaytarildi";
-        await this.reverseExtraCostForCashbox(
+        const marketBack = await this.reverseExtraCostForCashbox(
           queryRunner,
           order.id,
           marketCashbox,
           user,
           extraReversalComment,
         );
+        /**
+         * ⚠️ BEKORNI ROLLBACK QILISHDA daftar yozuvi SHU YERDA tug'iladi.
+         *
+         * Bekorda market kassasidan FAQAT xarajat yechilgan edi (qaror P4:
+         * yetkazish haqqi olinmaydi) va daftarga `CANCEL -extra_cost`
+         * yozilgan. Rollback pulni kassaga qaytaradi — demak daftarga ham
+         * MUSBAT teskari yozuv kerak. Busiz kassa 0 ga qaytib, daftar
+         * `-extra_cost` da qolardi va sotuvchi shu summaga kam olardi.
+         */
+        if (marketBack.net > 0) {
+          rollbackMarketWrite = {
+            history_id: marketBack.history_id as string,
+            delta: marketBack.net,
+          };
+        }
         await this.reverseExtraCostForCashbox(
           queryRunner,
           order.id,

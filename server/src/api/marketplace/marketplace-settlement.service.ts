@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { pgReturningNumber } from 'src/common/database/pg-returning.util';
 import { DataSource, Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
@@ -27,7 +28,6 @@ import { MarketplaceOutboxEntity } from 'src/core/entity/marketplace-outbox.enti
 export interface SettlementInput {
   amount: number;
   method: MarketplaceSettlementMethod;
-  allocation: Array<{ seller_id: string; amount: number }>;
   reference?: string | null;
   note?: string | null;
 }
@@ -78,31 +78,21 @@ export class MarketplaceSettlementService {
       throw new BadRequestException("To'lov summasi musbat bo'lishi shart");
     }
 
-    // ⚠️ TAQSIMOT YIG'INDISI SUMMAGA TENG BO'LISHI SHART.
-    // Aks holda marketplace sotuvchilarga noto'g'ri taqsimlaydi va farq
-    // hech qayerda ko'rinmaydi — bu eng yomon turdagi xato.
-    const allocation = (input.allocation ?? []).map((a) => ({
-      seller_id: String(a.seller_id),
-      amount: Math.trunc(Number(a.amount) || 0),
-    }));
-    const allocSum = allocation.reduce((n, a) => n + a.amount, 0);
-    if (allocation.length === 0) {
-      throw new BadRequestException(
-        "Sotuvchilar bo'yicha taqsimot ko'rsatilishi shart — " +
-          "marketplace kimga qancha berishni shundan biladi",
-      );
-    }
-    if (allocSum !== amount) {
-      throw new BadRequestException(
-        `Taqsimot yig'indisi (${allocSum.toLocaleString('uz-UZ')}) ` +
-          `to'lov summasiga (${amount.toLocaleString('uz-UZ')}) teng emas`,
-      );
-    }
-    if (allocation.some((a) => a.amount <= 0)) {
-      throw new BadRequestException(
-        "Taqsimotdagi har bir summa musbat bo'lishi shart",
-      );
-    }
+    /**
+     * ⚠️ TAQSIMOT YO'Q — YAXLIT TO'LOV.
+     *
+     * Qaror (2026-09-17): marketplace bizdan pulni OLADI va o'z
+     * sotuvchilariga O'ZI tarqatadi. Kim qancha ishlab topgani ularga
+     * har posilka hodisasidagi `seller_id` orqali allaqachon ma'lum.
+     *
+     * Avval bu yerda har to'lovda sotuvchilar bo'yicha taqsimot
+     * MAJBURIY edi — admin uchun bekorga ish va xato manbai, ularga
+     * esa hech qanday foyda bermasdi (ular baribir o'zi tarqatadi).
+     *
+     * Bizda YAGONA son qoladi: market kassasi balansi = «ularga qancha
+     * qarzdormiz». Daftar invarianti (`SUM(daftar) == kassa`) shu
+     * yagona sonni himoya qiladi.
+     */
 
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
@@ -159,7 +149,9 @@ export class MarketplaceSettlementService {
           integration_id: integration.id,
           amount,
           method: input.method,
-          allocation,
+          // ⚠️ Taqsimot YO'Q — ular o'zi tarqatadi. Ustun jadvalda
+          // qoladi (eski yozuvlar uchun), yangi to'lovda bo'sh.
+          allocation: [],
           reference: input.reference ?? null,
           cashbox_history_id: marketWrite.history_id,
           created_by: user.id,
@@ -168,14 +160,37 @@ export class MarketplaceSettlementService {
         }),
       );
 
-      // ── 4. Daftar: BITTA umumiy yozuv ──
-      // ⚠️ Har sotuvchiga alohida yozuv YOZILMAYDI. Sabab: kassada BITTA
-      // chiqim bor, daftar esa kassaga teng bo'lishi shart
-      // (`SUM(daftar) == cash_box.balance`). Sotuvchilar bo'yicha taqsimot
-      // `allocation` da saqlanadi va hodisada yuboriladi.
+      /**
+       * ── 4. Daftar: HAR SOTUVCHIGA ALOHIDA yozuv ──
+       *
+       * ⚠️ Avval bu yerda BITTA umumiy yozuv (`seller_id = null`) yozilardi.
+       * Kassa invarianti saqlanardi, lekin HAR-SOTUVCHI hisobi buzilardi:
+       * `balancesBySeller` `seller_id` bo'yicha guruhlaydi, ya'ni to'lov
+       * `null` chelagiga tushib, to'langan sotuvchining qoldig'i
+       * O'ZGARMASDI. Keyingi hisob-kitob taklifi unga YANA to'lashni
+       * taklif qilardi — ikki marta to'lov. Uchdan-uchga sinov buni
+       * ushladi: SLR-81 ga 780 000 to'langach qoldig'i hamon 780 000 edi.
+       *
+       * Yig'indi baribir `amount` ga teng (yuqorida tekshirilgan), shuning
+       * uchun `SUM(daftar) == kassa` invarianti saqlanadi.
+       *
+       * ⚠️ Kassa qatoriga FAQAT OXIRGI yozuv bog'lanadi: `appendEntry`
+       * idempotentligi `cashbox_history_id` bo'yicha ishlaydi — hammasini
+       * bog'lasak, faqat BIRINCHISI yozilardi.
+       */
+      /**
+       * BITTA daftar yozuvi, `seller_id` SIZ.
+       *
+       * ⚠️ Shu sabab sotuvchilar kesimi «qancha QARZDORMIZ» emas,
+       * «qancha ISHLAB TOPGAN» degani bo'ladi — to'lov hech bir
+       * sotuvchiga yozilmaydi, u umumiy qarzni kamaytiradi.
+       * Panel buni aynan shunday nomlaydi, aks holda admin raqamni
+       * «to'lanadigan» deb o'qib, ikki marta to'lab yuborardi.
+       */
       const entry = await this.ledger.appendEntry(qr.manager, {
         integration_id: integration.id,
         entry_type: MarketplaceLedgerEntryType.SETTLEMENT,
+        seller_id: null,
         amount: -amount,
         cashbox_history_id: marketWrite.history_id,
         note: comment,
@@ -183,14 +198,20 @@ export class MarketplaceSettlementService {
 
       // ── 5. Hodisa ──
       const eventId = randomUUID();
-      const seqRows: Array<{ next_ledger_seq: string }> = await qr.manager.query(
+      // ⚠️ `pgReturningNumber` SHART — TypeORM `UPDATE ... RETURNING` uchun
+      // `[rows, count]` tuple qaytaradi (batafsil: `pg-returning.util.ts`).
+      const seqRaw = await qr.manager.query(
         `UPDATE "marketplace_integration"
             SET "next_ledger_seq" = "next_ledger_seq" + 1, "updated_at" = $2
           WHERE "id" = $1
           RETURNING "next_ledger_seq"`,
         [integration.id, Date.now()],
       );
-      const seq = Number(seqRows[0].next_ledger_seq);
+      const seq = pgReturningNumber(
+        seqRaw,
+        'next_ledger_seq',
+        `hisob-kitob seq (${integration.slug})`,
+      );
 
       const payload = buildEventEnvelope({
         event_id: eventId,
@@ -204,7 +225,11 @@ export class MarketplaceSettlementService {
           external_order_id: '',
           seller_id: null,
         },
-        ledger: { entry_id: entry.id, balance_after: entry.balance_after },
+        ledger: {
+          entry_id: entry.id,
+          seq: Number(entry.seq),
+          balance_after: entry.balance_after,
+        },
         actor: { type: 'admin' },
         note: comment,
       });
@@ -216,7 +241,6 @@ export class MarketplaceSettlementService {
         method: input.method,
         paid_at: settlement.paid_at,
         reference: input.reference ?? null,
-        allocation,
       };
 
       await qr.manager.save(
@@ -243,13 +267,12 @@ export class MarketplaceSettlementService {
 
       this.logger.log(
         `💸 hisob-kitob: ${amount.toLocaleString('uz-UZ')} so'm, ` +
-          `${allocation.length} sotuvchi, balans ${entry.balance_after}`,
+          `balans ${entry.balance_after}`,
       );
 
       return {
         settlement_id: settlement.id,
         amount,
-        allocation,
         balance_after: entry.balance_after,
       };
     } catch (e) {
@@ -272,20 +295,38 @@ export class MarketplaceSettlementService {
       throw new NotFoundException(`Marketplace ulanishi topilmadi: ${slug}`);
     }
 
-    const balances = await this.ledger.balancesBySeller(integration.id);
-    const payable = balances.filter((b) => b.seller_id && b.balance > 0);
     const invariant = await this.ledger.verifyInvariant(integration.id);
+
+    /**
+     * ⚠️ QARZ — MARKET KASSASIDAN, sotuvchilar yig'indisidan EMAS.
+     *
+     * To'lov endi yaxlit (taqsimotsiz) va daftarga `seller_id` SIZ
+     * yoziladi. Ya'ni sotuvchilar kesimi «qancha QARZDORMIZ» emas,
+     * «qancha ISHLAB TOPGAN» degani — undan qarzni hisoblab bo'lmaydi.
+     *
+     * Yagona haqiqat manbai — kassa balansi. Daftar invarianti aynan
+     * shu sonni himoya qiladi.
+     */
+    const payable = Math.max(0, invariant.cashbox_balance);
 
     return {
       integration: { slug: integration.slug, name: integration.name },
-      total_payable: payable.reduce((n, b) => n + b.balance, 0),
-      sellers: payable.map((b) => ({
-        seller_id: b.seller_id,
-        amount: b.balance,
-        entries: b.entries,
-      })),
-      // Qoldig'i MANFIY sotuvchilar — ular BIZGA qarzdor (prepaid).
-      negative_sellers: balances.filter((b) => b.seller_id && b.balance < 0),
+      total_payable: payable,
+      /**
+       * ⚠️ SOTUVCHILAR RO'YXATI QAYTARILMAYDI.
+       *
+       * Qaror (2026-09-17): biz ularning sotuvchilarini BILMAYMIZ va
+       * ular bizga faqat ID yuborishi mumkin. `SLR-77` degan qatorni
+       * adminga ko'rsatish — foydasiz shovqin: u bu ID kimligini
+       * bilmaydi va unga qarab hech qanday qaror qabul qila olmaydi.
+       *
+       * `seller_id` BACKENDDA qoladi va kerak joyda ishlatiladi:
+       *   · har posilka hodisasida (sotuv, xarajat, rollback) —
+       *     marketplace shundan kimga qancha berishni biladi;
+       *   · kunlik `ledger.snapshot` da — ularning solishtiruvi uchun.
+       *
+       * Adminga esa YAGONA son kerak: ularga qancha qarzdormiz.
+       */
       invariant,
     };
   }

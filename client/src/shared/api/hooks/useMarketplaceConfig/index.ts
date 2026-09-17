@@ -4,6 +4,7 @@ import { api } from "../..";
 const MP_LIST_KEY = "marketplace-config-list";
 const MP_ONE_KEY = "marketplace-config-one";
 const MP_TARIFF_KEY = "marketplace-tariff-history";
+const MP_STATUS_MAP_KEY = "marketplace-status-map";
 
 /** Javob qobig'ini himoyalangan ochish (`{data}` bo'lishi ham, bo'lmasligi ham mumkin). */
 const unwrap = <T,>(raw: unknown): T =>
@@ -32,6 +33,8 @@ export interface MarketplaceChecklist {
   inbound_api_key: boolean;
   tariff: boolean;
   market: boolean;
+  /** `MARKETPLACE_SECRET_KEY` sozlanganmi — busiz sekretlar ochiq matn. */
+  encryption: boolean;
 }
 
 export interface MarketplaceTariffView {
@@ -101,6 +104,27 @@ export interface UpdateMarketplacePayload {
   is_sandbox?: boolean;
 }
 
+/**
+ * Status xaritasining bitta qatori.
+ *
+ * ⚠️ `partner` — admin kiritgan qiymat (hamkorda raqam, so'z yoki kod
+ * bo'lishi mumkin). `effective` — HAQIQATAN yuboriladigan qiymat:
+ * sozlanmagan bo'lsa kanonik nomning o'zi.
+ */
+export interface MarketplaceStatusRow {
+  canonical: string;
+  partner: string | null;
+  effective: string;
+}
+
+export interface MarketplaceStatusMapView {
+  slug: string;
+  rows: MarketplaceStatusRow[];
+  /** Ikki kanonik status BIR qiymatga tushgan holatlar. */
+  conflicts: Array<{ value: string; statuses: string[] }>;
+  configured: number;
+}
+
 export interface MarketplaceTariffRow {
   id: string;
   version: number;
@@ -168,6 +192,36 @@ export const useMarketplaceConfig = (slug?: string) => {
         .then((res) => unwrap<MarketplaceTariffRow[]>(res.data) ?? []),
   });
 
+  /**
+   * Hamkorning status lug'ati.
+   *
+   * ⚠️ Qo'lda sozlanadi: ularning tizimi allaqachon mavjud bo'lishi va
+   * butunlay boshqa qiymatlar ishlatishi mumkin (`7`, `dostavleno`,
+   * `ST-07`). Koddan taxmin qilib bo'lmaydi.
+   */
+  const statusMap = useQuery({
+    queryKey: [MP_STATUS_MAP_KEY, slug],
+    enabled: !!slug,
+    refetchOnWindowFocus: false,
+    queryFn: () =>
+      api
+        .get(`marketplace/config/${slug}/status-map`)
+        .then((res) => unwrap<MarketplaceStatusMapView>(res.data)),
+  });
+
+  const setStatusMap = useMutation({
+    mutationFn: (params: { slug: string; status_map: Record<string, string> }) =>
+      api
+        .post(`marketplace/config/${params.slug}/status-map`, {
+          status_map: params.status_map,
+        })
+        .then((res) => unwrap<MarketplaceStatusMapView>(res.data)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [MP_STATUS_MAP_KEY, slug] });
+      invalidate();
+    },
+  });
+
   const create = useMutation({
     mutationFn: (data: CreateMarketplacePayload) =>
       api.post("marketplace/config", data).then((res) => res.data),
@@ -203,6 +257,20 @@ export const useMarketplaceConfig = (slug?: string) => {
         .post(`marketplace/config/${s}/test`)
         .then((res) => unwrap<MarketplaceTestResult>(res.data)),
     onSuccess: invalidate,
+  });
+
+  /**
+   * IMZO SINOVI — `webhook.test` hodisasi imzolangan yo'ldan yuboriladi.
+   *
+   * ⚠️ «Ulanishni tekshirish» (ping) ATAYLAB imzolanmaydi, ya'ni u faqat
+   * «manzil javob beryapti» deydi. Imzo sekreti noto'g'ri bo'lsa xato
+   * faqat birinchi HAQIQIY sotuvdan keyin chiqardi.
+   */
+  const testSignature = useMutation({
+    mutationFn: (s: string) =>
+      api
+        .post(`marketplace/config/${s}/test-signature`)
+        .then((res) => unwrap<MarketplaceTestResult & { signed?: boolean; applied?: boolean | null }>(res.data)),
   });
 
   const setTariff = useMutation({
@@ -253,10 +321,13 @@ export const useMarketplaceConfig = (slug?: string) => {
     list,
     detail,
     tariffHistory,
+    statusMap,
+    setStatusMap,
     create,
     update,
     setActive,
     testConnection,
+    testSignature,
     setTariff,
     rotateSigning,
     clearPreviousSigning,
@@ -275,4 +346,5 @@ export const MARKETPLACE_CHECKLIST_LABELS: Record<
   inbound_api_key: "Kiruvchi API kalit",
   tariff: "Tarif",
   market: "Biriktirilgan market",
+  encryption: "Sekret shifrlash kaliti (MARKETPLACE_SECRET_KEY)",
 };

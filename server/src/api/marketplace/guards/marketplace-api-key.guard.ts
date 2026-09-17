@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -74,7 +75,7 @@ export class MarketplaceApiKeyGuard implements CanActivate {
     const allow = integration.ip_allowlist ?? [];
     if (allow.length > 0) {
       const ip = clientIp(req);
-      if (!allow.includes(ip)) {
+      if (!ipAllowed(ip, allow)) {
         this.logger.warn(`${slug}: ro'yxatda yo'q IP dan urinish (${ip})`);
         throw new ForbiddenException('Bu IP manzilga ruxsat yo\'q');
       }
@@ -104,4 +105,88 @@ function safeEqual(a: string, b: string): boolean {
 function clientIp(req: Request): string {
   // `trust proxy` yoqilgani uchun Express `req.ip` ni to'g'ri hisoblaydi.
   return String(req.ip ?? '').replace(/^::ffff:/, '');
+}
+
+/**
+ * IP oq ro'yxati — ANIQ manzil yoki CIDR blok (`91.212.0.0/16`).
+ *
+ * ⚠️ Avval faqat aniq satr taqqoslanardi. Hamkor bir nechta chiquvchi
+ * IP dan foydalansa (odatiy holat: yuk balanslovchi, bir nechta server),
+ * admin CIDR yozardi-yu, u HECH QACHON mos kelmasdi — hamkor jimgina
+ * 403 olib, sababini bilmasdi.
+ */
+export function ipAllowed(ip: string, allow: string[]): boolean {
+  const addr = normalizeIp(ip);
+  for (const raw of allow) {
+    const entry = String(raw ?? '').trim();
+    if (!entry) continue;
+    if (!entry.includes('/')) {
+      if (normalizeIp(entry) === addr) return true;
+      continue;
+    }
+    if (ipv4InCidr(addr, entry)) return true;
+  }
+  return false;
+}
+
+/** `::ffff:1.2.3.4` → `1.2.3.4` (Node IPv4-mapped shakli). */
+function normalizeIp(ip: string): string {
+  const v = String(ip ?? '').trim().toLowerCase();
+  const m = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(v);
+  return m ? m[1] : v;
+}
+
+function ipv4ToInt(ip: string): number | null {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (!m) return null;
+  const parts = m.slice(1).map(Number);
+  if (parts.some((n) => n > 255)) return null;
+  return ((parts[0] << 24) >>> 0) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+}
+
+function ipv4InCidr(ip: string, cidr: string): boolean {
+  const [base, bitsRaw] = cidr.split('/');
+  const bits = Number(bitsRaw);
+  if (!Number.isInteger(bits) || bits < 0 || bits > 32) return false;
+  const a = ipv4ToInt(ip);
+  const b = ipv4ToInt(base);
+  if (a === null || b === null) return false;
+  if (bits === 0) return true;
+  const mask = (0xffffffff << (32 - bits)) >>> 0;
+  return ((a & mask) >>> 0) === ((b & mask) >>> 0);
+}
+
+/**
+ * Oq ro'yxat yozuvlarini SOZLASH paytida tekshirish.
+ *
+ * ⚠️ Yaroqsiz yozuv (`91.212.0.` yoki `10.0.0.0/99`) hech qachon mos
+ * kelmaydi — hamkor jimgina 403 oladi va sababi hech qayerda ko'rinmaydi.
+ */
+export function assertValidIpAllowlist(list: string[]): void {
+  const bad: string[] = [];
+  for (const raw of list ?? []) {
+    const entry = String(raw ?? '').trim();
+    if (!entry) continue;
+    if (entry.includes('/')) {
+      const [base, bits] = entry.split('/');
+      const n = Number(bits);
+      if (
+        ipv4ToInt(base) === null ||
+        !Number.isInteger(n) ||
+        n < 0 ||
+        n > 32
+      ) {
+        bad.push(entry);
+      }
+      continue;
+    }
+    // IPv6 yoki IPv4 — ikkalasi ham ruxsat, lekin shakli tanilishi kerak.
+    if (ipv4ToInt(entry) === null && !entry.includes(':')) bad.push(entry);
+  }
+  if (bad.length) {
+    throw new BadRequestException(
+      `IP ro'yxatida yaroqsiz yozuv: ${bad.join(', ')}. ` +
+        `Aniq manzil (91.212.1.5) yoki blok (91.212.0.0/16) yozing.`,
+    );
+  }
 }

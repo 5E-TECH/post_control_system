@@ -56,6 +56,38 @@ export interface MarketplaceErrorInfo {
   /** Keyinroq qayta urinish mantiqiymi. */
   retryable: boolean;
   httpStatus: number | null;
+  /**
+   * `Retry-After` sarlavhasidan olingan kutish (ms).
+   *
+   * ⚠️ 429 da hamkor AYNAN qancha kutishni aytadi. Uni e'tiborsiz
+   * qoldirib o'z backoff'imiz bilan yursak, limitni qayta-qayta urib,
+   * urinish byudjetini yeb bitiramiz va ular bizni butunlay bloklashi
+   * mumkin. Yo'q bo'lsa `null` — odatdagi backoff ishlaydi.
+   */
+  retryAfterMs: number | null;
+}
+
+/**
+ * `Retry-After` — soniya (`120`) yoki HTTP sana bo'lishi mumkin.
+ * Ikkalasini ham tushunamiz; yaroqsiz bo'lsa `null`.
+ */
+function parseRetryAfter(raw: unknown): number | null {
+  if (raw == null) return null;
+  const v = String(raw).trim();
+  if (v === '') return null;
+
+  const secs = Number(v);
+  if (Number.isFinite(secs) && secs >= 0) {
+    // 1 soatdan ortiq kutish — mantiqsiz, cheklab qo'yamiz.
+    return Math.min(secs, 3600) * 1000;
+  }
+
+  const at = Date.parse(v);
+  if (!Number.isNaN(at)) {
+    const delta = at - Date.now();
+    return delta > 0 ? Math.min(delta, 3600_000) : 0;
+  }
+  return null;
 }
 
 /**
@@ -65,12 +97,16 @@ export interface MarketplaceErrorInfo {
  */
 export function classifyMarketplaceError(err: unknown): MarketplaceErrorInfo {
   const e = err as {
-    response?: { status?: number };
+    response?: { status?: number; headers?: Record<string, unknown> };
     code?: string;
     message?: string;
   };
   const status = e?.response?.status ?? null;
   const code = e?.code ?? '';
+  const headers = e?.response?.headers ?? {};
+  const retryAfterMs = parseRetryAfter(
+    headers['retry-after'] ?? headers['Retry-After'],
+  );
 
   // ── Timeout ─────────────────────────────────────────────────────────
   if (code === 'ECONNABORTED' || code === 'ETIMEDOUT' || /timeout/i.test(e?.message ?? '')) {
@@ -81,6 +117,7 @@ export function classifyMarketplaceError(err: unknown): MarketplaceErrorInfo {
       countsTowardBreaker: true,
       retryable: true,
       httpStatus: null,
+      retryAfterMs,
     };
   }
 
@@ -99,6 +136,7 @@ export function classifyMarketplaceError(err: unknown): MarketplaceErrorInfo {
       countsTowardBreaker: true,
       retryable: true,
       httpStatus: null,
+      retryAfterMs,
     };
   }
 
@@ -110,6 +148,7 @@ export function classifyMarketplaceError(err: unknown): MarketplaceErrorInfo {
       countsTowardBreaker: true,
       retryable: true,
       httpStatus: null,
+      retryAfterMs,
     };
   }
 
@@ -122,6 +161,7 @@ export function classifyMarketplaceError(err: unknown): MarketplaceErrorInfo {
       countsTowardBreaker: false, // ular ishlayapti — bu normal javob
       retryable: false,
       httpStatus: status,
+      retryAfterMs,
     };
   }
 
@@ -135,6 +175,7 @@ export function classifyMarketplaceError(err: unknown): MarketplaceErrorInfo {
       countsTowardBreaker: true,
       retryable: false,
       httpStatus: status,
+      retryAfterMs,
     };
   }
 
@@ -147,6 +188,7 @@ export function classifyMarketplaceError(err: unknown): MarketplaceErrorInfo {
       countsTowardBreaker: true,
       retryable: true,
       httpStatus: status,
+      retryAfterMs,
     };
   }
 
@@ -159,12 +201,14 @@ export function classifyMarketplaceError(err: unknown): MarketplaceErrorInfo {
       countsTowardBreaker: true,
       retryable: true,
       httpStatus: status,
+      retryAfterMs,
     };
   }
 
   // ── Qolgan 4xx ──────────────────────────────────────────────────────
   return {
     kind: 'bad_request',
+    retryAfterMs,
     message: `Marketplace so'rovni qabul qilmadi (${status}).`,
     allowManualAdd: false,
     countsTowardBreaker: true,

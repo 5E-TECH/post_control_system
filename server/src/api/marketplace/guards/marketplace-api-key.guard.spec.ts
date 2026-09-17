@@ -1,5 +1,5 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
-import { MarketplaceApiKeyGuard } from './marketplace-api-key.guard';
+import { MarketplaceApiKeyGuard, ipAllowed, assertValidIpAllowlist } from './marketplace-api-key.guard';
 
 const KEY = 'mock-inbound-key-abc123';
 
@@ -107,5 +107,38 @@ describe('MarketplaceApiKeyGuard', () => {
         ctx(request({ ip: '1.2.3.4' })),
       ),
     ).resolves.toBe(true);
+  });
+});
+
+describe('IP oq ro\'yxati — CIDR', () => {
+  it('ANIQ manzilga ruxsat beradi', () => {
+    expect(ipAllowed('91.212.1.5', ['91.212.1.5'])).toBe(true);
+    expect(ipAllowed('91.212.1.6', ['91.212.1.5'])).toBe(false);
+  });
+
+  it('CIDR BLOKNI tushunadi', () => {
+    // ⚠️ Avval faqat aniq satr taqqoslanardi — hamkor bir nechta
+    // chiquvchi IP dan foydalansa, CIDR HECH QACHON mos kelmasdi va
+    // u jimgina 403 olardi.
+    expect(ipAllowed('91.212.34.7', ['91.212.0.0/16'])).toBe(true);
+    expect(ipAllowed('91.213.0.1', ['91.212.0.0/16'])).toBe(false);
+    expect(ipAllowed('10.1.2.3', ['10.0.0.0/8'])).toBe(true);
+  });
+
+  it('IPv4-mapped IPv6 ni normallashtiradi', () => {
+    // Node `req.ip` ni `::ffff:1.2.3.4` shaklida beradi.
+    expect(ipAllowed('::ffff:91.212.1.5', ['91.212.1.5'])).toBe(true);
+    expect(ipAllowed('::ffff:91.212.34.7', ['91.212.0.0/16'])).toBe(true);
+  });
+
+  it('yaroqsiz yozuv SOZLASHDA rad etiladi', () => {
+    // Jimgina 403 o'rniga aniq xato.
+    expect(() => assertValidIpAllowlist(['91.212.0.'])).toThrow(
+      /yaroqsiz yozuv/i,
+    );
+    expect(() => assertValidIpAllowlist(['10.0.0.0/99'])).toThrow(
+      /yaroqsiz yozuv/i,
+    );
+    expect(() => assertValidIpAllowlist(['91.212.0.0/16', '1.2.3.4'])).not.toThrow();
   });
 });

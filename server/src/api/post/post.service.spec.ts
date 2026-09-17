@@ -12,6 +12,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { LdgShipmentService } from '../ldg-cargo/ldg-shipment.service';
 import { ElchiShipmentService } from '../elchi-cargo/elchi-shipment.service';
 import { BotService } from '../bots/notify-bot/bot.service';
+import { MarketplaceSyncService } from '../marketplace/marketplace-sync.service';
 import { Order_status, Post_status } from 'src/common/enums';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
@@ -131,6 +132,13 @@ describe('PostService — Return Requests', () => {
         {
           provide: BotService,
           useValue: { sendMessageToGroup: jest.fn() },
+        },
+        {
+          // ⚠️ Pochta jo'natilganda va kuryer skanerlaganda marketplace'ga
+          // ORALIQ status hodisasi ketadi (yo'lda / kuryerda). Marketplace
+          // bo'lmagan buyurtmada metod darhol chiqadi.
+          provide: MarketplaceSyncService,
+          useValue: { recordStatusEvent: jest.fn() },
         },
       ],
     }).compile();

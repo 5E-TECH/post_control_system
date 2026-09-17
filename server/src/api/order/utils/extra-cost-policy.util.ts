@@ -83,6 +83,8 @@ export function resolveExtraCostPolicy(params: {
     external_provider?: string | null;
   } | null;
   actionType: ExtraCostAction;
+  /** Buyurtma marketplace ulanishiga tegishlimi (`order.integration_id`). */
+  isMarketplaceOrder?: boolean;
 }): ExtraCostPolicy {
   const amount = Math.trunc(Number(params.amount ?? 0) || 0);
 
@@ -110,6 +112,26 @@ export function resolveExtraCostPolicy(params: {
     return IMMEDIATE(
       ExtraCostDecisionMode.EXTERNAL_AUTO,
       `Tashqi kargo (${params.courier.external_provider}) — tasdiq talab qilinmaydi`,
+    );
+  }
+
+  // ── 2b. MARKETPLACE buyurtmasi → har doim darhol ───────────────────────
+  //
+  // ⚠️ `deferred` rejimda pul sotuv/bekor TRANZAKSIYASIDAN TASHQARIDA,
+  // market tasdiqlaganda harakat qiladi (`ExtraCostDecisionService`).
+  // O'sha yo'lda marketplace daftar ilgagi YO'Q — ya'ni market kassasi
+  // kamayadi-yu, yordamchi daftarga hech narsa yozilmaydi va
+  // `SUM(daftar) == kassa balansi` invarianti buziladi. Undan ham yomoni:
+  // marketplace'ga «xarajat yechildi» deb xabar ketmaydi, sotuvchining
+  // qoldig'i noto'g'ri qoladi.
+  //
+  // Tasdiqlash yo'li marketplace daftariga ulanmaguncha bu buyurtmalar
+  // DARHOL rejimida qoladi — pul har doim bitta tranzaksiyada, daftar
+  // bilan birga yoziladi.
+  if (params.isMarketplaceOrder) {
+    return IMMEDIATE(
+      ExtraCostDecisionMode.EXTERNAL_AUTO,
+      "Marketplace buyurtmasi — xarajat daftar bilan BIRGA yoziladi",
     );
   }
 

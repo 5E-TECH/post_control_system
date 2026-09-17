@@ -40,7 +40,10 @@ export const MarketplaceCreateModal = ({ open, onClose, onCreated }: Props) => {
   const [form] = Form.useForm<CreateMarketplacePayload>();
   const { create } = useMarketplaceConfig();
   const { getMarkets } = useMarket();
-  const { data: marketsRaw } = getMarkets(open);
+  // ⚠️ `limit: 0` = HAMMASI. Aks holda backend birinchi sahifani
+  // (sukut bo'yicha 10 ta) qaytaradi va kerakli market ro'yxatda
+  // umuman ko'rinmaydi — integratsiyalar sahifasi ham shunday chaqiradi.
+  const { data: marketsRaw } = getMarkets(open, { limit: 0 });
 
   const markets = useMemo(() => unwrapMarkets(marketsRaw), [marketsRaw]);
 

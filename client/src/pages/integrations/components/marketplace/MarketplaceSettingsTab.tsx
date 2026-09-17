@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../../../../app/store";
 import {
   Alert,
   Button,
@@ -36,6 +38,7 @@ import {
   type MarketplaceTariffRow,
 } from "../../../../shared/api/hooks/useMarketplaceConfig";
 import { MarketplaceCreateModal } from "./MarketplaceCreateModal";
+import { MarketplaceStatusMapCard } from "./MarketplaceStatusMapCard";
 
 const money = (v: number | null | undefined) =>
   typeof v === "number" ? v.toLocaleString("ru-RU") : "—";
@@ -111,6 +114,18 @@ interface Props {
 }
 
 export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
+  /**
+   * ⚠️ Sekret aylantirish endpointlari FAQAT superadmin uchun
+   * (`@AcceptRoles(Roles.SUPERADMIN)`). Tugma har adminga ko'rinsa,
+   * u bosib 403 oladi va nima uchun ekanini tushunmaydi — ayni paytda
+   * integratsiya to'xtab qolgandek tuyuladi.
+   */
+  const role =
+    useSelector((st: RootState) => st.roleSlice.role) ||
+    localStorage.getItem("role") ||
+    "";
+  const canRotate = role === "superadmin";
+
   const [createOpen, setCreateOpen] = useState(false);
   const [oneTime, setOneTime] = useState<{
     secret: string;
@@ -123,6 +138,7 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
     update,
     setActive,
     testConnection,
+    testSignature,
     setTariff,
     rotateSigning,
     clearPreviousSigning,
@@ -206,6 +222,25 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
       );
     } else {
       message.error(`Ulanmadi (${res.kind ?? "noma'lum"}): ${res.message ?? ""}`);
+    }
+  };
+
+  /**
+   * ⚠️ «Ulanish» (ping) IMZONI SINAMAYDI — kontrakt bo'yicha ping
+   * ataylab imzolanmaydi. Imzo sekreti noto'g'ri bo'lsa xato faqat
+   * birinchi HAQIQIY sotuvdan keyin chiqardi va pul hodisasi
+   * navbatda qotib qolardi.
+   */
+  const doSignatureTest = async () => {
+    const res = await testSignature.mutateAsync(slug as string);
+    if (res.ok) {
+      message.success(
+        `Imzo qabul qilindi${res.applied === false ? " (hodisa qo'llanmadi — bu normal)" : ''}`,
+      );
+    } else {
+      message.error(
+        `Imzo sinovi yiqildi (${res.kind ?? '?'}): ${res.message ?? ''}`,
+      );
     }
   };
 
@@ -436,13 +471,27 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
               </span>
             }
             extra={
-              <Button
-                icon={<PlugZap className="w-4 h-4" />}
-                loading={testConnection.isPending}
-                onClick={doTest}
-              >
-                Tekshirish
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  icon={<PlugZap className="w-4 h-4" />}
+                  loading={testConnection.isPending}
+                  onClick={doTest}
+                >
+                  Ulanish
+                </Button>
+                {/*
+                  ⚠️ ALOHIDA tugma: «Ulanish» (ping) imzoni SINAMAYDI —
+                  kontrakt §4.1 bo'yicha ping ataylab imzolanmaydi.
+                  Imzo xato bo'lsa buni faqat birinchi sotuvda bilardik.
+                */}
+                <Button
+                  icon={<KeyRound className="w-4 h-4" />}
+                  loading={testSignature.isPending}
+                  onClick={doSignatureTest}
+                >
+                  Imzo
+                </Button>
+              </div>
             }
           >
             <Form form={connForm} layout="vertical" requiredMark={false}>
@@ -513,6 +562,16 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
               description="Server faqat oxirgi 4 belgini qaytaradi. Aylantirilganda yangi qiymat bir marta chiqadi — o'sha zahoti marketplace'ga uzating."
             />
 
+            {!canRotate && (
+              <Alert
+                type="warning"
+                showIcon
+                className="mb-3"
+                message="Kalit aylantirish faqat SUPERADMIN uchun"
+                description="Noto'g'ri paytda aylantirilgan kalit integratsiyani to'xtatib qo'yadi, shuning uchun bu amal cheklangan."
+              />
+            )}
+
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="font-medium">Imzo sekreti (biz → ular)</div>
@@ -540,7 +599,7 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                       });
                     }}
                   >
-                    <Button size="small" loading={rotateSigning.isPending}>
+                    <Button size="small" loading={rotateSigning.isPending} disabled={!canRotate}>
                       Aylantirish
                     </Button>
                   </Popconfirm>
@@ -556,7 +615,7 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                         message.success("Eski sekret tozalandi");
                       }}
                     >
-                      <Button size="small" danger>
+                      <Button size="small" danger disabled={!canRotate}>
                         Eskisini tozalash
                       </Button>
                     </Popconfirm>
@@ -588,13 +647,16 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                     });
                   }}
                 >
-                  <Button size="small" loading={rotateInbound.isPending}>
+                  <Button size="small" loading={rotateInbound.isPending} disabled={!canRotate}>
                     Aylantirish
                   </Button>
                 </Popconfirm>
               </div>
             </div>
           </Card>
+
+          {/* ── Status lug'ati ── */}
+          <MarketplaceStatusMapCard slug={slug} />
 
           {/* ── Tarif ── */}
           <Card title="Tarif">

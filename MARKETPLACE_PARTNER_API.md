@@ -396,7 +396,7 @@ Shu daqiqadan boshlab posilka **BeePost javobgarligida**.
     "extra_cost":              5000,
     "net_to_marketplace":      145000
   },
-  "ledger": { "entry_id": "uuid", "balance_after": 42350000 },
+  "ledger": { "entry_id": "uuid", "seq": 812, "balance_after": 42350000 },
   "actor":  { "type": "courier", "name": "Jasur T." },
   "note":   "Mijoz qabul qildi"
 }
@@ -828,7 +828,7 @@ bilasiz va o'sha sotuvchi hisobidan yechasiz.
     "extra_cost":              0,
     "net_to_marketplace":      -50000
   },
-  "ledger": { "entry_id": "uuid", "balance_after": 42300000 }
+  "ledger": { "entry_id": "uuid", "seq": 813, "balance_after": 42300000 }
 }
 ```
 
@@ -896,7 +896,7 @@ bizniki 42 350 000 bo'ladi — **darhol ko'rinadi**. Yo'qolganini
 
 ### 7.8 Hisob-kitob (BeePost sizga pul to'laydi)
 
-`settlement.paid` hodisasi **taqsimot ro'yxati bilan** keladi:
+`settlement.paid` — **YAXLIT summa**, taqsimotsiz:
 
 ```json
 {
@@ -906,23 +906,102 @@ bizniki 42 350 000 bo'ladi — **darhol ko'rinadi**. Yo'qolganini
     "amount":        40000000,
     "method":        "bank_transfer",
     "paid_at":       1789480740752,
-    "reference":     "TXN-88213",
-    "allocation": [
-      { "seller_id": "SLR-77", "amount": 5120000 },
-      { "seller_id": "SLR-81", "amount": 3400000 }
-    ]
+    "reference":     "TXN-88213"
   },
-  "ledger": { "entry_id": "uuid", "balance_after": 2350000 }
+  "ledger": { "entry_id": "uuid", "seq": 814, "balance_after": 2350000 }
 }
 ```
 
-`allocation` — **bizning tarifimizdagi** taqsimot: har sotuvchining posilkalaridan
-yig'ilgan sof summa. Sotuvchiga **haqiqatda qancha to'lashni** siz o'z marjangizni
-hisobga olib o'zingiz belgilaysiz.
+> ⚠️ **Taqsimot ro'yxati YUBORILMAYDI — ataylab.**
+>
+> Sotuvchilaringizni siz bilasiz, biz emas. Kim qancha ishlab topgani sizga
+> **har posilka hodisasida** (`parcel.delivered`, `parcel.partly_delivered`,
+> `parcel.cancelled`, `parcel.rolled_back`) `seller_id` va `money` bilan
+> allaqachon yetkazilgan — shundan o'z jamlamangizni yuritasiz.
+>
+> Biz esa YAGONA sonni yuritamiz: sizga qancha qarzdormiz. `settlement.paid`
+> aynan shu qarzni kamaytiradi.
+>
+> Sotuvchiga **haqiqatda qancha to'lashni** siz o'z marjangizni hisobga olib
+> o'zingiz belgilaysiz.
 
 🔴 **Juda muhim:** sotuvchiga to'lash signali **faqat `settlement.paid`**.
 Posilka statusi (`DELIVERED`) pul kelgani degani **emas** — u faqat «yetkazildi va
 hisobingizga yozildi» degani.
+
+### 7.5b STATUS LUG'ATI — sizniki qanday bo'lsa, shunday
+
+Kontraktdagi status nomlari (`ACCEPTED_BY_BEEPOST`, `DELIVERED`, ...) —
+BeePost tomonidagi KANONIK nomlar. Sizning tizimingizda ular boshqacha
+bo'lishi mumkin: raqam (`7`), so'z (`dostavleno`), kod (`ST-07`).
+
+**Siz hech narsani o'zgartirmaysiz.** BeePost admin panelida har kanonik
+status uchun SIZNING qiymatingiz qo'lda kiritiladi:
+
+| BeePost kanonik | Ma'nosi | Sizning qiymatingiz (misol) |
+|---|---|---|
+| `ACCEPTED_BY_BEEPOST` | Biz qabul qildik | `2` |
+| `IN_TRANSIT` | Yo'lda, omborda | `3` |
+| `OUT_FOR_DELIVERY` | Kuryerda, mijozga ketyapti | `4` |
+| `DELIVERED` | Yetkazildi, pul olindi | `7` |
+| `PARTLY_DELIVERED` | Qisman yetkazildi | `8` |
+| `CANCELLED` | Bekor qilindi | `otmenen` |
+| `RETURNED` | Qaytarib berildi | `9` |
+| `REJECTED_BY_BEEPOST` | Biz qabul qilmadik | `10` |
+
+Xarita ikki yo'nalishda ishlaydi:
+
+- **Bizdan sizga** — hodisadagi `status.from` / `status.to` SIZNING
+  qiymatingizda keladi;
+- **Sizdan bizga** — `lookup` va `status` javoblaringizdagi qiymat bizning
+  kanonik nomga qaytariladi (bu MUHIM: siz bekor qilgan posilkani biz
+  qabul qilib qo'ymasligimiz uchun).
+
+> ⚠️ Sozlanmagan status uchun KANONIK nom yuboriladi. Ya'ni xaritani
+> to'ldirmasangiz ham integratsiya ishlaydi — faqat siz bizning
+> nomlarimizni ko'rasiz.
+
+> ⚠️ Bir qiymatni IKKI kanonik statusga bermang (`DELIVERED` va
+> `PARTLY_DELIVERED` — ikkalasi ham `7`). Bizdan sizga yo'nalish baribir
+> to'g'ri ishlaydi, lekin SIZNING javobingizni o'qiganda qaysi biri
+> ekanini aniqlab bo'lmaydi. Panel bunday holatni ogohlantirish bilan
+> ko'rsatadi.
+
+Amalda: avval o'z status ro'yxatingizni bering — biz uni panelga
+kiritamiz va `webhook.test` bilan tekshiramiz.
+
+### 7.6 `ledger.balance_after` ni QANDAY solishtirish kerak
+
+Har pul hodisasida `ledger` bloki keladi:
+
+```json
+"ledger": { "entry_id": "uuid", "seq": 813, "balance_after": 42300000 }
+```
+
+| Maydon | Ma'nosi |
+|---|---|
+| `seq` | **Integratsiya bo'yicha GLOBAL** o'suvchi daftar raqami |
+| `balance_after` | Shu yozuvdan keyin BeePost'dagi umumiy qoldiq |
+
+> ⚠️ **`balance_after` ni faqat `seq` TARTIBIDA solishtiring.**
+>
+> Hodisalar HAR POSILKA bo'yicha ketma-ket yuboriladi, lekin turli
+> posilkalar (va hisob-kitob) ORASIDA tartib **kafolatlanmaydi**: kichikroq
+> `seq` li hodisa kechroq yetib kelishi mumkin.
+>
+> Qoida: **faqat KETMA-KET `seq` da solishtiring.**
+> - o'zingizda `max_ledger_seq` ni saqlang;
+> - `seq === max_ledger_seq + 1` bo'lsa — oraliqdagi hamma yozuv sizda bor,
+>   `balance_after` ni o'z yig'indingiz bilan solishtiring;
+> - aks holda (uzilish yoki eskirgan) — **solishtirmang**, faqat
+>   `max_ledger_seq` ni yangilang. Hodisaning o'zi baribir qo'llanadi
+>   (`event_id` bo'yicha idempotent).
+>
+> Nega ketma-ketlik shart: `seq 6` `seq 5` dan OLDIN kelishi mumkin. O'shanda
+> sizda hali `seq 5` ning puli yo'q va solishtiruv SOXTA farq berardi — har
+> kuni bekorga tekshiruv boshlanardi.
+
+Shubha bo'lsa — haqiqat manbai `GET /{slug}/ledger` (§5.2).
 
 ## 8. Xato taksonomiyasi
 

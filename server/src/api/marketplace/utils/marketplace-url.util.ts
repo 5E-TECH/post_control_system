@@ -22,8 +22,49 @@ const BLOCKED_HOSTS = new Set([
   'metadata.google.internal',
 ]);
 
+/**
+ * IPv6 LITERAL ichki manzilmi.
+ *
+ * ⚠️ `new URL()` IPv6 hostni kvadrat qavs bilan beradi (`[::1]`), ya'ni
+ * BLOCKED_HOSTS dagi `::1` bilan taqqoslash ishlamaydi. Bundan tashqari
+ * `::ffff:127.0.0.1` (IPv4-mapped), `fd00::/8` (unique local) va
+ * `fe80::/10` (link-local) ham ichki.
+ */
+function isPrivateIpv6(hostRaw: string): boolean {
+  const h = hostRaw.replace(/^\[|\]$/g, '').toLowerCase();
+  if (!h.includes(':')) return false;
+  if (h === '::1' || h === '::') return true;
+  /**
+   * IPv4-mapped manzil IKKI shaklda bo'ladi:
+   *   · `::ffff:127.0.0.1`  — foydalanuvchi yozgani
+   *   · `::ffff:7f00:1`     — `new URL()` NORMALLASHTIRGANI (o'n oltilik)
+   *
+   * ⚠️ Faqat birinchisini tekshirgan edik, ikkinchisi esa qo'riqchidan
+   * o'tib ketardi — ya'ni `https://[::ffff:127.0.0.1]` bilan loopback'ga
+   * so'rov yuborish mumkin edi.
+   */
+  const dotted = /::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(h);
+  if (dotted) return isPrivateIpv4(dotted[1]);
+
+  const hex = /::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(h);
+  if (hex) {
+    const hi = parseInt(hex[1], 16);
+    const lo = parseInt(hex[2], 16);
+    const ipv4 = `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+    return isPrivateIpv4(ipv4);
+  }
+  // Unique local (fc00::/7) va link-local (fe80::/10)
+  if (/^f[cd]/.test(h)) return true;
+  if (/^fe[89ab]/.test(h)) return true;
+  return false;
+}
+
 function isPrivateIpv4(host: string): boolean {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  // ⚠️ Oxiridagi nuqta olib tashlanadi: `127.0.0.1.` ham AYNI manzil,
+  // lekin regex unga mos kelmasdi va tekshiruvdan o'tib ketardi.
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(
+    host.replace(/\.$/, ''),
+  );
   if (!m) return false;
   const [a, b] = [Number(m[1]), Number(m[2])];
   if (a === 10) return true; // 10.0.0.0/8
@@ -65,8 +106,15 @@ export function assertOutboundUrlSafe(
     throw new BadRequestException('Manzilda login/parol bo\'lmasligi kerak');
   }
 
-  const host = url.hostname.toLowerCase();
-  if (!allowLocal && (BLOCKED_HOSTS.has(host) || isPrivateIpv4(host))) {
+  // ⚠️ Oxiridagi nuqta (`localhost.`) DNS'da AYNI nom — ro'yxatdan
+  // o'tib ketmasligi uchun kesiladi.
+  const host = url.hostname.toLowerCase().replace(/\.$/, '');
+  if (
+    !allowLocal &&
+    (BLOCKED_HOSTS.has(host) ||
+      isPrivateIpv4(host) ||
+      isPrivateIpv6(url.hostname))
+  ) {
     throw new BadRequestException(
       `Ichki manzilga so'rov yuborib bo'lmaydi: ${host}`,
     );

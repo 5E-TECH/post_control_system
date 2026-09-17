@@ -7,15 +7,13 @@ import {
   IsUUID,
   MaxLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import {
-  ArrayNotEmpty,
   IsArray,
   IsBoolean,
   IsInt,
+  IsObject,
   Max,
   Min,
-  ValidateNested,
 } from 'class-validator';
 import {
   MarketplaceRejectReason,
@@ -74,18 +72,6 @@ export class RejectParcelDto {
 }
 
 
-export class SettlementAllocationItemDto {
-  @ApiProperty({ description: 'Marketplace ichidagi sotuvchi ID si' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
-  seller_id: string;
-
-  @ApiProperty({ description: "Shu sotuvchiga tegishli summa (so'm)" })
-  @IsInt()
-  @Min(1)
-  amount: number;
-}
 
 export class SettlementPayDto {
   @ApiProperty({ description: "Umumiy to'lov summasi (so'm)" })
@@ -98,16 +84,17 @@ export class SettlementPayDto {
   method: MarketplaceSettlementMethod;
 
   /**
-   * ⚠️ MAJBURIY va yig'indisi `amount` ga TENG bo'lishi shart.
-   * Marketplace o'z sotuvchilariga shu ro'yxat bo'yicha to'laydi — mos
-   * kelmasa farq hech qayerda ko'rinmaydi.
+   * ⚠️ TAQSIMOT YO'Q — ataylab.
+   *
+   * Marketplace pulni oladi va o'z sotuvchilariga O'ZI tarqatadi
+   * (qaror 2026-09-17). Kim qancha ishlab topgani ularga har posilka
+   * hodisasidagi `seller_id` orqali allaqachon ma'lum. Har to'lovda
+   * jadval to'ldirish — admin uchun bekorga ish edi.
+   *
+   * `forbidNonWhitelisted: true` sabab eski `allocation` maydoni bilan
+   * kelgan so'rov 422 oladi — bu ham ataylab: chaqiruvchi eskirgan
+   * kontraktda ekanini DARHOL biladi.
    */
-  @ApiProperty({ type: [SettlementAllocationItemDto] })
-  @IsArray()
-  @ArrayNotEmpty()
-  @ValidateNested({ each: true })
-  @Type(() => SettlementAllocationItemDto)
-  allocation: SettlementAllocationItemDto[];
 
   @ApiPropertyOptional({ description: "Bank o'tkazmasi raqami / chek" })
   @IsOptional()
@@ -254,4 +241,20 @@ export class SetMarketplaceActiveDto {
   @ApiProperty({ description: 'MASTER kalit — o\'chirilsa skan ham to\'xtaydi' })
   @IsBoolean()
   is_active: boolean;
+}
+
+export class SetMarketplaceStatusMapDto {
+  /**
+   * `{ "<bizning kanonik status>": "<ularning qiymati>" }`
+   *
+   * ⚠️ Qiymat SATR sifatida keladi — hamkorda raqam (`7`) bo'lsa ham
+   * `"7"` deb yuboriladi. Sabab: `7` va `"7"` ni JSON'da ajratib
+   * bo'lmaydi-yu, taqqoslashda ular TENG EMAS.
+   */
+  @ApiProperty({
+    example: { DELIVERED: '7', CANCELLED: 'otmenen' },
+    description: "Bizning status -> ularning qiymati",
+  })
+  @IsObject({ message: "Status xaritasi obyekt bo'lishi kerak" })
+  status_map: Record<string, string>;
 }

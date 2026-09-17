@@ -108,11 +108,18 @@ export class MarketplaceController {
     return this.reconcile.listMismatches(integration.id);
   }
 
-  @Post('mismatches/:parcelId/clear')
+  @Post(':slug/mismatches/:parcelId/clear')
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @ApiOperation({ summary: 'Nomuvofiqlik hal qilindi — belgini olib tashlash' })
-  clearMismatch(@Param('parcelId') parcelId: string) {
-    return this.reconcile.clearMismatch(parcelId);
+  async clearMismatch(
+    @Param('slug') slug: string,
+    @Param('parcelId') parcelId: string,
+  ) {
+    // ⚠️ Posilka SHU ulanishga tegishli bo'lishi shart — aks holda bir
+    // marketplace admini boshqasining nomuvofiqlik belgisini o'chirib,
+    // haqiqiy pul farqini panelda ko'rinmas qilib qo'yardi.
+    const integration = await this.scan.resolveIntegration(slug);
+    return this.reconcile.clearMismatch(parcelId, integration.id);
   }
 
   @Post(':slug/reconcile')

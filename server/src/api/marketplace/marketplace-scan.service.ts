@@ -7,7 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { MarketplaceIntegrationEntity } from 'src/core/entity/marketplace-integration.entity';
@@ -15,13 +15,19 @@ import { MarketplaceParcelEntity } from 'src/core/entity/marketplace-parcel.enti
 import { MarketplaceScanSessionEntity } from 'src/core/entity/marketplace-scan-session.entity';
 import { MarketplaceSellerEntity } from 'src/core/entity/marketplace-seller.entity';
 import { MarketplaceApiService } from './marketplace-api.service';
+import { MarketplaceOutboxService } from './marketplace-outbox.service';
 import {
+  MarketplaceEventType,
   MarketplaceParcelStatus,
   MarketplaceRejectReason,
   MarketplaceScanSessionStatus,
   MarketplaceScanState,
 } from './marketplace.enums';
 import { checkMarketplaceToken } from './utils/marketplace-token.util';
+import {
+  buildEventStatus,
+  toCanonicalStatus,
+} from './utils/marketplace-status.util';
 import { parseLookupPayload } from './utils/marketplace-payload.util';
 import { MarketplaceErrorInfo } from './utils/marketplace-error.util';
 
@@ -86,6 +92,8 @@ export class MarketplaceScanService {
     @InjectRepository(DistrictEntity)
     private readonly districtRepo: Repository<DistrictEntity>,
     private readonly api: MarketplaceApiService,
+    private readonly outbox: MarketplaceOutboxService,
+    private readonly dataSource: DataSource,
   ) {}
 
   // ═══════════════════ INTEGRATSIYA ═══════════════════
@@ -127,13 +135,34 @@ export class MarketplaceScanService {
     });
     if (existing) return existing;
 
-    return this.sessionRepo.save(
-      this.sessionRepo.create({
-        integration_id: integration.id,
-        operator_id: user.id,
-        status: MarketplaceScanSessionStatus.OPEN,
-      }),
-    );
+    try {
+      return await this.sessionRepo.save(
+        this.sessionRepo.create({
+          integration_id: integration.id,
+          operator_id: user.id,
+          status: MarketplaceScanSessionStatus.OPEN,
+        }),
+      );
+    } catch (e) {
+      /**
+       * ⚠️ POYGA: operator ikki tabda bir vaqtda ochdi.
+       *
+       * `UQ_MP_SESSION_OPEN_PER_OPERATOR` qisman unique indeksi ikkinchisini
+       * to'sadi. Xato tashlash o'rniga MAVJUDINI qaytaramiz — operator
+       * uchun bu shunchaki «sessiya ochildi», ikki qop paydo bo'lmaydi.
+       */
+      if ((e as { code?: string }).code !== '23505') throw e;
+      const existingNow = await this.sessionRepo.findOne({
+        where: {
+          integration_id: integration.id,
+          operator_id: user.id,
+          status: MarketplaceScanSessionStatus.OPEN,
+        },
+        order: { created_at: 'DESC' },
+      });
+      if (!existingNow) throw e;
+      return existingNow;
+    }
   }
 
   async getSession(sessionId: string, user: JwtPayload) {
@@ -179,6 +208,19 @@ export class MarketplaceScanService {
     if (session.status !== MarketplaceScanSessionStatus.OPEN) {
       throw new ConflictException(
         'Bu sessiya yopilgan — yangi sessiya oching',
+      );
+    }
+    /**
+     * ⚠️ SESSIYA SHU ULANISHNIKI BO'LISHI SHART.
+     *
+     * Busiz A marketplace sessiyasining ID sini `POST /marketplace/B/scan`
+     * ga berish mumkin edi: posilka B ning `integration_id` si bilan
+     * yozilardi va keyin B ning tarifi/daftari bo'yicha hisoblanardi.
+     * Qabul tomonida bu tekshiruv bor — skan tomonida ham bo'lishi kerak.
+     */
+    if (session.integration_id !== integration.id) {
+      throw new ConflictException(
+        'Bu sessiya boshqa marketplace ulanishiga tegishli',
       );
     }
 
@@ -255,7 +297,17 @@ export class MarketplaceScanService {
     const p = parsed.parcel;
 
     // ── 6. ULARNING statusi ────────────────────────────────────────────
-    if (p.remote_status && REFUSED_REMOTE_STATUSES.has(p.remote_status)) {
+    /**
+     * ⚠️ KANONIKKA KELTIRAMIZ. `REFUSED_REMOTE_STATUSES` bizning kanonik
+     * nomlar bilan ishlaydi. Hamkor `7` yoki `"otmenen"` yuborsa, xom
+     * qiymat ro'yxatga TUSHMAYDI va ular BEKOR QILGAN posilkani jimgina
+     * qabul qilib yuborardik.
+     */
+    const canonicalRemote = toCanonicalStatus(
+      integration.status_map,
+      p.remote_status,
+    );
+    if (canonicalRemote && REFUSED_REMOTE_STATUSES.has(canonicalRemote)) {
       // §15 #9: bugun ular bekor qilgan posilka jimgina qabul qilinardi.
       throw new ConflictException(
         `Marketplace tomonida bu posilka holati «${p.remote_status}» — qabul qilib bo'lmaydi.`,
@@ -367,16 +419,56 @@ export class MarketplaceScanService {
       throw new ConflictException('Sessiya yopilgan');
     }
 
+    /**
+     * ⚠️ FAQAT SKANERLANGAN posilka qaytariladi — RAD ETILGANI EMAS.
+     *
+     * Rad etish haqida marketplace'ga ALLAQACHON hodisa yuborilgan. Uni
+     * jimgina o'chirsak, ularda «rad etildi» bo'lib qoladi-yu bizda hech
+     * narsa qolmaydi: keyin na solishtiruv, na operator sababini topa
+     * oladi. Operator xato rad etgan bo'lsa — posilkani qaytadan
+     * skanerlaydi (rad etilgani `scan_session_id` siz qoladi).
+     */
     const last = await this.parcelRepo.findOne({
       where: {
         scan_session_id: sessionId,
-        scan_state: In([MarketplaceScanState.SCANNED, MarketplaceScanState.REJECTED]),
+        scan_state: MarketplaceScanState.SCANNED,
       },
       order: { scanned_at: 'DESC' },
     });
-    if (!last) throw new NotFoundException('Qaytariladigan skan yo\'q');
+    if (!last) {
+      const rejected = await this.parcelRepo.count({
+        where: {
+          scan_session_id: sessionId,
+          scan_state: MarketplaceScanState.REJECTED,
+        },
+      });
+      throw new NotFoundException(
+        rejected > 0
+          ? "Qaytariladigan skan yo'q. Rad etilgan posilkani qaytarib " +
+            "bo'lmaydi — marketplace'ga allaqachon xabar berilgan."
+          : "Qaytariladigan skan yo'q",
+      );
+    }
 
-    await this.parcelRepo.remove(last);
+    /**
+     * ⚠️ SHARTLI O'CHIRISH — `remove(entity)` EMAS.
+     *
+     * `findOne` bilan `remove` orasida qabul (`accept`) tugashi mumkin:
+     * o'shanda posilka `accepted` bo'lib, unga BUYURTMA bog'langan
+     * bo'ladi-yu, biz uni o'chirib buyurtmani YETIM qoldirardik.
+     * Shart o'chirishning O'ZIDA — poyga oynasi yopiladi.
+     */
+    const res = await this.parcelRepo.delete({
+      id: last.id,
+      scan_session_id: sessionId,
+      scan_state: MarketplaceScanState.SCANNED,
+    });
+    if (!res.affected) {
+      throw new ConflictException(
+        'Bu posilka holati o\'zgardi (qabul qilingan bo\'lishi mumkin) — sahifani yangilang',
+      );
+    }
+
     await this.sessionRepo.decrement({ id: sessionId }, 'scanned_count', 1);
     return { removed: last.external_parcel_id };
   }
@@ -409,11 +501,65 @@ export class MarketplaceScanService {
       throw new ConflictException('Qabul qilingan posilkani rad etib bo\'lmaydi');
     }
 
-    parcel.scan_state = MarketplaceScanState.REJECTED;
-    parcel.reject_reason = reason;
-    parcel.reject_note = note;
-    await this.parcelRepo.save(parcel);
-    await this.sessionRepo.increment({ id: sessionId }, 'rejected_count', 1);
+    const integration = await this.integrationRepo.findOne({
+      where: { id: parcel.integration_id },
+    });
+    if (!integration) throw new NotFoundException('Ulanish topilmadi');
+
+    /**
+     * ⚠️ RAD ETISH MARKETPLACE'GA XABAR QILINADI.
+     *
+     * Avval bu faqat LOKAL yozuv edi — operator ekranida «marketplace'ga
+     * sabab bilan xabar beriladi» deb turardi-yu, hech qanday hodisa
+     * yuborilmasdi. Hamkor posilkani abadiy «bizda» deb bilib, uni
+     * qaytarib olishni ham, sotuvchiga aytishni ham bilmasdi.
+     *
+     * Holat o'zgarishi va hodisa BIR TRANZAKSIYADA (bloker B3).
+     */
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
+    try {
+      await qr.manager.update(
+        MarketplaceParcelEntity,
+        { id: parcel.id },
+        {
+          scan_state: MarketplaceScanState.REJECTED,
+          reject_reason: reason,
+          reject_note: note,
+          updated_at: Date.now(),
+        },
+      );
+      parcel.scan_state = MarketplaceScanState.REJECTED;
+      parcel.reject_reason = reason;
+      parcel.reject_note = note;
+
+      await qr.manager.increment(
+        MarketplaceScanSessionEntity,
+        { id: sessionId },
+        'rejected_count',
+        1,
+      );
+
+      await this.outbox.enqueueParcelEvent(qr.manager, {
+        integration: { id: integration.id, slug: integration.slug },
+        parcel,
+        event_type: MarketplaceEventType.PARCEL_REJECTED,
+        status: buildEventStatus(integration.status_map, {
+          from: toCanonicalStatus(integration.status_map, parcel.remote_status),
+          to: MarketplaceParcelStatus.REJECTED_BY_BEEPOST,
+        }),
+        actor: { type: 'operator' },
+        note: [reason, note].filter(Boolean).join(' — '),
+      });
+
+      await qr.commitTransaction();
+    } catch (e) {
+      await qr.rollbackTransaction();
+      throw e;
+    } finally {
+      await qr.release();
+    }
 
     return { external_parcel_id: parcel.external_parcel_id, reason };
   }

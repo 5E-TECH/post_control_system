@@ -96,12 +96,38 @@ export class MarketplaceOutboxWorker {
     const jobs = await this.claim();
     if (jobs.length === 0) return;
 
+    /**
+     * ⚠️ BIR POSILKANING hodisasi yiqilsa, SHU SIKLDA keyingilarini
+     * umuman urinib ko'rmaymiz.
+     *
+     * Aks holda: `seq 5` tarmoq xatosi bilan yiqiladi, `seq 6` o'tib
+     * ketadi va `last_sent_seq` 6 bo'ladi — keyingi urinishda `seq 5`
+     * «eskirgan» deb ABADIY tashlanadi. Agar 5 da PUL hodisasi bo'lsa
+     * (yetkazildi + summa), 6 esa faqat status bo'lsa — hamkor pulni
+     * HECH QACHON ko'rmaydi va daftar abadiy ajraladi.
+     *
+     * Bloklangan hodisa `pending` ga qaytariladi: keyingi sikl uni
+     * TARTIB BILAN qaytadan oladi.
+     */
+    const blocked = new Set<string>();
+
     for (const job of jobs) {
-      await this.deliver(job).catch((e) =>
+      const key = `${job.aggregate_type}:${job.aggregate_id}`;
+      if (blocked.has(key)) {
+        await this.finish(job, MarketplaceOutboxStatus.PENDING, {
+          nextRetryAt: Date.now(),
+          reason: 'Oldingi hodisa yiqildi — tartib saqlanmoqda',
+        });
+        continue;
+      }
+
+      const ok = await this.deliver(job).catch((e) => {
         this.logger.error(
           `hodisa yuborishda kutilmagan xato (${job.event_id}): ${e instanceof Error ? e.message : e}`,
-        ),
-      );
+        );
+        return false;
+      });
+      if (!ok) blocked.add(key);
     }
   }
 
@@ -162,7 +188,8 @@ export class MarketplaceOutboxWorker {
     }
   }
 
-  private async deliver(job: MarketplaceOutboxEntity): Promise<void> {
+  /** `true` — yakuniy holat (yuborildi/o'tkazildi); `false` — qayta urinish kerak. */
+  private async deliver(job: MarketplaceOutboxEntity): Promise<boolean> {
     const integration = await this.integrationRepo.findOne({
       where: { id: job.integration_id },
     });
@@ -174,7 +201,7 @@ export class MarketplaceOutboxWorker {
       await this.finish(job, MarketplaceOutboxStatus.SKIPPED, {
         reason: "Ulanish o'chirilgan — hodisa yuborilmadi",
       });
-      return;
+      return true;
     }
 
     // ── SEQ QO'RIQCHISI ────────────────────────────────────────────────
@@ -185,7 +212,7 @@ export class MarketplaceOutboxWorker {
         await this.finish(job, MarketplaceOutboxStatus.SUPERSEDED, {
           reason: `Eskirgan: seq ${job.seq} <= yuborilgan ${parcel.last_sent_seq}`,
         });
-        return;
+        return true;
       }
     }
 
@@ -203,15 +230,43 @@ export class MarketplaceOutboxWorker {
       });
 
       if (job.aggregate_type === MarketplaceAggregateType.PARCEL) {
-        // ⚠️ Faqat OSHIRAMIZ — parallel yetkazishda kichikroq seq katta
-        // raqamni orqaga surib yubormasin.
-        await this.parcelRepo
-          .createQueryBuilder()
-          .update(MarketplaceParcelEntity)
-          .set({ last_sent_seq: () => `GREATEST("last_sent_seq", ${Number(job.seq)})`, last_synced_at: Date.now() })
-          .where('id = :id', { id: job.aggregate_id })
-          .execute();
+        /**
+         * ⚠️ `remote_status` HAM yangilanadi — bu maydon «biz ularning
+         * statusi nima deb bilamiz» degan NUSXA.
+         *
+         * Avval u faqat SKAN paytida yozilardi va keyin hech qachon
+         * o'zgarmasdi. Natijada 15-daqiqalik solishtiruv ularning jonli
+         * statusini («DELIVERED») bizning eskirgan nusxa bilan
+         * («READY_FOR_PICKUP») taqqoslab, HAR BIR yetkazilgan posilkani
+         * nomuvofiq deb belgilardi. Panel soxta ogohlantirishga to'lib,
+         * HAQIQIY nomuvofiqlik ular orasida ko'rinmay ketardi —
+         * monitoringning ma'nosi yo'qolardi.
+         *
+         * Statusni ular TASDIQLAGANDAN keyin yozamiz (bu shox faqat
+         * muvaffaqiyatli javobdan keyin ishlaydi).
+         *
+         * ⚠️ Faqat OSHIRAMIZ — parallel yetkazishda kichikroq seq katta
+         * raqamni orqaga surib yubormasin. `CASE` ESKI `last_sent_seq` ni
+         * ko'radi (Postgres barcha `SET` ifodalarini eski qatordan hisoblaydi).
+         */
+        const payload = job.payload as { status?: { to?: string } };
+        const nextStatus = payload?.status?.to ?? null;
+        await this.parcelRepo.query(
+          `UPDATE "marketplace_parcel"
+              SET "last_sent_seq" = GREATEST("last_sent_seq", $2),
+                  "last_synced_at" = $3,
+                  "updated_at" = $3,
+                  "remote_status" = CASE
+                    WHEN $4::varchar IS NOT NULL AND $2 >= "last_sent_seq"
+                      THEN $4::varchar ELSE "remote_status" END,
+                  "remote_status_at" = CASE
+                    WHEN $4::varchar IS NOT NULL AND $2 >= "last_sent_seq"
+                      THEN $3 ELSE "remote_status_at" END
+            WHERE "id" = $1`,
+          [job.aggregate_id, Number(job.seq), Date.now(), nextStatus],
+        );
       }
+      return true;
     } catch (err) {
       const info = classifyMarketplaceError(err);
       const attempts = job.attempts + 1;
@@ -220,14 +275,29 @@ export class MarketplaceOutboxWorker {
       // byudjetini yeydi. Mavjud worker bu farqni ko'rmaydi.
       const retryable = info.retryable && attempts < job.max_attempts;
 
+      // ⚠️ Bu yerda avval `retryable ? FAILED : FAILED` turardi — ikkala
+      // shox ham bir xil. Natijada qayta urinilmaydigan hodisa `failed`
+      // bo'lib, `next_retry_at = null` bilan qolardi; `claim()` esa
+      // `next_retry_at IS NULL` ni «HOZIR tayyor» deb tushunadi va uni
+      // har 30 soniyada qayta olardi.
       await this.finish(
         job,
-        retryable ? MarketplaceOutboxStatus.FAILED : MarketplaceOutboxStatus.FAILED,
+        retryable
+          ? MarketplaceOutboxStatus.FAILED
+          : MarketplaceOutboxStatus.DROPPED,
         {
           attempts,
           httpStatus: info.httpStatus,
           error: info.message,
-          nextRetryAt: retryable ? Date.now() + nextRetryDelayMs(attempts) : null,
+          /**
+           * ⚠️ `Retry-After` USTUN. 429 da hamkor AYNAN qancha kutishni
+           * aytadi — uni e'tiborsiz qoldirib o'z backoff'imiz bilan
+           * yursak, limitni qayta-qayta urib urinish byudjetini yeymiz
+           * va ular bizni butunlay bloklashi mumkin.
+           */
+          nextRetryAt: retryable
+            ? Date.now() + (info.retryAfterMs ?? nextRetryDelayMs(attempts))
+            : null,
           reason: retryable ? null : `Qayta urinilmaydi (${info.kind})`,
         },
       );
@@ -237,6 +307,12 @@ export class MarketplaceOutboxWorker {
           `☠️ hodisa tashlandi: ${job.event_type} ${job.event_id} — ${info.kind}: ${info.message}`,
         );
       }
+      /**
+       * ⚠️ Qayta urinilmaydigan (`dropped`) hodisa ham `false` qaytaradi:
+       * u yetib BORMADI, demak shu posilkaning keyingi hodisalari uni
+       * «eskirgan» qilib qo'ymasligi kerak. Odam aralashib hal qiladi.
+       */
+      return false;
     }
   }
 

@@ -354,14 +354,30 @@ export class MarketplaceIntegration1749800000000 implements MigrationInterface {
         ADD COLUMN IF NOT EXISTS "external_seller_id" varchar(120),
         ADD COLUMN IF NOT EXISTS "extra_cost_net" bigint NOT NULL DEFAULT 0
     `);
-    await queryRunner.query(`
-      ALTER TABLE "order"
-        ADD CONSTRAINT "FK_ORDER_MP_INTEGRATION" FOREIGN KEY ("integration_id")
-          REFERENCES "marketplace_integration"("id") ON DELETE SET NULL
-    `).catch(() => {
-      // Qayta ishga tushirilganda cheklov allaqachon bor — bu xato emas.
-      // (Postgres `ADD CONSTRAINT IF NOT EXISTS` ni qo'llab-quvvatlamaydi.)
-    });
+    /**
+     * ⚠️ OLDINDAN TEKSHIRAMIZ, `catch` GA TAYANMAYMIZ.
+     *
+     * Postgres'da TRANZAKSIYA ICHIDAGI xato butun tranzaksiyani «aborted»
+     * holatiga o'tkazadi — ya'ni `.catch()` xatoni yutadi-yu, undan
+     * KEYINGI har bir so'rov «current transaction is aborted» bilan
+     * yiqiladi. Migratsiya qayta ishga tushirilganda (yoki qisman
+     * qo'llanganda) aynan shu bo'lardi va sababi tushunarsiz ko'rinardi.
+     *
+     * Postgres `ADD CONSTRAINT IF NOT EXISTS` ni qo'llab-quvvatlamaydi,
+     * shuning uchun `pg_constraint` dan qaraymiz.
+     */
+    const fkExists: Array<{ exists: boolean }> = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'FK_ORDER_MP_INTEGRATION'
+      ) AS exists
+    `);
+    if (!fkExists?.[0]?.exists) {
+      await queryRunner.query(`
+        ALTER TABLE "order"
+          ADD CONSTRAINT "FK_ORDER_MP_INTEGRATION" FOREIGN KEY ("integration_id")
+            REFERENCES "marketplace_integration"("id") ON DELETE SET NULL
+      `);
+    }
 
     await queryRunner.query(
       `CREATE INDEX IF NOT EXISTS "IDX_ORDER_MP_INTEGRATION" ON "order" ("integration_id")`,

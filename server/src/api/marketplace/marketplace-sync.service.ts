@@ -8,6 +8,7 @@ import { MarketplaceTariffEntity } from 'src/core/entity/marketplace-tariff.enti
 import { Where_deliver } from 'src/common/enums';
 import { feeBasis } from './utils/marketplace-money.util';
 import { MarketplaceLedgerService } from './marketplace-ledger.service';
+import { buildEventStatus } from './utils/marketplace-status.util';
 import { MarketplaceOutboxService } from './marketplace-outbox.service';
 import {
   MarketplaceEventType,
@@ -103,6 +104,30 @@ export class MarketplaceSyncService {
       );
     }
 
+    /**
+     * TARIF VERSIYASI — kontrakt §12 talabi: u HAR HODISADA bo'lishi shart
+     * («qaysi tarif qo'llandi» bahsi chiqmasin).
+     *
+     * ⚠️ Sotuv paytida biz faqat muzlatilgan SUMMANI bilamiz
+     * (`order.market_tariff`), versiyani emas — u buyurtmada saqlanmaydi.
+     * Shuning uchun posilka QABUL QILINGAN paytdagi amaldagi versiyani
+     * qidiramiz: summa aynan o'sha versiyadan muzlatilgan.
+     *
+     * Avval bu maydon sotuv/bekor hodisalarida umuman YO'Q edi (faqat
+     * qabulda bor edi) — uchdan-uchga sinov shuni ushladi.
+     */
+    const tariffVersion =
+      input.money?.tariff_version ??
+      (await this.resolveTariffVersion(
+        manager,
+        integration.id,
+        parcel?.accepted_at ?? null,
+      ));
+
+    const money = input.money
+      ? { ...input.money, tariff_version: tariffVersion ?? undefined }
+      : input.money;
+
     const entry = await this.ledger.appendEntry(manager, {
       integration_id: integration.id,
       entry_type: input.entry_type,
@@ -112,7 +137,7 @@ export class MarketplaceSyncService {
       external_parcel_id: parcel?.external_parcel_id ?? null,
       cashbox_history_id: input.cashbox_history_id ?? null,
       reverses_entry_id: input.reverses_entry_id ?? null,
-      tariff_version: input.money?.tariff_version ?? null,
+      tariff_version: tariffVersion,
       note: input.note ?? null,
     });
 
@@ -122,9 +147,16 @@ export class MarketplaceSyncService {
       integration: { id: integration.id, slug: integration.slug },
       parcel,
       event_type: input.event_type,
-      status: input.status,
-      money: input.money,
-      ledger: { entry_id: entry.id, balance_after: entry.balance_after },
+      // ⚠️ HAMKOR TILIGA o'giriladi: (1) PCS ichki statusi → kanonik,
+      // (2) kanonik → sozlangan xarita. Xom `waiting`/`on the road`
+      // kontrakt lug'atida YO'Q — hamkor ularni tushunmaydi.
+      status: buildEventStatus(integration.status_map, input.status),
+      money,
+      ledger: {
+        entry_id: entry.id,
+        seq: Number(entry.seq),
+        balance_after: entry.balance_after,
+      },
       actor: input.actor,
       order: { id: order.id, order_number: Number(order.order_number) },
       items_delivered: input.items_delivered,
@@ -190,6 +222,8 @@ export class MarketplaceSyncService {
         net_to_marketplace: input.ledger_amount,
         tariff_version: original?.tariff_version ?? undefined,
       },
+      // ⚠️ Xaritalash `recordOrderMoneyEvent` ichida — bu yerda XOM
+      // qiymat uzatiladi, aks holda ikki marta o'girilardi.
       status: input.status,
       actor: input.actor,
       note: input.note ?? 'Ortga qaytarildi',
@@ -313,7 +347,10 @@ export class MarketplaceSyncService {
       integration: { id: integration.id, slug: integration.slug },
       parcel,
       event_type: input.event_type,
-      status: input.status,
+      // ⚠️ HAMKOR TILIGA o'giriladi: (1) PCS ichki statusi → kanonik,
+      // (2) kanonik → sozlangan xarita. Xom `waiting`/`on the road`
+      // kontrakt lug'atida YO'Q — hamkor ularni tushunmaydi.
+      status: buildEventStatus(integration.status_map, input.status),
       actor: input.actor,
       order: {
         id: input.order.id,
@@ -322,4 +359,30 @@ export class MarketplaceSyncService {
       note: input.note,
     });
   }
+  /**
+   * Posilka QABUL QILINGAN paytda amalda bo'lgan tarif versiyasi.
+   *
+   * Tarif jadvali versiyalangan (`effective_from` / `effective_to`), shuning
+   * uchun vaqt bo'yicha aniq topiladi. `accepted_at` yo'q bo'lsa — joriy
+   * versiya (qabul qilinmagan posilka uchun pul hodisasi bo'lmasligi kerak,
+   * lekin jimgina `null` qoldirmaymiz).
+   */
+  private async resolveTariffVersion(
+    manager: EntityManager,
+    integrationId: string,
+    acceptedAt: number | null,
+  ): Promise<number | null> {
+    const at = Number(acceptedAt ?? Date.now());
+    const rows: Array<{ version: number }> = await manager.query(
+      `SELECT "version" FROM "marketplace_tariff"
+        WHERE "integration_id" = $1
+          AND "effective_from" <= $2
+          AND ("effective_to" IS NULL OR "effective_to" > $2)
+        ORDER BY "version" DESC
+        LIMIT 1`,
+      [integrationId, at],
+    );
+    return rows?.length ? Number(rows[0].version) : null;
+  }
+
 }

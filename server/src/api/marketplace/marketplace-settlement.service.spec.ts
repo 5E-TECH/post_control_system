@@ -29,8 +29,9 @@ function build(opts: { integration?: any; balances?: any[] } = {}) {
     update: jest.fn(async () => ({})),
     query: jest.fn(async (s: string) => {
       sql.push(s);
-      if (/UPDATE "cash_box"/.test(s)) return [{ balance: '100' }];
-      if (/next_ledger_seq/.test(s)) return [{ next_ledger_seq: '7' }];
+      // ⚠️ TUPLE — `UPDATE ... RETURNING` ning haqiqiy shakli.
+      if (/UPDATE "cash_box"/.test(s)) return [[{ balance: '100' }], 1];
+      if (/next_ledger_seq/.test(s)) return [[{ next_ledger_seq: '7' }], 1];
       return [];
     }),
   };
@@ -47,7 +48,14 @@ function build(opts: { integration?: any; balances?: any[] } = {}) {
       id: 'le-1', balance_after: 2_350_000, ...i,
     })),
     balancesBySeller: jest.fn(async () => opts.balances ?? []),
-    verifyInvariant: jest.fn(async () => ({ ok: true, ledger_sum: 0, cashbox_balance: 0, diff: 0 })),
+    // ⚠️ Qarz endi AYNAN shu `cashbox_balance` dan olinadi — sotuvchilar
+    // yig'indisidan emas (to'lov yaxlit va `seller_id` siz yoziladi).
+    verifyInvariant: jest.fn(async () => ({
+      ok: true,
+      ledger_sum: 42_350_000,
+      cashbox_balance: 42_350_000,
+      diff: 0,
+    })),
   };
   const repo = (found: any) => ({ findOne: jest.fn(async () => found) });
   const svc = new MarketplaceSettlementService(
@@ -64,10 +72,6 @@ const pay = (svc: MarketplaceSettlementService, over: any = {}) =>
   svc.pay('uzum', {
     amount: 8_520_000,
     method: MarketplaceSettlementMethod.BANK_TRANSFER,
-    allocation: [
-      { seller_id: 'SLR-77', amount: 5_120_000 },
-      { seller_id: 'SLR-81', amount: 3_400_000 },
-    ],
     reference: 'TXN-1',
     ...over,
   }, USER);
@@ -78,68 +82,58 @@ describe('MarketplaceSettlementService.pay', () => {
     const r = await pay(svc);
 
     expect(r.amount).toBe(8_520_000);
-    // Daftarda BITTA umumiy yozuv — kassada ham bitta chiqim bor.
-    // `SUM(daftar) == kassa balansi` invarianti shu bilan saqlanadi.
+    /**
+     * ⚠️ BITTA daftar yozuvi, `seller_id` SIZ.
+     *
+     * To'lov YAXLIT: marketplace pulni oladi va o'z sotuvchilariga
+     * O'ZI tarqatadi (qaror 2026-09-17). Shu sabab to'lov hech bir
+     * sotuvchiga yozilmaydi — u umumiy qarzni kamaytiradi.
+     */
     expect(ledger.appendEntry).toHaveBeenCalledTimes(1);
-    expect((ledger.appendEntry.mock.calls[0][1] as any).amount).toBe(-8_520_000);
+    const entry = ledger.appendEntry.mock.calls[0][1] as any;
+    expect(entry.seller_id).toBeNull();
+    expect(entry.amount).toBe(-8_520_000);
+    expect(entry.cashbox_history_id).toBeTruthy();
 
     const ev = saved.find((x) => x.event_type === 'settlement.paid');
     expect(ev).toBeDefined();
-    expect(ev.payload.settlement.allocation).toHaveLength(2);
+    // Taqsimot YUBORILMAYDI — ular kimga qancha berishni posilka
+    // hodisalaridagi `seller_id` dan biladi.
+    expect(ev.payload.settlement.allocation).toBeUndefined();
+    expect(ev.payload.settlement.amount).toBe(8_520_000);
     // Hisob-kitob posilkaga bog'liq emas.
     expect(ev.payload.parcel).toBeUndefined();
     expect(ev.aggregate_type).toBe('settlement');
   });
 
-  it('TAQSIMOT yig\'indisi summaga teng bo\'lmasa RAD ETADI', async () => {
-    // ⚠️ Aks holda marketplace sotuvchilarga noto'g'ri taqsimlaydi va farq
-    // hech qayerda ko'rinmaydi — eng yomon turdagi xato.
-    const { svc } = build();
-    await expect(
-      pay(svc, { allocation: [{ seller_id: 'SLR-77', amount: 1 }] }),
-    ).rejects.toThrow(/teng emas/);
-  });
 
-  it("taqsimotsiz to'lovni RAD ETADI", async () => {
-    // Marketplace kimga qancha berishni shundan biladi.
-    const { svc } = build();
-    await expect(pay(svc, { allocation: [] })).rejects.toThrow(/taqsimot/i);
-  });
 
   it('manfiy yoki nol summani rad etadi', async () => {
-    const { svc } = build();
-    await expect(pay(svc, { amount: 0, allocation: [{ seller_id: 'A', amount: 0 }] }))
-      .rejects.toThrow(BadRequestException);
-    await expect(
-      pay(svc, { amount: 100, allocation: [{ seller_id: 'A', amount: 100 }, { seller_id: 'B', amount: 0 }] }),
-    ).rejects.toThrow(/musbat/);
-  });
-
-  it('xatoda tranzaksiyani QAYTARADI', async () => {
     const { svc, qr } = build();
-    await expect(pay(svc, { allocation: [{ seller_id: 'A', amount: 1 }] })).rejects.toThrow();
+    await expect(pay(svc, { amount: 0 })).rejects.toThrow(BadRequestException);
+    await expect(pay(svc, { amount: -5 })).rejects.toThrow(/musbat/);
     // Validatsiya tranzaksiyadan OLDIN — qr umuman ochilmaydi.
     expect(qr.rollbackTransaction).not.toHaveBeenCalled();
   });
 });
 
 describe('MarketplaceSettlementService.suggestAllocation', () => {
-  it("faqat MUSBAT qoldiqlarni taklif qiladi", async () => {
-    // ⚠️ Manfiy qoldiq (prepaid posilkalar sabab) — sotuvchining BIZGA
-    // qarzi. Unga to'lash noto'g'ri bo'lardi.
-    const { svc } = build({
-      balances: [
-        { seller_id: 'SLR-77', balance: 5_120_000, entries: 40 },
-        { seller_id: 'SLR-81', balance: -50_000, entries: 3 },
-        { seller_id: null, balance: 1000, entries: 1 },
-      ],
-    });
-    const r = await svc.suggestAllocation('uzum');
+  it('QARZ kassadan olinadi, sotuvchilar ro\'yxati QAYTARILMAYDI', async () => {
+    /**
+     * ⚠️ Biz ularning sotuvchilarini BILMAYMIZ va ular bizga faqat ID
+     * yuborishi mumkin. `SLR-77` qatorini adminga ko'rsatish foydasiz
+     * shovqin — u bu ID kimligini bilmaydi.
+     *
+     * Adminga YAGONA son kerak: ularga qancha qarzdormiz. U esa
+     * MARKET KASSASIDAN olinadi (to'lov yaxlit va daftarga `seller_id`
+     * siz yozilgani uchun sotuvchilar yig'indisidan hisoblab bo'lmaydi).
+     */
+    const { svc } = build();
+    const r: any = await svc.suggestAllocation('uzum');
 
-    expect(r.sellers).toHaveLength(1);
-    expect(r.sellers[0].seller_id).toBe('SLR-77');
-    expect(r.total_payable).toBe(5_120_000);
-    expect(r.negative_sellers).toHaveLength(1);
-    expect(r.negative_sellers[0].seller_id).toBe('SLR-81');
+    expect(r.total_payable).toBe(42_350_000); // kassa balansi
+    expect(r.sellers).toBeUndefined();
+    expect(r.negative_sellers).toBeUndefined();
+    expect(r.invariant.ok).toBe(true);
   });
 });

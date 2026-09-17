@@ -46,7 +46,17 @@ export interface BuildEventInput {
   };
   status?: { from: string | null; to: string };
   money?: EventMoney;
-  ledger?: { entry_id: string; balance_after: number };
+  /**
+   * Daftar yozuvi. `seq` — INTEGRATSIYA bo'yicha GLOBAL o'suvchi raqam.
+   *
+   * ⚠️ `balance_after` ni faqat `seq` TARTIBIDA solishtirish mumkin.
+   * Hodisalar posilka bo'yicha serializatsiya qilinadi, lekin turli
+   * posilkalar (va hisob-kitob) ORASIDA tartib kafolatlanmaydi — ya'ni
+   * kichikroq `seq` li hodisa kechroq yetib kelishi mumkin. Shunday
+   * bo'lsa, uning `balance_after` i ESKIRGAN va e'tiborga olinmasligi
+   * kerak (eng katta `seq` niki haqiqat).
+   */
+  ledger?: { entry_id: string; seq: number; balance_after: number };
   actor?: { type: string; name?: string | null };
   items_delivered?: Array<{ sku: string | null; quantity: number }>;
   items_returned?: Array<{ sku: string | null; quantity: number }>;

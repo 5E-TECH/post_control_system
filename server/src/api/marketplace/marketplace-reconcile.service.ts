@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
+import { pgReturningNumber } from 'src/common/database/pg-returning.util';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { MarketplaceIntegrationEntity } from 'src/core/entity/marketplace-integration.entity';
+import { MarketplaceSellerEntity } from 'src/core/entity/marketplace-seller.entity';
 import { MarketplaceOutboxEntity } from 'src/core/entity/marketplace-outbox.entity';
 import { MarketplaceParcelEntity } from 'src/core/entity/marketplace-parcel.entity';
 import { MarketplaceApiService } from './marketplace-api.service';
@@ -33,6 +35,21 @@ const TERMINAL_REMOTE = new Set<string>([
 ]);
 
 /**
+ * Terminal statuslarning HAMKOR tilidagi ko'rinishi + kanonik nomlar.
+ *
+ * Ikkalasi ham kerak: xarita sozlanmagan bo'lsa kanonik, sozlangan bo'lsa
+ * ularning qiymati `remote_status` da turadi.
+ */
+function terminalValues(map: Record<string, string> | null): string[] {
+  const out = new Set<string>(TERMINAL_REMOTE);
+  for (const canonical of TERMINAL_REMOTE) {
+    const theirs = map?.[canonical];
+    if (theirs) out.add(String(theirs));
+  }
+  return [...out];
+}
+
+/**
  * SOLISHTIRUV — ikki tizim ajralib ketmasligining oxirgi himoyasi.
  *
  * ⚠️ NEGA KERAK. Kontraktda yetkazish kafolati halol yozilgan: hodisalar
@@ -55,6 +72,8 @@ export class MarketplaceReconcileService {
   constructor(
     @InjectRepository(MarketplaceIntegrationEntity)
     private readonly integrationRepo: Repository<MarketplaceIntegrationEntity>,
+    @InjectRepository(MarketplaceSellerEntity)
+    private readonly sellerRepo: Repository<MarketplaceSellerEntity>,
     @InjectRepository(MarketplaceParcelEntity)
     private readonly parcelRepo: Repository<MarketplaceParcelEntity>,
     @InjectRepository(MarketplaceOutboxEntity)
@@ -99,9 +118,16 @@ export class MarketplaceReconcileService {
       .andWhere('p.scan_state = :accepted', {
         accepted: MarketplaceScanState.ACCEPTED,
       })
+      /**
+       * ⚠️ TERMINAL ro'yxati XARITA orqali hamkor qiymatlariga ham
+       * kengaytiriladi. `remote_status` da ULARNING xom qiymati turadi
+       * (`7`, `"vozvrat"`), kanonik nomlar bilan solishtirsak terminal
+       * posilkalar hech qachon ro'yxatdan chiqmasdi va CRON ularni
+       * abadiy so'rab turardi.
+       */
       .andWhere(
         '(p.remote_status IS NULL OR p.remote_status NOT IN (:...terminal))',
-        { terminal: [...TERMINAL_REMOTE] },
+        { terminal: terminalValues(integration.status_map) },
       )
       .orderBy('p.last_synced_at', 'ASC', 'NULLS FIRST')
       .take(BATCH)
@@ -159,8 +185,30 @@ export class MarketplaceReconcileService {
         parcel.mismatch_reason = null;
       }
 
-      parcel.last_synced_at = now;
-      await this.parcelRepo.save(parcel);
+      /**
+       * ⚠️ NISHONLI `update`, `save(parcel)` EMAS.
+       *
+       * `parcel` obyekti HTTP so'rovidan OLDIN yuklangan (15 soniyagacha
+       * oldin). TypeORM `save()` butun qatorni diff qilib yozadi — ya'ni
+       * shu oynada kuryer sotgan bo'lsa, `next_seq` va `last_sent_seq`
+       * ESKI qiymatga QAYTARILADI. Oqibati og'ir:
+       *   · keyingi hodisa allaqachon band `seq` ni oladi →
+       *     `UQ_MP_OUTBOX_SEQ` buziladi → Postgres tranzaksiyani abort
+       *     qiladi → KURYERNING SOTUVI kassa yozuvi bilan birga yiqiladi;
+       *   · `last_sent_seq` orqaga surilsa worker'ning eskirgan-hodisa
+       *     qo'riqchisi teshiladi.
+       *
+       * Solishtiruv FAQAT o'z uch ustunini yozishi kerak.
+       */
+      await this.parcelRepo.update(
+        { id: parcel.id },
+        {
+          mismatch_at: parcel.mismatch_at,
+          mismatch_reason: parcel.mismatch_reason,
+          last_synced_at: now,
+          updated_at: Date.now(),
+        },
+      );
     }
 
     // ── 3. ULARDA UMUMAN YO'Q POSILKALAR ──
@@ -169,10 +217,16 @@ export class MarketplaceReconcileService {
     for (const [extId, parcel] of byExternalId) {
       if (seen.has(extId)) continue;
       mismatches++;
-      parcel.mismatch_at = now;
-      parcel.mismatch_reason = 'Marketplace javobida bu posilka YO\'Q';
-      parcel.last_synced_at = now;
-      await this.parcelRepo.save(parcel);
+      // ⚠️ Yuqoridagi bilan bir xil sabab — nishonli `update`.
+      await this.parcelRepo.update(
+        { id: parcel.id },
+        {
+          mismatch_at: now,
+          mismatch_reason: "Marketplace javobida bu posilka YO'Q",
+          last_synced_at: now,
+          updated_at: Date.now(),
+        },
+      );
       requeued += await this.requeueMissingEvents(parcel.id, 0);
       this.logger.warn(`⚠️ ularda topilmadi: ${extId}`);
     }
@@ -199,6 +253,27 @@ export class MarketplaceReconcileService {
     parcelId: string,
     fromSeq: number,
   ): Promise<number> {
+    /**
+     * ⚠️ AVVAL `last_sent_seq` NI TUSHIRAMIZ — busiz butun tiklash yo'li
+     * O'LIK edi.
+     *
+     * Worker'da seq qo'riqchisi bor: `job.seq <= parcel.last_sent_seq`
+     * bo'lsa hodisa `superseded` deb belgilanadi. Qayta navbatga
+     * qo'yilayotgan hodisalarning seq'i aynan shu chegaradan PAST —
+     * ya'ni ular navbatga qaytgan zahoti «eskirgan» deb tashlanardi va
+     * marketplace yo'qotgan hodisalarni HECH QACHON olmasdi.
+     *
+     * Bu yerda belgi HAQIQATGA keltiriladi: ular faqat `fromSeq` gacha
+     * qo'llagan, demak bizning «yuborilgan» chegaramiz ham shu.
+     * `LEAST` — faqat TUSHIRAMIZ, hech qachon ko'tarmaymiz.
+     */
+    await this.parcelRepo.query(
+      `UPDATE "marketplace_parcel"
+          SET "last_sent_seq" = LEAST("last_sent_seq", $2), "updated_at" = $3
+        WHERE "id" = $1`,
+      [parcelId, Math.max(0, Math.trunc(fromSeq)), Date.now()],
+    );
+
     const res = await this.outboxRepo
       .createQueryBuilder()
       .update(MarketplaceOutboxEntity)
@@ -297,15 +372,20 @@ export class MarketplaceReconcileService {
     balance: number,
     sellers: Array<{ seller_id: string | null; balance: number }>,
   ): Promise<void> {
-    const rows: Array<{ next_ledger_seq: string }> =
-      await this.integrationRepo.query(
-        `UPDATE "marketplace_integration"
-            SET "next_ledger_seq" = "next_ledger_seq" + 1, "updated_at" = $2
-          WHERE "id" = $1
-          RETURNING "next_ledger_seq"`,
-        [integration.id, Date.now()],
-      );
-    const seq = Number(rows[0].next_ledger_seq);
+    // ⚠️ `pgReturningNumber` SHART — TypeORM `UPDATE ... RETURNING` uchun
+    // `[rows, count]` tuple qaytaradi (batafsil: `pg-returning.util.ts`).
+    const raw = await this.integrationRepo.query(
+      `UPDATE "marketplace_integration"
+          SET "next_ledger_seq" = "next_ledger_seq" + 1, "updated_at" = $2
+        WHERE "id" = $1
+        RETURNING "next_ledger_seq"`,
+      [integration.id, Date.now()],
+    );
+    const seq = pgReturningNumber(
+      raw,
+      'next_ledger_seq',
+      `snapshot seq (${integration.slug})`,
+    );
     const eventId = randomUUID();
 
     const payload = buildEventEnvelope({
@@ -351,12 +431,101 @@ export class MarketplaceReconcileService {
     });
   }
 
+  // ═══════════════════ SOTUVCHILAR REESTRI ═══════════════════
+
+  /**
+   * SOTUVCHILARNI KUNLIK KO'ZGU QILISH.
+   *
+   * ⚠️ Nega kerak. Reestr hozircha faqat SKAN paytida to'ldiriladi va
+   * o'shanda ham posilkadagi nom bilan. Natijada hisob-kitob ekranida
+   * sotuvchi faqat `SLR-77` bo'lib ko'rinadi — admin kimga to'layotganini
+   * bilmaydi. Nomi o'zgargan yoki yopilgan sotuvchi ham eskirgan holda
+   * qolaveradi.
+   *
+   * Kuniga bir marta — hamkorning API'siga yuk bermaydi.
+   */
+  @Cron('0 0 4 * * *', { timeZone: 'Asia/Tashkent' })
+  async syncSellersCron(): Promise<void> {
+    const integrations = await this.integrationRepo.find({
+      where: { is_active: true },
+    });
+    for (const integration of integrations) {
+      await this.syncSellers(integration).catch((e) =>
+        this.logger.error(
+          `sotuvchilar sinxroni yiqildi (${integration.slug}): ${e instanceof Error ? e.message : e}`,
+        ),
+      );
+    }
+  }
+
+  async syncSellers(integration: MarketplaceIntegrationEntity) {
+    let cursor: string | null | undefined;
+    let total = 0;
+    let pages = 0;
+
+    do {
+      const res = await this.api.fetchSellers(integration, {
+        limit: 200,
+        ...(cursor ? { cursor } : {}),
+      });
+      const items = res?.items ?? [];
+
+      for (const it of items) {
+        const externalId = String(it?.seller_id ?? '').trim();
+        if (!externalId) continue;
+
+        /**
+         * ⚠️ `upsert` EMAS, nishonli `update` + zaxira `insert`.
+         * Skan paytida yaratilgan qator `is_unknown: true` bilan turadi —
+         * reestrdan kelgan yozuv uni TASDIQLAYDI.
+         */
+        const patch = {
+          name: it?.name ?? null,
+          phone: it?.phone ?? null,
+          is_active: it?.is_active !== false,
+          is_unknown: false,
+          synced_at: Date.now(),
+          updated_at: Date.now(),
+        };
+        const res2 = await this.sellerRepo.update(
+          { integration_id: integration.id, external_seller_id: externalId },
+          patch,
+        );
+        if (!res2.affected) {
+          await this.sellerRepo
+            .save(
+              this.sellerRepo.create({
+                integration_id: integration.id,
+                external_seller_id: externalId,
+                ...patch,
+              }),
+            )
+            // Poygada ikkinchi INSERT — muhim emas.
+            .catch(() => undefined);
+        }
+        total++;
+      }
+
+      cursor = res?.next_cursor ?? null;
+      pages++;
+      // Cheksiz sahifalashdan himoya (ularning `next_cursor` i qotib qolsa).
+    } while (cursor && pages < 50);
+
+    this.logger.log(`👥 ${integration.slug}: ${total} sotuvchi ko'zgu qilindi`);
+    return { synced: total, pages };
+  }
+
   /** Operator nomuvofiqlikni hal qildi — belgini olib tashlash. */
-  async clearMismatch(parcelId: string) {
-    await this.parcelRepo.update(
-      { id: parcelId },
+  async clearMismatch(parcelId: string, integrationId?: string) {
+    const res = await this.parcelRepo.update(
+      // ⚠️ `integration_id` shartga KIRADI: boshqa ulanishning posilkasini
+      // tozalab bo'lmaydi.
+      integrationId ? { id: parcelId, integration_id: integrationId } : { id: parcelId },
       { mismatch_at: null, mismatch_reason: null, updated_at: Date.now() },
     );
+    if (!res.affected) {
+      throw new NotFoundException('Posilka topilmadi yoki bu ulanishga tegishli emas');
+    }
     return { ok: true };
   }
 }

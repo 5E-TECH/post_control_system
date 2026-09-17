@@ -115,3 +115,36 @@ describe('MarketplaceCircuitBreaker', () => {
     expect(b.isOpen(61_001)).toBe(false);
   });
 });
+
+describe('Retry-After sarlavhasi', () => {
+  const at = (headers: Record<string, string>) =>
+    classifyMarketplaceError({ response: { status: 429, headers } });
+
+  it('soniyani o\'qiydi', () => {
+    // ⚠️ 429 da hamkor AYNAN qancha kutishni aytadi. E'tiborsiz
+    // qoldirsak, limitni qayta-qayta urib urinish byudjetini yeymiz.
+    expect(at({ 'retry-after': '120' }).retryAfterMs).toBe(120_000);
+  });
+
+  it('HTTP SANANI ham o\'qiydi', () => {
+    const future = new Date(Date.now() + 60_000).toUTCString();
+    const ms = at({ 'retry-after': future }).retryAfterMs ?? 0;
+    expect(ms).toBeGreaterThan(50_000);
+    expect(ms).toBeLessThanOrEqual(60_000);
+  });
+
+  it('o\'tib ketgan sana — 0', () => {
+    const past = new Date(Date.now() - 60_000).toUTCString();
+    expect(at({ 'retry-after': past }).retryAfterMs).toBe(0);
+  });
+
+  it('1 soatdan ortiq kutish CHEKLANADI', () => {
+    // Mantiqsiz qiymat bilan navbat abadiy to'xtab qolmasin.
+    expect(at({ 'retry-after': '99999' }).retryAfterMs).toBe(3_600_000);
+  });
+
+  it('yaroqsiz yoki yo\'q — null (odatdagi backoff)', () => {
+    expect(at({ 'retry-after': 'axlat' }).retryAfterMs).toBeNull();
+    expect(at({}).retryAfterMs).toBeNull();
+  });
+});

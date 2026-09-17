@@ -92,6 +92,16 @@ export enum MarketplaceOutboxStatus {
   SENT = 'sent',
   FAILED = 'failed',
   /**
+   * QAYTA URINILMAYDI — 4xx kabi o'zgarmaydigan xato.
+   *
+   * ⚠️ `failed` DAN AJRATILGAN va bu MUHIM: `claim()` `failed` ni
+   * `next_retry_at IS NULL` bo'lsa ham oladi. Ya'ni «qayta urinmaymiz»
+   * deb belgilangan hodisa aslida har 30 soniyada qayta yuborilib,
+   * urinish byudjetini yeb bitirardi va monitorda «xato» bo'lib
+   * turaverardi. `dropped` — yakuniy holat, odam aralashuvi kerak.
+   */
+  DROPPED = 'dropped',
+  /**
    * Yangiroq `seq` allaqachon yuborilgan — bu hodisa eskirgan.
    *
    * ⚠️ Bu `failed` DAN AJRATILGAN: `failed` "yubora olmadik, muammo bor"

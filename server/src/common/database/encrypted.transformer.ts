@@ -53,6 +53,19 @@ function warnOnce(): void {
   );
 }
 
+/**
+ * Shifrlash kaliti SOZLANGANMI.
+ *
+ * ⚠️ Kalit yo'q bo'lsa transformer sekretlarni OCHIQ MATN saqlaydi
+ * (ataylab: kalitsiz server ko'tarilmasligi butun tizimni yiqitardi).
+ * Lekin bu holat sozlash ekranida KO'RINISHI shart — aks holda admin
+ * «hammasi tayyor» deb ishonch bilan ishlaydi, bazada esa hamkor
+ * kaliti ochiq yotadi.
+ */
+export function isSecretEncryptionConfigured(): boolean {
+  return resolveKey() !== null;
+}
+
 export function encryptSecret(plain: string): string {
   const key = resolveKey();
   if (!key) {

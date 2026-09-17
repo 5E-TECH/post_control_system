@@ -96,9 +96,21 @@ export class ExtraCostApplierService {
       );
     }
 
-    // MARKET kassasi — pochtaning marketga qarzi kamayadi (market to'laydi).
-    const marketHistory = await this.writeOne(queryRunner, {
-      cashbox: params.marketCashbox,
+    /**
+     * ⚠️ ATOMIK YO'L (bloker B1) — «o'qi-o'zgartir-yoz» EMAS.
+     *
+     * Avval bu yerda `cashbox.balance -= amount; save(cashbox)` turardi.
+     * Ikki kuryer bir marketning ikki BOSHQA buyurtmasiga bir vaqtda
+     * xarajat yozsa, biri ikkinchisining yozuvini JIMGINA o'chirardi.
+     * Undan ham yomoni: `balance_after` xotiradagi TAXMIN edi, marketplace
+     * daftari esa aynan o'sha qatordan o'qiydi — ikki tomon balansi
+     * ajralib ketardi.
+     *
+     * Tasdiqlash yo'li (`applyApproved`) allaqachon `writeOneAtomic`
+     * ishlatardi; endi ikkala yo'l ham DB tasdiqlagan bitta yo'ldan o'tadi.
+     */
+    const marketHistory = await this.writeOneAtomic(queryRunner, {
+      cashboxId: params.marketCashbox.id,
       amount,
       orderId: params.orderId,
       comment: params.comment,
@@ -111,8 +123,8 @@ export class ExtraCostApplierService {
     });
 
     // KURYER kassasi — kuryerning pochtaga qarzi kamayadi (= kuryerga to'lov).
-    const courierHistory = await this.writeOne(queryRunner, {
-      cashbox: params.courierCashbox,
+    const courierHistory = await this.writeOneAtomic(queryRunner, {
+      cashboxId: params.courierCashbox.id,
       amount,
       orderId: params.orderId,
       comment: params.comment,
@@ -120,6 +132,11 @@ export class ExtraCostApplierService {
       sourceUserId: params.marketId,
       paymentDate: params.paymentDate,
     });
+
+    // ⚠️ Xotiradagi nusxalarni DB tasdiqlagan qiymatga keltiramiz —
+    // chaqiruvchi shu obyektlarni keyin ishlatishi mumkin.
+    params.marketCashbox.balance = Number(marketHistory.balance_after);
+    params.courierCashbox.balance = Number(courierHistory.balance_after);
 
     return {
       marketHistoryId: marketHistory.id,
@@ -258,40 +275,4 @@ export class ExtraCostApplierService {
     return history;
   }
 
-  /** Bitta kassaga chiqim + tarix yozuvi. */
-  private async writeOne(
-    queryRunner: QueryRunner,
-    p: {
-      cashbox: CashEntity;
-      amount: number;
-      orderId: string;
-      comment: string;
-      createdBy: string;
-      sourceUserId: string | null;
-      paymentDate?: number | null;
-    },
-  ): Promise<CashboxHistoryEntity> {
-    p.cashbox.balance -= p.amount;
-    await queryRunner.manager.save(p.cashbox);
-
-    const history = queryRunner.manager.create(CashboxHistoryEntity, {
-      operation_type: Operation_type.EXPENSE,
-      cashbox_id: p.cashbox.id,
-      source_id: p.orderId,
-      source_type: Source_type.EXTRA_COST,
-      amount: p.amount,
-      balance_after: p.cashbox.balance,
-      comment: p.comment,
-      created_by: p.createdBy,
-      ...(p.sourceUserId ? { source_user_id: p.sourceUserId } : {}),
-      // `payment_date` — `date` ustuni (faqat kun). O'ZBEKISTON sanasi
-      // bo'yicha to'ldiriladi: UTC ishlatilsa 00:00-05:00 oralig'idagi
-      // amallar oldingi kunga yozilib qolardi.
-      ...(p.paymentDate
-        ? { payment_date: toUzbekistanDateString(p.paymentDate) }
-        : {}),
-    });
-    await queryRunner.manager.save(history);
-    return history;
-  }
 }

@@ -72,6 +72,25 @@ function build(over: {
     decrement: jest.fn(async () => undefined),
   });
 
+  const enqueued: any[] = [];
+  const outbox = {
+    enqueueParcelEvent: jest.fn(async (_m: any, i: any) => {
+      enqueued.push(i);
+      return { id: 'ob-1' };
+    }),
+  };
+  const qr = {
+    connect: jest.fn(async () => undefined),
+    startTransaction: jest.fn(async () => undefined),
+    commitTransaction: jest.fn(async () => undefined),
+    rollbackTransaction: jest.fn(async () => undefined),
+    release: jest.fn(async () => undefined),
+    manager: {
+      update: jest.fn(async () => ({})),
+      increment: jest.fn(async () => ({})),
+    },
+  };
+
   const api = {
     isPaused: jest.fn(() => over.paused ?? false),
     lookupParcel: over.lookup ?? jest.fn(async () => lookupOk()),
@@ -84,8 +103,13 @@ function build(over: {
     repo(over.seller ?? null) as any,
     repo(over.district === undefined ? { id: 'd-1', name: 'Yunusobod' } : over.district) as any,
     api as any,
+    // ⚠️ Rad etish endi marketplace'ga HODISA yuboradi — avval faqat
+    // lokal yozuv edi va operator ekrani «xabar beriladi» deb yolg'on
+    // aytardi.
+    outbox as any,
+    { createQueryRunner: () => qr } as any,
   );
-  return { svc, api, saved };
+  return { svc, api, saved, enqueued, outbox };
 }
 
 const scan = (svc: MarketplaceScanService, token = 'UZM-8842-1', user = USER) =>
@@ -231,5 +255,37 @@ describe('MarketplaceScanService.scan', () => {
   it('boshqa operatorning sessiyasiga skanerlab bo\'lmaydi', async () => {
     const { svc } = build();
     await expect(scan(svc, 'UZM-8842-1', OTHER)).rejects.toThrow(ConflictException);
+  });
+});
+
+describe('MarketplaceScanService.rejectParcel', () => {
+  it('rad etishda MARKETPLACE\'GA hodisa yuboriladi', async () => {
+    // ⚠️ Avval bu faqat lokal yozuv edi: operator ekranida
+    // «marketplace'ga sabab bilan xabar beriladi» deb turardi-yu, hamkor
+    // posilkani abadiy «bizda» deb bilardi.
+    const { svc, enqueued } = build({
+      existingParcel: {
+        id: 'p-1',
+        integration_id: 'int-1',
+        external_parcel_id: 'PCL-1',
+        scan_state: 'scanned',
+        scan_session_id: 'ses-1',
+        remote_status: 'READY_FOR_PICKUP',
+      },
+    });
+
+    const r = await svc.rejectParcel(
+      'ses-1',
+      'p-1',
+      'DAMAGED' as never,
+      'quti ezilgan',
+      USER,
+    );
+
+    expect(r.external_parcel_id).toBe('PCL-1');
+    expect(enqueued).toHaveLength(1);
+    expect(enqueued[0].event_type).toBe('parcel.rejected');
+    expect(enqueued[0].status.to).toBe('REJECTED_BY_BEEPOST');
+    expect(enqueued[0].note).toMatch(/quti ezilgan/);
   });
 });
