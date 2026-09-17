@@ -84,7 +84,19 @@ async function main() {
   const out = path.join(__dirname, 'qr-varaq.html');
   fs.writeFileSync(out, html);
   console.log(`✅ ${PARCELS.length} ta QR yozildi: ${out}`);
-  console.log('   Brauzerda oching va bosib chiqaring.');
+
+  /**
+   * ⚠️ Klientning `public/` iga ham nusxa. Repo ichidagi chuqur yo'lni
+   * fayl menejeridan topish noqulay — dev-server ishlab turganda
+   * `http://localhost:5173/admin/qr-varaq.html` bilan ochilgani osonroq.
+   */
+  const pub = path.join(__dirname, '../../../../client/public');
+  if (fs.existsSync(pub)) {
+    fs.writeFileSync(path.join(pub, 'qr-varaq.html'), html);
+    console.log('   Brauzerda: http://localhost:5173/admin/qr-varaq.html');
+  } else {
+    console.log('   Brauzerda oching va bosib chiqaring.');
+  }
 }
 
 main().catch((e) => {
