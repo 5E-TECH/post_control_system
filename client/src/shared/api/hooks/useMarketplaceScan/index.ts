@@ -92,6 +92,8 @@ export interface MarketplaceAvailableRow {
   id: string;
   name: string;
   slug: string;
+  /** Biriktirilgan market nomi — skan ekrani sarlavhasida ko'rinadi. */
+  market_name: string | null;
 }
 
 /**

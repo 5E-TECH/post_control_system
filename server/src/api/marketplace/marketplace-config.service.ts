@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { JwtPayload } from 'src/common/utils/types/user.type';
 import { Cashbox_type, Roles } from 'src/common/enums';
@@ -131,13 +131,35 @@ export class MarketplaceConfigService {
    * darvozadan o'tmaydi, ro'yxatda ko'rinishi esa chalg'itardi.
    */
   async listForOperator(): Promise<
-    Array<{ id: string; name: string; slug: string }>
+    Array<{ id: string; name: string; slug: string; market_name: string | null }>
   > {
     const rows = await this.integrationRepo.find({
       where: { is_active: true },
       order: { name: 'ASC' },
     });
-    return rows.map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
+    if (!rows.length) return [];
+
+    /**
+     * ⚠️ BIRIKTIRILGAN MARKET NOMI — skan ekrani sarlavhasida chiqadi.
+     *
+     * Operator qaysi market kassasiga ishlayotganini KO'RISHI kerak:
+     * marketplace puli aynan shu kassaga tushadi. Nomsiz ekran «qaysi
+     * marketga skanerlayapman?» degan savolni ochiq qoldirardi.
+     *
+     * Bitta so'rov — har qator uchun alohida emas.
+     */
+    const markets = await this.dataSource.getRepository(UserEntity).find({
+      where: { id: In(rows.map((r) => r.market_id)) },
+      select: ['id', 'name'],
+    });
+    const nameById = new Map(markets.map((m) => [m.id, m.name ?? null]));
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      market_name: nameById.get(r.market_id) ?? null,
+    }));
   }
 
   /** Sekretsiz ko'rinish + sozlash tayyorligi. */

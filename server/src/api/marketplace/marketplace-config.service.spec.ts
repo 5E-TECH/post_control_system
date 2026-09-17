@@ -138,6 +138,8 @@ function build(
             ? { id: 'cb-1', balance: 1_250_000 }
             : { id: 'market-1', name: 'UzMarket', phone_number: '+998900000003' },
         ),
+        // Operator ro'yxati market nomlarini BITTA so'rov bilan oladi.
+        find: jest.fn(async () => [{ id: 'market-1', name: 'UzMarket' }]),
       }),
     } as any,
     api as any,
@@ -478,7 +480,14 @@ describe("MarketplaceConfigService — operator ro'yxati", () => {
     const { svc } = build();
     const rows = await svc.listForOperator();
 
-    expect(rows).toEqual([{ id: 'int-1', name: 'UzMarket', slug: 'uzmarket' }]);
+    /**
+     * ⚠️ `market_name` ATAYLAB bor: skan ekrani sarlavhasida qaysi market
+     * kassasiga ishlayotgani yozilishi kerak. `market_id` (UUID) esa
+     * CHIQMAYDI — operatorga foydasiz.
+     */
+    expect(rows).toEqual([
+      { id: 'int-1', name: 'UzMarket', slug: 'uzmarket', market_name: 'UzMarket' },
+    ]);
     // Butun javobda sekretning izi ham bo'lmasligi kerak.
     const json = JSON.stringify(rows);
     expect(json).not.toContain('KEY-abcd1234');

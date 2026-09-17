@@ -1,30 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Modal, message } from "antd";
 import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Input,
-  Modal,
-  Popconfirm,
-  Result,
-  Segmented,
-  Select,
-  Spin,
-  Statistic,
-  Table,
-  Tag,
-  Tooltip,
-  message,
-} from "antd";
-import type { InputRef } from "antd";
-import {
+  AlertCircle,
   AlertTriangle,
+  ArrowLeft,
   Ban,
+  Building2,
+  CheckCircle,
+  ChevronRight,
+  Home,
+  Loader2,
+  MapPin,
+  Package,
   PackageCheck,
+  Phone,
   QrCode,
   RotateCcw,
-  ScanLine,
+  Store,
+  Wallet,
 } from "lucide-react";
 import {
   MARKETPLACE_REJECT_REASONS,
@@ -59,6 +53,66 @@ const pauseSecondsFrom = (e: unknown): number | null => {
   return m ? Number(m[1]) : PAUSE_FALLBACK_SEC;
 };
 
+/** `+998 90 123 45 67` ko'rinishi — «Tashqi saytlar» oqimidagi bilan bir xil. */
+const prettyPhone = (raw: string): string => {
+  const d = raw.replace(/\D/g, "");
+  if (d.length === 9)
+    return `+998 ${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 7)} ${d.slice(
+      7,
+    )}`;
+  if (d.length === 12 && d.startsWith("998"))
+    return `+${d.slice(0, 3)} ${d.slice(3, 5)} ${d.slice(5, 8)} ${d.slice(
+      8,
+      10,
+    )} ${d.slice(10)}`;
+  return raw;
+};
+
+/* ─────────────────────── OVOZLI SIGNAL ───────────────────────
+ * Operator ekranga qaramaydi — qo'lida skaner, ko'zi qutida. «Tashqi
+ * saytlar» oqimida allaqachon shunday: muvaffaqiyatda «bip», xatoda
+ * boshqa ovoz. O'SHA ikki fayl qayta ishlatiladi, yangisi qo'shilmaydi.
+ */
+const BASE_URL = import.meta.env.BASE_URL || "/";
+let successAudio: HTMLAudioElement | null = null;
+let errorAudio: HTMLAudioElement | null = null;
+
+if (typeof window !== "undefined") {
+  try {
+    successAudio = new Audio(`${BASE_URL}sound/beep.mp3`);
+    successAudio.volume = 0.8;
+    successAudio.load();
+
+    errorAudio = new Audio(`${BASE_URL}sound/error.mp3`);
+    errorAudio.volume = 1.0;
+    errorAudio.load();
+  } catch {
+    /* ovozsiz ishlayveradi */
+  }
+}
+
+const playSuccessSound = () => {
+  try {
+    if (successAudio) {
+      successAudio.currentTime = 0;
+      successAudio.play().catch(() => {});
+    }
+  } catch {
+    /* ignore */
+  }
+};
+
+const playErrorSound = () => {
+  try {
+    if (errorAudio) {
+      errorAudio.currentTime = 0;
+      errorAudio.play().catch(() => {});
+    }
+  } catch {
+    /* ignore */
+  }
+};
+
 /**
  * ⚠️ `crypto.randomUUID` HTTPS yoki localhost'dagina bor. Planshet HTTP
  * orqali ochilsa u `undefined` bo'ladi va qabul qilish butunlay ishlamay
@@ -91,15 +145,26 @@ const newIdempotencyKey = (): string => {
  * `marketplace_parcel` jadvalida yashaydi. Planshet o'chsa yoki sahifa
  * yangilansa, operator o'nlab posilkani qaytadan skanerlamaydi — ochiq
  * sessiya qayta tiklanadi.
+ *
+ * ⚠️ KO'RINISH «Tashqi saytlar» oqimi bilan BIR XIL. Operator kuniga
+ * ikkalasida ham ishlaydi; boshqacha ekran uni sekinlashtiradi va xatoga
+ * olib keladi. Shuning uchun bu yerda antd jadvali emas — o'sha oqimdagi
+ * karta-ro'yxat, pulsatsiyalovchi skaner kartasi va ovozli signal.
  */
 const MarketplaceIntakePage = () => {
+  const navigate = useNavigate();
   const [slug, setSlug] = useState<string | undefined>();
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [token, setToken] = useState("");
   const [rows, setRows] = useState<MarketplaceScanOutcome[]>([]);
-  const [rejectFor, setRejectFor] = useState<MarketplaceScanOutcome | null>(null);
-  const [rejectReason, setRejectReason] = useState<MarketplaceRejectReason>("DAMAGED");
+  const [rejectFor, setRejectFor] = useState<MarketplaceScanOutcome | null>(
+    null,
+  );
+  const [rejectReason, setRejectReason] =
+    useState<MarketplaceRejectReason>("DAMAGED");
   const [rejectNote, setRejectNote] = useState("");
+  const [confirmAccept, setConfirmAccept] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const [result, setResult] = useState<{
     accepted: Array<{ external_parcel_id: string; order_number: number }>;
     failed: Array<{ external_parcel_id: string; reason: string }>;
@@ -111,7 +176,7 @@ const MarketplaceIntakePage = () => {
    * va buyurtmalar IKKI MARTA yaratilardi.
    */
   const idemKey = useRef<string>(newIdempotencyKey());
-  const inputRef = useRef<InputRef>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // ⚠️ Sozlash ro'yxati EMAS — u admin-only. Bu endpoint registratorga
   // ham ochiq va faqat yoqilgan ulanishlarning nomini beradi.
@@ -120,6 +185,10 @@ const MarketplaceIntakePage = () => {
     useMarketplaceScan(slug, sessionId);
 
   const integrations = useMemo(() => available.data ?? [], [available.data]);
+  const current = useMemo(
+    () => integrations.find((r) => r.slug === slug),
+    [integrations, slug],
+  );
 
   useEffect(() => {
     if (!slug && integrations.length) setSlug(integrations[0].slug);
@@ -138,6 +207,24 @@ const MarketplaceIntakePage = () => {
     // qo'shilsa cheksiz halqa bo'lardi.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
+
+  /**
+   * Caps Lock — skaner klaviatura emulyatsiyasi bo'lgani uchun QR kod
+   * NOTO'G'RI o'qilishi mumkin. «Tashqi saytlar» oqimidagi bilan bir xil.
+   */
+  useEffect(() => {
+    const onKeyEvent = (e: KeyboardEvent) => {
+      if (typeof e.getModifierState === "function") {
+        setCapsLockOn(e.getModifierState("CapsLock"));
+      }
+    };
+    window.addEventListener("keydown", onKeyEvent);
+    window.addEventListener("keyup", onKeyEvent);
+    return () => {
+      window.removeEventListener("keydown", onKeyEvent);
+      window.removeEventListener("keyup", onKeyEvent);
+    };
+  }, []);
 
   /**
    * Serverdagi sessiyani ekranga tiklash.
@@ -202,14 +289,14 @@ const MarketplaceIntakePage = () => {
    * navbatida serverga boradi.
    */
   const queue = useRef<Promise<void>>(Promise.resolve());
+  const [queueLength, setQueueLength] = useState(0);
 
   /**
-   * SKANERLASH TO'XTATILGANI — turg'un banner.
+   * SKANERLASH TO'XTATILGANI — turg'un holat.
    *
    * Avval faqat `message.error` chiqardi: u 3 soniyada yo'qoladi, keyin
    * operator yana skanerlaydi, yana yo'qoladi — va skaneri buzuq deb
-   * o'ylaydi. Banner sanoq tugaguncha yoki muvaffaqiyatli skangacha
-   * turadi.
+   * o'ylaydi. Skaner kartasi sanoq tugaguncha QIZIL bo'lib turadi.
    */
   const [pausedUntil, setPausedUntil] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -232,7 +319,10 @@ const MarketplaceIntakePage = () => {
     const qr = raw.trim();
     if (!qr || !sessionId) return;
     setToken("");
-    queue.current = queue.current.then(() => runScan(qr, sessionId));
+    setQueueLength((n) => n + 1);
+    queue.current = queue.current
+      .then(() => runScan(qr, sessionId))
+      .finally(() => setQueueLength((n) => Math.max(0, n - 1)));
   };
 
   const runScan = async (qr: string, sid: string) => {
@@ -244,14 +334,18 @@ const MarketplaceIntakePage = () => {
         return [outcome, ...rest];
       });
       if (outcome.blockers.length) {
+        playErrorSound();
         message.error(outcome.blockers[0]);
       } else if (outcome.duplicate_in_session) {
+        playErrorSound();
         message.warning("Bu posilka allaqachon skanerlangan");
       } else {
+        playSuccessSound();
         message.success(`${outcome.external_parcel_id} qo'shildi`);
       }
       setPausedUntil(null); // aloqa tiklandi
     } catch (e) {
+      playErrorSound();
       const sec = pauseSecondsFrom(e);
       if (sec !== null) setPausedUntil(Date.now() + sec * 1000);
       message.error(errText(e, "Skan qilib bo'lmadi"));
@@ -289,6 +383,7 @@ const MarketplaceIntakePage = () => {
 
   const blocked = rows.filter((r) => r.blockers.length);
   const totalCod = rows.reduce((s, r) => s + Number(r.cod_amount ?? 0), 0);
+  const canAccept = !!rows.length && incomplete.length === 0;
 
   const doAccept = async () => {
     if (!sessionId || !slug) return;
@@ -298,6 +393,8 @@ const MarketplaceIntakePage = () => {
         idempotency_key: idemKey.current,
       });
       setResult({ accepted: res.accepted, failed: res.failed });
+      if (res.failed.length) playErrorSound();
+      else playSuccessSound();
       // Muvaffaqiyatdan keyingina yangi kalit — keyingi qop uchun.
       idemKey.current = newIdempotencyKey();
       setRows([]);
@@ -305,6 +402,7 @@ const MarketplaceIntakePage = () => {
       const s = await openSession.mutateAsync(slug);
       setSessionId(s.id);
     } catch (e) {
+      playErrorSound();
       message.error(errText(e, "Qabul qilib bo'lmadi"));
     }
   };
@@ -324,350 +422,575 @@ const MarketplaceIntakePage = () => {
       setRejectNote("");
     } catch (e) {
       message.error(errText(e, "Rad etib bo'lmadi"));
+    } finally {
+      focusInput();
     }
   };
 
-  const columns = [
-    {
-      title: "Posilka",
-      dataIndex: "external_parcel_id",
-      render: (v: string, r: MarketplaceScanOutcome) => (
-        <div>
-          <div className="font-mono text-xs">{v}</div>
-          {r.parcel_count > 1 && (
-            <Tag color="purple">
-              quti {r.parcel_index}/{r.parcel_count}
-            </Tag>
-          )}
-        </div>
-      ),
-    },
-    /**
-     * ⚠️ SOTUVCHI USTUNI YO'Q — ataylab.
-     *
-     * Marketplace bizga faqat ID yuborishi mumkin (`SLR-77`). Operator
-     * bu ID kimligini bilmaydi va unga qarab hech narsa qilmaydi —
-     * ekranda joy egallagan foydasiz shovqin bo'lardi. Sotuvchi bilan
-     * bog'liq HAQIQIY signal («reestrda yo'q», «faol emas») «Holat»
-     * ustunidagi ogohlantirishlarda chiqadi.
-     *
-     * `seller_id` BACKENDDA saqlanadi va har hodisada marketplace'ga
-     * boradi — ular kimga qancha berishni shundan biladi.
-     */
-    {
-      title: "Mijoz",
-      dataIndex: "customer_name",
-      render: (v: string, r: MarketplaceScanOutcome) => (
-        <div>
-          <div className="text-sm">{v}</div>
-          <div className="text-xs text-gray-400">{r.phone}</div>
-        </div>
-      ),
-    },
-    {
-      title: "Yetkazish",
-      dataIndex: "where_deliver",
-      render: (v: string, r: MarketplaceScanOutcome) => (
-        <div>
-          <Tag color={v === "address" ? "geekblue" : "default"}>
-            {v === "address" ? "uygacha" : "markazgacha"}
-          </Tag>
-          <div className="text-xs text-gray-400">{r.district_name ?? ""}</div>
-        </div>
-      ),
-    },
-    {
-      title: "Olinadigan",
-      dataIndex: "cod_amount",
-      align: "right" as const,
-      render: (v: number, r: MarketplaceScanOutcome) => (
-        <div>
-          <div className="font-medium">{money(Number(v))} so'm</div>
-          {r.prepaid && <Tag color="green">oldindan to'langan</Tag>}
-        </div>
-      ),
-    },
-    {
-      title: "Holat",
-      key: "state",
-      render: (_: unknown, r: MarketplaceScanOutcome) => (
-        <div className="space-y-1">
-          {r.blockers.map((b) => (
-            <Tag key={b} color="red" className="whitespace-normal">
-              {b}
-            </Tag>
-          ))}
-          {r.warnings.map((w) => (
-            <Tag key={w} color="orange" className="whitespace-normal">
-              {w}
-            </Tag>
-          ))}
-          {!r.blockers.length && !r.warnings.length && (
-            <Tag color="green">tayyor</Tag>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: "",
-      key: "actions",
-      render: (_: unknown, r: MarketplaceScanOutcome) => (
-        <Button
-          size="small"
-          danger
-          icon={<Ban className="w-4 h-4" />}
-          onClick={() => setRejectFor(r)}
-        >
-          Rad etish
-        </Button>
-      ),
-    },
-  ];
+  const doUndo = async () => {
+    if (!sessionId) return;
+    try {
+      const res = await undoLast.mutateAsync(sessionId);
+      setRows((prev) => prev.filter((r) => r.external_parcel_id !== res.removed));
+      message.success(`${res.removed} olib tashlandi`);
+    } catch (e) {
+      message.error(errText(e, "Qaytarib bo'lmadi"));
+    } finally {
+      focusInput();
+    }
+  };
 
+  /* ─────────────────────────── YUKLANISH ─────────────────────────── */
   if (available.isLoading) {
     return (
-      <div className="flex justify-center py-16">
-        <Spin />
+      <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-12 text-center border border-gray-100 dark:border-gray-700/50">
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-500 mx-auto" />
+        <p className="mt-4 text-gray-500 dark:text-gray-400">Yuklanmoqda...</p>
       </div>
     );
   }
 
   if (!integrations.length) {
     return (
-      <Card>
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="Yoqilgan marketplace ulanishi yo'q — administrator «Integratsiyalar → Marketplace» da sozlashi kerak"
-        />
-      </Card>
+      <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-8 sm:p-12 text-center border border-gray-100 dark:border-gray-700/50">
+        <Store className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+        <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-2">
+          Yoqilgan marketplace ulanishi yo'q
+        </h3>
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+          Administrator «Integratsiyalar → Marketplace» bo'limida sozlashi kerak
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <Card
-        title={
-          <span className="flex items-center gap-2">
-            <ScanLine className="w-4 h-4" /> Marketplace qabuli
-          </span>
-        }
-        extra={
-          integrations.length > 1 && (
-            <Segmented
-              value={slug}
-              onChange={(v) => setSlug(String(v))}
-              options={integrations.map((r) => ({ label: r.name, value: r.slug }))}
-            />
-          )
+      {/* ─────────────────────── Sarlavha ─────────────────────── */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={() => navigate("/today-orders")}
+          className="h-10 px-4 rounded-xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#352F4A] transition-all cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="hidden sm:inline">Orqaga</span>
+        </button>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xl shadow-md flex-shrink-0">
+            🛒
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-white truncate">
+              {current?.name ?? "Marketplace"}
+            </h2>
+            {/*
+              ⚠️ MARKET NOMI SHART. Marketplace puli aynan shu market
+              kassasiga tushadi — operator qaysi kassaga ishlayotganini
+              ko'rmasa, ulanish «hech qanday marketga biriktirilmagan»
+              bo'lib tuyuladi.
+            */}
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              Market: {current?.market_name || "Noma'lum"}
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 flex-shrink-0">
+          <CheckCircle className="w-3.5 h-3.5" /> Ulangan
+        </span>
+      </div>
+
+      {/* Bir nechta ulanish bo'lsa — tanlash */}
+      {integrations.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          {integrations.map((r) => (
+            <button
+              key={r.slug}
+              onClick={() => setSlug(r.slug)}
+              className={
+                r.slug === slug
+                  ? "px-4 h-9 rounded-xl text-sm font-medium bg-gradient-to-r from-violet-500 to-indigo-600 text-white shadow-md cursor-pointer transition-all"
+                  : "px-4 h-9 rounded-xl text-sm font-medium bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#352F4A] cursor-pointer transition-all"
+              }
+            >
+              {r.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ─────────────────── Skaner holati ─────────────────── */}
+      <div
+        className={
+          pauseLeft > 0
+            ? "rounded-2xl shadow-sm p-6 border-2 transition-all border-red-400 bg-red-50 dark:bg-red-900/10 dark:border-red-700"
+            : queueLength > 0
+              ? "rounded-2xl shadow-sm p-6 border-2 transition-all border-amber-400 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-700"
+              : "rounded-2xl shadow-sm p-6 border-2 transition-all border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700"
         }
       >
-        {pauseLeft > 0 && (
-          <Alert
-            type="error"
-            showIcon
-            className="mb-3"
-            message={`Skanerlash to'xtatildi — ${pauseLeft} soniya`}
-            description="Marketplace javob bermayapti. Skaneringiz soz — muammo tashqi tizimda. Sanoq tugagach o'zi tiklanadi, kodni qaytadan skanerlang."
-          />
-        )}
-        <Input
-          ref={inputRef}
-          autoFocus
-          size="large"
-          allowClear
-          value={token}
-          disabled={!sessionId}
-          prefix={<QrCode className="w-4 h-4" />}
-          placeholder="QR kodni skanerlang yoki kodni kiriting va Enter bosing"
-          onChange={(e) => setToken(e.target.value)}
-          onPressEnter={() => doScan(token)}
-        />
-        <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          Skaner klaviatura kabi ishlaydi — maydon fokusda tursa, har skan
-          avtomatik qo'shiladi. Ro'yxat serverda saqlanadi: sahifa yangilansa
-          ham yo'qolmaydi.
-        </div>
-      </Card>
+        <div className="text-center">
+          {pauseLeft > 0 ? (
+            <>
+              <div className="w-20 h-20 mx-auto rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                <AlertCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
+              </div>
+              <p className="text-lg font-medium text-red-700 dark:text-red-400">
+                Skanerlash to'xtatildi — {pauseLeft} soniya
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-md mx-auto">
+                Marketplace javob bermayapti. Skaneringiz soz — muammo tashqi
+                tizimda. Sanoq tugagach o'zi tiklanadi.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4 animate-pulse">
+                <QrCode className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <p className="text-lg font-medium text-emerald-700 dark:text-emerald-400">
+                Skaner tayyor!
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                QR kodni skanerlang — avtomatik qo'shiladi
+              </p>
+            </>
+          )}
 
+          {/* Kod maydoni — skaner klaviatura kabi yozadi */}
+          <div className="mt-4 max-w-xl mx-auto relative">
+            <QrCode className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              ref={inputRef}
+              autoFocus
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") doScan(token);
+              }}
+              placeholder="QR kodni skanerlang yoki kodni kiriting va Enter bosing"
+              className="w-full h-12 pl-11 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A263D] text-gray-800 dark:text-white placeholder-gray-400 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+            />
+          </div>
+
+          {/* Navbat — tez skanerlashda so'rovlar ketma-ket ishlanadi */}
+          {queueLength > 0 && (
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 inline-flex items-center gap-2">
+              <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                Navbatda: {queueLength} ta
+              </span>
+            </div>
+          )}
+
+          {capsLockOn && (
+            <div className="mt-3 mx-auto max-w-md px-4 py-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 flex items-center justify-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>
+                Caps Lock yoqiq — QR kodlari noto'g'ri o'qilishi mumkin.
+              </span>
+            </div>
+          )}
+
+          <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+            Ro'yxat serverda saqlanadi — sahifa yangilansa ham yo'qolmaydi
+          </p>
+        </div>
+      </div>
+
+      {/* ─────────────────── Ogohlantirishlar ─────────────────── */}
       {incomplete.length > 0 && (
-        <Alert
-          type="warning"
-          showIcon
-          icon={<AlertTriangle className="w-4 h-4" />}
-          message="Chala buyurtma bor — qabul qilinmaydi"
-          description={
+        <div className="rounded-xl p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div className="text-sm">
-              {incomplete.map((i) => (
-                <div key={i.order_id}>
-                  <span className="font-mono text-xs">{i.order_id}</span> —{" "}
-                  {i.have}/{i.total} quti skanerlangan
-                </div>
-              ))}
-              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <p className="font-semibold text-amber-800 dark:text-amber-300">
+                Chala buyurtma bor — qabul qilinmaydi
+              </p>
+              <div className="mt-1 space-y-0.5 text-amber-700 dark:text-amber-400">
+                {incomplete.map((i) => (
+                  <div key={i.order_id}>
+                    <span className="font-mono text-xs">{i.order_id}</span> —{" "}
+                    {i.have}/{i.total} quti skanerlangan
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Yarim buyurtmani qabul qilish mijozga chala posilka yuborish
                 demak. Yo'qolgan quti hali mashinada bo'lishi mumkin.
-              </div>
+              </p>
             </div>
-          }
-        />
+          </div>
+        </div>
       )}
 
       {blocked.length > 0 && (
-        <Alert
-          type="error"
-          showIcon
-          message={`${blocked.length} ta posilkada to'siq bor`}
-          description="Ular qabulda yiqiladi. To'siqni bartaraf eting yoki posilkani rad eting."
-        />
+        <div className="rounded-xl p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold text-red-700 dark:text-red-400">
+                {blocked.length} ta posilkada to'siq bor
+              </p>
+              <p className="text-red-600 dark:text-red-400/80">
+                Ular qabulda yiqiladi. To'siqni bartaraf eting yoki posilkani
+                rad eting.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
-      <Card>
-        <div className="flex items-center gap-6 flex-wrap mb-3">
-          <Statistic title="Skanerlangan" value={rows.length} />
-          <Statistic title="Jami olinadigan" value={totalCod} suffix="so'm" />
-          <div className="flex gap-2 ml-auto">
-            <Popconfirm
-              title="Oxirgi skanni qaytarish"
-              okText="Qaytarish"
-              cancelText="Bekor"
-              disabled={!rows.length}
-              onConfirm={async () => {
-                if (!sessionId) return;
-                try {
-                  const res = await undoLast.mutateAsync(sessionId);
-                  setRows((prev) =>
-                    prev.filter((r) => r.external_parcel_id !== res.removed),
-                  );
-                  message.success(`${res.removed} olib tashlandi`);
-                } catch (e) {
-                  message.error(errText(e, "Qaytarib bo'lmadi"));
-                } finally {
-                  focusInput();
-                }
-              }}
+      {/* ─────────────────── Posilkalar ro'yxati ─────────────────── */}
+      {rows.length > 0 && (
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm overflow-hidden flex flex-col border border-gray-100 dark:border-gray-700/50 max-h-[80vh]">
+          {/* Sarlavha: sanoq + summa + qaytarish */}
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex items-center justify-between flex-shrink-0 flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                <PackageCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                {rows.length} ta skanerlangan
+              </span>
+              <span className="text-gray-300 dark:text-gray-600">•</span>
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-white">
+                <Wallet className="w-4 h-4 text-gray-400" />
+                {money(totalCod)} so'm
+              </span>
+            </div>
+            <button
+              onClick={doUndo}
+              disabled={!rows.length || undoLast.isPending}
+              className="h-9 px-3 rounded-lg bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#352F4A] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Button
-                icon={<RotateCcw className="w-4 h-4" />}
-                disabled={!rows.length}
-                loading={undoLast.isPending}
-              >
-                Oxirgisini qaytarish
-              </Button>
-            </Popconfirm>
+              <RotateCcw
+                className={
+                  undoLast.isPending ? "w-4 h-4 animate-spin" : "w-4 h-4"
+                }
+              />
+              Oxirgisini qaytarish
+            </button>
+          </div>
 
-            <Tooltip
+          {/* Ro'yxat — skrollanadi */}
+          <div className="p-4 space-y-3 overflow-y-auto flex-1">
+            {rows.map((r) => (
+              <div
+                key={r.parcel_id}
+                className={
+                  r.blockers.length
+                    ? "p-3 sm:p-4 rounded-xl transition-all border bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/50"
+                    : r.warnings.length
+                      ? "p-3 sm:p-4 rounded-xl transition-all border bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50"
+                      : "p-3 sm:p-4 rounded-xl transition-all border bg-gray-50 dark:bg-gray-800/30 border-gray-100 dark:border-gray-700/30 hover:bg-emerald-50 dark:hover:bg-emerald-900/10"
+                }
+              >
+                {/* Yuqori qator: ID va belgilar */}
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs sm:text-sm font-semibold text-gray-600 dark:text-gray-300">
+                      {r.external_parcel_id}
+                    </span>
+                    {r.parcel_count > 1 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs sm:text-sm font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                        <Package className="w-3 h-3 sm:w-4 sm:h-4" />
+                        quti {r.parcel_index}/{r.parcel_count}
+                      </span>
+                    )}
+                    {r.where_deliver === "address" ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs sm:text-sm font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                        <Home className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">Uygacha</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs sm:text-sm font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        <Building2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">Markazgacha</span>
+                      </span>
+                    )}
+                    {r.prepaid && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs sm:text-sm font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">
+                          Oldindan to'langan
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  {!r.blockers.length && !r.warnings.length && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      <CheckCircle className="w-3.5 h-3.5" /> Tayyor
+                    </span>
+                  )}
+                </div>
+
+                {/* Asosiy qator: mijoz + pul + amal */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 flex-1 min-w-0">
+                    <span className="text-sm sm:text-base font-semibold text-gray-800 dark:text-white truncate">
+                      {r.customer_name}
+                    </span>
+                    {r.phone && (
+                      <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
+                        <Phone className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
+                        {prettyPhone(r.phone)}
+                      </span>
+                    )}
+                    {(r.district_name || r.address) && (
+                      <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 truncate">
+                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">
+                          {r.district_name ?? r.address}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-gray-700/30">
+                    <p className="text-sm sm:text-base font-bold text-gray-800 dark:text-white whitespace-nowrap">
+                      {money(Number(r.cod_amount ?? 0))} so'm
+                    </p>
+                    <button
+                      onClick={() => setRejectFor(r)}
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all cursor-pointer"
+                      title="Rad etish"
+                    >
+                      <Ban className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* To'siq va ogohlantirishlar */}
+                {(r.blockers.length > 0 || r.warnings.length > 0) && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {r.blockers.map((b) => (
+                      <span
+                        key={b}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                      >
+                        {b}
+                      </span>
+                    ))}
+                    {r.warnings.map((w) => (
+                      <span
+                        key={w}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                      >
+                        {w}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Qabul tugmasi — pastda qotgan */}
+          <div className="p-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50 dark:bg-[#252139] flex-shrink-0">
+            <button
+              onClick={() => setConfirmAccept(true)}
+              disabled={!canAccept || accept.isPending}
               title={
                 incomplete.length
                   ? "Chala buyurtma bor — avval qolgan qutilarni skanerlang"
                   : undefined
               }
+              className={
+                !canAccept || accept.isPending
+                  ? "w-full h-12 rounded-xl flex items-center justify-center gap-2 text-base font-medium transition-all opacity-50 cursor-not-allowed bg-gray-300 dark:bg-gray-700 text-gray-500"
+                  : "w-full h-12 rounded-xl flex items-center justify-center gap-2 text-base font-medium transition-all bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-lg hover:shadow-emerald-500/25 cursor-pointer"
+              }
             >
-              <Popconfirm
-                title={`${rows.length} ta posilkani qabul qilish`}
-                description="Buyurtmalar yaratiladi va marketplace'ga xabar ketadi."
-                okText="Qabul qilish"
-                cancelText="Bekor"
-                disabled={!rows.length || incomplete.length > 0}
-                onConfirm={doAccept}
-              >
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<PackageCheck className="w-4 h-4" />}
-                  disabled={!rows.length || incomplete.length > 0}
-                  loading={accept.isPending}
-                >
-                  Qabul qilish
-                </Button>
-              </Popconfirm>
-            </Tooltip>
+              {accept.isPending ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <PackageCheck className="w-5 h-5" />
+              )}
+              {accept.isPending
+                ? "Qabul qilinmoqda..."
+                : `Qabul qilish (${rows.length} ta posilka)`}
+            </button>
           </div>
         </div>
+      )}
 
-        <Table<MarketplaceScanOutcome>
-          size="small"
-          rowKey="parcel_id"
-          pagination={false}
-          loading={session.isLoading}
-          dataSource={rows}
-          columns={columns}
-          locale={{ emptyText: "Hali hech narsa skanerlanmagan" }}
-        />
-      </Card>
+      {/* Bo'sh holat */}
+      {rows.length === 0 && !session.isLoading && (
+        <div className="bg-white dark:bg-[#2A263D] rounded-2xl shadow-sm p-8 sm:p-12 text-center border border-gray-100 dark:border-gray-700/50">
+          <Package className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-white mb-2">
+            Skanerlangan posilkalar yo'q
+          </h3>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            QR kodni skanerlang — posilkalar avtomatik qo'shiladi
+          </p>
+        </div>
+      )}
 
-      {/* ── Rad etish ── */}
+      {/* ─────────────────── Qabulni tasdiqlash ─────────────────── */}
       <Modal
-        open={!!rejectFor}
-        onCancel={() => setRejectFor(null)}
-        onOk={doReject}
-        okText="Rad etish"
-        cancelText="Bekor"
-        okButtonProps={{ danger: true }}
-        confirmLoading={reject.isPending}
-        title={`Rad etish — ${rejectFor?.external_parcel_id ?? ""}`}
+        open={confirmAccept}
+        onCancel={() => setConfirmAccept(false)}
+        footer={null}
+        centered
+        closable={false}
+        width={400}
       >
-        <div className="space-y-3">
-          <Select
-            className="w-full"
-            value={rejectReason}
-            onChange={(v) => setRejectReason(v)}
-            options={MARKETPLACE_REJECT_REASONS.map((r) => ({
-              value: r.value,
-              label: r.label,
-            }))}
-          />
-          <Input.TextArea
-            rows={3}
-            value={rejectNote}
-            onChange={(e) => setRejectNote(e.target.value)}
-            placeholder="Izoh (ixtiyoriy)"
-            maxLength={500}
-          />
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            Rad etilgan posilka qabul qilinmaydi va marketplace'ga sabab bilan
-            xabar beriladi.
+        <div className="text-center py-4">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+            <PackageCheck className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+            {rows.length} ta posilkani qabul qilasizmi?
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            Buyurtmalar yaratiladi va marketplace'ga xabar ketadi.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setConfirmAccept(false)}
+              className="flex-1 h-11 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all cursor-pointer"
+            >
+              Bekor qilish
+            </button>
+            <button
+              onClick={() => {
+                setConfirmAccept(false);
+                doAccept();
+              }}
+              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all cursor-pointer"
+            >
+              Ha, qabul qilish
+            </button>
           </div>
         </div>
       </Modal>
 
-      {/* ── Natija ── */}
+      {/* ─────────────────────── Rad etish ─────────────────────── */}
+      <Modal
+        open={!!rejectFor}
+        onCancel={() => setRejectFor(null)}
+        footer={null}
+        centered
+        closable={false}
+        width={440}
+      >
+        <div className="py-2">
+          <div className="text-center mb-4">
+            <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <Ban className="w-8 h-8 text-red-600 dark:text-red-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+              Posilkani rad etish
+            </h3>
+            <p className="font-mono text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {rejectFor?.external_parcel_id ?? ""}
+            </p>
+          </div>
+
+          <div className="space-y-2 mb-3">
+            {MARKETPLACE_REJECT_REASONS.map((r) => (
+              <button
+                key={r.value}
+                onClick={() => setRejectReason(r.value)}
+                className={
+                  rejectReason === r.value
+                    ? "w-full px-4 py-3 rounded-xl text-sm text-left flex items-center justify-between transition-all cursor-pointer bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 font-medium"
+                    : "w-full px-4 py-3 rounded-xl text-sm text-left flex items-center justify-between transition-all cursor-pointer bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50"
+                }
+              >
+                {r.label}
+                {rejectReason === r.value && <ChevronRight className="w-4 h-4" />}
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            rows={3}
+            value={rejectNote}
+            onChange={(e) => setRejectNote(e.target.value)}
+            maxLength={500}
+            placeholder="Izoh (ixtiyoriy)"
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A263D] text-gray-800 dark:text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 transition-all resize-none"
+          />
+
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-4">
+            Rad etilgan posilka qabul qilinmaydi va marketplace'ga sabab bilan
+            xabar beriladi.
+          </p>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setRejectFor(null)}
+              className="flex-1 h-11 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-all cursor-pointer"
+            >
+              Bekor qilish
+            </button>
+            <button
+              onClick={doReject}
+              disabled={reject.isPending}
+              className="flex-1 h-11 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-medium hover:shadow-lg hover:shadow-red-500/25 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {reject.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Rad etish
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ─────────────────────── Natija ─────────────────────── */}
       <Modal
         open={!!result}
-        onCancel={() => setResult(null)}
-        onOk={() => {
+        onCancel={() => {
           setResult(null);
           focusInput();
         }}
-        okText="Yopish"
-        cancelButtonProps={{ style: { display: "none" } }}
-        title="Qabul natijasi"
-        width={640}
+        footer={null}
+        centered
+        closable={false}
+        width={560}
       >
-        <Result
-          status={result?.failed.length ? "warning" : "success"}
-          title={`${result?.accepted.length ?? 0} ta buyurtma yaratildi`}
-          subTitle={
-            result?.failed.length
-              ? `${result.failed.length} ta posilka qabul qilinmadi`
-              : "Marketplace'ga xabar yuborildi"
-          }
-        />
-        {!!result?.accepted.length && (
-          <div className="flex gap-2 flex-wrap mb-3">
-            {result.accepted.map((a) => (
-              <Tag key={a.external_parcel_id} color="green">
-                #{a.order_number}
-              </Tag>
-            ))}
+        <div className="py-2">
+          <div className="text-center mb-4">
+            <div
+              className={
+                result?.failed.length
+                  ? "w-16 h-16 mx-auto mb-3 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center"
+                  : "w-16 h-16 mx-auto mb-3 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center"
+              }
+            >
+              {result?.failed.length ? (
+                <AlertTriangle className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+              ) : (
+                <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+              )}
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+              {result?.accepted.length ?? 0} ta buyurtma yaratildi
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {result?.failed.length
+                ? `${result.failed.length} ta posilka qabul qilinmadi`
+                : "Marketplace'ga xabar yuborildi"}
+            </p>
           </div>
-        )}
-        {!!result?.failed.length && (
-          <Alert
-            type="error"
-            showIcon
-            message="Qabul qilinmaganlar"
-            description={
-              <div className="text-sm space-y-1">
+
+          {!!result?.accepted.length && (
+            <div className="flex gap-2 flex-wrap mb-4 max-h-48 overflow-y-auto">
+              {result.accepted.map((a) => (
+                <span
+                  key={a.external_parcel_id}
+                  className="px-2.5 py-1 rounded-lg text-sm font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                >
+                  #{a.order_number}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {!!result?.failed.length && (
+            <div className="rounded-xl p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 mb-4">
+              <p className="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">
+                Qabul qilinmaganlar
+              </p>
+              <div className="text-sm space-y-1 text-red-600 dark:text-red-400/90">
                 {result.failed.map((f) => (
                   <div key={f.external_parcel_id}>
                     <span className="font-mono text-xs">
@@ -677,9 +1000,19 @@ const MarketplaceIntakePage = () => {
                   </div>
                 ))}
               </div>
-            }
-          />
-        )}
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              setResult(null);
+              focusInput();
+            }}
+            className="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all cursor-pointer"
+          >
+            Yopish
+          </button>
+        </div>
       </Modal>
     </div>
   );
