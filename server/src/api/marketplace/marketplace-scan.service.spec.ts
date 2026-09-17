@@ -54,6 +54,7 @@ function build(over: {
   existingParcel?: any;
   district?: any;
   seller?: any;
+  sellerAfterSync?: any;
   lookup?: () => Promise<unknown>;
   paused?: boolean;
 } = {}) {
@@ -97,11 +98,27 @@ function build(over: {
     lookupParcel: over.lookup ?? jest.fn(async () => lookupOk()),
   };
 
+  /**
+   * Noma'lum sotuvchi: reestr AVTOMATIK yangilanadi va ikkinchi
+   * `findOne` topadi. `over.sellerAfterSync` shu ikkinchi javob.
+   */
+  const sellerRepo = repo(over.seller ?? null);
+  if (over.sellerAfterSync !== undefined) {
+    let calls = 0;
+    sellerRepo.findOne = jest.fn(async () =>
+      calls++ === 0 ? null : over.sellerAfterSync,
+    );
+  }
+
+  const reconcile = {
+    refreshSellersIfStale: jest.fn(async () => undefined),
+  };
+
   const svc = new MarketplaceScanService(
     repo(over.integration === undefined ? INTEGRATION : over.integration) as any,
     repo(over.existingParcel ?? null) as any,
     repo(SESSION) as any,
-    repo(over.seller ?? null) as any,
+    sellerRepo as any,
     repo(over.district === undefined ? { id: 'd-1', name: 'Yunusobod' } : over.district) as any,
     api as any,
     // ⚠️ Rad etish endi marketplace'ga HODISA yuboradi — avval faqat
@@ -109,8 +126,9 @@ function build(over: {
     // aytardi.
     outbox as any,
     { createQueryRunner: () => qr } as any,
+    reconcile as any,
   );
-  return { svc, api, saved, enqueued, outbox };
+  return { svc, api, saved, enqueued, outbox, reconcile, sellerRepo };
 }
 
 const scan = (svc: MarketplaceScanService, token = 'UZM-8842-1', user = USER) =>
@@ -289,5 +307,31 @@ describe('MarketplaceScanService.rejectParcel', () => {
     expect(enqueued[0].event_type).toBe('parcel.rejected');
     expect(enqueued[0].status.to).toBe('REJECTED_BY_BEEPOST');
     expect(enqueued[0].note).toMatch(/quti ezilgan/);
+  });
+});
+
+describe('noma\'lum sotuvchi — reestr AVTOMATIK yangilanadi', () => {
+  it("yangilashdan keyin topilsa OGOHLANTIRISH CHIQMAYDI", async () => {
+    const { svc, reconcile } = build({
+      sellerAfterSync: { name: 'Nodira Butik', is_active: true, is_unknown: false },
+    });
+    const res: any = await scan(svc);
+    expect(reconcile.refreshSellersIfStale).toHaveBeenCalledTimes(1);
+    expect(res.warnings.join(' ')).not.toMatch(/reestrda yo'q/);
+  });
+
+  it('yangilashdan keyin ham topilmasa ogohlantiradi (ular reestrida yo\'q)', async () => {
+    const { svc, reconcile } = build({ seller: null });
+    const res: any = await scan(svc);
+    expect(reconcile.refreshSellersIfStale).toHaveBeenCalledTimes(1);
+    expect(res.warnings.join(' ')).toMatch(/reestrda yo'q/);
+  });
+
+  it("sotuvchi allaqachon reestrda bo'lsa TASHQI SO'ROV YUBORMAYDI", async () => {
+    const { svc, reconcile } = build({
+      seller: { name: 'Texno Plus', is_active: true, is_unknown: false },
+    });
+    await scan(svc);
+    expect(reconcile.refreshSellersIfStale).not.toHaveBeenCalled();
   });
 });

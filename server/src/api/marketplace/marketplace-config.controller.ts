@@ -102,6 +102,14 @@ export class MarketplaceConfigController {
     return this.config.sendWebhookTest(slug);
   }
 
+  @Post(':slug/sync-sellers')
+  @ApiOperation({
+    summary: "Sotuvchi reestrini QO'LDA sinxronlash (aks holda 04:00 CRON)",
+  })
+  syncSellers(@Param('slug') slug: string, @CurrentUser() user: JwtPayload) {
+    return this.config.syncSellers(slug, user);
+  }
+
   // ─────────────── tarif ───────────────
 
   @Get(':slug/tariff')

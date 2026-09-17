@@ -458,6 +458,71 @@ export class MarketplaceReconcileService {
     }
   }
 
+  /**
+   * REESTRNI AVTOMATIK YANGILASH — skan yo'lidan chaqiriladi.
+   *
+   * ⚠️ Nega kerak: sotuvchi reestri kechasi 04:00 da yangilanardi. Yangi
+   * sotuvchi kun davomida paydo bo'lsa, ertaga tonggacha uning HAR
+   * posilkasi «Sotuvchi reestrda yo'q» bilan belgilanardi. Kuniga 1000
+   * posilkada buni qo'lda tuzatib bo'lmaydi.
+   *
+   * ⚠️ Kontraktda (§4.6) bitta sotuvchini so'rash YO'Q — faqat to'liq
+   * reestr. Shuning uchun:
+   *   · BIRLASHTIRILGAN (single-flight): 50 ta skan bir vaqtda noma'lum
+   *     sotuvchi ko'rsa ham reestr BIR MARTA tortiladi;
+   *   · DEBOUNCE: bir integratsiya uchun `SELLER_REFRESH_MS` da bir marta
+   *     — ularning reestrida haqiqatan yo'q sotuvchi har skanda
+   *     so'rov yubormaydi;
+   *   · VAQT CHEGARASI: skan reestrni kutib QOTIB QOLMAYDI. Ulgurmasa
+   *     ogohlantirish chiqadi, yangilash fonda tugaydi va keyingi skan toza.
+   */
+  private static readonly SELLER_REFRESH_MS = 60_000;
+  private readonly sellerRefresh = new Map<
+    string,
+    { at: number; inflight: Promise<unknown> | null }
+  >();
+
+  async refreshSellersIfStale(
+    integration: MarketplaceIntegrationEntity,
+    waitMs = 3_000,
+  ): Promise<void> {
+    const key = integration.id;
+    const now = Date.now();
+    let st = this.sellerRefresh.get(key);
+    if (!st) {
+      st = { at: 0, inflight: null };
+      this.sellerRefresh.set(key, st);
+    }
+
+    if (!st.inflight) {
+      if (now - st.at < MarketplaceReconcileService.SELLER_REFRESH_MS) return;
+      st.at = now;
+      st.inflight = this.syncSellers(integration)
+        .catch((e) => {
+          // Reestr yangilanmasa skan TO'XTAMAYDI — ogohlantirish qoladi.
+          this.logger.warn(
+            `Sotuvchi reestrini yangilab bo'lmadi (${integration.slug}): ${
+              (e as Error)?.message ?? e
+            }`,
+          );
+        })
+        .finally(() => {
+          const cur = this.sellerRefresh.get(key);
+          if (cur) cur.inflight = null;
+        });
+    }
+
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      st.inflight,
+      new Promise<void>((res) => {
+        timer = setTimeout(res, waitMs);
+      }),
+    ]).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+  }
+
   async syncSellers(integration: MarketplaceIntegrationEntity) {
     let cursor: string | null | undefined;
     let total = 0;

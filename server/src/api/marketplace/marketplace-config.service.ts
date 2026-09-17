@@ -17,6 +17,7 @@ import { MarketplaceTariffEntity } from 'src/core/entity/marketplace-tariff.enti
 import { isSecretEncryptionConfigured } from 'src/common/database/encrypted.transformer';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { MarketplaceApiService } from './marketplace-api.service';
+import { MarketplaceReconcileService } from './marketplace-reconcile.service';
 import { MarketplaceLedgerService } from './marketplace-ledger.service';
 import {
   isReservedMarketplaceSlug,
@@ -78,6 +79,7 @@ export class MarketplaceConfigService {
     private readonly api: MarketplaceApiService,
     private readonly ledger: MarketplaceLedgerService,
     private readonly activityLog: ActivityLogService,
+    private readonly reconcile: MarketplaceReconcileService,
   ) {}
 
   /**
@@ -612,6 +614,26 @@ export class MarketplaceConfigService {
    * ⚠️ Xato PARTLAMAYDI — u ham natija. Admin nima bo'lganini
    * (URL xatomi, kalit xatomi, ular o'chganmi) ko'rishi kerak.
    */
+  /**
+   * SOTUVCHI REESTRINI QO'LDA SINXRONLASH.
+   *
+   * ⚠️ Nega tugma kerak: avval sinxron faqat kechasi 04:00 dagi CRON bilan
+   * ishlardi. Ya'ni bugun sozlangan integratsiyada ERTAGA TONGGACHA har
+   * skanda «Sotuvchi reestrda yo'q» ogohlantirishi chiqib turardi — aslida
+   * sotuvchi ularning reestrida bor, bizda hali yo'q edi.
+   *
+   * Sotuvchi ID lari QAYTARILMAYDI — faqat sanoq (qaror O5: ID frontendga
+   * chiqarilmaydi).
+   */
+  async syncSellers(slug: string, user?: JwtPayload) {
+    const integration = await this.mustFind(slug);
+    const res = await this.reconcile.syncSellers(integration);
+    await this.audit(integration, 'marketplace.sellers.sync', user ?? null, {
+      synced: res.synced,
+    });
+    return { synced: res.synced };
+  }
+
   async testConnection(slug: string) {
     const integration = await this.mustFind(slug);
     if (!integration.api_base_url) {

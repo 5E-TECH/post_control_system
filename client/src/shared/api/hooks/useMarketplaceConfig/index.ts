@@ -286,6 +286,20 @@ export const useMarketplaceConfig = (slug?: string) => {
         .then((res) => unwrap<MarketplaceTestResult & { signed?: boolean; applied?: boolean | null }>(res.data)),
   });
 
+  /**
+   * SOTUVCHI REESTRINI QO'LDA SINXRONLASH.
+   *
+   * Avtomatik sinxron kechasi 04:00 da ishlaydi — yangi sozlangan
+   * integratsiyada ertaga tonggacha har skanda «Sotuvchi reestrda yo'q»
+   * ogohlantirishi chiqib turardi. Javobda faqat SANOQ bor.
+   */
+  const syncSellers = useMutation({
+    mutationFn: (s: string) =>
+      api
+        .post(`marketplace/config/${s}/sync-sellers`)
+        .then((res) => unwrap<{ synced: number }>(res.data)),
+  });
+
   const setTariff = useMutation({
     mutationFn: (params: {
       slug: string;
@@ -341,6 +355,7 @@ export const useMarketplaceConfig = (slug?: string) => {
     setActive,
     testConnection,
     testSignature,
+    syncSellers,
     setTariff,
     rotateSigning,
     clearPreviousSigning,

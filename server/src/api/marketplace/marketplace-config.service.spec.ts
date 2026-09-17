@@ -52,6 +52,7 @@ function build(
     cashbox?: any;
     boundTo?: any;
     ping?: any;
+    synced?: number;
   } = {},
 ) {
   const saved: any[] = [];
@@ -117,6 +118,10 @@ function build(
     })),
   };
 
+  const reconcile = {
+    syncSellers: jest.fn(async () => ({ synced: opts.synced ?? 3, pages: 1 })),
+  };
+
   const svc = new MarketplaceConfigService(
     integrationRepo as any,
     tariffRepo as any,
@@ -140,8 +145,9 @@ function build(
     // ⚠️ Sozlash amallari (kalit aylantirish, kill-switch, `api_key`)
     // audit jurnaliga yoziladi — «kim o'chirib qo'ydi?» savoliga javob.
     activityLog as any,
+    reconcile as any,
   );
-  return { svc, integrationRepo, tariffRepo, manager, saved, api, ledger, qr, findArgs, activityLog };
+  return { svc, integrationRepo, tariffRepo, manager, saved, api, ledger, qr, findArgs, activityLog, reconcile };
 }
 
 const NEW_INPUT = {
@@ -560,5 +566,22 @@ describe('MarketplaceConfigService — biriktirilgan market', () => {
       cashbox_balance: 1_250_000,
     });
     expect(view.market_id).toBe('market-1');
+  });
+});
+
+describe("sotuvchi reestrini qo'lda sinxronlash", () => {
+  it('sanoq qaytaradi va audit jurnaliga yozadi', async () => {
+    const { svc, reconcile, activityLog } = build({ synced: 7 });
+    await expect(svc.syncSellers('uzmarket', USER as any)).resolves.toEqual({
+      synced: 7,
+    });
+    expect(reconcile.syncSellers).toHaveBeenCalledTimes(1);
+    expect(activityLog.log).toHaveBeenCalled();
+  });
+
+  it("javobda sotuvchi ID lari BO'LMAYDI (qaror O5)", async () => {
+    const { svc } = build({ synced: 7 });
+    const res: any = await svc.syncSellers('uzmarket', USER as any);
+    expect(Object.keys(res)).toEqual(['synced']);
   });
 });

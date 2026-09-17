@@ -28,6 +28,7 @@ import {
   Plus,
   RefreshCcwDot,
   Scale,
+  Users,
   Wallet,
   XCircle,
 } from "lucide-react";
@@ -139,6 +140,7 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
     setActive,
     testConnection,
     testSignature,
+    syncSellers,
     setTariff,
     rotateSigning,
     clearPreviousSigning,
@@ -241,6 +243,21 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
       message.error(
         `Imzo sinovi yiqildi (${res.kind ?? '?'}): ${res.message ?? ''}`,
       );
+    }
+  };
+
+  /**
+   * ⚠️ Nega tugma: avtomatik sinxron kechasi 04:00 da ishlaydi. Bugun
+   * sozlangan integratsiyada ertaga tonggacha har skanda «Sotuvchi
+   * reestrda yo'q» ogohlantirishi chiqib turardi — sotuvchi ularda bor,
+   * bizda hali yo'q edi.
+   */
+  const doSyncSellers = async () => {
+    try {
+      const res = await syncSellers.mutateAsync(slug as string);
+      message.success(`${res.synced} ta sotuvchi sinxronlandi`);
+    } catch (e) {
+      message.error(errText(e, "Sotuvchilarni sinxronlab bo'lmadi"));
     }
   };
 
@@ -514,6 +531,20 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                 >
                   Imzo
                 </Button>
+                {/*
+                  ⚠️ Sotuvchi reestri kechasi 04:00 da sinxronlanadi —
+                  bu tugmasiz yangi ulanishda ertaga tonggacha har skanda
+                  «Sotuvchi reestrda yo'q» ogohlantirishi chiqardi.
+                */}
+                <Tooltip title="Ularning sotuvchi reestrini hoziroq ko'chirib oladi. Busiz reestr kechasi 04:00 da yangilanadi va yangi ulanishda skanlarda «Sotuvchi reestrda yo'q» ogohlantirishi chiqadi.">
+                  <Button
+                    icon={<Users className="w-4 h-4" />}
+                    loading={syncSellers.isPending}
+                    onClick={doSyncSellers}
+                  >
+                    Sotuvchilar
+                  </Button>
+                </Tooltip>
               </div>
             }
           >

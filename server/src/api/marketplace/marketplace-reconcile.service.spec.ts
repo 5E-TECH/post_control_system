@@ -18,6 +18,7 @@ const parcel = (over: any = {}) => ({
 
 function build(opts: {
   parcels?: any[];
+  sellers?: any[];
   remoteItems?: any[];
   invariant?: any;
   remoteBalance?: any;
@@ -70,6 +71,12 @@ function build(opts: {
     query: jest.fn(async () => [[{ next_ledger_seq: '9' }], 1]),
   };
   const api = {
+    fetchSellers: jest.fn(async () => ({
+      items: opts.sellers ?? [
+        { seller_id: 'SLR-81', name: 'Nodira Butik', is_active: true },
+      ],
+      next_cursor: null,
+    })),
     fetchParcelStatuses: jest.fn(async () => ({
       items: opts.remoteItems ?? [
         { external_parcel_id: 'PCL-8842-1', status: 'OUT_FOR_DELIVERY', last_applied_seq: 5 },
@@ -271,5 +278,44 @@ describe('MarketplaceReconcileService.syncSellers', () => {
     const r = await svc.syncSellers(INTEGRATION as any);
     expect(r.synced).toBe(0);
     expect(sellerRows).toHaveLength(0);
+  });
+});
+
+describe('refreshSellersIfStale — avtomatik reestr yangilash', () => {
+  const INTEG = { id: 'int-1', slug: 'uzmarket' } as any;
+
+  it("bir vaqtda kelgan chaqiriqlar BITTA so'rovga birlashadi", async () => {
+    const { svc, api } = build({});
+    // 50 ta skan bir vaqtda noma'lum sotuvchi ko'rdi.
+    await Promise.all(
+      Array.from({ length: 50 }, () => svc.refreshSellersIfStale(INTEG)),
+    );
+    expect(api.fetchSellers).toHaveBeenCalledTimes(1);
+  });
+
+  it('debounce: darhol takror chaqirilsa qayta tortmaydi', async () => {
+    const { svc, api } = build({});
+    await svc.refreshSellersIfStale(INTEG);
+    await svc.refreshSellersIfStale(INTEG);
+    expect(api.fetchSellers).toHaveBeenCalledTimes(1);
+  });
+
+  it('reestr yiqilsa SKAN TO\'XTAMAYDI (xato yutiladi)', async () => {
+    const { svc } = build({});
+    (svc as any).api.fetchSellers = jest.fn(async () => {
+      throw new Error('marketplace o\'lik');
+    });
+    await expect(svc.refreshSellersIfStale(INTEG)).resolves.toBeUndefined();
+  });
+
+  it("sekin reestr skanni QOTIRIB QO'YMAYDI", async () => {
+    const { svc } = build({});
+    (svc as any).api.fetchSellers = jest.fn(
+      () => new Promise(() => undefined), // hech qachon tugamaydi
+    );
+    // 20 ms kutib qo'yib yuboradi — skan davom etadi.
+    await expect(
+      svc.refreshSellersIfStale({ id: 'int-slow', slug: 'x' } as any, 20),
+    ).resolves.toBeUndefined();
   });
 });

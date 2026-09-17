@@ -15,6 +15,7 @@ import { MarketplaceParcelEntity } from 'src/core/entity/marketplace-parcel.enti
 import { MarketplaceScanSessionEntity } from 'src/core/entity/marketplace-scan-session.entity';
 import { MarketplaceSellerEntity } from 'src/core/entity/marketplace-seller.entity';
 import { MarketplaceApiService } from './marketplace-api.service';
+import { MarketplaceReconcileService } from './marketplace-reconcile.service';
 import { MarketplaceOutboxService } from './marketplace-outbox.service';
 import {
   MarketplaceEventType,
@@ -94,6 +95,7 @@ export class MarketplaceScanService {
     private readonly api: MarketplaceApiService,
     private readonly outbox: MarketplaceOutboxService,
     private readonly dataSource: DataSource,
+    private readonly reconcile: MarketplaceReconcileService,
   ) {}
 
   // ═══════════════════ INTEGRATSIYA ═══════════════════
@@ -333,11 +335,31 @@ export class MarketplaceScanService {
     // ── 8. Sotuvchi ────────────────────────────────────────────────────
     let sellerName = p.seller_name;
     if (p.seller_id) {
-      const known = await this.sellerRepo.findOne({
+      let known = await this.sellerRepo.findOne({
         where: { integration_id: integration.id, external_seller_id: p.seller_id },
       });
       if (!known) {
-        // Reestrda yo'q — posilka baribir qabul qilinadi, lekin belgilanadi.
+        /**
+         * ⚠️ AVVAL reestrni AVTOMATIK yangilaymiz, keyin ogohlantiramiz.
+         *
+         * Reestr kechasi 04:00 da sinxronlanadi — kunduzi qo'shilgan
+         * sotuvchining har posilkasi ertaga tonggacha belgilanardi.
+         * Kuniga 1000 posilkada buni qo'lda tuzatib bo'lmaydi, shuning
+         * uchun tizim o'zi bir marta tortib oladi (birlashtirilgan va
+         * debounce'langan — 50 ta skan bitta so'rovga yig'iladi).
+         */
+        await this.reconcile.refreshSellersIfStale(integration);
+        known = await this.sellerRepo.findOne({
+          where: {
+            integration_id: integration.id,
+            external_seller_id: p.seller_id,
+          },
+        });
+      }
+
+      if (!known) {
+        // Yangilashdan keyin ham yo'q — ularda HAQIQATAN yo'q. Posilka
+        // baribir qabul qilinadi, lekin belgilanadi.
         warnings.push(`Sotuvchi reestrda yo'q: ${p.seller_id}`);
         await this.sellerRepo
           .save(
