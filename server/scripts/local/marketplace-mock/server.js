@@ -220,8 +220,31 @@ function applyMoney(ev) {
   });
 
   // ── SOLISHTIRUV: bizning hisob vs ularning `balance_after` ──
+  //
+  // ⚠️ FAQAT ENG YANGI `ledger.seq` bo'yicha. Hodisalar posilka bo'yicha
+  // serializatsiya qilinadi, lekin TURLI posilkalar (va hisob-kitob)
+  // orasida tartib kafolatlanmaydi — kichikroq `seq` li hodisa kechroq
+  // kelishi mumkin va uning `balance_after` i ESKIRGAN bo'ladi.
+  // Uni solishtirish SOXTA «daftar ajraldi» beradi.
   const reported = ev.ledger && ev.ledger.balance_after;
-  if (reported != null) {
+  const ledgerSeq = ev.ledger && ev.ledger.seq != null
+    ? Math.trunc(Number(ev.ledger.seq)) : null;
+  //
+  // ⚠️ FAQAT KETMA-KET `seq` da solishtiramiz.
+  //
+  // `balance_after` — BeePost'ning GLOBAL qoldig'i. Uni o'z yig'indimiz
+  // bilan solishtirish faqat ORALIQDAGI HAMMA yozuvni qo'llagan bo'lsak
+  // ma'noli. Hodisalar posilka bo'yicha serializatsiya qilinadi, lekin
+  // turli posilkalar (va hisob-kitob) orasida tartib kafolatlanmaydi —
+  // ya'ni `seq 6` `seq 5` dan oldin kelishi mumkin. O'shanda bizda hali
+  // `seq 5` ning puli yo'q va solishtiruv SOXTA farq berardi.
+  const prevSeq = state.maxLedgerSeq || 0;
+  if (ledgerSeq != null && ledgerSeq !== prevSeq + 1) {
+    // Uzilish yoki eskirgan — solishtirmaymiz (xato EMAS).
+    if (ledgerSeq > prevSeq) state.maxLedgerSeq = ledgerSeq;
+    state.counters.ledger_skipped = (state.counters.ledger_skipped || 0) + 1;
+  } else if (reported != null) {
+    if (ledgerSeq != null) state.maxLedgerSeq = ledgerSeq;
     const r = Math.trunc(Number(reported));
     if (r !== state.balance) {
       issue('error', 'LEDGER_DRIFT',
@@ -402,7 +425,20 @@ const server = http.createServer((req, res) => {
     const rawBody = Buffer.concat(chunks).toString('utf8');
     const started = Date.now();
 
-    // ── Mock boshqaruvi (kontraktdan tashqari) ──
+    /**
+     * ── Mock boshqaruvi (kontraktdan tashqari) ──
+     *
+     * ⚠️ Bu yo'llar ham API KALIT talab qiladi. Avval ular kalitdan
+     * OLDIN ishlanardi: mock lokal bo'lsa ham, `/_mock/reset` butun
+     * daftarni tozalaydi — sinov o'rtasida tasodifan chaqirilsa
+     * natijalar ma'nosiz bo'lib qolardi va sababini topish qiyin edi.
+     */
+    if (path.startsWith('/_mock/')) {
+      if (req.headers['x-api-key'] !== CFG.apiKey) {
+        return fail(res, 401, 'BAD_API_KEY', "Mock boshqaruvi uchun ham X-Api-Key kerak");
+      }
+    }
+
     if (path === '/_mock/report') {
       return send(res, 200, {
         balance: state.balance,
@@ -422,6 +458,7 @@ const server = http.createServer((req, res) => {
       seed();
       state.seenEvents.clear(); state.batches.clear();
       state.ledger.length = 0; state.balance = 0; state.bySeller.clear();
+    state.maxLedgerSeq = 0;
       state.issues.length = 0;
       for (const k of Object.keys(state.counters)) state.counters[k] = 0;
       console.log('\n🔄 mock tozalandi\n');
