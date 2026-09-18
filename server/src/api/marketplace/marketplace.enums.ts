@@ -63,7 +63,7 @@ export enum MarketplaceScanSessionStatus {
   ABANDONED = 'abandoned',
 }
 
-/** Chiquvchi hodisa turlari (kontrakt §9.2). */
+/** Chiquvchi hodisa turlari (kontrakt §4.4 — to'liq ro'yxat). */
 export enum MarketplaceEventType {
   PARCEL_ACCEPTED = 'parcel.accepted',
   PARCEL_REJECTED = 'parcel.rejected',

@@ -1,12 +1,28 @@
 # BeePost ↔ Marketplace Integratsiya Kontrakti
 
-> **v1.0-draft** · Sana: 2026-09-15
+> **v1.1** · Sana: 2026-09-18
 > Bu hujjat **marketplace dasturchilari** uchun. Unda: siz qanday API chiqarishingiz,
 > bizdan nima qabul qilishingiz va pulni qanday hisoblashingiz yozilgan.
 >
 > ⚠️ Bu **SPEC rejimi**: kontraktni BeePost belgilaydi, marketplace uni bajaradi.
 > Shuning uchun maydon nomlari, status nomlari va summa birliklari **aynan** shu yerdagidek
 > bo'lishi shart — moslashtirish qatlami yo'q.
+
+### v1.1 da nima o'zgardi
+
+Kontrakt ishlaydigan kod bilan **satrma-satr solishtirildi**. Topilgan
+farqlar tuzatildi — v1.0 bo'yicha yozilgan implementatsiya quyidagi
+uchta nuqtada ishlamasdi:
+
+| # | Nima to'g'rilandi | Nega muhim |
+|:---:|---|---|
+| 1 | **§4.4 — hodisa turlarining to'liq ro'yxati (18 ta)** va «noma'lum turda ham `200`» qoidasi | v1.0 da atigi 11 tasi sanalgan edi. Sanalmaganlardan biri — `parcel.accepted`, ya'ni posilkaning **birinchi** hodisasi. Uni `4xx` bilan rad etsangiz o'sha posilkaning butun oqimi to'xtardi |
+| 2 | **§4.2 — ko'p qutili buyurtmada pul qaysi qutida** | Pul 1-qutida bo'lmasa buyurtmani **hech qachon** qabul qilib bo'lmasdi. v1.0 da bu yozilmagan edi |
+| 3 | **§4.2 — `district_sato` marshrutni belgilashi** va misoldagi kod tuzatildi | v1.0 misolida kod (`1727401` = Nurafshon) manzil matniga (`Yunusobod`) zid edi. Sinovda posilkalar boshqa viloyatga ketdi |
+
+Shuningdek: `cod_amount: 0` ↔ `prepaid` ziddiyati, status lug'ati bo'yicha
+§6.1 ↔ §7.9 ziddiyati, bo'lim raqamlaridagi takror, circuit breaker (§9.1),
+`qr_token` registri va yangi 6 ta qabul testi (§11).
 
 ---
 
@@ -270,8 +286,8 @@ Biz buni admin panelidagi «Ulanishni tekshirish» tugmasida ishlatamiz.
     "full_name":        "Aliyev Vali",
     "phone":            "+998901234567",
     "additional_phone": "+998991112233",
-    "region_sato":      "1727",
-    "district_sato":    "1727401",
+    "region_sato":      "1726",
+    "district_sato":    "1726266",
     "address":          "Toshkent sh., Yunusobod t., 4-mavze, 15-uy",
     "comment":          "Eshik oldiga qo'ying"
   },
@@ -306,17 +322,60 @@ Biz buni admin panelidagi «Ulanishni tekshirish» tugmasida ishlatamiz.
 | `parcel.status` | enum | ✅ | §6.1 dagi ro'yxatdan |
 | `seller.seller_id` | string | ✅ | **Eng muhim maydon.** Pul shu bo'yicha ajratiladi |
 | `seller.seller_name` | string | ✅ | Ko'rsatish uchun |
-| `customer.phone` | string | ✅ | `+998XXXXXXXXX` formatida. **Bo'sh bo'lmasin** |
-| `customer.district_sato` | string | ✅ | O'zbekiston SOATO tuman kodi. Mos kelmasa posilka **qabul qilinmaydi** |
+| `customer.phone` | string | ✅ | `+998XXXXXXXXX`. 9 xonali (`901234567`) ham bo'ladi. Boshqa shakl — **posilka qabul qilinmaydi** |
+| `customer.district_sato` | string | ✅ | 🔴 **MARSHRUT SHU KOD BO'YICHA.** Pastdagi ogohlantirishni o'qing |
+| `customer.full_name` | string | 🟡 | Yo'q bo'lsa «Marketplace mijozi» deb yoziladi va ogohlantirish chiqadi |
+| `customer.address` | string | 🟡 | Kuryer uchun matn. **Marshrutga ta'sir qilmaydi** |
+| `customer.region_sato` | string | ⚪ | Biz **o'qimaymiz** — viloyat `district_sato` dan aniqlanadi. Yuborsangiz ham zarari yo'q |
 | `money.product_amount` | int | ✅ | Mahsulotlar summasi |
 | `money.delivery_amount` | int | ✅ | Yetkazish narxi (mijozdan). Yo'q bo'lsa `0` |
-| `money.cod_amount` | int | ✅ | Mijozdan olinadigan summa. `0` = oldindan to'langan |
+| `money.cod_amount` | int | ✅ | Mijozdan olinadigan summa. 🔴 `0` bo'lsa `prepaid` **majburiy** `true` — pastga qarang |
 | `money.prepaid` | bool | ✅ | `true` bo'lsa kuryer pul olmaydi. **Tarif baribir hisoblanadi** (§7.5) |
 | `items[]` | array | ✅ | **Majburiy.** Qisman sotuvda qaysi mahsulot yetkazilgani/qaytgani shundan hisoblanadi |
 | `where_deliver` | enum | 🟡 | `center` \| `address` (default: `center`) |
 
 > ⚠️ **Tiplar qat'iy.** `phone` — **string**, son emas. `product_amount` — **son**, satr emas.
 > Noto'g'ri tip butun qopni rad ettiradi.
+
+#### 🔴 `district_sato` — marshrut shu kod bo'yicha, MANZIL MATNI bo'yicha EMAS
+
+Posilka qaysi hududga ketishi **faqat** `district_sato` bilan aniqlanadi.
+`address` — kuryer o'qiydigan erkin matn, u marshrutga **umuman ta'sir qilmaydi**.
+
+Ikkisi mos kelmasa hech qanday xato chiqmaydi — posilka **jimgina** kod
+ko'rsatgan joyga ketadi. Bu eng qimmat xato turi: ekranda bir narsa,
+amalda boshqa narsa.
+
+| Misol | `district_sato` | Posilka qayerga ketadi |
+|---|---|---|
+| ✅ To'g'ri | `1726266` | Toshkent shahri, Yunusobod tumani |
+| ❌ Xato | `1727401` | **Toshkent viloyati, Nurafshon** — manzilda «Yunusobod» yozilgan bo'lsa ham |
+
+> Kod bizning tuman ma'lumotnomamizda topilmasa posilka **qabul qilinmaydi**
+> va operator «Tuman topilmadi (SOATO …)» xatosini ko'radi. Sinovdan oldin
+> o'z kodlaringizni bizga bering — biz ularni tekshirib beramiz.
+
+#### 🔴 KO'P QUTILI buyurtmada pul QAYSI qutida
+
+Pul **faqat `parcel_index: 1`** bo'lgan qutida bo'ladi. Qolgan qutilarda
+`cod_amount` **`0`**.
+
+| Quti | `cod_amount` | `prepaid` |
+|---|---|---|
+| `1/3` | `200000` (butun buyurtma summasi) | `false` |
+| `2/3` | `0` | `false` |
+| `3/3` | `0` | `false` |
+
+⚠️ Agar pulni boshqa qutiga qo'ysangiz, 1-quti `cod_amount: 0` +
+`prepaid: false` bo'lib qoladi — bu **to'siq**, ya'ni o'sha buyurtmani
+**hech qachon qabul qilib bo'lmaydi**. 2+ qutida COD bo'lsa
+ogohlantirish chiqadi va u pul hisobiga **kirmaydi**.
+
+#### `qr_token` — registr ahamiyatsiz
+
+Taqqoslashdan oldin tokenni kichik harfga keltiramiz: `UZM-8842-1` va
+`uzm-8842-1` — **bir xil** posilka. Bizga qaytarayotganda esa yorliqdagi
+**asl** ko'rinishni yuboring.
 
 ---
 
@@ -417,13 +476,40 @@ Shu daqiqadan boshlab posilka **BeePost javobgarligida**.
 { "ok": true, "applied": false, "reason": "STALE_SEQ", "current_seq": 147 }
 ```
 
-#### 🔴 Uchta majburiy qoida
+#### Hodisa turlarining TO'LIQ ro'yxati
+
+> Bu ro'yxat **to'liq**. Boshqa `event_type` yubormaymiz.
+> Har birini qabul qilishga tayyor bo'ling — pastdagi 4-qoidaga qarang.
+
+| `event_type` | Qachon | `status.to` | Pul harakati |
+|---|---|---|---|
+| `parcel.accepted` | Operator qopni qabul qildi — **posilkaning BIRINCHI hodisasi** | `ACCEPTED_BY_BEEPOST` | yo'q |
+| `parcel.rejected` | Operator posilkani rad etdi (sabab bilan) | `REJECTED_BY_BEEPOST` | yo'q |
+| `parcel.dispatched` | Posilka hududga jo'natildi | `IN_TRANSIT` | yo'q |
+| `parcel.out_for_delivery` | Kuryer qabul qildi, mijozga ketyapti | `OUT_FOR_DELIVERY` | yo'q |
+| `parcel.delivered` | Yetkazildi, pul yig'ildi | `DELIVERED` | ✅ sizning foydangizga |
+| `parcel.partly_delivered` | Qisman yetkazildi | `PARTLY_DELIVERED` | ✅ qisman |
+| `parcel.cancelled` | Bekor qilindi | `CANCELLED` | ✅ faqat ortiqcha xarajat bo'lsa |
+| `parcel.returning` | Qaytish yo'lida | `RETURNING` | yo'q |
+| `parcel.returned` | Sizga qaytarildi | `RETURNED` | yo'q |
+| `parcel.rolled_back` | Operator xatosi ortga qaytarildi (§6.3) | `OUT_FOR_DELIVERY` | ✅ **teskari yozuv** |
+| `parcel.extra_cost_applied` | Ortiqcha xarajat yozildi (§0 #12) | o'zgarmaydi | ✅ sizdan yechiladi |
+| `parcel.extra_cost_reversed` | Ortiqcha xarajat qaytarildi | o'zgarmaydi | ✅ sizga qaytariladi |
+| `parcel.price_changed` | Buyurtma summasi o'zgardi | o'zgarmaydi | ✅ farq |
+| `parcel.fee_changed` | Tarif qayta hisoblandi | o'zgarmaydi | ✅ farq |
+| `ledger.entry` | Daftar yozuvi (§7.7) | — | ✅ |
+| `ledger.snapshot` | Kunlik daftar surati (§7.7) | — | — |
+| `settlement.paid` | BeePost sizga pul to'ladi (§7.8) | — | ✅ |
+| `webhook.test` | Sozlash paytidagi imzo sinovi | — | — |
+
+#### 🔴 To'rtta majburiy qoida
 
 | # | Qoida | Nima uchun |
 |---|---|---|
 | 1 | **`event_id` bo'yicha dedup.** Ayni `event_id` ikkinchi marta kelsa — **hech narsa qilmang**, `applied: false` qaytaring | Tarmoq uzilsa biz qayta yuboramiz. Dedup bo'lmasa **sotuvchiga ikki marta pul yozasiz** |
 | 2 | **`seq` bo'yicha tartib.** Har posilka uchun oxirgi `seq`ni saqlang. Kelgan `seq` ≤ saqlangandan bo'lsa — **qo'llamang** | Qayta urinishlar tartibni buzadi: eskirgan `delivered` yangi `rolled_back`dan **keyin** kelishi mumkin |
 | 3 | **Har doim `200` qaytaring** (biznes rad etishida ham, tanada `applied:false` bilan). `4xx`/`5xx` faqat haqiqiy xatoda | `5xx` bizni qayta urintiradi; `4xx` hodisani **butunlay tashlatadi** |
+| 4 | 🔴 **Noma'lum `event_type` kelsa ham `200` + `applied:false` qaytaring.** `4xx` qaytarmang | Kelajakda yangi tur qo'shilsa `4xx` uni tashlab yuboradi **va o'sha posilkaning keyingi hamma hodisasi to'xtaydi** — chunki biz tartibni saqlash uchun yetib bormagan hodisadan keyingilarini yubormaymiz. Bitta noma'lum tur butun posilkani muzlatib qo'yadi |
 
 **Kafolat (halol):** hodisalar **kamida bir marta** yuboriladi va **yo'qolishi ham mumkin**.
 Shuning uchun §4.5 (solishtiruv) **majburiy**.
@@ -631,7 +717,12 @@ Javob — §4.4 dagi konvertlarning massivi:
 
 ## 6. Status modeli
 
-### 6.1 Sizning tomondagi statuslar (biz shularni kutamiz)
+### 6.1 Kanonik statuslar
+
+> 🟡 **Bu nomlarni O'ZLASHTIRISHINGIZ SHART EMAS.** Quyidagilar — BeePost
+> tomonidagi *kanonik* nomlar. Sizda ular raqam (`7`), so'z (`dostavleno`)
+> yoki kod (`ST-07`) bo'lishi mumkin: biz **sizning** qiymatlaringizni
+> panelga kiritamiz va ikki yo'nalishda o'giramiz. Batafsil — **§7.9**.
 
 | Status | Ma'nosi | Kim qo'yadi |
 |---|---|---|
@@ -929,7 +1020,7 @@ bizniki 42 350 000 bo'ladi — **darhol ko'rinadi**. Yo'qolganini
 Posilka statusi (`DELIVERED`) pul kelgani degani **emas** — u faqat «yetkazildi va
 hisobingizga yozildi» degani.
 
-### 7.5b STATUS LUG'ATI — sizniki qanday bo'lsa, shunday
+### 7.9 STATUS LUG'ATI — sizniki qanday bo'lsa, shunday
 
 Kontraktdagi status nomlari (`ACCEPTED_BY_BEEPOST`, `DELIVERED`, ...) —
 BeePost tomonidagi KANONIK nomlar. Sizning tizimingizda ular boshqacha
@@ -970,7 +1061,7 @@ Xarita ikki yo'nalishda ishlaydi:
 Amalda: avval o'z status ro'yxatingizni bering — biz uni panelga
 kiritamiz va `webhook.test` bilan tekshiramiz.
 
-### 7.6 `ledger.balance_after` ni QANDAY solishtirish kerak
+### 7.10 `ledger.balance_after` ni QANDAY solishtirish kerak
 
 Har pul hodisasida `ledger` bloki keladi:
 
@@ -1048,6 +1139,22 @@ Shubha bo'lsa — haqiqat manbai `GET /{slug}/ledger` (§5.2).
 Deploy yoki texnik ishlar **4 soatdan uzoq** bo'lsa — solishtiruv endpointi (§4.5)
 yo'qolganlarni tiklaydi.
 
+### 9.1 Skanerlash to'xtatilishi (circuit breaker)
+
+`parcels/lookup` **ketma-ket 3 marta** yiqilsa (timeout, `5xx`, ulanish
+xatosi), BeePost o'sha ulanish uchun skanerlashni **60 soniyaga to'xtatadi**
+va operatorga «Marketplace bilan aloqa uzilgan — N soniyadan keyin
+avtomatik tiklanadi» deb ko'rsatadi.
+
+| | |
+|---|---|
+| Nega | Sizning API'ingiz yiqilganda operator 200 ta posilkani ketma-ket urinib, 200 ta xato ko'rmasligi kerak |
+| Siz nimani ko'rasiz | 60 soniya davomida `lookup` so'rovlari **umuman kelmaydi** |
+| Tiklanish | Avtomatik. Birinchi muvaffaqiyatli so'rovdan keyin sanoq nolga tushadi |
+
+⚠️ Bu **faqat skanerlashga** tegishli. Hodisalar navbati (`/events`) o'z
+backoff'i bilan ishlaydi va to'xtamaydi.
+
 ---
 
 ## 10. Limitlar
@@ -1114,6 +1221,12 @@ Uni o'z tilingizga ko'chirishingiz yoki mantiqni namuna sifatida olishingiz mumk
 | 13 | 4 soat o'chirib qo'yish | Tiklangach hamma hodisa yetib keladi |
 | 14 | `GET /parcels/status` solishtiruvi | `last_applied_seq` biznikiga mos |
 | 15 | Kalit aylantirish (v1+v2) | Uzilish yo'q |
+| 16 | 🔴 **Noma'lum `event_type` yuborish** (masalan `parcel.future_thing`) | `200` + `applied:false`. **`4xx` BO'LMASIN** — §4.4 qoida 4 |
+| 17 | 🔴 **`parcel.accepted` hodisasini qabul qilish** | Posilka `ACCEPTED_BY_BEEPOST` ga o'tadi. Bu posilkaning **birinchi** hodisasi |
+| 18 | 🔴 **Ko'p qutili buyurtmada pul 1-qutida** | 1-quti `cod_amount > 0`, 2- va 3-quti `cod_amount = 0` |
+| 19 | 🔴 **`district_sato` ma'lumotnomaga mos** | 20 ta real kodni bizga bering — biz «topildi/topilmadi» ro'yxatini qaytaramiz |
+| 20 | `qr_token` katta-kichik harf aralash | Ayni posilka topiladi (registr ahamiyatsiz) |
+| 21 | `lookup` 3 marta ketma-ket 500 qaytarsa | BeePost 60 soniya so'rov yubormaydi (§9.1), keyin o'zi tiklanadi |
 
 ---
 
@@ -1129,7 +1242,7 @@ Uni o'z tilingizga ko'chirishingiz yoki mantiqni namuna sifatida olishingiz mumk
 | 4 | `GET /bp/v1/ping` |
 | 5 | `POST /bp/v1/parcels/lookup` — **yon ta'sirsiz**, `seller_id` bilan. ⚠️ **Manifest yo'q** — bu endpoint har skanerda chaqiriladi va **ishonchli bo'lishi shart** |
 | 6 | `POST /bp/v1/parcels/accept` — **`batch_id` bo'yicha idempotent** |
-| 7 | `POST /bp/v1/events` — **`event_id` bo'yicha dedup + `seq` bo'yicha tartib** |
+| 7 | `POST /bp/v1/events` — **`event_id` bo'yicha dedup + `seq` bo'yicha tartib**. §4.4 dagi **18 ta hodisa turining hammasini** qabul qilish |
 | 8 | `GET /bp/v1/parcels/status` — **solishtiruv** (`ids` va `updated_since`) |
 | 9 | `GET /bp/v1/sellers` |
 | 10 | `GET /bp/v1/ledger/balance` |
@@ -1141,7 +1254,10 @@ Uni o'z tilingizga ko'chirishingiz yoki mantiqni namuna sifatida olishingiz mumk
 | 16 | `+998XXXXXXXXX` formatidagi **string** telefon |
 | 17 | `parcel_index` / `parcel_count` — ko'p qutili buyurtma |
 | 18 | `items[]` — SKU, nom, miqdor, birlik narxi (**qisman sotuv uchun**) |
-| 19 | `money.prepaid` bayrog'i va `cod_amount` (`0` bo'lishi mumkin) |
+| 19 | `money.prepaid` bayrog'i va `cod_amount`. 🔴 `cod_amount: 0` yuborilsa `prepaid: true` **majburiy** — aks holda posilka qabul qilinmaydi |
+| 19a | 🔴 **Ko'p qutilida pul faqat `parcel_index: 1` da**, qolganlarida `cod_amount: 0` (§4.2) |
+| 19b | 🔴 **Noma'lum `event_type` da ham `200`** qaytarish (§4.4 qoida 4) — aks holda posilkaning hodisa oqimi to'xtaydi |
+| 19c | 🔴 **`customer.district_sato` real SOATO kodi** va manzil matniga MOS bo'lishi — marshrut shu kod bo'yicha ketadi (§4.2) |
 | 20 | Sandbox muhiti — alohida kalit, alohida ma'lumot |
 | 21 | `4xx` = qayta urinma; `5xx`/`429` = vaqtinchalik |
 | 22 | 12 oy audit saqlash (`event_id`, payload, HTTP kod, vaqt) — bizning ID bo'yicha qidiriladigan |
