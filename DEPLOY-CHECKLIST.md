@@ -150,6 +150,6 @@ ishlatilmagan qatorni o'chiradi.
 
 | Holat | Ta'siri |
 |---|---|
-| Marketlarda `telegram_id` yo'q | Tasdiqlash **tugmali** xabari kelmaydi. Zaxira yo'l ishlaydi: buyurtma boti orqali market foydalanuvchilariga **matnli** xabar ketadi va panel orqali tasdiqlanadi |
+| Marketlarda `telegram_id` yo'q | 🟡 **Tekshiring.** Dev bazada 13 marketdan 0 tasida bor. Zaxira yo'l (`notifyMarketUsers`) market yoki uning **operatoriga** yuboradi — ikkalasida ham `telegram_id` bo'lmasa **hech qanday xabar bormaydi**. Tizim yiqilmaydi va tasdiqlash panel orqali ishlayveradi, lekin market so'rovdan **o'zi panelga kirmaguncha xabardor bo'lmaydi**. Bog'lash: market egasi order-botga market tokenini + telefonini yuboradi |
 | Yangi tumanlarga kuryer biriktirilmagan | Posilka **qabul qilinadi**, lekin kuryer qo'lda tayinlanadi |
 | Marketplace kontrakti hali hamkorga berilmagan | `MARKETPLACE_PARTNER_API.md` (v1.1) va PDF tayyor |
