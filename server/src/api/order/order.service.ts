@@ -1252,6 +1252,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         delete payload.assigned_courier_tariff_center;
       }
 
+      /**
+       * ⚠️ MARKET SEKRETLARI OLIB TASHLANADI.
+       *
+       * `market` munosabati butun `users` qatorini olib keladi — parol
+       * hash'i va `market_tg_token` bilan birga. Buyurtma detali esa
+       * kuryerga, operatorga va registratorga ochiq. `market_tg_token`
+       * bilan order-botga kirib o'sha marketga YANGI OPERATOR qo'shish
+       * mumkin, ya'ni bu shunchaki ma'lumot oqishi emas.
+       */
+      if (payload.market) {
+        const { password, market_tg_token, ...safeMarket } = payload.market;
+        payload.market = safeMarket;
+      }
+
       // Almashtirish: agar bu ESKI (qaytarilayotgan) buyurtma bo'lsa — uni qaysi
       // YANGI buyurtma almashtirayotganini topib biriktiramiz (detalda havola).
       if (newOrder.is_replacement_return) {

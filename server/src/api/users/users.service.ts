@@ -1002,6 +1002,34 @@ export class UserService implements OnModuleInit {
         where: { id },
         relations: ['region', 'market', 'salary'],
       });
+
+      /**
+       * ⚠️ SEKRETLAR OLIB TASHLANADI.
+       *
+       * Bu javob butun `users` qatorini va `market` munosabatini o'z
+       * holicha qaytarardi. Ya'ni har bir operator:
+       *   · o'z parol hash'ini,
+       *   · MARKETNING parol hash'ini,
+       *   · MARKETNING `market_tg_token` ini
+       * ko'rardi. Oxirgisi eng yomoni: o'sha token bilan order-botga
+       * kirib shu marketga YANGI OPERATOR qo'shish mumkin.
+       *
+       * ⚠️ Oq ro'yxat EMAS, qora ro'yxat: frontend `market` obyektidan
+       * 20 dan ortiq maydonni o'qiydi (nom, tarif, ortiqcha xarajat
+       * sozlamalari...), oq ro'yxat qilinsa bittasi unutilib ekran
+       * buzilardi. Shu bois faqat xavflilari olib tashlanadi.
+       *
+       * ⚠️ Foydalanuvchining O'Z `market_tg_token` i QOLADI — market
+       * profil sahifasi uni ko'rsatadi (user-profile/index.tsx:681).
+       */
+      if (myProfile) {
+        delete (myProfile as Partial<UserEntity>).password;
+        if (myProfile.market) {
+          const m = myProfile.market as Partial<UserEntity>;
+          delete m.password;
+          delete m.market_tg_token;
+        }
+      }
       return successRes(myProfile, 200, 'Profile info');
     } catch (error) {
       return catchError(error);
@@ -1872,8 +1900,16 @@ export class UserService implements OnModuleInit {
     try {
       const { phone_number, password } = signInDto;
 
+      /**
+       * ⚠️ `is_deleted: false` SHART.
+       *
+       * O'chirish hamma joyda YUMSHOQ (`deleteOperator` faqat
+       * `is_deleted = true` qo'yadi, `status` esa ACTIVE qoladi). Bu
+       * filtrsiz o'chirilgan operator/kuryer/logist eski paroli bilan
+       * kirishda davom etardi va buyurtma yarata olardi.
+       */
       const user = await this.userRepo.findOne({
-        where: { phone_number, role: Not(Roles.CUSTOMER) },
+        where: { phone_number, role: Not(Roles.CUSTOMER), is_deleted: false },
       });
       if (!user) {
         this.logFailedLogin('unknown_phone', phone_number, req);
@@ -2039,7 +2075,12 @@ export class UserService implements OnModuleInit {
         throw new UnauthorizedException('Refresh token expired or invalid');
       }
 
-      const user = await this.userRepo.findOne({ where: { id: payload.id } });
+      // ⚠️ `is_deleted` bu yerda ham tekshiriladi — aks holda o'chirilgan
+      // foydalanuvchi mavjud refresh cookie'si bilan sessiyani cheksiz
+      // uzaytirardi va login filtrini aylanib o'tardi.
+      const user = await this.userRepo.findOne({
+        where: { id: payload.id, is_deleted: false },
+      });
       if (!user || user.status === Status.INACTIVE) {
         res.clearCookie('refreshToken');
         throw new UnauthorizedException('User not found or inactive');
@@ -2377,7 +2418,7 @@ export class UserService implements OnModuleInit {
     try {
       const { password, ...otherFields } = dto;
       const logist = await this.userRepo.findOne({
-        where: { id, role: Roles.LOGIST },
+        where: { id, role: Roles.LOGIST, is_deleted: false },
       });
       if (!logist) {
         throw new NotFoundException('Logist topilmadi');
@@ -2464,7 +2505,7 @@ export class UserService implements OnModuleInit {
   async deleteLogist(id: string, actor?: JwtPayload): Promise<object> {
     try {
       const logist = await this.userRepo.findOne({
-        where: { id, role: Roles.LOGIST },
+        where: { id, role: Roles.LOGIST, is_deleted: false },
       });
       if (!logist) {
         throw new NotFoundException('Logist topilmadi');
