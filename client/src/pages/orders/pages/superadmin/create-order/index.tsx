@@ -139,6 +139,10 @@ const CreateOrder = () => {
       comment: productInfo?.comment,
       operator: productInfo?.operator,
       operator_phone: normalizedOperatorPhone || undefined,
+      // Tanlanmagan bo'lsa YUBORILMAYDI — global ValidationPipe
+      // `forbidNonWhitelisted` bo'lsa ham `undefined` maydon tashlanadi,
+      // server esa eski xatti-harakatni saqlaydi.
+      operator_id: productInfo?.operator_id || undefined,
       // Buyurtma uchun yetkazib berish manzili
       district_id: customer?.district_id,
       address: customer?.address,
