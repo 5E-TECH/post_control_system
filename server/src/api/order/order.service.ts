@@ -12,6 +12,7 @@ import { RollbackOrderDto, RollbackTarget } from './dto/rollback-order.dto';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
+import { resolveOperatorAssignment } from './utils/operator-assignment.util';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { DataSource, EntityManager, In, IsNull, QueryRunner } from 'typeorm';
 import { OrderItemEntity } from 'src/core/entity/order-item.entity';
@@ -384,6 +385,40 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new BadRequestException('You can not create order and product');
       }
 
+      /**
+       * ── OPERATOR BIRIKTIRISH (ixtiyoriy) ──────────────────────────────
+       *
+       * ⚠️ Avval bu yerda `operator_id` FAQAT yaratuvchining o'zi operator
+       * bo'lsa to'lardi. Natijada market yoki admin yaratgan buyurtma
+       * hech kimga bog'lanmasdi: operator komissiyasi hisoblanmasdi va
+       * «qaysi operator qancha ishladi» degan savolga javob yo'q edi.
+       *
+       * Nomzod SHU tranzaksiya ichida o'qiladi — tekshirish bilan yozish
+       * orasida operator o'chirilib qolmasin.
+       */
+      const operatorCandidate = createOrderDto.operator_id
+        ? await queryRunner.manager.findOne(UserEntity, {
+            where: { id: createOrderDto.operator_id, role: Roles.OPERATOR },
+            select: ['id', 'name', 'status', 'market_id', 'is_deleted'],
+          })
+        : null;
+      const assignment = resolveOperatorAssignment({
+        creatorId: user.id,
+        creatorRole: user.role as Roles,
+        marketId: market.id,
+        requestedOperatorId: createOrderDto.operator_id,
+        candidate: operatorCandidate,
+        now: Date.now(),
+      });
+      /**
+       * Tanlangan operator ismi chekdagi YAGONA haqiqat manbai bo'ladi —
+       * market erkin matnga boshqa ism yozib qo'ysa, chek bilan
+       * komissiya egasi bir-biriga zid bo'lardi.
+       */
+      if (assignment.operator_name) {
+        createOrderDto.operator = assignment.operator_name;
+      }
+
       // Operator telefon mantiqi (require_operator_phone toggle bo'yicha):
       //  • toggle OFF                    — default ishlatiladi (mavjud bo'lsa), form'dagi input — 2-raqam
       //  • toggle ON + default bor       — default = 1-raqam, form'dagi input — ixtiyoriy 2-raqam
@@ -518,7 +553,10 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         operator: createOrderDto.operator,
         operator_phone: finalOperatorPhone,
         secondary_operator_phone: finalSecondaryOperatorPhone,
-        operator_id: user.role === Roles.OPERATOR ? user.id : null,
+        operator_id: assignment.operator_id,
+        operator_assigned_by: assignment.operator_assigned_by,
+        operator_assigned_at: assignment.operator_assigned_at,
+        operator_accepted_at: assignment.operator_accepted_at,
         total_price,
         product_quantity,
         where_deliver: where_deliver || Where_deliver.CENTER,

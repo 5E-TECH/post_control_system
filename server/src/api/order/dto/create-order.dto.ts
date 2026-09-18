@@ -130,4 +130,18 @@ export class CreateOrderDto {
   @IsOptional()
   @IsUUID(4, { message: "Almashtirilayotgan buyurtma ID noto'g'ri formatda" })
   replaced_order_id?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Buyurtma biriktiriladigan operator (IXTIYORIY). Faqat SHU marketning ' +
+      "o'chirilmagan va bloklanmagan operatori qabul qilinadi. Berilmasa: " +
+      "yaratuvchining o'zi operator bo'lsa o'ziga biriktiriladi, aks holda " +
+      "bo'sh qoladi (market operator qo'shmagan holat).",
+    type: String,
+    format: 'uuid',
+    example: '9f1c2d3e-4b5a-46c7-8d9e-0a1b2c3d4e5f',
+  })
+  @IsOptional()
+  @IsUUID(4, { message: "Operator ID noto'g'ri formatda" })
+  operator_id?: string;
 }

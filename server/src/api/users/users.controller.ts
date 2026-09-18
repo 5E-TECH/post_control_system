@@ -690,6 +690,34 @@ export class UsersController {
     return this.userService.getMyOperators(user);
   }
 
+  /**
+   * ⚠️ `my-operators` dan ALOHIDA: u faqat MARKET uchun, bu esa buyurtma
+   * YARATADIGAN barcha rollar uchun va faqat `id` + `name` qaytaradi.
+   * Marshrut `:id` dan OLDIN turishi shart — aks holda `selectable`
+   * `@Get(':id')` ga tushib ketardi.
+   */
+  @ApiOperation({ summary: 'Buyurtmaga biriktirish uchun operatorlar' })
+  @ApiQuery({
+    name: 'market_id',
+    required: false,
+    description: 'Faqat admin/registrator uchun — qaysi marketning operatorlari',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.MARKET,
+    Roles.OPERATOR,
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+  )
+  @Get('operators/selectable')
+  getSelectableOperators(
+    @CurrentUser() user: JwtPayload,
+    @Query('market_id') marketId?: string,
+  ) {
+    return this.userService.getSelectableOperators(user, marketId);
+  }
+
   @ApiOperation({ summary: 'Delete operator' })
   @ApiParam({ name: 'id', description: 'Operator ID' })
   @ApiResponse({ status: 200, description: 'Operator deleted successfully' })

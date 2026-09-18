@@ -103,9 +103,46 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   secondary_operator_phone: string | null;
 
-  // Buyurtmani yaratgan operatorning user ID si
+  /**
+   * Buyurtma BIRIKTIRILGAN operator.
+   *
+   * ⚠️ Avval bu «yaratgan operator» edi va faqat yaratuvchi OPERATOR
+   * rolida bo'lsa to'lardi. Endi market/admin ham boshqa operatorni
+   * tanlashi mumkin — shu bois ma'nosi «kimga biriktirilgan».
+   * Operator KOMISSIYASI (`operator_earning`) aynan shu ustundan
+   * hisoblanadi, shuning uchun unga faqat SHU MARKETNING faol operatori
+   * yozilishi mumkin (`resolveOperatorAssignment`).
+   */
   @Column({ type: 'uuid', nullable: true })
   operator_id: string | null;
+
+  /**
+   * Kim biriktirdi. `null` — operator o'zi yaratgan yoki eski yozuv.
+   * Rad etish faqat BOSHQA odam biriktirgan bo'lsa ruxsat etiladi.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  operator_assigned_by: string | null;
+
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  operator_assigned_at: number | null;
+
+  /**
+   * Operator biriktiruvni QABUL QILGAN vaqt. `null` — kutilmoqda.
+   *
+   * ⚠️ Bu buyurtma STATUSIGA tegmaydi va pulni boshqarmaydi — u faqat
+   * «operator ko'rdi va o'ziniki deb tan oldi» signali. Guruh-tasdiqlash
+   * (CREATED→NEW) oqimi bilan aralashtirmaslik kerak.
+   */
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  operator_accepted_at: number | null;
 
   @Column({ type: 'uuid', nullable: true })
   post_id: string | null;

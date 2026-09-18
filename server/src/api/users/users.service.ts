@@ -2584,9 +2584,78 @@ export class UserService implements OnModuleInit {
           is_deleted: false,
         },
         order: { created_at: 'DESC' },
-        select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+        /**
+         * ⚠️ KOMISSIYA MAYDONLARI SHART.
+         *
+         * Avval `select` ularni qaytarmasdi, ekran esa
+         * `op.commission_type` / `op.commission_value` ni o'qib forma
+         * yig'ardi. Natijada saqlangan komissiya hech qachon ko'rinmasdi
+         * va keyingi saqlashda JIMGINA ustiga yozilardi.
+         */
+        select: [
+          'id',
+          'name',
+          'phone_number',
+          'status',
+          'created_at',
+          'commission_type',
+          'commission_value',
+        ],
       });
       return successRes(operators, 200, 'Market operatorlari');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * BUYURTMA FORMASI UCHUN OPERATORLAR RO'YXATI.
+   *
+   * ⚠️ `getMyOperators` dan farqi — ROLLAR. U faqat MARKET uchun ochiq,
+   * buyurtmani esa market, uning operatori, registrator va admin ham
+   * yaratadi. Shu bois alohida, MINIMAL yuzali endpoint:
+   * faqat `id` + `name` qaytadi (telefon, komissiya, status — yo'q).
+   *
+   * Market aniqlash qoidasi:
+   *   MARKET    → o'zi
+   *   OPERATOR  → o'z marketi (hamkasbiga biriktira oladi)
+   *   ADMIN/SUPERADMIN/REGISTRATOR → `marketId` parametridagi market
+   */
+  async getSelectableOperators(
+    user: JwtPayload,
+    marketId?: string,
+  ): Promise<object> {
+    try {
+      let targetMarketId: string | null = null;
+
+      if (user.role === Roles.MARKET) {
+        targetMarketId = user.id;
+      } else if (user.role === Roles.OPERATOR) {
+        const me = await this.userRepo.findOne({
+          where: { id: user.id, role: Roles.OPERATOR, is_deleted: false },
+          select: ['id', 'market_id'],
+        });
+        targetMarketId = me?.market_id ?? null;
+      } else {
+        // Admin-like rollar market tanlab ishlaydi.
+        targetMarketId = marketId ?? null;
+      }
+
+      // Market aniqlanmasa — bo'sh ro'yxat. Xato EMAS: forma shunchaki
+      // tanlovni ko'rsatmaydi va buyurtma avvalgidek yaratilaveradi.
+      if (!targetMarketId) return successRes([], 200, 'Operatorlar');
+
+      const operators = await this.userRepo.find({
+        where: {
+          market_id: targetMarketId,
+          role: Roles.OPERATOR,
+          is_deleted: false,
+          status: Status.ACTIVE,
+        },
+        order: { name: 'ASC' },
+        select: ['id', 'name'],
+      });
+      return successRes(operators, 200, 'Operatorlar');
     } catch (error) {
       return catchError(error);
     }
