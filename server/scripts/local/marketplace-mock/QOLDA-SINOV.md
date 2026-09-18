@@ -44,6 +44,28 @@ node server/scripts/local/marketplace-mock/server.js
    posilkalar  11 ta · sotuvchilar 4 ta
 ```
 
+### 1.3.1 Qayta sinash — YANGI PARTIYA
+
+Bir marta qabul qilingan posilkani PCS qayta skanerlashga qo'ymaydi
+(to'g'ri qiladi). Ya'ni bitta to'liq sinovdan keyin QR varaq **o'lik**
+bo'ladi: «posilka topilmadi». `/_mock/reset` ham yordam bermaydi — u
+o'sha ID larni tiklaydi.
+
+Yangi partiya oling va varaqni o'sha belgi bilan qayta chiqaring:
+
+```bash
+curl -s -H "X-Api-Key: mock-marketplace-key" localhost:4010/_mock/new-batch
+node server/scripts/local/marketplace-mock/print-qr.js B2
+```
+
+⚠️ Mock holati XOTIRADA. Mock qayta ishga tushsa partiya yo'qoladi va
+varaq yana o'lik bo'ladi — shuning uchun mock'ni partiya bilan
+ko'taring:
+
+```bash
+MP_SECRET=mock-secret-v1 MP_BATCH=B2 node server/scripts/local/marketplace-mock/server.js
+```
+
 ### 1.4 QR varaqni bosib chiqarish
 
 ```bash

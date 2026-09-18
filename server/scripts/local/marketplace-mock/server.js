@@ -78,6 +78,50 @@ function seed() {
 }
 seed();
 
+/**
+ * Seed nusxasini YANGI ID bilan yaratadi (`PCL-8842-1` → `PCL-8842-1-B2`).
+ * Sinov holatlari (ko'p qutili, oldindan to'langan, noma'lum sotuvchi)
+ * saqlanadi — faqat identifikatorlar o'zgaradi.
+ */
+function mintBatch(tag) {
+  const created = [];
+  for (const d of PARCELS) {
+    const def = {
+      ...d,
+      external_parcel_id: `${d.external_parcel_id}-${tag}`,
+      external_order_id: `${d.external_order_id}-${tag}`,
+      qr_token: `${d.qr_token}-${tag}`,
+    };
+    state.parcels.set(def.external_parcel_id, {
+      def,
+      status: def.status,
+      last_applied_seq: 0,
+      money: null,
+      updated_at: Date.now(),
+      accepted_batch: null,
+    });
+    created.push({ qr_token: def.qr_token, why: def._why });
+  }
+  console.log(`\n🆕 partiya ${tag}: ${created.length} ta posilka\n`);
+  return created;
+}
+
+/**
+ * ⚠️ PARTIYA ISHGA TUSHISHDA TIKLANADI.
+ *
+ * Mock holati XOTIRADA — u qayta ishga tushsa partiya yo'qolardi va
+ * bosib chiqarilgan QR varaq (`print-qr.js B2`) o'lik bo'lib qolardi:
+ * «posilka topilmadi». `MP_BATCH=B2` bilan varaq amal qilaveradi.
+ */
+if (process.env.MP_BATCH) {
+  const tags = process.env.MP_BATCH.split(',').map((t) => t.trim()).filter(Boolean);
+  for (const t of tags) mintBatch(t);
+  state.batchNo = Math.max(
+    1,
+    ...tags.map((t) => Number(String(t).replace(/^B/, '')) || 1),
+  );
+}
+
 function issue(severity, code, message, extra) {
   const row = { at: new Date().toISOString(), severity, code, message, ...(extra || {}) };
   state.issues.push(row);
@@ -468,25 +512,7 @@ const server = http.createServer((req, res) => {
     if (path === '/_mock/new-batch') {
       state.batchNo = (state.batchNo || 1) + 1;
       const tag = `B${state.batchNo}`;
-      const created = [];
-      for (const d of PARCELS) {
-        const def = {
-          ...d,
-          external_parcel_id: `${d.external_parcel_id}-${tag}`,
-          external_order_id: `${d.external_order_id}-${tag}`,
-          qr_token: `${d.qr_token}-${tag}`,
-        };
-        state.parcels.set(def.external_parcel_id, {
-          def,
-          status: def.status,
-          last_applied_seq: 0,
-          money: null,
-          updated_at: Date.now(),
-          accepted_batch: null,
-        });
-        created.push({ qr_token: def.qr_token, why: def._why });
-      }
-      console.log(`\n🆕 yangi partiya ${tag}: ${created.length} ta posilka\n`);
+      const created = mintBatch(tag);
       return send(res, 200, { batch: tag, count: created.length, parcels: created });
     }
 

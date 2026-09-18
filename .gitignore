@@ -21,3 +21,7 @@ server/.uploads-dev/
 
 # Backup/test arxivlari — repoda saqlanmaydi
 *.tar.gz
+
+# .env zaxira nusxalari — sekretlar bor, HECH QACHON commit qilinmaydi
+.env.bak-*
+**/.env.bak-*
