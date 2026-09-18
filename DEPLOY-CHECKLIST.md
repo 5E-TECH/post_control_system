@@ -127,10 +127,25 @@ Qo'llanadiganlar (prod holatiga qarab):
 | 5 | `MarketplaceIntegration` | Marketplace 8 jadvali |
 | 6 | `MarketplaceStatusMap` | Status lug'ati + sessiya indeksi |
 | 7 | `SoatoDistrictsBackfill` | 26 ta tuman/shahar (faqat `INSERT`) |
+| 8 | `OrderOperatorAssignment` | Operator biriktirish ustunlari + eski buyurtmalar backfill'i |
 
 `SoatoDistrictsBackfill` xavfsizligi: faqat qo'shadi, mavjud qatorlarga
 tegmaydi (sha256 barmoq izi bilan tekshirilgan), idempotent, `down()` faqat
 ishlatilmagan qatorni o'chiradi.
+
+`OrderOperatorAssignment` xavfsizligi: ustunlar `IF NOT EXISTS`;
+`order.operator_id` va uning indeksi ham shu yerda kafolatlanadi (ular
+bazada tarixan `synchronize` orqali paydo bo'lgan, migratsiyasi yo'q edi
+— prod'da bo'lmasligi mumkin). Backfill eski buyurtmalarni «qabul
+qilingan» deb belgilaydi.
+
+⚠️ Deploydan keyin TEKSHIRING:
+```sql
+SELECT count(*) FROM "order"
+ WHERE operator_id IS NOT NULL AND operator_accepted_at IS NULL;
+```
+Natija `0` bo'lishi kerak. Aks holda operator sahifasi butun tarix bilan
+«Sizga biriktirilgan» bo'lib to'lib ketadi.
 
 ---
 
@@ -143,6 +158,9 @@ ishlatilmagan qatorni o'chiradi.
 | 3 | Kuryerdan qo'shimcha xarajat: foto yuklash ishlaydi (413 xatosi bo'lmasin) |
 | 4 | Audit jurnalida IP `127.0.0.1` emas, haqiqiy IP |
 | 5 | Yangi tumanlar ro'yxatda: Nukus shahri, Termiz shahri, Urganch shahri |
+| 6 | Buyurtma formasida operator tanlovi (operatorli marketda) chiqadi |
+| 7 | `SELECT count(*) FROM "order" WHERE operator_id IS NOT NULL AND operator_accepted_at IS NULL` → `0` |
+| 8 | O'chirilgan operator kira OLMAYDI (login 400) |
 
 ---
 
