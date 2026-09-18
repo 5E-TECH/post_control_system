@@ -413,7 +413,7 @@ const OperatorOrders = () => {
             Mening buyurtmalarim
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Siz yaratgan barcha buyurtmalar
+            Siz yaratgan va sizga biriktirilgan buyurtmalar
           </p>
         </div>
       </div>
