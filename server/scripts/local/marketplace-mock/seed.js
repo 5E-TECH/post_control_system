@@ -20,8 +20,19 @@ const CUSTOMER = {
   full_name: 'Aliyev Vali',
   phone: '+998901234567',
   additional_phone: null,
-  region_sato: '1727',
-  district_sato: '1727401',
+  /**
+   * ⚠️ SOATO va MANZIL MATNI BIR-BIRIGA MOS BO'LISHI SHART.
+   *
+   * Avval bu yerda `1727401` (Nurafshon, Toshkent VILOYATI) turardi,
+   * manzil matni esa «Toshkent sh., Yunusobod t.» deb yozilgan edi.
+   * Marshrutlash SOATO bo'yicha ketadi — buyurtmalar Nurafshonga
+   * tushardi, ekranda esa Yunusobod ko'rinardi. Sinov ma'lumoti
+   * o'zi ziddiyatli bo'lsa, sinov hech narsani isbotlamaydi.
+   *
+   * 1726 = Toshkent shahri, 1726266 = Yunusobod tumani.
+   */
+  region_sato: '1726',
+  district_sato: '1726266',
   address: "Toshkent sh., Yunusobod t., 4-mavze, 15-uy",
   comment: null,
 };

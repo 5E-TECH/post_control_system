@@ -178,7 +178,46 @@ export class MarketplaceScanService {
       where: { scan_session_id: sessionId },
       order: { scanned_at: 'ASC' },
     });
-    return { session, parcels };
+
+    /**
+     * ⚠️ TUMAN NOMI QAYTARILADI — ekran uni O'ZI topa olmaydi.
+     *
+     * Marshrutlash SOATO KODI bo'yicha ketadi, `raw_payload.customer.address`
+     * esa hamkorning erkin matni. Ular mos kelmasligi mumkin (sinov
+     * ma'lumotida aynan shunday bo'lgan: matn «Yunusobod», kod esa
+     * Nurafshon). Ekran matnni ko'rsatsa, operator posilka qayerga
+     * ketishini NOTO'G'RI biladi.
+     *
+     * Bitta so'rov — har posilka uchun alohida emas.
+     */
+    const satoCodes = [
+      ...new Set(
+        parcels
+          .map((p) => {
+            const raw = (p.raw_payload ?? {}) as Record<string, unknown>;
+            const cust = (raw.customer ?? {}) as Record<string, unknown>;
+            return String(cust.district_sato ?? '').trim();
+          })
+          .filter(Boolean),
+      ),
+    ];
+    const districts = satoCodes.length
+      ? await this.districtRepo.find({ where: { sato_code: In(satoCodes) } })
+      : [];
+    const nameBySato = new Map(districts.map((d) => [d.sato_code, d.name]));
+
+    return {
+      session,
+      parcels: parcels.map((p) => {
+        const raw = (p.raw_payload ?? {}) as Record<string, unknown>;
+        const cust = (raw.customer ?? {}) as Record<string, unknown>;
+        const sato = String(cust.district_sato ?? '').trim();
+        return {
+          ...p,
+          district_name: nameBySato.get(sato) ?? null,
+        };
+      }),
+    };
   }
 
   // ═══════════════════ SKAN ═══════════════════

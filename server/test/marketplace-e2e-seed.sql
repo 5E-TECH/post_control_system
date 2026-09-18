@@ -14,11 +14,17 @@ DELETE FROM users WHERE role IN ('customer','market','courier','superadmin');
 DELETE FROM district;
 DELETE FROM region;
 
+-- ⚠️ SOATO kodlari HAQIQIY qiymatlar bilan bir xil bo'lishi shart:
+-- 1726 = Toshkent shahri, 1726266 = Yunusobod tumani. Avval bu yerda
+-- 'Yunusobod' nomi 1727401 kodi bilan turardi — bu kod aslida Nurafshon
+-- (Toshkent VILOYATI). Sinov o'z ichida mos edi, shuning uchun hech
+-- narsani ushlamasdi, prod ma'lumotida esa buyurtma boshqa viloyatga
+-- ketardi.
 INSERT INTO region (id, created_at, updated_at, name, sato_code) VALUES
-  ('11111111-1111-4111-8111-111111111111', 1, 1, 'Toshkent shahri', '1727');
+  ('11111111-1111-4111-8111-111111111111', 1, 1, 'Toshkent shahri', '1726');
 
 INSERT INTO district (id, created_at, updated_at, name, region_id, sato_code) VALUES
-  ('22222222-2222-4222-8222-222222222222', 1, 1, 'Yunusobod', '11111111-1111-4111-8111-111111111111', '1727401');
+  ('22222222-2222-4222-8222-222222222222', 1, 1, 'Yunusobod tumani', '11111111-1111-4111-8111-111111111111', '1726266');
 
 -- superadmin: sozlash + skan + qabul
 INSERT INTO users (id, created_at, updated_at, name, phone_number, role, status) VALUES

@@ -73,6 +73,12 @@ export interface MarketplaceParcelRow {
   reject_note: string | null;
   scanned_at: number | null;
   raw_payload: Record<string, unknown> | null;
+  /**
+   * SOATO kodidan aniqlangan tuman — MARSHRUTLASH shu bo'yicha ketadi.
+   * `raw_payload.customer.address` (hamkorning erkin matni) bilan mos
+   * kelmasligi mumkin, shuning uchun ekranda ikkalasi ALOHIDA ko'rsatiladi.
+   */
+  district_name: string | null;
 }
 
 export interface MarketplaceAcceptResult {

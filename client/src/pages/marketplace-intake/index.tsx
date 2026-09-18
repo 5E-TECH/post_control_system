@@ -293,7 +293,7 @@ const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
             seller_name: (seller.seller_name as string | undefined) ?? null,
             customer_name: String(cust.full_name ?? "Marketplace mijozi"),
             phone: String(cust.phone ?? ""),
-            district_name: null,
+            district_name: p.district_name ?? null,
             address: cust.address ? String(cust.address) : null,
             cod_amount: Number(p.cod_amount ?? 0),
             prepaid: !!p.prepaid,
@@ -900,12 +900,24 @@ const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
                         {prettyPhone(r.phone)}
                       </span>
                     )}
-                    {(r.district_name || r.address) && (
-                      <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 truncate">
-                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
-                        <span className="truncate">
-                          {r.district_name ?? r.address}
-                        </span>
+                    {/*
+                      ⚠️ TUMAN va MANZIL ALOHIDA.
+                      Avval `district_name ?? address` yozilgan edi: tuman
+                      aniqlanmasa ekran hamkorning erkin manzil matnini
+                      ko'rsatardi. Marshrutlash esa SOATO kodi bo'yicha
+                      ketadi — matn «Yunusobod» deb tursa ham posilka
+                      Nurafshonga ketishi mumkin edi. Operator qayerga
+                      ketishini ANIQ ko'rishi shart.
+                    */}
+                    {r.district_name && (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs sm:text-sm font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 flex-shrink-0">
+                        <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                        {r.district_name}
+                      </span>
+                    )}
+                    {r.address && (
+                      <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {r.address}
                       </span>
                     )}
                   </div>
