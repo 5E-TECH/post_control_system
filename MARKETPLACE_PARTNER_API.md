@@ -24,6 +24,12 @@ Shuningdek: `cod_amount: 0` ↔ `prepaid` ziddiyati, status lug'ati bo'yicha
 §6.1 ↔ §7.9 ziddiyati, bo'lim raqamlaridagi takror, circuit breaker (§9.1),
 `qr_token` registri va yangi 6 ta qabul testi (§11).
 
+**Ilova A qo'shildi** — BeePost qabul qiladigan SOATO kodlarining to'liq
+ro'yxati (14 viloyat, 207 tuman/shahar). Ma'lumotnoma rasmiy SOATO tasnifi
+bilan solishtirilib **to'ldirildi**: avval yetishmayotgan 26 ta yozuv,
+jumladan Namangan, Termiz, Urganch, Nukus, Guliston va Farg'ona
+**shaharlari** qo'shildi.
+
 ---
 
 ## 0. Kelishilgan shartlar (2026-09-15)
@@ -1321,7 +1327,8 @@ Har o'zgarish **versiyalanadi** (`v1`, `v1.1`, ...) va eski versiya kamida 3 oy 
 > **qabul qilinmaydi** va operator «Tuman topilmadi (SOATO …)» xatosini
 > ko'radi.
 
-**Hozirgi holat:** 14 viloyat · **181 tuman/shahar**.
+**Hozirgi holat:** 14 viloyat · **207 tuman/shahar** — O'zbekiston bo'ylab
+to'liq qamrov.
 
 ### Qanday ishlatiladi
 
@@ -1333,21 +1340,19 @@ Har o'zgarish **versiyalanadi** (`v1`, `v1.1`, ...) va eski versiya kamida 3 oy 
 4. Ishga tushirishdan **oldin** 20 ta real kodingizni bizga yuboring —
    biz «topildi / topilmadi» ro'yxatini qaytaramiz (§11, test 19).
 
-### ⚠️ Ma'lumotnomada YO'Q hududlar
+### ⚠️ TUMAN va SHAHAR — alohida kodlar
 
-Quyidagi yirik shaharlar hozircha alohida yozuv sifatida **kiritilmagan**.
-Bu hududlarga buyurtma yuborishdan oldin BeePost bilan bog'laning:
+Ko'p viloyatda markaziy shahar va shu nomdagi tuman **alohida** yozuv:
 
-| Viloyat | Yo'q yozuv |
-|---|---|
-| Namangan viloyati | Namangan **shahri** |
-| Surxondaryo viloyati | Termiz **shahri** |
-| Xorazm viloyati | Urganch **shahri** |
-| Qoraqalpog'iston Respublikasi | Nukus **shahri** |
-| Navoiy viloyati | Uchquduq, Tomdi tumanlari |
+| Kod | Nomi | Nima |
+|---|---|---|
+| `1735225` | Nukus | **tuman** (shahar atrofi) |
+| `1735401` | Nukus shahri | **shahar** |
+| `1733217` | Urganch | **tuman** |
+| `1733401` | Urganch shahri | **shahar** |
 
-> Ro'yxatdagi `Namangan`, `Termiz`, `Urganch`, `Nukus` yozuvlari —
-> shu nomdagi **tumanlar**, shaharlar EMAS.
+Adashtirilsa posilka qo'shni hududga ketadi va hech qanday xato chiqmaydi.
+SOATO'da **5-raqam `4` bo'lsa — bu shahar** (`1735`**4**`01`).
 
 ### To'liq ro'yxat
 
@@ -1376,18 +1381,19 @@ Bu hududlarga buyurtma yuborishdan oldin BeePost bilan bog'laning:
 | `1706258` | Shofirkon tumani | `1706401` | Buxoro shahri |
 | `1706403` | Kogon shahri |  |  |
 
-#### Jizzax viloyati — `1708` (11 ta)
+#### Jizzax viloyati — `1708` (13 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
 | `1708201` | Arnasoy | `1708204` | Baxmal |
-| `1708209` | G'allaorol | `1708215` | Dostlik |
+| `1708209` | G'allaorol | `1708212` | Sh.Rashidov tumani |
+| `1708215` | Dostlik | `1708218` | Zomin tumani |
 | `1708220` | Zarbdor | `1708223` | Mirzacho'l |
 | `1708225` | Zafarobod | `1708228` | Paxtakor |
 | `1708235` | Forish | `1708237` | Yangiobod |
 | `1708401` | Jizzax shahri |  |  |
 
-#### Qashqadaryo viloyati — `1710` (15 ta)
+#### Qashqadaryo viloyati — `1710` (16 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
@@ -1397,27 +1403,30 @@ Bu hududlarga buyurtma yuborishdan oldin BeePost bilan bog'laning:
 | `1710233` | Mirishkor | `1710234` | Muborak |
 | `1710235` | Nishon | `1710237` | Kasbi |
 | `1710240` | Ko'kdala | `1710242` | Chiroqchi |
-| `1710250` | Yakkabog' | `1710401` | Qarshi shahri |
-| `1710405` | Shahrisabz |  |  |
+| `1710245` | Shahrisabz tumani | `1710250` | Yakkabog' |
+| `1710401` | Qarshi shahri | `1710405` | Shahrisabz |
 
-#### Navoiy viloyati — `1712` (8 ta)
+#### Navoiy viloyati — `1712` (11 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
 | `1712211` | Konimex tumani | `1712216` | Qiziltepa tumani |
 | `1712230` | Navbahor tumani | `1712234` | Karmana tumani |
-| `1712238` | Nurota tumani | `1712251` | Xatirchi |
+| `1712238` | Nurota tumani | `1712244` | Tomdi tumani |
+| `1712248` | Uchquduq tumani | `1712251` | Xatirchi |
 | `1712401` | Navoiy shahri | `1712408` | Zarafshon shahri |
+| `1712412` | G'ozg'on tumani |  |  |
 
-#### Namangan viloyati — `1714` (10 ta)
+#### Namangan viloyati — `1714` (12 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
 | `1714204` | Mingbuloq | `1714207` | Kosonsoy |
 | `1714212` | Namangan | `1714216` | Norin |
 | `1714219` | Pop | `1714224` | To'raqo'rg'on |
-| `1714234` | Uchqo'rg'on | `1714236` | Chortoq |
-| `1714237` | Chust | `1714242` | Yangiqo'rg'on |
+| `1714229` | Uychi tumani | `1714234` | Uchqo'rg'on |
+| `1714236` | Chortoq | `1714237` | Chust |
+| `1714242` | Yangiqo'rg'on | `1714401` | Namangan shahri |
 
 #### Samarqand viloyati — `1718` (16 ta)
 
@@ -1432,7 +1441,7 @@ Bu hududlarga buyurtma yuborishdan oldin BeePost bilan bog'laning:
 | `1718236` | Urgut tumani | `1718238` | Tayloq tumani |
 | `1718401` | Samarqand shahri | `1718406` | Kattaqo'rg'on shahri |
 
-#### Surxondaryo viloyati — `1722` (14 ta)
+#### Surxondaryo viloyati — `1722` (15 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
@@ -1443,8 +1452,9 @@ Bu hududlarga buyurtma yuborishdan oldin BeePost bilan bog'laning:
 | `1722215` | Qiziriq | `1722217` | Sariosiyo |
 | `1722220` | Termiz | `1722221` | Uzun |
 | `1722223` | Sherobod | `1722226` | Sho'rchi |
+| `1722401` | Termiz shahri |  |  |
 
-#### Sirdaryo viloyati — `1724` (10 ta)
+#### Sirdaryo viloyati — `1724` (12 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
@@ -1452,7 +1462,8 @@ Bu hududlarga buyurtma yuborishdan oldin BeePost bilan bog'laning:
 | `1724216` | Sayxunobod | `1724220` | Guliston |
 | `1724226` | Sardoba | `1724228` | Mirzaobod |
 | `1724231` | Sirdaryo | `1724235` | Xovos |
-| `1724410` | Shirin | `1724413` | Yangier |
+| `1724401` | Guliston shahri | `1724410` | Shirin |
+| `1724413` | Yangier | `1724414` | Baxt shahri |
 
 #### Toshkent shahri — `1726` (12 ta)
 
@@ -1465,7 +1476,7 @@ Bu hududlarga buyurtma yuborishdan oldin BeePost bilan bog'laning:
 | `1726287` | Yakkasaroy tumani | `1726290` | Yashnobod tumani |
 | `1726292` | Yangihayot tumani | `1726294` | Chilonzor tumani |
 
-#### Toshkent viloyati — `1727` (18 ta)
+#### Toshkent viloyati — `1727` (22 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
@@ -1474,44 +1485,51 @@ Bu hududlarga buyurtma yuborishdan oldin BeePost bilan bog'laning:
 | `1727228` | Bo'ka | `1727233` | Quyichirchiq |
 | `1727237` | Zangiota | `1727239` | Yuqorichirchiq |
 | `1727248` | Qibray | `1727249` | Parkent |
-| `1727250` | Piskent | `1727256` | Chinoz |
-| `1727259` | Yangiyo'l | `1727265` | Toshkent tumani |
-| `1727401` | Nurafshon | `1727404` | Olmaliq |
-| `1727407` | Angren | `1727419` | Chirchiq |
+| `1727250` | Piskent | `1727253` | O'rtachirchiq tumani |
+| `1727256` | Chinoz | `1727259` | Yangiyo'l |
+| `1727265` | Toshkent tumani | `1727401` | Nurafshon |
+| `1727404` | Olmaliq | `1727407` | Angren |
+| `1727413` | Bekobod shahri | `1727415` | Ohangaron shahri |
+| `1727419` | Chirchiq | `1727424` | Yangiyo'l shahri |
 
-#### Farg'ona viloyati — `1730` (15 ta)
+#### Farg'ona viloyati — `1730` (19 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
-| `1730203` | Oltiariq | `1730209` | Bog'dod |
-| `1730212` | Buvayda | `1730215` | Beshariq |
-| `1730218` | Quva | `1730221` | Uchko'prik |
-| `1730224` | Rishton | `1730226` | So'x |
-| `1730227` | Toshloq | `1730233` | Farg'ona |
+| `1730203` | Oltiariq | `1730206` | Qo'shtepa tumani |
+| `1730209` | Bog'dod | `1730212` | Buvayda |
+| `1730215` | Beshariq | `1730218` | Quva |
+| `1730221` | Uchko'prik | `1730224` | Rishton |
+| `1730226` | So'x | `1730227` | Toshloq |
+| `1730230` | O'zbekiston tumani | `1730233` | Farg'ona |
 | `1730236` | Dang'ara | `1730238` | Furqat |
-| `1730242` | Yozyovon | `1730405` | Qo'qon |
+| `1730242` | Yozyovon | `1730401` | Farg'ona shahri |
+| `1730405` | Qo'qon | `1730408` | Quvasoy shahri |
 | `1730412` | Marg'ilon |  |  |
 
-#### Xorazm viloyati — `1733` (9 ta)
+#### Xorazm viloyati — `1733` (13 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
 | `1733204` | Bog'ot | `1733208` | Gurlan |
 | `1733212` | Qo'shko'pir | `1733217` | Urganch |
-| `1733220` | Hazorasp | `1733226` | Khiva |
+| `1733220` | Hazorasp | `1733221` | Tuproqqal'a tumani |
+| `1733223` | Xonqa tumani | `1733226` | Khiva |
 | `1733230` | Shovot | `1733233` | Yangiariq |
-| `1733236` | Yangibozor |  |  |
+| `1733236` | Yangibozor | `1733401` | Urganch shahri |
+| `1733406` | Xiva shahri |  |  |
 
-#### Qoraqalpog'iston Respublikasi — `1735` (14 ta)
+#### Qoraqalpog'iston Respublikasi — `1735` (17 ta)
 
 | Kod | Tuman / shahar | Kod | Tuman / shahar |
 |---|---|---|---|
 | `1735204` | Amudaryo | `1735207` | Beruniy |
-| `1735211` | Qorao'zak | `1735212` | Kegeyli |
-| `1735215` | Qo'ng'irot | `1735218` | Qanliko'l |
-| `1735222` | Mo'ynoq | `1735225` | Nukus |
+| `1735209` | Bo'zatov tumani | `1735211` | Qorao'zak |
+| `1735212` | Kegeyli | `1735215` | Qo'ng'irot |
+| `1735218` | Qanliko'l | `1735222` | Mo'ynoq |
+| `1735225` | Nukus | `1735228` | Taxiatosh tumani |
 | `1735230` | Taxtako'pir | `1735233` | To'rtko'l |
 | `1735236` | Xo'jayli | `1735240` | Chimboy |
 | `1735243` | Shumanay | `1735250` | Ellikqal'a |
+| `1735401` | Nukus shahri |  |  |
 
----
