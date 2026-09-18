@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -43,6 +44,7 @@ import {
   EntityManager,
   ILike,
   In,
+  IsNull,
   Not,
 } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
@@ -3089,11 +3091,17 @@ export class UserService implements OnModuleInit {
   }
 
   // Operator o'z buyurtmalarini ko'rish (pagination bilan)
+  /**
+   * @param assignment `pending` — boshqa odam biriktirgan, operator hali
+   *   qabul qilmagan buyurtmalar. `accepted` — qabul qilinganlar.
+   *   Berilmasa — hammasi.
+   */
   async getMyOrders(
     operator: JwtPayload,
     page: number = 1,
     limit: number = 20,
     status?: string,
+    assignment?: 'pending' | 'accepted',
   ): Promise<object> {
     try {
       const operatorUser = await this.userRepo.findOne({
@@ -3123,6 +3131,16 @@ export class UserService implements OnModuleInit {
       if (status) {
         where.status = status;
       }
+      /**
+       * ⚠️ Operator O'ZI yaratmagan, lekin unga BIRIKTIRILGAN buyurtmalar
+       * ham shu ro'yxatda — `operator_id` bo'yicha filtr o'zgarmaydi.
+       * `assignment` faqat qabul qilinganini qabul qilinmaganidan ajratadi.
+       */
+      if (assignment === 'pending') {
+        where.operator_accepted_at = IsNull();
+      } else if (assignment === 'accepted') {
+        where.operator_accepted_at = Not(IsNull());
+      }
 
       const [orders, total] = await orderRepo.findAndCount({
         where,
@@ -3137,6 +3155,34 @@ export class UserService implements OnModuleInit {
         skip,
         take: safeLimit,
       });
+
+      /**
+       * Kim biriktirgani ISMI — operator «buni menga kim berdi?» degan
+       * savolga javob olishi kerak. Sahifadagi ID lar BITTA so'rovda
+       * yechiladi (har qator uchun alohida so'rov = N+1).
+       */
+      const assignerIds = [
+        ...new Set(
+          orders
+            .map((o) => o.operator_assigned_by)
+            .filter((v): v is string => !!v && v !== operator.id),
+        ),
+      ];
+      const assignerNames = new Map<string, string>();
+      if (assignerIds.length) {
+        const assigners = await this.userRepo.find({
+          where: { id: In(assignerIds) },
+          select: ['id', 'name'],
+        });
+        for (const a of assigners) assignerNames.set(a.id, a.name ?? '—');
+      }
+
+      // Rad etish faqat SOTUVDAN OLDIN mumkin.
+      const rejectableStatuses = [
+        Order_status.CREATED,
+        Order_status.NEW,
+        Order_status.RECEIVED,
+      ];
 
       // Har bir order uchun earning ma'lumotini olish
       const ordersWithEarnings = await Promise.all(
@@ -3195,6 +3241,27 @@ export class UserService implements OnModuleInit {
               : null,
             is_sold: isSold,
             is_cancelled: isCancelled,
+            /**
+             * ⚠️ `needs_acceptance` buyurtma STATUSIGA tegishli EMAS —
+             * u guruh-tasdiqlash (CREATED→NEW) bilan aralashtirilmasin.
+             * Bu faqat «operator biriktiruvni ko'rdi va tan oldi» belgisi.
+             */
+            assignment: {
+              assigned_by_name: order.operator_assigned_by
+                ? (assignerNames.get(order.operator_assigned_by) ?? null)
+                : null,
+              assigned_at: order.operator_assigned_at,
+              accepted_at: order.operator_accepted_at,
+              is_self_created:
+                !order.operator_assigned_by ||
+                order.operator_assigned_by === operator.id,
+              needs_acceptance: order.operator_accepted_at === null,
+              can_reject:
+                order.operator_accepted_at === null &&
+                !!order.operator_assigned_by &&
+                order.operator_assigned_by !== operator.id &&
+                rejectableStatuses.includes(order.status),
+            },
           };
         }),
       );
@@ -3202,7 +3269,7 @@ export class UserService implements OnModuleInit {
       // Statistika (soft-deleted'lar TypeORM tomonidan avtomatik filter qilinadi)
       const allOperatorOrders = await orderRepo.find({
         where: { operator_id: operator.id },
-        select: ['id', 'status'],
+        select: ['id', 'status', 'operator_accepted_at'],
       });
 
       const soldStatuses = [
@@ -3224,6 +3291,10 @@ export class UserService implements OnModuleInit {
           cancelStatuses.includes(o.status),
         ).length,
         pending: 0,
+        // Biriktirilgan, lekin hali qabul qilinmaganlar.
+        pending_acceptance: allOperatorOrders.filter(
+          (o) => o.operator_accepted_at === null,
+        ).length,
       };
       stats.pending = stats.total - stats.sold - stats.cancelled;
 
@@ -3242,6 +3313,179 @@ export class UserService implements OnModuleInit {
         200,
         'Mening buyurtmalarim',
       );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * OPERATOR UNGA BIRIKTIRILGAN BUYURTMANI QABUL QILADI.
+   *
+   * ⚠️ BU STATUSNI O'ZGARTIRMAYDI va PULNI BOSHQARMAYDI. Komissiya
+   * avvalgidek `order.operator_id` dan hisoblanadi — qabul qilish faqat
+   * «ko'rdim, meniki» degan tan olish signali. Guruh-tasdiqlash
+   * (CREATED → ✅ → NEW) oqimiga umuman tegilmaydi.
+   *
+   * ⚠️ `OrderService` ga bog'liqlik QO'SHILMAYDI — loyihada
+   * `OrderService` bir nechta modulda qayta provider qilingan va yangi
+   * konstruktor bog'liqligi prod'da serverni ko'tarmay qo'yadi
+   * (`tsc` ham, testlar ham buni ko'rmaydi). Shu bois mavjud
+   * `this.dataSource` ishlatiladi.
+   */
+  async acceptAssignedOrder(id: string, operator: JwtPayload): Promise<object> {
+    try {
+      const me = await this.userRepo.findOne({
+        where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
+        select: ['id', 'name', 'market_id'],
+      });
+      if (!me?.market_id) throw new NotFoundException('Operator topilmadi');
+
+      const orderRepo = this.dataSource.getRepository(OrderEntity);
+
+      /**
+       * ⚠️ ATOMIK. Ikki qurilmadan bir vaqtda bosilsa ham bir marta
+       * qabul qilinadi (`operator_accepted_at IS NULL` shart ichida).
+       *
+       * ⚠️ `.returning()` ISHLATILMAYDI — TypeORM uni `[rows, count]`
+       * tuple qilib qaytaradi va `affected` NaN bo'lib qoladi.
+       * ⚠️ `deleted_at IS NULL` QO'LDA: `.update()` soft-delete filtrini
+       * o'zi qo'llamaydi.
+       */
+      const res = await orderRepo
+        .createQueryBuilder()
+        .update(OrderEntity)
+        .set({ operator_accepted_at: Date.now() })
+        .where('id = :id', { id })
+        .andWhere('operator_id = :opId', { opId: me.id })
+        .andWhere('user_id = :marketId', { marketId: me.market_id })
+        .andWhere('operator_accepted_at IS NULL')
+        .andWhere('deleted_at IS NULL')
+        .execute();
+
+      if (!res.affected) {
+        // Sababni aniqlaymiz — operator nima bo'lganini bilishi kerak.
+        const row = await orderRepo.findOne({
+          where: { id },
+          select: ['id', 'operator_id', 'operator_accepted_at', 'order_number'],
+        });
+        if (!row) throw new NotFoundException('Buyurtma topilmadi');
+        if (row.operator_id !== me.id) {
+          throw new ForbiddenException('Bu buyurtma sizga biriktirilmagan');
+        }
+        // Allaqachon qabul qilingan — idempotent, xato emas.
+        return successRes({}, 200, 'Buyurtma allaqachon qabul qilingan');
+      }
+
+      const row = await orderRepo.findOne({
+        where: { id },
+        select: ['id', 'order_number'],
+      });
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: id,
+        action: 'operator_accepted',
+        new_value: { operator_id: me.id, operator_name: me.name },
+        description: `Buyurtma #${row?.order_number} — operator ${me.name} biriktiruvni qabul qildi`,
+        user: operator,
+      });
+      return successRes({}, 200, 'Buyurtma qabul qilindi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * OPERATOR BIRIKTIRUVNI RAD ETADI — buyurtma operatorsiz qoladi.
+   *
+   * Shartlar (hammasi bitta atomik `UPDATE` da):
+   *   · hali QABUL QILINMAGAN (qabul qilgandan keyin rad etib bo'lmaydi)
+   *   · BOSHQA odam biriktirgan (o'zi yaratganini rad eta olmaydi)
+   *   · sotuvdan OLDIN (`created` / `new` / `received`)
+   *
+   * ⚠️ `operator` MATN maydoni tegilmaydi — chek allaqachon chop etilgan
+   * bo'lishi mumkin. Market jurnaldan ko'radi va kerak bo'lsa tahrirlaydi.
+   * `operator_earning` ham tegilmaydi: rad etish faqat sotuvdan oldin
+   * mumkin, ya'ni daromad qatori hali mavjud emas.
+   */
+  async rejectAssignedOrder(id: string, operator: JwtPayload): Promise<object> {
+    try {
+      const me = await this.userRepo.findOne({
+        where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
+        select: ['id', 'name', 'market_id'],
+      });
+      if (!me?.market_id) throw new NotFoundException('Operator topilmadi');
+
+      const orderRepo = this.dataSource.getRepository(OrderEntity);
+      const res = await orderRepo
+        .createQueryBuilder()
+        .update(OrderEntity)
+        .set({
+          operator_id: null,
+          operator_assigned_by: null,
+          operator_assigned_at: null,
+        })
+        .where('id = :id', { id })
+        .andWhere('operator_id = :opId', { opId: me.id })
+        .andWhere('user_id = :marketId', { marketId: me.market_id })
+        .andWhere('operator_accepted_at IS NULL')
+        .andWhere('operator_assigned_by IS NOT NULL')
+        .andWhere('operator_assigned_by <> operator_id')
+        .andWhere('status IN (:...sts)', {
+          sts: [
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.RECEIVED,
+          ],
+        })
+        .andWhere('deleted_at IS NULL')
+        .execute();
+
+      if (!res.affected) {
+        const row = await orderRepo.findOne({
+          where: { id },
+          select: [
+            'id',
+            'operator_id',
+            'operator_accepted_at',
+            'operator_assigned_by',
+            'status',
+          ],
+        });
+        if (!row) throw new NotFoundException('Buyurtma topilmadi');
+        if (row.operator_id !== me.id) {
+          throw new ForbiddenException('Bu buyurtma sizga biriktirilmagan');
+        }
+        if (row.operator_accepted_at !== null) {
+          throw new BadRequestException(
+            "Siz uni allaqachon qabul qilgansiz — rad etib bo'lmaydi",
+          );
+        }
+        if (
+          !row.operator_assigned_by ||
+          row.operator_assigned_by === row.operator_id
+        ) {
+          throw new BadRequestException(
+            "O'zingiz yaratgan buyurtmani rad etib bo'lmaydi",
+          );
+        }
+        throw new BadRequestException(
+          "Bu bosqichda rad etib bo'lmaydi — buyurtma allaqachon ish jarayonida",
+        );
+      }
+
+      const row = await orderRepo.findOne({
+        where: { id },
+        select: ['id', 'order_number'],
+      });
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: id,
+        action: 'operator_rejected',
+        old_value: { operator_id: me.id, operator_name: me.name },
+        description: `Buyurtma #${row?.order_number} — operator ${me.name} biriktiruvni rad etdi`,
+        user: operator,
+      });
+      return successRes({}, 200, 'Biriktirish rad etildi');
     } catch (error) {
       return catchError(error);
     }

@@ -806,13 +806,43 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.OPERATOR)
   @Get('my-orders')
+  @ApiQuery({
+    name: 'assignment',
+    required: false,
+    enum: ['pending', 'accepted'],
+    description:
+      "`pending` — boshqa odam biriktirgan, hali qabul qilinmaganlar",
+  })
   getMyOrders(
     @CurrentUser() user: JwtPayload,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
     @Query('status') status?: string,
+    @Query('assignment') assignment?: 'pending' | 'accepted',
   ) {
-    return this.userService.getMyOrders(user, page, limit, status);
+    return this.userService.getMyOrders(user, page, limit, status, assignment);
+  }
+
+  /**
+   * ⚠️ `@Patch` ishlatiladi va controllerda umumiy `@Patch(':id')` YO'Q —
+   * shuning uchun marshrut to'qnashuvi bo'lmaydi.
+   */
+  @ApiOperation({ summary: 'Biriktirilgan buyurtmani qabul qilish (operator)' })
+  @ApiParam({ name: 'id', description: 'Buyurtma ID' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.OPERATOR)
+  @Patch('my-orders/:id/accept')
+  acceptMyOrder(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.userService.acceptAssignedOrder(id, user);
+  }
+
+  @ApiOperation({ summary: 'Biriktirishni rad etish (operator)' })
+  @ApiParam({ name: 'id', description: 'Buyurtma ID' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.OPERATOR)
+  @Patch('my-orders/:id/reject')
+  rejectMyOrder(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.userService.rejectAssignedOrder(id, user);
   }
 
   @ApiOperation({
