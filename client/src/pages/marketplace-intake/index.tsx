@@ -17,8 +17,10 @@ import {
   Phone,
   QrCode,
   RotateCcw,
+  Search,
   Store,
   Wallet,
+  X,
 } from "lucide-react";
 import {
   MARKETPLACE_REJECT_REASONS,
@@ -178,6 +180,12 @@ const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
   const [rejectNote, setRejectNote] = useState("");
   const [confirmAccept, setConfirmAccept] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
+  const [query, setQuery] = useState("");
+  /**
+   * ⚠️ Qidiruv maydoni fokusda bo'lsa skaner maydoniga fokus
+   * QAYTARILMAYDI — aks holda yozilayotgan harflar o'g'irlanardi.
+   */
+  const [searchFocused, setSearchFocused] = useState(false);
   const [result, setResult] = useState<{
     accepted: Array<{ external_parcel_id: string; order_number: number }>;
     failed: Array<{ external_parcel_id: string; reason: string }>;
@@ -262,6 +270,16 @@ const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
       const seen = new Map(prev.map((r) => [r.parcel_id, r]));
       return data.parcels
         .filter((p) => p.scan_state === "scanned")
+        /**
+         * ⚠️ OXIRGI SKAN ENG TEPADA.
+         *
+         * Server `scanned_at: ASC` qaytaradi (eng eskisi birinchi).
+         * Skan paytida yangi qator tepaga qo'yilardi, lekin sessiya
+         * qayta o'qilgach u PASTGA tushib ketardi — operator hozirgina
+         * skanerlagan posilkasini ro'yxatdan qidirishga majbur bo'lardi.
+         */
+        .slice()
+        .sort((a, b) => Number(b.scanned_at ?? 0) - Number(a.scanned_at ?? 0))
         .map((p) => {
           const raw = (p.raw_payload ?? {}) as Record<string, unknown>;
           const cust = (raw.customer ?? {}) as Record<string, unknown>;
@@ -307,13 +325,13 @@ const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
    */
   const modalOpen = !!rejectFor || confirmAccept || !!result;
   useEffect(() => {
-    if (modalOpen) return;
+    if (modalOpen || searchFocused) return;
     const t = setInterval(() => {
       const el = inputRef.current;
       if (el && document.activeElement !== el) el.focus();
     }, 700);
     return () => clearInterval(t);
-  }, [modalOpen]);
+  }, [modalOpen, searchFocused]);
 
   /**
    * ⚠️ SKANLAR KETMA-KET NAVBATDA ISHLANADI, maydon esa HECH QACHON
@@ -417,6 +435,27 @@ const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
         total: v.total,
       }));
   }, [rows]);
+
+  /**
+   * QIDIRUV — posilka/buyurtma raqami, mijoz ismi yoki telefon bo'yicha.
+   *
+   * ⚠️ FAQAT KO'RINISHNI filtrlaydi. Jami summa, sanoq va «Qabul qilish»
+   * BUTUN ro'yxat bo'yicha ishlaydi — aks holda operator qidiruv yoqiq
+   * turganda «3 ta posilka» deb o'ylab, aslida 40 tasini qabul qilardi.
+   */
+  const visibleRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    const digits = q.replace(/\D/g, "");
+    return rows.filter((r) => {
+      if (r.external_parcel_id.toLowerCase().includes(q)) return true;
+      if (r.external_order_id.toLowerCase().includes(q)) return true;
+      if (r.customer_name.toLowerCase().includes(q)) return true;
+      // Telefon: `+998 90 …` yozilsa ham, `901234567` yozilsa ham topilsin.
+      if (digits && r.phone.replace(/\D/g, "").includes(digits)) return true;
+      return false;
+    });
+  }, [rows, query]);
 
   const blocked = rows.filter((r) => r.blockers.length);
   const totalCod = rows.reduce((s, r) => s + Number(r.cod_amount ?? 0), 0);
@@ -740,13 +779,40 @@ const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
                 <PackageCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                {rows.length} ta skanerlangan
+                {/* Filtr yoqiq bo'lsa JAMI ham ko'rinadi — qidiruv
+                    natijasini «hammasi shu» deb o'ylamaslik uchun. */}
+                {query.trim()
+                  ? `${visibleRows.length} / ${rows.length} ta`
+                  : `${rows.length} ta skanerlangan`}
               </span>
               <span className="text-gray-300 dark:text-gray-600">•</span>
               <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-white">
                 <Wallet className="w-4 h-4 text-gray-400" />
                 {money(totalCod)} so'm
               </span>
+            </div>
+            <div className="relative flex-1 min-w-[10rem] max-w-xs">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                placeholder="Posilka, mijoz, telefon..."
+                className="w-full h-9 pl-9 pr-8 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A263D] text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all"
+              />
+              {!!query && (
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    focusInput();
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                  title="Tozalash"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
             <button
               onClick={doUndo}
@@ -764,7 +830,15 @@ const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
 
           {/* Ro'yxat — skrollanadi */}
           <div className="p-4 space-y-3 overflow-y-auto flex-1">
-            {rows.map((r) => (
+            {!visibleRows.length && (
+              <div className="py-10 text-center">
+                <Search className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  «{query}» bo'yicha posilka topilmadi
+                </p>
+              </div>
+            )}
+            {visibleRows.map((r) => (
               <div
                 key={r.parcel_id}
                 className={
