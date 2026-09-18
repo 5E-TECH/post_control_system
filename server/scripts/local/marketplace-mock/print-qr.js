@@ -20,13 +20,27 @@ const { PARCELS } = require('./seed.js');
 
 const money = (n) => Number(n || 0).toLocaleString('ru-RU');
 
+/**
+ * ⚠️ PARTIYA BELGISI.
+ *
+ * Bir marta qabul qilingan posilkani PCS qayta skanerlashga qo'ymaydi
+ * (to'g'ri qiladi), shuning uchun bitta to'liq sinovdan keyin varaq
+ * o'lik bo'ladi. Mock'dan yangi partiya olib (`/_mock/new-batch`),
+ * varaqni o'sha belgi bilan qayta chiqaring:
+ *
+ *   curl -s -H "X-Api-Key: mock-marketplace-key" localhost:4010/_mock/new-batch
+ *   node print-qr.js B2
+ */
+const BATCH = (process.argv[2] || '').trim();
+const withBatch = (v) => (BATCH ? `${v}-${BATCH}` : v);
+
 async function main() {
   const cards = [];
 
   for (const p of PARCELS) {
     // ⚠️ QR ichida AYNAN `qr_token` — skan shuni kutadi. Normalizatsiya
     // serverda bo'ladi, shuning uchun registrni o'zgartirmaymiz.
-    const dataUrl = await QRCode.toDataURL(p.qr_token, {
+    const dataUrl = await QRCode.toDataURL(withBatch(p.qr_token), {
       width: 260,
       margin: 1,
       errorCorrectionLevel: 'M',
@@ -42,10 +56,10 @@ async function main() {
 
     cards.push(`
       <div class="card">
-        <img src="${dataUrl}" alt="${p.qr_token}" />
-        <div class="token">${p.qr_token}</div>
+        <img src="${dataUrl}" alt="${withBatch(p.qr_token)}" />
+        <div class="token">${withBatch(p.qr_token)}</div>
         <div class="meta">
-          <b>${p.external_parcel_id}</b>${box ? ` · quti ${box}` : ''}
+          <b>${withBatch(p.external_parcel_id)}</b>${box ? ` · quti ${box}` : ''}
         </div>
         <div class="money">
           olinadi: <b>${money(m.cod_amount)}</b> so'm

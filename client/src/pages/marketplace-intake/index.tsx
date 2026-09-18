@@ -151,9 +151,22 @@ const newIdempotencyKey = (): string => {
  * olib keladi. Shuning uchun bu yerda antd jadvali emas — o'sha oqimdagi
  * karta-ro'yxat, pulsatsiyalovchi skaner kartasi va ovozli signal.
  */
-const MarketplaceIntakePage = () => {
+type Props = {
+  /** Tashqi ro'yxatdan tanlangan ulanish (ichki rejim). */
+  slug?: string;
+  /** Ichki rejimda «Orqaga» — ro'yxatga qaytaradi, marshrutga EMAS. */
+  onBack?: () => void;
+};
+
+const MarketplaceIntakePage = ({ slug: slugProp, onBack }: Props = {}) => {
   const navigate = useNavigate();
-  const [slug, setSlug] = useState<string | undefined>();
+  /**
+   * ⚠️ ICHKI REJIM: ekran «Bugungi buyurtmalar → Tashqi buyurtmalar»
+   * ichida, adosh oqimi bilan BIR XIL joyda ochiladi. Operator uchun bu
+   * bitta ish joyi — alohida sahifa uni chalg'itardi.
+   */
+  const embedded = !!slugProp;
+  const [slug, setSlug] = useState<string | undefined>(slugProp);
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [token, setToken] = useState("");
   const [rows, setRows] = useState<MarketplaceScanOutcome[]>([]);
@@ -191,8 +204,12 @@ const MarketplaceIntakePage = () => {
   );
 
   useEffect(() => {
+    if (slugProp) {
+      setSlug(slugProp);
+      return;
+    }
     if (!slug && integrations.length) setSlug(integrations[0].slug);
-  }, [integrations, slug]);
+  }, [integrations, slug, slugProp]);
 
   // Ochiq sessiyani olish (yoki yangisini ochish).
   useEffect(() => {
@@ -277,6 +294,26 @@ const MarketplaceIntakePage = () => {
   }, [session.data]);
 
   const focusInput = () => setTimeout(() => inputRef.current?.focus(), 0);
+
+  /**
+   * ⚠️ FOKUS QAYTARILADI.
+   *
+   * Maydon ko'rinmaydi, shuning uchun operator uni yo'qotganini
+   * SEZMAYDI — tasodifiy bosishdan keyin skanerlangan kod hech qayerga
+   * tushmasdi va posilka «skanerlanmagan» bo'lib qolardi.
+   *
+   * Oyna ochiq bo'lsa TEGILMAYDI — aks holda fokusni oynadan tortib
+   * olardi va u yerda yozib bo'lmasdi.
+   */
+  const modalOpen = !!rejectFor || confirmAccept || !!result;
+  useEffect(() => {
+    if (modalOpen) return;
+    const t = setInterval(() => {
+      const el = inputRef.current;
+      if (el && document.activeElement !== el) el.focus();
+    }, 700);
+    return () => clearInterval(t);
+  }, [modalOpen]);
 
   /**
    * ⚠️ SKANLAR KETMA-KET NAVBATDA ISHLANADI, maydon esa HECH QACHON
@@ -480,15 +517,16 @@ const MarketplaceIntakePage = () => {
       {/* ─────────────────────── Sarlavha ─────────────────────── */}
       <div className="flex items-center gap-3 flex-wrap flex-shrink-0">
         <button
-          onClick={() => navigate("/today-orders")}
+          onClick={() => (onBack ? onBack() : navigate("/order/markets/new-orders"))}
           className="h-10 px-4 rounded-xl bg-white dark:bg-[#2A263D] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#352F4A] transition-all cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           <span className="hidden sm:inline">Orqaga</span>
         </button>
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xl shadow-md flex-shrink-0">
-            🛒
+          {/* Adosh oqimidagi bilan BIR XIL: yashil kvadrat + ikonka */}
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-md flex-shrink-0">
+            <Store className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-gray-800 dark:text-white truncate">
@@ -511,7 +549,7 @@ const MarketplaceIntakePage = () => {
       </div>
 
       {/* Bir nechta ulanish bo'lsa — tanlash */}
-      {integrations.length > 1 && (
+      {!embedded && integrations.length > 1 && (
         <div className="flex gap-2 flex-wrap">
           {integrations.map((r) => (
             <button
@@ -533,12 +571,12 @@ const MarketplaceIntakePage = () => {
       <div
         className={
           pauseLeft > 0
-            ? "rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-red-400 bg-red-50 dark:bg-red-900/10 dark:border-red-700"
+            ? "relative rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-red-400 bg-red-50 dark:bg-red-900/10 dark:border-red-700"
             : queueLength > 0
-              ? "rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-amber-400 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-700"
+              ? "relative rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-amber-400 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-700"
               : compact
-              ? "rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700"
-              : "rounded-2xl shadow-sm p-6 border-2 transition-all flex-shrink-0 border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700"
+              ? "relative rounded-2xl shadow-sm p-4 border-2 transition-all flex-shrink-0 border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700"
+              : "relative rounded-2xl shadow-sm p-6 border-2 transition-all flex-shrink-0 border-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-700"
         }
       >
         <div className="text-center">
@@ -580,26 +618,41 @@ const MarketplaceIntakePage = () => {
                 Skaner tayyor!
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                QR kodni skanerlang — avtomatik qo'shiladi
+                QR kodni skanerlang - avtomatik qo'shiladi
               </p>
             </>
           )}
 
-          {/* Kod maydoni — skaner klaviatura kabi yozadi */}
-          <div className="mt-3 max-w-xl mx-auto relative">
-            <QrCode className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              ref={inputRef}
-              autoFocus
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") doScan(token);
-              }}
-              placeholder="QR kodni skanerlang yoki kodni kiriting va Enter bosing"
-              className="w-full h-12 pl-11 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#2A263D] text-gray-800 dark:text-white placeholder-gray-400 text-base focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
-            />
-          </div>
+          {/*
+            KOD MAYDONI KO'RINMAYDI — adosh oqimida ham maydon yo'q,
+            operator shunchaki skanerlaydi.
+
+            ⚠️ Lekin maydonning O'ZI saqlanadi (shaffof va fokusda):
+            global `keydown` tinglagichdan farqli — brauzer kiritishni
+            o'zi yig'adi, klaviatura tartibi/tez skaner bilan
+            adashmaydi, planshetda qo'lda kiritish ham ishlayveradi.
+            Skanerlanayotgan kod quyida ko'rinadi.
+          */}
+          <input
+            ref={inputRef}
+            autoFocus
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") doScan(token);
+            }}
+            aria-label="QR kod"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-default"
+          />
+
+          {token && (
+            <div className="mt-4 p-3 bg-white dark:bg-[#2A263D] rounded-lg border border-gray-200 dark:border-gray-700 inline-block">
+              <p className="text-xs text-gray-400 mb-1">Skanerlanmoqda:</p>
+              <p className="text-lg font-mono font-bold text-gray-800 dark:text-white">
+                {token}
+              </p>
+            </div>
+          )}
 
           {/* Navbat — tez skanerlashda so'rovlar ketma-ket ishlanadi */}
           {queueLength > 0 && (

@@ -454,6 +454,42 @@ const server = http.createServer((req, res) => {
           : `❌ ${state.issues.filter((i) => i.severity === 'error').length} ta buzilish`,
       });
     }
+    /**
+     * ── YANGI PARTIYA ──
+     *
+     * ⚠️ `/_mock/reset` YETMAYDI: u seed'ni O'SHA ID lar bilan tiklaydi,
+     * PCS esa ularni «allaqachon qabul qilingan» deb to'g'ri rad etadi.
+     * Ya'ni bitta to'liq qo'lda sinovdan keyin QR varaq O'LIK bo'lardi.
+     *
+     * Bu yo'l seed'dagi har posilkaning NUSXASINI yangi ID bilan
+     * yaratadi (`PCL-8842-1` → `PCL-8842-1-B2`), sinov holatlari
+     * (ko'p qutili, oldindan to'langan, noma'lum sotuvchi) saqlanadi.
+     */
+    if (path === '/_mock/new-batch') {
+      state.batchNo = (state.batchNo || 1) + 1;
+      const tag = `B${state.batchNo}`;
+      const created = [];
+      for (const d of PARCELS) {
+        const def = {
+          ...d,
+          external_parcel_id: `${d.external_parcel_id}-${tag}`,
+          external_order_id: `${d.external_order_id}-${tag}`,
+          qr_token: `${d.qr_token}-${tag}`,
+        };
+        state.parcels.set(def.external_parcel_id, {
+          def,
+          status: def.status,
+          last_applied_seq: 0,
+          money: null,
+          updated_at: Date.now(),
+          accepted_batch: null,
+        });
+        created.push({ qr_token: def.qr_token, why: def._why });
+      }
+      console.log(`\n🆕 yangi partiya ${tag}: ${created.length} ta posilka\n`);
+      return send(res, 200, { batch: tag, count: created.length, parcels: created });
+    }
+
     if (path === '/_mock/reset') {
       seed();
       state.seenEvents.clear(); state.batches.clear();
