@@ -28,7 +28,18 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn'
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+      /**
+       * `_` bilan boshlangan o'zgaruvchi — ATAYLAB ishlatilmaydigan.
+       * Asosiy holat: maxfiy maydonni javobdan chiqarib tashlash —
+       * `const { password: _pw, ...safe } = user;`. Bu naqsh loyihada
+       * allaqachon ishlatiladi, lekin qoida uni "ishlatilmagan" deb
+       * belgilardi va haqiqiy ishlatilmagan importlar orasida yo'qolardi.
+       */
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
+      ],
     },
   },
 );

@@ -193,7 +193,11 @@ export class UserService implements OnModuleInit {
         description: `Admin yaratildi: ${admin.name}`,
         user: actor,
       });
-      return successRes(admin, 201, 'New Admin created');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeAdmin } = admin;
+      return successRes(safeAdmin, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -367,7 +371,11 @@ export class UserService implements OnModuleInit {
         description: `Registrator yaratildi: ${user.name}`,
         user: actor,
       });
-      return successRes(user, 201, 'New Admin created');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUser } = user;
+      return successRes(safeUser, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -476,7 +484,11 @@ export class UserService implements OnModuleInit {
         description: `Kuryer yaratildi: ${courier.name}`,
         user: actor,
       });
-      return successRes(courier, 201, `New courier created`);
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeCourier } = courier;
+      return successRes(safeCourier, 201, `New courier created`);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -538,7 +550,11 @@ export class UserService implements OnModuleInit {
         description: `Market yaratildi: ${newMarket.name}`,
         user: actor,
       });
-      return successRes(newMarket, 201, 'New market created');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeNewMarket } = newMarket;
+      return successRes(safeNewMarket, 201, 'New market created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -1032,6 +1048,24 @@ export class UserService implements OnModuleInit {
           delete m.market_tg_token;
         }
       }
+
+      /**
+       * ⚠️ MARKET O'Z TOKENINI KO'RADI — ATAYLAB.
+       *
+       * Ustun `select: false` (users.entity.ts), ya'ni u endi hech qaysi
+       * `find` natijasida kelmaydi. Lekin market uni profil sahifasida
+       * ko'rsatadi va nusxalaydi (user-profile/index.tsx:681) — order-botga
+       * yuborish uchun. Shu bois FAQAT egasi uchun, FAQAT MARKET rolida
+       * alohida so'rov bilan olinadi. Boshqa rollarda bu maydon yo'q.
+       */
+      if (myProfile && user.role === Roles.MARKET) {
+        const row = await this.userRepo
+          .createQueryBuilder('user')
+          .select('user.market_tg_token', 'market_tg_token')
+          .where('user.id = :id', { id })
+          .getRawOne<{ market_tg_token: string | null }>();
+        myProfile.market_tg_token = row?.market_tg_token ?? (null as never);
+      }
       return successRes(myProfile, 200, 'Profile info');
     } catch (error) {
       return catchError(error);
@@ -1414,7 +1448,11 @@ export class UserService implements OnModuleInit {
         roleLabel: 'Kuryer',
         actor,
       });
-      return successRes(updatedUser, 200, 'User updated');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUpdatedUser } = updatedUser ?? {};
+      return successRes(safeUpdatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }
@@ -1482,7 +1520,11 @@ export class UserService implements OnModuleInit {
         beforeAutoApproveUnder,
         actor,
       });
-      return successRes(updatedMarket, 200, 'Market updated');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUpdatedMarket } = updatedMarket;
+      return successRes(safeUpdatedMarket, 200, 'Market updated');
     } catch (error) {
       return catchError(error);
     }
@@ -1704,7 +1746,11 @@ export class UserService implements OnModuleInit {
         }`,
         user,
       });
-      return successRes(updatedUser, 200, 'User updated');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUpdatedUser } = updatedUser ?? {};
+      return successRes(safeUpdatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }
@@ -1910,9 +1956,23 @@ export class UserService implements OnModuleInit {
        * filtrsiz o'chirilgan operator/kuryer/logist eski paroli bilan
        * kirishda davom etardi va buyurtma yarata olardi.
        */
-      const user = await this.userRepo.findOne({
-        where: { phone_number, role: Not(Roles.CUSTOMER), is_deleted: false },
-      });
+      /**
+       * ⚠️ `addSelect` SHART — `password` ustuni `select: false`
+       * (users.entity.ts). Busiz `user.password` `undefined` bo'lib
+       * `bcrypt.compare` hamma uchun `false` qaytaradi, ya'ni HECH KIM
+       * tizimga kira olmaydi. Yashirin ustunni ishonchli qo'shish uchun
+       * `findOne` emas, QueryBuilder ishlatiladi.
+       *
+       * `is_deleted = false` avvalgidek: yumshoq o'chirilgan xodim eski
+       * paroli bilan kira olmasligi kerak.
+       */
+      const user = await this.userRepo
+        .createQueryBuilder('user')
+        .where('user.phone_number = :phone_number', { phone_number })
+        .andWhere('user.role != :customer', { customer: Roles.CUSTOMER })
+        .andWhere('user.is_deleted = false')
+        .addSelect('user.password')
+        .getOne();
       if (!user) {
         this.logFailedLogin('unknown_phone', phone_number, req);
         throw new BadRequestException('Phone number or password incorrect');
@@ -1921,9 +1981,19 @@ export class UserService implements OnModuleInit {
         this.logFailedLogin('blocked', phone_number, req, user.id);
         throw new BadRequestException('You have been blocked by superadmin');
       }
+      /**
+       * Parol o'rnatilmagan (yoki kelajakda `addSelect` tushib qolgan)
+       * holat: `bcrypt.compare(pw, undefined)` istisno tashlab 500
+       * berardi — sababi manbadan uzoqda ko'rinadi. Aniq 400 bilan
+       * to'xtatamiz.
+       */
+      if (!user.password) {
+        this.logFailedLogin('wrong_password', phone_number, req, user.id);
+        throw new BadRequestException('Phone number or password incorrect');
+      }
       const IsMatchPassword = await this.bcrypt.compare(
         password,
-        user?.password,
+        user.password,
       );
       if (!IsMatchPassword) {
         this.logFailedLogin('wrong_password', phone_number, req, user.id);
@@ -2368,7 +2438,11 @@ export class UserService implements OnModuleInit {
         description: `Logist yaratildi: ${user.name}`,
         user: actor,
       });
-      return successRes(user, 201, 'Yangi logist yaratildi');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUser } = user;
+      return successRes(safeUser, 201, 'Yangi logist yaratildi');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

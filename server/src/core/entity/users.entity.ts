@@ -49,7 +49,26 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   external_provider: string | null;
 
-  @Column({ type: 'varchar', nullable: true })
+  /**
+   * ⚠️ `select: false` — ATAYLAB.
+   *
+   * Parol hash'i har bir `userRepo.find*` natijasida kelardi va u yerdan
+   * `successRes(user)` orqali API javobiga chiqib ketardi: `GET /user`,
+   * `GET /user/:id`, `GET /user/logists`, `PATCH /user/self`,
+   * `POST /user/operator` va boshqalar. Har bir joyni qo'lda tozalash bir
+   * necha marta urinilgan va baribir yangi joyda qaytib paydo bo'lgan —
+   * shu bois to'siq ORM qatlamiga ko'chirildi: endi ustun SELECT ga
+   * umuman qo'shilmaydi.
+   *
+   * Hash butun serverda FAQAT bitta joyda o'qiladi — `signIn`
+   * (`bcrypt.compare`), u yerda `addSelect('user.password')` bilan
+   * ATAYLAB so'raladi.
+   *
+   * ⚠️ YOZISHGA ta'sir qilmaydi: `user.password = ...` + `save()`
+   * avvalgidek ishlaydi. Yuklanganda `undefined` bo'lgan maydonni TypeORM
+   * UPDATE ga kiritmaydi, ya'ni mavjud parol ustiga NULL yozilmaydi.
+   */
+  @Column({ type: 'varchar', nullable: true, select: false })
   password: string;
 
   @Column({ type: 'uuid', nullable: true })
@@ -94,7 +113,20 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
   ai_price_per_order: number | null;
 
-  @Column({ type: 'varchar', nullable: true })
+  /**
+   * ⚠️ `select: false` — bu BIR MARTALIK operator-qo'shish kaliti.
+   *
+   * Order-botga yuborilsa o'sha marketga YANGI OPERATOR qo'shiladi va
+   * token aylantiriladi. Ya'ni token = imtiyoz, lekin u `GET /user`
+   * (admin ro'yxati), `GET /user/:id` va `POST /user/market` javoblarida
+   * butun qator bilan chiqib ketardi.
+   *
+   * ⚠️ QIDIRISH ishlashda davom etadi — `select: false` faqat SELECT
+   * ro'yxatiga ta'sir qiladi, WHERE ga emas (bot `where: { market_tg_token }`
+   * bilan qidiradi). YOZISH ham tegilmaydi (`save()` / `update()`).
+   * Egasiga ko'rsatish uchun `profile()` da ATAYLAB `addSelect` bor.
+   */
+  @Column({ type: 'varchar', nullable: true, select: false })
   market_tg_token: string;
 
   @Column({ type: 'varchar', nullable: true })
