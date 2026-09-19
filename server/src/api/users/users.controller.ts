@@ -47,6 +47,7 @@ import { TelegramInitData } from './dto/initData.dto';
 import { CreateLogistDto } from './dto/create-logist.dto';
 import { UpdateLogistDto } from './dto/update-logist.dto';
 import { CreateOperatorDto } from './dto/create-operator.dto';
+import { UpdateOperatorDto } from './dto/update-operator.dto';
 import { UpdateOperatorCommissionDto } from './dto/update-operator-commission.dto';
 import { PayOperatorDto } from './dto/pay-operator.dto';
 
@@ -736,6 +737,23 @@ export class UsersController {
   @Get('operator/:id/stats')
   getOperatorStats(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.userService.getOperatorStats(id, user);
+  }
+
+  /**
+   * ⚠️ Telefon va parol bu yerda O'ZGARTIRILMAYDI — sabab
+   * `UpdateOperatorDto` izohida.
+   */
+  @ApiOperation({ summary: "Operatorni tahrirlash / bloklash (market)" })
+  @ApiParam({ name: 'id', description: 'Operator ID' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET)
+  @Patch('operator/:id')
+  updateOperator(
+    @Param('id') id: string,
+    @Body() dto: UpdateOperatorDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.updateOperator(id, dto, user);
   }
 
   @ApiOperation({ summary: 'Update operator commission settings' })

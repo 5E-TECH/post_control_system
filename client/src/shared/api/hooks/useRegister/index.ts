@@ -173,6 +173,22 @@ export const useUser = (path?: string) => {
     });
 
   // Update operator commission settings
+  /**
+   * Operatorni tahrirlash / bloklash (market).
+   * Telefon va parol ATAYLAB yo'q — ular egasining o'zi orqali.
+   */
+  const updateOperator = useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name?: string; status?: "active" | "inactive" };
+    }) => api.patch(`user/operator/${id}`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [user, "operators"] }),
+  });
+
   const updateOperatorCommission = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.patch(`user/operator/${id}/commission`, data).then((res) => res.data),
@@ -292,6 +308,7 @@ export const useUser = (path?: string) => {
     acceptMyOrder,
     rejectMyOrder,
     getOperatorStats,
+    updateOperator,
     updateOperatorCommission,
     getOperatorBalance,
     payOperator,

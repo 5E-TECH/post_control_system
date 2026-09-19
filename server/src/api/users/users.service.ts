@@ -28,6 +28,8 @@ import { UpdateCourierDto } from './dto/update-courier.dto';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
+import { normalizeUserPhone } from 'src/common/utils/normalize-user-phone.util';
+import { UpdateOperatorDto } from './dto/update-operator.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
@@ -2616,10 +2618,33 @@ export class UserService implements OnModuleInit {
     market: JwtPayload,
   ): Promise<object> {
     try {
-      const { password, phone_number, name } = dto;
+      const { password, name } = dto;
 
+      /**
+       * ⚠️ TELEFON SERVERDA NORMALLASHTIRILADI.
+       *
+       * Avval DTO'dan kelgan xom qiymat qidirilardi va saqlanardi —
+       * normallashtirish faqat brauzerda bajarilgan. Ya'ni API'ga
+       * to'g'ridan-to'g'ri `998901234567` yuborilsa, u `+998901234567`
+       * bilan MOS KELMASDI: takroriylik tekshiruvi aylanib o'tilardi va
+       * bazada bir odamning ikki xil yozilgan raqami paydo bo'lardi.
+       * Bot allaqachon shunday qiladi (`normalizePhone`).
+       */
+      const phone_number = normalizeUserPhone(dto.phone_number);
+
+      /**
+       * ⚠️ `role: Not(CUSTOMER)` — bot bilan BIR XIL qoida.
+       *
+       * Avval bu yerda rol filtri umuman yo'q edi: faqat MIJOZ sifatida
+       * mavjud raqam panel orqali 409 bilan rad etilardi, bot orqali esa
+       * bemalol operator bo'lardi. Ikki yo'l bir xil ishlashi kerak.
+       *
+       * Qaror (o'zgarmaydi): mijoz yozuvi buyurtma tarixiga bog'langan,
+       * shuning uchun uning roli AYLANTIRILMAYDI — alohida operator
+       * yozuvi yaratiladi.
+       */
       const existUser = await this.userRepo.findOne({
-        where: { phone_number, is_deleted: false },
+        where: { phone_number, is_deleted: false, role: Not(Roles.CUSTOMER) },
       });
       if (existUser) {
         throw new ConflictException(
@@ -2748,6 +2773,84 @@ export class UserService implements OnModuleInit {
         select: ['id', 'name'],
       });
       return successRes(operators, 200, 'Operatorlar');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * MARKET O'Z OPERATORINI TAHRIRLAYDI (ism) va BLOKLAYDI (status).
+   *
+   * ⚠️ NEGA KERAK. Bugungacha market operator ustidan faqat YARATISH va
+   * O'CHIRISH qila olardi — «yumshoq jazo» darajasi umuman yo'q edi.
+   * Operator esa `PATCH /user/self` orqali o'z ismini erkin o'zgartirar,
+   * market buni na tuzata, na to'xtata olardi.
+   *
+   * ⚠️ BLOKLASH O'CHIRISH EMAS. `status = inactive` operatorni tizimga
+   * kirita olmaydi (`signIn` tekshiradi) va yangi buyurtmaga biriktirib
+   * bo'lmaydi (`resolveOperatorAssignment`), lekin uning mavjud
+   * buyurtmalari, daromadi va tarixi TEGILMAYDI.
+   *
+   * ⚠️ Mavjud sessiya DARHOL uzilmaydi: `JwtGuard` bazaga qaramaydi va
+   * token bir kun yashaydi. Ya'ni bloklash keyingi kirishdan kuchga
+   * kiradi. Buni darhol qilish uchun har so'rovda bazaga murojaat kerak
+   * bo'lardi — bu alohida qaror.
+   */
+  async updateOperator(
+    id: string,
+    dto: UpdateOperatorDto,
+    market: JwtPayload,
+  ): Promise<object> {
+    try {
+      const operator = await this.userRepo.findOne({
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
+        select: ['id', 'name', 'status'],
+      });
+      if (!operator) {
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
+      }
+
+      const before = { name: operator.name, status: operator.status };
+      if (dto.name !== undefined) operator.name = dto.name.trim();
+      if (dto.status !== undefined) operator.status = dto.status;
+
+      // Hech narsa o'zgarmagan bo'lsa jurnalni shovqin bilan to'ldirmaymiz.
+      if (
+        before.name === operator.name &&
+        before.status === operator.status
+      ) {
+        return successRes({}, 200, "O'zgarish yo'q");
+      }
+
+      await this.userRepo.save(operator);
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'updated',
+        old_value: before,
+        new_value: { name: operator.name, status: operator.status },
+        description:
+          before.status !== operator.status
+            ? `Operator ${operator.name} ${
+                operator.status === Status.INACTIVE ? 'bloklandi' : 'blokdan chiqarildi'
+              }`
+            : `Operator tahrirlandi: ${before.name} → ${operator.name}`,
+        user: market,
+      });
+
+      return successRes(
+        { id: operator.id, name: operator.name, status: operator.status },
+        200,
+        'Operator yangilandi',
+      );
     } catch (error) {
       return catchError(error);
     }

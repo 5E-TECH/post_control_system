@@ -21,8 +21,13 @@ import { Modal } from "antd";
 
 const MarketOperators = () => {
   const navigate = useNavigate();
-  const { createOperator, getMyOperators, deleteOperator, updateOperatorCommission } =
-    useUser();
+  const {
+    createOperator,
+    getMyOperators,
+    deleteOperator,
+    updateOperator,
+    updateOperatorCommission,
+  } = useUser();
   const { handleApiError, handleSuccess } = useApiNotification();
 
   const { data, isLoading } = getMyOperators();
@@ -92,6 +97,41 @@ const MarketOperators = () => {
         },
       }
     );
+  };
+
+  /**
+   * BLOKLASH / BLOKDAN CHIQARISH.
+   *
+   * O'chirishdan farqi tasdiq oynasida ATAYLAB tushuntiriladi — market
+   * ikkalasini chalkashtirmasligi kerak: bloklash qaytariladigan,
+   * o'chirish esa yo'q.
+   */
+  const handleToggleStatus = (op: {
+    id: string;
+    name: string;
+    status: string;
+  }) => {
+    const blocking = op.status === "active";
+    Modal.confirm({
+      title: blocking ? "Operatorni bloklash" : "Blokdan chiqarish",
+      content: blocking
+        ? `${op.name} tizimga kira olmaydi va yangi buyurtmaga biriktirilmaydi. Mavjud buyurtmalari va daromadi saqlanadi.`
+        : `${op.name} yana ishlay oladi.`,
+      okText: blocking ? "Bloklash" : "Chiqarish",
+      cancelText: "Bekor",
+      okButtonProps: blocking ? { danger: true } : undefined,
+      centered: true,
+      onOk: () =>
+        updateOperator.mutate(
+          { id: op.id, data: { status: blocking ? "inactive" : "active" } },
+          {
+            onSuccess: () =>
+              handleSuccess(blocking ? "Operator bloklandi" : "Blokdan chiqarildi"),
+            onError: (err: unknown) =>
+              handleApiError(err, "Holatni o'zgartirib bo'lmadi"),
+          },
+        ),
+    });
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -351,15 +391,31 @@ const MarketOperators = () => {
                             : `${Number(op.commission_value).toLocaleString()} so'm`}
                         </span>
                       )}
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      {/*
+                        ⚠️ Belgi endi TUGMA: market operatorni vaqtincha
+                        to'xtata oladi. Bu O'CHIRISH EMAS — buyurtmalari,
+                        daromadi va tarixi tegilmaydi; u faqat tizimga
+                        kira olmaydi va yangi buyurtmaga biriktirilmaydi.
+                      */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleStatus(op);
+                        }}
+                        disabled={updateOperator.isPending}
+                        title={
+                          op.status === "active"
+                            ? "Vaqtincha bloklash"
+                            : "Blokdan chiqarish"
+                        }
+                        className={`text-xs px-2 py-1 rounded-full font-medium cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50 ${
                           op.status === "active"
                             ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
                             : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
                         }`}
                       >
                         {op.status === "active" ? "Faol" : "Nofaol"}
-                      </span>
+                      </button>
                       <button
                         onClick={() => toggleExpand(op)}
                         className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
