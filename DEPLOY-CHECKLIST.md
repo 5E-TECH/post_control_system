@@ -168,6 +168,8 @@ KO'RINMAYDI, lekin bu shartsiz so'rov soxta ogohlantirish beradi.
 | 6 | Buyurtma formasida operator tanlovi (operatorli marketda) chiqadi |
 | 7 | Yuqoridagi SQL (§4 oxiri, `deleted_at IS NULL` bilan) → `0` |
 | 8 | O'chirilgan operator kira OLMAYDI (login 400) |
+| 9 | Marketni bloklang → uning operatori kira OLMASLIGI kerak (login 400) |
+| 10 | Marketni blokdan chiqaring → operator yana kiradi; ALOHIDA bloklangan operator esa bloklanganicha qoladi |
 
 ---
 
@@ -178,3 +180,5 @@ KO'RINMAYDI, lekin bu shartsiz so'rov soxta ogohlantirish beradi.
 | Marketlarda `telegram_id` yo'q | 🟡 **Tekshiring.** Dev bazada 13 marketdan 0 tasida bor. Zaxira yo'l (`notifyMarketUsers`) market yoki uning **operatoriga** yuboradi — ikkalasida ham `telegram_id` bo'lmasa **hech qanday xabar bormaydi**. Tizim yiqilmaydi va tasdiqlash panel orqali ishlayveradi, lekin market so'rovdan **o'zi panelga kirmaguncha xabardor bo'lmaydi**. Bog'lash: market egasi order-botga market tokenini + telefonini yuboradi |
 | Yangi tumanlarga kuryer biriktirilmagan | Posilka **qabul qilinadi**, lekin kuryer qo'lda tayinlanadi |
 | Marketplace kontrakti hali hamkorga berilmagan | `MARKETPLACE_PARTNER_API.md` (v1.1) va PDF tayyor |
+| Market bloklansa mavjud sessiya DARHOL uzilmaydi | `JwtGuard` bazaga qaramaydi, token 1 kun yashaydi. Lekin frontend interceptori birinchi 401 da `/user/refresh` ga boradi, u ham rad etadi → foydalanuvchi login sahifasiga chiqariladi. Ya'ni amalda keyingi so'rovdayoq uziladi |
+| Testlar parallel ishlaganda beqaror | Bu mashinada `npx jest` har safar BOSHQA to'plamni yiqitadi (alohida esa o'tadi). `npx jest --maxWorkers=2` bilan 883/883. Resurs raqobati, koddagi muammo emas |
