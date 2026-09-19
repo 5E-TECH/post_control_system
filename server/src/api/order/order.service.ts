@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  UnauthorizedException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -13,6 +14,10 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { resolveOperatorAssignment } from './utils/operator-assignment.util';
+import {
+  isMarketUsable,
+  MARKET_BLOCKED_MESSAGE,
+} from 'src/common/utils/market-gate.util';
 import { OrderRepository } from 'src/core/repository/order.repository';
 import { DataSource, EntityManager, In, IsNull, QueryRunner } from 'typeorm';
 import { OrderItemEntity } from 'src/core/entity/order-item.entity';
@@ -370,12 +375,47 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new BadRequestException('Market Id is not match!');
       }
 
+      /**
+       * ⚠️ `market_id` BO'SHLIGI ALOHIDA TEKSHIRILADI.
+       *
+       * TypeORM `where` dagi `undefined` shartni JIMGINA TASHLAB
+       * YUBORADI — ya'ni `{ id: undefined, role: MARKET }` «istalgan
+       * market» degani bo'lib qoladi va `findOne` TASODIFIY marketni
+       * qaytaradi. So'ng uning `add_order` va blok holati tekshiriladi
+       * (BOSHQA marketning sozlamasi bo'yicha qaror), oxirida esa
+       * `user_id` NULL bo'lib INSERT 500 bilan yiqiladi. Admin
+       * `market_id` ni yubormasa aynan shu bo'lardi.
+       */
+      if (!market_id) {
+        throw new BadRequestException(
+          'Market tanlanmagan — `market_id` yuborilishi shart',
+        );
+      }
+
       const market = await queryRunner.manager.findOne(UserEntity, {
         where: { id: market_id, role: Roles.MARKET },
       });
 
       if (!market) {
         throw new NotFoundException('Market not found');
+      }
+
+      /**
+       * ⚠️ MARKET DARVOZASI — `add_order` dan ALOHIDA to'siq.
+       *
+       * `add_order` — marketning O'Z biznes sozlamasi («hozircha qabul
+       * qilmayman»), buni market o'zi yoqadi va o'chiradi. Bu esa ADMIN
+       * bloki: market uni o'zi yecha olmaydi. Operator ham to'siladi —
+       * u marketidan ortiq huquqqa ega emas.
+       *
+       * Admin va registrator ATAYLAB to'silmaydi: blokni ular qo'ygan va
+       * kerak bo'lsa ongli ravishda buyurtma kirita oladi.
+       */
+      if (
+        (user.role === Roles.MARKET || user.role === Roles.OPERATOR) &&
+        !isMarketUsable(market)
+      ) {
+        throw new UnauthorizedException(MARKET_BLOCKED_MESSAGE);
       }
 
       if (
@@ -748,6 +788,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         throw new BadRequestException(
           'Only market or operator can create orders via bot',
         );
+      }
+
+      /**
+       * ⚠️ BU YO'LDA MARKET HOLATI UMUMAN TEKSHIRILMASDI.
+       *
+       * `createOrderByBot` — WebApp/bot oqimi, `createOrder` dan butunlay
+       * alohida. Unda na foydalanuvchining `status` i, na market qatori
+       * ko'rilardi: bloklangan market ham, bloklangan operator ham
+       * buyurtma yaratishda davom etardi.
+       */
+      if (currentUser.status === Status.INACTIVE || currentUser.is_deleted) {
+        throw new UnauthorizedException('You have been blocked by superadmin');
+      }
+      const botMarketRow = await queryRunner.manager.findOne(UserEntity, {
+        where: { id: marketId, role: Roles.MARKET },
+        select: ['id', 'status', 'is_deleted'],
+      });
+      if (!isMarketUsable(botMarketRow)) {
+        throw new UnauthorizedException(MARKET_BLOCKED_MESSAGE);
       }
 
       // Tuman mavjudligini tekshirish (aniq xato xabari + noto'g'ri district_id

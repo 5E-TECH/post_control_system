@@ -29,6 +29,10 @@ import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { normalizeUserPhone } from 'src/common/utils/normalize-user-phone.util';
+import {
+  isMarketUsable,
+  MARKET_BLOCKED_MESSAGE,
+} from 'src/common/utils/market-gate.util';
 import { UpdateOperatorDto } from './dto/update-operator.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
@@ -1799,8 +1803,28 @@ export class UserService implements OnModuleInit {
   // Muvaffaqiyatsiz login urinishini loglaydi. Maxfiylik: telefon TO'LIQ
   // saqlanmaydi (faqat oxirgi 4 raqam), tavsif umumiy — telefon mavjudligi
   // oshkor qilinmaydi. Noma'lum telefon uchun entity_id = NIL sentinel.
+  /**
+   * OPERATOR UCHUN MARKET DARVOZASI.
+   *
+   * Operator qatoriga hech narsa YOZILMAYDI (sabab: market-gate.util.ts),
+   * shuning uchun market holati har kirish va har amalda qayta o'qiladi.
+   * Operator bo'lmagan rollarga ta'sir qilmaydi.
+   */
+  private async isActorMarketUsable(
+    user: Pick<UserEntity, 'role' | 'market_id'>,
+  ): Promise<boolean> {
+    if (user.role !== Roles.OPERATOR) return true;
+    // Market QATTIQ o'chirilgan — FK `SET NULL` qoldirgan holat.
+    if (!user.market_id) return false;
+    const market = await this.userRepo.findOne({
+      where: { id: user.market_id, role: Roles.MARKET },
+      select: ['id', 'status', 'is_deleted'],
+    });
+    return isMarketUsable(market);
+  }
+
   private logFailedLogin(
-    reason: 'unknown_phone' | 'blocked' | 'wrong_password',
+    reason: 'unknown_phone' | 'blocked' | 'wrong_password' | 'market_blocked',
     phone: string,
     req?: Request,
     userId?: string,
@@ -1989,6 +2013,19 @@ export class UserService implements OnModuleInit {
        * berardi — sababi manbadan uzoqda ko'rinadi. Aniq 400 bilan
        * to'xtatamiz.
        */
+      /**
+       * ⚠️ MARKET DARVOZASI. Operator o'z marketidan ortiq huquqqa ega
+       * emas: admin market bilan ishlashni to'xtatgan bo'lsa, uning
+       * operatori ham kira olmaydi.
+       *
+       * Operator qatoriga YOZILMAYDI — shu bois market blokdan
+       * chiqarilganda market ALOHIDA bloklagan operator bloklanganicha
+       * qoladi.
+       */
+      if (!(await this.isActorMarketUsable(user))) {
+        this.logFailedLogin('market_blocked', phone_number, req, user.id);
+        throw new BadRequestException(MARKET_BLOCKED_MESSAGE);
+      }
       if (!user.password) {
         this.logFailedLogin('wrong_password', phone_number, req, user.id);
         throw new BadRequestException('Phone number or password incorrect');
@@ -2095,14 +2132,38 @@ export class UserService implements OnModuleInit {
       }
       const user = JSON.parse(userStr);
 
+      /**
+       * ⚠️ BU YO'L AVVAL HECH NARSANI TEKSHIRMASDI.
+       *
+       * Faqat `telegram_id` qidirilardi: `is_deleted`, `status` va rol —
+       * hech biri ko'rilmasdi. Ya'ni `/user/signin` dagi barcha to'siqlar
+       * (o'chirilgan xodim, bloklangan foydalanuvchi) shu yerdan bemalol
+       * aylanib o'tilardi.
+       */
       const isRegisteredUser = await this.userRepo.findOne({
-        where: { telegram_id: user.id },
+        where: { telegram_id: user.id, is_deleted: false },
       });
 
       if (!isRegisteredUser) {
         throw new UnauthorizedException(
           'You have not registred for this platform',
         );
+      }
+      // Telegram orqali faqat market va uning operatori kiradi — bu yo'l
+      // WebApp (buyurtma yaratish) uchun mo'ljallangan.
+      if (
+        isRegisteredUser.role !== Roles.MARKET &&
+        isRegisteredUser.role !== Roles.OPERATOR
+      ) {
+        throw new UnauthorizedException(
+          'You have not registred for this platform',
+        );
+      }
+      if (isRegisteredUser.status === Status.INACTIVE) {
+        throw new UnauthorizedException('You have been blocked by superadmin');
+      }
+      if (!(await this.isActorMarketUsable(isRegisteredUser))) {
+        throw new UnauthorizedException(MARKET_BLOCKED_MESSAGE);
       }
       const { id, role, status } = isRegisteredUser;
       const payload: JwtPayload = { id, role, status };
@@ -2158,6 +2219,20 @@ export class UserService implements OnModuleInit {
       if (!user || user.status === Status.INACTIVE) {
         res.clearCookie('refreshToken');
         throw new UnauthorizedException('User not found or inactive');
+      }
+      /**
+       * ⚠️ BU DARVOZA TIRIK SESSIYANI UZADI.
+       *
+       * `JwtGuard` bazaga qaramaydi va access token bir kun yashaydi —
+       * ya'ni market bloklangach operator tokeni darhol o'lmaydi. Lekin
+       * frontend interceptori har 401 da `/user/refresh` ga boradi; bu
+       * yerda rad etilgach cookie tozalanadi va foydalanuvchi login
+       * sahifasiga chiqariladi. Shu bois `token_version` ustuni kerak
+       * emas.
+       */
+      if (!(await this.isActorMarketUsable(user))) {
+        res.clearCookie('refreshToken');
+        throw new UnauthorizedException(MARKET_BLOCKED_MESSAGE);
       }
 
       const newPayload: JwtPayload = {
@@ -2630,6 +2705,22 @@ export class UserService implements OnModuleInit {
        * bazada bir odamning ikki xil yozilgan raqami paydo bo'lardi.
        * Bot allaqachon shunday qiladi (`normalizePhone`).
        */
+      /**
+       * ⚠️ MARKET HOLATI BAZADAN QAYTA O'QILADI.
+       *
+       * Avval `market.id` to'g'ridan-to'g'ri JWT payload'idan olinardi va
+       * market qatori umuman ko'rilmasdi. Ya'ni BLOKLANGAN market ham
+       * yangi operator qo'shishda davom etardi — yangi qator esa
+       * `active` bo'lib tug'iladi va blok o'z-o'zidan «eriydi».
+       */
+      const marketRow = await this.userRepo.findOne({
+        where: { id: market.id, role: Roles.MARKET },
+        select: ['id', 'status', 'is_deleted'],
+      });
+      if (!isMarketUsable(marketRow)) {
+        throw new ForbiddenException(MARKET_BLOCKED_MESSAGE);
+      }
+
       const phone_number = normalizeUserPhone(dto.phone_number);
 
       /**
