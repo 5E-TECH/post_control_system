@@ -142,10 +142,17 @@ qilingan» deb belgilaydi.
 ⚠️ Deploydan keyin TEKSHIRING:
 ```sql
 SELECT count(*) FROM "order"
- WHERE operator_id IS NOT NULL AND operator_accepted_at IS NULL;
+ WHERE operator_id IS NOT NULL
+   AND operator_accepted_at IS NULL
+   AND deleted_at IS NULL;          -- ⚠️ o'chirilganlar hisobga olinmaydi
 ```
 Natija `0` bo'lishi kerak. Aks holda operator sahifasi butun tarix bilan
 «Sizga biriktirilgan» bo'lib to'lib ketadi.
+
+⚠️ `deleted_at IS NULL` SHART: o'chirilgan buyurtmalar ham
+`operator_accepted_at IS NULL` bo'lishi mumkin (deploydan keyin
+biriktirilib, keyin o'chirilgan bo'lsa) — ular operator ekranida
+KO'RINMAYDI, lekin bu shartsiz so'rov soxta ogohlantirish beradi.
 
 ---
 
@@ -159,7 +166,7 @@ Natija `0` bo'lishi kerak. Aks holda operator sahifasi butun tarix bilan
 | 4 | Audit jurnalida IP `127.0.0.1` emas, haqiqiy IP |
 | 5 | Yangi tumanlar ro'yxatda: Nukus shahri, Termiz shahri, Urganch shahri |
 | 6 | Buyurtma formasida operator tanlovi (operatorli marketda) chiqadi |
-| 7 | `SELECT count(*) FROM "order" WHERE operator_id IS NOT NULL AND operator_accepted_at IS NULL` → `0` |
+| 7 | Yuqoridagi SQL (§4 oxiri, `deleted_at IS NULL` bilan) → `0` |
 | 8 | O'chirilgan operator kira OLMAYDI (login 400) |
 
 ---
