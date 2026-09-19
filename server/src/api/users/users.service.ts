@@ -2571,7 +2571,23 @@ export class UserService implements OnModuleInit {
         description: `Operator yaratildi: ${operator.name}`,
         user: market,
       });
-      return successRes(operator, 201, 'Yangi operator yaratildi');
+      /**
+       * ⚠️ BUTUN ENTITY QAYTARILMAYDI — unda `password` HASH'i bor edi.
+       *
+       * Ekran bu javobdan hech narsa o'qimaydi (`onSuccess: () => {...}`,
+       * market-operators/index.tsx:83) — ro'yxat alohida so'rov bilan
+       * yangilanadi. Shu bois minimal, xavfsiz yuza qaytaramiz.
+       */
+      return successRes(
+        {
+          id: operator.id,
+          name: operator.name,
+          phone_number: operator.phone_number,
+          status: operator.status,
+        },
+        201,
+        'Yangi operator yaratildi',
+      );
     } catch (error) {
       return catchError(error);
     }
