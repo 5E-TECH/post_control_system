@@ -7,20 +7,33 @@
 
 ## 1. `.env` ga QO'SHILADI
 
-### 1.1 `MARKETPLACE_SECRET_KEY` — 🔴 SHART
+### 1.1 `SECRET_ENC_KEY` — 🔴 SHART
 
 ```bash
-MARKETPLACE_SECRET_KEY=<kamida 32 belgi, tasodifiy>
+SECRET_ENC_KEY=<kamida 32 belgi, tasodifiy>
 ```
 
-Marketplace `api_key`, `signing_secret`, `inbound_api_key` larini bazada
-AES-256-GCM bilan shifrlaydi.
+> ⚠️ Eski nom `MARKETPLACE_SECRET_KEY` ham ishlaydi (zaxira sifatida
+> o'qiladi), lekin u chalg'itadi: «qaysidir marketplace'ning siri»
+> degandek o'qiladi. Yangi o'rnatishda `SECRET_ENC_KEY` ishlating.
+
+**Bu HAMKORNING kaliti EMAS — bu BIZNING shifrlash kalitimiz.**
+
+Hamkor bergan `api_key`, `signing_secret`, `inbound_api_key` lar
+**UI'dan** kiritiladi va **bazada** (`marketplace_integration` ustunlari)
+yotadi. `.env` ga hamkor haqida hech narsa yozilmaydi. Bu kalit esa
+o'sha ustunlarni bazaga yozishdan oldin AES-256-GCM bilan shifrlaydi —
+ya'ni baza = seyf, bu kalit = seyfning kaliti. Seyf kalitini seyf ichiga
+qo'yib bo'lmaydi, shuning uchun u `.env` da turadi.
+
+Bitta kalit BARCHA marketplace ulanishlari uchun. Hamkor almashsa ham,
+yangi ulanish qo'shilsa ham — bu kalit o'zgarmaydi.
 
 | Holat | Nima bo'ladi |
 |---|---|
 | Berilmasa | Sekretlar **ochiq matnda** saqlanadi. Tizim ishlaydi, lekin bazaga kirgan odam hamkor kalitlarini ko'radi |
 | Keyin qo'yilsa | Ochiq matndagi eski qiymatlar o'qilaveradi, yangilari shifrlanadi — uzilish yo'q |
-| **Qo'yilib, keyin YO'QOLSA** | 🔴 Shifrlangan sekretlar **butunlay o'qilmaydi**. Har so'rov «Sekret shifrlangan, lekin MARKETPLACE_SECRET_KEY o'rnatilmagan» beradi va integratsiya to'xtaydi |
+| **Qo'yilib, keyin YO'QOLSA** | 🔴 Shifrlangan sekretlar **butunlay o'qilmaydi**. Har so'rov «Sekret shifrlangan, lekin SECRET_ENC_KEY o'rnatilmagan» beradi va integratsiya to'xtaydi |
 
 > ⚠️ Bu kalitni **zaxirada saqlang**. Lokal sinovda aynan shu yo'qolib,
 > integratsiya butunlay ishlamay qolgan — sekretlarni qayta o'rnatishga

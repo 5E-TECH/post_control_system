@@ -27,8 +27,20 @@ const PREFIX = 'v1';
 const IV_LEN = 12; // GCM uchun tavsiya etilgan uzunlik
 
 /**
- * Shifrlash kaliti. `MARKETPLACE_SECRET_KEY` (yoki umumiy `SECRET_ENC_KEY`)
- * ENV dan olinadi va SHA-256 bilan 32 baytga keltiriladi.
+ * Shifrlash kaliti — `SECRET_ENC_KEY` yoki `MARKETPLACE_SECRET_KEY`.
+ *
+ * ⚠️ NOM CHALG'ITADI. `MARKETPLACE_SECRET_KEY` «qaysidir marketplace'ning
+ * siri» degandek o'qiladi, aslida esa bu BIZNING kalitimiz: u bazadagi
+ * `marketplace_integration.api_key` / `signing_secret` /
+ * `inbound_api_key` ustunlarini shifrlaydi. Hamkorning kalitlari UI'dan
+ * kiritiladi va SHU ustunlarda yotadi — ENV ga hamkor haqida hech narsa
+ * yozilmaydi.
+ *
+ * Shu sababli `SECRET_ENC_KEY` birinchi o'rinda tekshiriladi: yangi
+ * o'rnatishlarda o'sha nom ishlatilsin, `MARKETPLACE_SECRET_KEY` esa
+ * mavjud o'rnatishlar uchun qoladi.
+ *
+ * Qiymat SHA-256 bilan 32 baytga keltiriladi.
  *
  * ⚠️ Kalit yo'q bo'lsa — `null` qaytariladi va transformer shifrlamaydi
  * (ochiq matn saqlaydi + ogohlantirish). Bu ATAYLAB: kalitsiz server
@@ -37,7 +49,7 @@ const IV_LEN = 12; // GCM uchun tavsiya etilgan uzunlik
  */
 function resolveKey(): Buffer | null {
   const raw =
-    process.env.MARKETPLACE_SECRET_KEY || process.env.SECRET_ENC_KEY || '';
+    process.env.SECRET_ENC_KEY || process.env.MARKETPLACE_SECRET_KEY || '';
   if (!raw || raw.trim().length < 16) return null;
   return createHash('sha256').update(raw.trim()).digest();
 }
@@ -48,8 +60,9 @@ function warnOnce(): void {
   warned = true;
   // eslint-disable-next-line no-console
   console.warn(
-    '[encrypted.transformer] MARKETPLACE_SECRET_KEY o\'rnatilmagan — ' +
-      'sekretlar OCHIQ MATN saqlanadi. Ishga tushirishdan oldin .env ga qo\'shing.',
+    '[encrypted.transformer] SECRET_ENC_KEY (yoki MARKETPLACE_SECRET_KEY) ' +
+      "o'rnatilmagan — sekretlar OCHIQ MATN saqlanadi. Ishga tushirishdan " +
+      "oldin .env ga qo'shing.",
   );
 }
 
@@ -89,7 +102,8 @@ export function decryptSecret(stored: string): string {
     // Shifrlangan qiymat bor, lekin kalit yo'q — jimgina axlat qaytarishdan
     // ko'ra ochiq xato yaxshi (aks holda 401 sababini hech kim topa olmaydi).
     throw new Error(
-      'Sekret shifrlangan, lekin MARKETPLACE_SECRET_KEY o\'rnatilmagan',
+      "Sekret shifrlangan, lekin SECRET_ENC_KEY (yoki " +
+        "MARKETPLACE_SECRET_KEY) o'rnatilmagan",
     );
   }
 
