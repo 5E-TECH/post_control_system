@@ -10,9 +10,33 @@
  * xato feedback'ini chaqiruvchi sahifa (hook `feedback` overlay'i) ko'rsatadi.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { Scanner, type IDetectedBarcode } from "@yudiel/react-qr-scanner";
 import { X, Zap, ZapOff, Camera, RefreshCw, ScanLine } from "lucide-react";
+
+/**
+ * Ramka va sarlavha rangi — AMALNING MA'NOSINI bildiradi.
+ *
+ * ⚠️ Sinflar LITERAL yozilgan. Tailwind sinf nomlarini shablon ifodasidan
+ * (`border-${tone}-500`) yasab bo'lmaydi — u qoidani UMUMAN yaratmaydi va
+ * ramka ko'rinmay qoladi (loyihada bu xato allaqachon bo'lgan).
+ */
+const TONES = {
+  emerald: {
+    corner: "border-emerald-500",
+    text: "text-emerald-400",
+  },
+  rose: {
+    corner: "border-rose-500",
+    text: "text-rose-400",
+  },
+  amber: {
+    corner: "border-amber-500",
+    text: "text-amber-400",
+  },
+} as const;
+
+export type ScannerTone = keyof typeof TONES;
 
 interface CourierCameraScannerProps {
   open: boolean;
@@ -21,6 +45,24 @@ interface CourierCameraScannerProps {
   onToken: (token: string) => void;
   /** Shu sessiyada qabul qilinganlar soni (yuqorida ko'rsatish uchun). */
   successCount?: number;
+
+  /**
+   * Sarlavhadagi matn. Standart — "Skaner aktiv".
+   *
+   * ⚠️ Tezkor amalda bu MAJBURIY ma'no tashiydi: bitta skan rejimga qarab
+   * buyurtmani BEKOR qiladi yoki QOLDIRADI. Kuryer kamerada turganda qaysi
+   * rejimda ekanini ko'rmasa, 20 ta buyurtmani noto'g'ri savatga qo'yib
+   * yuborishi mumkin.
+   */
+  statusText?: string;
+  /** Kamera ustidagi yo'riqnoma. */
+  hint?: string;
+  /** Kamera ochilmaganda ko'rsatiladigan maslahat. */
+  errorHint?: string;
+  /** Ramka rangi — amal ma'nosini bildiradi. */
+  tone?: ScannerTone;
+  /** "Yakunlash" tugmasi USTIDAGI bo'sh joy (masalan rejim almashtirgich). */
+  footer?: ReactNode;
 }
 
 // Bir xil tokenni shu oraliqda qayta ishlamaymiz (kamera uzluksiz o'qiydi).
@@ -31,7 +73,13 @@ export function CourierCameraScanner({
   onClose,
   onToken,
   successCount = 0,
+  statusText = "Skaner aktiv",
+  hint = "Buyurtma QR kodini ramka ichiga tuting — avtomatik qabul qilinadi",
+  errorHint = 'Hardware skaner yoki "qo\'lda qabul" tugmasidan foydalaning',
+  tone = "emerald",
+  footer,
 }: CourierCameraScannerProps) {
+  const toneCls = TONES[tone] ?? TONES.emerald;
   const [torchOn, setTorchOn] = useState(false);
   const [error, setError] = useState("");
   const lastRef = useRef<{ token: string; at: number }>({ token: "", at: 0 });
@@ -83,10 +131,10 @@ export function CourierCameraScanner({
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2 text-white">
-          <ScanLine className="w-5 h-5 text-emerald-400" />
-          <span className="font-semibold text-sm">
-            Skaner aktiv · ✓ {successCount}
+        <div className="flex min-w-0 items-center gap-2 text-white">
+          <ScanLine className={`w-5 h-5 shrink-0 ${toneCls.text}`} />
+          <span className="truncate font-semibold text-sm">
+            {statusText} · ✓ {successCount}
           </span>
         </div>
 
@@ -106,7 +154,7 @@ export function CourierCameraScanner({
       {/* Camera */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 pb-6">
         <p className="text-gray-300 text-sm text-center mb-4 max-w-xs">
-          Buyurtma QR kodini ramka ichiga tuting — avtomatik qabul qilinadi
+          {hint}
         </p>
 
         <div className="relative w-full max-w-sm aspect-square rounded-3xl overflow-hidden bg-black/50 border-2 border-white/20">
@@ -134,9 +182,7 @@ export function CourierCameraScanner({
                 <Camera className="w-8 h-8 text-red-500" />
               </div>
               <p className="text-white font-semibold mb-2">{error}</p>
-              <p className="text-gray-400 text-xs mb-5">
-                Hardware skaner yoki "qo'lda qabul" tugmasidan foydalaning
-              </p>
+              <p className="text-gray-400 text-xs mb-5">{errorHint}</p>
               <button
                 type="button"
                 onClick={() => setError("")}
@@ -151,18 +197,20 @@ export function CourierCameraScanner({
           {/* Corner markers */}
           {!error && (
             <div className="absolute inset-8 pointer-events-none">
-              <div className="absolute top-0 left-0 w-12 h-12 border-l-4 border-t-4 border-emerald-500 rounded-tl-xl" />
-              <div className="absolute top-0 right-0 w-12 h-12 border-r-4 border-t-4 border-emerald-500 rounded-tr-xl" />
-              <div className="absolute bottom-0 left-0 w-12 h-12 border-l-4 border-b-4 border-emerald-500 rounded-bl-xl" />
-              <div className="absolute bottom-0 right-0 w-12 h-12 border-r-4 border-b-4 border-emerald-500 rounded-br-xl" />
+              <div className={`absolute top-0 left-0 w-12 h-12 border-l-4 border-t-4 rounded-tl-xl ${toneCls.corner}`} />
+              <div className={`absolute top-0 right-0 w-12 h-12 border-r-4 border-t-4 rounded-tr-xl ${toneCls.corner}`} />
+              <div className={`absolute bottom-0 left-0 w-12 h-12 border-l-4 border-b-4 rounded-bl-xl ${toneCls.corner}`} />
+              <div className={`absolute bottom-0 right-0 w-12 h-12 border-r-4 border-b-4 rounded-br-xl ${toneCls.corner}`} />
             </div>
           )}
         </div>
 
+        {footer && <div className="mt-5 w-full max-w-sm">{footer}</div>}
+
         <button
           type="button"
           onClick={onClose}
-          className="mt-6 w-full max-w-sm h-12 rounded-xl bg-white/10 border border-white/20 text-white font-medium active:scale-[0.98] transition-all"
+          className="mt-4 w-full max-w-sm h-12 rounded-xl bg-white/10 border border-white/20 text-white font-medium active:scale-[0.98] transition-all"
         >
           Skanerlashni yakunlash
         </button>

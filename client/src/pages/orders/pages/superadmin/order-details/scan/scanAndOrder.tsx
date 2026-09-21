@@ -42,6 +42,9 @@ import type { FieldType } from "../../../../components/courier/waiting-orders";
 import { useOrder } from "../../../../../../shared/api/hooks/useOrder";
 import { useApiNotification } from "../../../../../../shared/hooks/useApiNotification";
 import { BASE_URL } from "../../../../../../shared/const";
+import ExtraCostProofField, {
+  type ProofFieldValue,
+} from "../../../../../../shared/components/ExtraCostProofField";
 
 interface OrderItem {
   product_id: string;
@@ -70,6 +73,9 @@ export default function ScanAndOrder() {
   >(null);
   const [isModalOpen, _] = useState(false);
   const [extraCostValue, setExtraCostValue] = useState<string>("");
+  // Qo'shimcha xarajat isboti. ⚠️ Bu SAHIFA UNUTILMASLIGI KERAK — kuryer
+  // xarajatni uch ekranda kiritadi va QR-skan eng ko'p ishlatiladigani.
+  const [proofValue, setProofValue] = useState<ProofFieldValue>({});
 
   const navigate = useNavigate();
   const role = useSelector((state: RootState) => state.roleSlice.role);
@@ -190,6 +196,7 @@ export default function ScanAndOrder() {
           order_item_info,
           totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: parsedExtraCost,
+          ...proofValue,
           comment: data?.comment,
         };
         partlySellOrder.mutate(
@@ -211,6 +218,7 @@ export default function ScanAndOrder() {
         const sellData = {
           comment: data?.comment,
           extraCost: parsedExtraCost,
+          ...proofValue,
         };
         sellOrder.mutate(
           { id, data: sellData },
@@ -246,6 +254,7 @@ export default function ScanAndOrder() {
           order_item_info,
           totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: parsedExtraCost,
+          ...proofValue,
           comment: data?.comment,
         };
         partlySellOrder.mutate(
@@ -267,6 +276,7 @@ export default function ScanAndOrder() {
         const cancelData = {
           comment: data?.comment,
           extraCost: parsedExtraCost,
+          ...proofValue,
         };
         cancelOrder.mutate(
           { id, data: cancelData },
@@ -966,6 +976,49 @@ export default function ScanAndOrder() {
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 ml-1">
                         Kassadan ayiriladigan qo'shimcha xarajat
                       </p>
+
+                      {(() => {
+                        // ⚠️ Bu sahifada avval NA limit ogohlantirishi, NA
+                        // `where_deliver` guard'i bor edi — kuryer server rad
+                        // etadigan summani kiritib, sababini bilmasdan 400
+                        // olardi. Qoida serverdagi bilan bir xil
+                        // (`extra-cost-limit.util.ts`).
+                        const od = order?.data;
+                        const isCenter = od?.where_deliver === "center";
+                        const center = Number(od?.post?.courier?.tariff_center ?? 0);
+                        const home = Number(od?.post?.courier?.tariff_home ?? 0);
+                        const sellMax =
+                          home - center > 0
+                            ? home - center
+                            : Math.floor(Math.max(0, center) / 2);
+                        const parsedExtra = extraCostValue
+                          ? Number(extraCostValue.replace(/[^\d]/g, ""))
+                          : 0;
+                        const maxExtraCost = isCenter ? sellMax : 0;
+                        const over = parsedExtra > maxExtraCost;
+
+                        return (
+                          <>
+                            {parsedExtra > 0 && over && (
+                              <div className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                                {isCenter
+                                  ? `Maksimal qo'shimcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm`
+                                  : "Uyga yetkaziladigan buyurtmada qo'shimcha xarajat yozib bo'lmaydi"}
+                              </div>
+                            )}
+
+                            {/* Foto isbot — market bayrog'i yoqilgan bo'lsa MAJBURIY */}
+                            <ExtraCostProofField
+                              required={
+                                od?.market?.extra_cost_proof_required === true
+                              }
+                              amount={parsedExtra}
+                              onChange={setProofValue}
+                              resetKey={od?.id}
+                            />
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Izoh */}

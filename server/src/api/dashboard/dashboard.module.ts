@@ -20,9 +20,12 @@ import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { ExternalIntegrationModule } from '../external-integration/external-integration.module';
 import { IntegrationSyncModule } from '../integration-sync/integration-sync.module';
+import { ExtraCostModule } from '../extra-cost/extra-cost.module';
+import { MarketplaceModule } from '../marketplace/marketplace.module';
 
 @Module({
   imports: [
+    MarketplaceModule,
     TypeOrmModule.forFeature([
       OrderItemEntity,
       OrderEntity,
@@ -37,6 +40,11 @@ import { IntegrationSyncModule } from '../integration-sync/integration-sync.modu
     OrderBotModule,
     ExternalIntegrationModule,
     IntegrationSyncModule,
+    // ⚠️ SHART: bu modul `OrderService` ni O'Z provideri sifatida qayta
+    // quradi (yuqoridagi `providers` ro'yxati), ya'ni `OrderService`
+    // konstruktoridagi HAR BIR bog'liqlik shu injectorda ham topilishi kerak.
+    // Aks holda NestJS ishga tushishda yiqiladi — typecheck buni ushlamaydi.
+    ExtraCostModule,
   ],
   controllers: [DashboardController],
   providers: [

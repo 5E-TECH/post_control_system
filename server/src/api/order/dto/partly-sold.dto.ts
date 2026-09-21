@@ -1,12 +1,18 @@
 import {
+  ArrayMaxSize,
   IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
   IsNotEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
+import { ExtraCostCategory } from 'src/common/enums';
+import { PROOF_MAX_FILES } from 'src/api/extra-cost/proof-storage.const';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { OrderItems } from 'src/common/utils/types/order-item.type';
@@ -51,8 +57,12 @@ export class PartlySoldDto {
 
   @ApiPropertyOptional({ description: 'Extra cost if any', example: 2000 })
   @IsOptional()
-  @Transform(({ value }) => parseFormattedNumber(value))
-  @IsNumber()
+  @Transform(({ value }) => {
+    const n = parseFormattedNumber(value);
+    return n === undefined ? undefined : Math.trunc(n);
+  })
+  // ⚠️ `@IsInt` — kassa ustunlari `bigint`, kasr INSERT xatosi beradi.
+  @IsInt({ message: "Qo'shimcha xarajat butun son bo'lishi kerak" })
   @Min(0)
   extraCost?: number;
 
@@ -63,4 +73,26 @@ export class PartlySoldDto {
   @IsOptional()
   @IsString()
   comment?: string;
+
+  /** Isbot fayllarining id'lari — `sellCancel-order.dto.ts` bilan bir xil. */
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  // ⚠️ Qattiq raqam EMAS — chegara `proof-storage.const.ts` da. Ular
+  // ajralib ketsa server 4-5-chi isbotni JIMGINA rad etardi.
+  @ArrayMaxSize(PROOF_MAX_FILES)
+  @IsUUID('4', { each: true })
+  extra_cost_proof_ids?: string[];
+
+  /** Xarajat sababi (yoki narx pasaytirish sababi). */
+  @ApiPropertyOptional({ enum: ExtraCostCategory })
+  @IsOptional()
+  @IsEnum(ExtraCostCategory)
+  extra_cost_category?: ExtraCostCategory;
+
+  /** "Isbotsiz davom etish" — sotuv yiqilmasin (24 soat muhlat). */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  extra_cost_proof_deferred?: boolean;
 }

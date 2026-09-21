@@ -10,6 +10,7 @@ import * as express from 'express';
 import helmet from 'helmet';
 import { MyLogger } from 'src/logger/logger.service';
 import { AppModule } from './app.module';
+import { assertProofStorageConfigured } from './extra-cost/proof-storage.const';
 
 export default class Application {
   public static async main(): Promise<void> {
@@ -28,6 +29,17 @@ export default class Application {
       console.warn(
         "⚠️  NODE_ENV o'rnatilmagan. Production deploy uchun NODE_ENV=production majburiy.",
       );
+    }
+
+    // ⚠️ ISBOT SAQLASH JOYI — yuqoridagi bilan bir xil sabab: jimgina noto'g'ri
+    // ishlashdan ko'ra umuman ko'tarilmagan yaxshi. Qo'shimcha xarajat isboti
+    // pul nizosining yagona dalili; u deploy papkasi ichiga yozilsa, har
+    // relizda o'chib ketadi va bahsni hal qilib bo'lmay qoladi.
+    try {
+      assertProofStorageConfigured();
+    } catch (e) {
+      console.error(e instanceof Error ? e.message : String(e));
+      process.exit(1);
     }
 
     // Telegram bot timeout xatoliklari serverni crash qilmasligi uchun

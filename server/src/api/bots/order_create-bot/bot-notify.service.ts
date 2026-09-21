@@ -79,6 +79,53 @@ export class BotNotifyService {
   }
 
   /**
+   * MARKET FOYDALANUVCHILARIGA ixtiyoriy matn yuboradi (egasi + operatorlar).
+   *
+   * `notifyBalanceTopup` ning umumlashtirilgani — matn chaqiruvchidan keladi.
+   * Qo'shimcha xarajat tasdiqlash oqimi shuni ishlatadi: market guruhga
+   * ulanmagan bo'lishi mumkin, DM esa har doim ishlaydi.
+   *
+   * ⚠️ BEST-EFFORT. Xato hech qachon chaqiruvchini yiqitmaydi — xabar
+   * yetmagani sotuv yoki pul oqimini to'xtatmasligi kerak.
+   */
+  async notifyMarketUsers(marketId: string, text: string): Promise<void> {
+    const body = (text || '').trim();
+    if (!body || !marketId) return;
+
+    let recipients: UserEntity[];
+    try {
+      recipients = await this.userRepo.find({
+        where: [
+          { id: marketId, role: Roles.MARKET, is_deleted: false },
+          { market_id: marketId, role: Roles.OPERATOR, is_deleted: false },
+        ],
+      });
+    } catch (err) {
+      this.logger.log(
+        `notifyMarketUsers: foydalanuvchilarni olishda xato: ${(err as Error).message}`,
+        'BotNotify',
+      );
+      return;
+    }
+
+    const targets = recipients.filter((u) => u.telegram_id);
+    if (!targets.length) return;
+
+    await Promise.all(
+      targets.map(async (u) => {
+        try {
+          await this.bot.telegram.sendMessage(u.telegram_id, body);
+        } catch (err) {
+          this.logger.log(
+            `notifyMarketUsers: ${u.telegram_id} ga yuborilmadi: ${(err as Error).message}`,
+            'BotNotify',
+          );
+        }
+      }),
+    );
+  }
+
+  /**
    * ADMIN e'loni: BARCHA ro'yxatdan o'tган bot foydalanuvchilariga (market
    * egalari + operatorlar, telegram_id bor) ixtiyoriy matnni yuboradi. Bir
    * martalik yangilik e'loni yoki boshqa xabarnomalar uchun. Best-effort;

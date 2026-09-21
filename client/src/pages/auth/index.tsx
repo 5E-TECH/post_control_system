@@ -46,6 +46,13 @@ const Auth = () => {
                 require_operator_phone: res?.data?.data?.require_operator_phone || false,
                 default_operator_phone: res?.data?.data?.default_operator_phone || "",
                 secondary_operator_phone: res?.data?.data?.secondary_operator_phone || "",
+                // Qo'shimcha xarajat nazorati — bu ro'yxat OQ RO'YXAT: bu
+                // yerda sanab o'tilmagan maydon reduxga UMUMAN tushmaydi.
+                extra_cost_proof_required:
+                  res?.data?.data?.extra_cost_proof_required || false,
+                extra_cost_auto_approve_under: Number(
+                  res?.data?.data?.extra_cost_auto_approve_under || 0,
+                ),
               }),
             );
         }
@@ -66,6 +73,11 @@ const Auth = () => {
                 require_operator_phone: res.data.data.market.require_operator_phone || false,
                 default_operator_phone: res.data.data.market.default_operator_phone || "",
                 secondary_operator_phone: res.data.data.market.secondary_operator_phone || "",
+                extra_cost_proof_required:
+                  res.data.data.market.extra_cost_proof_required || false,
+                extra_cost_auto_approve_under: Number(
+                  res.data.data.market.extra_cost_auto_approve_under || 0,
+                ),
               }),
             );
           }

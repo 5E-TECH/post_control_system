@@ -26,6 +26,9 @@ import {
   Filter,
   Wallet,
   TrendingDown,
+  UserCheck,
+  Check,
+  X,
 } from "lucide-react";
 
 const fmt = (val: number) =>
@@ -90,6 +93,74 @@ const statusFilters = [
 const canEditOrder = (status: string) => status === "created" || status === "new";
 
 // Mobile Order Card
+/**
+ * BIRIKTIRISH BELGISI VA TUGMALARI.
+ *
+ * ⚠️ Matn ataylab «Biriktirishni qabul qilish» — guruh-tasdiqlash
+ * (✅/❌ CREATED→NEW) bilan chalkashmasligi uchun. Bu tugma buyurtma
+ * STATUSINI o'zgartirmaydi.
+ *
+ * ⚠️ `stopPropagation` SHART — qator/karta bosilganda detal sahifasiga
+ * o'tadi, tugma esa unga tushib ketmasligi kerak.
+ */
+interface IAssignment {
+  assigned_by_name: string | null;
+  assigned_at: number | null;
+  accepted_at: number | null;
+  is_self_created: boolean;
+  needs_acceptance: boolean;
+  can_reject: boolean;
+}
+
+const AssignmentActions = ({
+  assignment,
+  onAccept,
+  onReject,
+  busy,
+}: {
+  assignment?: IAssignment | null;
+  onAccept: () => void;
+  onReject: () => void;
+  busy: boolean;
+}) => {
+  if (!assignment?.needs_acceptance) return null;
+  return (
+    <div className="mt-3 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 p-3">
+      <p className="text-xs text-violet-800 dark:text-violet-300 mb-2">
+        {assignment.assigned_by_name
+          ? `Sizga biriktirildi — ${assignment.assigned_by_name}`
+          : "Sizga biriktirildi"}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          disabled={busy}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAccept();
+          }}
+          className="h-8 px-3 rounded-lg bg-gradient-to-r from-emerald-500 to-green-600 text-white text-xs font-medium flex items-center gap-1.5 hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
+        >
+          <Check className="w-3.5 h-3.5" />
+          Qabul qilish
+        </button>
+        {assignment.can_reject && (
+          <button
+            disabled={busy}
+            onClick={(e) => {
+              e.stopPropagation();
+              onReject();
+            }}
+            className="h-8 px-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium flex items-center gap-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <X className="w-3.5 h-3.5" />
+            Rad etish
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const OrderCard = ({
   item,
   index,
@@ -97,6 +168,9 @@ const OrderCard = ({
   onEdit,
   onDelete,
   showEarnings,
+  onAccept,
+  onReject,
+  busy,
 }: {
   item: any;
   index: number;
@@ -104,6 +178,9 @@ const OrderCard = ({
   onEdit: () => void;
   onDelete: () => void;
   showEarnings: boolean;
+  onAccept: () => void;
+  onReject: () => void;
+  busy: boolean;
 }) => (
   <div
     onClick={onClick}
@@ -209,6 +286,13 @@ const OrderCard = ({
 
       <ChevronRight className="w-5 h-5 text-gray-400" />
     </div>
+
+    <AssignmentActions
+      assignment={item?.assignment}
+      onAccept={onAccept}
+      onReject={onReject}
+      busy={busy}
+    />
   </div>
 );
 
@@ -245,7 +329,7 @@ const TableRowSkeleton = () => (
 
 const OperatorOrders = () => {
   const navigate = useNavigate();
-  const { getMyOrders } = useUser();
+  const { getMyOrders, acceptMyOrder, rejectMyOrder } = useUser();
   const { deleteOrders } = useOrder();
   const { handleApiError, handleSuccess } = useApiNotification();
 
@@ -253,11 +337,24 @@ const OperatorOrders = () => {
   const limit = Number(getParam("limit") || 20);
   const [page, setPage] = useState<number>(Number(getParam("page") || 1));
   const [statusFilter, setStatusFilter] = useState("");
+  /**
+   * «Qabul kutilmoqda» filtri — boshqa odam biriktirgan, operator hali
+   * tan olmagan buyurtmalar. Status filtridan ALOHIDA: bu buyurtma
+   * holati emas, biriktirish holati.
+   */
+  const [assignmentFilter, setAssignmentFilter] = useState<
+    "pending" | undefined
+  >(undefined);
   const [deleteId, setDeleteId] = useState("");
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const { data, isLoading } = getMyOrders(
-    { page, limit, status: statusFilter || undefined },
+    {
+      page,
+      limit,
+      status: statusFilter || undefined,
+      assignment: assignmentFilter,
+    },
     true,
   );
 
@@ -267,6 +364,29 @@ const OperatorOrders = () => {
   const pagination = result?.pagination;
   const showEarnings = result?.show_earnings;
   const total = pagination?.total || 0;
+
+  /**
+   * ⚠️ Xato xabari SERVERDAN olinadi — u sababni aniq aytadi
+   * («allaqachon qabul qilgansiz», «sizga biriktirilmagan» ...).
+   * Umumiy «xatolik» matni operatorni chalg'itardi.
+   */
+  const handleAccept = (id: string) => {
+    acceptMyOrder.mutate(id, {
+      onSuccess: (res: { message?: string }) =>
+        handleSuccess(res?.message || "Buyurtma qabul qilindi"),
+      onError: (e: unknown) => handleApiError(e, "Qabul qilib bo'lmadi"),
+    });
+  };
+
+  const handleReject = (id: string) => {
+    rejectMyOrder.mutate(id, {
+      onSuccess: (res: { message?: string }) =>
+        handleSuccess(res?.message || "Biriktirish rad etildi"),
+      onError: (e: unknown) => handleApiError(e, "Rad etib bo'lmadi"),
+    });
+  };
+
+  const assignmentBusy = acceptMyOrder.isPending || rejectMyOrder.isPending;
 
   const onChange: PaginationProps["onChange"] = (newPage, newLimit) => {
     setPage(newPage);
@@ -293,7 +413,7 @@ const OperatorOrders = () => {
             Mening buyurtmalarim
           </h1>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Siz yaratgan barcha buyurtmalar
+            Siz yaratgan va sizga biriktirilgan buyurtmalar
           </p>
         </div>
       </div>
@@ -333,6 +453,50 @@ const OperatorOrders = () => {
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Kutilmoqda</p>
             <h2 className="text-xl font-bold text-gray-800 dark:text-white">{stats.pending}</h2>
           </div>
+          {/*
+            Biriktirilgan, lekin hali tan olinmagan buyurtmalar. Karta
+            FAQAT ular bo'lganda ko'rinadi — aks holda ekranda doim nol
+            turgan ortiqcha karta bo'lardi.
+          */}
+          {stats.pending_acceptance > 0 && (
+            <button
+              onClick={() => {
+                setAssignmentFilter(
+                  assignmentFilter === "pending" ? undefined : "pending",
+                );
+                setPage(1);
+              }}
+              className="relative bg-white dark:bg-[#2A263D] p-4 rounded-2xl shadow-sm overflow-hidden text-left cursor-pointer hover:shadow-md transition-shadow"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-fuchsia-500" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white mb-3 shadow-lg">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Sizga biriktirilgan
+              </p>
+              <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                {stats.pending_acceptance}
+              </h2>
+            </button>
+          )}
+        </div>
+      )}
+
+      {assignmentFilter === "pending" && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl px-4 py-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800">
+          <p className="text-sm text-violet-800 dark:text-violet-300">
+            Faqat sizga biriktirilgan va hali qabul qilinmagan buyurtmalar
+          </p>
+          <button
+            onClick={() => {
+              setAssignmentFilter(undefined);
+              setPage(1);
+            }}
+            className="text-xs font-medium text-violet-700 dark:text-violet-300 underline cursor-pointer"
+          >
+            Filtrni olib tashlash
+          </button>
         </div>
       )}
 
@@ -379,6 +543,9 @@ const OperatorOrders = () => {
                   setIsConfirmOpen(true);
                 }}
                 showEarnings={showEarnings}
+                onAccept={() => handleAccept(item.id)}
+                onReject={() => handleReject(item.id)}
+                busy={assignmentBusy}
               />
             ))
           )}
@@ -475,6 +642,45 @@ const OperatorOrders = () => {
                       {fmtDate(item?.created_at)}
                     </td>
                     <td className="px-4 py-4 text-center">
+                      {/*
+                        Biriktirish tugmalari tahrirlash/o'chirishdan OLDIN —
+                        operator uchun birinchi navbatdagi amal shu.
+                        Jadvalda joy kam, shuning uchun ixcham ikonkalar
+                        (`title` bilan); mobil kartada to'liq matnli
+                        tugmalar ko'rinadi.
+                      */}
+                      {item?.assignment?.needs_acceptance && (
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <button
+                            disabled={assignmentBusy}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAccept(item.id);
+                            }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
+                            title={
+                              item.assignment.assigned_by_name
+                                ? `Biriktirishni qabul qilish — ${item.assignment.assigned_by_name}`
+                                : 'Biriktirishni qabul qilish'
+                            }
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          {item.assignment.can_reject && (
+                            <button
+                              disabled={assignmentBusy}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleReject(item.id);
+                              }}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all cursor-pointer disabled:opacity-50"
+                              title="Biriktirishni rad etish"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                       {canEditOrder(item?.status) ? (
                         <div className="flex items-center justify-center gap-1">
                           <button

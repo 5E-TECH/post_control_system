@@ -63,6 +63,8 @@ import { ShiftEntity, ShiftStatus } from 'src/core/entity/shift.entity';
 import { ShiftRepository } from 'src/core/repository/shift.repository';
 import { getSafeLimit } from 'src/common/constants/pagination';
 import { ActivityLogService } from '../activity-log/activity-log.service';
+import { applyCashboxDelta } from 'src/common/database/cashbox-delta.util';
+import { MarketplaceIntegrationEntity } from 'src/core/entity/marketplace-integration.entity';
 
 /** Bitta virtual karta bo'yicha ledger (statement) qatori. */
 type CardLedgerKind =
@@ -1172,29 +1174,24 @@ export class CashBoxService
         throw new NotFoundException('Main cashbox not found');
       }
 
-      courierCashbox.balance -= amount;
-      await transaction.manager.save(courierCashbox);
-
-      const courierCashboxHistory = transaction.manager.create(
-        CashboxHistoryEntity,
-        {
-          operation_type: Operation_type.EXPENSE,
-          cashbox_id: courierCashbox.id,
-          source_type: Source_type.COURIER_PAYMENT,
-          // Click_to_market bo'lsa — pul to'g'ridan-to'g'ri qaysi marketga
-          // ketganini kuryer tarixida ko'rsatish uchun source_user_id = market_id.
-          source_user_id:
-            payment_method === PaymentMethod.CLICK_TO_MARKET ? market_id : null,
-          amount,
-          balance_after: courierCashbox.balance,
-          comment,
-          created_by: user.id,
-          payment_date,
-          payment_method,
-        },
-      );
-
-      await transaction.manager.save(courierCashboxHistory);
+      // ⚠️ ATOMIK — LOST UPDATE ga qarshi (bloker B1). Kassa qatori hech
+      // qayerda lock qilinmaydi; sotuvlar bilan parallel ishlaganda
+      // «o'qi-o'zgartir-yoz» bir tomonning yozuvini jimgina o'chirardi.
+      await applyCashboxDelta(transaction.manager, {
+        cashbox: courierCashbox,
+        delta: -amount,
+        operation: Operation_type.EXPENSE,
+        source_type: Source_type.COURIER_PAYMENT,
+        amount,
+        // Click_to_market bo'lsa — pul to'g'ridan-to'g'ri qaysi marketga
+        // ketganini kuryer tarixida ko'rsatish uchun source_user_id = market_id.
+        source_user_id:
+          payment_method === PaymentMethod.CLICK_TO_MARKET ? market_id : null,
+        comment,
+        created_by: user.id,
+        payment_date,
+        payment_method,
+      });
 
       mainCashbox.balance += amount;
       // Naqd yoki karta balansini yangilash. Karta bo'lsa — tanlangan virtual
@@ -1250,6 +1247,34 @@ export class CashBoxService
           throw new NotFoundException('Market cashbox topilmadi');
         }
 
+        /**
+         * ⚠️ MARKETPLACE DARVOZASI — `paymentsToMarket` dagi bilan BIR XIL
+         * sabab, lekin bu yo'l uni CHETLAB O'TARDI.
+         *
+         * CLICK_TO_MARKET market kassasidan pul yechadi va quyidagi FIFO
+         * yurishi buyurtmalarni `SOLD → PAID` qiladi. Marketplace marketida:
+         *   · kassa kamayadi, yordamchi daftarga esa HECH NARSA yozilmaydi
+         *     → `SUM(daftar) == kassa balansi` invarianti darhol buziladi
+         *     va kechalik solishtiruv «farq» deb baqiradi;
+         *   · FIFO eng eski buyurtmalarni to'laydi — ya'ni A sotuvchi uchun
+         *     berilgan pul C va D sotuvchilarining buyurtmalarini
+         *     «to'langan» qilib qo'yadi va marketplace NOTO'G'RI odamga
+         *     to'laydi.
+         *
+         * Marketplace'ga to'lov FAQAT taqsimotli hisob-kitob ekranidan.
+         */
+        const boundIntegration = await transaction.manager.findOne(
+          MarketplaceIntegrationEntity,
+          { where: { market_id } },
+        );
+        if (boundIntegration) {
+          throw new BadRequestException(
+            `Bu market «${boundIntegration.name}» marketplace'iga biriktirilgan. ` +
+              `Kuryerdan to'g'ridan-to'g'ri to'lov sotuvchilar bo'yicha ` +
+              `taqsimlanmaydi. Marketplace hisob-kitob ekranidan foydalaning.`,
+          );
+        }
+
         const allSoldOrders = await this.orderRepo
           .createQueryBuilder('o')
           .where('o.user_id = :market_id', { market_id })
@@ -1297,27 +1322,21 @@ export class CashBoxService
         );
         await transaction.manager.save(mainCashboxHistoryMarket);
 
-        market_cashbox.balance -= amount;
-        await transaction.manager.save(market_cashbox);
-
-        const marketCashboxHistory = transaction.manager.create(
-          CashboxHistoryEntity,
-          {
-            operation_type: Operation_type.EXPENSE,
-            cashbox_id: market_cashbox.id,
-            source_type: Source_type.MARKET_PAYMENT,
-            // Pul qaysi kuryerdan (click orqali) tushganini market
-            // tarixida ko'rsatish uchun source_user_id = courier_id.
-            source_user_id: courier_id,
-            amount,
-            balance_after: market_cashbox.balance,
-            comment,
-            created_by: user.id,
-            payment_date,
-            payment_method,
-          },
-        );
-        await transaction.manager.save(marketCashboxHistory);
+        // ⚠️ ATOMIK (bloker B1)
+        await applyCashboxDelta(transaction.manager, {
+          cashbox: market_cashbox,
+          delta: -amount,
+          operation: Operation_type.EXPENSE,
+          source_type: Source_type.MARKET_PAYMENT,
+          amount,
+          // Pul qaysi kuryerdan (click orqali) tushganini market
+          // tarixida ko'rsatish uchun source_user_id = courier_id.
+          source_user_id: courier_id,
+          comment,
+          created_by: user.id,
+          payment_date,
+          payment_method,
+        });
 
         let paymentInProcess = amount;
 
@@ -1409,6 +1428,30 @@ export class CashBoxService
         where: { id: market_id, role: Roles.MARKET },
       });
       if (!market) throw new NotFoundException('Market not found');
+
+      // === MARKETPLACE MARKETI UCHUN BU YO'L BLOKLANADI ===
+      //
+      // ⚠️ NEGA. Quyidagi FIFO yurishi to'lovni market bo'yicha ENG ESKI
+      // buyurtmalardan boshlab tarqatadi va ularni `SOLD → PAID` qiladi.
+      // Marketplace marketida 40 ta sotuvchi bo'lishi mumkin — ya'ni
+      // «A sotuvchi uchun» berilgan pul C, D va E sotuvchilarining
+      // buyurtmalarini «to'langan» qilib qo'yadi.
+      //
+      // Marketplace esa bizning `PAID` bayrog'imizga qarab o'z sotuvchisiga
+      // to'lasa — NOTO'G'RI odamga to'laydi. Shu bois marketplace marketiga
+      // to'lov FAQAT taqsimotli hisob-kitob ekrani orqali bo'ladi.
+      const boundIntegration = await queryRunner.manager.findOne(
+        MarketplaceIntegrationEntity,
+        { where: { market_id } },
+      );
+      if (boundIntegration) {
+        throw new BadRequestException(
+          `«${market.name}» marketi «${boundIntegration.name}» marketplace'iga biriktirilgan. ` +
+            `Bu yerdagi umumiy to'lov sotuvchilar bo'yicha taqsimlanmaydi va ` +
+            `noto'g'ri sotuvchining buyurtmalarini «to'langan» qilib qo'yadi. ` +
+            `Marketplace hisob-kitob ekranidan foydalaning.`,
+        );
+      }
 
       const mainCashbox = await queryRunner.manager.findOne(CashEntity, {
         where: { cashbox_type: Cashbox_type.MAIN },
@@ -1510,22 +1553,21 @@ export class CashBoxService
       }
 
       // ✅ Market cashboxdan pul ayirish
-      marketCashbox.balance -= amount;
-      await queryRunner.manager.save(marketCashbox);
-
-      await queryRunner.manager.save(
-        queryRunner.manager.create(CashboxHistoryEntity, {
-          operation_type: Operation_type.EXPENSE,
-          cashbox_id: marketCashbox.id,
-          source_type: Source_type.MARKET_PAYMENT,
-          amount,
-          balance_after: marketCashbox.balance,
-          comment,
-          created_by: user.id,
-          payment_date,
-          payment_method,
-        }),
-      );
+      // ⚠️ ATOMIK — LOST UPDATE ga qarshi (bloker B1). Kassa qatori hech
+      // qayerda lock qilinmaydi; sotuvlar bilan parallel ishlaganda
+      // «o'qi-o'zgartir-yoz» bir tomonning yozuvini jimgina o'chirardi.
+      const marketPaymentWrite = await applyCashboxDelta(queryRunner.manager, {
+        cashbox: marketCashbox,
+        delta: -amount,
+        operation: Operation_type.EXPENSE,
+        source_type: Source_type.MARKET_PAYMENT,
+        amount,
+        comment,
+        created_by: user.id,
+        payment_date,
+        payment_method,
+      });
+      void marketPaymentWrite;
 
       await queryRunner.commitTransaction();
       this.activityLog.log({

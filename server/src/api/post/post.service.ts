@@ -45,6 +45,8 @@ import {
 } from '../elchi-cargo/elchi-shipment.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { BotService } from '../bots/notify-bot/bot.service';
+import { MarketplaceSyncService } from '../marketplace/marketplace-sync.service';
+import { MarketplaceEventType } from '../marketplace/marketplace.enums';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
@@ -99,6 +101,7 @@ export class PostService {
     private readonly ldgShipmentService: LdgShipmentService,
     private readonly elchiShipmentService: ElchiShipmentService,
     private readonly botService: BotService,
+    private readonly marketplaceSync: MarketplaceSyncService,
   ) {}
 
   /**
@@ -991,6 +994,13 @@ export class PostService {
       for (const order of newOrders) {
         order.post_id = sentPost.id;
         order.status = Order_status.ON_THE_ROAD;
+        // ⚠️ MARKETPLACE ORALIQ STATUSI — pochta yo'lga chiqdi.
+        await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+          order,
+          event_type: MarketplaceEventType.PARCEL_DISPATCHED,
+          status: { from: Order_status.RECEIVED, to: 'IN_TRANSIT' },
+          actor: { type: 'operator' },
+        });
         if (courier.is_super_courier) {
           const t =
             order.where_deliver === Where_deliver.CENTER
@@ -1228,6 +1238,17 @@ export class PostService {
 
       for (const order of orders) {
         order.status = Order_status.WAITING;
+        // ⚠️ MARKETPLACE ORALIQ STATUSI — kuryerda, mijozga ketyapti.
+        // Avval hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi;
+        // oradagi hamma narsa qorong'i edi va ularning mijozi «posilkam
+        // qayerda?» deganda javob yo'q edi. Marketplace bo'lmagan
+        // buyurtmada metod darhol chiqadi (so'rovsiz).
+        await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+          order,
+          event_type: MarketplaceEventType.PARCEL_OUT_FOR_DELIVERY,
+          status: { from: Order_status.ON_THE_ROAD, to: 'OUT_FOR_DELIVERY' },
+          actor: { type: 'courier' },
+        });
         await queryRunner.manager.save(order);
       }
 
@@ -1293,6 +1314,17 @@ export class PostService {
 
       // 3) Order statusini o'zgartiramiz
       order.status = Order_status.WAITING;
+      // ⚠️ MARKETPLACE ORALIQ STATUSI — kuryerda, mijozga ketyapti.
+      // Avval hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi;
+      // oradagi hamma narsa qorong'i edi va ularning mijozi «posilkam
+      // qayerda?» deganda javob yo'q edi. Marketplace bo'lmagan
+      // buyurtmada metod darhol chiqadi (so'rovsiz).
+      await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+        order,
+        event_type: MarketplaceEventType.PARCEL_OUT_FOR_DELIVERY,
+        status: { from: Order_status.ON_THE_ROAD, to: 'OUT_FOR_DELIVERY' },
+        actor: { type: 'courier' },
+      });
       await queryRunner.manager.save(order);
 
       // 4) Post ichida hali "ON_THE_ROAD" order bor yoki yo'qligini tekshiramiz
@@ -1398,6 +1430,17 @@ export class PostService {
 
       // 4) Buyurtmani WAITING ga o'tkazamiz
       order.status = Order_status.WAITING;
+      // ⚠️ MARKETPLACE ORALIQ STATUSI — kuryerda, mijozga ketyapti.
+      // Avval hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi;
+      // oradagi hamma narsa qorong'i edi va ularning mijozi «posilkam
+      // qayerda?» deganda javob yo'q edi. Marketplace bo'lmagan
+      // buyurtmada metod darhol chiqadi (so'rovsiz).
+      await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+        order,
+        event_type: MarketplaceEventType.PARCEL_OUT_FOR_DELIVERY,
+        status: { from: Order_status.ON_THE_ROAD, to: 'OUT_FOR_DELIVERY' },
+        actor: { type: 'courier' },
+      });
       await queryRunner.manager.save(order);
 
       // 5) Postda yana ON_THE_ROAD buyurtma qolganmi?
@@ -1499,6 +1542,17 @@ export class PostService {
       }
 
       order.status = Order_status.WAITING;
+      // ⚠️ MARKETPLACE ORALIQ STATUSI — kuryerda, mijozga ketyapti.
+      // Avval hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi;
+      // oradagi hamma narsa qorong'i edi va ularning mijozi «posilkam
+      // qayerda?» deganda javob yo'q edi. Marketplace bo'lmagan
+      // buyurtmada metod darhol chiqadi (so'rovsiz).
+      await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+        order,
+        event_type: MarketplaceEventType.PARCEL_OUT_FOR_DELIVERY,
+        status: { from: Order_status.ON_THE_ROAD, to: 'OUT_FOR_DELIVERY' },
+        actor: { type: 'courier' },
+      });
       order.return_requested = true;
       await queryRunner.manager.save(order);
 

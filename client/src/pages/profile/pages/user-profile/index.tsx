@@ -23,6 +23,7 @@ import {
   Lock,
   Truck,
   Bot,
+  Receipt,
 } from "lucide-react";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { setUserData } from "../../../../shared/lib/features/login/authSlice";
@@ -52,6 +53,10 @@ const UserProfile = () => {
     useState(false);
   const [defaultOperatorPhoneValue, setDefaultOperatorPhoneValue] =
     useState("");
+
+  // Qo'shimcha xarajat — avtomatik tasdiq chegarasi (inline tahrirlash)
+  const [autoApproveUnderEditing, setAutoApproveUnderEditing] = useState(false);
+  const [autoApproveUnderValue, setAutoApproveUnderValue] = useState<number>(0);
 
   // Maosh progress hisoblash
   const salaryProgress = useMemo(() => {
@@ -331,6 +336,60 @@ const UserProfile = () => {
   const onChangeRequireOperatorPhone = (checked: boolean, user: any) => {
     // Toggle mustaqil — default raqam alohida tahrirlanadi (popup yo'q)
     persistRequireOperatorPhone(checked, user);
+  };
+
+  /**
+   * QO'SHIMCHA XARAJAT NAZORATI — bayroq va avtomatik tasdiq chegarasi.
+   *
+   * Bayroq yoqilganda kuryer yozgan qo'shimcha xarajat kassaga DARHOL
+   * yozilmaydi: u foto isbot bilan market tasdig'iga yuboriladi va pul faqat
+   * tasdiqlangandan keyin harakat qiladi.
+   */
+  const persistExtraCostSetting = (
+    patch: Record<string, any>,
+    user: any,
+    successMessage: string,
+  ) => {
+    updateUser.mutate(
+      { role: user?.role, id: user?.id, data: patch },
+      {
+        onSuccess: () => {
+          handleSuccess(successMessage);
+          refreshMarketDataIfSelf(user, patch);
+          refetch();
+        },
+        onError: (err) => handleApiError(err, "Sozlamani yangilashda xatolik"),
+      },
+    );
+  };
+
+  const onChangeExtraCostProofRequired = (checked: boolean, user: any) => {
+    persistExtraCostSetting(
+      { extra_cost_proof_required: checked },
+      user,
+      checked
+        ? "Qo'shimcha xarajat uchun isbot va tasdiq YOQILDI"
+        : "Qo'shimcha xarajat nazorati o'chirildi",
+    );
+  };
+
+  const startEditAutoApproveUnder = () => {
+    setAutoApproveUnderValue(
+      Number(user?.extra_cost_auto_approve_under ?? 0) || 0,
+    );
+    setAutoApproveUnderEditing(true);
+  };
+
+  const saveAutoApproveUnder = () => {
+    const value = Math.max(0, Math.trunc(Number(autoApproveUnderValue) || 0));
+    persistExtraCostSetting(
+      { extra_cost_auto_approve_under: value },
+      user,
+      value > 0
+        ? `Avtomatik tasdiq chegarasi: ${value.toLocaleString("uz-UZ")} so'm`
+        : "Avtomatik tasdiq chegarasi o'chirildi",
+    );
+    setAutoApproveUnderEditing(false);
   };
 
   const startEditDefaultOperatorPhone = () => {
@@ -721,6 +780,126 @@ const UserProfile = () => {
                   Pastdagi maydondan default raqamni kiriting — aks holda
                   buyurtma yaratilganda har safar raqam talab qilinadi.
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Qo'shimcha xarajat nazorati — market yozuvida, FAQAT admin ko'radi.
+              Backend ham admin-only (`PATCH user/market/:id`), bu esa shunchaki
+              boshqa rollarga ishlamaydigan tugma ko'rsatmaslik uchun.
+              ⚠️ `/user-profile/:id` marshrutining o'zi RequireRole'siz — uni
+              qulflash registrator/market oqimini buzishi mumkin, shuning uchun
+              marshrut emas, aynan shu karta himoyalanadi. */}
+          {user?.role === "market" &&
+            (currentUserRole === "admin" ||
+              currentUserRole === "superadmin") && (
+            <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Receipt className="w-6 h-6 text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                      Qo'shimcha xarajat nazorati
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                      {user?.extra_cost_proof_required
+                        ? "Isbot va tasdiq majburiy"
+                        : "O'chiq — xarajat darhol yoziladi"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  className={`${
+                    user?.extra_cost_proof_required
+                      ? "bg-green-600!"
+                      : "bg-[#F76659]!"
+                  }`}
+                  checked={user?.extra_cost_proof_required}
+                  loading={updateUser.isPending}
+                  onChange={(checked, event) => {
+                    event.stopPropagation();
+                    onChangeExtraCostProofRequired(checked, user);
+                  }}
+                />
+              </div>
+
+              {user?.extra_cost_proof_required && (
+                <>
+                  <div className="mt-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 text-xs text-blue-700 dark:text-blue-300">
+                    Kuryer bu market buyurtmasiga qo'shimcha xarajat yozsa, foto
+                    isbot biriktirishi shart bo'ladi va pul market
+                    tasdiqlagunga qadar kassaga yozilmaydi.
+                    <br />
+                    <span className="font-medium">
+                      Diqqat: tashqi kargo (Elchi/LDG) orqali yetkazilgan
+                      buyurtmalarga qo'llanmaydi
+                    </span>{" "}
+                    — u kuryerlar bizning ilovadan foydalanmaydi.
+                  </div>
+
+                  <div className="mt-3 flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex-1 min-w-[200px]">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
+                        Avtomatik tasdiq chegarasi
+                      </p>
+                      {autoApproveUnderEditing ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <InputNumber
+                            size="middle"
+                            autoFocus
+                            min={0}
+                            step={1000}
+                            value={autoApproveUnderValue}
+                            onChange={(v) =>
+                              setAutoApproveUnderValue(Number(v ?? 0))
+                            }
+                            onPressEnter={saveAutoApproveUnder}
+                            formatter={(v) =>
+                              `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
+                            }
+                            parser={(v) =>
+                              Number(`${v}`.replace(/[^\d]/g, "")) || 0
+                            }
+                            className="max-w-[160px]"
+                          />
+                          <Button
+                            type="primary"
+                            size="middle"
+                            onClick={saveAutoApproveUnder}
+                            loading={updateUser.isPending}
+                          >
+                            Saqlash
+                          </Button>
+                          <Button
+                            size="middle"
+                            onClick={() => setAutoApproveUnderEditing(false)}
+                          >
+                            Bekor qilish
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                          {Number(user?.extra_cost_auto_approve_under ?? 0) > 0
+                            ? `${Number(
+                                user.extra_cost_auto_approve_under,
+                              ).toLocaleString("uz-UZ")} so'mdan kichik so'rovlar avtomatik tasdiqlanadi`
+                            : "O'chiq — har bir so'rovni market ko'rib chiqadi"}
+                        </p>
+                      )}
+                    </div>
+                    {!autoApproveUnderEditing && (
+                      <Button
+                        size="middle"
+                        icon={<Edit3 className="w-4 h-4" />}
+                        onClick={startEditAutoApproveUnder}
+                      >
+                        O'zgartirish
+                      </Button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}

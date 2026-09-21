@@ -47,6 +47,7 @@ import { TelegramInitData } from './dto/initData.dto';
 import { CreateLogistDto } from './dto/create-logist.dto';
 import { UpdateLogistDto } from './dto/update-logist.dto';
 import { CreateOperatorDto } from './dto/create-operator.dto';
+import { UpdateOperatorDto } from './dto/update-operator.dto';
 import { UpdateOperatorCommissionDto } from './dto/update-operator-commission.dto';
 import { PayOperatorDto } from './dto/pay-operator.dto';
 
@@ -690,6 +691,34 @@ export class UsersController {
     return this.userService.getMyOperators(user);
   }
 
+  /**
+   * ⚠️ `my-operators` dan ALOHIDA: u faqat MARKET uchun, bu esa buyurtma
+   * YARATADIGAN barcha rollar uchun va faqat `id` + `name` qaytaradi.
+   * Marshrut `:id` dan OLDIN turishi shart — aks holda `selectable`
+   * `@Get(':id')` ga tushib ketardi.
+   */
+  @ApiOperation({ summary: 'Buyurtmaga biriktirish uchun operatorlar' })
+  @ApiQuery({
+    name: 'market_id',
+    required: false,
+    description: 'Faqat admin/registrator uchun — qaysi marketning operatorlari',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.MARKET,
+    Roles.OPERATOR,
+    Roles.ADMIN,
+    Roles.SUPERADMIN,
+    Roles.REGISTRATOR,
+  )
+  @Get('operators/selectable')
+  getSelectableOperators(
+    @CurrentUser() user: JwtPayload,
+    @Query('market_id') marketId?: string,
+  ) {
+    return this.userService.getSelectableOperators(user, marketId);
+  }
+
   @ApiOperation({ summary: 'Delete operator' })
   @ApiParam({ name: 'id', description: 'Operator ID' })
   @ApiResponse({ status: 200, description: 'Operator deleted successfully' })
@@ -708,6 +737,23 @@ export class UsersController {
   @Get('operator/:id/stats')
   getOperatorStats(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.userService.getOperatorStats(id, user);
+  }
+
+  /**
+   * ⚠️ Telefon va parol bu yerda O'ZGARTIRILMAYDI — sabab
+   * `UpdateOperatorDto` izohida.
+   */
+  @ApiOperation({ summary: "Operatorni tahrirlash / bloklash (market)" })
+  @ApiParam({ name: 'id', description: 'Operator ID' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET)
+  @Patch('operator/:id')
+  updateOperator(
+    @Param('id') id: string,
+    @Body() dto: UpdateOperatorDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.updateOperator(id, dto, user);
   }
 
   @ApiOperation({ summary: 'Update operator commission settings' })
@@ -778,13 +824,43 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.OPERATOR)
   @Get('my-orders')
+  @ApiQuery({
+    name: 'assignment',
+    required: false,
+    enum: ['pending', 'accepted'],
+    description:
+      "`pending` — boshqa odam biriktirgan, hali qabul qilinmaganlar",
+  })
   getMyOrders(
     @CurrentUser() user: JwtPayload,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 20,
     @Query('status') status?: string,
+    @Query('assignment') assignment?: 'pending' | 'accepted',
   ) {
-    return this.userService.getMyOrders(user, page, limit, status);
+    return this.userService.getMyOrders(user, page, limit, status, assignment);
+  }
+
+  /**
+   * ⚠️ `@Patch` ishlatiladi va controllerda umumiy `@Patch(':id')` YO'Q —
+   * shuning uchun marshrut to'qnashuvi bo'lmaydi.
+   */
+  @ApiOperation({ summary: 'Biriktirilgan buyurtmani qabul qilish (operator)' })
+  @ApiParam({ name: 'id', description: 'Buyurtma ID' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.OPERATOR)
+  @Patch('my-orders/:id/accept')
+  acceptMyOrder(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.userService.acceptAssignedOrder(id, user);
+  }
+
+  @ApiOperation({ summary: 'Biriktirishni rad etish (operator)' })
+  @ApiParam({ name: 'id', description: 'Buyurtma ID' })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.OPERATOR)
+  @Patch('my-orders/:id/reject')
+  rejectMyOrder(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.userService.rejectAssignedOrder(id, user);
   }
 
   @ApiOperation({

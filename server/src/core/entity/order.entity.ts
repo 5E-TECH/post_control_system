@@ -103,9 +103,46 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   secondary_operator_phone: string | null;
 
-  // Buyurtmani yaratgan operatorning user ID si
+  /**
+   * Buyurtma BIRIKTIRILGAN operator.
+   *
+   * ⚠️ Avval bu «yaratgan operator» edi va faqat yaratuvchi OPERATOR
+   * rolida bo'lsa to'lardi. Endi market/admin ham boshqa operatorni
+   * tanlashi mumkin — shu bois ma'nosi «kimga biriktirilgan».
+   * Operator KOMISSIYASI (`operator_earning`) aynan shu ustundan
+   * hisoblanadi, shuning uchun unga faqat SHU MARKETNING faol operatori
+   * yozilishi mumkin (`resolveOperatorAssignment`).
+   */
   @Column({ type: 'uuid', nullable: true })
   operator_id: string | null;
+
+  /**
+   * Kim biriktirdi. `null` — operator o'zi yaratgan yoki eski yozuv.
+   * Rad etish faqat BOSHQA odam biriktirgan bo'lsa ruxsat etiladi.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  operator_assigned_by: string | null;
+
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  operator_assigned_at: number | null;
+
+  /**
+   * Operator biriktiruvni QABUL QILGAN vaqt. `null` — kutilmoqda.
+   *
+   * ⚠️ Bu buyurtma STATUSIGA tegmaydi va pulni boshqarmaydi — u faqat
+   * «operator ko'rdi va o'ziniki deb tan oldi» signali. Guruh-tasdiqlash
+   * (CREATED→NEW) oqimi bilan aralashtirmaslik kerak.
+   */
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  operator_accepted_at: number | null;
 
   @Column({ type: 'uuid', nullable: true })
   post_id: string | null;
@@ -244,6 +281,47 @@ export class OrderEntity extends BaseEntity {
   // (Telegram). Eski yozuvlar -> 'manual'. AI dashboard va tracking uchun.
   @Column({ type: 'varchar', length: 16, default: OrderCreatedSource.MANUAL })
   created_source: OrderCreatedSource;
+
+  // ══════════════════ MARKETPLACE INTEGRATSIYASI ══════════════════
+  // Uchala ustun ham NULLABLE — mavjud buyurtmalar xulqi 0% o'zgarmaydi.
+
+  /**
+   * Buyurtma qaysi marketplace integratsiyasidan kelgani.
+   *
+   * ⚠️ NEGA FK, MATN EMAS. Mavjud generik yo'lda bog'lanish `operator`
+   * MATN ustunini `external_<slug>` deb parse qilish orqali quriladi
+   * (`integration-sync.service.ts`). Natijada slug o'zgarsa BARCHA tarixiy
+   * buyurtma sinxrondan jimgina chiqib ketadi. Bu yerda bunday bo'lmaydi.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  integration_id: string | null;
+
+  /**
+   * Marketplace ICHIDAGI sotuvchi ID si — pul attributsiyasining kaliti.
+   *
+   * ⚠️ Bola buyurtmalarga NUSXALANISHI SHART (qisman sotuv, almashtirish).
+   * Aks holda qaytgan qism qaysi sotuvchiniki ekani yo'qoladi — bugungi
+   * `partlySold` bola buyurtmani `external_id`siz yaratadi va u sinxron
+   * uchun butunlay ko'rinmas bo'lib qoladi.
+   */
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  external_seller_id: string | null;
+
+  /**
+   * Shu buyurtma bo'yicha SOF ortiqcha xarajat (qo'shilgan − qaytarilgan).
+   *
+   * ⚠️ NEGA KERAK. Bugun ortiqcha xarajat `order` da UMUMAN saqlanmaydi —
+   * u ikkita `cashbox_history` qatori va `order.comment` ichidagi erkin
+   * matndan iborat. «Bu buyurtmada qancha ortiqcha xarajat bor» degan
+   * savolga javob berish uchun `SUM(EXTRA_COST) − SUM(CORRECTION)` hisobini
+   * yuritish kerak bo'lardi — hodisaga solish uchun bu juda qimmat va
+   * `CORRECTION` juftligi sotuv reversalida ham ishlatilgani uchun xatoga moyil.
+   */
+  // ⚠️ Bu faylda import ALIAS bilan: `bigintTransformerNonNull as bigintTransformer`.
+  // Ya'ni quyidagi `bigintTransformer` — null-SAQLOVCHI emas, `default: 0` li
+  // NOT NULL varianti. Aynan shu kerak (sof xarajat hech qachon null bo'lmaydi).
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  extra_cost_net: number;
 
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order)

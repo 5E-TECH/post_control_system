@@ -129,6 +129,30 @@ export const useUser = (path?: string) => {
       staleTime: 1000 * 60 * 2,
     });
 
+  /**
+   * Buyurtma formasi uchun operatorlar (faqat `id` + `name`).
+   *
+   * ⚠️ `getMyOperators` dan farqi — u FAQAT market roli uchun ochiq,
+   * buyurtmani esa operator, registrator va admin ham yaratadi.
+   * `marketId` faqat admin/registrator uchun kerak (market va operator
+   * o'z marketini serverdan oladi).
+   */
+  const getSelectableOperators = (
+    marketId?: string | null,
+    enabled = true,
+  ) =>
+    useQuery({
+      queryKey: [user, "selectable-operators", marketId ?? "self"],
+      queryFn: () =>
+        api
+          .get(
+            `user/operators/selectable${marketId ? `?market_id=${marketId}` : ""}`,
+          )
+          .then((res) => res.data),
+      enabled,
+      staleTime: 1000 * 60 * 2,
+    });
+
   // Delete operator
   const deleteOperator = useMutation({
     mutationFn: (id: string) =>
@@ -149,6 +173,22 @@ export const useUser = (path?: string) => {
     });
 
   // Update operator commission settings
+  /**
+   * Operatorni tahrirlash / bloklash (market).
+   * Telefon va parol ATAYLAB yo'q — ular egasining o'zi orqali.
+   */
+  const updateOperator = useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name?: string; status?: "active" | "inactive" };
+    }) => api.patch(`user/operator/${id}`, data).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [user, "operators"] }),
+  });
+
   const updateOperatorCommission = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.patch(`user/operator/${id}/commission`, data).then((res) => res.data),
@@ -197,16 +237,31 @@ export const useUser = (path?: string) => {
 
   // Get my orders (operator role)
   const getMyOrders = (
-    params: { page?: number; limit?: number; status?: string } = {},
+    params: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      /** `pending` — boshqa odam biriktirgan, hali qabul qilinmaganlar. */
+      assignment?: "pending" | "accepted";
+    } = {},
     enabled = true,
   ) =>
     useQuery({
-      queryKey: [user, "my-orders", params.page, params.status],
+      // ⚠️ `assignment` KALITGA kiradi — aks holda filtr almashganda
+      // eski ro'yxat keshdan qaytardi.
+      queryKey: [
+        user,
+        "my-orders",
+        params.page,
+        params.status,
+        params.assignment,
+      ],
       queryFn: () => {
         const query = new URLSearchParams();
         if (params.page) query.set("page", String(params.page));
         if (params.limit) query.set("limit", String(params.limit));
         if (params.status) query.set("status", params.status);
+        if (params.assignment) query.set("assignment", params.assignment);
         return api
           .get(`user/my-orders?${query.toString()}`)
           .then((res) => res.data);
@@ -214,6 +269,25 @@ export const useUser = (path?: string) => {
       enabled,
       staleTime: 1000 * 60,
     });
+
+  /** Biriktiruvni qabul qilish / rad etish (operator). */
+  const acceptMyOrder = useMutation({
+    mutationFn: (id: string) =>
+      api.patch(`user/my-orders/${id}/accept`).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [user, "my-orders"] });
+      client.invalidateQueries({ queryKey: [user, "my-earnings"] });
+    },
+  });
+
+  const rejectMyOrder = useMutation({
+    mutationFn: (id: string) =>
+      api.patch(`user/my-orders/${id}/reject`).then((res) => res.data),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: [user, "my-orders"] });
+      client.invalidateQueries({ queryKey: [user, "my-earnings"] });
+    },
+  });
 
   return {
     createUser,
@@ -229,8 +303,12 @@ export const useUser = (path?: string) => {
     deleteLogist,
     createOperator,
     getMyOperators,
+    getSelectableOperators,
     deleteOperator,
+    acceptMyOrder,
+    rejectMyOrder,
     getOperatorStats,
+    updateOperator,
     updateOperatorCommission,
     getOperatorBalance,
     payOperator,

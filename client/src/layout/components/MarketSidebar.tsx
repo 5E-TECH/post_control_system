@@ -1,12 +1,19 @@
 import { memo } from "react";
-import { House, ShoppingBag, Apple, Calendar1, CreditCard, Users, Bot } from "lucide-react";
+import { House, ShoppingBag, Apple, Calendar1, CreditCard, Users, Bot, Receipt } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
+import { useExtraCost } from "../../shared/api/hooks/useExtraCost";
 
 const MarketSidebar = () => {
   const { t } = useTranslation(['sidebar'])
+
+  // ⚠️ Qo'shimcha xarajat so'rovlari — market javob bermasa pul avtomatik
+  // tasdiqlanadi, shuning uchun raqam yon menyuda DOIM ko'rinib turadi.
+  // Bu komponent faqat market roli uchun render bo'ladi.
+  const { getMarketCounts } = useExtraCost();
+  const { data: extraCostCounts } = getMarketCounts();
 
   const links = [
     { to: "/", icon: <House />, label: t("dashboard"), end: true },
@@ -23,6 +30,12 @@ const MarketSidebar = () => {
     },
     { to: "/products", icon: <Apple />, label: t("products") },
     { to: "/cash-box", icon: <CreditCard />, label: t("payments") },
+    {
+      to: "/extra-cost",
+      icon: <Receipt />,
+      label: "Qo'shimcha xarajat",
+      badge: Number(extraCostCounts?.open ?? 0),
+    },
     { to: "/market-operators", icon: <Users />, label: "Operatorlar" },
     { to: "/ai-balance", icon: <Bot />, label: "AI balans" },
   ];

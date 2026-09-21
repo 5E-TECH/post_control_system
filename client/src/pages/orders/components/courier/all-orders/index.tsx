@@ -37,6 +37,9 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { useProfile } from "../../../../../shared/api/hooks/useProfile";
 import ReplacementBadge from "../../../../../shared/components/replacement-badge";
+import ExtraCostProofField, {
+  type ProofFieldValue,
+} from "../../../../../shared/components/ExtraCostProofField";
 
 const statusConfig: Record<
   string,
@@ -165,6 +168,9 @@ const AllOrders = () => {
   const [isShow, setIsShow] = useState<boolean>(false);
   const [isShowModal, setIsShowModal] = useState<boolean>(false);
   const [extraCostValue, setExtraCostValue] = useState<string>("");
+  // Qo'shimcha xarajat isboti (foto id'lari + kategoriya). Sotuv so'rovi
+  // JSON bo'lib qoladi — bu yerda faqat id'lar to'planadi.
+  const [proofValue, setProofValue] = useState<ProofFieldValue>({});
   const orderId = useRef<string | null>(null);
   const { handleSuccess, handleApiError, handleWarning } = useApiNotification();
   const { getUser: getProfile } = useProfile();
@@ -263,6 +269,8 @@ const AllOrders = () => {
           totalPrice: Number(String(totalPrice).split(",").join("")),
           extraCost: parsedExtraCost,
           comment: values?.comment,
+          // Isbot maydonlari — faqat xarajat kiritilgan bo'lsa to'ladi.
+          ...proofValue,
         };
         partlySellOrder.mutate(
           { id: order.current.id, data },
@@ -280,6 +288,7 @@ const AllOrders = () => {
         const data = {
           comment: values?.comment,
           extraCost: parsedExtraCost,
+          ...proofValue,
         };
         sellOrder.mutate(
           { id: item?.id as string, data },
@@ -314,6 +323,7 @@ const AllOrders = () => {
           totalPrice: Number(String(totalPrice).split(",").join("")),
           extraCost: parsedExtraCost,
           comment: values?.comment,
+          ...proofValue,
         };
         partlySellOrder.mutate(
           { id: order.current.id, data },
@@ -331,6 +341,7 @@ const AllOrders = () => {
         const data = {
           comment: values?.comment,
           extraCost: parsedExtraCost,
+          ...proofValue,
         };
         cancelOrder.mutate(
           { id: item?.id as string, data },
@@ -943,14 +954,23 @@ const AllOrders = () => {
                   ? courierCenterTariff
                   : courierHomeTariff;
 
-                // Sotishda (faqat markaz): max = uyTarif - markazTarif.
-                // Agar uy va markaz tarifi teng bo'lsa (farq = 0),
-                // kuryer o'z xizmat haqqigacha extra cost yozishi mumkin.
-                // Bekor qilishda: max = o'z xizmat haqqi (courierTariff).
+                // ⚠️ SERVER QOIDASI BILAN BIR XIL bo'lishi SHART
+                // (`extra-cost-limit.util.ts`). Avval bu yerda tariflar teng
+                // bo'lganda TO'LIQ tarif ko'rsatilardi, server esa yarmini
+                // ruxsat berardi — ya'ni kuryerga 2 BAROBAR katta maksimum
+                // ko'rinib, u ko'rsatilgan summani yozib 400 olardi.
+                //
+                // Sotish (faqat markazga): uy va markaz tarifi FARQI;
+                //   farq 0 bo'lsa markaz tarifining YARMI.
+                // Bekor qilish: o'z xizmat haqqi (uyga/markazga ajratilmaydi).
+                const sellMax =
+                  courierHomeTariff - courierCenterTariff > 0
+                    ? courierHomeTariff - courierCenterTariff
+                    : Math.floor(Math.max(0, courierCenterTariff) / 2);
                 const maxExtraCost = isSell
-                  ? courierHomeTariff - courierTariff > 0
-                    ? courierHomeTariff - courierTariff
-                    : Math.max(0, courierTariff)
+                  ? isCenter
+                    ? sellMax
+                    : 0 // uyga yetkazishda qo'shimcha xarajat MUMKIN EMAS
                   : courierTariff;
 
                 const parsedExtra = extraCostValue
@@ -1006,10 +1026,29 @@ const AllOrders = () => {
                         <span>
                           {isOverLimit
                             ? `Limit oshib ketdi! Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm`
-                            : `Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm (xizmat haqqingiz)`}
+                            : `Maks ortiqcha xarajat: ${maxExtraCost.toLocaleString("uz-UZ")} so'm`}
                         </span>
                       </div>
                     )}
+                    {isSell && !isCenter && parsedExtra > 0 && (
+                      <div className="mt-2 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>
+                          Uyga yetkaziladigan buyurtmada qo'shimcha xarajat
+                          yozib bo'lmaydi — uy tarifi allaqachon yuqori.
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Foto isbot — market bayrog'i yoqilgan bo'lsa MAJBURIY */}
+                    <ExtraCostProofField
+                      required={
+                        order.current?.market?.extra_cost_proof_required === true
+                      }
+                      amount={parsedExtra}
+                      onChange={setProofValue}
+                      resetKey={order.current?.id}
+                    />
                   </div>
                 );
               })()}

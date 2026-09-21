@@ -184,6 +184,31 @@ jobs:
                 exit 1
               fi
 
+              # ----- 🧾 Qo'shimcha xarajat rekonsiliatsiyasi (strict) -----
+              # Kassa invarianti balansni tarix bilan solishtiradi, LEKIN
+              # xarajat SO'ROVLARI bilan kassa yozuvlari orasidagi bog'lanishni
+              # ko'rmaydi. Ikki eng qimmat xato aynan o'sha yerda:
+              #   "tasdiqlangan, lekin to'lanmagan"  (kuryer pulsiz qoladi)
+              #   "rad etilgan, lekin to'langan"     (market rad etganini to'laydi)
+              echo '🧾 Post-migration extra-cost reconciliation...'
+              if ! npm run db:check-extra-cost; then
+                echo '❌ EXTRA-COST INVARIANT FAILED! App restart QILINMAYDI.'
+                exit 1
+              fi
+
+              # ----- 🎬 ffmpeg (video isbotni siqish) — YUMSHOQ tekshiruv -----
+              # ⚠️ ATAYLAB `exit 1` EMAS. ffmpeg yo'qligi ma'lumot yo'qotmaydi:
+              # video shunchaki ASL (10-15 barobar katta) hajmda saqlanadi va
+              # tizim ishlayveradi. Deploy'ni to'xtatish nomutanosib javob
+              # bo'lardi — lekin bu jimgina o'tib ketmasligi ham kerak,
+              # chunki disk sezilarli tez to'ladi.
+              if command -v ffmpeg >/dev/null 2>&1; then
+                echo "🎬 ffmpeg: $(ffmpeg -version 2>/dev/null | head -1)"
+              else
+                echo '⚠️  ffmpeg TOPILMADI — video isbotlar siqilmaydi (disk ~10x tez to.ladi).'
+                echo '    Tuzatish: sudo apt-get install -y ffmpeg'
+              fi
+
               cd ..
             fi
 

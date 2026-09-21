@@ -121,8 +121,8 @@ export class CreateOrderDto {
   @ApiPropertyOptional({
     description:
       'Almashtirish (kafolat-swap): bu yangi buyurtma qaysi ESKI (avval ' +
-      'yetkazilgan) buyurtma o\'rniga ketayotganini ko\'rsatadi. Eski buyurtma ' +
-      'shu mijoz va shu marketga tegishli, sotilgan bo\'lishi shart.',
+      "yetkazilgan) buyurtma o'rniga ketayotganini ko'rsatadi. Eski buyurtma " +
+      "shu mijoz va shu marketga tegishli, sotilgan bo'lishi shart.",
     type: String,
     format: 'uuid',
     example: '2c3f5b7a-1d9e-44f7-8a1b-0a1d2b3c4d5e',
@@ -130,4 +130,18 @@ export class CreateOrderDto {
   @IsOptional()
   @IsUUID(4, { message: "Almashtirilayotgan buyurtma ID noto'g'ri formatda" })
   replaced_order_id?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Buyurtma biriktiriladigan operator (IXTIYORIY). Faqat SHU marketning ' +
+      "o'chirilmagan va bloklanmagan operatori qabul qilinadi. Berilmasa: " +
+      "yaratuvchining o'zi operator bo'lsa o'ziga biriktiriladi, aks holda " +
+      "bo'sh qoladi (market operator qo'shmagan holat).",
+    type: String,
+    format: 'uuid',
+    example: '9f1c2d3e-4b5a-46c7-8d9e-0a1b2c3d4e5f',
+  })
+  @IsOptional()
+  @IsUUID(4, { message: "Operator ID noto'g'ri formatda" })
+  operator_id?: string;
 }
