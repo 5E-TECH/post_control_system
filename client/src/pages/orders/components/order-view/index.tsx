@@ -310,7 +310,7 @@ const OrderView = () => {
   const triggerDownload = useSelector(
     (state: RootState) => state.requestDownload
   );
-  const { handleApiError, handleSuccess } = useApiNotification();
+  const { handleApiError, handleSuccess, handleWarning } = useApiNotification();
   const role = user.role;
 
   const { getParam, setParam, removeParam } = useParamsHook();
@@ -384,6 +384,34 @@ const OrderView = () => {
           }
         );
 
+        /**
+         * ⚠️ `response.ok` NI TEKSHIRISH SHART.
+         *
+         * Avval bu tekshiruv yo'q edi. Backend xatosi (`catchError` →
+         * `HttpException`) JSON tanasi bilan keladi: `{message, error}`.
+         * U `JSON.parse` dan muammosiz o'tadi, lekin ichida `data.data`
+         * BO'LMAYDI. Natijada quyidagi zanjir ishga tushardi:
+         *
+         *   data?.data?.data  -> undefined
+         *   ?.filter(...)     -> undefined
+         *   exportData || []  -> []
+         *   exportToExcel([]) -> JIMGINA qaytadi (helper:6)
+         *   handleSuccess(...) -> «muvaffaqiyatli export qilindi»
+         *
+         * Ya'ni 401/403/500 ning hammasi foydalanuvchiga YASHIL XABAR
+         * bo'lib ko'rinardi, fayl esa hech qachon yuklanmasdi.
+         */
+        if (!response.ok) {
+          let serverMsg = `Server ${response.status} qaytardi`;
+          try {
+            const body = JSON.parse(await response.text());
+            if (typeof body?.message === "string") serverMsg = body.message;
+          } catch {
+            /* tana JSON emas — statusning o'zi yetarli */
+          }
+          throw new Error(serverMsg);
+        }
+
         const rawText = await response.text();
 
         let data;
@@ -393,9 +421,22 @@ const OrderView = () => {
           throw new Error("Backend JSON emas, HTML qaytaryapti!");
         }
 
-        const orders = data?.data?.data?.filter(
-          (order: any) => order.status !== "new"
-        );
+        const rows = data?.data?.data;
+        if (!Array.isArray(rows)) {
+          // Javob 200, lekin kutilgan shaklda emas — jim o'tkazib yubormaymiz.
+          throw new Error(
+            "Server javobi kutilgan shaklda emas (data.data massiv emas)"
+          );
+        }
+
+        /**
+         * ⚠️ «Yangi» buyurtmalar ATAYLAB tashlab yuboriladi — ular hali
+         * pochtaga tushmagan. Lekin natija BO'SH bo'lsa, buni jim
+         * muvaffaqiyat deb ko'rsatib bo'lmaydi: foydalanuvchi aynan
+         * «Yangi» filtrida turgan bo'lishi mumkin va hamma qator
+         * chiqib ketadi.
+         */
+        const orders = rows.filter((order: any) => order.status !== "new");
         const exportData = orders?.map((order: any, inx: number) => ({
           N: inx + 1,
           // Order district yoki customer district (fallback)
@@ -418,12 +459,53 @@ const OrderView = () => {
           }),
         }));
 
-        exportToExcel(
-          exportData || [],
+        /**
+         * ⚠️ MUVAFFAQIYAT XABARI ENDI SHARTLI.
+         *
+         * Avval `handleSuccess` `exportToExcel` dan keyin SHARTSIZ
+         * chaqirilardi. Helper esa bo'sh ma'lumotda jimgina qaytadi
+         * (`export-download-excel.ts:6`) — ya'ni fayl yaratilmasa ham
+         * foydalanuvchi «muvaffaqiyatli export qilindi» degan yashil
+         * xabarni ko'rardi. Aynan shu shikoyatga sabab bo'lgan.
+         */
+        if (!exportData.length) {
+          handleWarning(
+            "Excel yaratilmadi",
+            orders.length === 0 && rows.length > 0
+              ? "Tanlangan filtrda faqat «Yangi» buyurtmalar bor — ular eksportga kirmaydi."
+              : "Bu filtr bo'yicha eksport qilinadigan buyurtma topilmadi."
+          );
+          return;
+        }
+
+        const written = exportToExcel(
+          exportData,
           isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
         );
 
-        handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+        if (!written) {
+          handleWarning("Excel yaratilmadi", "Fayl yozilmadi.");
+          return;
+        }
+
+        /**
+         * ⚠️ `fetchAll=true` server tomonda 5000 qator bilan CHEKLANGAN
+         * (`pagination.ts: MAX_FETCH_ALL`), `total` esa haqiqiy sonni
+         * qaytaradi. Kesilganini aytmasak, moliyaviy hisobot jimgina
+         * to'liqsiz chiqardi.
+         */
+        const total = Number(data?.data?.total ?? rows.length);
+        if (total > rows.length) {
+          handleWarning(
+            "Fayl to'liq emas",
+            `Server bir so'rovda ${rows.length} ta qator beradi, jami esa ${total} ta. ` +
+              "Filtrni toraytiring (masalan sana oralig'i bo'yicha) va qismlarga bo'lib yuklang."
+          );
+        }
+
+        handleSuccess(
+          `${exportData.length} ta buyurtma Excelga export qilindi`
+        );
       } catch (err) {
         handleApiError(err, "Excel yuklashda xatolik");
       } finally {
