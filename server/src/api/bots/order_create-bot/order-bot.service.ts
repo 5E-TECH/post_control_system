@@ -9,6 +9,10 @@ import { Context, Telegraf } from 'telegraf';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from 'src/core/entity/users.entity';
+import {
+  isMarketUsable,
+  MARKET_BLOCKED_MESSAGE_UZ,
+} from 'src/common/utils/market-gate.util';
 import { UserRepository } from 'src/core/repository/user.repository';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
@@ -239,6 +243,16 @@ export class OrderBotService {
       if (!market) {
         throw new NotFoundException("Token noto'g'ri yoki eskirgan.");
       }
+      /**
+       * ⚠️ BLOKLANGAN MARKET OPERATOR «EKA OLMASLIGI» KERAK.
+       *
+       * Aks holda blok o'z-o'zidan eriydi: market o'z tokenini yuborib
+       * yangi operator qo'shadi, yangi qator esa `active` bo'lib
+       * tug'iladi va u bemalol ishlaydi.
+       */
+      if (!isMarketUsable(market)) {
+        throw new ForbiddenException(MARKET_BLOCKED_MESSAGE_UZ);
+      }
 
       // Token bu yerda AYLANTIRILMAYDI: u faqat ro'yxatdan o'tish (kontakt
       // ulashish) muvaffaqiyatli yakunlangach registerNewOperator ichida
@@ -367,6 +381,18 @@ export class OrderBotService {
         throw new NotFoundException(
           "Market topilmadi. Tokenni qayta yuborib ko'ring.",
         );
+      }
+      /**
+       * ⚠️ IKKINCHI TO'SIQ (`checkToken` dagidan keyin).
+       *
+       * Token tekshirilgandan keyin foydalanuvchi kontakt ulashguncha
+       * vaqt o'tadi va market shu orada bloklanishi mumkin. Sessiyadagi
+       * ma'lumot eski bo'lishi mumkin, shuning uchun qaror ENG YANGI
+       * qatorga qarab qabul qilinadi. Qo'shimcha so'rov YO'Q — market
+       * shu yerda allaqachon o'qilgan.
+       */
+      if (!isMarketUsable(market)) {
+        throw new ForbiddenException(MARKET_BLOCKED_MESSAGE_UZ);
       }
 
       const tempPassword = randomBytes(6).toString('hex');

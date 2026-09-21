@@ -1,5 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useMarketplaceAvailable } from "../../shared/api/hooks/useMarketplaceScan";
+import MarketplaceIntake from "../marketplace-intake";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
@@ -203,6 +205,24 @@ const ExternalOrdersTab = () => {
   // Integratsiyalarni olish (dinamik)
   const { getActiveIntegrations, testConnection, resetSyncedOrders } = useExternalIntegration();
   const { data: integrationsData, isLoading: integrationsLoading, refetch: refetchIntegrations } = getActiveIntegrations();
+
+  /**
+   * MARKETPLACE ULANISHLARI — shu ro'yxatda ham ko'rinadi.
+   *
+   * ⚠️ Nega shu yerda. Operator tashqi buyurtmani AYNAN shu ekrandan
+   * skanerlaydi («adosh» oqimi). Marketplace uchun alohida sahifa
+   * qilinganda uni hech kim topmasdi — operator bu yerga kirib,
+   * ro'yxatda ko'rmay «integratsiya ulanmagan» deb o'ylardi.
+   *
+   * Oqimlar HAR XIL (marketplace'da server tomonda sessiya, qop va
+   * daftar bor), shuning uchun kartani bosganda marketplace'ning O'Z
+   * ekraniga o'tkazamiz — bu ekranning mantiqiga aralashtirmaymiz.
+   */
+  const marketplaceList = useMarketplaceAvailable();
+  const marketplaces = marketplaceList.data ?? [];
+  const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(
+    null,
+  );
 
   // Integratsiyalar ro'yxatini olish
   const integrations = useMemo(() => {
@@ -878,6 +898,37 @@ const ExternalOrdersTab = () => {
     processQueue();
   };
 
+  /**
+   * MARKETPLACE SHU EKRAN ICHIDA OCHILADI.
+   *
+   * ⚠️ Avval alohida marshrutga (`/marketplace-intake`) o'tardi va
+   * operator butunlay boshqa sahifada paydo bo'lardi: sarlavha,
+   * tablar — hammasi yo'qolardi. Adosh oqimi esa aynan shu yerda
+   * ochiladi. Operator uchun bu BITTA ish joyi.
+   */
+  if (selectedMarketplace) {
+    /*
+     * ⚠️ ANIQ BALANDLIK SHART.
+     *
+     * Skan ekrani ichida ro'yxat qolgan joyni egallaydi va «Qabul
+     * qilish» tugmasi pastda qotib turadi — buning uchun otasida ANIQ
+     * balandlik bo'lishi kerak. Bu yerda `h-full` zanjiri uzilgan
+     * (tepadagi sarlavha va tablar oddiy oqimda), shuning uchun
+     * balandlik ekrandan hisoblanadi: 20rem (320px) = yuqori panel
+     * (64px) + sarlavha va tablar (186px) + pastki bo'shliq (~70px).
+     * Bular QAT'IY piksel — foiz emas — shuning uchun ayirish ham
+     * qat'iy. Brauzerda o'lchandi: bo'sh joy 631px, ekran 617px.
+     */
+    return (
+      <div className="h-[calc(100vh-20rem)] min-h-[22rem]">
+        <MarketplaceIntake
+          slug={selectedMarketplace}
+          onBack={() => setSelectedMarketplace(null)}
+        />
+      </div>
+    );
+  }
+
   // Integratsiyalar ro'yxati
   if (!selectedIntegration) {
     return (
@@ -932,6 +983,33 @@ const ExternalOrdersTab = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* ── MARKETPLACE ulanishlari ── */}
+            {marketplaces.map((mp) => (
+              <div
+                key={mp.id}
+                onClick={() => setSelectedMarketplace(mp.slug)}
+                className="p-4 bg-white dark:bg-[#2A263D] rounded-xl border border-indigo-200 dark:border-indigo-700/50 cursor-pointer transition-all hover:shadow-lg hover:border-indigo-400"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-2xl shadow-lg flex-shrink-0">
+                    🏬
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white truncate">
+                      {mp.name}
+                    </h3>
+                    <p className="text-sm text-indigo-600 dark:text-indigo-400">
+                      Marketplace — skan va qabul
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Ko'p sotuvchili · qop bilan qabul qilinadi
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                </div>
+              </div>
+            ))}
+
             {filteredIntegrations.map((integration: Integration) => (
               <div
                 key={integration.id}

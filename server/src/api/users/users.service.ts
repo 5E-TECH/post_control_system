@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -27,6 +28,12 @@ import { UpdateCourierDto } from './dto/update-courier.dto';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { BcryptEncryption } from 'src/infrastructure/lib/bcrypt';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
+import { normalizeUserPhone } from 'src/common/utils/normalize-user-phone.util';
+import {
+  isMarketUsable,
+  MARKET_BLOCKED_MESSAGE,
+} from 'src/common/utils/market-gate.util';
+import { UpdateOperatorDto } from './dto/update-operator.dto';
 import { SignInUserDto } from './dto/signInUserDto';
 import { Token } from 'src/infrastructure/lib/token-generator/token';
 import { writeToCookie } from 'src/infrastructure/lib/write-to-cookie/writeToCookie';
@@ -43,6 +50,7 @@ import {
   EntityManager,
   ILike,
   In,
+  IsNull,
   Not,
 } from 'typeorm';
 import { JwtPayload } from 'src/common/utils/types/user.type';
@@ -191,7 +199,11 @@ export class UserService implements OnModuleInit {
         description: `Admin yaratildi: ${admin.name}`,
         user: actor,
       });
-      return successRes(admin, 201, 'New Admin created');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeAdmin } = admin;
+      return successRes(safeAdmin, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -365,7 +377,11 @@ export class UserService implements OnModuleInit {
         description: `Registrator yaratildi: ${user.name}`,
         user: actor,
       });
-      return successRes(user, 201, 'New Admin created');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUser } = user;
+      return successRes(safeUser, 201, 'New Admin created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -474,7 +490,11 @@ export class UserService implements OnModuleInit {
         description: `Kuryer yaratildi: ${courier.name}`,
         user: actor,
       });
-      return successRes(courier, 201, `New courier created`);
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeCourier } = courier;
+      return successRes(safeCourier, 201, `New courier created`);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -536,7 +556,11 @@ export class UserService implements OnModuleInit {
         description: `Market yaratildi: ${newMarket.name}`,
         user: actor,
       });
-      return successRes(newMarket, 201, 'New market created');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeNewMarket } = newMarket;
+      return successRes(safeNewMarket, 201, 'New market created');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -772,6 +796,11 @@ export class UserService implements OnModuleInit {
           'user.require_operator_phone',
           'user.default_operator_phone',
           'user.secondary_operator_phone',
+          // Qo'shimcha xarajat nazorati — admin ro'yxatdan toggle holatini
+          // ko'rishi kerak. Select ro'yxati OQ RO'YXAT bo'lgani uchun yangi
+          // ustun bu yerga qo'shilmasa, UI'da har doim "o'chiq" ko'rinardi.
+          'user.extra_cost_proof_required',
+          'user.extra_cost_auto_approve_under',
           'cashbox', // cashboxni to'liq olish uchun
         ]);
 
@@ -997,6 +1026,52 @@ export class UserService implements OnModuleInit {
         where: { id },
         relations: ['region', 'market', 'salary'],
       });
+
+      /**
+       * ⚠️ SEKRETLAR OLIB TASHLANADI.
+       *
+       * Bu javob butun `users` qatorini va `market` munosabatini o'z
+       * holicha qaytarardi. Ya'ni har bir operator:
+       *   · o'z parol hash'ini,
+       *   · MARKETNING parol hash'ini,
+       *   · MARKETNING `market_tg_token` ini
+       * ko'rardi. Oxirgisi eng yomoni: o'sha token bilan order-botga
+       * kirib shu marketga YANGI OPERATOR qo'shish mumkin.
+       *
+       * ⚠️ Oq ro'yxat EMAS, qora ro'yxat: frontend `market` obyektidan
+       * 20 dan ortiq maydonni o'qiydi (nom, tarif, ortiqcha xarajat
+       * sozlamalari...), oq ro'yxat qilinsa bittasi unutilib ekran
+       * buzilardi. Shu bois faqat xavflilari olib tashlanadi.
+       *
+       * ⚠️ Foydalanuvchining O'Z `market_tg_token` i QOLADI — market
+       * profil sahifasi uni ko'rsatadi (user-profile/index.tsx:681).
+       */
+      if (myProfile) {
+        delete (myProfile as Partial<UserEntity>).password;
+        if (myProfile.market) {
+          const m = myProfile.market as Partial<UserEntity>;
+          delete m.password;
+          delete m.market_tg_token;
+        }
+      }
+
+      /**
+       * ⚠️ MARKET O'Z TOKENINI KO'RADI — ATAYLAB.
+       *
+       * Ustun `select: false` (users.entity.ts), ya'ni u endi hech qaysi
+       * `find` natijasida kelmaydi. Lekin market uni profil sahifasida
+       * ko'rsatadi va nusxalaydi (user-profile/index.tsx:681) — order-botga
+       * yuborish uchun. Shu bois FAQAT egasi uchun, FAQAT MARKET rolida
+       * alohida so'rov bilan olinadi. Boshqa rollarda bu maydon yo'q.
+       */
+      if (myProfile && user.role === Roles.MARKET) {
+        const row = await this.userRepo
+          .createQueryBuilder('user')
+          .select('user.market_tg_token', 'market_tg_token')
+          .where('user.id = :id', { id })
+          .getRawOne<{ market_tg_token: string | null }>();
+        myProfile.market_tg_token = row?.market_tg_token ?? (null as never);
+      }
       return successRes(myProfile, 200, 'Profile info');
     } catch (error) {
       return catchError(error);
@@ -1379,7 +1454,11 @@ export class UserService implements OnModuleInit {
         roleLabel: 'Kuryer',
         actor,
       });
-      return successRes(updatedUser, 200, 'User updated');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUpdatedUser } = updatedUser ?? {};
+      return successRes(safeUpdatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }
@@ -1399,6 +1478,13 @@ export class UserService implements OnModuleInit {
         throw new NotFoundException('Market not found');
       }
       const beforeStatus = market.status;
+      // Qo'shimcha xarajat nazorati — PUL sozlamasi, shuning uchun o'zgarishi
+      // alohida loglanadi. `logUserMutation` faqat status/rol/parolni ko'radi,
+      // ya'ni bayroqni o'chirish aks holda JIMGINA o'tib ketardi.
+      const beforeProofRequired = market.extra_cost_proof_required;
+      const beforeAutoApproveUnder = Number(
+        market.extra_cost_auto_approve_under ?? 0,
+      );
 
       if (otherFields.phone_number) {
         const isExistPhoneNumber = await this.userRepo.findOne({
@@ -1434,7 +1520,17 @@ export class UserService implements OnModuleInit {
         roleLabel: 'Market',
         actor,
       });
-      return successRes(updatedMarket, 200, 'Market updated');
+      this.logExtraCostSettingChange({
+        market: updatedMarket,
+        beforeProofRequired,
+        beforeAutoApproveUnder,
+        actor,
+      });
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUpdatedMarket } = updatedMarket;
+      return successRes(safeUpdatedMarket, 200, 'Market updated');
     } catch (error) {
       return catchError(error);
     }
@@ -1656,7 +1752,11 @@ export class UserService implements OnModuleInit {
         }`,
         user,
       });
-      return successRes(updatedUser, 200, 'User updated');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUpdatedUser } = updatedUser ?? {};
+      return successRes(safeUpdatedUser, 200, 'User updated');
     } catch (error) {
       return catchError(error);
     }
@@ -1703,8 +1803,28 @@ export class UserService implements OnModuleInit {
   // Muvaffaqiyatsiz login urinishini loglaydi. Maxfiylik: telefon TO'LIQ
   // saqlanmaydi (faqat oxirgi 4 raqam), tavsif umumiy — telefon mavjudligi
   // oshkor qilinmaydi. Noma'lum telefon uchun entity_id = NIL sentinel.
+  /**
+   * OPERATOR UCHUN MARKET DARVOZASI.
+   *
+   * Operator qatoriga hech narsa YOZILMAYDI (sabab: market-gate.util.ts),
+   * shuning uchun market holati har kirish va har amalda qayta o'qiladi.
+   * Operator bo'lmagan rollarga ta'sir qilmaydi.
+   */
+  private async isActorMarketUsable(
+    user: Pick<UserEntity, 'role' | 'market_id'>,
+  ): Promise<boolean> {
+    if (user.role !== Roles.OPERATOR) return true;
+    // Market QATTIQ o'chirilgan — FK `SET NULL` qoldirgan holat.
+    if (!user.market_id) return false;
+    const market = await this.userRepo.findOne({
+      where: { id: user.market_id, role: Roles.MARKET },
+      select: ['id', 'status', 'is_deleted'],
+    });
+    return isMarketUsable(market);
+  }
+
   private logFailedLogin(
-    reason: 'unknown_phone' | 'blocked' | 'wrong_password',
+    reason: 'unknown_phone' | 'blocked' | 'wrong_password' | 'market_blocked',
     phone: string,
     req?: Request,
     userId?: string,
@@ -1727,6 +1847,75 @@ export class UserService implements OnModuleInit {
   // Foydalanuvchi yangilanishini loglaydi va sezgir o'zgarishlarni alohida
   // action sifatida ajratadi (bloklash, blokdan chiqarish, rol o'zgarishi,
   // parol o'zgarishi). Parol HECH QACHON saqlanmaydi — faqat flag.
+  /**
+   * Qo'shimcha xarajat nazorati sozlamasining o'zgarishini loglaydi.
+   *
+   * NEGA ALOHIDA. Bu bayroq PULNI boshqaradi: yoqilgan bo'lsa kuryer xarajati
+   * market tasdig'igacha kassaga yozilmaydi. Uni o'chirish — nazoratni
+   * o'chirish demak, va bu keyinchalik "kim, qachon o'chirgan?" degan savolga
+   * javob talab qiladi. `logUserMutation` esa faqat status/rol/parolni ko'radi.
+   *
+   * `entity_type: 'user'` — sozlama market yozuvida yashaydi, buyurtmada emas.
+   */
+  private logExtraCostSettingChange(params: {
+    market: UserEntity;
+    beforeProofRequired: boolean;
+    beforeAutoApproveUnder: number;
+    actor?: JwtPayload;
+  }): void {
+    const { market, beforeProofRequired, beforeAutoApproveUnder, actor } =
+      params;
+    const afterProofRequired = !!market.extra_cost_proof_required;
+    const afterAutoApproveUnder = Number(
+      market.extra_cost_auto_approve_under ?? 0,
+    );
+
+    const proofChanged = !!beforeProofRequired !== afterProofRequired;
+    const limitChanged = beforeAutoApproveUnder !== afterAutoApproveUnder;
+    if (!proofChanged && !limitChanged) return;
+
+    const parts: string[] = [];
+    if (proofChanged) {
+      parts.push(
+        afterProofRequired
+          ? "isbot va market tasdig'i YOQILDI"
+          : "isbot va market tasdig'i O'CHIRILDI",
+      );
+    }
+    if (limitChanged) {
+      parts.push(
+        afterAutoApproveUnder > 0
+          ? `avtomatik tasdiq chegarasi: ${afterAutoApproveUnder.toLocaleString('uz-UZ')} so'm`
+          : "avtomatik tasdiq chegarasi o'chirildi",
+      );
+    }
+
+    this.activityLog.log({
+      entity_type: 'user',
+      entity_id: market.id,
+      action: 'extra_cost_proof_flag_changed',
+      old_value: {
+        ...(proofChanged
+          ? { extra_cost_proof_required: !!beforeProofRequired }
+          : {}),
+        ...(limitChanged
+          ? { extra_cost_auto_approve_under: beforeAutoApproveUnder }
+          : {}),
+      },
+      new_value: {
+        name: market.name,
+        ...(proofChanged
+          ? { extra_cost_proof_required: afterProofRequired }
+          : {}),
+        ...(limitChanged
+          ? { extra_cost_auto_approve_under: afterAutoApproveUnder }
+          : {}),
+      },
+      description: `Qo'shimcha xarajat nazorati — ${market.name}: ${parts.join(', ')}`,
+      user: actor,
+    });
+  }
+
   private logUserMutation(params: {
     user: { id: string; name: string; role: string; status: string };
     beforeStatus?: string;
@@ -1785,9 +1974,31 @@ export class UserService implements OnModuleInit {
     try {
       const { phone_number, password } = signInDto;
 
-      const user = await this.userRepo.findOne({
-        where: { phone_number, role: Not(Roles.CUSTOMER) },
-      });
+      /**
+       * ⚠️ `is_deleted: false` SHART.
+       *
+       * O'chirish hamma joyda YUMSHOQ (`deleteOperator` faqat
+       * `is_deleted = true` qo'yadi, `status` esa ACTIVE qoladi). Bu
+       * filtrsiz o'chirilgan operator/kuryer/logist eski paroli bilan
+       * kirishda davom etardi va buyurtma yarata olardi.
+       */
+      /**
+       * ⚠️ `addSelect` SHART — `password` ustuni `select: false`
+       * (users.entity.ts). Busiz `user.password` `undefined` bo'lib
+       * `bcrypt.compare` hamma uchun `false` qaytaradi, ya'ni HECH KIM
+       * tizimga kira olmaydi. Yashirin ustunni ishonchli qo'shish uchun
+       * `findOne` emas, QueryBuilder ishlatiladi.
+       *
+       * `is_deleted = false` avvalgidek: yumshoq o'chirilgan xodim eski
+       * paroli bilan kira olmasligi kerak.
+       */
+      const user = await this.userRepo
+        .createQueryBuilder('user')
+        .where('user.phone_number = :phone_number', { phone_number })
+        .andWhere('user.role != :customer', { customer: Roles.CUSTOMER })
+        .andWhere('user.is_deleted = false')
+        .addSelect('user.password')
+        .getOne();
       if (!user) {
         this.logFailedLogin('unknown_phone', phone_number, req);
         throw new BadRequestException('Phone number or password incorrect');
@@ -1796,9 +2007,32 @@ export class UserService implements OnModuleInit {
         this.logFailedLogin('blocked', phone_number, req, user.id);
         throw new BadRequestException('You have been blocked by superadmin');
       }
+      /**
+       * Parol o'rnatilmagan (yoki kelajakda `addSelect` tushib qolgan)
+       * holat: `bcrypt.compare(pw, undefined)` istisno tashlab 500
+       * berardi — sababi manbadan uzoqda ko'rinadi. Aniq 400 bilan
+       * to'xtatamiz.
+       */
+      /**
+       * ⚠️ MARKET DARVOZASI. Operator o'z marketidan ortiq huquqqa ega
+       * emas: admin market bilan ishlashni to'xtatgan bo'lsa, uning
+       * operatori ham kira olmaydi.
+       *
+       * Operator qatoriga YOZILMAYDI — shu bois market blokdan
+       * chiqarilganda market ALOHIDA bloklagan operator bloklanganicha
+       * qoladi.
+       */
+      if (!(await this.isActorMarketUsable(user))) {
+        this.logFailedLogin('market_blocked', phone_number, req, user.id);
+        throw new BadRequestException(MARKET_BLOCKED_MESSAGE);
+      }
+      if (!user.password) {
+        this.logFailedLogin('wrong_password', phone_number, req, user.id);
+        throw new BadRequestException('Phone number or password incorrect');
+      }
       const IsMatchPassword = await this.bcrypt.compare(
         password,
-        user?.password,
+        user.password,
       );
       if (!IsMatchPassword) {
         this.logFailedLogin('wrong_password', phone_number, req, user.id);
@@ -1898,14 +2132,38 @@ export class UserService implements OnModuleInit {
       }
       const user = JSON.parse(userStr);
 
+      /**
+       * ⚠️ BU YO'L AVVAL HECH NARSANI TEKSHIRMASDI.
+       *
+       * Faqat `telegram_id` qidirilardi: `is_deleted`, `status` va rol —
+       * hech biri ko'rilmasdi. Ya'ni `/user/signin` dagi barcha to'siqlar
+       * (o'chirilgan xodim, bloklangan foydalanuvchi) shu yerdan bemalol
+       * aylanib o'tilardi.
+       */
       const isRegisteredUser = await this.userRepo.findOne({
-        where: { telegram_id: user.id },
+        where: { telegram_id: user.id, is_deleted: false },
       });
 
       if (!isRegisteredUser) {
         throw new UnauthorizedException(
           'You have not registred for this platform',
         );
+      }
+      // Telegram orqali faqat market va uning operatori kiradi — bu yo'l
+      // WebApp (buyurtma yaratish) uchun mo'ljallangan.
+      if (
+        isRegisteredUser.role !== Roles.MARKET &&
+        isRegisteredUser.role !== Roles.OPERATOR
+      ) {
+        throw new UnauthorizedException(
+          'You have not registred for this platform',
+        );
+      }
+      if (isRegisteredUser.status === Status.INACTIVE) {
+        throw new UnauthorizedException('You have been blocked by superadmin');
+      }
+      if (!(await this.isActorMarketUsable(isRegisteredUser))) {
+        throw new UnauthorizedException(MARKET_BLOCKED_MESSAGE);
       }
       const { id, role, status } = isRegisteredUser;
       const payload: JwtPayload = { id, role, status };
@@ -1952,10 +2210,29 @@ export class UserService implements OnModuleInit {
         throw new UnauthorizedException('Refresh token expired or invalid');
       }
 
-      const user = await this.userRepo.findOne({ where: { id: payload.id } });
+      // ⚠️ `is_deleted` bu yerda ham tekshiriladi — aks holda o'chirilgan
+      // foydalanuvchi mavjud refresh cookie'si bilan sessiyani cheksiz
+      // uzaytirardi va login filtrini aylanib o'tardi.
+      const user = await this.userRepo.findOne({
+        where: { id: payload.id, is_deleted: false },
+      });
       if (!user || user.status === Status.INACTIVE) {
         res.clearCookie('refreshToken');
         throw new UnauthorizedException('User not found or inactive');
+      }
+      /**
+       * ⚠️ BU DARVOZA TIRIK SESSIYANI UZADI.
+       *
+       * `JwtGuard` bazaga qaramaydi va access token bir kun yashaydi —
+       * ya'ni market bloklangach operator tokeni darhol o'lmaydi. Lekin
+       * frontend interceptori har 401 da `/user/refresh` ga boradi; bu
+       * yerda rad etilgach cookie tozalanadi va foydalanuvchi login
+       * sahifasiga chiqariladi. Shu bois `token_version` ustuni kerak
+       * emas.
+       */
+      if (!(await this.isActorMarketUsable(user))) {
+        res.clearCookie('refreshToken');
+        throw new UnauthorizedException(MARKET_BLOCKED_MESSAGE);
       }
 
       const newPayload: JwtPayload = {
@@ -2238,7 +2515,11 @@ export class UserService implements OnModuleInit {
         description: `Logist yaratildi: ${user.name}`,
         user: actor,
       });
-      return successRes(user, 201, 'Yangi logist yaratildi');
+      // ⚠️ Parol hash'i javobga CHIQMAYDI. Ustun `select: false` bo'lsa-da,
+      // bu obyekt xotirada qurilgan (`create({ password: hash })`) — ya'ni
+      // hash unda BOR. Loyihadagi mavjud naqsh (`:242`) qo'llanadi.
+      const { password: _pw, ...safeUser } = user;
+      return successRes(safeUser, 201, 'Yangi logist yaratildi');
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);
@@ -2290,7 +2571,7 @@ export class UserService implements OnModuleInit {
     try {
       const { password, ...otherFields } = dto;
       const logist = await this.userRepo.findOne({
-        where: { id, role: Roles.LOGIST },
+        where: { id, role: Roles.LOGIST, is_deleted: false },
       });
       if (!logist) {
         throw new NotFoundException('Logist topilmadi');
@@ -2377,7 +2658,7 @@ export class UserService implements OnModuleInit {
   async deleteLogist(id: string, actor?: JwtPayload): Promise<object> {
     try {
       const logist = await this.userRepo.findOne({
-        where: { id, role: Roles.LOGIST },
+        where: { id, role: Roles.LOGIST, is_deleted: false },
       });
       if (!logist) {
         throw new NotFoundException('Logist topilmadi');
@@ -2412,10 +2693,49 @@ export class UserService implements OnModuleInit {
     market: JwtPayload,
   ): Promise<object> {
     try {
-      const { password, phone_number, name } = dto;
+      const { password, name } = dto;
 
+      /**
+       * ⚠️ TELEFON SERVERDA NORMALLASHTIRILADI.
+       *
+       * Avval DTO'dan kelgan xom qiymat qidirilardi va saqlanardi —
+       * normallashtirish faqat brauzerda bajarilgan. Ya'ni API'ga
+       * to'g'ridan-to'g'ri `998901234567` yuborilsa, u `+998901234567`
+       * bilan MOS KELMASDI: takroriylik tekshiruvi aylanib o'tilardi va
+       * bazada bir odamning ikki xil yozilgan raqami paydo bo'lardi.
+       * Bot allaqachon shunday qiladi (`normalizePhone`).
+       */
+      /**
+       * ⚠️ MARKET HOLATI BAZADAN QAYTA O'QILADI.
+       *
+       * Avval `market.id` to'g'ridan-to'g'ri JWT payload'idan olinardi va
+       * market qatori umuman ko'rilmasdi. Ya'ni BLOKLANGAN market ham
+       * yangi operator qo'shishda davom etardi — yangi qator esa
+       * `active` bo'lib tug'iladi va blok o'z-o'zidan «eriydi».
+       */
+      const marketRow = await this.userRepo.findOne({
+        where: { id: market.id, role: Roles.MARKET },
+        select: ['id', 'status', 'is_deleted'],
+      });
+      if (!isMarketUsable(marketRow)) {
+        throw new ForbiddenException(MARKET_BLOCKED_MESSAGE);
+      }
+
+      const phone_number = normalizeUserPhone(dto.phone_number);
+
+      /**
+       * ⚠️ `role: Not(CUSTOMER)` — bot bilan BIR XIL qoida.
+       *
+       * Avval bu yerda rol filtri umuman yo'q edi: faqat MIJOZ sifatida
+       * mavjud raqam panel orqali 409 bilan rad etilardi, bot orqali esa
+       * bemalol operator bo'lardi. Ikki yo'l bir xil ishlashi kerak.
+       *
+       * Qaror (o'zgarmaydi): mijoz yozuvi buyurtma tarixiga bog'langan,
+       * shuning uchun uning roli AYLANTIRILMAYDI — alohida operator
+       * yozuvi yaratiladi.
+       */
       const existUser = await this.userRepo.findOne({
-        where: { phone_number, is_deleted: false },
+        where: { phone_number, is_deleted: false, role: Not(Roles.CUSTOMER) },
       });
       if (existUser) {
         throw new ConflictException(
@@ -2441,7 +2761,23 @@ export class UserService implements OnModuleInit {
         description: `Operator yaratildi: ${operator.name}`,
         user: market,
       });
-      return successRes(operator, 201, 'Yangi operator yaratildi');
+      /**
+       * ⚠️ BUTUN ENTITY QAYTARILMAYDI — unda `password` HASH'i bor edi.
+       *
+       * Ekran bu javobdan hech narsa o'qimaydi (`onSuccess: () => {...}`,
+       * market-operators/index.tsx:83) — ro'yxat alohida so'rov bilan
+       * yangilanadi. Shu bois minimal, xavfsiz yuza qaytaramiz.
+       */
+      return successRes(
+        {
+          id: operator.id,
+          name: operator.name,
+          phone_number: operator.phone_number,
+          status: operator.status,
+        },
+        201,
+        'Yangi operator yaratildi',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -2456,9 +2792,156 @@ export class UserService implements OnModuleInit {
           is_deleted: false,
         },
         order: { created_at: 'DESC' },
-        select: ['id', 'name', 'phone_number', 'status', 'created_at'],
+        /**
+         * ⚠️ KOMISSIYA MAYDONLARI SHART.
+         *
+         * Avval `select` ularni qaytarmasdi, ekran esa
+         * `op.commission_type` / `op.commission_value` ni o'qib forma
+         * yig'ardi. Natijada saqlangan komissiya hech qachon ko'rinmasdi
+         * va keyingi saqlashda JIMGINA ustiga yozilardi.
+         */
+        select: [
+          'id',
+          'name',
+          'phone_number',
+          'status',
+          'created_at',
+          'commission_type',
+          'commission_value',
+        ],
       });
       return successRes(operators, 200, 'Market operatorlari');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * BUYURTMA FORMASI UCHUN OPERATORLAR RO'YXATI.
+   *
+   * ⚠️ `getMyOperators` dan farqi — ROLLAR. U faqat MARKET uchun ochiq,
+   * buyurtmani esa market, uning operatori, registrator va admin ham
+   * yaratadi. Shu bois alohida, MINIMAL yuzali endpoint:
+   * faqat `id` + `name` qaytadi (telefon, komissiya, status — yo'q).
+   *
+   * Market aniqlash qoidasi:
+   *   MARKET    → o'zi
+   *   OPERATOR  → o'z marketi (hamkasbiga biriktira oladi)
+   *   ADMIN/SUPERADMIN/REGISTRATOR → `marketId` parametridagi market
+   */
+  async getSelectableOperators(
+    user: JwtPayload,
+    marketId?: string,
+  ): Promise<object> {
+    try {
+      let targetMarketId: string | null = null;
+
+      if (user.role === Roles.MARKET) {
+        targetMarketId = user.id;
+      } else if (user.role === Roles.OPERATOR) {
+        const me = await this.userRepo.findOne({
+          where: { id: user.id, role: Roles.OPERATOR, is_deleted: false },
+          select: ['id', 'market_id'],
+        });
+        targetMarketId = me?.market_id ?? null;
+      } else {
+        // Admin-like rollar market tanlab ishlaydi.
+        targetMarketId = marketId ?? null;
+      }
+
+      // Market aniqlanmasa — bo'sh ro'yxat. Xato EMAS: forma shunchaki
+      // tanlovni ko'rsatmaydi va buyurtma avvalgidek yaratilaveradi.
+      if (!targetMarketId) return successRes([], 200, 'Operatorlar');
+
+      const operators = await this.userRepo.find({
+        where: {
+          market_id: targetMarketId,
+          role: Roles.OPERATOR,
+          is_deleted: false,
+          status: Status.ACTIVE,
+        },
+        order: { name: 'ASC' },
+        select: ['id', 'name'],
+      });
+      return successRes(operators, 200, 'Operatorlar');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * MARKET O'Z OPERATORINI TAHRIRLAYDI (ism) va BLOKLAYDI (status).
+   *
+   * ⚠️ NEGA KERAK. Bugungacha market operator ustidan faqat YARATISH va
+   * O'CHIRISH qila olardi — «yumshoq jazo» darajasi umuman yo'q edi.
+   * Operator esa `PATCH /user/self` orqali o'z ismini erkin o'zgartirar,
+   * market buni na tuzata, na to'xtata olardi.
+   *
+   * ⚠️ BLOKLASH O'CHIRISH EMAS. `status = inactive` operatorni tizimga
+   * kirita olmaydi (`signIn` tekshiradi) va yangi buyurtmaga biriktirib
+   * bo'lmaydi (`resolveOperatorAssignment`), lekin uning mavjud
+   * buyurtmalari, daromadi va tarixi TEGILMAYDI.
+   *
+   * ⚠️ Mavjud sessiya DARHOL uzilmaydi: `JwtGuard` bazaga qaramaydi va
+   * token bir kun yashaydi. Ya'ni bloklash keyingi kirishdan kuchga
+   * kiradi. Buni darhol qilish uchun har so'rovda bazaga murojaat kerak
+   * bo'lardi — bu alohida qaror.
+   */
+  async updateOperator(
+    id: string,
+    dto: UpdateOperatorDto,
+    market: JwtPayload,
+  ): Promise<object> {
+    try {
+      const operator = await this.userRepo.findOne({
+        where: {
+          id,
+          role: Roles.OPERATOR,
+          market_id: market.id,
+          is_deleted: false,
+        },
+        select: ['id', 'name', 'status'],
+      });
+      if (!operator) {
+        throw new NotFoundException(
+          'Operator topilmadi yoki sizga tegishli emas',
+        );
+      }
+
+      const before = { name: operator.name, status: operator.status };
+      if (dto.name !== undefined) operator.name = dto.name.trim();
+      if (dto.status !== undefined) operator.status = dto.status;
+
+      // Hech narsa o'zgarmagan bo'lsa jurnalni shovqin bilan to'ldirmaymiz.
+      if (
+        before.name === operator.name &&
+        before.status === operator.status
+      ) {
+        return successRes({}, 200, "O'zgarish yo'q");
+      }
+
+      await this.userRepo.save(operator);
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'updated',
+        old_value: before,
+        new_value: { name: operator.name, status: operator.status },
+        description:
+          before.status !== operator.status
+            ? `Operator ${operator.name} ${
+                operator.status === Status.INACTIVE ? 'bloklandi' : 'blokdan chiqarildi'
+              }`
+            : `Operator tahrirlandi: ${before.name} → ${operator.name}`,
+        user: market,
+      });
+
+      return successRes(
+        { id: operator.id, name: operator.name, status: operator.status },
+        200,
+        'Operator yangilandi',
+      );
     } catch (error) {
       return catchError(error);
     }
@@ -2892,11 +3375,17 @@ export class UserService implements OnModuleInit {
   }
 
   // Operator o'z buyurtmalarini ko'rish (pagination bilan)
+  /**
+   * @param assignment `pending` — boshqa odam biriktirgan, operator hali
+   *   qabul qilmagan buyurtmalar. `accepted` — qabul qilinganlar.
+   *   Berilmasa — hammasi.
+   */
   async getMyOrders(
     operator: JwtPayload,
     page: number = 1,
     limit: number = 20,
     status?: string,
+    assignment?: 'pending' | 'accepted',
   ): Promise<object> {
     try {
       const operatorUser = await this.userRepo.findOne({
@@ -2926,6 +3415,16 @@ export class UserService implements OnModuleInit {
       if (status) {
         where.status = status;
       }
+      /**
+       * ⚠️ Operator O'ZI yaratmagan, lekin unga BIRIKTIRILGAN buyurtmalar
+       * ham shu ro'yxatda — `operator_id` bo'yicha filtr o'zgarmaydi.
+       * `assignment` faqat qabul qilinganini qabul qilinmaganidan ajratadi.
+       */
+      if (assignment === 'pending') {
+        where.operator_accepted_at = IsNull();
+      } else if (assignment === 'accepted') {
+        where.operator_accepted_at = Not(IsNull());
+      }
 
       const [orders, total] = await orderRepo.findAndCount({
         where,
@@ -2940,6 +3439,34 @@ export class UserService implements OnModuleInit {
         skip,
         take: safeLimit,
       });
+
+      /**
+       * Kim biriktirgani ISMI — operator «buni menga kim berdi?» degan
+       * savolga javob olishi kerak. Sahifadagi ID lar BITTA so'rovda
+       * yechiladi (har qator uchun alohida so'rov = N+1).
+       */
+      const assignerIds = [
+        ...new Set(
+          orders
+            .map((o) => o.operator_assigned_by)
+            .filter((v): v is string => !!v && v !== operator.id),
+        ),
+      ];
+      const assignerNames = new Map<string, string>();
+      if (assignerIds.length) {
+        const assigners = await this.userRepo.find({
+          where: { id: In(assignerIds) },
+          select: ['id', 'name'],
+        });
+        for (const a of assigners) assignerNames.set(a.id, a.name ?? '—');
+      }
+
+      // Rad etish faqat SOTUVDAN OLDIN mumkin.
+      const rejectableStatuses = [
+        Order_status.CREATED,
+        Order_status.NEW,
+        Order_status.RECEIVED,
+      ];
 
       // Har bir order uchun earning ma'lumotini olish
       const ordersWithEarnings = await Promise.all(
@@ -2998,6 +3525,27 @@ export class UserService implements OnModuleInit {
               : null,
             is_sold: isSold,
             is_cancelled: isCancelled,
+            /**
+             * ⚠️ `needs_acceptance` buyurtma STATUSIGA tegishli EMAS —
+             * u guruh-tasdiqlash (CREATED→NEW) bilan aralashtirilmasin.
+             * Bu faqat «operator biriktiruvni ko'rdi va tan oldi» belgisi.
+             */
+            assignment: {
+              assigned_by_name: order.operator_assigned_by
+                ? (assignerNames.get(order.operator_assigned_by) ?? null)
+                : null,
+              assigned_at: order.operator_assigned_at,
+              accepted_at: order.operator_accepted_at,
+              is_self_created:
+                !order.operator_assigned_by ||
+                order.operator_assigned_by === operator.id,
+              needs_acceptance: order.operator_accepted_at === null,
+              can_reject:
+                order.operator_accepted_at === null &&
+                !!order.operator_assigned_by &&
+                order.operator_assigned_by !== operator.id &&
+                rejectableStatuses.includes(order.status),
+            },
           };
         }),
       );
@@ -3005,7 +3553,7 @@ export class UserService implements OnModuleInit {
       // Statistika (soft-deleted'lar TypeORM tomonidan avtomatik filter qilinadi)
       const allOperatorOrders = await orderRepo.find({
         where: { operator_id: operator.id },
-        select: ['id', 'status'],
+        select: ['id', 'status', 'operator_accepted_at'],
       });
 
       const soldStatuses = [
@@ -3027,6 +3575,10 @@ export class UserService implements OnModuleInit {
           cancelStatuses.includes(o.status),
         ).length,
         pending: 0,
+        // Biriktirilgan, lekin hali qabul qilinmaganlar.
+        pending_acceptance: allOperatorOrders.filter(
+          (o) => o.operator_accepted_at === null,
+        ).length,
       };
       stats.pending = stats.total - stats.sold - stats.cancelled;
 
@@ -3045,6 +3597,179 @@ export class UserService implements OnModuleInit {
         200,
         'Mening buyurtmalarim',
       );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * OPERATOR UNGA BIRIKTIRILGAN BUYURTMANI QABUL QILADI.
+   *
+   * ⚠️ BU STATUSNI O'ZGARTIRMAYDI va PULNI BOSHQARMAYDI. Komissiya
+   * avvalgidek `order.operator_id` dan hisoblanadi — qabul qilish faqat
+   * «ko'rdim, meniki» degan tan olish signali. Guruh-tasdiqlash
+   * (CREATED → ✅ → NEW) oqimiga umuman tegilmaydi.
+   *
+   * ⚠️ `OrderService` ga bog'liqlik QO'SHILMAYDI — loyihada
+   * `OrderService` bir nechta modulda qayta provider qilingan va yangi
+   * konstruktor bog'liqligi prod'da serverni ko'tarmay qo'yadi
+   * (`tsc` ham, testlar ham buni ko'rmaydi). Shu bois mavjud
+   * `this.dataSource` ishlatiladi.
+   */
+  async acceptAssignedOrder(id: string, operator: JwtPayload): Promise<object> {
+    try {
+      const me = await this.userRepo.findOne({
+        where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
+        select: ['id', 'name', 'market_id'],
+      });
+      if (!me?.market_id) throw new NotFoundException('Operator topilmadi');
+
+      const orderRepo = this.dataSource.getRepository(OrderEntity);
+
+      /**
+       * ⚠️ ATOMIK. Ikki qurilmadan bir vaqtda bosilsa ham bir marta
+       * qabul qilinadi (`operator_accepted_at IS NULL` shart ichida).
+       *
+       * ⚠️ `.returning()` ISHLATILMAYDI — TypeORM uni `[rows, count]`
+       * tuple qilib qaytaradi va `affected` NaN bo'lib qoladi.
+       * ⚠️ `deleted_at IS NULL` QO'LDA: `.update()` soft-delete filtrini
+       * o'zi qo'llamaydi.
+       */
+      const res = await orderRepo
+        .createQueryBuilder()
+        .update(OrderEntity)
+        .set({ operator_accepted_at: Date.now() })
+        .where('id = :id', { id })
+        .andWhere('operator_id = :opId', { opId: me.id })
+        .andWhere('user_id = :marketId', { marketId: me.market_id })
+        .andWhere('operator_accepted_at IS NULL')
+        .andWhere('deleted_at IS NULL')
+        .execute();
+
+      if (!res.affected) {
+        // Sababni aniqlaymiz — operator nima bo'lganini bilishi kerak.
+        const row = await orderRepo.findOne({
+          where: { id },
+          select: ['id', 'operator_id', 'operator_accepted_at', 'order_number'],
+        });
+        if (!row) throw new NotFoundException('Buyurtma topilmadi');
+        if (row.operator_id !== me.id) {
+          throw new ForbiddenException('Bu buyurtma sizga biriktirilmagan');
+        }
+        // Allaqachon qabul qilingan — idempotent, xato emas.
+        return successRes({}, 200, 'Buyurtma allaqachon qabul qilingan');
+      }
+
+      const row = await orderRepo.findOne({
+        where: { id },
+        select: ['id', 'order_number'],
+      });
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: id,
+        action: 'operator_accepted',
+        new_value: { operator_id: me.id, operator_name: me.name },
+        description: `Buyurtma #${row?.order_number} — operator ${me.name} biriktiruvni qabul qildi`,
+        user: operator,
+      });
+      return successRes({}, 200, 'Buyurtma qabul qilindi');
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * OPERATOR BIRIKTIRUVNI RAD ETADI — buyurtma operatorsiz qoladi.
+   *
+   * Shartlar (hammasi bitta atomik `UPDATE` da):
+   *   · hali QABUL QILINMAGAN (qabul qilgandan keyin rad etib bo'lmaydi)
+   *   · BOSHQA odam biriktirgan (o'zi yaratganini rad eta olmaydi)
+   *   · sotuvdan OLDIN (`created` / `new` / `received`)
+   *
+   * ⚠️ `operator` MATN maydoni tegilmaydi — chek allaqachon chop etilgan
+   * bo'lishi mumkin. Market jurnaldan ko'radi va kerak bo'lsa tahrirlaydi.
+   * `operator_earning` ham tegilmaydi: rad etish faqat sotuvdan oldin
+   * mumkin, ya'ni daromad qatori hali mavjud emas.
+   */
+  async rejectAssignedOrder(id: string, operator: JwtPayload): Promise<object> {
+    try {
+      const me = await this.userRepo.findOne({
+        where: { id: operator.id, role: Roles.OPERATOR, is_deleted: false },
+        select: ['id', 'name', 'market_id'],
+      });
+      if (!me?.market_id) throw new NotFoundException('Operator topilmadi');
+
+      const orderRepo = this.dataSource.getRepository(OrderEntity);
+      const res = await orderRepo
+        .createQueryBuilder()
+        .update(OrderEntity)
+        .set({
+          operator_id: null,
+          operator_assigned_by: null,
+          operator_assigned_at: null,
+        })
+        .where('id = :id', { id })
+        .andWhere('operator_id = :opId', { opId: me.id })
+        .andWhere('user_id = :marketId', { marketId: me.market_id })
+        .andWhere('operator_accepted_at IS NULL')
+        .andWhere('operator_assigned_by IS NOT NULL')
+        .andWhere('operator_assigned_by <> operator_id')
+        .andWhere('status IN (:...sts)', {
+          sts: [
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.RECEIVED,
+          ],
+        })
+        .andWhere('deleted_at IS NULL')
+        .execute();
+
+      if (!res.affected) {
+        const row = await orderRepo.findOne({
+          where: { id },
+          select: [
+            'id',
+            'operator_id',
+            'operator_accepted_at',
+            'operator_assigned_by',
+            'status',
+          ],
+        });
+        if (!row) throw new NotFoundException('Buyurtma topilmadi');
+        if (row.operator_id !== me.id) {
+          throw new ForbiddenException('Bu buyurtma sizga biriktirilmagan');
+        }
+        if (row.operator_accepted_at !== null) {
+          throw new BadRequestException(
+            "Siz uni allaqachon qabul qilgansiz — rad etib bo'lmaydi",
+          );
+        }
+        if (
+          !row.operator_assigned_by ||
+          row.operator_assigned_by === row.operator_id
+        ) {
+          throw new BadRequestException(
+            "O'zingiz yaratgan buyurtmani rad etib bo'lmaydi",
+          );
+        }
+        throw new BadRequestException(
+          "Bu bosqichda rad etib bo'lmaydi — buyurtma allaqachon ish jarayonida",
+        );
+      }
+
+      const row = await orderRepo.findOne({
+        where: { id },
+        select: ['id', 'order_number'],
+      });
+      this.activityLog.log({
+        entity_type: 'order',
+        entity_id: id,
+        action: 'operator_rejected',
+        old_value: { operator_id: me.id, operator_name: me.name },
+        description: `Buyurtma #${row?.order_number} — operator ${me.name} biriktiruvni rad etdi`,
+        user: operator,
+      });
+      return successRes({}, 200, 'Biriktirish rad etildi');
     } catch (error) {
       return catchError(error);
     }

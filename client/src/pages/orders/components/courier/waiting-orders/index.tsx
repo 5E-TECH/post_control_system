@@ -34,6 +34,10 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import { useProfile } from "../../../../../shared/api/hooks/useProfile";
 import ReplacementBadge from "../../../../../shared/components/replacement-badge";
+import ExtraCostProofField, {
+  type ProofFieldValue,
+} from "../../../../../shared/components/ExtraCostProofField";
+import ExtraCostDecisionBanner from "../../../../../shared/components/ExtraCostDecisionBanner";
 
 export type FieldType = {
   comment?: string;
@@ -90,6 +94,7 @@ const WaitingOrders = () => {
   const [orderItemInfo, setOrderItemInfo] = useState<any[]>([]);
   const [totalPrice, setTotalPrice] = useState<number | string>("");
   const [extraCostValue, setExtraCostValue] = useState<string>("");
+  const [proofValue, setProofValue] = useState<ProofFieldValue>({});
   // Almashtirish (kafolat-swap): kuryer eski mahsulotni olganini tasdiqlaydi.
   // Almashtirish buyurtmasini sotish uchun MAJBURIY (server ham tekshiradi).
   const [oldItemCollected, setOldItemCollected] = useState<boolean>(false);
@@ -133,6 +138,7 @@ const WaitingOrders = () => {
           order_item_info,
           totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: parsedExtraCost,
+          ...proofValue,
           comment: values?.comment,
         };
         partlySellOrder.mutate(
@@ -161,6 +167,7 @@ const WaitingOrders = () => {
         const data = {
           comment: values?.comment,
           extraCost: parsedExtraCost,
+          ...proofValue,
           // Almashtirish buyurtmasi bo'lsa — eski mahsulot olingani tasdig'i
           ...(item?.replacement_of_order_id
             ? { old_item_collected: oldItemCollected }
@@ -192,6 +199,7 @@ const WaitingOrders = () => {
           order_item_info,
           totalPrice: Number(String(totalPrice).replace(/[^\d]/g, "")),
           extraCost: parsedExtraCost,
+          ...proofValue,
           comment: values?.comment,
         };
         partlySellOrder.mutate(
@@ -210,6 +218,7 @@ const WaitingOrders = () => {
         const data = {
           comment: values?.comment,
           extraCost: parsedExtraCost,
+          ...proofValue,
         };
         cancelOrder.mutate(
           { id: item?.id as string, data },
@@ -352,6 +361,11 @@ const WaitingOrders = () => {
 
   return (
     <div>
+      {/* Qaror banneri — kuryerga Telegram yo'q, bu YAGONA kanal */}
+      <div className="px-3 pt-3 lg:px-0">
+        <ExtraCostDecisionBanner />
+      </div>
+
       {/* Mobile Card View */}
       <div className="lg:hidden p-3 space-y-3">
         {orders.map((item: any, index: number) => (
@@ -835,14 +849,18 @@ const WaitingOrders = () => {
                   ? courierCenterTariff
                   : courierHomeTariff;
 
-                // Sotishda (faqat markaz): max = uyTarif - markazTarif.
-                // Agar uy va markaz tarifi teng bo'lsa (farq = 0),
-                // kuryer o'z xizmat haqqigacha extra cost yozishi mumkin.
-                // Bekor qilishda: max = o'z xizmat haqqi (courierTariff).
+                // ⚠️ SERVER QOIDASI BILAN BIR XIL (`extra-cost-limit.util.ts`).
+                // Tariflar teng bo'lganda server markaz tarifining YARMINI
+                // ruxsat beradi — avval bu yerda TO'LIQ tarif ko'rsatilib,
+                // kuryerga 2 barobar katta maksimum ko'rinardi.
+                const sellMax =
+                  courierHomeTariff - courierCenterTariff > 0
+                    ? courierHomeTariff - courierCenterTariff
+                    : Math.floor(Math.max(0, courierCenterTariff) / 2);
                 const maxExtraCost = isSell
-                  ? courierHomeTariff - courierTariff > 0
-                    ? courierHomeTariff - courierTariff
-                    : Math.max(0, courierTariff)
+                  ? isCenter
+                    ? sellMax
+                    : 0 // uyga yetkazishda qo'shimcha xarajat MUMKIN EMAS
                   : courierTariff;
 
                 const parsedExtra = extraCostValue
@@ -902,6 +920,25 @@ const WaitingOrders = () => {
                         </span>
                       </div>
                     )}
+                    {isSell && !isCenter && parsedExtra > 0 && (
+                      <div className="mt-2 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>
+                          Uyga yetkaziladigan buyurtmada qo'shimcha xarajat
+                          yozib bo'lmaydi — uy tarifi allaqachon yuqori.
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Foto isbot — market bayrog'i yoqilgan bo'lsa MAJBURIY */}
+                    <ExtraCostProofField
+                      required={
+                        order.current?.market?.extra_cost_proof_required === true
+                      }
+                      amount={parsedExtra}
+                      onChange={setProofValue}
+                      resetKey={order.current?.id}
+                    />
                   </div>
                 );
               })()}

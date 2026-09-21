@@ -23,9 +23,11 @@ import { OrderBotModule } from './bots/order_create-bot/order-bot.module';
 import { ExternalProxyModule } from './external-proxy/external-proxy.module';
 import { ExternalIntegrationModule } from './external-integration/external-integration.module';
 import { IntegrationSyncModule } from './integration-sync/integration-sync.module';
+import { ExtraCostModule } from './extra-cost/extra-cost.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
 import { ElchiCargoModule } from './elchi-cargo/elchi-cargo.module';
+import { MarketplaceModule } from './marketplace/marketplace.module';
 import { InvestorModule } from './investor/investor.module';
 import { AiFinanceModule } from './ai-finance/ai-finance.module';
 import { AiUsageModule } from './ai-usage/ai-usage.module';
@@ -84,8 +86,10 @@ import { AiUsageModule } from './ai-usage/ai-usage.module';
     ExternalProxyModule,
     ExternalIntegrationModule,
     IntegrationSyncModule,
+    ExtraCostModule,
     LdgCargoModule,
     ElchiCargoModule,
+    MarketplaceModule,
     InvestorModule,
     AiFinanceModule,
     AiUsageModule,

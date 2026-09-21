@@ -62,6 +62,11 @@ export interface IProductInfo {
   comment?: string;
   operator?: string;
   operator_phone?: string;
+  /**
+   * Biriktiriladigan operator (IXTIYORIY). Market operator qo'shmagan
+   * bo'lsa tanlov umuman ko'rinmaydi va bu maydon bo'sh qoladi.
+   */
+  operator_id?: string | null;
 }
 
 const ProductInfo = () => {
@@ -114,6 +119,21 @@ const ProductInfo = () => {
     market?.default_operator_phone ||
     marketData?.default_operator_phone ||
     "";
+  /**
+   * BIRIKTIRISH UCHUN OPERATORLAR.
+   *
+   * Admin/registrator market tanlab ishlaydi, shuning uchun ularga
+   * `marketId` uzatiladi; market va operator o'z marketini serverdan
+   * oladi. Ro'yxat BO'SH bo'lsa (market operator qo'shmagan) — tanlov
+   * ko'rsatilmaydi va forma avvalgidek erkin matn bilan ishlaydi.
+   */
+  const { getSelectableOperators } = useUser();
+  const { data: operatorsRes } = getSelectableOperators(
+    isAdminLike ? marketId : undefined,
+  );
+  const selectableOperators: Array<{ id: string; name: string }> =
+    operatorsRes?.data ?? [];
+
   const showOperatorPhoneInput = requireOperatorPhone;
   const operatorPhoneInputRequired =
     requireOperatorPhone && !marketDefaultOperatorPhone;
@@ -125,6 +145,7 @@ const ProductInfo = () => {
     comment: "",
     operator: userRole === "operator" ? (OperatorName || "") : "",
     operator_phone: showOperatorPhoneInput ? "+998 " : "",
+    operator_id: null,
   };
 
   const { t } = useTranslation("createOrder");
@@ -285,13 +306,62 @@ const ProductInfo = () => {
               <User className="w-4 h-4 text-purple-500" />
               {t("Operator")}
             </label>
-            <input
-              name="operator"
-              value={formData.operator}
-              onChange={handleChange}
-              placeholder={t("Operator...")}
-              className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-            />
+            {/*
+              ⚠️ TANLOV FAQAT OPERATOR BO'LSA ko'rinadi. Market operator
+              qo'shmagan bo'lsa (ro'yxat bo'sh) — eski erkin matn maydoni
+              qoladi va forma avvalgidek ishlaydi.
+
+              ⚠️ Tanlansa maydon `readOnly` bo'ladi: chekdagi ism bilan
+              komissiya egasi bir xil bo'lishi kerak, aks holda ular
+              bir-biriga zid bo'lardi.
+            */}
+            {selectableOperators.length > 0 ? (
+              <>
+                <select
+                  name="operator_id"
+                  value={formData.operator_id ?? ""}
+                  onChange={(e) => {
+                    const id = e.target.value || null;
+                    const picked = selectableOperators.find((o) => o.id === id);
+                    setFormData((prev) => ({
+                      ...prev,
+                      operator_id: id,
+                      operator: picked ? picked.name : "",
+                    }));
+                  }}
+                  className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                >
+                  <option value="">{t("Tanlanmagan")}</option>
+                  {selectableOperators.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+                {!formData.operator_id && (
+                  <input
+                    name="operator"
+                    value={formData.operator}
+                    onChange={handleChange}
+                    placeholder={t("Operator...")}
+                    className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  />
+                )}
+                {formData.operator_id && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Sotuvdan keyin komissiya shu operatorga yoziladi
+                  </p>
+                )}
+              </>
+            ) : (
+              <input
+                name="operator"
+                value={formData.operator}
+                onChange={handleChange}
+                placeholder={t("Operator...")}
+                className="w-full h-11 px-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              />
+            )}
           </div>
           {showOperatorPhoneInput && (
             <div className="space-y-2">

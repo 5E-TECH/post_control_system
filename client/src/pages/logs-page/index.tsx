@@ -363,6 +363,17 @@ const FIELD_LABEL: Record<string, string> = {
   district_name: "Tuman",
   ldg_tracking: "LDG kuzatuv",
   extra_cost: "Qo'shimcha xarajat",
+  // Qo'shimcha xarajat tasdiqlash oqimi maydonlari — bularsiz jurnalda
+  // xom kalit nomlari (`review_note`, `decision_mode`) chiqadi.
+  extra_cost_request_id: "Xarajat so'rovi",
+  proof_count: "Isbot soni",
+  category: "Xarajat sababi",
+  review_note: "Qaror izohi",
+  decision_mode: "Qaror turi",
+  dup_proof_count: "Takroriy isbot",
+  hidden_price_cut: "Narx pasaytirildi",
+  extra_cost_proof_required: "Isbot majburiy",
+  extra_cost_auto_approve_under: "Avtomatik tasdiq chegarasi",
   type: "Tur",
   source: "Manba",
   opening_balance_cash: "Ochilish naqd",

@@ -39,6 +39,7 @@ const SendMessage = lazy(() => import("../pages/send-message"));
 const LogsPage = lazy(() => import("../pages/logs-page"));
 const Payments = lazy(() => import("../pages/payments"));
 const RolesPermissions = lazy(() => import("../pages/roles-permissions"));
+const MarketplaceIntake = lazy(() => import("../pages/marketplace-intake"));
 const Profile = lazy(() => import("../pages/profile"));
 const CreateUser = lazy(() => import("../pages/users/create-user"));
 const CreateAdmin = lazy(() => import("../pages/users/pages/create-admin"));
@@ -132,6 +133,12 @@ const CourierOldMails = lazy(
 );
 const FinancialHistory = lazy(() => import("../pages/payments/pages/financial-history"));
 const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
+const MarketExtraCost = lazy(
+  () => import("../pages/extra-cost-requests/market"),
+);
+const CourierExtraCost = lazy(
+  () => import("../pages/extra-cost-requests/courier"),
+);
 const Integrations = lazy(
   () => import("../pages/integrations/IntegrationsRoot"),
 );
@@ -255,6 +262,16 @@ const AppRouters = () => {
               ),
             },
             {
+              // Marketplace qabuli — operatorning kundalik skan ekrani.
+              // Sozlash «Integratsiyalar → Marketplace» da, bu yerda esa ish.
+              path: "marketplace-intake",
+              element: (
+                <RequireRole roles={["superadmin", "admin", "registrator"]}>
+                  <MarketplaceIntake />
+                </RequireRole>
+              ),
+            },
+            {
               path: "all-users",
               element: <Users />,
               children: [
@@ -359,6 +376,26 @@ const AppRouters = () => {
               ],
             },
             { path: "cash-box", element: <CashDetailMarketCourier /> },
+            // Qo'shimcha xarajat — market tasdiqlash sahifasi.
+            // ⚠️ `RequireRole` SHART: market sahifalarining ko'pchiligi
+            // hozir himoyasiz, lekin bu sahifa PUL qarorini qabul qiladi.
+            {
+              path: "extra-cost",
+              element: (
+                <RequireRole roles={["market"]}>
+                  <MarketExtraCost />
+                </RequireRole>
+              ),
+            },
+            // Kuryer — o'z so'rovlari va holatlari.
+            {
+              path: "my-extra-cost",
+              element: (
+                <RequireRole roles={["courier"]}>
+                  <CourierExtraCost />
+                </RequireRole>
+              ),
+            },
             { path: "ai-balance", element: <MarketAiBalance /> },
             { path: "my-region", element: <MyRegion /> },
             // Rollar endi Settings ichida — eski URL redirect

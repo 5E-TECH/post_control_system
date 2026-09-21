@@ -23,6 +23,12 @@ function buildSvc(
     payments?: Row[];
     /** `sumMoney` uchun xom natijalar: [sent, collected, paid] */
     rawSums?: [number, number, number];
+    /** Elchi ushlagan tarif yig'indisi (audit M2). */
+    rawFee?: number;
+    /** Yangi pul maydonlari yo'q posilkalar soni. */
+    rawUnreported?: number;
+    /** To'liq nazorat kerak bo'lganda — xom javoblar ketma-ketligi. */
+    rawQueue?: Array<Record<string, string>>;
     applyImpl?: jest.Mock;
     config?: Row;
   } = {},
@@ -34,6 +40,21 @@ function buildSvc(
 
   const sums = over.rawSums ?? [0, 0, 0];
   let rawCall = 0;
+  /**
+   * `rawSums` = [jo'natilgan, yig'ilgan, to'langan] — eski qulay shakl
+   * saqlanadi. Tarif `rawFee` bilan beriladi (sukut: 0), chunki qarz endi
+   * `yig'ilgan − tarif − to'langan` (audit M2).
+   */
+  const rawQueue: Array<Record<string, string>> = over.rawQueue ?? [
+    { sum: String(sums[0] ?? 0), cnt: '0' },
+    {
+      collected: String(sums[1] ?? 0),
+      fee: String(over.rawFee ?? 0),
+      cnt: '0',
+    },
+    { sum: String(sums[2] ?? 0), cnt: '0' },
+    { cnt: String(over.rawUnreported ?? 0) },
+  ];
 
   const makeQb = (): any => {
     const qb: any = {
@@ -49,10 +70,18 @@ function buildSvc(
       getManyAndCount: jest.fn(() =>
         Promise.resolve([over.shipments ?? [], (over.shipments ?? []).length]),
       ),
-      // Chaqiruv tartibi: sent → collected → paid (sumMoney ichida).
-      getRawOne: jest.fn(() =>
-        Promise.resolve({ sum: String(sums[rawCall++ % 3] ?? 0), cnt: '0' }),
-      ),
+      /**
+       * ⚠️ ANIQ KETMA-KETLIK, aylanma EMAS.
+       *
+       * Ilgari mock uch qiymatni `% 3` bilan aylantirardi va har bir
+       * so'rovga `{sum, cnt}` qaytarardi. So'rovlar soni yoki javob shakli
+       * o'zgarsa test JIMGINA boshqa narsani tekshirib qolardi. `sumMoney`
+       * endi TO'RT so'rov qiladi va ikkinchisi `{collected, fee}` shaklida.
+       *
+       * Tartib (sumMoney ichida): sent -> reported{collected,fee} -> paid
+       * -> unreported{cnt}.
+       */
+      getRawOne: jest.fn(() => Promise.resolve(rawQueue[rawCall++] ?? {})),
     };
     return qb;
   };
@@ -112,7 +141,7 @@ function buildSvc(
     applyStatusUpdate:
       over.applyImpl ??
       jest.fn(() =>
-        Promise.resolve({ status: 'success', message: 'qo\'llandi' }),
+        Promise.resolve({ status: 'success', message: "qo'llandi" }),
       ),
   };
   svc.activityLog = {
@@ -126,15 +155,64 @@ function buildSvc(
   return { svc, saved, deleted, logs };
 }
 
-describe("ElchiAdminService — hisob-kitob (pul)", () => {
-  it('qarz = butun vaqt yig\'ilgani − butun vaqt to\'langani', async () => {
-    // sumMoney: sent=1_000_000, collected=900_000, paid=400_000
-    const { svc } = buildSvc({ rawSums: [1_000_000, 900_000, 400_000] });
+describe('ElchiAdminService — hisob-kitob (pul)', () => {
+  it("⭐ qarz = yig'ilgan − Elchi tarifi − to'langan (audit M2)", async () => {
+    /**
+     * ⚠️ FORMULA O'ZGARDI VA BU TUZATISH.
+     *
+     * Ilgari `qarz = yig'ilgan − to'langan` edi va "yig'ilgan" deb
+     * `cod_collected_reported` olinardi — u Elchi'ning `order.paid_amount`
+     * qiymati, ya'ni market qarzining avto-to'langan qismi, oddiy sotuvda 0.
+     * Natijada qarz MANFIY chiqardi.
+     *
+     * Endi Elchi yig'gan naqdni va o'z tarifini ALOHIDA aytadi. Elchi
+     * tarifni o'zida qoldiradi, qolganini bizga beradi — shuning uchun
+     * tarif ham ayiriladi.
+     */
+    const { svc } = buildSvc({
+      rawSums: [1_000_000, 900_000, 400_000],
+      rawFee: 30_000,
+    });
     const money = await svc.sumMoney();
     expect(money.cod_sent).toBe(1_000_000);
     expect(money.cod_collected).toBe(900_000);
+    expect(money.elchi_fee).toBe(30_000);
     expect(money.paid_by_elchi).toBe(400_000);
-    expect(money.debt).toBe(500_000);
+    // 900 000 yig'ildi − 30 000 tarif − 400 000 to'langan = 470 000
+    expect(money.debt).toBe(470_000);
+  });
+
+  it("⭐ qarz MANFIY chiqmaydi — eski xatoning regressiya qo'riqchisi", async () => {
+    /**
+     * Eski formulada yig'ilgan 0 edi (chunki maydon yolg'on), to'lovlar esa
+     * bor — natijada qarz MANFIY ko'rinardi va operator "Elchi bizga qarz
+     * emas, biz unga qarzmiz" deb o'qirdi. Hozir yig'ilgan 0 bo'lishi FAQAT
+     * haqiqatan hech narsa yig'ilmaganda (masalan hammasi onlayn to'langan)
+     * yuz beradi.
+     */
+    const { svc } = buildSvc({ rawSums: [500_000, 0, 0], rawFee: 15_000 });
+    const money = await svc.sumMoney();
+    // Onlayn to'langan: naqd yig'ilmagan, tarifni market bizga QARZ.
+    expect(money.debt).toBe(-15_000);
+    expect(money.cod_collected).toBe(0);
+  });
+
+  it("⭐ ma'lumot yo'q posilkalar ALOHIDA sanaladi, aralashtirilmaydi", async () => {
+    /**
+     * Eski posilkalarda yangi maydonlar `NULL`. `COALESCE` bilan eski
+     * yolg'on qiymatga qaytish rost bilan yolg'onni bitta yig'indiga
+     * qo'shardi. Shu bois ular yig'indiga KIRMAYDI va soni ochiq
+     * ko'rsatiladi — panel "N posilka bo'yicha ma'lumot yo'q" deb aytadi.
+     */
+    const { svc } = buildSvc({
+      rawSums: [1_000_000, 200_000, 0],
+      rawFee: 6_000,
+      rawUnreported: 9,
+    });
+    const money = await svc.sumMoney();
+    expect(money.unreported_count).toBe(9);
+    // Yig'indi faqat MA'LUMOTI BOR posilkalar bo'yicha.
+    expect(money.cod_collected).toBe(200_000);
   });
 
   it("qarz DAVR bo'yicha kesilmaydi — `overall` bloki alohida keladi", async () => {
@@ -150,12 +228,17 @@ describe("ElchiAdminService — hisob-kitob (pul)", () => {
     expect(res.period.to).toBe(2_000);
   });
 
-  it("Elchi ushlagan summa AYNI yig'ilgan posilkalar bo'yicha hisoblanadi", async () => {
+  it("⭐ Elchi ushlagan summa TAXMIN qilinmaydi — Elchi o'zi aytadi (M2)", async () => {
     /**
-     * `sumMoney` va `getSettlement` bir xil `getRawOne` mockidan o'qiydi, shu
-     * bois bu yerda faqat FORMULA tekshiriladi: `sent_for_collected − sum`.
-     * Ikki har xil to'plamning ayirmasi (davrda jo'natilgan − davrda yig'ilgan)
-     * tarifni EMAS, to'plamlar farqini ko'rsatardi.
+     * ⚠️ BU TEST AVVAL XATO FORMULANI QULFLAB TURGAN.
+     *
+     * Ilgari tarif `sent_for_collected − sum` deb hisoblanardi. "sum"
+     * (yig'ilgan) esa amalda 0 bo'lgani uchun tarif o'rniga BUTUN COD
+     * chiqardi — 15 000 emas, 500 000. Test yashil edi, chunki fixture
+     * `sum: 900000` degan haqiqatda hech qachon bo'lmaydigan qiymat berardi.
+     *
+     * Endi Elchi tarifning sotuvda ISHLATILGAN snapshotini yuboradi va
+     * panel uni shundayligicha yig'adi — ayirma bilan taxmin qilmaydi.
      */
     const { svc } = buildSvc();
     svc.shipmentRepo.createQueryBuilder = jest.fn(() => {
@@ -168,6 +251,8 @@ describe("ElchiAdminService — hisob-kitob (pul)", () => {
           Promise.resolve({
             sum: '900000',
             cnt: '3',
+            // Elchi aytgan tarif yig'indisi — ayirma bilan hisoblanmaydi.
+            fee: '45000',
             sent_for_collected: '1000000',
           }),
         ),
@@ -177,16 +262,21 @@ describe("ElchiAdminService — hisob-kitob (pul)", () => {
 
     const res = await svc.getSettlement({ from: 1, to: 2 });
 
-    // 1_000_000 − 900_000 = 100_000 (3 posilka × ~33 333 tarif)
-    expect(res.period.elchi_fee).toBe(100_000);
+    // Elchi aytgan qiymat — 3 posilka x 15 000 tarif.
+    expect(res.period.elchi_fee).toBe(45_000);
     expect(res.period.collected_count).toBe(3);
+    /**
+     * Eski (xato) formula 1 000 000 − 900 000 = 100 000 berardi. Endi u
+     * ishlatilmaydi — regressiya qo'riqchisi.
+     */
+    expect(res.period.elchi_fee).not.toBe(100_000);
   });
 
-  it("teskari oraliq (from > to) RAD ETILADI", async () => {
+  it('teskari oraliq (from > to) RAD ETILADI', async () => {
     const { svc } = buildSvc();
-    await expect(
-      svc.getSettlement({ from: 5_000, to: 1_000 }),
-    ).rejects.toThrow(/katta/i);
+    await expect(svc.getSettlement({ from: 5_000, to: 1_000 })).rejects.toThrow(
+      /katta/i,
+    );
   });
 });
 
@@ -194,7 +284,7 @@ describe("ElchiAdminService — qo'lda to'lov (M6)", () => {
   it("to'lovni qayd etadi va audit yozadi", async () => {
     const { svc, logs } = buildSvc();
     const res = await svc.addSettlementPayment(
-      { amount: 250_000, note: '  o\'tkazma #12  ' },
+      { amount: 250_000, note: "  o'tkazma #12  " },
       { id: 'u1' },
     );
     expect(res.amount).toBe('250000.00');
@@ -213,10 +303,10 @@ describe("ElchiAdminService — qo'lda to'lov (M6)", () => {
     );
   });
 
-  it('son bo\'lmagan summa RAD ETILADI', async () => {
+  it("son bo'lmagan summa RAD ETILADI", async () => {
     const { svc } = buildSvc();
     await expect(
-      svc.addSettlementPayment({ amount: 'ko\'p' as any }),
+      svc.addSettlementPayment({ amount: "ko'p" as any }),
     ).rejects.toThrow(/musbat/i);
   });
 
@@ -252,7 +342,7 @@ describe("ElchiAdminService — qo'lda to'lov (M6)", () => {
 
   it("mavjud bo'lmagan to'lovni o'chirish 404 beradi", async () => {
     const { svc } = buildSvc({ payments: [] });
-    await expect(svc.deleteSettlementPayment('yo\'q')).rejects.toThrow(
+    await expect(svc.deleteSettlementPayment("yo'q")).rejects.toThrow(
       /topilmadi/i,
     );
   });
@@ -268,7 +358,7 @@ describe('ElchiAdminService — webhookni qayta ishlash', () => {
     await expect(svc.reprocessWebhook('e1')).rejects.toThrow(/imzo/i);
   });
 
-  it('allaqachon muvaffaqiyatli hodisa QAYTA QO\'LLANMAYDI', async () => {
+  it("allaqachon muvaffaqiyatli hodisa QAYTA QO'LLANMAYDI", async () => {
     const apply = jest.fn();
     const { svc } = buildSvc({
       webhookLogs: [
@@ -281,7 +371,7 @@ describe('ElchiAdminService — webhookni qayta ishlash', () => {
     expect(apply).not.toHaveBeenCalled(); // eng muhimi
   });
 
-  it("muvaffaqiyatsiz yozuv qayta ishlanadi va status yangilanadi", async () => {
+  it('muvaffaqiyatsiz yozuv qayta ishlanadi va status yangilanadi', async () => {
     const log: Row = {
       event_id: 'e1',
       signature_valid: true,
@@ -317,9 +407,9 @@ describe('ElchiAdminService — webhookni qayta ishlash', () => {
     expect(saved[0].error_message).toContain('DB yiqildi');
   });
 
-  it("topilmagan log 404 beradi", async () => {
+  it('topilmagan log 404 beradi', async () => {
     const { svc } = buildSvc({ webhookLogs: [] });
-    await expect(svc.reprocessWebhook('yo\'q')).rejects.toThrow(/topilmadi/i);
+    await expect(svc.reprocessWebhook("yo'q")).rejects.toThrow(/topilmadi/i);
   });
 });
 

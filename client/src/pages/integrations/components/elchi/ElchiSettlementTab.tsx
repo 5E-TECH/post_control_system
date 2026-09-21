@@ -135,8 +135,12 @@ export const ElchiSettlementTab = () => {
             value={money(overall?.cod_sent ?? 0)}
           />
           <Statistic
-            title="Elchi yig'gan (net)"
+            title="Elchi yig'gan (naqd)"
             value={money(overall?.cod_collected ?? 0)}
+          />
+          <Statistic
+            title="Elchi ushlagan (tarif)"
+            value={money(overall?.elchi_fee ?? 0)}
           />
           <Statistic
             title="Elchi to'lagan"
@@ -150,10 +154,27 @@ export const ElchiSettlementTab = () => {
             }}
           />
         </div>
+        {/*
+          ⚠️ MA'LUMOTI YO'Q POSILKALAR OCHIQ AYTILADI (audit M2).
+
+          Eski posilkalarda Elchi haqiqiy pul maydonlarini yubormagan. Ular
+          yig'indiga KIRMAYDI — aks holda rost bilan yolg'on bitta raqamga
+          qo'shilardi. Lekin jim qoldirish ham xato bo'lardi: operator
+          yig'indini TO'LIQ deb o'qib, kamomad bor deb o'ylardi.
+        */}
+        {(overall?.unreported_count ?? 0) > 0 && (
+          <Alert
+            className="mt-3"
+            type="warning"
+            showIcon
+            message={`${overall?.unreported_count} posilka bo'yicha Elchi hali pul ma'lumotini yubormagan`}
+            description="Yuqoridagi summalar faqat ma'lumoti KELGAN posilkalar bo'yicha. Eski posilkalar hisobga kirmaydi — ular uchun Elchi tomonidagi hisob-kitob ekrani bilan qo'lda solishtirish kerak."
+          />
+        )}
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           Qarz <b>davr bo'yicha kesilmaydi</b> — u to'planib boradigan qoldiq.
-          Oldingi oyda yig'ilib bu oyda to'langan pul aks holda "ortiqcha to'lov"
-          bo'lib ko'rinardi.
+          Oldingi oyda yig'ilib bu oyda to'langan pul aks holda "ortiqcha
+          to'lov" bo'lib ko'rinardi.
         </p>
       </Card>
 
@@ -246,10 +267,7 @@ export const ElchiSettlementTab = () => {
             {
               title: "",
               width: 60,
-              render: (
-                _: unknown,
-                r: { id: string; amount: number },
-              ) => (
+              render: (_: unknown, r: { id: string; amount: number }) => (
                 <Button
                   size="small"
                   danger
@@ -292,7 +310,9 @@ export const ElchiSettlementTab = () => {
               min={1}
               step={1000}
               // Minglik ajratgich — katta summani ko'z bilan tekshirish uchun.
-              formatter={(v) => `${v ?? ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, " ")}
+              formatter={(v) =>
+                `${v ?? ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
+              }
               parser={(v) => Number(`${v ?? ""}`.replace(/\s/g, ""))}
             />
           </Form.Item>

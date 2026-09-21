@@ -18,13 +18,15 @@ const SECRET = 'topsecret';
 const sign = (body: string) =>
   createHmac('sha256', SECRET).update(body, 'utf8').digest('hex');
 
-function buildSvc(over: {
-  config?: unknown;
-  shipment?: Record<string, unknown> | null;
-  existingLog?: Record<string, unknown> | null;
-  logSaveError?: unknown;
-  terminal?: Record<string, jest.Mock>;
-} = {}) {
+function buildSvc(
+  over: {
+    config?: unknown;
+    shipment?: Record<string, unknown> | null;
+    existingLog?: Record<string, unknown> | null;
+    logSaveError?: unknown;
+    terminal?: Record<string, jest.Mock>;
+  } = {},
+) {
   const savedLogs: any[] = [];
   const logUpdates: any[] = [];
   const savedShipments: any[] = [];
@@ -45,11 +47,13 @@ function buildSvc(over: {
     ),
   };
   svc.shipmentRepo = {
-    findOne: jest.fn().mockResolvedValue(
-      over.shipment === undefined
-        ? { id: 's-1', order_id: 'o-1', elchi_shipment_id: '9001' }
-        : over.shipment,
-    ),
+    findOne: jest
+      .fn()
+      .mockResolvedValue(
+        over.shipment === undefined
+          ? { id: 's-1', order_id: 'o-1', elchi_shipment_id: '9001' }
+          : over.shipment,
+      ),
     save: jest.fn((x: any) => {
       savedShipments.push({ ...x });
       return Promise.resolve(x);
@@ -78,6 +82,9 @@ function buildSvc(over: {
     markReturnedByElchi:
       over.terminal?.markReturnedByElchi ??
       jest.fn().mockResolvedValue({ kind: 'applied' }),
+    markRolledBackByElchi:
+      over.terminal?.markRolledBackByElchi ??
+      jest.fn().mockResolvedValue({ kind: 'applied' }),
   };
   svc.logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
@@ -96,7 +103,7 @@ const payload = (over: Record<string, unknown> = {}) =>
   });
 
 describe('ElchiWebhookService — imzo', () => {
-  it("imzo xato -> 401 va buyurtma TEGILMAYDI", async () => {
+  it('imzo xato -> 401 va buyurtma TEGILMAYDI', async () => {
     const { svc, savedLogs } = buildSvc();
     const body = payload();
 
@@ -148,7 +155,7 @@ describe('ElchiWebhookService — imzo', () => {
 describe('ElchiWebhookService — takror himoyasi', () => {
   const uniqueViolation = { code: '23505' };
 
-  it("ayni event_id ikkinchi marta -> TAKROR (200, amal bajarilmaydi)", async () => {
+  it('ayni event_id ikkinchi marta -> TAKROR (200, amal bajarilmaydi)', async () => {
     const { svc } = buildSvc({
       logSaveError: uniqueViolation,
       existingLog: { event_id: 'ev-1', status: 'success' },
@@ -194,7 +201,7 @@ describe('ElchiWebhookService — takror himoyasi', () => {
 });
 
 describe('ElchiWebhookService — statusni qo‘llash', () => {
-  it("sold -> sotuv oqimi + narx/xarajat uzatiladi", async () => {
+  it('sold -> sotuv oqimi + narx/xarajat uzatiladi', async () => {
     const { svc, savedShipments, logUpdates } = buildSvc();
     const body = payload();
 
@@ -267,7 +274,7 @@ describe('ElchiWebhookService — statusni qo‘llash', () => {
     expect(logUpdates[0].patch.status).toBe('skipped');
   });
 
-  it("posilka topilmadi -> skipped (xato emas)", async () => {
+  it('posilka topilmadi -> skipped (xato emas)', async () => {
     const { svc, logUpdates } = buildSvc({ shipment: null });
     const body = payload();
 
@@ -313,7 +320,7 @@ describe('ElchiWebhookService — statusni qo‘llash', () => {
     expect(last.mismatch_reason).toMatch(/bekor qilingan/);
   });
 
-  it("vakil-kuryer biriktirilmagan -> failed (terminal amal bajarilmaydi)", async () => {
+  it('vakil-kuryer biriktirilmagan -> failed (terminal amal bajarilmaydi)', async () => {
     const { svc, logUpdates } = buildSvc({
       config: {
         id: 'cfg',
@@ -378,7 +385,10 @@ describe('ElchiWebhookService — sinov webhooki', () => {
     const { svc } = buildSvc();
     const body = testPayload();
 
-    const res = await svc.process({ rawBody: body, signatureHeader: sign(body) });
+    const res = await svc.process({
+      rawBody: body,
+      signatureHeader: sign(body),
+    });
 
     expect(res.http_status).toBe(200);
     expect(res.message).toMatch(/Sinov webhooki qabul qilindi/);
@@ -419,5 +429,78 @@ describe('ElchiWebhookService — sinov webhooki', () => {
 
     expect(res.http_status).toBe(401);
     expect(res.message).not.toMatch(/Sinov webhooki qabul qilindi/);
+  });
+});
+
+/**
+ * ROLLBACK — QABUL MEZONI №5.
+ *
+ * Elchi sotilgan buyurtmani `waiting`ga qaytarsa, ilgari webhook kelardi,
+ * jurnalga "success" yozilardi va SHU YERDA TO'XTARDI: buyurtma holatiga
+ * tegilmasdi, `mismatch_at` ham qo'yilmasdi. PCS'da SOLD qolardi, pul
+ * kassada qolardi, Elchi'da esa WAITING.
+ */
+describe('⭐ Elchi ROLLBACK webhooki (mezon №5)', () => {
+  const waitingBody = () => payload({ status: 'waiting' });
+
+  it('`waiting` kelganda rollback metodi CHAQIRILADI', async () => {
+    const spy = jest.fn().mockResolvedValue({ kind: 'applied' });
+    const { svc } = buildSvc({ terminal: { markRolledBackByElchi: spy } });
+    const body = waitingBody();
+
+    const res: any = await svc.process({
+      rawBody: body,
+      signatureHeader: sign(body),
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(res.http_status).toBe(200);
+    // Sotuv oqimi CHAQIRILMAYDI — aks holda pul ikki marta harakat qilardi.
+    expect(svc.orderService.markDeliveredByElchi).not.toHaveBeenCalled();
+  });
+
+  it('⭐ ODDIY OQIM buzilmaydi — `skipped` javobi xato EMAS', async () => {
+    /**
+     * `waiting` oldinga yo'nalishda ham keladi (kuryer pochtani qabul
+     * qildi). Bunda `markRolledBackByElchi` `skipped` qaytaradi va bu
+     * NORMAL: webhook 200 bo'lishi kerak, aks holda Elchi tomonida
+     * qayta urinish tsikli boshlanardi.
+     */
+    const { svc, savedShipments } = buildSvc({
+      terminal: {
+        markRolledBackByElchi: jest.fn().mockResolvedValue({
+          kind: 'skipped',
+          reason: 'oldinga oqim (waiting)',
+        }),
+      },
+    });
+    const body = waitingBody();
+
+    const res: any = await svc.process({
+      rawBody: body,
+      signatureHeader: sign(body),
+    });
+
+    expect(res.http_status).toBe(200);
+    // Nomuvofiqlik YOZILMAYDI — bu xato emas, oddiy oqim.
+    expect(savedShipments.find((x: any) => x.mismatch_at)).toBeUndefined();
+  });
+
+  it('⭐ rollback yiqilsa NOMUVOFIQLIK yoziladi, jim qolmaydi', async () => {
+    const { svc, savedShipments } = buildSvc({
+      terminal: {
+        markRolledBackByElchi: jest.fn().mockResolvedValue({
+          kind: 'mismatch',
+          reason: "Elchi rollback qo'llanmadi: kassa yopiq",
+        }),
+      },
+    });
+    const body = waitingBody();
+
+    await svc.process({ rawBody: body, signatureHeader: sign(body) });
+
+    const flagged = savedShipments.find((x: any) => x.mismatch_at);
+    expect(flagged).toBeDefined();
+    expect(String(flagged?.mismatch_reason)).toMatch(/rollback/i);
   });
 });

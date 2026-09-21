@@ -14,7 +14,7 @@ import { Order_status } from 'src/common/enums';
  */
 
 /** Terminal status kelganda ishga tushadigan biznes oqimi. */
-export type ElchiTerminalAction = 'sell' | 'cancel' | 'return';
+export type ElchiTerminalAction = 'sell' | 'cancel' | 'return' | 'rollback';
 
 export interface ElchiStatusMapping {
   /** Bizda qaysi holatga o'tadi. */
@@ -22,10 +22,11 @@ export interface ElchiStatusMapping {
   /** Boshqa o'zgarish kutilmaydi. */
   is_terminal: boolean;
   /**
-   * `sell`   → `markDeliveredByElchi` (kassaga pul tushadi)
-   * `cancel` → `markCancelledByElchi`
-   * `return` → `markReturnedByElchi` (posilka qaytish yo'lida)
-   * `null`   → faqat status yangilanadi.
+   * `sell`     → `markDeliveredByElchi` (kassaga pul tushadi)
+   * `cancel`   → `markCancelledByElchi`
+   * `return`   → `markReturnedByElchi` (posilka qaytish yo'lida)
+   * `rollback` → `markRolledBackByElchi` (Elchi o'z sotuvini bekor qildi)
+   * `null`     → faqat status yangilanadi.
    */
   terminal_action: ElchiTerminalAction | null;
 }
@@ -63,10 +64,22 @@ const MAPPING: Record<string, ElchiStatusMapping> = {
     is_terminal: false,
     terminal_action: null,
   },
+  /**
+   * ⚠️ `waiting` IKKI XIL MA'NODA keladi va shu bois terminal amal
+   * SHARTLI bajariladi:
+   *
+   *   OLDINGA — kuryer pochtani qabul qildi, sotuv kutilmoqda (oddiy oqim);
+   *   ORQAGA  — Elchi sotilgan buyurtmani qaytardi (rollback).
+   *
+   * Statusning o'zi ikkisini ajratmaydi, shuning uchun ajratish
+   * `markRolledBackByElchi` ichida: faqat BIZDA sotilgan bo'lsa qaytariladi,
+   * aks holda `skipped`. Ilgari bu yerda `null` turgani uchun rollback
+   * UMUMAN qo'llanmasdi va pul kassada qolib ketardi (qabul mezoni №5).
+   */
   waiting: {
     order_status: Order_status.WAITING,
     is_terminal: false,
-    terminal_action: null,
+    terminal_action: 'rollback',
   },
   // G4: kuryer yetkaza olmadi (mijoz javob bermadi/keyinga qoldirdi).
   // TERMINAL EMAS — buyurtma hamon kutmoqda, Elchi qayta urinadi.

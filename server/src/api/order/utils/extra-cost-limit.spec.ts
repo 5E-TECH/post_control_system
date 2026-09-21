@@ -37,7 +37,7 @@ describe("Qo'shimcha xarajat chegarasi — SOTUV", () => {
     );
   });
 
-  it('TC3: tariflar TENG bo\'lsa — o\'z tarifining 50%i', () => {
+  it("TC3: tariflar TENG bo'lsa — o'z tarifining 50%i", () => {
     // ⭐ O'ZGARISH: avval TO'LIQ tarifgacha (20000) ruxsat berilardi, ya'ni
     // kuryer xizmat haqini ikki baravar qilib olishi mumkin edi.
     const limit = sell(Where_deliver.CENTER, 20000, 20000);
@@ -48,14 +48,14 @@ describe("Qo'shimcha xarajat chegarasi — SOTUV", () => {
     );
   });
 
-  it('TC4: uy tarifi markazdan KICHIK bo\'lsa ham 50% qoidasi', () => {
+  it("TC4: uy tarifi markazdan KICHIK bo'lsa ham 50% qoidasi", () => {
     // Buzilgan sozlama (uy < markaz) -> diff manfiy -> 50% ga tushadi.
     // Manfiy chegara berib qo'yish xavfli bo'lardi.
     const limit = sell(Where_deliver.CENTER, 20000, 10000);
     expect(limit.max).toBe(10000);
   });
 
-  it('TC5: kasrli farq — butun so\'mga yaxlitlanadi (pastga)', () => {
+  it("TC5: kasrli farq — butun so'mga yaxlitlanadi (pastga)", () => {
     const limit = sell(Where_deliver.CENTER, 15001, 15001);
     expect(limit.max).toBe(7500); // 15001/2 = 7500.5 -> 7500
   });
@@ -77,7 +77,7 @@ describe("Qo'shimcha xarajat chegarasi — SOTUV", () => {
     expect(limit.max).toBe(0);
   });
 
-  it('TC8: xarajat 0 yoki manfiy bo\'lsa tekshiruv o\'tkazib yuboriladi', () => {
+  it("TC8: xarajat 0 yoki manfiy bo'lsa tekshiruv o'tkazib yuboriladi", () => {
     const limit = sell(Where_deliver.ADDRESS, 15000, 25000);
     // Uyga taqiq bo'lsa ham, xarajat yozilmasa xato bermaydi.
     expect(() => assertExtraCostWithinLimit(0, limit)).not.toThrow();
@@ -86,7 +86,7 @@ describe("Qo'shimcha xarajat chegarasi — SOTUV", () => {
 });
 
 describe("Qo'shimcha xarajat chegarasi — BEKOR QILISH", () => {
-  it("TC9: maksimum = kuryer tarifi (sotuvdan BOSHQA qoida)", () => {
+  it('TC9: maksimum = kuryer tarifi (sotuvdan BOSHQA qoida)', () => {
     // Kuryer borib qaytdi, vaqt-yoqilg'i sarfladi — shu bois to'liq tarif.
     const limit = cancelExtraCostLimit({ courierTariff: 15000 });
     expect(limit.max).toBe(15000);

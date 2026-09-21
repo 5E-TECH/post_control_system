@@ -45,6 +45,8 @@ import {
 } from '../elchi-cargo/elchi-shipment.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { BotService } from '../bots/notify-bot/bot.service';
+import { MarketplaceSyncService } from '../marketplace/marketplace-sync.service';
+import { MarketplaceEventType } from '../marketplace/marketplace.enums';
 import { CourierRegionEntity } from 'src/core/entity/courier-region.entity';
 import { RegionEntity } from 'src/core/entity/region.entity';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
@@ -99,6 +101,7 @@ export class PostService {
     private readonly ldgShipmentService: LdgShipmentService,
     private readonly elchiShipmentService: ElchiShipmentService,
     private readonly botService: BotService,
+    private readonly marketplaceSync: MarketplaceSyncService,
   ) {}
 
   /**
@@ -143,9 +146,26 @@ export class PostService {
    */
   private dispatchOrdersToElchi(orderIds: string[]): void {
     void (async () => {
+      /**
+       * QOP HAJMI — Elchi operatori "12 posilka kelayotgan edi, 11 tasi
+       * yetdi" holatini ko'rishi uchun.
+       *
+       * ⚠️ AYNAN SHU YERDA sanaladi, `createShipmentForOrder` ichida emas:
+       * u har posilka uchun alohida chaqiriladi va "qopda jami nechta"
+       * degan ma'lumot faqat bu yerda — butun ro'yxat qo'lda.
+       *
+       * ⚠️ Elchi tomonida bu qiymat BIZ AYTGAN son bo'lib saqlanadi va
+       * ular sanagan son bilan solishtiriladi. Shu bois jo'natishga
+       * ketayotgan HAQIQIY son berilishi kerak.
+       */
+      const batch = { size: orderIds.length };
       for (const orderId of orderIds) {
         try {
-          await this.elchiShipmentService.createShipmentForOrder(orderId);
+          await this.elchiShipmentService.createShipmentForOrder(
+            orderId,
+            undefined,
+            batch,
+          );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           this.logger.warn(
@@ -974,6 +994,13 @@ export class PostService {
       for (const order of newOrders) {
         order.post_id = sentPost.id;
         order.status = Order_status.ON_THE_ROAD;
+        // ⚠️ MARKETPLACE ORALIQ STATUSI — pochta yo'lga chiqdi.
+        await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+          order,
+          event_type: MarketplaceEventType.PARCEL_DISPATCHED,
+          status: { from: Order_status.RECEIVED, to: 'IN_TRANSIT' },
+          actor: { type: 'operator' },
+        });
         if (courier.is_super_courier) {
           const t =
             order.where_deliver === Where_deliver.CENTER
@@ -1211,6 +1238,17 @@ export class PostService {
 
       for (const order of orders) {
         order.status = Order_status.WAITING;
+        // ⚠️ MARKETPLACE ORALIQ STATUSI — kuryerda, mijozga ketyapti.
+        // Avval hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi;
+        // oradagi hamma narsa qorong'i edi va ularning mijozi «posilkam
+        // qayerda?» deganda javob yo'q edi. Marketplace bo'lmagan
+        // buyurtmada metod darhol chiqadi (so'rovsiz).
+        await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+          order,
+          event_type: MarketplaceEventType.PARCEL_OUT_FOR_DELIVERY,
+          status: { from: Order_status.ON_THE_ROAD, to: 'OUT_FOR_DELIVERY' },
+          actor: { type: 'courier' },
+        });
         await queryRunner.manager.save(order);
       }
 
@@ -1276,6 +1314,17 @@ export class PostService {
 
       // 3) Order statusini o'zgartiramiz
       order.status = Order_status.WAITING;
+      // ⚠️ MARKETPLACE ORALIQ STATUSI — kuryerda, mijozga ketyapti.
+      // Avval hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi;
+      // oradagi hamma narsa qorong'i edi va ularning mijozi «posilkam
+      // qayerda?» deganda javob yo'q edi. Marketplace bo'lmagan
+      // buyurtmada metod darhol chiqadi (so'rovsiz).
+      await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+        order,
+        event_type: MarketplaceEventType.PARCEL_OUT_FOR_DELIVERY,
+        status: { from: Order_status.ON_THE_ROAD, to: 'OUT_FOR_DELIVERY' },
+        actor: { type: 'courier' },
+      });
       await queryRunner.manager.save(order);
 
       // 4) Post ichida hali "ON_THE_ROAD" order bor yoki yo'qligini tekshiramiz
@@ -1381,6 +1430,17 @@ export class PostService {
 
       // 4) Buyurtmani WAITING ga o'tkazamiz
       order.status = Order_status.WAITING;
+      // ⚠️ MARKETPLACE ORALIQ STATUSI — kuryerda, mijozga ketyapti.
+      // Avval hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi;
+      // oradagi hamma narsa qorong'i edi va ularning mijozi «posilkam
+      // qayerda?» deganda javob yo'q edi. Marketplace bo'lmagan
+      // buyurtmada metod darhol chiqadi (so'rovsiz).
+      await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+        order,
+        event_type: MarketplaceEventType.PARCEL_OUT_FOR_DELIVERY,
+        status: { from: Order_status.ON_THE_ROAD, to: 'OUT_FOR_DELIVERY' },
+        actor: { type: 'courier' },
+      });
       await queryRunner.manager.save(order);
 
       // 5) Postda yana ON_THE_ROAD buyurtma qolganmi?
@@ -1459,9 +1519,7 @@ export class PostService {
         throw new NotFoundException('Buyurtma topilmadi');
       }
       if (!order.post_id) {
-        throw new BadRequestException(
-          'Bu buyurtma pochtaga biriktirilmagan',
-        );
+        throw new BadRequestException('Bu buyurtma pochtaga biriktirilmagan');
       }
 
       const post = await queryRunner.manager.findOne(PostEntity, {
@@ -1484,6 +1542,17 @@ export class PostService {
       }
 
       order.status = Order_status.WAITING;
+      // ⚠️ MARKETPLACE ORALIQ STATUSI — kuryerda, mijozga ketyapti.
+      // Avval hamkor faqat «qabul qilindi» va «yetkazildi» ni ko'rardi;
+      // oradagi hamma narsa qorong'i edi va ularning mijozi «posilkam
+      // qayerda?» deganda javob yo'q edi. Marketplace bo'lmagan
+      // buyurtmada metod darhol chiqadi (so'rovsiz).
+      await this.marketplaceSync.recordStatusEvent(queryRunner.manager, {
+        order,
+        event_type: MarketplaceEventType.PARCEL_OUT_FOR_DELIVERY,
+        status: { from: Order_status.ON_THE_ROAD, to: 'OUT_FOR_DELIVERY' },
+        actor: { type: 'courier' },
+      });
       order.return_requested = true;
       await queryRunner.manager.save(order);
 
@@ -1553,9 +1622,7 @@ export class PostService {
         );
       }
       if (!order.return_requested) {
-        throw new BadRequestException(
-          "Bu buyurtmada qaytarish so'rovi yo'q",
-        );
+        throw new BadRequestException("Bu buyurtmada qaytarish so'rovi yo'q");
       }
 
       order.return_requested = false;
@@ -1770,7 +1837,11 @@ export class PostService {
       }
 
       return successRes(
-        { post_id: canceledPost.id, count: orderIds.length, order_ids: orderIds },
+        {
+          post_id: canceledPost.id,
+          count: orderIds.length,
+          order_ids: orderIds,
+        },
         200,
         `${orderIds.length} ta bekor qilingan buyurtma pochtaga yuborildi`,
       );

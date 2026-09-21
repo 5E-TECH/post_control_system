@@ -8,11 +8,7 @@ const ELCHI_WEBHOOK_LOGS_KEY = "elchi-webhook-logs";
 const ELCHI_SETTLEMENT_KEY = "elchi-settlement";
 
 export type ElchiShipmentFilter =
-  | "all"
-  | "pending"
-  | "error"
-  | "delivered"
-  | "mismatch";
+  "all" | "pending" | "error" | "delivered" | "mismatch";
 
 export interface ElchiPaginated<T> {
   data: T[];
@@ -84,6 +80,15 @@ export interface ElchiStats {
     cod_collected: number;
     paid_by_elchi: number;
     debt: number;
+    /** Elchi ushlab qolgan tarif — Elchi O'ZI aytadi (audit M2). */
+    elchi_fee: number;
+    /**
+     * Yangi pul maydonlari YO'Q posilkalar soni.
+     *
+     * Ular yig'indiga kirmaydi (rost bilan yolg'onni qo'shmaslik uchun),
+     * shu bois soni ochiq ko'rsatiladi.
+     */
+    unreported_count: number;
   };
 }
 
@@ -96,7 +101,13 @@ export interface ElchiSettlement {
     paid_by_elchi: number;
     dispatched_count: number;
     collected_count: number;
-    /** Elchi ushlab qolgan summa — YIG'ILGAN posilkalar bo'yicha hisoblanadi. */
+    /**
+     * Elchi ushlab qolgan tarif.
+     *
+     * ⚠️ Ilgari `jo'natilgan − yig'ilgan` ayirmasi bilan TAXMIN qilinardi va
+     * yig'ilgan 0 bo'lgani uchun tarif o'rniga butun COD chiqardi (audit M2).
+     * Endi Elchi sotuvda ishlatilgan tarif snapshotini o'zi yuboradi.
+     */
     elchi_fee: number;
   };
   /** ⚠️ Qarz FAQAT shu blokda — u davr bo'yicha kesilmaydi. */
@@ -105,6 +116,15 @@ export interface ElchiSettlement {
     cod_collected: number;
     paid_by_elchi: number;
     debt: number;
+    /** Elchi ushlab qolgan tarif — Elchi O'ZI aytadi (audit M2). */
+    elchi_fee: number;
+    /**
+     * Yangi pul maydonlari YO'Q posilkalar soni.
+     *
+     * Ular yig'indiga kirmaydi (rost bilan yolg'onni qo'shmaslik uchun),
+     * shu bois soni ochiq ko'rsatiladi.
+     */
+    unreported_count: number;
   };
   payments: Array<{
     id: string;
@@ -116,7 +136,7 @@ export interface ElchiSettlement {
   }>;
 }
 
-const unwrap = <T,>(raw: unknown): T =>
+const unwrap = <T>(raw: unknown): T =>
   ((raw as { data?: T })?.data ?? raw) as T;
 
 /**
@@ -126,7 +146,7 @@ const unwrap = <T,>(raw: unknown): T =>
  * uchun oddiy `unwrap` bu yerda XATO ishlaydi (massivni qaytarib yuborardi).
  * Shu bois alohida: `total` mavjudligiga qarab qaysi qatlam ekanini aniqlaymiz.
  */
-const unwrapPage = <T,>(raw: unknown): ElchiPaginated<T> => {
+const unwrapPage = <T>(raw: unknown): ElchiPaginated<T> => {
   const outer = raw as { data?: unknown; total?: number };
   if (Array.isArray(outer?.data) && typeof outer?.total === "number") {
     return outer as unknown as ElchiPaginated<T>;
@@ -143,8 +163,7 @@ export const useElchiAdmin = () => {
   const useHealth = () =>
     useQuery({
       queryKey: [ELCHI_HEALTH_KEY],
-      queryFn: () =>
-        api.get("elchi/admin/health").then((res) => res.data),
+      queryFn: () => api.get("elchi/admin/health").then((res) => res.data),
       staleTime: 60_000,
       refetchOnWindowFocus: false,
     });
@@ -154,7 +173,9 @@ export const useElchiAdmin = () => {
     useQuery({
       queryKey: [ELCHI_STATS_KEY],
       queryFn: () =>
-        api.get("elchi/admin/stats").then((res) => unwrap<ElchiStats>(res.data)),
+        api
+          .get("elchi/admin/stats")
+          .then((res) => unwrap<ElchiStats>(res.data)),
     });
 
   const useShipments = (params: {
@@ -236,7 +257,9 @@ export const useElchiAdmin = () => {
   const reprocessWebhook = useMutation({
     mutationFn: (eventId: string) =>
       api
-        .post(`elchi/admin/webhook-logs/${encodeURIComponent(eventId)}/reprocess`)
+        .post(
+          `elchi/admin/webhook-logs/${encodeURIComponent(eventId)}/reprocess`,
+        )
         .then((res) => res.data),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: [ELCHI_WEBHOOK_LOGS_KEY] });

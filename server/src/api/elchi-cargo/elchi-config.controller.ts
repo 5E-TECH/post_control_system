@@ -147,8 +147,18 @@ export class ElchiConfigController {
 
   @ApiOperation({
     summary:
+      "ELCHI TOMONIDAGI tumanlar ro'yxati — qo'lda moslash uchun. " +
+      "Faqat o'qish, hech narsani o'zgartirmaydi.",
+  })
+  @Get('remote-districts')
+  async listRemoteDistricts() {
+    return this.configService.listRemoteDistricts();
+  }
+
+  @ApiOperation({
+    summary:
       "Elchi tumanlarini SOATO bo'yicha avtomatik moslashtirish. " +
-      "DARVOZANI OCHMAYDI — ruxsat alohida beriladi.",
+      'DARVOZANI OCHMAYDI — ruxsat alohida beriladi.',
   })
   @Post('districts/sync')
   async syncDistricts(@CurrentUser() user: JwtPayload) {
@@ -159,7 +169,7 @@ export class ElchiConfigController {
     summary:
       "Tumanni QO'LDA moslash. Avtomatik moslash SOATO bo'yicha ishlaydi, " +
       "lekin Elchi tomonda haqiqiy SOATO bo'lmasa (o'rinbosar kod) shu yo'l " +
-      "ishlatiladi. DARVOZAGA TEGMAYDI.",
+      'ishlatiladi. DARVOZAGA TEGMAYDI.',
   })
   @Patch('districts/:districtId/mapping')
   async setDistrictMapping(
@@ -178,7 +188,7 @@ export class ElchiConfigController {
   @ApiOperation({
     summary:
       "Elchi'da BeePost market akkauntini ochish. Tarif VAKIL-KURYERDAN " +
-      'olinadi (M4: ikki tomonda teng bo\'lishi shart). Idempotent.',
+      "olinadi (M4: ikki tomonda teng bo'lishi shart). Idempotent.",
   })
   @Post('config/provision-market')
   async provisionMarket(@CurrentUser() user: JwtPayload) {
@@ -188,7 +198,7 @@ export class ElchiConfigController {
   @ApiOperation({
     summary:
       "DARVOZA: shu tumandagi buyurtmalarni Elchi'ga jo'natishga ruxsat berish " +
-      "yoki bloklash",
+      'yoki bloklash',
   })
   @Patch('districts/:districtId/gate')
   async setDistrictGate(
@@ -216,7 +226,7 @@ export class ElchiConfigController {
   @ApiOperation({
     summary:
       "DARVOZA: BUTUN VILOYAT pochtasini Elchi'ga jo'natishga ruxsat berish " +
-      "yoki bloklash. Moslanmagan tumanlar ochilmaydi — javobda qaytariladi.",
+      'yoki bloklash. Moslanmagan tumanlar ochilmaydi — javobda qaytariladi.',
   })
   @Patch('regions/:regionId/gate')
   async setRegionGate(
@@ -242,7 +252,7 @@ export class ElchiConfigController {
   @ApiOperation({
     summary:
       "Pochta bo'yicha jo'natish holati — nechta buyurtma Elchi'ga haqiqatan " +
-      "yetdi. Dispatch fon rejimida ketgani uchun kerak.",
+      'yetdi. Dispatch fon rejimida ketgani uchun kerak.',
   })
   @Get('posts/:postId/dispatch-status')
   async getDispatchStatus(@Param('postId', ParseUUIDPipe) postId: string) {
@@ -272,7 +282,7 @@ export class ElchiConfigController {
   }
 
   @ApiOperation({
-    summary: "Bitta buyurtmani Elchi bilan tenglashtirish",
+    summary: 'Bitta buyurtmani Elchi bilan tenglashtirish',
   })
   @Post('orders/:orderId/reconcile')
   async reconcileOne(@Param('orderId', ParseUUIDPipe) orderId: string) {
@@ -284,7 +294,7 @@ export class ElchiConfigController {
   @ApiOperation({
     summary:
       "ZAXIRA YO'LI: buyurtma boshqaruvini Elchi'dan qaytarib olish. " +
-      "Avval Elchi posilkasi bekor qilinadi, keyin BeePostda amallar ochiladi — " +
+      'Avval Elchi posilkasi bekor qilinadi, keyin BeePostda amallar ochiladi — ' +
       "ikki tomon bir vaqtda faol bo'lib qolmaydi.",
   })
   @Post('orders/:orderId/reclaim-control')

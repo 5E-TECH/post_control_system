@@ -32,7 +32,11 @@ export interface ElchiDistrictSyncResult {
   /** Qo'lda moslangani uchun TEGILMAGAN soni. */
   kept_manual: number;
   /** Elchi tomonda mos SOATO topilmagan tumanlar. */
-  unmatched: Array<{ district_id: string; name: string; sato_code: string | null }>;
+  unmatched: Array<{
+    district_id: string;
+    name: string;
+    sato_code: string | null;
+  }>;
 }
 
 /**
@@ -418,8 +422,8 @@ export class ElchiConfigService {
         homeOk && centerOk
           ? `mos: uyga ${ours.home}, markazga ${ours.center}`
           : `NOMUVOFIQ — uyga: bizda ${ours.home} / Elchi'da ${theirs.home}; ` +
-            `markazga: bizda ${ours.center} / Elchi'da ${theirs.center}. ` +
-            `Har buyurtmada farq to'planadi — tuzatilishi shart.`,
+              `markazga: bizda ${ours.center} / Elchi'da ${theirs.center}. ` +
+              `Har buyurtmada farq to'planadi — tuzatilishi shart.`,
       );
 
       if (!homeOk || !centerOk) {
@@ -442,6 +446,34 @@ export class ElchiConfigService {
   // ===================== TUMAN MOSLAMASI =====================
 
   /** Moslama jadvali (admin panelda ko'rsatish uchun, tuman nomi bilan). */
+  /**
+   * ELCHI TOMONIDAGI tumanlar ro'yxati — qo'lda moslash uchun.
+   *
+   * ⚠️ NEGA KERAK BO'LDI. Qo'lda moslash backendi bor edi, lekin operator
+   * Elchi tumanining UUID'ini QAYERDAN olishini hech kim aytmagan. Ro'yxat
+   * bo'lmasa UI'da xom UUID yozish qoladi — bu amalda ishlamaydi va shu
+   * sababdan frontend umuman yozilmagan edi.
+   *
+   * Faqat o'qish: Elchi'ning ommaviy `GET /partner/districts` yo'liga
+   * murojaat qiladi va hech narsani saqlamaydi.
+   */
+  async listRemoteDistricts(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      region_id: string;
+      sato_code: string | null;
+    }>
+  > {
+    const rows = await this.api.getDistricts();
+    return rows.map((d) => ({
+      id: String(d.id),
+      name: String(d.name ?? ''),
+      region_id: String(d.region_id ?? ''),
+      sato_code: d.sato_code != null ? String(d.sato_code) : null,
+    }));
+  }
+
   async listDistrictMap(): Promise<ElchiDistrictMapEntity[]> {
     return this.mapRepo.find({
       relations: ['district'],
@@ -586,7 +618,11 @@ export class ElchiConfigService {
       }
 
       // Qo'lda moslangan qatorga TEGMAYMIZ.
-      if (existing && !existing.matched_automatically && existing.elchi_district_id) {
+      if (
+        existing &&
+        !existing.matched_automatically &&
+        existing.elchi_district_id
+      ) {
         result.kept_manual += 1;
         continue;
       }
@@ -733,12 +769,16 @@ export class ElchiConfigService {
    */
   async provisionMarket(
     user?: JwtPayload,
-  ): Promise<{ elchi_market_id: string; tariff_home: number; tariff_center: number }> {
+  ): Promise<{
+    elchi_market_id: string;
+    tariff_home: number;
+    tariff_center: number;
+  }> {
     const config = await this.getOrCreate();
 
     if (!config.api_base_url || !config.api_key) {
       throw new BadRequestException(
-        "Avval Elchi manzili va API kalitini kiriting",
+        'Avval Elchi manzili va API kalitini kiriting',
       );
     }
     if (!config.elchi_courier_user_id) {
@@ -1027,7 +1067,10 @@ export class ElchiConfigService {
   /** Dispatch uchun Elchi hudud id'lari (moslama bo'lmasa `null`). */
   async resolveElchiGeo(
     districtId: string,
-  ): Promise<{ elchi_district_id: string; elchi_region_id: string | null } | null> {
+  ): Promise<{
+    elchi_district_id: string;
+    elchi_region_id: string | null;
+  } | null> {
     const row = await this.mapRepo.findOne({
       where: { district_id: districtId, is_enabled: true },
     });

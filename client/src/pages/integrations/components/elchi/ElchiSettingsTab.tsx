@@ -68,7 +68,25 @@ export const ElchiSettingsTab = () => {
     setDistrictGate,
     regions: regionsQuery,
     setRegionGate,
+    setDistrictMapping,
+    provisionMarket,
+    remoteDistricts,
   } = useElchiConfig();
+
+  /**
+   * QO'LDA MOSLASH OYNASI.
+   *
+   * ⚠️ NEGA KERAK. Avtomatik moslash SOATO bo'yicha ishlaydi. Elchi tomonda
+   * haqiqiy SOATO bo'lmasa (o'rinbosar kod yozilgan bo'lsa) moslash
+   * topilmaydi va o'sha tumandagi buyurtmalar JO'NATILMAYDI. Backend
+   * endpointi bor edi, lekin UI yo'q edi — ya'ni operator bu holatni
+   * tuzata olmasdi va har safar dasturchi kerak bo'lardi.
+   */
+  const [mapRow, setMapRow] = useState<{
+    district_id: string;
+    name: string;
+  } | null>(null);
+  const [mapChoice, setMapChoice] = useState<string | undefined>();
 
   const { getCourier } = useCourier();
   const { data: couriersData } = getCourier(true);
@@ -103,7 +121,7 @@ export const ElchiSettingsTab = () => {
     (c) => !c.external_provider || c.external_provider === "elchi",
   );
   const linkedCourier = config?.elchi_courier_user_id
-    ? allCouriers.find((c) => c.id === config.elchi_courier_user_id) ?? null
+    ? (allCouriers.find((c) => c.id === config.elchi_courier_user_id) ?? null)
     : null;
 
   /**
@@ -136,7 +154,8 @@ export const ElchiSettingsTab = () => {
     const cleaned: UpdateElchiConfigDto = { ...values };
     if (!cleaned.api_key) delete cleaned.api_key;
     if (!cleaned.webhook_secret) delete cleaned.webhook_secret;
-    if (!cleaned.webhook_secret_previous) delete cleaned.webhook_secret_previous;
+    if (!cleaned.webhook_secret_previous)
+      delete cleaned.webhook_secret_previous;
 
     try {
       await updateConfig.mutateAsync(cleaned);
@@ -205,7 +224,60 @@ export const ElchiSettingsTab = () => {
       });
     } catch (err) {
       const e = err as { response?: { data?: { message?: string } } };
-      message.error(e.response?.data?.message ?? "Darvozani o'zgartirib bo'lmadi");
+      message.error(
+        e.response?.data?.message ?? "Darvozani o'zgartirib bo'lmadi",
+      );
+    }
+  };
+
+  /** Moslash oynasini ochadi va Elchi tumanlarini BIR MARTA yuklaydi. */
+  const openMapping = (row: ElchiDistrictMapRow) => {
+    setMapRow({
+      district_id: row.district_id,
+      name: row.district?.name ?? row.district_id,
+    });
+    setMapChoice(row.elchi_district_id ?? undefined);
+    // `enabled: false` bo'lgani uchun so'rov faqat shu yerda boshlanadi.
+    if (!remoteDistricts.data) void remoteDistricts.refetch();
+  };
+
+  const submitMapping = async () => {
+    if (!mapRow || !mapChoice) return;
+    const chosen = (remoteDistricts.data ?? []).find((d) => d.id === mapChoice);
+    try {
+      await setDistrictMapping.mutateAsync({
+        districtId: mapRow.district_id,
+        elchi_district_id: mapChoice,
+        elchi_region_id: chosen?.region_id ?? null,
+      });
+      /**
+       * ⚠️ MOSLASH DARVOZANI OCHMAYDI — bu ataylab. Operator jo'natishga
+       * ruxsatni ALOHIDA beradi, aks holda moslash bilvosita darvozani
+       * ochib yuborgan bo'lardi.
+       */
+      message.success(
+        "Moslandi. Jo'natish uchun darvozani ALOHIDA yoqish kerak.",
+      );
+      setMapRow(null);
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } } };
+      message.error(e.response?.data?.message ?? "Moslab bo'lmadi");
+    }
+  };
+
+  /**
+   * ELCHI'DA MARKET AKKAUNTINI OCHISH.
+   *
+   * Busiz posilka yaratib bo'lmaydi — `elchi_market_id` qattiq darvoza.
+   * Idempotent, shu bois qayta bosish xavfsiz.
+   */
+  const handleProvisionMarket = async () => {
+    try {
+      await provisionMarket.mutateAsync();
+      message.success("Market akkaunti tayyor");
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string } } };
+      message.error(e.response?.data?.message ?? "Market ochib bo'lmadi");
     }
   };
 
@@ -217,10 +289,7 @@ export const ElchiSettingsTab = () => {
    * tuman butun viloyat pochtasini to'sadi — "ochdim" deb o'ylab qolib,
    * jo'natishda blokka urilish eng yomon stsenariy.
    */
-  const handleRegionGate = async (
-    row: ElchiRegionGateRow,
-    next: boolean,
-  ) => {
+  const handleRegionGate = async (row: ElchiRegionGateRow, next: boolean) => {
     try {
       const res = await setRegionGate.mutateAsync({
         regionId: row.region_id,
@@ -441,9 +510,9 @@ export const ElchiSettingsTab = () => {
         )}
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           ⚠️ Kuryer tarifi Elchi tomonidagi BeePost market tarifi bilan{" "}
-          <b>teng</b> bo'lishi shart. Aks holda PCS bir summani, Elchi boshqasini
-          ushlab qoladi va ikki daftar ajraladi. Tenglikni "Umumiy holat" ekrani
-          avtomatik tekshiradi.
+          <b>teng</b> bo'lishi shart. Aks holda PCS bir summani, Elchi
+          boshqasini ushlab qoladi va ikki daftar ajraladi. Tenglikni "Umumiy
+          holat" ekrani avtomatik tekshiradi.
         </p>
       </Card>
 
@@ -488,8 +557,8 @@ export const ElchiSettingsTab = () => {
               width: 190,
               render: (_: unknown, r) => (
                 <span className="text-xs">
-                  <b>{r.enabled}</b> ochiq / {r.mapped} moslangan /{" "}
-                  {r.total} jami
+                  <b>{r.enabled}</b> ochiq / {r.mapped} moslangan / {r.total}{" "}
+                  jami
                 </span>
               ),
             },
@@ -578,6 +647,20 @@ export const ElchiSettingsTab = () => {
             >
               SOATO bo'yicha moslash
             </Button>
+            {/*
+              ⚠️ MARKET AKKAUNTI — QATTIQ DARVOZA. Elchi'da BeePost market
+              yozuvi bo'lmasa `elchi_market_id` yo'q va posilka UMUMAN
+              yaratilmaydi. Backend endpointi bor edi, tugma yo'q edi.
+              Idempotent: qayta bosish mavjudini qaytaradi.
+            */}
+            <Tooltip title="Elchi'da BeePost market akkaunti. Busiz posilka yaratilmaydi. Qayta bosish xavfsiz.">
+              <Button
+                loading={provisionMarket.isPending}
+                onClick={handleProvisionMarket}
+              >
+                Market akkaunti
+              </Button>
+            </Tooltip>
           </div>
         }
       >
@@ -623,6 +706,15 @@ export const ElchiSettingsTab = () => {
                 ),
             },
             {
+              title: "Moslash",
+              width: 110,
+              render: (_: unknown, r) => (
+                <Button size="small" onClick={() => openMapping(r)}>
+                  {r.elchi_district_id ? "o'zgartirish" : "qo'lda"}
+                </Button>
+              ),
+            },
+            {
               title: "Darvoza",
               dataIndex: "is_enabled",
               width: 120,
@@ -647,6 +739,59 @@ export const ElchiSettingsTab = () => {
           ]}
         />
       </Card>
+
+      {/* ═══════ QO'LDA MOSLASH OYNASI ═══════ */}
+      <Modal
+        open={Boolean(mapRow)}
+        title={`Qo'lda moslash — ${mapRow?.name ?? ""}`}
+        onCancel={() => setMapRow(null)}
+        onOk={submitMapping}
+        okText="Moslash"
+        cancelText="Bekor qilish"
+        okButtonProps={{
+          disabled: !mapChoice,
+          loading: setDistrictMapping.isPending,
+        }}
+        destroyOnClose
+      >
+        <Alert
+          className="mb-3"
+          type="info"
+          showIcon
+          message="Moslash DARVOZANI OCHMAYDI"
+          description="Bu texnik bog'lanish. Jo'natishga ruxsat alohida, jadvaldagi darvoza kaliti bilan beriladi — aks holda moslash bilvosita darvozani ochib yuborgan bo'lardi."
+        />
+        <Select
+          className="w-full"
+          showSearch
+          placeholder="Elchi tumanini tanlang"
+          loading={remoteDistricts.isFetching}
+          value={mapChoice}
+          onChange={setMapChoice}
+          /**
+           * Nom VA SOATO bo'yicha qidiriladi: bir nom ikki xil yozilishi
+           * mumkin ("Oqoltin" / "Akaltyn"), SOATO esa aniq ajratadi.
+           */
+          filterOption={(input, option) =>
+            String(option?.label ?? "")
+              .toLowerCase()
+              .includes(input.toLowerCase())
+          }
+          options={(remoteDistricts.data ?? []).map((d) => ({
+            value: d.id,
+            label: `${d.name}${d.sato_code ? ` · ${d.sato_code}` : ""}`,
+          }))}
+        />
+        {remoteDistricts.isError && (
+          <Alert
+            className="mt-3"
+            type="error"
+            showIcon
+            message="Elchi tumanlarini olib bo'lmadi"
+            description="Ulanish sozlamalari to'g'ri va Elchi API ishlayotganini tekshiring."
+          />
+        )}
+      </Modal>
 
       <Modal
         open={bindOpen}

@@ -59,3 +59,19 @@ export function getUzbekistanDayRange(): { start: number; end: number } {
 
   return { start, end };
 }
+
+/**
+ * UTC timestamp (ms) dan O'ZBEKISTON bo'yicha `YYYY-MM-DD` sana qaytaradi.
+ *
+ * `toUzbekistanTimestamp` ning TESKARISI.
+ *
+ * ⚠️ NEGA KERAK. `cashbox_history.payment_date` — `date` ustuni, ya'ni faqat
+ * KUN saqlaydi. Uni `new Date(ms).toISOString()` bilan to'ldirish UTC kunini
+ * beradi va O'zbekistonda soat 00:00–05:00 orasida bo'lgan har bir amal
+ * OLDINGI KUNGA yozilib qoladi (UTC+5). Kechki sotuvlar kunlik hisobotda
+ * "kechagi" bo'lib ko'rinadi.
+ */
+export function toUzbekistanDateString(epochMs: number): string {
+  const uz = new Date(epochMs + UZB_OFFSET_MS);
+  return `${uz.getUTCFullYear()}-${pad(uz.getUTCMonth() + 1)}-${pad(uz.getUTCDate())}`;
+}

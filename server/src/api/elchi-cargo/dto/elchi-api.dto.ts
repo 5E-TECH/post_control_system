@@ -80,6 +80,27 @@ export interface ElchiCreateShipmentRequest {
   }>;
   cod_amount: number;
   subtotal?: number;
+  /**
+   * BIZNING jismoniy yorliqdagi QR token (`order.qr_code_token`).
+   *
+   * Elchi uni buyurtmaning `qr_code_token` i sifatida saqlaydi — ya'ni
+   * BIZNING yorlig'imiz ULARNING skanerida ishlaydi. Yuborilmasa Elchi o'z
+   * tasodifiy tokenini yaratadi va ularning "Kiruvchi buyurtmalar" ekranida
+   * qopdagi yorliq skanerlanmaydi ("topilmadi").
+   *
+   * Elchi tomonda noyoblik tekshiriladi: band bo'lsa 409.
+   */
+  label_token?: string;
+  /**
+   * QOP (batch) — bitta pochtada ketayotgan posilkalar guruhi.
+   *
+   * Elchi kiruvchi ekranida guruhlash uchun, va eng muhimi: operator QOP
+   * ustidagi umumiy yorliqni skanerlaganda butun qop qabul qilinadi.
+   * Busiz u 12 posilkani bittalab skanerlashga majbur bo'lardi.
+   */
+  batch_ref?: string;
+  batch_label_token?: string;
+  batch_size?: number;
 }
 
 export interface ElchiCreateShipmentResponse {
@@ -113,6 +134,21 @@ export interface ElchiShipmentStatusResponse {
    * (settlement) uchun ishlatiladi, pul solishtiruvi uchun EMAS.
    */
   cod_collected?: number;
+  /**
+   * HAQIQIY yig'ilgan naqd — kuryer mijozdan olgan pul (sotuv snapshoti).
+   *
+   * ⚠️ Yuqoridagi `cod_collected` NING O'RNINI BOSADI. U nomi yolg'on
+   * bo'lgani uchun panelda uch xato ko'rsatkich chiqargan (audit M2).
+   *
+   * ⚠️ `0` HAQIQIY QIYMAT: mijoz onlayn to'lagan bo'lsa kuryer naqd
+   * yig'maydi. `null` esa "hali sotilmagan / Elchi yubormagan" degani —
+   * ikkisini aralashtirmaslik kerak.
+   */
+  collected_from_customer?: number | null;
+  /** Elchi ushlab qolgan tarif (sotuv snapshoti). */
+  elchi_fee?: number | null;
+  /** Elchi bizga qarzi: `collected_from_customer - elchi_fee`. */
+  market_amount?: number | null;
   /**
    * Elchi tomonidagi buyurtma narxi. Biz yuborgan `cod_amount_sent` bilan
    * teng bo'lishi SHART — farq bo'lsa kimdir Elchi tomonda narxni o'zgartirgan.
