@@ -102,7 +102,7 @@
     "exportSuccess": "Excel file downloaded successfully",
     "exportError": "Failed to export Excel file",
     "shiftOpened": "Shift opened successfully!",
-    "shiftClosed": "Shift closed and report downloaded!"
+    "shiftClosed": "Shift closed!"
   },
   "shiftStatus": {
     "open": "Shift is open",

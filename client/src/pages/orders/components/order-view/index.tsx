@@ -9,7 +9,7 @@ import type { RootState } from "../../../../app/store";
 import { exportToExcel } from "../../../../shared/helpers/export-download-excel";
 import { resetDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
-import { BASE_URL } from "../../../../shared/const";
+import { api } from "../../../../shared/api";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import ReplacementBadge from "../../../../shared/components/replacement-badge";
 import {
@@ -101,19 +101,6 @@ const statusLabels: Record<string, string> = {
   partly_paid: "Qisman to'langan",
   "cancelled (sent)": "Bekorlangan jo'natma",
   closed: "Yopilgan",
-};
-
-// Helper function to build query string with proper array handling
-const buildQueryString = (filters: Record<string, any>): string => {
-  const params = new URLSearchParams();
-  Object.entries(filters).forEach(([key, value]) => {
-    if (Array.isArray(value)) {
-      value.forEach((v) => params.append(key, v));
-    } else if (value !== null && value !== undefined) {
-      params.append(key, value);
-    }
-  });
-  return params.toString();
 };
 
 // Format price with spaces
@@ -368,58 +355,37 @@ const OrderView = () => {
       try {
         const isFiltered = Object.keys(cleanedFilters).length > 0;
 
-        let url = `${BASE_URL}order`;
-        if (user?.role === "market" || user?.role === "operator") {
-          url = `${BASE_URL}order/market/all/my-orders`;
-        } else if (user?.role === "courier") {
-          url = `${BASE_URL}order/courier/orders`;
-        }
-
-        const response = await fetch(
-          `${url}?page=1&fetchAll=true&${buildQueryString(cleanedFilters)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
-            },
-          }
-        );
-
         /**
-         * ⚠️ `response.ok` NI TEKSHIRISH SHART.
+         * ⚠️ XOM `fetch` EMAS, AXIOS.
          *
-         * Avval bu tekshiruv yo'q edi. Backend xatosi (`catchError` →
-         * `HttpException`) JSON tanasi bilan keladi: `{message, error}`.
-         * U `JSON.parse` dan muammosiz o'tadi, lekin ichida `data.data`
-         * BO'LMAYDI. Natijada quyidagi zanjir ishga tushardi:
+         * Avval bu yerda xom `fetch` turardi va u `shared/api/index.ts`
+         * dagi interceptordan CHETLAB o'tardi. Oqibati:
+         *   · 401 da avtomatik `user/refresh` + qayta urinish ishlamasdi —
+         *     sahifaning qolgan qismi (axios orqali) ishlayverar, faqat
+         *     Excel tugmasi jimgina yiqilardi. «Goh ishlaydi, goh yo'q»
+         *     shikoyatining sababi shu.
+         *   · `X-Device-Id` va `withCredentials` ham yuborilmasdi, ya'ni
+         *     audit jurnalida bu so'rov qurilmasiz ko'rinardi.
          *
-         *   data?.data?.data  -> undefined
-         *   ?.filter(...)     -> undefined
-         *   exportData || []  -> []
-         *   exportToExcel([]) -> JIMGINA qaytadi (helper:6)
-         *   handleSuccess(...) -> «muvaffaqiyatli export qilindi»
+         * Axios xato statusida THROW qiladi, shuning uchun alohida
+         * `response.ok` tekshiruvi endi KERAK EMAS — pastdagi `catch`
+         * server xabarini o'zi ko'rsatadi.
          *
-         * Ya'ni 401/403/500 ning hammasi foydalanuvchiga YASHIL XABAR
-         * bo'lib ko'rinardi, fayl esa hech qachon yuklanmasdi.
+         * `paramsSerializer: { indexes: null }` api instansiyasida
+         * o'rnatilgan, ya'ni massiv filtri `status=sold&status=paid`
+         * bo'lib ketadi (`status[0]=` emas) — backend aynan shuni kutadi.
          */
-        if (!response.ok) {
-          let serverMsg = `Server ${response.status} qaytardi`;
-          try {
-            const body = JSON.parse(await response.text());
-            if (typeof body?.message === "string") serverMsg = body.message;
-          } catch {
-            /* tana JSON emas — statusning o'zi yetarli */
-          }
-          throw new Error(serverMsg);
+        let path = "order";
+        if (user?.role === "market" || user?.role === "operator") {
+          path = "order/market/all/my-orders";
+        } else if (user?.role === "courier") {
+          path = "order/courier/orders";
         }
 
-        const rawText = await response.text();
-
-        let data;
-        try {
-          data = JSON.parse(rawText);
-        } catch {
-          throw new Error("Backend JSON emas, HTML qaytaryapti!");
-        }
+        const res = await api.get(path, {
+          params: { page: 1, fetchAll: true, ...cleanedFilters },
+        });
+        const data = res.data;
 
         const rows = data?.data?.data;
         if (!Array.isArray(rows)) {
@@ -444,7 +410,11 @@ const OrderView = () => {
           Tuman: order?.district?.name || order?.customer?.district?.name,
           Firma: order?.market?.name,
           Mahsulot: order?.items
-            ?.map((item: any) => item.product.name)
+            // ⚠️ `item.product?.name` — mahsulot o'chirilgan bo'lsa join
+            // `null` qaytaradi va himoyasiz `.name` BUTUN eksportni
+            // yiqitardi (bitta buzuq qator 311 qatorni yo'q qilardi).
+            ?.map((item: any) => item.product?.name)
+            ?.filter(Boolean)
             ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
           Narxi: Number((order?.total_price ?? 0) / 1000),

@@ -3,7 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useCashBox } from "../../../../shared/api/hooks/useCashbox";
 import { Select, DatePicker, message } from "antd";
 import TextArea from "antd/es/input/TextArea";
-import { BASE_URL } from "../../../../shared/const";
+import {
+  blobErrorMessage,
+  downloadFile,
+} from "../../../../shared/helpers/download-file";
 import { CashboxCard } from "../../components/CashCard";
 import { CashboxHistory } from "../../components/paymentHistory";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
@@ -82,27 +85,13 @@ const CashDetail = () => {
     try {
       setIsExporting(true);
 
-      const exportParams = new URLSearchParams();
-      if (form.from) exportParams.append("fromDate", form.from);
-      if (form.to) exportParams.append("toDate", form.to);
+      const params: Record<string, unknown> = {};
+      if (form.from) params.fromDate = form.from;
+      if (form.to) params.toDate = form.to;
       if (historyTab === "payments") {
-        exportParams.append("sourceTypes", "courier_payment,market_payment");
+        params.sourceTypes = "courier_payment,market_payment";
       }
 
-      const response = await fetch(
-        `${BASE_URL}cashbox/user/${id}/export?${exportParams.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error("Export failed");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
       const userName = data?.data?.cashbox?.user?.name || "kassa";
       const periodPart =
         form.from && form.to
@@ -110,16 +99,23 @@ const CashDetail = () => {
             ? form.from
             : `${form.from}-${form.to}`
           : "umumiy";
-      a.href = url;
-      a.download = `kassa-${userName}-${periodPart}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+
+      // ⚠️ Xom `fetch` emas — axios. 401 da avtomatik refresh ishlaydi.
+      await downloadFile(
+        `cashbox/user/${id}/export`,
+        Object.keys(params).length ? params : undefined,
+        `kassa-${userName}-${periodPart}.xlsx`,
+      );
 
       message.success(t("messages.exportSuccess") || "Excel fayl yuklandi!");
     } catch (error) {
-      message.error(t("messages.exportError") || "Excel yuklab olishda xatolik!");
+      // ⚠️ Blob javobida server xabari faqat matnga o'girgandan keyin o'qiladi.
+      message.error(
+        await blobErrorMessage(
+          error,
+          t("messages.exportError") || "Excel yuklab olishda xatolik!",
+        ),
+      );
     } finally {
       setIsExporting(false);
     }
