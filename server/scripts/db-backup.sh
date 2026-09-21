@@ -65,6 +65,21 @@ SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
 echo "✅ Lokal backup tayyor: $BACKUP_FILE ($SIZE)"
 
 # ----- 2. S3 ga yuklash (agar sozlangan bo'lsa) -----
+#
+# ⚠️  BU BLOK DEPLOY'NI TO'XTATADI. `set -e` + quyidagi `exit 1` tufayli
+#     S3 yuklash muvaffaqiyatsiz bo'lsa, CI/CD deploy'i SHU YERDA yiqiladi —
+#     migratsiyaga ham, app restartiga ham yetib bormaydi. Bu ATAYLAB:
+#     zaxirasiz migratsiya qilishdan ko'ra deploy'ni to'xtatgan afzal.
+#
+#     Lekin real nosozlik odatda bazada emas, AWS tomonida bo'ladi:
+#       InvalidAccessKeyId / InvalidClientTokenId  -> kalit o'chirilgan yoki
+#       hisob to'lanmagan. Tekshirish: `aws sts get-caller-identity`
+#       (`ubuntu` foydalanuvchisi ostida, sudo'SIZ — sudo /root/.aws/ ni o'qiydi).
+#
+#     Shoshilinch chiqish yo'li: `.env` da `S3_BACKUP_BUCKET` ni izohga oling.
+#     Skript quyidagi `else` shoxiga tushadi, lokal backup baribir olinadi
+#     (server/backups/, oxirgi 3 tasi) va deploy davom etadi. AWS tuzalgach
+#     qatorni qaytaring — lokal nusxa disk to'lishidan himoya qilmaydi.
 if [[ -n "${S3_BACKUP_BUCKET:-}" ]]; then
   if ! command -v aws >/dev/null 2>&1; then
     echo "❌ aws CLI topilmadi, S3 yuklash o'tkazib yuborildi. Lokal nusxa saqlangan." >&2
