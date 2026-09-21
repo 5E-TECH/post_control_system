@@ -287,6 +287,20 @@ const MainDetail = () => {
     });
   };
 
+  /**
+   * Smena hisobotini yuklab olish.
+   *
+   * ⚠️ `cashbox/main/export` DAN FARQLI: u asosiy kassa tarixini beradi,
+   * bu esa smenaning ochilish/yopilish balanslari va rekonsiliatsiyasini.
+   * shiftId yuborilmaydi — server oxirgi YOPILGAN smenani qaytaradi.
+   */
+  const downloadShiftReport = () =>
+    downloadFile(
+      "cashbox/shift/export",
+      undefined,
+      `smena-hisobot-${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+
   // Smena yopish va avtomatik Excel yuklash
   const handleCloseShift = async () => {
     setIsClosingShift(true);
@@ -326,23 +340,38 @@ const MainDetail = () => {
 
     // ── 2-qadam: hisobot (ixtiyoriy — yiqilsa smena baribir yopiq) ───
     try {
-      await downloadFile(
-        "cashbox/shift/export",
-        undefined,
-        `smena-hisobot-${new Date().toISOString().split("T")[0]}.xlsx`,
-      );
+      await downloadShiftReport();
     } catch (error) {
       /**
        * ⚠️ Bu yerda `handleApiError` EMAS — smena muvaffaqiyatli yopilgan,
-       * qizil «xatolik» chalg'itardi. Hisobotni keyin ham olish mumkin:
-       * `cashbox/shift/export` shiftId'siz oxirgi YOPILGAN smenani beradi.
+       * qizil «xatolik» chalg'itardi.
+       *
+       * ⚠️ «Excel» tugmasiga YO'NALTIRMAYMIZ: sahifadagi o'sha tugma
+       * `cashbox/main/export` ni chaqiradi — bu asosiy kassa TARIXI,
+       * smena hisoboti EMAS. Uning o'rniga shu yerda haqiqiy qayta
+       * urinish beriladi.
+       *
+       * Qayta urinish ishlaydi, chunki `cashbox/shift/export` shiftId'siz
+       * oxirgi YOPILGAN smenani qaytaradi — ya'ni hozirgina yopilganini.
+       * ⚠️ Lekin YANGI smena yopilgandan keyin bu yo'l eskisiga emas,
+       * yangisiga tegadi. Shuning uchun qayta urinish HOZIR taklif etiladi.
        */
-      message.warning(
-        `Smena yopildi, lekin hisobot yuklanmadi: ${await blobErrorMessage(
-          error,
-          "noma'lum xato",
-        )}. Hisobotni «Excel» tugmasi bilan qayta yuklab olishingiz mumkin.`,
-      );
+      const reason = await blobErrorMessage(error, "noma'lum xato");
+      Modal.warning({
+        title: "Smena yopildi, lekin hisobot yuklanmadi",
+        content: `Sabab: ${reason}. Smena muvaffaqiyatli yopilgan — hisobotni hoziroq qayta yuklab olishingiz mumkin.`,
+        okText: "Qayta urinish",
+        onOk: async () => {
+          try {
+            await downloadShiftReport();
+            message.success("Hisobot yuklandi");
+          } catch (e) {
+            message.error(
+              await blobErrorMessage(e, "Hisobotni yuklab bo'lmadi"),
+            );
+          }
+        },
+      });
     } finally {
       setIsClosingShift(false);
     }

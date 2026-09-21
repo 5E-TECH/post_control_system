@@ -2256,7 +2256,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
          */
         .leftJoinAndSelect('order.market', 'market')
         .leftJoinAndSelect('order.post', 'post')
-        .leftJoinAndSelect('post.courier', 'courier')
+        /**
+         * ⚠️ `leftJoin` + `addSelect`, `leftJoinAndSelect` EMAS.
+         *
+         * To'liq select kuryerning BUTUN yozuvini market va operatorga
+         * ochib qo'yardi: tarif, komissiya, telefon, `telegram_id`,
+         * `ai_balance`. Eksportga esa faqat ISM kerak
+         * (`order.post.courier.name`). `fetchAll=5000` da bu minglab
+         * ortiqcha maydon degani.
+         */
+        .leftJoin('post.courier', 'courier')
+        .addSelect(['courier.id', 'courier.name'])
         .leftJoinAndSelect('orderDistrict.assignedToRegion', 'orderAssignedRegion')
         .leftJoinAndSelect('district.assignedToRegion', 'customerAssignedRegion')
         .where('order.user_id = :userId', { userId: effectiveUserId })
@@ -2445,6 +2455,21 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
         .leftJoinAndSelect('customer.district', 'district')
         // Almashtirish: kuryer modalida "eski #X mahsulotini ol" deb ko'rsatish
+        /**
+         * ⚠️ EKSPORT UCHUN. Klient «Viloyat» ustunini
+         * `district.assignedToRegion.name` dan, «Kuryer» ustunini
+         * `post.courier.name` dan oladi. Bu join'lar bo'lmasa kuryer
+         * yuklagan faylda o'sha ikki ustun bo'sh chiqardi — market
+         * yo'lida tuzatilgan, kuryer yo'lida qolib ketgan edi.
+         *
+         * Kuryer maydonlari CHEKLANGAN (faqat id + ism) — market
+         * yo'lidagi bilan bir xil sabab.
+         */
+        .leftJoinAndSelect('o.post', 'post')
+        .leftJoin('post.courier', 'courier')
+        .addSelect(['courier.id', 'courier.name'])
+        .leftJoinAndSelect('orderDistrict.assignedToRegion', 'orderAssignedRegion')
+        .leftJoinAndSelect('district.assignedToRegion', 'customerAssignedRegion')
         .leftJoinAndSelect('o.replacementOf', 'replacementOf')
         .where('o.post_id IN (:...postIds)', { postIds: allPostIds })
         .orderBy('o.created_at', 'DESC')

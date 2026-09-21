@@ -203,9 +203,21 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
       request_timeout_ms: cfg.request_timeout_ms,
       settlement_period_days: cfg.settlement_period_days,
     });
-    // ⚠️ Sekret hech qachon oldindan to'ldirilmaydi — server uni qaytarmaydi.
+  }, [cfg, connForm]);
+
+  /**
+   * Sekret maydoni BOSHQA ULANISHGA o'tilgandagina tozalanadi.
+   *
+   * ⚠️ Bog'liqlik `cfg` EMAS, `slug`. `cfg` ga bog'lansa, admin kalitni
+   * yozayotganda har qanday `detail` yangilanishi (Saqlash, master
+   * toggle, «Yangilash» tugmasi) yozilgan kalitni JIMGINA o'chirib
+   * yuborardi — ekranda esa yashil «Saqlandi» turardi.
+   *
+   * Sekret hech qachon oldindan to'ldirilmaydi: server uni qaytarmaydi.
+   */
+  useEffect(() => {
     secretForm.setFieldsValue({ api_key: undefined });
-  }, [cfg, connForm, secretForm]);
+  }, [slug, secretForm]);
 
   if (!slug) {
     return (

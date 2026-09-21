@@ -130,17 +130,17 @@ jobs:
             #
             # ⚠️ QURISH VA NASHR ATAYLAB AJRATILDI.
             #
-            # Avval frontend shu yerda darhol `/var/www/html/` ga ko'chirilardi —
-            # ya'ni backend bosqichidan OLDIN. Backend bosqichida esa `exit 1`
+            # Avval frontend shu yerda darhol /var/www/html/ ga ko'chirilardi —
+            # ya'ni backend bosqichidan OLDIN. Backend bosqichida esa exit 1
             # qiladigan beshta qadam bor: db:backup (S3 kalitiga ham bog'liq),
             # migration, kassa invarianti, investor daftari, qo'shimcha xarajat
             # rekonsiliatsiyasi. Ulardan biri yiqilsa deploy to'xtardi, LEKIN
             # prodda allaqachon YANGI SPA + ESKI API qolardi.
             #
             # Aynan shunday holat 2026-09-21 da yuz berdi: S3 kaliti yaroqsiz
-            # bo'lgani uchun deploy `db:backup` da yiqildi.
+            # bo'lgani uchun deploy db:backup da yiqildi.
             #
-            # Endi bu yerda faqat `dist/` yig'iladi. Nashr backend migratsiya
+            # Endi bu yerda faqat dist/ yig'iladi. Nashr backend migratsiya
             # va restartdan KEYIN, pastda bo'ladi.
             if [[ '$CHANGED_DIRS' == *'client'* ]]; then
               echo '📁 Building frontend (hozircha faqat quriladi)...'
@@ -149,6 +149,9 @@ jobs:
               npm ci --prefer-offline --legacy-peer-deps
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
               cd ..
+              # Qurilgan dist QAYSI commitdan ekanini belgilab qo'yamiz.
+              # Nashr qarori shu shtampga qarab qabul qilinadi (pastga qarang).
+              git rev-parse HEAD > client/dist/.deployed-sha
               echo '📦 Frontend qurildi — nashr backenddan keyin.'
             fi
 
@@ -210,16 +213,19 @@ jobs:
               fi
 
               # ----- 🎬 ffmpeg (video isbotni siqish) — YUMSHOQ tekshiruv -----
-              # ⚠️ ATAYLAB `exit 1` EMAS. ffmpeg yo'qligi ma'lumot yo'qotmaydi:
+              # ⚠️ ATAYLAB exit 1 EMAS. ffmpeg yo'qligi ma'lumot yo'qotmaydi:
               # video shunchaki ASL (10-15 barobar katta) hajmda saqlanadi va
               # tizim ishlayveradi. Deploy'ni to'xtatish nomutanosib javob
               # bo'lardi — lekin bu jimgina o'tib ketmasligi ham kerak,
               # chunki disk sezilarli tez to'ladi.
               if command -v ffmpeg >/dev/null 2>&1; then
-                # ⚠️ BUYRUQ TO'G'RIDAN-TO'G'RI ishlatiladi, `$(...)` EMAS.
-                # Butun ssh bloki qo'sh tirnoq ichida va tirnoqlar ichma-ich
-                # joylashgan — `$(...)` bu yerda GitHub runner'ida bajarilib,
-                # SERVERNING emas, runner'ning versiyasini chop etardi.
+                # ⚠️ BUYRUQ TO'G'RIDAN-TO'G'RI ishlatiladi, buyruq
+                # almashtirish (dollar + qavs) EMAS. Butun ssh bloki qo'sh
+                # tirnoq ichida — u yerda buyruq almashtirish GitHub
+                # runner'ida bajarilib, SERVERNING emas, runner'ning
+                # versiyasini chop etardi. Shu sabab izohlarda ham
+                # dollar-qavs va backtick ISHLATILMAYDI: ular izoh ichida
+                # bo'lsa ham runner tomonidan bajariladi.
                 echo '🎬 ffmpeg:'
                 ffmpeg -version 2>/dev/null | head -1
               else
@@ -251,27 +257,44 @@ jobs:
             # to'liq o'tgan bo'lishi SHART: backup olingan, migratsiya
             # qo'llangan, kassa/investor/xarajat invariantlari toza va
             # servis ko'tarilgan. Yuqoridagilardan biri yiqilsa skript
-            # `set -e` bilan shu yergacha YETIB KELMAYDI va prodda eski,
+            # set -e bilan shu yergacha YETIB KELMAYDI va prodda eski,
             # ISHLAYDIGAN frontend qoladi.
             #
             # Tartib «backend avval, frontend keyin»: qisqa vaqt eski SPA
             # yangi API bilan ishlaydi (API orqaga mos bo'lishi kerak —
             # odatdagi talab), teskarisi esa — yangi SPA eski API bilan —
             # darhol 404/422 beradi.
-            if [[ '$CHANGED_DIRS' == *'client'* ]]; then
-              # ⚠️ `$(...)` ATAYLAB ISHLATILMAYDI. Butun ssh blok qo'sh
-              # tirnoq ichida, ya'ni `$(...)` GitHub runner'ida, serverda
-              # EMAS bajarilardi — runner'da esa `client/dist` qurilmagan
-              # va tekshiruv har doim yiqilardi. `[[ -f ... ]]` da `$` yo'q,
-              # shuning uchun u serverda bajariladi.
-              if [[ ! -f client/dist/index.html ]]; then
-                echo '❌ client/dist/index.html topilmadi — frontend qurilmagan, nashr qilinmaydi.'
-                exit 1
-              fi
+            #
+            # ⚠️ SHART CHANGED_DIRS EMAS, SHTAMP.
+            #
+            # Agar bu blok CHANGED_DIRS ga bog'langan bo'lsa, quyidagi
+            # ssenariy frontendni ABADIY eski holda qoldirardi:
+            #   push #1 (client+server) -> client quriladi -> backend
+            #     bosqichi yiqiladi -> nashr bo'lmaydi (to'g'ri)
+            #   push #2 (faqat server tuzatishi) -> CHANGED_DIRS='server'
+            #     -> nashr bloki O'TKAZIB YUBORILADI -> deploy YASHIL,
+            #     lekin /var/www/html da push #1 dan OLDINGI SPA qoladi
+            #     va u hech qachon o'z-o'zidan yangilanmaydi.
+            #
+            # Shuning uchun qaror 'shu push'da nima o'zgardi' dan emas,
+            # 'serverda haqiqatan nima nashr qilingan' dan chiqariladi:
+            # qurilgan dist dagi commit shtampi nashr qilingani bilan
+            # solishtiriladi. Push #2 da dist hali push #1 shtampi bilan
+            # turadi (u gitignore'da, git reset --hard uni o'chirmaydi),
+            # shtamplar farq qiladi va nashr BAJARILADI.
+            #
+            # cmp va [[ ]] da $ yo'q — ikkalasi ham serverda bajariladi.
+            if [[ -f client/dist/index.html ]] && ! sudo cmp -s client/dist/.deployed-sha /var/www/html/.deployed-sha; then
               echo '🚀 Frontend nashr qilinmoqda...'
               sudo rm -rf /var/www/html/*
               sudo cp -r client/dist/* /var/www/html/
+              # Shtamp FAQAT cp muvaffaqiyatidan keyin yangilanadi — aks
+              # holda nusxalash yarim yo'lda uzilsa, keyingi deploy
+              # 'allaqachon nashr qilingan' deb o'ylab o'tkazib yuborardi.
+              sudo cp client/dist/.deployed-sha /var/www/html/.deployed-sha
               echo '⚡️ Frontend deployed.'
+            else
+              echo 'ℹ️  Frontend o'\''zgarmagan — nashr o'\''tkazib yuborildi.'
             fi
 
             echo '✅ Deployment completed successfully.'

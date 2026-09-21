@@ -101,7 +101,7 @@
     "exportSuccess": "Excel файл успешно загружен",
     "exportError": "Ошибка при загрузке Excel файла",
     "shiftOpened": "Смена успешно открыта!",
-    "shiftClosed": "Смена закрыта, отчет загружен!"
+    "shiftClosed": "Смена закрыта!"
   },
   "shiftStatus": {
     "open": "Смена открыта",
