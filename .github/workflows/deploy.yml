@@ -126,17 +126,30 @@ jobs:
 
             echo '🧾 Changed directories: $CHANGED_DIRS'
 
-            # ===== Build React frontend if changed =====
+            # ===== Build React frontend if changed (NASHR QILINMAYDI) =====
+            #
+            # ⚠️ QURISH VA NASHR ATAYLAB AJRATILDI.
+            #
+            # Avval frontend shu yerda darhol `/var/www/html/` ga ko'chirilardi —
+            # ya'ni backend bosqichidan OLDIN. Backend bosqichida esa `exit 1`
+            # qiladigan beshta qadam bor: db:backup (S3 kalitiga ham bog'liq),
+            # migration, kassa invarianti, investor daftari, qo'shimcha xarajat
+            # rekonsiliatsiyasi. Ulardan biri yiqilsa deploy to'xtardi, LEKIN
+            # prodda allaqachon YANGI SPA + ESKI API qolardi.
+            #
+            # Aynan shunday holat 2026-09-21 da yuz berdi: S3 kaliti yaroqsiz
+            # bo'lgani uchun deploy `db:backup` da yiqildi.
+            #
+            # Endi bu yerda faqat `dist/` yig'iladi. Nashr backend migratsiya
+            # va restartdan KEYIN, pastda bo'ladi.
             if [[ '$CHANGED_DIRS' == *'client'* ]]; then
-              echo '📁 Building frontend...'
+              echo '📁 Building frontend (hozircha faqat quriladi)...'
               rm -rf client/dist client/build
               cd client
               npm ci --prefer-offline --legacy-peer-deps
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
-              sudo rm -rf /var/www/html/*
-              sudo cp -r dist/* /var/www/html/
               cd ..
-              echo '⚡️ Frontend deployed.'
+              echo '📦 Frontend qurildi — nashr backenddan keyin.'
             fi
 
             # ===== Build NestJS backend if changed =====
@@ -203,7 +216,12 @@ jobs:
               # bo'lardi — lekin bu jimgina o'tib ketmasligi ham kerak,
               # chunki disk sezilarli tez to'ladi.
               if command -v ffmpeg >/dev/null 2>&1; then
-                echo "🎬 ffmpeg: $(ffmpeg -version 2>/dev/null | head -1)"
+                # ⚠️ BUYRUQ TO'G'RIDAN-TO'G'RI ishlatiladi, `$(...)` EMAS.
+                # Butun ssh bloki qo'sh tirnoq ichida va tirnoqlar ichma-ich
+                # joylashgan — `$(...)` bu yerda GitHub runner'ida bajarilib,
+                # SERVERNING emas, runner'ning versiyasini chop etardi.
+                echo '🎬 ffmpeg:'
+                ffmpeg -version 2>/dev/null | head -1
               else
                 echo '⚠️  ffmpeg TOPILMADI — video isbotlar siqilmaydi (disk ~10x tez to.ladi).'
                 echo '    Tuzatish: sudo apt-get install -y ffmpeg'
@@ -225,6 +243,35 @@ jobs:
                 exit 1
               fi
               echo '✅ nestapp.service ishga tushdi.'
+            fi
+
+            # ===== Frontend NASHRI — eng oxirida =====
+            #
+            # ⚠️ NEGA AYNAN SHU YERDA. Bu qadarga yetib kelish uchun backend
+            # to'liq o'tgan bo'lishi SHART: backup olingan, migratsiya
+            # qo'llangan, kassa/investor/xarajat invariantlari toza va
+            # servis ko'tarilgan. Yuqoridagilardan biri yiqilsa skript
+            # `set -e` bilan shu yergacha YETIB KELMAYDI va prodda eski,
+            # ISHLAYDIGAN frontend qoladi.
+            #
+            # Tartib «backend avval, frontend keyin»: qisqa vaqt eski SPA
+            # yangi API bilan ishlaydi (API orqaga mos bo'lishi kerak —
+            # odatdagi talab), teskarisi esa — yangi SPA eski API bilan —
+            # darhol 404/422 beradi.
+            if [[ '$CHANGED_DIRS' == *'client'* ]]; then
+              # ⚠️ `$(...)` ATAYLAB ISHLATILMAYDI. Butun ssh blok qo'sh
+              # tirnoq ichida, ya'ni `$(...)` GitHub runner'ida, serverda
+              # EMAS bajarilardi — runner'da esa `client/dist` qurilmagan
+              # va tekshiruv har doim yiqilardi. `[[ -f ... ]]` da `$` yo'q,
+              # shuning uchun u serverda bajariladi.
+              if [[ ! -f client/dist/index.html ]]; then
+                echo '❌ client/dist/index.html topilmadi — frontend qurilmagan, nashr qilinmaydi.'
+                exit 1
+              fi
+              echo '🚀 Frontend nashr qilinmoqda...'
+              sudo rm -rf /var/www/html/*
+              sudo cp -r client/dist/* /var/www/html/
+              echo '⚡️ Frontend deployed.'
             fi
 
             echo '✅ Deployment completed successfully.'

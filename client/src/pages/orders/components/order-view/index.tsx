@@ -444,7 +444,11 @@ const OrderView = () => {
           Tuman: order?.district?.name || order?.customer?.district?.name,
           Firma: order?.market?.name,
           Mahsulot: order?.items
-            ?.map((item: any) => item.product.name)
+            // ⚠️ `item.product?.name` — mahsulot o'chirilgan bo'lsa join
+            // `null` qaytaradi va himoyasiz `.name` BUTUN eksportni
+            // yiqitardi (bitta buzuq qator 311 qatorni yo'q qilardi).
+            ?.map((item: any) => item.product?.name)
+            ?.filter(Boolean)
             ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
           Narxi: Number((order?.total_price ?? 0) / 1000),
