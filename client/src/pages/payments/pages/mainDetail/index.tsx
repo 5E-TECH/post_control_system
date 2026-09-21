@@ -21,7 +21,10 @@ import {
   ChevronLeft,
   HandCoins,
 } from "lucide-react";
-import { BASE_URL } from "../../../../shared/const";
+import {
+  blobErrorMessage,
+  downloadFile,
+} from "../../../../shared/helpers/download-file";
 import { message, Modal } from "antd";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { useCourier } from "../../../../shared/api/hooks/useCourier";
@@ -191,34 +194,31 @@ const MainDetail = () => {
     try {
       setIsExporting(true);
 
-      const params = new URLSearchParams();
-      if (form.from) params.append("fromDate", form.from);
-      if (form.to) params.append("toDate", form.to);
+      const qs: Record<string, unknown> = {};
+      if (form.from) qs.fromDate = form.from;
+      if (form.to) qs.toDate = form.to;
 
-      const response = await fetch(
-        `${BASE_URL}cashbox/main/export?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
-          },
-        }
+      const periodPart =
+        form.from && form.to
+          ? `${form.from}-${form.to}`
+          : form.from || "umumiy";
+
+      // ⚠️ Xom `fetch` emas — axios. 401 da avtomatik refresh ishlaydi.
+      await downloadFile(
+        "cashbox/main/export",
+        Object.keys(qs).length ? qs : undefined,
+        `cashbox-${periodPart}.xlsx`,
       );
-
-      if (!response.ok) throw new Error("Export failed");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `cashbox-${form.from && form.to ? `${form.from}-${form.to}` : form.from || "umumiy"}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
 
       message.success(t("messages.exportSuccess") || "Excel fayl yuklandi!");
     } catch (error) {
-      message.error(t("messages.exportError") || "Excel yuklab olishda xatolik!");
+      // ⚠️ Blob javobida server xabari faqat matnga o'girgandan keyin o'qiladi.
+      message.error(
+        await blobErrorMessage(
+          error,
+          t("messages.exportError") || "Excel yuklab olishda xatolik!",
+        ),
+      );
     } finally {
       setIsExporting(false);
     }
@@ -290,38 +290,59 @@ const MainDetail = () => {
   // Smena yopish va avtomatik Excel yuklash
   const handleCloseShift = async () => {
     setIsClosingShift(true);
+
+    /**
+     * ⚠️ IKKI AMAL, IKKI ALOHIDA `try`.
+     *
+     * Avval ikkalasi bitta `try` ichida edi. `closeShift` SERVER HOLATINI
+     * O'ZGARTIRADI — smena yopiladi. Agar keyingi Excel yuklash yiqilsa
+     * (401, 5xx, tarmoq), `catch` ga sakrab o'tilardi va quyidagilar
+     * BAJARILMASDI: modalni yopish, `refetchShift()`, `refetch()`.
+     *
+     * Natijada kassir xato xabarini ko'rar, tasdiq oynasi ochiq qolar va
+     * u qayta bosardi — ikkinchi urinish esa serverdan «smena ochiq emas»
+     * xatosini olardi. Smena aslida yopilgan, hisobot esa yo'q.
+     *
+     * Endi: yopish muvaffaqiyatli bo'lsa UI DARHOL yangilanadi; hisobot
+     * alohida ishlanadi va yiqilsa ALOHIDA ogohlantirish beradi.
+     */
+
+    // ── 1-qadam: smenani yopish (yon ta'sirli amal) ──────────────────
     try {
-      // 1. Smenani yopish
       await closeShift.mutateAsync(shiftComment);
-
-      // 2. Avtomatik Excel yuklash
-      const response = await fetch(`${BASE_URL}cashbox/shift/export`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
-        },
-      });
-
-      if (!response.ok) throw new Error("Export failed");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `smena-hisobot-${new Date().toISOString().split("T")[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-      message.success(t("messages.shiftClosed") || "Smena yopildi va hisobot yuklandi!");
-      setShowShiftConfirm(false);
-      setShiftComment("");
-      refetchShift();
-      refetch();
     } catch (error) {
       const err = error as AxiosError<{ message?: string; error?: string }>;
-      const msg = err.response?.data?.message || "Xatolik yuz berdi!";
-      handleApiError(err, msg);
+      handleApiError(err, err.response?.data?.message || "Xatolik yuz berdi!");
+      setIsClosingShift(false);
+      return;
+    }
+
+    // Yopish o'tdi — UI holatini DARHOL yangilaymiz.
+    message.success(t("messages.shiftClosed") || "Smena yopildi!");
+    setShowShiftConfirm(false);
+    setShiftComment("");
+    refetchShift();
+    refetch();
+
+    // ── 2-qadam: hisobot (ixtiyoriy — yiqilsa smena baribir yopiq) ───
+    try {
+      await downloadFile(
+        "cashbox/shift/export",
+        undefined,
+        `smena-hisobot-${new Date().toISOString().split("T")[0]}.xlsx`,
+      );
+    } catch (error) {
+      /**
+       * ⚠️ Bu yerda `handleApiError` EMAS — smena muvaffaqiyatli yopilgan,
+       * qizil «xatolik» chalg'itardi. Hisobotni keyin ham olish mumkin:
+       * `cashbox/shift/export` shiftId'siz oxirgi YOPILGAN smenani beradi.
+       */
+      message.warning(
+        `Smena yopildi, lekin hisobot yuklanmadi: ${await blobErrorMessage(
+          error,
+          "noma'lum xato",
+        )}. Hisobotni «Excel» tugmasi bilan qayta yuklab olishingiz mumkin.`,
+      );
     } finally {
       setIsClosingShift(false);
     }
