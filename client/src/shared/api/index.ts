@@ -40,6 +40,20 @@ api.interceptors.request.use((config) => {
     return config
 })
 
+/**
+ * 401 -> `user/refresh` -> qayta urinish. Muvaffaqiyatsiz bo'lsa: tokenlar
+ * tozalanadi va foydalanuvchi login sahifasiga chiqariladi.
+ *
+ * ⚠️ Bloklash shu yerda kuchga kiradi. `JwtGuard` bazaga qaramaydi — access
+ * token 1 kun yashaydi, ya'ni admin marketni (yoki operatorni) bloklaganda
+ * mavjud sessiya O'SHA ZAHOTI uzilmaydi. Lekin `user/refresh` backendda
+ * market darvozasidan (`isMarketUsable`) o'tadi va rad etiladi, shuning
+ * uchun birinchi 401 dayoq bu blok foydalanuvchini tashqariga chiqaradi.
+ *
+ * Xulosa: bloklangan foydalanuvchi keyingi so'rovidayoq uziladi. Buni
+ * darhol uzilishga aylantirish uchun `JwtGuard` ga baza tekshiruvi kerak
+ * bo'lardi — har so'rovga bitta qo'shimcha SELECT, ataylab qilinmagan.
+ */
 api.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
