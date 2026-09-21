@@ -2,6 +2,19 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import QRCode from "qrcode";
 
+/**
+ * Kuryer manifesti (QR + sarlavha bilan) Excel fayli.
+ *
+ * ⚠️ IKKI NARSAGA DIQQAT:
+ *   1. Bu funksiya ASYNC (QR generatsiya + exceljs buffer). `await`siz
+ *      chaqirilsa rad etish (rejection) chaqiruvchining `try/catch` iga
+ *      TUSHMAYDI — «floating promise» bo'lib ketadi.
+ *   2. Qaytarma qiymat SHART. Avval `void` edi va bo'sh ma'lumotda
+ *      jimgina qaytardi; chaqiruvchi esa keyin shartsiz «muvaffaqiyatli
+ *      export qilindi» deb yozardi.
+ *
+ * @returns `true` — fayl saqlandi; `false` — yozadigan ma'lumot yo'q edi.
+ */
 export const exportToExcel = async (
   data: any[],
   fileName: string,
@@ -12,8 +25,8 @@ export const exportToExcel = async (
     totalOrders?: number | string;
     date?: string;
   }
-) => {
-  if (!Array.isArray(data) || data.length === 0) return;
+): Promise<boolean> => {
+  if (!Array.isArray(data) || data.length === 0) return false;
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Hisobot", {
@@ -168,4 +181,5 @@ export const exportToExcel = async (
       header?.date ? formattedDate : ""
     }.xlsx`
   );
+  return true;
 };

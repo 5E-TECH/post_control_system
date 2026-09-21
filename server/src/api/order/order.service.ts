@@ -2235,6 +2235,30 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
+        /**
+         * ⚠️ QUYIDAGI TO'RT JOIN EXCEL EKSPORTI UCHUN.
+         *
+         * Klientdagi eksport har bir qator uchun quyidagilarni o'qiydi
+         * (`order-view/index.tsx`):
+         *   Viloyat — `district.assignedToRegion.name`
+         *   Firma   — `market.name`
+         *   Kuryer  — `post.courier.name`
+         *
+         * Admin yo'li (`allOrders`) bularni allaqachon join qiladi,
+         * bu yo'l esa qilmasdi. Natijada market va operator yuklagan
+         * faylda «Viloyat» va «Firma» BO'SH, «Kuryer» esa har qatorda
+         * «-» bo'lardi — fayl yuklanardi, lekin hisobot sifatida
+         * yaroqsiz edi.
+         *
+         * ⚠️ `assignedToRegion` — tumanning HAQIQIY biriktirilgan
+         * viloyati; `region` bilan bir xil emas (LDG/marketplace
+         * yo'nalishida ular farq qiladi).
+         */
+        .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('order.post', 'post')
+        .leftJoinAndSelect('post.courier', 'courier')
+        .leftJoinAndSelect('orderDistrict.assignedToRegion', 'orderAssignedRegion')
+        .leftJoinAndSelect('district.assignedToRegion', 'customerAssignedRegion')
         .where('order.user_id = :userId', { userId: effectiveUserId })
         .orderBy('order.created_at', 'DESC');
 
@@ -2381,15 +2405,34 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const allPostIds: string[] = allMyPosts.map((post) => post.id);
 
-      if (!allPostIds.length) {
-        return successRes([], 200, 'No posts found for this courier');
-      }
-
       // pagination params
       const page = query.page && query.page > 0 ? query.page : 1;
       const fetchAll =
         query.fetchAll === true || (query.fetchAll as any) === 'true';
       const limit = getSafeLimit(query.limit, fetchAll);
+
+      /**
+       * ⚠️ BO'SH NATIJA HAM ODATDAGI SHAKLDA QAYTADI.
+       *
+       * Avval bu yerda `successRes([], ...)` turardi — ya'ni posti yo'q
+       * kuryer uchun javob tanasi `{data: []}` bo'lardi, normal yo'lda esa
+       * `{data: {data: [...], total, page, limit, totalPages}}`. Ikki xil
+       * shakl.
+       *
+       * Klient faqat `data.data.data` ni o'qiydi, shuning uchun bo'sh
+       * holatda u `undefined` olardi va Excel eksporti buni jimgina
+       * «muvaffaqiyat» deb ko'rsatardi. Endi klientda shakl tekshiruvi
+       * bor — agar bu yerda eski shakl qolsa, foydalanuvchi «javob
+       * kutilgan shaklda emas» degan CHALG'ITUVCHI xato olardi, holbuki
+       * haqiqiy sabab shunchaki «pochta yo'q».
+       */
+      if (!allPostIds.length) {
+        return successRes(
+          { data: [], total: 0, page, limit, totalPages: 0 },
+          200,
+          'No posts found for this courier',
+        );
+      }
       const offset = (page - 1) * limit;
 
       const qb = this.orderRepo

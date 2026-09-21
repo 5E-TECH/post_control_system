@@ -1,9 +1,20 @@
 import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
 
-export const exportToExcel = (data: any[], fileName: string) => {
+/**
+ * Excel fayl yasab, brauzerga yuklatadi.
+ *
+ * ⚠️ QAYTARMA QIYMAT SHART. Avval bu funksiya `void` edi va bo'sh
+ * ma'lumotda JIMGINA `return` qilardi — chaqiruvchi fayl yaratilganini
+ * bilishning imkoni yo'q edi. Natijada buyurtmalar sahifasi
+ * `exportToExcel(...)` dan keyin SHARTSIZ «muvaffaqiyatli export
+ * qilindi» deb yozardi, fayl esa umuman yaratilmasdi.
+ *
+ * @returns `true` — fayl saqlandi; `false` — yozadigan ma'lumot yo'q edi.
+ */
+export const exportToExcel = (data: any[], fileName: string): boolean => {
   if (!Array.isArray(data) || data.length === 0) {
-    return;
+    return false;
   }
 
   const headerKeys = Object.keys(data[0]);
@@ -135,4 +146,5 @@ export const exportToExcel = (data: any[], fileName: string) => {
   const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
   const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
   saveAs(blob, `${fileName}.xlsx`);
+  return true;
 };
