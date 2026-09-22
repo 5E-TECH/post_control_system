@@ -4793,30 +4793,64 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         const marketDiff = Number(order.total_price) - Number(marketTarif);
         const courierDiff = Number(order.total_price) - Number(courierTarif);
 
-        // Market kassasidan ayrish
+        /**
+         * ⚠️ YO'NALISH `delta` DAN HOSIL QILINADI — QOTIB QOLMAYDI.
+         *
+         * Avval bu yerda `operation: EXPENSE` qattiq yozilgan edi, holbuki
+         * `delta = -marketDiff` MUSBAT bo'lishi mumkin: `total_price`
+         * tarifdan KICHIK bo'lsa (0 so'mli buyurtma — eng aniq holat)
+         * rollback pulni kassaga QAYTARADI.
+         *
+         * `cash_box.balance` to'g'ri edi (`delta` ishorali), lekin tarix
+         * qatori `expense` bo'lib yozilardi va `amount` ham
+         * `cashbox-delta.util.ts` da `Math.abs` qilinardi. Yo'nalishni
+         * esa HAMMA joy `operation_type` dan o'qiydi
+         * (`cash-box.service.ts:1049`: `if (INCOME) income += amount;
+         * else outcome += amount`). Natijada 0 so'mli buyurtmada
+         * «Chiqim» sotuv + rollback = 2 × tarif bo'lib ko'rinardi va
+         * foydalanuvchi «tarif ikkinchi marta ayrildi» deb hisoblardi.
+         *
+         * Bu 2026-09-16 (`4a525a5f`) da paydo bo'lgan: undan oldin xom
+         * `amount: marketDiff` ISHORALI yozilar va jamlagich
+         * `outcome += (-50000)` qilib o'zini-o'zi qoplardi.
+         *
+         * ⚠️ `source_type` ham `CORRECTION` dan `ROLLBACK_CORRECTION` ga
+         * ko'chirildi. Sabab: `reverseExtraCostForCashbox` qaytarilgan
+         * xarajatni AYNAN `CORRECTION + INCOME` yig'indisi deb hisoblaydi
+         * va bu yozuv undan OLDIN bajariladi. `CORRECTION + INCOME`
+         * qoldirilsa `net <= 0` bo'lib, qo'shimcha xarajat UMUMAN
+         * qaytarilmasdi — bu ko'rinish emas, REAL PUL ZARARI.
+         */
+        const marketDelta = -marketDiff;
+        const courierDelta = -courierDiff;
+
+        // Market kassasi — teskari yozuv
         // ⚠️ ATOMIK (bloker B1)
         {
           const res = await applyCashboxDelta(queryRunner.manager, {
             cashbox: marketCashbox,
-            delta: -marketDiff,
-            operation: Operation_type.EXPENSE,
-            source_type: Source_type.CORRECTION,
-            amount: marketDiff,
+            delta: marketDelta,
+            operation:
+              marketDelta >= 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+            source_type: Source_type.ROLLBACK_CORRECTION,
+            amount: Math.abs(marketDelta),
             source_id: order.id,
             comment: rollbackComment,
             created_by: user.id,
           });
-          rollbackMarketWrite = { history_id: res.history_id, delta: -marketDiff };
+          // ⚠️ Marketplace daftari ISHORALI deltani oladi — abs EMAS.
+          rollbackMarketWrite = { history_id: res.history_id, delta: marketDelta };
         }
 
-        // Courier kassasidan ayrish
+        // Courier kassasi — teskari yozuv
         // ⚠️ ATOMIK (bloker B1)
         await applyCashboxDelta(queryRunner.manager, {
           cashbox: courierCashbox,
-          delta: -courierDiff,
-          operation: Operation_type.EXPENSE,
-          source_type: Source_type.CORRECTION,
-          amount: courierDiff,
+          delta: courierDelta,
+          operation:
+            courierDelta >= 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+          source_type: Source_type.ROLLBACK_CORRECTION,
+          amount: Math.abs(courierDelta),
           source_id: order.id,
           comment: rollbackComment,
           created_by: user.id,
@@ -4857,30 +4891,48 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           0,
         );
 
+        /**
+         * ⚠️ SOLD/PAID shoxi bilan BIR XIL NAQSH.
+         *
+         * Bu yerda ishoralar hozircha doim manfiy: `marketDiff` =
+         * `paid_amount` (>= 0), `courierDiff` esa `Math.max(..., 0)` bilan
+         * qisilgan. Ya'ni `EXPENSE` bugun TO'G'RI chiqadi.
+         *
+         * Shunga qaramay yo'nalish baribir `delta` dan hosil qilinadi va
+         * `source_type` ham `ROLLBACK_CORRECTION` ga ko'chiriladi:
+         * qotirib yozilgan ishora AYNAN SOLD shoxida nuqsonga olib keldi,
+         * va kelajakda bu formulalar o'zgarsa (masalan qisman to'lovga
+         * qayta hisoblash qo'shilsa) xuddi shu tuzoq takrorlanardi.
+         */
+        const marketDelta = -marketDiff;
+        const courierDelta = -courierDiff;
+
         // Market kassasidan aynan paid_amount miqdorini ayiramiz
         // ⚠️ ATOMIK (bloker B1)
         {
           const res = await applyCashboxDelta(queryRunner.manager, {
             cashbox: marketCashbox,
-            delta: -marketDiff,
-            operation: Operation_type.EXPENSE,
-            source_type: Source_type.CORRECTION,
-            amount: marketDiff,
+            delta: marketDelta,
+            operation:
+              marketDelta >= 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+            source_type: Source_type.ROLLBACK_CORRECTION,
+            amount: Math.abs(marketDelta),
             source_id: order.id,
             comment: rollbackComment,
             created_by: user.id,
           });
-          rollbackMarketWrite = { history_id: res.history_id, delta: -marketDiff };
+          rollbackMarketWrite = { history_id: res.history_id, delta: marketDelta };
         }
 
         // Courier kassasidan sotishda qo'shilgan ulushni ayiramiz
         // ⚠️ ATOMIK (bloker B1)
         await applyCashboxDelta(queryRunner.manager, {
           cashbox: courierCashbox,
-          delta: -courierDiff,
-          operation: Operation_type.EXPENSE,
-          source_type: Source_type.CORRECTION,
-          amount: courierDiff,
+          delta: courierDelta,
+          operation:
+            courierDelta >= 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+          source_type: Source_type.ROLLBACK_CORRECTION,
+          amount: Math.abs(courierDelta),
           source_id: order.id,
           comment: rollbackComment,
           created_by: user.id,

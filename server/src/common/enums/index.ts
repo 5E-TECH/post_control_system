@@ -38,7 +38,21 @@ export enum Source_type {
   MARKET_PAYMENT = 'market_payment',
   MANUAL_EXPENSE = 'manual_expense',
   MANUAL_INCOME = 'manual_income',
+  /**
+   * ⚠️ FAQAT QO'SHIMCHA XARAJATNI TESKARI QAYTARISH uchun.
+   *
+   * `reverseExtraCostForCashbox` qaytarilgan summani AYNAN
+   * `source_type=CORRECTION AND operation_type=INCOME` yig'indisi deb
+   * hisoblaydi. Shu sabab boshqa hech qanday rollback yozuvi bu turni
+   * ISHLATMASLIGI kerak — aks holda u «xarajat allaqachon qaytarilgan»
+   * deb sanalib, haqiqiy qaytarish bajarilmay qoladi.
+   */
   CORRECTION = 'correction',
+  /**
+   * Sotuvni orqaga qaytarish (rollback) tuzatishi — tarif/summa teskari
+   * yozuvi. `CORRECTION` dan ATAYLAB ajratilgan (yuqoridagi izohga qarang).
+   */
+  ROLLBACK_CORRECTION = 'rollback_correction',
   SALARY = 'salary',
   SELL = 'sell',
   CANCEL = 'cancel',

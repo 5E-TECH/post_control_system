@@ -5,6 +5,13 @@ on:
     branches:
       - main
 
+# ⚠️ Bir vaqtda faqat BITTA prod deploy. Ikki run parallel ketsa ular
+# bir xil webroot va bir xil bazaga yozadi: rm -rf bilan cp oralig'ida
+# ikkinchisi aralashsa sayt yirtiq holatda qolishi mumkin.
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
 jobs:
   # 🛡️ Faza 0 — xavfsizlik gate'i. Deploy'dan OLDIN ishlaydi.
   #   • audit:roles + guard testi — BLOKLOVCHI (yashil): RolesGuard fail-closed
@@ -284,17 +291,53 @@ jobs:
             # shtamplar farq qiladi va nashr BAJARILADI.
             #
             # cmp va [[ ]] da $ yo'q — ikkalasi ham serverda bajariladi.
-            if [[ -f client/dist/index.html ]] && ! sudo cmp -s client/dist/.deployed-sha /var/www/html/.deployed-sha; then
-              echo '🚀 Frontend nashr qilinmoqda...'
-              sudo rm -rf /var/www/html/*
-              sudo cp -r client/dist/* /var/www/html/
-              # Shtamp FAQAT cp muvaffaqiyatidan keyin yangilanadi — aks
-              # holda nusxalash yarim yo'lda uzilsa, keyingi deploy
-              # 'allaqachon nashr qilingan' deb o'ylab o'tkazib yuborardi.
-              sudo cp client/dist/.deployed-sha /var/www/html/.deployed-sha
-              echo '⚡️ Frontend deployed.'
+            # ⚠️ DARVOZA 1 — shu deployda HAQIQATAN ish bajarildimi.
+            #
+            # Bu shartsiz nashr bloki hujjat-only push'da ham ishlab
+            # ketardi: client qurilmaydi, server qurilmaydi, migratsiya
+            # yo'q, restart yo'q — lekin oldingi YIQILGAN deploydan
+            # qolgan yangi dist prodga chiqib ketardi. Natija aynan
+            # qochmoqchi bo'lgan holat: yangi SPA + eski API, deploy esa
+            # YASHIL. Bu jamoada checklist-only push odatiy hol.
+            if [[ '$CHANGED_DIRS' == *'client'* || '$CHANGED_DIRS' == *'server'* ]]; then
+
+              # ⚠️ DARVOZA 2 — dist TO'LIQ bo'lsin.
+              #
+              # Avval faqat index.html tekshirilardi, pastda esa
+              # .deployed-sha ishlatilardi. Eski tartib qurgan dist da
+              # shtamp YO'Q: shunda webroot rm -rf qilinar, nusxalanar,
+              # keyin shtamp nusxalash ENOENT bilan yiqilib deploy QIZIL
+              # bo'lardi. Ikkala fayl ham shart.
+              if [[ -f client/dist/index.html && -f client/dist/.deployed-sha ]]; then
+
+                # ⚠️ DARVOZA 3 — nashr kerakmi.
+                #
+                # Birinchi shart webroot BO'SH qolgan holatni qaytaradi
+                # (masalan oldingi deploy rm bilan cp orasida uzilgan):
+                # shtamplar teng bo'lsa ham majburan qayta nashr qilinadi.
+                #
+                # sudo ATAYLAB ishlatilmaydi: webroot dunyo uchun
+                # o'qiladigan, sudoers ga yangi bog'liqlik kerak emas.
+                # Ruxsat yetmasa buyruq yiqiladi va nashr BAJARILADI —
+                # xato tomon xavfsiz.
+                if [[ ! -f /var/www/html/index.html ]] || ! cmp -s client/dist/.deployed-sha /var/www/html/.deployed-sha; then
+                  echo '🚀 Frontend nashr qilinmoqda...'
+                  sudo rm -rf /var/www/html/*
+                  sudo cp -r client/dist/* /var/www/html/
+                  # Shtamp FAQAT cp muvaffaqiyatidan keyin yangilanadi —
+                  # aks holda nusxalash yarim yo'lda uzilsa, keyingi
+                  # deploy 'allaqachon nashr qilingan' deb o'tkazib
+                  # yuborardi.
+                  sudo cp client/dist/.deployed-sha /var/www/html/.deployed-sha
+                  echo '⚡️ Frontend deployed.'
+                else
+                  echo 'ℹ️  Frontend allaqachon shu versiyada — nashr qilinmadi.'
+                fi
+              else
+                echo '⚠️  client/dist to.liq emas (index.html yoki .deployed-sha yo.q) — nashr qilinmadi.'
+              fi
             else
-              echo 'ℹ️  Frontend o'\''zgarmagan — nashr o'\''tkazib yuborildi.'
+              echo 'ℹ️  client ham, server ham o.zgarmagan — frontend nashri o.tkazib yuborildi.'
             fi
 
             echo '✅ Deployment completed successfully.'
