@@ -3150,6 +3150,7 @@ export class CashBoxService
       [Source_type.MANUAL_EXPENSE]: "Qo'lda chiqim",
       [Source_type.MANUAL_INCOME]: "Qo'lda kirim",
       [Source_type.CORRECTION]: 'Tuzatish',
+      [Source_type.ROLLBACK_CORRECTION]: 'Sotuv qaytarildi',
       [Source_type.SALARY]: 'Maosh',
       [Source_type.SELL]: 'Sotuv',
       [Source_type.CANCEL]: 'Bekor qilish',

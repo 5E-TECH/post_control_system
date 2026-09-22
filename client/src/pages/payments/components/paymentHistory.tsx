@@ -110,6 +110,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
       manual_expense: "Qo'lda chiqim",
       manual_income: "Qo'lda kirim",
       correction: "Tuzatish",
+      rollback_correction: "Sotuv qaytarildi",
       salary: "Maosh",
       sell: "Sotuv",
       cancel: "Bekor qilish",

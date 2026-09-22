@@ -74,6 +74,71 @@ describe('applyCashboxDelta', () => {
     expect(m.saved[0].amount).toBe(50000);
   });
 
+  /**
+   * ⚠️ BU TESTLAR NEGA BOR.
+   *
+   * 2026-09-16 dan 2026-09-23 gacha `rollbackOrderToWaiting` musbat
+   * `delta` (pul QAYTARILADI) bilan birga `operation: EXPENSE` ni
+   * qotirib yozardi. Balans to'g'ri qolar, tarix qatori esa teskari
+   * yo'nalishni ko'rsatardi — va hamma jamlagich yo'nalishni
+   * `operation_type` dan o'qiydi. 0 so'mlik buyurtmada «Chiqim»
+   * sotuv + rollback = 2 × tarif bo'lib ko'rinardi.
+   *
+   * Eski test to'plami FAQAT MOS juftliklarni sinardi, shuning uchun
+   * nuqson bir hafta yashirin qoldi.
+   */
+  it('zid ishora: musbat delta + EXPENSE — XATO tashlaydi', async () => {
+    const m = makeManager([{ balance: '1050000' }]);
+    await expect(
+      applyCashboxDelta(m as any, input({
+        delta: 50000, amount: 50000, operation: Operation_type.EXPENSE,
+      })),
+    ).rejects.toThrow(/ishora ziddiyati/);
+    // ⚠️ Balansga TEGILMAGAN bo'lishi shart: tekshiruv UPDATE dan OLDIN
+    // turadi, aks holda zid yozuvda balans o'zgarib, tarix esa
+    // yozilmay qolardi — bu yanada yomon.
+    expect(m.query).not.toHaveBeenCalled();
+    expect(m.save).not.toHaveBeenCalled();
+  });
+
+  it('zid ishora: manfiy delta + INCOME — XATO tashlaydi', async () => {
+    const m = makeManager([{ balance: '950000' }]);
+    await expect(
+      applyCashboxDelta(m as any, input({
+        delta: -50000, amount: 50000, operation: Operation_type.INCOME,
+      })),
+    ).rejects.toThrow(/ishora ziddiyati/);
+  });
+
+  it('musbat delta + INCOME — o\'tadi (rollback qaytarishi)', async () => {
+    const m = makeManager([{ balance: '1050000' }]);
+    const r = await applyCashboxDelta(m as any, input({
+      delta: 50000, amount: 50000, operation: Operation_type.INCOME,
+    }));
+    expect(m.lastParams[0]).toBe(50000);
+    expect(r.balance_after).toBe(1050000);
+    expect(m.saved[0].operation_type).toBe(Operation_type.INCOME);
+    expect(m.saved[0].amount).toBe(50000);
+  });
+
+  it('delta = 0 — yo\'nalish tekshirilmaydi', async () => {
+    const m = makeManager([{ balance: '1000000' }]);
+    await expect(
+      applyCashboxDelta(m as any, input({
+        delta: 0, amount: 0, operation: Operation_type.EXPENSE,
+      })),
+    ).resolves.toBeDefined();
+  });
+
+  it('manfiy amount — XATO tashlaydi (avval jimgina abs qilinardi)', async () => {
+    const m = makeManager([{ balance: '1050000' }]);
+    await expect(
+      applyCashboxDelta(m as any, input({
+        delta: 50000, amount: -50000, operation: Operation_type.INCOME,
+      })),
+    ).rejects.toThrow(/amount MUSBAT/);
+  });
+
   it('TypeORM ning `[rows, count]` shaklini ham tushunadi', async () => {
     // ⚠️ Busiz `rows[0].balance` `undefined` bo'lib, `Number(undefined)=NaN`
     // orqali bigint ustunga INSERT yiqilardi.
