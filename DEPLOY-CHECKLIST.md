@@ -141,6 +141,9 @@ Qo'llanadiganlar (prod holatiga qarab):
 | 6 | `MarketplaceStatusMap` | Status lug'ati + sessiya indeksi |
 | 7 | `SoatoDistrictsBackfill` | 26 ta tuman/shahar (faqat `INSERT`) |
 | 8 | `OrderOperatorAssignment` | Operator biriktirish ustunlari + eski buyurtmalar backfill'i |
+| 9 | `RollbackCorrectionSourceType` | `cashbox_history.source_type` ga `rollback_correction` qiymati |
+| 10 | `OrderMarketNet` | `order.market_net` (ishorali) + qisman indeks; backfill `= to_be_paid` |
+| 11 | `OrderMarketSettled` | `order.market_settled` (ishorali); backfill `= paid_amount` |
 
 `SoatoDistrictsBackfill` xavfsizligi: faqat qo'shadi, mavjud qatorlarga
 tegmaydi (sha256 barmoq izi bilan tekshirilgan), idempotent, `down()` faqat
@@ -151,6 +154,22 @@ ishlatilmagan qatorni o'chiradi.
 bazada tarixan `synchronize` orqali paydo bo'lgan, migratsiyasi yo'q edi
 — prod'da bo'lmasligi mumkin). Backfill eski buyurtmalarni «qabul
 qilingan» deb belgilaydi.
+
+`RollbackCorrectionSourceType` xavfsizligi: faqat enum qiymati
+QO'SHILADI (`ADD VALUE IF NOT EXISTS`), ishlatilmaydi — shuning uchun
+PG 12+ da tranzaksiya ichida xavfsiz. `down()` ataylab bo'sh: Postgres
+enum qiymatini o'chirishni qo'llab-quvvatlamaydi.
+
+`OrderMarketNet` / `OrderMarketSettled` xavfsizligi: ikkala backfill ham
+HOZIRGI qiymatni ko'chiradi (`to_be_paid` / `paid_amount`), QAYTA
+HISOBLAMAYDI. Ya'ni eski buyurtmalar va to'lov navbati AYNAN hozirgidek
+qoladi — tuzatish faqat YANGI sotuvlarga ta'sir qiladi. Bu ataylab
+(qaror 2026-09-23: mavjud tafovut migratsiya bilan to'g'rilanmaydi).
+
+⚠️ MAVJUD TAFOVUT SAQLANADI. 2026-09-16 dan beri to'plangan farq
+(dev bazada ~5,9 mln) o'z-o'zidan yopilmaydi. Shu sabab
+`db:check-market-settlement` deploy'da STRICT emas, `--snapshot` /
+`--compare` rejimida ishlaydi: halt faqat YANGI farq paydo bo'lsa.
 
 ⚠️ Deploydan keyin TEKSHIRING:
 ```sql
@@ -183,6 +202,9 @@ KO'RINMAYDI, lekin bu shartsiz so'rov soxta ogohlantirish beradi.
 | 8 | O'chirilgan operator kira OLMAYDI (login 400) |
 | 9 | Marketni bloklang → uning operatori kira OLMASLIGI kerak (login 400) |
 | 10 | Marketni blokdan chiqaring → operator yana kiradi; ALOHIDA bloklangan operator esa bloklanganicha qoladi |
+| 11 | `npm run db:check-market-settlement` — farqlar ro'yxati deploydan OLDINGI bilan bir xil (yangi farq YO'Q) |
+| 12 | Bitta marketga to'liq to'lov: kassadagi summa kiritilsa BARCHA buyurtma `PAID` bo'lishi kerak. Eski buyurtmalarda tafovut saqlanadi — bu kutilgan |
+| 13 | 0 so'mlik yoki tarifdan arzon buyurtma sotilsa: `market_net` MANFIY bo'ladi (`SELECT market_net FROM "order" WHERE ...`) — bu to'g'ri, market farqni qoplaydi |
 
 ---
 
