@@ -23,11 +23,23 @@ import {
   MessageSquare,
   Truck,
   Home,
+  MinusCircle,
 } from "lucide-react";
 
 interface IProps {
   items: any[];
   to_be_paid: any;
+  /**
+   * Shu buyurtma bo'yicha SOF qo'shimcha xarajat (qo'shilgan − qaytarilgan).
+   *
+   * ⚠️ NEGA ALOHIDA QATOR KERAK. Xarajat market kassasidan ushlanadi,
+   * ya'ni «To'langan» summasi «To'lanishi kerak» dan aynan shu qadar
+   * KAM chiqadi. Avval bu faqat buyurtma IZOHIDA erkin matn bo'lib
+   * yozilardi («!!! Bu buyurtmadan qo'shimcha 10000 ... ushlab qolingan»)
+   * — market raqamlar nega mos kelmasligini tushunmasdi va «kam
+   * to'lashdi» degan savol tug'ilardi.
+   */
+  extra_cost_net?: any;
   paid_amount: any;
   total_price: any;
   marketId: string;
@@ -40,6 +52,7 @@ const Details: FC<IProps> = ({
   items = [],
   total_price,
   to_be_paid,
+  extra_cost_net,
   paid_amount,
   marketId,
   comment,
@@ -267,6 +280,26 @@ const Details: FC<IProps> = ({
                   {Number(to_be_paid).toLocaleString("uz-UZ")} so'm
                 </span>
               </div>
+
+              {/*
+                Qo'shimcha xarajat — FAQAT mavjud bo'lsa ko'rsatiladi.
+                «To'lanishi kerak» va «To'langan» orasida turadi, shuning
+                uchun ayirma o'z-o'zidan tushunarli bo'ladi:
+                    150 000 − 10 000 = 140 000
+              */}
+              {Number(extra_cost_net) > 0 && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MinusCircle className="w-4 h-4 text-rose-500" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {t("detail.extra_cost")}
+                    </span>
+                  </div>
+                  <span className="text-base font-semibold text-rose-600 dark:text-rose-400">
+                    − {Number(extra_cost_net).toLocaleString("uz-UZ")} so'm
+                  </span>
+                </div>
+              )}
 
               {/* Paid Amount */}
               <div className="flex items-center justify-between">

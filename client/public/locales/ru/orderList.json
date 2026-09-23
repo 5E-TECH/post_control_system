@@ -63,7 +63,8 @@
     "manzil": "Адрес",
     "courier": "Информация о курьере",
     "courierName": "Курьер",
-    "courierPhone": "Телефон"
+    "courierPhone": "Телефон",
+    "extra_cost": "Доп. расход"
   },
   "kutilayotganBuyurtmalar": "Ожидающие заказы",
   "hammaBuyurtmalar": "Все заказы",
