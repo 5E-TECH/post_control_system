@@ -187,6 +187,15 @@ jobs:
               # 2026-09-16..23 oralig'ida to'plangan tarixiy tafovut ATAYLAB
               # tuzatilmagan (qaror: faqat kod tuzatiladi). Shuning uchun bu
               # yerda ham snapshot/compare naqshi: halt faqat YANGI farqda.
+              #
+              # BIRINCHI DEPLOYDA BU BOSQICH O'TKAZIB YUBORILADI. Skript
+              # o'qiydigan market_net/market_settled ustunlarini quyidagi
+              # migratsiyaning O'ZI yaratadi, ya'ni hozir ular hali yo'q.
+              # 2026-09-24 da deploy AYNAN shu sababli yiqilgan edi
+              # (column o.market_net does not exist). Endi skript ustun
+              # yo'qligini ko'rib schema_ready=false bayrog'i bilan
+              # bo'sh baseline yozadi va 0 bilan chiqadi; pastdagi compare
+              # o'sha bayroqni ko'rib birinchi yurishni qabul qiladi.
               echo '🧮 Pre-migration market settlement baseline...'
               npm run db:check-market-settlement -- --snapshot=/tmp/ms-pre.json
 
