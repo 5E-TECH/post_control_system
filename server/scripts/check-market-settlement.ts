@@ -61,6 +61,58 @@ async function main() {
   console.log('🔌 DB ulandi. Market hisob-kitob invarianti tekshirilmoqda...\n');
 
   /**
+   * ⚠️ SXEMA DARVOZASI — MIGRATSIYADAN OLDIN ISHLAY OLISHI SHART.
+   *
+   * Bu skript deploy'da IKKI marta chaqiriladi:
+   *   1. migratsiyadan OLDIN  (--snapshot, baseline olish)
+   *   2. migratsiyadan KEYIN  (--compare)
+   *
+   * `market_net` / `market_settled` ustunlarini esa AYNAN o'sha
+   * migratsiya yaratadi. Ya'ni birinchi chaqiruvda ular hali YO'Q.
+   *
+   * 2026-09-24 deploy'i shu sababli yiqildi:
+   *     column o.market_net does not exist
+   *     Error: Process completed with exit code 1
+   * (migratsiya ishlamadi, baza tegilmadi — xato baseline bosqichida edi).
+   *
+   * Endi ustunlar yo'qligi XATO EMAS: baseline olinmaydi va buni
+   * fayldagi `schema_ready: false` bayrog'i bildiradi. `--compare`
+   * o'sha bayroqni ko'rib, birinchi ishga tushirish ekanini tushunadi.
+   */
+  const colRows: Array<{ n: string }> = await dataSource.query(
+    `SELECT column_name AS n
+       FROM information_schema.columns
+      WHERE table_name = 'order'
+        AND column_name IN ('market_net', 'market_settled')`,
+  );
+  const schemaReady = colRows.length === 2;
+
+  if (!schemaReady) {
+    console.log(
+      "ℹ️  `market_net` / `market_settled` ustunlari hali yo'q —\n" +
+        '   migratsiya qo\'llanmagan. Tekshiruv o\'tkazib yuborildi.',
+    );
+    await dataSource.destroy();
+
+    if (snapshotPath) {
+      fs.writeFileSync(
+        snapshotPath,
+        JSON.stringify(
+          { taken_at: new Date().toISOString(), schema_ready: false, items: [] },
+          null,
+          2,
+        ),
+      );
+      console.log(`💾 Bo'sh baseline yozildi: ${snapshotPath}`);
+    }
+    /**
+     * ⚠️ `exit 0` — deploy TO'XTAMAYDI. Ustun yo'qligi nuqson emas,
+     * shunchaki migratsiya hali qo'llanmagani.
+     */
+    process.exit(0);
+  }
+
+  /**
    * ⚠️ `deleted_at IS NULL` SHART. Soft-delete qilingan buyurtma
    * to'lov navbatiga tushmaydi (TypeORM uni avtomatik chiqaradi), demak
    * uning qoldig'i ham hisobga olinmasligi kerak. Aks holda skript
@@ -102,6 +154,7 @@ async function main() {
   if (snapshotPath) {
     const payload = {
       taken_at: new Date().toISOString(),
+      schema_ready: true,
       total: rows.length,
       drifted: drifted.length,
       items: drifted.map((r) => ({ market_id: r.market_id, diff: r.diff })),
@@ -121,8 +174,39 @@ async function main() {
       process.exit(1);
     }
     const snap = JSON.parse(fs.readFileSync(comparePath, 'utf8')) as {
+      schema_ready?: boolean;
       items: Array<{ market_id: string; diff: string }>;
     };
+
+    /**
+     * ⚠️ BIRINCHI ISHGA TUSHIRISH.
+     *
+     * Baseline olinganda ustunlar hali yo'q edi (`schema_ready: false`),
+     * ya'ni taqqoslash uchun asos YO'Q. Migratsiya backfill'i
+     * `market_net = to_be_paid` va `market_settled = paid_amount` qiladi,
+     * demak hozirgi farqlar MIGRATSIYADAN OLDIN ham mavjud bo'lgan
+     * tarixiy farqlar.
+     *
+     * Bo'sh baseline bilan solishtirsak ularning HAMMASI «yangi» bo'lib
+     * ko'rinib, deploy'ni asossiz to'xtatardi. Shu sabab birinchi
+     * yurishda hozirgi holat YANGI BASELINE sifatida qabul qilinadi.
+     */
+    if (snap.schema_ready === false) {
+      console.log(
+        '\nℹ️  Baseline migratsiyadan OLDIN olingan — ustunlar hali yo\'q edi.\n' +
+          `   Bu BIRINCHI yurish: hozirgi ${drifted.length} ta farq tarixiy deb\n` +
+          '   qabul qilinadi (migratsiya backfill\'i mavjud holatni ko\'chirgan).\n' +
+          '   Keyingi deploylarda ular baseline bo\'lib xizmat qiladi.',
+      );
+      if (drifted.length > 0) {
+        console.log(
+          `   Eslatma: ${drifted.length} ta market uchun kassa va hisob-kitob\n` +
+            '   mos kelmaydi — bu 2026-09 dagi ma\'lum tarixiy tafovut.',
+        );
+      }
+      process.exit(0);
+    }
+
     const prevMap = new Map(snap.items.map((it) => [it.market_id, it.diff]));
 
     const newDrifts: Array<{ id: string; before: string; after: string }> = [];
