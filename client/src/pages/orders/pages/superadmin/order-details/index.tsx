@@ -490,6 +490,7 @@ const OrderDetails = () => {
             <Details
               items={data?.data?.items}
               to_be_paid={data?.data?.to_be_paid}
+              extra_cost_net={data?.data?.extra_cost_net}
               paid_amount={data?.data?.paid_amount}
               total_price={data?.data?.total_price}
               marketId={data?.data?.market?.id}

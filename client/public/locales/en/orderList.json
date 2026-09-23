@@ -63,7 +63,8 @@
     "manzil": "Address",
     "courier": "Courier information",
     "courierName": "Courier",
-    "courierPhone": "Phone"
+    "courierPhone": "Phone",
+    "extra_cost": "Extra cost"
   },
   "kutilayotganBuyurtmalar": "Pending Orders",
   "hammaBuyurtmalar": "All Orders",

@@ -64,6 +64,10 @@ import { ShiftRepository } from 'src/core/repository/shift.repository';
 import { getSafeLimit } from 'src/common/constants/pagination';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { applyCashboxDelta } from 'src/common/database/cashbox-delta.util';
+import {
+  planMarketPayment,
+  SettlementStatusAction,
+} from '../order/utils/market-settlement.util';
 import { MarketplaceIntegrationEntity } from 'src/core/entity/marketplace-integration.entity';
 
 /** Bitta virtual karta bo'yicha ledger (statement) qatori. */
@@ -1351,9 +1355,14 @@ export class CashBoxService
           if (paymentInProcess >= remaining) {
             paymentInProcess -= remaining;
             partlyPaidOrder.paid_amount = partlyPaidOrder.to_be_paid;
+            // ⚠️ Hisob-kitob ustuni `paid_amount` bilan SINXRON qoladi —
+            // aks holda u ajralib ketib, marketga to'lov halqasi noto'g'ri
+            // qoldiq ko'rardi. Bu oqim mantiqi O'ZGARMAYDI.
+            partlyPaidOrder.market_settled = partlyPaidOrder.paid_amount;
             partlyPaidOrder.status = Order_status.PAID;
           } else {
             partlyPaidOrder.paid_amount += paymentInProcess;
+            partlyPaidOrder.market_settled = partlyPaidOrder.paid_amount;
             partlyPaidOrder.status = Order_status.PARTLY_PAID;
             paymentInProcess = 0;
           }
@@ -1371,9 +1380,11 @@ export class CashBoxService
           if (paymentInProcess >= order.to_be_paid) {
             paymentInProcess -= order.to_be_paid;
             order.paid_amount = order.to_be_paid;
+            order.market_settled = order.paid_amount;
             order.status = Order_status.PAID;
           } else {
             order.paid_amount = paymentInProcess;
+            order.market_settled = order.paid_amount;
             order.status = Order_status.PARTLY_PAID;
             paymentInProcess = 0;
           }
@@ -1482,17 +1493,43 @@ export class CashBoxService
         }
       }
 
+      /**
+       * ═══ TO'LOV NAVBATI ═══
+       *
+       * ⚠️ SHART KENGAYTIRILDI — ikki toifa kiradi:
+       *
+       *   1. `market_net <> market_settled` — hisob OCHIQ. Bu manfiy ham
+       *      bo'lishi mumkin: tarifdan arzon sotuvda yoki bekordagi
+       *      xarajatda market BIZGA qarzdor. Avval bunday buyurtma
+       *      navbatga UMUMAN tushmasdi va uning qarzi kassada «egasiz»
+       *      osilib qolardi — marketga kassadagi hamma pulni to'lasangiz
+       *      ham aynan shuncha buyurtma yopilmasdi.
+       *
+       *   2. status hali `sold`/`partly_paid` — hisobi 0 bo'lsa ham.
+       *      ⚠️ BU SHART REGRESSIYANI OLDINI OLADI: eski tarifdan arzon
+       *      buyurtmalarda `market_net = market_settled = 0`, lekin status
+       *      hamon `sold`. Eski halqa ularni `PAID` qilardi
+       *      (`remaining = 0` → shart rost). Faqat 1-shart qoldirilsa ular
+       *      abadiy `sold` bo'lib qolardi.
+       *
+       * TARTIB: avval MANFIYLAR (ular to'lov hovuzini OSHIRADI), keyin
+       * qisman to'langanlar, keyin sotilganlar — har biri ichida eskisidan.
+       */
       const allSoldOrders = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.user_id = :market_id', { market_id })
-        .andWhere('o.status IN (:...statuses)', {
-          statuses: [Order_status.PARTLY_PAID, Order_status.SOLD],
-        })
+        .andWhere('o.deleted_at IS NULL')
+        .andWhere(
+          `(o.market_net <> o.market_settled OR o.status IN (:...statuses))`,
+          { statuses: [Order_status.PARTLY_PAID, Order_status.SOLD] },
+        )
         .orderBy(
           `
-    CASE 
+    CASE
+      WHEN o.market_net < o.market_settled THEN 0
       WHEN o.status = '${Order_status.PARTLY_PAID}' THEN 1
       WHEN o.status = '${Order_status.SOLD}' THEN 2
+      ELSE 3
     END
   `,
         )
@@ -1532,22 +1569,56 @@ export class CashBoxService
         }),
       );
 
-      // ✅ Orderlarni yopish
-      for (let i = 0; i < allSoldOrders.length && paymentInProcess > 0; i++) {
-        const order = allSoldOrders[i];
-        const remaining = order.to_be_paid - order.paid_amount;
+      /**
+       * ═══ ORDERLARNI YOPISH ═══
+       *
+       * ⚠️ HALQA SHARTI `paymentInProcess > 0` EMAS.
+       *
+       * Manfiy hisobli buyurtma (market BIZGA qarzdor) yopilganda pul
+       * SARFLANMAYDI — aksincha, hovuz OSHADI. Eski shart bilan pul
+       * tugagach halqa to'xtar va o'sha qarzlar hech qachon yopilmasdi.
+       *
+       * ⚠️ `paid_amount` FAQAT MUSBAT hisobda o'zgaradi — u
+       * foydalanuvchiga «To'langan» deb ko'rsatiladi va manfiy bo'lishi
+       * mumkin emas. Hisob-kitob `market_settled` da yuritiladi.
+       */
+      /**
+       * ⚠️ TAQSIMOT SOF FUNKSIYADA — `planMarketPayment`.
+       *
+       * Avval bu mantiq shu yerda inline edi va unga HECH QANDAY test
+       * yo'q edi. Aynan shu sabab «marketga hamma pulni to'lasam ham
+       * buyurtmalar yopilmaydi» nuqsoni oylab sezilmadi.
+       *
+       * Endi qaror DB'siz testlanadi (24 test), servis esa faqat
+       * natijani QO'LLAYDI. Ikkisi ajralib ketmasligi uchun servis
+       * o'z nusxasini SAQLAMAYDI.
+       */
+      const { plans } = planMarketPayment(
+        allSoldOrders.map((o) => ({
+          id: o.id,
+          market_net: o.market_net,
+          market_settled: o.market_settled,
+          paid_amount: o.paid_amount,
+          is_open_status:
+            o.status === Order_status.SOLD ||
+            o.status === Order_status.PARTLY_PAID,
+        })),
+        amount,
+      );
 
-        if (paymentInProcess >= remaining) {
-          // To‘liq yopiladi
-          order.paid_amount += remaining;
+      const byId = new Map(allSoldOrders.map((o) => [o.id, o]));
+      for (const plan of plans) {
+        const order = byId.get(plan.id);
+        if (!order) continue;
+
+        order.market_settled = plan.market_settled;
+        order.paid_amount = plan.paid_amount;
+        if (plan.status === SettlementStatusAction.CLOSE) {
           order.status = Order_status.PAID;
-          paymentInProcess -= remaining;
-        } else {
-          // Qisman yopiladi
-          order.paid_amount += paymentInProcess;
+        } else if (plan.status === SettlementStatusAction.PARTIAL) {
           order.status = Order_status.PARTLY_PAID;
-          paymentInProcess = 0;
         }
+        // KEEP — statusga tegilmaydi.
 
         await queryRunner.manager.save(order);
       }
