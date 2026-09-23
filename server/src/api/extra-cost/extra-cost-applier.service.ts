@@ -133,6 +133,10 @@ export class ExtraCostApplierService {
       paymentDate: params.paymentDate,
     });
 
+    // ⚠️ XARAJAT BUYURTMAGA HAM YOZILADI — busiz market bilan hisob-kitob
+    // buziladi (quyidagi `bumpOrderExtraCostNet` izohiga qarang).
+    await this.bumpOrderExtraCostNet(queryRunner, params.orderId, amount);
+
     // ⚠️ Xotiradagi nusxalarni DB tasdiqlagan qiymatga keltiramiz —
     // chaqiruvchi shu obyektlarni keyin ishlatishi mumkin.
     params.marketCashbox.balance = Number(marketHistory.balance_after);
@@ -208,10 +212,45 @@ export class ExtraCostApplierService {
       paymentDate: params.paymentDate,
     });
 
+    // ⚠️ XARAJAT BUYURTMAGA HAM YOZILADI (applyInline bilan bir xil sabab).
+    await this.bumpOrderExtraCostNet(queryRunner, params.orderId, amount);
+
     return {
       marketHistoryId: marketHistory.id,
       courierHistoryId: courierHistory.id,
     };
+  }
+
+  /**
+   * SOF XARAJATNI BUYURTMAGA YOZISH.
+   *
+   * ⚠️ NEGA KERAK. `extra_cost_net` ustuni bazada 2026-06 dan beri bor
+   * (`1749800000000` migratsiyasi) va entity izohida maqsadi aniq
+   * yozilgan — LEKIN unga hech qachon yozilmagan. Natijada xarajat
+   * FAQAT market kassasida ko'rinardi, buyurtmada esa izi qolmasdi.
+   *
+   * Oqibati: `paymentsToMarket` to'lovni `to_be_paid` bo'yicha
+   * tarqatadi, market kassasi esa xarajat qadar KAM. Ya'ni marketga
+   * kassadagi HAMMA pulni bersangiz ham, xarajat qadar buyurtma
+   * yopilmay qolardi — «hamma pulni to'ladim, baribir PAID bo'lmadi»
+   * shikoyatining bevosita sababi.
+   *
+   * ⚠️ ATOMIK `UPDATE` — «o'qi-o'zgartir-yoz» EMAS. Bir buyurtmaga ikki
+   * xarajat parallel tasdiqlansa, ikkinchisi birinchisini o'chirardi.
+   *
+   * @param delta musbat — xarajat qo'shildi; manfiy — teskari qaytarildi
+   */
+  async bumpOrderExtraCostNet(
+    queryRunner: QueryRunner,
+    orderId: string,
+    delta: number,
+  ): Promise<void> {
+    const d = Math.trunc(Number(delta) || 0);
+    if (d === 0) return;
+    await queryRunner.manager.query(
+      `UPDATE "order" SET "extra_cost_net" = "extra_cost_net" + $1 WHERE "id" = $2`,
+      [d, orderId],
+    );
   }
 
   /** Bitta kassaga ATOMIK chiqim + tarix yozuvi. */

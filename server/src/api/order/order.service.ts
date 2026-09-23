@@ -4540,6 +4540,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       created_by: user.id,
     });
     /**
+     * ⚠️ `extra_cost_net` BU YERDA O'ZGARTIRILMAYDI — ATAYLAB.
+     *
+     * Avval bu yerda xom `UPDATE "order" SET extra_cost_net = ...`
+     * turardi va u ISHLAMASDI: `rollbackOrderToWaiting` oxirida
+     * `save(order)` (:5140) entity'ning ESKI qiymatini ustiga yozib
+     * yuborardi. Sotuv yo'lida bunday muammo yo'q, chunki u yerda
+     * `save(order)` xarajat yozuvidan OLDIN bajariladi.
+     *
+     * Shuning uchun rollback `net` ni qaytarib oladi va `order`
+     * entity'sini O'ZI tuzatadi — saqlash bitta joydan ketadi.
+     */
+
+    /**
      * ⚠️ Langar QAYTARILADI. Marketplace buyurtmasida bu pul harakati
      * yordamchi daftarda ham aks etishi SHART: aks holda kassa 0 ga
      * qaytadi-yu, daftarda `-extra_cost` abadiy qolib ketadi va
@@ -4734,6 +4747,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         delta: number;
       } | null = null;
 
+      /**
+       * MARKET kassasiga qaytarilgan sof qo'shimcha xarajat.
+       *
+       * ⚠️ Uchala shoxdan (SOLD/PAID, PARTLY_PAID, CANCELLED/CLOSED)
+       * faqat BITTASI ishlaydi, shuning uchun bitta o'zgaruvchi yetarli.
+       * `order.extra_cost_net` shu qiymatga kamaytiriladi — pastdagi
+       * yagona `save(order)` dan OLDIN.
+       */
+      let marketExtraReversed = 0;
+
       const rollbackComment = `[ROLLBACK] ${order.comment || ''}`;
 
       /**
@@ -4867,6 +4890,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
         // ⚠️ Xarajat qaytishi ham marketplace daftariga tushishi SHART.
         // Langar = MARKET kassasiga OXIRGI yozilgan qator.
+        marketExtraReversed += marketBack.net;
         if (marketBack.net > 0 && rollbackMarketWrite) {
           rollbackMarketWrite = {
             history_id: marketBack.history_id ?? rollbackMarketWrite.history_id,
@@ -4948,6 +4972,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
         // ⚠️ Xarajat qaytishi ham marketplace daftariga tushishi SHART.
         // Langar = MARKET kassasiga OXIRGI yozilgan qator.
+        marketExtraReversed += marketBack.net;
         if (marketBack.net > 0 && rollbackMarketWrite) {
           rollbackMarketWrite = {
             history_id: marketBack.history_id ?? rollbackMarketWrite.history_id,
@@ -4988,6 +5013,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
          * MUSBAT teskari yozuv kerak. Busiz kassa 0 ga qaytib, daftar
          * `-extra_cost` da qolardi va sotuvchi shu summaga kam olardi.
          */
+        marketExtraReversed += marketBack.net;
         if (marketBack.net > 0) {
           rollbackMarketWrite = {
             history_id: marketBack.history_id as string,
@@ -5114,6 +5140,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order.canceled_post_id = canceledPost.id;
         order.status = Order_status.CANCELLED_SENT;
         order.cancelled_at = Date.now();
+      }
+
+      /**
+       * ⚠️ SOF XARAJATNI KAMAYTIRISH — `save(order)` DAN OLDIN.
+       *
+       * Qaytarilgan xarajat buyurtmadan ham ayrilishi shart, aks holda
+       * `extra_cost_net` abadiy o'sib boradi va market bilan hisob-kitob
+       * xarajat qadar noto'g'ri chiqadi.
+       *
+       * `Math.max(0, ...)` — eski ma'lumotda kassa tarixida xarajat bor,
+       * lekin `extra_cost_net` yozilmagan buyurtmalar bor (ustun
+       * 2026-06 dan beri mavjud, unga hech qachon yozilmagan). Ularda
+       * ayirish manfiyga tushib ketardi.
+       */
+      if (marketExtraReversed > 0) {
+        order.extra_cost_net = Math.max(
+          0,
+          Number(order.extra_cost_net || 0) - marketExtraReversed,
+        );
       }
 
       await queryRunner.manager.save(order);
