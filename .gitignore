@@ -25,3 +25,6 @@ server/.uploads-dev/
 # .env zaxira nusxalari — sekretlar bor, HECH QACHON commit qilinmaydi
 .env.bak-*
 **/.env.bak-*
+
+# Lokal ngrok tunnel manzili — mashinaga xos, repoga tushmasin
+ngrok-url.txt

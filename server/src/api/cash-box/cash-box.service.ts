@@ -1351,9 +1351,14 @@ export class CashBoxService
           if (paymentInProcess >= remaining) {
             paymentInProcess -= remaining;
             partlyPaidOrder.paid_amount = partlyPaidOrder.to_be_paid;
+            // ⚠️ Hisob-kitob ustuni `paid_amount` bilan SINXRON qoladi —
+            // aks holda u ajralib ketib, marketga to'lov halqasi noto'g'ri
+            // qoldiq ko'rardi. Bu oqim mantiqi O'ZGARMAYDI.
+            partlyPaidOrder.market_settled = partlyPaidOrder.paid_amount;
             partlyPaidOrder.status = Order_status.PAID;
           } else {
             partlyPaidOrder.paid_amount += paymentInProcess;
+            partlyPaidOrder.market_settled = partlyPaidOrder.paid_amount;
             partlyPaidOrder.status = Order_status.PARTLY_PAID;
             paymentInProcess = 0;
           }
@@ -1371,9 +1376,11 @@ export class CashBoxService
           if (paymentInProcess >= order.to_be_paid) {
             paymentInProcess -= order.to_be_paid;
             order.paid_amount = order.to_be_paid;
+            order.market_settled = order.paid_amount;
             order.status = Order_status.PAID;
           } else {
             order.paid_amount = paymentInProcess;
+            order.market_settled = order.paid_amount;
             order.status = Order_status.PARTLY_PAID;
             paymentInProcess = 0;
           }
@@ -1482,17 +1489,43 @@ export class CashBoxService
         }
       }
 
+      /**
+       * ═══ TO'LOV NAVBATI ═══
+       *
+       * ⚠️ SHART KENGAYTIRILDI — ikki toifa kiradi:
+       *
+       *   1. `market_net <> market_settled` — hisob OCHIQ. Bu manfiy ham
+       *      bo'lishi mumkin: tarifdan arzon sotuvda yoki bekordagi
+       *      xarajatda market BIZGA qarzdor. Avval bunday buyurtma
+       *      navbatga UMUMAN tushmasdi va uning qarzi kassada «egasiz»
+       *      osilib qolardi — marketga kassadagi hamma pulni to'lasangiz
+       *      ham aynan shuncha buyurtma yopilmasdi.
+       *
+       *   2. status hali `sold`/`partly_paid` — hisobi 0 bo'lsa ham.
+       *      ⚠️ BU SHART REGRESSIYANI OLDINI OLADI: eski tarifdan arzon
+       *      buyurtmalarda `market_net = market_settled = 0`, lekin status
+       *      hamon `sold`. Eski halqa ularni `PAID` qilardi
+       *      (`remaining = 0` → shart rost). Faqat 1-shart qoldirilsa ular
+       *      abadiy `sold` bo'lib qolardi.
+       *
+       * TARTIB: avval MANFIYLAR (ular to'lov hovuzini OSHIRADI), keyin
+       * qisman to'langanlar, keyin sotilganlar — har biri ichida eskisidan.
+       */
       const allSoldOrders = await this.orderRepo
         .createQueryBuilder('o')
         .where('o.user_id = :market_id', { market_id })
-        .andWhere('o.status IN (:...statuses)', {
-          statuses: [Order_status.PARTLY_PAID, Order_status.SOLD],
-        })
+        .andWhere('o.deleted_at IS NULL')
+        .andWhere(
+          `(o.market_net <> o.market_settled OR o.status IN (:...statuses))`,
+          { statuses: [Order_status.PARTLY_PAID, Order_status.SOLD] },
+        )
         .orderBy(
           `
-    CASE 
+    CASE
+      WHEN o.market_net < o.market_settled THEN 0
       WHEN o.status = '${Order_status.PARTLY_PAID}' THEN 1
       WHEN o.status = '${Order_status.SOLD}' THEN 2
+      ELSE 3
     END
   `,
         )
@@ -1532,19 +1565,96 @@ export class CashBoxService
         }),
       );
 
-      // ✅ Orderlarni yopish
-      for (let i = 0; i < allSoldOrders.length && paymentInProcess > 0; i++) {
-        const order = allSoldOrders[i];
-        const remaining = order.to_be_paid - order.paid_amount;
+      /**
+       * ═══ ORDERLARNI YOPISH ═══
+       *
+       * ⚠️ HALQA SHARTI `paymentInProcess > 0` EMAS.
+       *
+       * Manfiy hisobli buyurtma (market BIZGA qarzdor) yopilganda pul
+       * SARFLANMAYDI — aksincha, hovuz OSHADI. Eski shart bilan pul
+       * tugagach halqa to'xtar va o'sha qarzlar hech qachon yopilmasdi.
+       *
+       * ⚠️ `paid_amount` FAQAT MUSBAT hisobda o'zgaradi — u
+       * foydalanuvchiga «To'langan» deb ko'rsatiladi va manfiy bo'lishi
+       * mumkin emas. Hisob-kitob `market_settled` da yuritiladi.
+       */
+      for (const order of allSoldOrders) {
+        const net = Number(order.market_net) || 0;
+        const settled = Number(order.market_settled) || 0;
+        const remaining = net - settled;
 
-        if (paymentInProcess >= remaining) {
-          // To‘liq yopiladi
-          order.paid_amount += remaining;
+        if (remaining < 0 && net < 0) {
+          /**
+           * MARKET BIZGA QARZDOR — qarz to'liq hisobga olinadi va
+           * to'lanadigan summaga QO'SHILADI (netting).
+           *
+           * Foydalanuvchi qarori (2026-09-23): tarifdan arzon sotuvda
+           * ham, bekordagi xarajatda ham market farqni qoplaydi va u
+           * keyingi to'lovdan ushlanadi.
+           *
+           * ⚠️ `net < 0` SHARTI MAJBURIY. `remaining < 0` yolg'iz
+           * yetarli emas: `market_settled` `market_net` dan OSHIB
+           * ketishi mumkin (masalan `paymentsFromCourier` buyurtmani
+           * `to_be_paid` bo'yicha yopadi, `market_net` esa xarajat
+           * qadar kichik). Shunday qatorni «market qarzdor» deb
+           * hisoblasak, halqa YO'QDAN PUL yaratib, boshqa
+           * buyurtmalarni asossiz yopib yuborardi.
+           */
+          order.market_settled = net;
+          paymentInProcess -= remaining; // remaining manfiy → hovuz oshadi
+          /**
+           * ⚠️ STATUS HAM YOPILADI. Hisob teng bo'lgach buyurtma navbatda
+           * qolmasligi kerak — aks holda u har to'lovda qayta o'qilib,
+           * ro'yxatni to'ldirib turardi (birinchi sinovda `sold` bo'lib
+           * qolgani aynan shu).
+           */
+          if (
+            order.status === Order_status.SOLD ||
+            order.status === Order_status.PARTLY_PAID
+          ) {
+            order.status = Order_status.PAID;
+          }
+        } else if (remaining < 0) {
+          /**
+           * ORTIQCHA YOPILGAN (`market_settled > market_net >= 0`) —
+           * eski ma'lumot yoki boshqa oqim natijasi.
+           *
+           * Faqat NORMALLASHTIRAMIZ: hisobni `market_net` ga tenglaymiz
+           * va PUL HOVUZIGA TEGMAYMIZ. Bu ma'lumot tozalash, pul
+           * harakati EMAS — aks holda halqa mavjud bo'lmagan pulni
+           * tarqatardi.
+           */
+          order.market_settled = net;
+          if (
+            order.status === Order_status.SOLD ||
+            order.status === Order_status.PARTLY_PAID
+          ) {
+            order.status = Order_status.PAID;
+          }
+        } else if (remaining === 0) {
+          /**
+           * Hisob allaqachon teng. Faqat status qoldiq bo'lsa yopamiz —
+           * eski halqa aynan shunday qilardi (`remaining = 0` → PAID).
+           */
+          if (
+            order.status === Order_status.SOLD ||
+            order.status === Order_status.PARTLY_PAID
+          ) {
+            order.status = Order_status.PAID;
+          } else {
+            continue; // yozishga hojat yo'q
+          }
+        } else if (paymentInProcess <= 0) {
+          // Pul tugadi — qolgan MUSBAT qatorlarga tegmaymiz.
+          continue;
+        } else if (paymentInProcess >= remaining) {
+          order.market_settled = net;
+          order.paid_amount = Number(order.paid_amount || 0) + remaining;
           order.status = Order_status.PAID;
           paymentInProcess -= remaining;
         } else {
-          // Qisman yopiladi
-          order.paid_amount += paymentInProcess;
+          order.market_settled = settled + paymentInProcess;
+          order.paid_amount = Number(order.paid_amount || 0) + paymentInProcess;
           order.status = Order_status.PARTLY_PAID;
           paymentInProcess = 0;
         }

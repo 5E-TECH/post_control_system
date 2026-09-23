@@ -3061,6 +3061,13 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           extra_cost_net: order.extra_cost_net,
         }),
         paid_amount: paidAfter,
+        /**
+         * ⚠️ `paid_amount` BILAN SINXRON. Sotuv paytida qarz avtomatik
+         * qoplanishi mumkin (`autoPay`) — o'sha qoplangan qism ham
+         * hisob-kitobda aks etishi shart, aks holda to'lov halqasi uni
+         * QAYTA undirishga urinardi.
+         */
+        market_settled: paidAfter,
         comment: finalComment,
         sold_at: Date.now(),
         cancelled_at: null,
@@ -4152,6 +4159,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           extra_cost_net: order.extra_cost_net,
         }),
         paid_amount: paidAfter,
+        // ⚠️ `sellOrder` bilan bir xil sabab — sinxron qoladi.
+        market_settled: paidAfter,
         total_price: price,
         // Asl summani saqlaymiz — rollback'da total_price aynan shundan tiklanadi
         // (dona kamaymay faqat narx tushgan holatda "bola" order bo'lmaydi).
@@ -5123,6 +5132,8 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         [Order_status.PAID, Order_status.PARTLY_PAID].includes(order.status)
       ) {
         order.paid_amount = 0;
+        // ⚠️ Hisob-kitob ham tozalanadi — `paid_amount` bilan sinxron.
+        order.market_settled = 0;
         order.sold_at = null;
       } else {
         order.sold_at = null;
@@ -5137,6 +5148,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
          * to'lov halqasi bilan birga ko'rib chiqiladi.
          */
         order.market_net = 0;
+        order.market_settled = 0;
         settlementReset = true;
       }
 

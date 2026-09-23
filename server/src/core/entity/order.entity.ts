@@ -343,6 +343,21 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   market_net: number;
 
+  /**
+   * `market_net` ning YOPILGAN qismi — ISHORALI.
+   *
+   *     market_settled == market_net  →  hisob yopiq
+   *     market_settled <> market_net  →  hisob ochiq
+   *
+   * ⚠️ `paid_amount` DAN FARQI. `paid_amount` foydalanuvchiga
+   * «To'langan» deb ko'rsatiladi va MANFIY bo'lmasligi kerak. Manfiy
+   * hisobli buyurtmalarda (tarifdan arzon sotuv, bekordagi xarajat)
+   * market BIZGA qarzdor bo'ladi — o'sha qarz yopilganini shu ustun
+   * kuzatadi, `paid_amount` esa tegilmaydi.
+   */
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  market_settled: number;
+
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order)
   items: OrderItemEntity[];
