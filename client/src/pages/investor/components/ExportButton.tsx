@@ -4,6 +4,7 @@ import { saveAs } from "file-saver";
 import { message } from "antd";
 import { useTranslation } from "react-i18next";
 import { useInvestor } from "../../../shared/api/hooks/useInvestor";
+import { blobErrorMessage } from "../../../shared/helpers/download-file";
 
 interface Props {
   scope?: "business" | "personal";
@@ -25,16 +26,29 @@ const ExportButton = ({ scope = "business", from, to }: Props) => {
         scope === "personal"
           ? await exportMyInvestment(params)
           : await exportBusiness(params);
-      if (!res?.data) throw new Error("empty");
-      const blob = new Blob([res.data], {
+      /**
+       * ⚠️ `if (!res?.data)` YETARLI EMAS — `new Blob()` (0 bayt) TRUTHY.
+       * Tekshiruvsiz brauzer 0 KB `.xlsx` saqlaydi va Excel «fayl
+       * buzilgan» deydi: foydalanuvchi uchun «yuklandi, lekin ochilmaydi».
+       */
+      const body = res?.data as Blob | undefined;
+      if (!(body instanceof Blob) || body.size === 0) {
+        throw new Error("Server bo'sh fayl qaytardi");
+      }
+
+      const blob = new Blob([body], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
       const prefix = scope === "personal" ? "my-investment" : "investor";
       saveAs(blob, `${prefix}-${from || "umumiy"}.xlsx`);
-    } catch (e: any) {
-      message.error(
-        e?.response?.data?.message || t("exportError", "Eksport xatosi"),
-      );
+    } catch (e: unknown) {
+      /**
+       * ⚠️ `responseType: "blob"` da XATO javobi ham Blob bo'ladi, ya'ni
+       * `e.response.data.message` HAR DOIM undefined edi va foydalanuvchi
+       * har qanday nosozlikda faqat umumiy «Eksport xatosi» ni ko'rardi.
+       * Helper blob'ni matnga o'girib, server xabarini ajratadi.
+       */
+      message.error(await blobErrorMessage(e, t("exportError", "Eksport xatosi")));
     } finally {
       setLoading(false);
     }

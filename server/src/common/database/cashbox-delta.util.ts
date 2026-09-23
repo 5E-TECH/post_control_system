@@ -76,6 +76,55 @@ export async function applyCashboxDelta(
   input: CashboxDeltaInput,
 ): Promise<CashboxDeltaResult> {
   const delta = Math.trunc(Number(input.delta) || 0);
+  const amount = Math.trunc(Number(input.amount) || 0);
+
+  /**
+   * ⚠️ ISHORA ZIDDIYATI DARVOZASI.
+   *
+   * Bu util balansni `delta` bo'yicha (ISHORALI), tarixni esa
+   * chaqiruvchining `operation` + `Math.abs(amount)` bo'yicha yozadi.
+   * Ikki manba — ikki haqiqat. Ular zid bo'lsa hech kim sezmasdi:
+   * `cash_box.balance` to'g'ri qolar, `cashbox_history` esa TESKARI
+   * yo'nalishni ko'rsatardi. Yo'nalishni esa hamma jamlagich
+   * `operation_type` dan o'qiydi:
+   *
+   *     if (INCOME) income += amount; else outcome += amount;
+   *
+   * 2026-09-16 dan 2026-09-23 gacha `rollbackOrderToWaiting` aynan shu
+   * tuzoqqa tushdi: `delta` musbat (pul QAYTARILADI) bo'lsa ham
+   * `operation: EXPENSE` qotirib yozilgan edi. 0 so'mlik buyurtmada
+   * «Chiqim» sotuv + rollback = 2 × tarif bo'lib ko'rinardi.
+   *
+   * `tsc` buni ko'rmaydi — ikkalasi ham `number`. Shuning uchun
+   * tekshiruv ISH VAQTIDA, yozishdan OLDIN.
+   *
+   * `delta === 0` ataylab o'tkaziladi: nol o'zgarishli yozuv (masalan
+   * to'liq qoplangan tuzatish) yo'nalishga ega emas.
+   */
+  if (delta !== 0) {
+    const expected =
+      delta > 0 ? Operation_type.INCOME : Operation_type.EXPENSE;
+    if (input.operation !== expected) {
+      throw new Error(
+        `applyCashboxDelta: ishora ziddiyati — delta=${delta} uchun ` +
+          `'${expected}' kutilgan, lekin '${input.operation}' berildi. ` +
+          `Kassa ${input.cashbox.id}, manba ${input.source_type}.`,
+      );
+    }
+  }
+
+  /**
+   * ⚠️ Manfiy `amount` JIMGINA `Math.abs` ga tushib ketardi va tarixda
+   * musbat bo'lib ko'rinardi. Interfeys uni «MUSBAT summa» deb
+   * ta'riflaydi — endi bu majburlanadi.
+   */
+  if (amount < 0) {
+    throw new Error(
+      `applyCashboxDelta: amount MUSBAT bo'lishi shart, berildi ${amount} ` +
+        `(kassa ${input.cashbox.id}, manba ${input.source_type}).`,
+    );
+  }
+
   const now = Date.now();
 
   const raw = await manager.query(
@@ -107,7 +156,7 @@ export async function applyCashboxDelta(
     source_type: input.source_type,
     source_id: input.source_id ?? null,
     source_user_id: input.source_user_id ?? null,
-    amount: Math.trunc(Math.abs(Number(input.amount) || 0)),
+    amount,
     // ⚠️ DB tasdiqlagan qiymat — xotiradagi taxmin emas.
     balance_after: balanceAfter,
     comment: input.comment ?? undefined,

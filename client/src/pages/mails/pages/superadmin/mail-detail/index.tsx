@@ -401,7 +401,8 @@ const MailDetail = () => {
           sendCouriersToPost(
             { id, data: post },
             {
-              onSuccess: (res) => {
+              // ⚠️ `async` — ichida `await exportToExcel(...)` bor.
+              onSuccess: async (res) => {
 
                 const courierName = res?.data?.updatedPost?.courier?.name;
                 // Server HAQIQATAN jo'natgan buyurtmalar soni (stale tanlovlar
@@ -436,13 +437,24 @@ const MailDetail = () => {
                     Izoh: mail?.comment || "",
                   }));
 
-                  exportToExcel(exportData || [], "pochtalar", {
-                    qrCodeToken: res?.data?.updatedPost?.qr_code_token,
-                    regionName: res?.data?.updatedPost?.region?.name,
-                    courierName,
-                    totalOrders: res?.data?.postTotalInfo?.total,
-                    date: res?.data?.updatedPost?.created_at,
-                  });
+                  /**
+                   * ⚠️ `await` SHART. `exportToExcel` — ASYNC (QR
+                   * generatsiya + exceljs buffer). Avval u `await`siz
+                   * chaqirilardi, ya'ni «floating promise» bo'lib
+                   * quyidagi `catch` ga TUSHMASDI, `handleSuccess` esa
+                   * fayl yozilishini kutmasdan darhol ishlardi.
+                   */
+                  const written = await exportToExcel(
+                    exportData || [],
+                    "pochtalar",
+                    {
+                      qrCodeToken: res?.data?.updatedPost?.qr_code_token,
+                      regionName: res?.data?.updatedPost?.region?.name,
+                      courierName,
+                      totalOrders: res?.data?.postTotalInfo?.total,
+                      date: res?.data?.updatedPost?.created_at,
+                    },
+                  );
 
                   // Virtual kuryer (Elchi) uchun qog'oz chek yo'q.
                   if (!chosenIsElchi) {
@@ -457,7 +469,14 @@ const MailDetail = () => {
                     });
                   }
 
-                  handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+                  if (written) {
+                    handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+                  } else {
+                    handleWarning(
+                      "Excel yaratilmadi",
+                      "Bu pochtada eksport qilinadigan buyurtma topilmadi.",
+                    );
+                  }
                 } catch (error) {
 
                   handleApiError(error, "Excel yuklashda xatolik");
@@ -536,7 +555,8 @@ const MailDetail = () => {
     sendCouriersToPost(
       { id: id as string, data: post },
       {
-        onSuccess: (res) => {
+        // ⚠️ `async` — ichida `await exportToExcel(...)` bor.
+        onSuccess: async (res) => {
 
           const courierName = res?.data?.updatedPost?.courier?.name;
           handleSuccess(`Pochta ${courierName} kuryerga jo'natildi`);
@@ -556,7 +576,8 @@ const MailDetail = () => {
               Izoh: mail?.comment || "",
             }));
 
-            exportToExcel(exportData || [], "pochtalar", {
+            // ⚠️ `await` shart — yuqoridagi chaqiruvdagi bilan bir xil sabab.
+            const written = await exportToExcel(exportData || [], "pochtalar", {
               qrCodeToken: res?.data?.updatedPost?.qr_code_token,
               regionName: res?.data?.updatedPost?.region?.name,
               courierName,
@@ -578,7 +599,14 @@ const MailDetail = () => {
               });
             }
 
-            handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+            if (written) {
+              handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+            } else {
+              handleWarning(
+                "Excel yaratilmadi",
+                "Bu pochtada eksport qilinadigan buyurtma topilmadi.",
+              );
+            }
           } catch (error) {
             handleApiError(error, "Excel yuklashda xatolik");
           } finally {

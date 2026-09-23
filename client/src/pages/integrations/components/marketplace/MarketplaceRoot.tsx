@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Segmented, Spin } from "antd";
+import { Alert, Button, Segmented, Spin } from "antd";
 import {
   Banknote,
+  RefreshCcwDot,
   Settings as SettingsIcon,
   ShieldAlert,
 } from "lucide-react";
@@ -74,6 +75,49 @@ export const MarketplaceRoot = () => {
       <div className="flex justify-center py-16">
         <Spin />
       </div>
+    );
+  }
+
+  /**
+   * ⚠️ XATO HOLATI BO'SH HOLAT EMAS.
+   *
+   * Avval bu shox yo'q edi: so'rov yiqilsa `list.data` undefined bo'lib,
+   * `rows` bo'sh massivga aylanardi, `slug` esa hech qachon o'rnatilmasdi.
+   * Natijada sozlash tabi «Marketplace ulanishi hali yaratilmagan» deb
+   * YOLG'ON aytardi — bazada ulanish bor bo'lsa ham. Admin uchun bu
+   * «sekret kiritadigan joy umuman yo'q» bo'lib ko'rinardi.
+   *
+   * Eng ko'p uchraydigan sabab — `SECRET_ENC_KEY` almashgani: shunda
+   * sekret ustunlari deshifrlanmaydi va endpoint 500 beradi.
+   */
+  if (list.isError) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        message="Marketplace ulanishlarini olib bo'lmadi"
+        description={
+          <div className="space-y-2">
+            <div>
+              {(list.error as { response?: { data?: { message?: string } } })
+                ?.response?.data?.message ??
+                "Server javob bermadi. Bu ro'yxat bo'sh degani EMAS — mavjud ulanishlar ham ko'rinmayapti."}
+            </div>
+            <div className="text-xs text-gray-500">
+              Tez-tez uchraydigan sabab: serverda `SECRET_ENC_KEY` o'rnatilmagan
+              yoki almashgan — u holda sekretlar deshifrlanmaydi.
+            </div>
+            <Button
+              size="small"
+              icon={<RefreshCcwDot className="w-4 h-4" />}
+              loading={list.isFetching}
+              onClick={() => list.refetch()}
+            >
+              Qayta urinish
+            </Button>
+          </div>
+        }
+      />
     );
   }
 

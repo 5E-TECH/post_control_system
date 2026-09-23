@@ -24,12 +24,12 @@ import {
   CheckCircle2,
   Copy,
   KeyRound,
+  Link2,
   PlugZap,
   Plus,
   RefreshCcwDot,
   Scale,
   Users,
-  Wallet,
   XCircle,
 } from "lucide-react";
 import {
@@ -97,15 +97,45 @@ const SecretOnceModal = ({
   </Modal>
 );
 
-const ChecklistRow = ({ ok, label }: { ok: boolean; label: string }) => (
-  <div className="flex items-center gap-2 text-sm">
-    {ok ? (
-      <CheckCircle2 className="w-4 h-4 text-green-500" />
-    ) : (
-      <XCircle className="w-4 h-4 text-red-500" />
-    )}
-    <span className={ok ? "text-gray-500" : "font-medium"}>{label}</span>
-  </div>
+/**
+ * Har bir sozlash bandi QAYERDAN tuzatilishi.
+ *
+ * ⚠️ Busiz ro'yxat faqat «nima yetishmayapti» deydi, «qayerga borish
+ * kerak»ni esa admin o'zi topishi kerak edi. Ayniqsa `encryption` bandi
+ * chalg'itardi: u UI'dan umuman sozlanmaydi — bu serverdagi `.env`.
+ */
+const CHECKLIST_HINTS: Record<keyof MarketplaceChecklist, string> = {
+  api_base_url: "«Ulanish sozlamalari» kartasi → API manzili",
+  api_key: "«Kalitlar va sekretlar» kartasi → Ularning API kaliti",
+  signing_secret:
+    "«Kalitlar va sekretlar» kartasi → Imzo sekreti → «Kalit yaratish» (faqat superadmin)",
+  inbound_api_key:
+    "«Kalitlar va sekretlar» kartasi → Kiruvchi kalit → «Kalit yaratish» (faqat superadmin)",
+  tariff: "Shu sahifaning pastidagi «Tarif» kartasi",
+  market: "Ulanish yaratilganda tanlanadi — keyin o'zgartirilmaydi",
+  encryption:
+    "UI'dan sozlanmaydi. Serverdagi .env faylida SECRET_ENC_KEY (kamida 16 belgi) + server restart.",
+};
+
+const ChecklistRow = ({
+  ok,
+  label,
+  hint,
+}: {
+  ok: boolean;
+  label: string;
+  hint?: string;
+}) => (
+  <Tooltip title={ok ? undefined : hint}>
+    <div className="flex items-center gap-2 text-sm">
+      {ok ? (
+        <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+      ) : (
+        <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+      )}
+      <span className={ok ? "text-gray-500" : "font-medium"}>{label}</span>
+    </div>
+  </Tooltip>
 );
 
 interface Props {
@@ -148,6 +178,20 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
   } = useMarketplaceConfig(slug);
 
   const [connForm] = Form.useForm();
+  /**
+   * ⚠️ SEKRET UCHUN ALOHIDA FORMA.
+   *
+   * Avval `api_key` ulanish formasining ichida, «Ulanish sozlamalari»
+   * (hamyon ikonkasi) kartasida turardi. Admin esa kalit qidirganda
+   * tabiiy ravishda «Kalitlar» (kalit ikonkasi) kartasiga borardi — u
+   * yerda esa birorta kiritish maydoni yo'q edi, faqat tugmalar. Natijada
+   * «UI'da sekret kiritadigan joy umuman yo'q» degan xulosa chiqardi.
+   *
+   * Endi maydon o'z kartasida, o'z saqlash tugmasi bilan. Ulanish
+   * formasiga tegmaydi: nom/manzil o'zgartirib saqlaganda sekret
+   * so'rovga umuman qo'shilmaydi.
+   */
+  const [secretForm] = Form.useForm();
   const [tariffForm] = Form.useForm();
   const cfg = detail.data;
 
@@ -156,11 +200,24 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
     connForm.setFieldsValue({
       name: cfg.name,
       api_base_url: cfg.api_base_url ?? undefined,
-      api_key: undefined, // ⚠️ sekret hech qachon oldindan to'ldirilmaydi
       request_timeout_ms: cfg.request_timeout_ms,
       settlement_period_days: cfg.settlement_period_days,
     });
   }, [cfg, connForm]);
+
+  /**
+   * Sekret maydoni BOSHQA ULANISHGA o'tilgandagina tozalanadi.
+   *
+   * ⚠️ Bog'liqlik `cfg` EMAS, `slug`. `cfg` ga bog'lansa, admin kalitni
+   * yozayotganda har qanday `detail` yangilanishi (Saqlash, master
+   * toggle, «Yangilash» tugmasi) yozilgan kalitni JIMGINA o'chirib
+   * yuborardi — ekranda esa yashil «Saqlandi» turardi.
+   *
+   * Sekret hech qachon oldindan to'ldirilmaydi: server uni qaytarmaydi.
+   */
+  useEffect(() => {
+    secretForm.setFieldsValue({ api_key: undefined });
+  }, [slug, secretForm]);
 
   if (!slug) {
     return (
@@ -197,25 +254,64 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
       )
     : [];
 
+  /**
+   * ⚠️ `validateFields()` ATAYLAB `try` ICHIDA. Tashqarida qolsa, forma
+   * noto'g'ri to'ldirilganda rad etilgan promise ushlanmasdan ketardi va
+   * ekranda hech narsa ko'rinmasdi.
+   */
   const saveConnection = async () => {
-    const values = await connForm.validateFields();
     try {
-      await update.mutateAsync({
-        slug: slug as string,
-        // Bo'sh sekret maydonini YUBORMAYMIZ — aks holda mavjud kalit
-        // bo'sh satr bilan almashib, ulanish jimgina buzilardi.
-        data: { ...values, api_key: values.api_key || undefined },
-      });
-      connForm.setFieldsValue({ api_key: undefined });
+      const values = await connForm.validateFields();
+      // ⚠️ Sekret bu formada YO'Q — u `saveApiKey` orqali alohida yuboriladi.
+      await update.mutateAsync({ slug: slug as string, data: values });
       message.success("Saqlandi");
     } catch (e) {
+      if ((e as { errorFields?: unknown[] })?.errorFields) return; // forma validatsiyasi
       message.error(errText(e, "Saqlab bo'lmadi"));
     }
   };
 
+  /**
+   * HAMKORNING API KALITINI SAQLASH.
+   *
+   * ⚠️ Bo'sh maydon YUBORILMAYDI. Aks holda «o'zgartirmadim» degani
+   * «kalitni o'chir» ga aylanib, mavjud kalit jimgina yo'qolardi —
+   * ulanish esa YOQIQ qolgani uchun nosozlik faqat birinchi haqiqiy
+   * so'rovda bilinardi.
+   */
+  const saveApiKey = async () => {
+    const values = await secretForm.getFieldsValue();
+    const key = String(values.api_key ?? "").trim();
+    if (!key) {
+      message.warning("Kalit kiritilmadi");
+      return;
+    }
+    try {
+      await update.mutateAsync({ slug: slug as string, data: { api_key: key } });
+      secretForm.setFieldsValue({ api_key: undefined });
+      message.success("API kaliti saqlandi");
+    } catch (e) {
+      message.error(errText(e, "Kalitni saqlab bo'lmadi"));
+    }
+  };
+
+  /**
+   * ⚠️ IKKI XIL XATO, IKKI XIL ISHLOV.
+   *
+   *   · «ulanmadi» — servis `{ok:false, kind, message}` qaytaradi, HTTP 200.
+   *     Bu PARTLAMAYDI, shuning uchun natijaning o'zi tekshiriladi.
+   *   · HTTP xatosi (404/500/tarmoq) — `mutateAsync` THROW qiladi.
+   *     Avval bu ushlanmasdi: tugma bosilar, hech narsa chiqmas edi va
+   *     admin «tugma ishlamayapti» deb o'ylardi.
+   */
   const doTest = async () => {
-    const res = await testConnection.mutateAsync(slug as string);
-    // ⚠️ Xato PARTLAMAYDI — natijaning o'zini tekshiramiz.
+    let res: Awaited<ReturnType<typeof testConnection.mutateAsync>>;
+    try {
+      res = await testConnection.mutateAsync(slug as string);
+    } catch (e) {
+      message.error(errText(e, "Ulanishni tekshirib bo'lmadi"));
+      return;
+    }
     if (res.ok) {
       message.success(
         `Ulanish bor — ${res.latency_ms ?? "?"} ms${
@@ -234,7 +330,13 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
    * navbatda qotib qolardi.
    */
   const doSignatureTest = async () => {
-    const res = await testSignature.mutateAsync(slug as string);
+    let res: Awaited<ReturnType<typeof testSignature.mutateAsync>>;
+    try {
+      res = await testSignature.mutateAsync(slug as string);
+    } catch (e) {
+      message.error(errText(e, "Imzo sinovini bajarib bo'lmadi"));
+      return;
+    }
     if (res.ok) {
       message.success(
         `Imzo qabul qilindi${res.applied === false ? " (hodisa qo'llanmadi — bu normal)" : ''}`,
@@ -258,6 +360,57 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
       message.success(`${res.synced} ta sotuvchi sinxronlandi`);
     } catch (e) {
       message.error(errText(e, "Sotuvchilarni sinxronlab bo'lmadi"));
+    }
+  };
+
+  /**
+   * ── KALIT AYLANTIRISH ──────────────────────────────────────────────
+   *
+   * ⚠️ NEGA ALOHIDA FUNKSIYA, INLINE `onConfirm` EMAS.
+   *
+   * Avval bu uchala amal Popconfirm ichida inline `async` funksiya edi va
+   * `try/catch` yo'q edi. antd Popconfirm `onConfirm` dan qaytgan RAD
+   * ETILGAN promise'ni jimgina yutadi — ya'ni 403 (admin rolida), 404
+   * yoki 500 bo'lsa ekranda MUTLAQO hech narsa ko'rinmasdi.
+   *
+   * Eng xavfli tomoni: `rotateInbound` serverda kalitni ALMASHTIRIB
+   * bo'lgan, javob esa yo'lda yiqilgan bo'lishi ham mumkin. U holda
+   * hamkorning eski kaliti ishlamay qoladi, admin esa buni bilmaydi.
+   * Shuning uchun xato matni endi aniq ogohlantirish bilan chiqadi.
+   */
+  const doRotateSigning = async () => {
+    try {
+      const res = await rotateSigning.mutateAsync(slug as string);
+      setOneTime({
+        secret: res.signing_secret as string,
+        warning: res.warning,
+      });
+    } catch (e) {
+      message.error(errText(e, "Imzo sekretini aylantirib bo'lmadi"));
+    }
+  };
+
+  const doClearPrevious = async () => {
+    try {
+      await clearPreviousSigning.mutateAsync(slug as string);
+      message.success("Eski sekret tozalandi");
+    } catch (e) {
+      message.error(errText(e, "Eski sekretni tozalab bo'lmadi"));
+    }
+  };
+
+  const doRotateInbound = async () => {
+    try {
+      const res = await rotateInbound.mutateAsync(slug as string);
+      setOneTime({
+        secret: res.inbound_api_key as string,
+        warning: res.warning,
+      });
+    } catch (e) {
+      message.error(
+        `${errText(e, "Kiruvchi kalitni aylantirib bo'lmadi")} — kalit serverda ` +
+          "almashgan bo'lishi mumkin, «Yangilash» bilan holatni tekshiring.",
+      );
     }
   };
 
@@ -340,7 +493,41 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
         </Button>
       </div>
 
-      {detail.isLoading || !cfg ? (
+      {/*
+        ⚠️ UCH HOLAT, IKKITA EMAS.
+
+        Avval shart `detail.isLoading || !cfg` edi. React Query v5 da xatodan
+        keyin `isLoading` false, `data` esa undefined bo'ladi — ya'ni `!cfg`
+        tufayli shart BARIBIR true qolib, spinner MANGU aylanardi. Sekret
+        kiritish maydoni ham, «Kalitlar» kartasi ham shu shartning `else`
+        shoxida bo'lgani uchun ular ekranda umuman paydo bo'lmasdi va hech
+        qanday xato xabari ham chiqmasdi.
+      */}
+      {detail.isError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Ulanish ma'lumotini olib bo'lmadi"
+          description={
+            <div className="space-y-2">
+              <div>{errText(detail.error, "Server javob bermadi.")}</div>
+              <div className="text-xs text-gray-500">
+                Sozlash formasi shu sabab ko'rinmayapti. Tez-tez uchraydigan
+                sabab: serverda `SECRET_ENC_KEY` o'rnatilmagan yoki almashgan —
+                u holda sekretlar deshifrlanmaydi va so'rov 500 qaytaradi.
+              </div>
+              <Button
+                size="small"
+                icon={<RefreshCcwDot className="w-4 h-4" />}
+                loading={detail.isFetching}
+                onClick={() => detail.refetch()}
+              >
+                Qayta urinish
+              </Button>
+            </div>
+          }
+        />
+      ) : detail.isLoading || !cfg ? (
         <div className="flex justify-center py-16">
           <Spin />
         </div>
@@ -386,6 +573,7 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                     key={k}
                     ok={cfg.checklist[k]}
                     label={MARKETPLACE_CHECKLIST_LABELS[k]}
+                    hint={CHECKLIST_HINTS[k]}
                   />
                 ))}
               </div>
@@ -507,7 +695,7 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
           <Card
             title={
               <span className="flex items-center gap-2">
-                <Wallet className="w-4 h-4" /> Ulanish sozlamalari
+                <Link2 className="w-4 h-4" /> Ulanish sozlamalari
               </span>
             }
             extra={
@@ -562,21 +750,12 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                   <Input placeholder="https://api.uzmarket.uz" maxLength={300} />
                 </Form.Item>
 
-                <Form.Item
-                  name="api_key"
-                  label="Ularning API kaliti"
-                  extra={
-                    cfg.secrets.api_key.set
-                      ? `Kiritilgan (${cfg.secrets.api_key.hint}). Yangisini kiritsangiz almashadi.`
-                      : "Hali kiritilmagan."
-                  }
-                >
-                  <Input.Password
-                    placeholder="o'zgartirmasangiz bo'sh qoldiring"
-                    maxLength={300}
-                    autoComplete="new-password"
-                  />
-                </Form.Item>
+                {/*
+                  ⚠️ `api_key` BU YERDAN OLIB TASHLANDI — u endi pastdagi
+                  «Kalitlar va sekretlar» kartasida, boshqa uch sekret bilan
+                  yonma-yon. Sabab: admin kalitni kalit ikonkasidagi kartadan
+                  qidiradi, hamyon ikonkasidagidan emas.
+                */}
 
                 <Form.Item name="request_timeout_ms" label="So'rov timeouti (ms)">
                   <InputNumber className="w-full" min={1000} max={60000} step={500} />
@@ -604,7 +783,7 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
           <Card
             title={
               <span className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4" /> Kalitlar
+                <KeyRound className="w-4 h-4" /> Kalitlar va sekretlar
               </span>
             }
           >
@@ -614,6 +793,61 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
               className="mb-3"
               message="Kalitlar hech qachon ko'rsatilmaydi"
               description="Server faqat oxirgi 4 belgini qaytaradi. Aylantirilganda yangi qiymat bir marta chiqadi — o'sha zahoti marketplace'ga uzating."
+            />
+
+            {/*
+              ── HAMKORNING KALITI ────────────────────────────────────────
+              Uchta sekretdan YAGONA qo'lda kiritiladigani. Qolgan ikkitasi
+              (imzo sekreti, kiruvchi kalit) serverda generatsiya qilinadi —
+              shuning uchun ular uchun input yo'q, faqat tugma. Bu farq
+              pastdagi izohda ochiq aytilgan, aks holda admin qolgan ikki
+              maydonni izlab vaqt yo'qotadi.
+            */}
+            <Form form={secretForm} layout="vertical" requiredMark={false}>
+              <div className="grid md:grid-cols-2 gap-x-4 items-end">
+                <Form.Item
+                  name="api_key"
+                  label="Ularning API kaliti (ular → biz beramiz)"
+                  extra={
+                    cfg.secrets.api_key.set
+                      ? `Kiritilgan (${cfg.secrets.api_key.hint}). Yangisini kiritsangiz almashadi.`
+                      : "Hali kiritilmagan. Bu kalitni marketplace sizga beradi."
+                  }
+                  className="mb-3"
+                >
+                  <Input.Password
+                    placeholder="o'zgartirmasangiz bo'sh qoldiring"
+                    maxLength={300}
+                    autoComplete="new-password"
+                    onPressEnter={saveApiKey}
+                  />
+                </Form.Item>
+
+                <Form.Item className="mb-3">
+                  <Button
+                    type="primary"
+                    loading={update.isPending}
+                    onClick={saveApiKey}
+                  >
+                    Kalitni saqlash
+                  </Button>
+                </Form.Item>
+              </div>
+            </Form>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 my-3" />
+
+            <Alert
+              type="info"
+              showIcon={false}
+              className="mb-3"
+              message={
+                <span className="text-xs">
+                  Quyidagi ikki kalit <b>qo'lda kiritilmaydi</b> — ularni server
+                  o'zi yaratadi. Shuning uchun bu yerda kiritish maydoni emas,
+                  «Kalit yaratish» tugmasi turibdi.
+                </span>
+              }
             />
 
             {!canRotate && (
@@ -645,16 +879,12 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                     description="Eskisi ham vaqtincha ishlaydi — uzilish bo'lmaydi."
                     okText="Aylantirish"
                     cancelText="Bekor"
-                    onConfirm={async () => {
-                      const res = await rotateSigning.mutateAsync(slug as string);
-                      setOneTime({
-                        secret: res.signing_secret as string,
-                        warning: res.warning,
-                      });
-                    }}
+                    onConfirm={doRotateSigning}
                   >
                     <Button size="small" loading={rotateSigning.isPending} disabled={!canRotate}>
-                      Aylantirish
+                      {cfg.secrets.signing_secret.set
+                        ? "Aylantirish"
+                        : "Kalit yaratish"}
                     </Button>
                   </Popconfirm>
 
@@ -664,10 +894,7 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                       description="Marketplace yangisiga o'tganiga ishonch hosil qiling — aks holda so'rovlarimiz rad etiladi."
                       okText="Tozalash"
                       cancelText="Bekor"
-                      onConfirm={async () => {
-                        await clearPreviousSigning.mutateAsync(slug as string);
-                        message.success("Eski sekret tozalandi");
-                      }}
+                      onConfirm={doClearPrevious}
                     >
                       <Button size="small" danger disabled={!canRotate}>
                         Eskisini tozalash
@@ -693,16 +920,12 @@ export const MarketplaceSettingsTab = ({ slug, onCreated }: Props) => {
                   description="Eskisi DARHOL ishlamay qoladi — marketplace so'rovlari yangisi kiritilguncha rad etiladi."
                   okText="Aylantirish"
                   cancelText="Bekor"
-                  onConfirm={async () => {
-                    const res = await rotateInbound.mutateAsync(slug as string);
-                    setOneTime({
-                      secret: res.inbound_api_key as string,
-                      warning: res.warning,
-                    });
-                  }}
+                  onConfirm={doRotateInbound}
                 >
                   <Button size="small" loading={rotateInbound.isPending} disabled={!canRotate}>
-                    Aylantirish
+                    {cfg.secrets.inbound_api_key.set
+                      ? "Aylantirish"
+                      : "Kalit yaratish"}
                   </Button>
                 </Popconfirm>
               </div>

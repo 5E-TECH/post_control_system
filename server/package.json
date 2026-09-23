@@ -31,6 +31,8 @@
     "db:check-extra-cost": "ts-node -r tsconfig-paths/register scripts/check-extra-cost.ts",
     "db:check-cards": "ts-node -r tsconfig-paths/register scripts/check-card-invariant.ts",
     "db:check-investor-ledger": "ts-node -r tsconfig-paths/register scripts/check-investor-ledger-invariant.ts",
+    "db:check-market-settlement": "ts-node -r tsconfig-paths/register scripts/check-market-settlement.ts",
+    "db:check-rollback-history": "ts-node -r tsconfig-paths/register scripts/check-rollback-history.ts",
     "test:marketplace-e2e": "bash scripts/local/run-marketplace-e2e.sh"
   },
   "dependencies": {

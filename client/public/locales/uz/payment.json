@@ -99,7 +99,7 @@
     "exportSuccess": "Excel fayl muvaffaqiyatli yuklandi",
     "exportError": "Excel yuklab olishda xatolik yuz berdi",
     "shiftOpened": "Smena muvaffaqiyatli ochildi!",
-    "shiftClosed": "Smena yopildi va hisobot yuklandi!"
+    "shiftClosed": "Smena yopildi!"
   },
   "shiftStatus": {
     "open": "Smena ochiq",

@@ -63,7 +63,8 @@
     "manzil": "Manzil",
     "courier": "Kuryer ma'lumotlari",
     "courierName": "Kuryer",
-    "courierPhone": "Telefon"
+    "courierPhone": "Telefon",
+    "extra_cost": "Qo'shimcha xarajat"
   },
   "kutilayotganBuyurtmalar": "Kutilayotgan Buyurtmalar",
   "hammaBuyurtmalar": "Hamma buyurtmalar",

@@ -10,6 +10,7 @@ import {
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { RollbackOrderDto, RollbackTarget } from './dto/rollback-order.dto';
+import { computeMarketSettlement } from './utils/market-settlement.util';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
@@ -2235,6 +2236,40 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('district.region', 'region')
         .leftJoinAndSelect('order.items', 'items')
         .leftJoinAndSelect('items.product', 'product')
+        /**
+         * ⚠️ QUYIDAGI TO'RT JOIN EXCEL EKSPORTI UCHUN.
+         *
+         * Klientdagi eksport har bir qator uchun quyidagilarni o'qiydi
+         * (`order-view/index.tsx`):
+         *   Viloyat — `district.assignedToRegion.name`
+         *   Firma   — `market.name`
+         *   Kuryer  — `post.courier.name`
+         *
+         * Admin yo'li (`allOrders`) bularni allaqachon join qiladi,
+         * bu yo'l esa qilmasdi. Natijada market va operator yuklagan
+         * faylda «Viloyat» va «Firma» BO'SH, «Kuryer» esa har qatorda
+         * «-» bo'lardi — fayl yuklanardi, lekin hisobot sifatida
+         * yaroqsiz edi.
+         *
+         * ⚠️ `assignedToRegion` — tumanning HAQIQIY biriktirilgan
+         * viloyati; `region` bilan bir xil emas (LDG/marketplace
+         * yo'nalishida ular farq qiladi).
+         */
+        .leftJoinAndSelect('order.market', 'market')
+        .leftJoinAndSelect('order.post', 'post')
+        /**
+         * ⚠️ `leftJoin` + `addSelect`, `leftJoinAndSelect` EMAS.
+         *
+         * To'liq select kuryerning BUTUN yozuvini market va operatorga
+         * ochib qo'yardi: tarif, komissiya, telefon, `telegram_id`,
+         * `ai_balance`. Eksportga esa faqat ISM kerak
+         * (`order.post.courier.name`). `fetchAll=5000` da bu minglab
+         * ortiqcha maydon degani.
+         */
+        .leftJoin('post.courier', 'courier')
+        .addSelect(['courier.id', 'courier.name'])
+        .leftJoinAndSelect('orderDistrict.assignedToRegion', 'orderAssignedRegion')
+        .leftJoinAndSelect('district.assignedToRegion', 'customerAssignedRegion')
         .where('order.user_id = :userId', { userId: effectiveUserId })
         .orderBy('order.created_at', 'DESC');
 
@@ -2381,15 +2416,34 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       const allPostIds: string[] = allMyPosts.map((post) => post.id);
 
-      if (!allPostIds.length) {
-        return successRes([], 200, 'No posts found for this courier');
-      }
-
       // pagination params
       const page = query.page && query.page > 0 ? query.page : 1;
       const fetchAll =
         query.fetchAll === true || (query.fetchAll as any) === 'true';
       const limit = getSafeLimit(query.limit, fetchAll);
+
+      /**
+       * ⚠️ BO'SH NATIJA HAM ODATDAGI SHAKLDA QAYTADI.
+       *
+       * Avval bu yerda `successRes([], ...)` turardi — ya'ni posti yo'q
+       * kuryer uchun javob tanasi `{data: []}` bo'lardi, normal yo'lda esa
+       * `{data: {data: [...], total, page, limit, totalPages}}`. Ikki xil
+       * shakl.
+       *
+       * Klient faqat `data.data.data` ni o'qiydi, shuning uchun bo'sh
+       * holatda u `undefined` olardi va Excel eksporti buni jimgina
+       * «muvaffaqiyat» deb ko'rsatardi. Endi klientda shakl tekshiruvi
+       * bor — agar bu yerda eski shakl qolsa, foydalanuvchi «javob
+       * kutilgan shaklda emas» degan CHALG'ITUVCHI xato olardi, holbuki
+       * haqiqiy sabab shunchaki «pochta yo'q».
+       */
+      if (!allPostIds.length) {
+        return successRes(
+          { data: [], total: 0, page, limit, totalPages: 0 },
+          200,
+          'No posts found for this courier',
+        );
+      }
       const offset = (page - 1) * limit;
 
       const qb = this.orderRepo
@@ -2402,6 +2456,21 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         .leftJoinAndSelect('orderDistrict.region', 'orderRegion')
         .leftJoinAndSelect('customer.district', 'district')
         // Almashtirish: kuryer modalida "eski #X mahsulotini ol" deb ko'rsatish
+        /**
+         * ⚠️ EKSPORT UCHUN. Klient «Viloyat» ustunini
+         * `district.assignedToRegion.name` dan, «Kuryer» ustunini
+         * `post.courier.name` dan oladi. Bu join'lar bo'lmasa kuryer
+         * yuklagan faylda o'sha ikki ustun bo'sh chiqardi — market
+         * yo'lida tuzatilgan, kuryer yo'lida qolib ketgan edi.
+         *
+         * Kuryer maydonlari CHEKLANGAN (faqat id + ism) — market
+         * yo'lidagi bilan bir xil sabab.
+         */
+        .leftJoinAndSelect('o.post', 'post')
+        .leftJoin('post.courier', 'courier')
+        .addSelect(['courier.id', 'courier.name'])
+        .leftJoinAndSelect('orderDistrict.assignedToRegion', 'orderAssignedRegion')
+        .leftJoinAndSelect('district.assignedToRegion', 'customerAssignedRegion')
         .leftJoinAndSelect('o.replacementOf', 'replacementOf')
         .where('o.post_id IN (:...postIds)', { postIds: allPostIds })
         .orderBy('o.created_at', 'DESC')
@@ -2975,7 +3044,30 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               ? Order_status.PARTLY_PAID
               : Order_status.SOLD,
         to_be_paid: netToBePaid,
+        /**
+         * ⚠️ ISHORALI hisob — `to_be_paid` dan FARQLI.
+         *
+         * `to_be_paid` `Math.max(..., 0)` bilan qisilgan, ya'ni tarifdan
+         * arzon sotuvda 0 bo'lib qoladi va market qarzi yo'qoladi.
+         * `market_net` esa manfiy bo'la oladi.
+         *
+         * Xarajat bu yerda hali qo'shilmagan (u `save(order)` dan KEYIN,
+         * `applyInline` da yoziladi) — o'sha yerda `market_net` ham ayni
+         * so'rovda kamaytiriladi.
+         */
+        market_net: computeMarketSettlement({
+          total_price: order.total_price,
+          market_tariff: marketTarif,
+          extra_cost_net: order.extra_cost_net,
+        }),
         paid_amount: paidAfter,
+        /**
+         * ⚠️ `paid_amount` BILAN SINXRON. Sotuv paytida qarz avtomatik
+         * qoplanishi mumkin (`autoPay`) — o'sha qoplangan qism ham
+         * hisob-kitobda aks etishi shart, aks holda to'lov halqasi uni
+         * QAYTA undirishga urinardi.
+         */
+        market_settled: paidAfter,
         comment: finalComment,
         sold_at: Date.now(),
         cancelled_at: null,
@@ -4052,7 +4144,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               ? Order_status.PARTLY_PAID
               : Order_status.SOLD,
         to_be_paid: netToBePaid,
+        /**
+         * ⚠️ `sellOrder` bilan BIR XIL — qisman sotuv ham xuddi o'sha
+         * 4 ta CASE nusxasiga ega. Biri tuzatilib ikkinchisi qolsa
+         * tafovut qayta to'planardi.
+         *
+         * `total_price` bu yerda YANGI (kamaytirilgan) narx — shuning
+         * uchun `price` ishlatiladi, `order.total_price` emas: u hali
+         * eski qiymatda turibdi.
+         */
+        market_net: computeMarketSettlement({
+          total_price: price,
+          market_tariff: marketTarif,
+          extra_cost_net: order.extra_cost_net,
+        }),
         paid_amount: paidAfter,
+        // ⚠️ `sellOrder` bilan bir xil sabab — sinxron qoladi.
+        market_settled: paidAfter,
         total_price: price,
         // Asl summani saqlaymiz — rollback'da total_price aynan shundan tiklanadi
         // (dona kamaymay faqat narx tushgan holatda "bola" order bo'lmaydi).
@@ -4472,6 +4580,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       created_by: user.id,
     });
     /**
+     * ⚠️ `extra_cost_net` BU YERDA O'ZGARTIRILMAYDI — ATAYLAB.
+     *
+     * Avval bu yerda xom `UPDATE "order" SET extra_cost_net = ...`
+     * turardi va u ISHLAMASDI: `rollbackOrderToWaiting` oxirida
+     * `save(order)` (:5140) entity'ning ESKI qiymatini ustiga yozib
+     * yuborardi. Sotuv yo'lida bunday muammo yo'q, chunki u yerda
+     * `save(order)` xarajat yozuvidan OLDIN bajariladi.
+     *
+     * Shuning uchun rollback `net` ni qaytarib oladi va `order`
+     * entity'sini O'ZI tuzatadi — saqlash bitta joydan ketadi.
+     */
+
+    /**
      * ⚠️ Langar QAYTARILADI. Marketplace buyurtmasida bu pul harakati
      * yordamchi daftarda ham aks etishi SHART: aks holda kassa 0 ga
      * qaytadi-yu, daftarda `-extra_cost` abadiy qolib ketadi va
@@ -4666,6 +4787,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         delta: number;
       } | null = null;
 
+      /**
+       * MARKET kassasiga qaytarilgan sof qo'shimcha xarajat.
+       *
+       * ⚠️ Uchala shoxdan (SOLD/PAID, PARTLY_PAID, CANCELLED/CLOSED)
+       * faqat BITTASI ishlaydi, shuning uchun bitta o'zgaruvchi yetarli.
+       * `order.extra_cost_net` shu qiymatga kamaytiriladi — pastdagi
+       * yagona `save(order)` dan OLDIN.
+       */
+      let marketExtraReversed = 0;
+
       const rollbackComment = `[ROLLBACK] ${order.comment || ''}`;
 
       /**
@@ -4725,30 +4856,64 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         const marketDiff = Number(order.total_price) - Number(marketTarif);
         const courierDiff = Number(order.total_price) - Number(courierTarif);
 
-        // Market kassasidan ayrish
+        /**
+         * ⚠️ YO'NALISH `delta` DAN HOSIL QILINADI — QOTIB QOLMAYDI.
+         *
+         * Avval bu yerda `operation: EXPENSE` qattiq yozilgan edi, holbuki
+         * `delta = -marketDiff` MUSBAT bo'lishi mumkin: `total_price`
+         * tarifdan KICHIK bo'lsa (0 so'mli buyurtma — eng aniq holat)
+         * rollback pulni kassaga QAYTARADI.
+         *
+         * `cash_box.balance` to'g'ri edi (`delta` ishorali), lekin tarix
+         * qatori `expense` bo'lib yozilardi va `amount` ham
+         * `cashbox-delta.util.ts` da `Math.abs` qilinardi. Yo'nalishni
+         * esa HAMMA joy `operation_type` dan o'qiydi
+         * (`cash-box.service.ts:1049`: `if (INCOME) income += amount;
+         * else outcome += amount`). Natijada 0 so'mli buyurtmada
+         * «Chiqim» sotuv + rollback = 2 × tarif bo'lib ko'rinardi va
+         * foydalanuvchi «tarif ikkinchi marta ayrildi» deb hisoblardi.
+         *
+         * Bu 2026-09-16 (`4a525a5f`) da paydo bo'lgan: undan oldin xom
+         * `amount: marketDiff` ISHORALI yozilar va jamlagich
+         * `outcome += (-50000)` qilib o'zini-o'zi qoplardi.
+         *
+         * ⚠️ `source_type` ham `CORRECTION` dan `ROLLBACK_CORRECTION` ga
+         * ko'chirildi. Sabab: `reverseExtraCostForCashbox` qaytarilgan
+         * xarajatni AYNAN `CORRECTION + INCOME` yig'indisi deb hisoblaydi
+         * va bu yozuv undan OLDIN bajariladi. `CORRECTION + INCOME`
+         * qoldirilsa `net <= 0` bo'lib, qo'shimcha xarajat UMUMAN
+         * qaytarilmasdi — bu ko'rinish emas, REAL PUL ZARARI.
+         */
+        const marketDelta = -marketDiff;
+        const courierDelta = -courierDiff;
+
+        // Market kassasi — teskari yozuv
         // ⚠️ ATOMIK (bloker B1)
         {
           const res = await applyCashboxDelta(queryRunner.manager, {
             cashbox: marketCashbox,
-            delta: -marketDiff,
-            operation: Operation_type.EXPENSE,
-            source_type: Source_type.CORRECTION,
-            amount: marketDiff,
+            delta: marketDelta,
+            operation:
+              marketDelta >= 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+            source_type: Source_type.ROLLBACK_CORRECTION,
+            amount: Math.abs(marketDelta),
             source_id: order.id,
             comment: rollbackComment,
             created_by: user.id,
           });
-          rollbackMarketWrite = { history_id: res.history_id, delta: -marketDiff };
+          // ⚠️ Marketplace daftari ISHORALI deltani oladi — abs EMAS.
+          rollbackMarketWrite = { history_id: res.history_id, delta: marketDelta };
         }
 
-        // Courier kassasidan ayrish
+        // Courier kassasi — teskari yozuv
         // ⚠️ ATOMIK (bloker B1)
         await applyCashboxDelta(queryRunner.manager, {
           cashbox: courierCashbox,
-          delta: -courierDiff,
-          operation: Operation_type.EXPENSE,
-          source_type: Source_type.CORRECTION,
-          amount: courierDiff,
+          delta: courierDelta,
+          operation:
+            courierDelta >= 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+          source_type: Source_type.ROLLBACK_CORRECTION,
+          amount: Math.abs(courierDelta),
           source_id: order.id,
           comment: rollbackComment,
           created_by: user.id,
@@ -4765,6 +4930,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
         // ⚠️ Xarajat qaytishi ham marketplace daftariga tushishi SHART.
         // Langar = MARKET kassasiga OXIRGI yozilgan qator.
+        marketExtraReversed += marketBack.net;
         if (marketBack.net > 0 && rollbackMarketWrite) {
           rollbackMarketWrite = {
             history_id: marketBack.history_id ?? rollbackMarketWrite.history_id,
@@ -4789,30 +4955,48 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
           0,
         );
 
+        /**
+         * ⚠️ SOLD/PAID shoxi bilan BIR XIL NAQSH.
+         *
+         * Bu yerda ishoralar hozircha doim manfiy: `marketDiff` =
+         * `paid_amount` (>= 0), `courierDiff` esa `Math.max(..., 0)` bilan
+         * qisilgan. Ya'ni `EXPENSE` bugun TO'G'RI chiqadi.
+         *
+         * Shunga qaramay yo'nalish baribir `delta` dan hosil qilinadi va
+         * `source_type` ham `ROLLBACK_CORRECTION` ga ko'chiriladi:
+         * qotirib yozilgan ishora AYNAN SOLD shoxida nuqsonga olib keldi,
+         * va kelajakda bu formulalar o'zgarsa (masalan qisman to'lovga
+         * qayta hisoblash qo'shilsa) xuddi shu tuzoq takrorlanardi.
+         */
+        const marketDelta = -marketDiff;
+        const courierDelta = -courierDiff;
+
         // Market kassasidan aynan paid_amount miqdorini ayiramiz
         // ⚠️ ATOMIK (bloker B1)
         {
           const res = await applyCashboxDelta(queryRunner.manager, {
             cashbox: marketCashbox,
-            delta: -marketDiff,
-            operation: Operation_type.EXPENSE,
-            source_type: Source_type.CORRECTION,
-            amount: marketDiff,
+            delta: marketDelta,
+            operation:
+              marketDelta >= 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+            source_type: Source_type.ROLLBACK_CORRECTION,
+            amount: Math.abs(marketDelta),
             source_id: order.id,
             comment: rollbackComment,
             created_by: user.id,
           });
-          rollbackMarketWrite = { history_id: res.history_id, delta: -marketDiff };
+          rollbackMarketWrite = { history_id: res.history_id, delta: marketDelta };
         }
 
         // Courier kassasidan sotishda qo'shilgan ulushni ayiramiz
         // ⚠️ ATOMIK (bloker B1)
         await applyCashboxDelta(queryRunner.manager, {
           cashbox: courierCashbox,
-          delta: -courierDiff,
-          operation: Operation_type.EXPENSE,
-          source_type: Source_type.CORRECTION,
-          amount: courierDiff,
+          delta: courierDelta,
+          operation:
+            courierDelta >= 0 ? Operation_type.INCOME : Operation_type.EXPENSE,
+          source_type: Source_type.ROLLBACK_CORRECTION,
+          amount: Math.abs(courierDelta),
           source_id: order.id,
           comment: rollbackComment,
           created_by: user.id,
@@ -4828,6 +5012,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
         // ⚠️ Xarajat qaytishi ham marketplace daftariga tushishi SHART.
         // Langar = MARKET kassasiga OXIRGI yozilgan qator.
+        marketExtraReversed += marketBack.net;
         if (marketBack.net > 0 && rollbackMarketWrite) {
           rollbackMarketWrite = {
             history_id: marketBack.history_id ?? rollbackMarketWrite.history_id,
@@ -4868,6 +5053,7 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
          * MUSBAT teskari yozuv kerak. Busiz kassa 0 ga qaytib, daftar
          * `-extra_cost` da qolardi va sotuvchi shu summaga kam olardi.
          */
+        marketExtraReversed += marketBack.net;
         if (marketBack.net > 0) {
           rollbackMarketWrite = {
             history_id: marketBack.history_id as string,
@@ -4928,6 +5114,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       // === Update order status ===
+      /**
+       * Buyurtma WAITING ga qaytarilib, hisob-kitob TO'LIQ tozalandimi.
+       *
+       * ⚠️ Pastdagi xarajat tuzatishi uchun kerak: tozalangan shoxda
+       * `market_net` allaqachon 0 va u YAKUNIY qiymat. Bayroqsiz
+       * qaytarilgan xarajat 0 ning ustiga qo'shilib, WAITING buyurtmada
+       * «market qarzdor» bo'lib qolardi (harness aynan shuni ushladi).
+       */
+      let settlementReset = false;
       const previousStatus = order.status;
       const targetStatus = dto?.target_status || RollbackTarget.WAITING;
 
@@ -4937,10 +5132,24 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         [Order_status.PAID, Order_status.PARTLY_PAID].includes(order.status)
       ) {
         order.paid_amount = 0;
+        // ⚠️ Hisob-kitob ham tozalanadi — `paid_amount` bilan sinxron.
+        order.market_settled = 0;
         order.sold_at = null;
       } else {
         order.sold_at = null;
         order.to_be_paid = 0;
+        /**
+         * ⚠️ `to_be_paid` BILAN BIRGA tozalanadi — 2-bosqichda xatti-harakat
+         * o'zgarmasligi uchun aynan o'sha naqsh saqlanadi.
+         *
+         * Yuqoridagi shox (superadmin + PAID/PARTLY_PAID) `to_be_paid` ni
+         * ATAYLAB tozalamaydi — bu assimetriya oldindan mavjud va uni
+         * shu yerda tuzatish xatti-harakatni o'zgartirardi. U 3-bosqichda,
+         * to'lov halqasi bilan birga ko'rib chiqiladi.
+         */
+        order.market_net = 0;
+        order.market_settled = 0;
+        settlementReset = true;
       }
 
       if (targetStatus === RollbackTarget.WAITING) {
@@ -4994,6 +5203,34 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         order.canceled_post_id = canceledPost.id;
         order.status = Order_status.CANCELLED_SENT;
         order.cancelled_at = Date.now();
+      }
+
+      /**
+       * ⚠️ SOF XARAJATNI KAMAYTIRISH — `save(order)` DAN OLDIN.
+       *
+       * Qaytarilgan xarajat buyurtmadan ham ayrilishi shart, aks holda
+       * `extra_cost_net` abadiy o'sib boradi va market bilan hisob-kitob
+       * xarajat qadar noto'g'ri chiqadi.
+       *
+       * `Math.max(0, ...)` — eski ma'lumotda kassa tarixida xarajat bor,
+       * lekin `extra_cost_net` yozilmagan buyurtmalar bor (ustun
+       * 2026-06 dan beri mavjud, unga hech qachon yozilmagan). Ularda
+       * ayirish manfiyga tushib ketardi.
+       */
+      if (marketExtraReversed > 0) {
+        const before = Number(order.extra_cost_net || 0);
+        order.extra_cost_net = Math.max(0, before - marketExtraReversed);
+        /**
+         * ⚠️ `market_net` AYNAN shuncha oshadi: xarajat qaytarilsa market
+         * olishi kerak bo'lgan summa ortadi. `Math.max` tufayli haqiqiy
+         * ayirma `marketExtraReversed` dan kichik bo'lishi mumkin
+         * (eski ma'lumotda `extra_cost_net` yozilmagan) — shuning uchun
+         * AYNAN qo'llanilgan farq ishlatiladi.
+         */
+        if (!settlementReset) {
+          order.market_net =
+            Number(order.market_net || 0) + (before - order.extra_cost_net);
+        }
       }
 
       await queryRunner.manager.save(order);

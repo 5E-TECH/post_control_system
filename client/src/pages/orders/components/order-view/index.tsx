@@ -9,7 +9,7 @@ import type { RootState } from "../../../../app/store";
 import { exportToExcel } from "../../../../shared/helpers/export-download-excel";
 import { resetDownload } from "../../../../shared/lib/features/excel-download-func/excelDownloadFunc";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
-import { BASE_URL } from "../../../../shared/const";
+import { api } from "../../../../shared/api";
 import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import ReplacementBadge from "../../../../shared/components/replacement-badge";
 import {
@@ -101,19 +101,6 @@ const statusLabels: Record<string, string> = {
   partly_paid: "Qisman to'langan",
   "cancelled (sent)": "Bekorlangan jo'natma",
   closed: "Yopilgan",
-};
-
-// Helper function to build query string with proper array handling
-const buildQueryString = (filters: Record<string, any>): string => {
-  const params = new URLSearchParams();
-  Object.entries(filters).forEach(([key, value]) => {
-    if (Array.isArray(value)) {
-      value.forEach((v) => params.append(key, v));
-    } else if (value !== null && value !== undefined) {
-      params.append(key, value);
-    }
-  });
-  return params.toString();
 };
 
 // Format price with spaces
@@ -310,7 +297,7 @@ const OrderView = () => {
   const triggerDownload = useSelector(
     (state: RootState) => state.requestDownload
   );
-  const { handleApiError, handleSuccess } = useApiNotification();
+  const { handleApiError, handleSuccess, handleWarning } = useApiNotification();
   const role = user.role;
 
   const { getParam, setParam, removeParam } = useParamsHook();
@@ -368,34 +355,54 @@ const OrderView = () => {
       try {
         const isFiltered = Object.keys(cleanedFilters).length > 0;
 
-        let url = `${BASE_URL}order`;
+        /**
+         * ⚠️ XOM `fetch` EMAS, AXIOS.
+         *
+         * Avval bu yerda xom `fetch` turardi va u `shared/api/index.ts`
+         * dagi interceptordan CHETLAB o'tardi. Oqibati:
+         *   · 401 da avtomatik `user/refresh` + qayta urinish ishlamasdi —
+         *     sahifaning qolgan qismi (axios orqali) ishlayverar, faqat
+         *     Excel tugmasi jimgina yiqilardi. «Goh ishlaydi, goh yo'q»
+         *     shikoyatining sababi shu.
+         *   · `X-Device-Id` va `withCredentials` ham yuborilmasdi, ya'ni
+         *     audit jurnalida bu so'rov qurilmasiz ko'rinardi.
+         *
+         * Axios xato statusida THROW qiladi, shuning uchun alohida
+         * `response.ok` tekshiruvi endi KERAK EMAS — pastdagi `catch`
+         * server xabarini o'zi ko'rsatadi.
+         *
+         * `paramsSerializer: { indexes: null }` api instansiyasida
+         * o'rnatilgan, ya'ni massiv filtri `status=sold&status=paid`
+         * bo'lib ketadi (`status[0]=` emas) — backend aynan shuni kutadi.
+         */
+        let path = "order";
         if (user?.role === "market" || user?.role === "operator") {
-          url = `${BASE_URL}order/market/all/my-orders`;
+          path = "order/market/all/my-orders";
         } else if (user?.role === "courier") {
-          url = `${BASE_URL}order/courier/orders`;
+          path = "order/courier/orders";
         }
 
-        const response = await fetch(
-          `${url}?page=1&fetchAll=true&${buildQueryString(cleanedFilters)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
-            },
-          }
-        );
+        const res = await api.get(path, {
+          params: { page: 1, fetchAll: true, ...cleanedFilters },
+        });
+        const data = res.data;
 
-        const rawText = await response.text();
-
-        let data;
-        try {
-          data = JSON.parse(rawText);
-        } catch {
-          throw new Error("Backend JSON emas, HTML qaytaryapti!");
+        const rows = data?.data?.data;
+        if (!Array.isArray(rows)) {
+          // Javob 200, lekin kutilgan shaklda emas — jim o'tkazib yubormaymiz.
+          throw new Error(
+            "Server javobi kutilgan shaklda emas (data.data massiv emas)"
+          );
         }
 
-        const orders = data?.data?.data?.filter(
-          (order: any) => order.status !== "new"
-        );
+        /**
+         * ⚠️ «Yangi» buyurtmalar ATAYLAB tashlab yuboriladi — ular hali
+         * pochtaga tushmagan. Lekin natija BO'SH bo'lsa, buni jim
+         * muvaffaqiyat deb ko'rsatib bo'lmaydi: foydalanuvchi aynan
+         * «Yangi» filtrida turgan bo'lishi mumkin va hamma qator
+         * chiqib ketadi.
+         */
+        const orders = rows.filter((order: any) => order.status !== "new");
         const exportData = orders?.map((order: any, inx: number) => ({
           N: inx + 1,
           // Order district yoki customer district (fallback)
@@ -403,7 +410,11 @@ const OrderView = () => {
           Tuman: order?.district?.name || order?.customer?.district?.name,
           Firma: order?.market?.name,
           Mahsulot: order?.items
-            ?.map((item: any) => item.product.name)
+            // ⚠️ `item.product?.name` — mahsulot o'chirilgan bo'lsa join
+            // `null` qaytaradi va himoyasiz `.name` BUTUN eksportni
+            // yiqitardi (bitta buzuq qator 311 qatorni yo'q qilardi).
+            ?.map((item: any) => item.product?.name)
+            ?.filter(Boolean)
             ?.join(", "),
           "Telefon raqam": order?.customer?.phone_number,
           Narxi: Number((order?.total_price ?? 0) / 1000),
@@ -418,12 +429,53 @@ const OrderView = () => {
           }),
         }));
 
-        exportToExcel(
-          exportData || [],
+        /**
+         * ⚠️ MUVAFFAQIYAT XABARI ENDI SHARTLI.
+         *
+         * Avval `handleSuccess` `exportToExcel` dan keyin SHARTSIZ
+         * chaqirilardi. Helper esa bo'sh ma'lumotda jimgina qaytadi
+         * (`export-download-excel.ts:6`) — ya'ni fayl yaratilmasa ham
+         * foydalanuvchi «muvaffaqiyatli export qilindi» degan yashil
+         * xabarni ko'rardi. Aynan shu shikoyatga sabab bo'lgan.
+         */
+        if (!exportData.length) {
+          handleWarning(
+            "Excel yaratilmadi",
+            orders.length === 0 && rows.length > 0
+              ? "Tanlangan filtrda faqat «Yangi» buyurtmalar bor — ular eksportga kirmaydi."
+              : "Bu filtr bo'yicha eksport qilinadigan buyurtma topilmadi."
+          );
+          return;
+        }
+
+        const written = exportToExcel(
+          exportData,
           isFiltered ? "filterlangan_buyurtmalar" : "barcha_buyurtmalar"
         );
 
-        handleSuccess("Buyurtmalar muvaffaqiyatli export qilindi");
+        if (!written) {
+          handleWarning("Excel yaratilmadi", "Fayl yozilmadi.");
+          return;
+        }
+
+        /**
+         * ⚠️ `fetchAll=true` server tomonda 5000 qator bilan CHEKLANGAN
+         * (`pagination.ts: MAX_FETCH_ALL`), `total` esa haqiqiy sonni
+         * qaytaradi. Kesilganini aytmasak, moliyaviy hisobot jimgina
+         * to'liqsiz chiqardi.
+         */
+        const total = Number(data?.data?.total ?? rows.length);
+        if (total > rows.length) {
+          handleWarning(
+            "Fayl to'liq emas",
+            `Server bir so'rovda ${rows.length} ta qator beradi, jami esa ${total} ta. ` +
+              "Filtrni toraytiring (masalan sana oralig'i bo'yicha) va qismlarga bo'lib yuklang."
+          );
+        }
+
+        handleSuccess(
+          `${exportData.length} ta buyurtma Excelga export qilindi`
+        );
       } catch (err) {
         handleApiError(err, "Excel yuklashda xatolik");
       } finally {

@@ -26,7 +26,10 @@ import { useMarket } from "../../../../shared/api/hooks/useMarket/useMarket";
 import { SELECT_CLS, SELECT_POPUP_CLS } from "../../../../shared/ui/select-styles";
 import PaymentPopup from "../../../../shared/ui/paymentPopup";
 import CustomCalendar from "../../../../shared/components/customDate";
-import { BASE_URL } from "../../../../shared/const";
+import {
+  blobErrorMessage,
+  downloadFile,
+} from "../../../../shared/helpers/download-file";
 
 const { RangePicker } = DatePicker;
 
@@ -130,38 +133,22 @@ const CardDetail = () => {
     try {
       setIsExporting(true);
 
-      const exportParams = new URLSearchParams();
-      if (from && to) {
-        exportParams.append("fromDate", from);
-        exportParams.append("toDate", to);
-      }
-
-      const response = await fetch(
-        `${BASE_URL}cashbox/cards/${id}/ledger/export?${exportParams.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("x-auth-token")}`,
-          },
-        },
-      );
-      if (!response.ok) throw new Error("Export failed");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
       const safeName = (card?.name || "karta").replace(/\s+/g, "_");
       const periodPart =
         from && to ? (from === to ? from : `${from}-${to}`) : "umumiy";
-      a.href = url;
-      a.download = `karta-${safeName}-${periodPart}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+
+      // ⚠️ Xom `fetch` emas — axios. 401 da avtomatik refresh ishlaydi.
+      await downloadFile(
+        `cashbox/cards/${id}/ledger/export`,
+        from && to ? { fromDate: from, toDate: to } : undefined,
+        `karta-${safeName}-${periodPart}.xlsx`,
+      );
 
       message.success("Excel fayl yuklandi!");
-    } catch {
-      message.error("Excel yuklab olishda xatolik!");
+    } catch (e) {
+      // ⚠️ Blob javobida `e.response.data.message` HAR DOIM undefined —
+      // xato tanasi ham Blob bo'ladi. Helper uni matnga o'girib o'qiydi.
+      message.error(await blobErrorMessage(e, "Excel yuklab olishda xatolik!"));
     } finally {
       setIsExporting(false);
     }

@@ -374,5 +374,8 @@ export const MARKETPLACE_CHECKLIST_LABELS: Record<
   inbound_api_key: "Kiruvchi API kalit",
   tariff: "Tarif",
   market: "Biriktirilgan market",
-  encryption: "Sekret shifrlash kaliti (MARKETPLACE_SECRET_KEY)",
+  // ⚠️ Nom `SECRET_ENC_KEY` ga o'zgargan; `MARKETPLACE_SECRET_KEY` hamon
+  // zaxira sifatida o'qiladi, lekin yorliqda yangi nom turishi kerak —
+  // aks holda devops `.env` ga eskirgan nomni qo'yadi.
+  encryption: "Sekret shifrlash kaliti (serverda .env: SECRET_ENC_KEY)",
 };
