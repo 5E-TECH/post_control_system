@@ -183,6 +183,13 @@ jobs:
               echo '🩺 Pre-migration cashbox baseline snapshot...'
               npm run db:check-cashbox -- --snapshot=/tmp/cb-pre.json
 
+              # ----- 🧮 Market hisob-kitobi — BASELINE (migration oldidan) -----
+              # 2026-09-16..23 oralig'ida to'plangan tarixiy tafovut ATAYLAB
+              # tuzatilmagan (qaror: faqat kod tuzatiladi). Shuning uchun bu
+              # yerda ham snapshot/compare naqshi: halt faqat YANGI farqda.
+              echo '🧮 Pre-migration market settlement baseline...'
+              npm run db:check-market-settlement -- --snapshot=/tmp/ms-pre.json
+
               # ----- 🧬 Migration ishga tushirish -----
               echo '🧬 Running TypeORM migrations...'
               npm run migration:show || true
@@ -197,6 +204,18 @@ jobs:
               if ! npm run db:check-cashbox -- --compare=/tmp/cb-pre.json; then
                 echo '❌ POST-MIGRATION INVARIANT FAILED! Yangi drift paydo bo'\''ldi.'
                 echo '   App restart QILINMAYDI. Ko'\''rib chiqing: npm run migration:revert yoki backupdan tiklang.'
+                exit 1
+              fi
+
+              # ----- 🧮 Market hisob-kitob invarianti (compare, migration keyin) -----
+              #
+              # Nimani qo'riqlaydi: cash_box.balance == SUM(market_net − market_settled).
+              # Bu ikkovi ajralib ketsa, marketga kassadagi HAMMA pulni to'lasangiz
+              # ham buyurtmalar PAID ga o'tmay qoladi — 2026-09 da aynan shunday
+              # bo'lgan va oylab sezilmagan, chunki bunday tekshiruv YO'Q edi.
+              echo '🧮 Post-migration market settlement invariant (compare)...'
+              if ! npm run db:check-market-settlement -- --compare=/tmp/ms-pre.json; then
+                echo '❌ MARKET SETTLEMENT INVARIANT FAILED! App restart QILINMAYDI.'
                 exit 1
               fi
 
