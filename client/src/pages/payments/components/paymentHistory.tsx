@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { sourceTypeLabel } from "../../../shared/const/source-type-labels";
 import HistoryPopup from "./historyPopup";
 import {
   TrendingUp,
@@ -103,22 +104,6 @@ const CashboxHistoryComponent: React.FC<Props> = ({
     return styles[role] || { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400", label: role?.slice(0, 2).toUpperCase() };
   };
 
-  const getSourceTypeLabel = (sourceType: string) => {
-    const labels: Record<string, string> = {
-      courier_payment: "Kuryer to'lovi",
-      market_payment: "Market to'lovi",
-      manual_expense: "Qo'lda chiqim",
-      manual_income: "Qo'lda kirim",
-      correction: "Tuzatish",
-      rollback_correction: "Sotuv qaytarildi",
-      salary: "Maosh",
-      sell: "Sotuv",
-      cancel: "Bekor qilish",
-      extra_cost: "Qo'shimcha xarajat",
-      bills: "To'lovlar",
-    };
-    return labels[sourceType] || sourceType;
-  };
 
   return (
     <div className="w-full">
@@ -328,7 +313,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
                         <div className="flex items-center gap-2 flex-wrap">
                           {/* Source Type */}
                           <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-medium">
-                            {getSourceTypeLabel(item?.source_type)}
+                            {sourceTypeLabel(item?.source_type)}
                           </span>
                           {/* Payment Method */}
                           {item?.payment_method && (
