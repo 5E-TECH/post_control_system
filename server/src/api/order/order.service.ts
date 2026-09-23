@@ -10,6 +10,7 @@ import {
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { RollbackOrderDto, RollbackTarget } from './dto/rollback-order.dto';
+import { computeMarketSettlement } from './utils/market-settlement.util';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrderEntity } from 'src/core/entity/order.entity';
@@ -3043,6 +3044,22 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               ? Order_status.PARTLY_PAID
               : Order_status.SOLD,
         to_be_paid: netToBePaid,
+        /**
+         * ⚠️ ISHORALI hisob — `to_be_paid` dan FARQLI.
+         *
+         * `to_be_paid` `Math.max(..., 0)` bilan qisilgan, ya'ni tarifdan
+         * arzon sotuvda 0 bo'lib qoladi va market qarzi yo'qoladi.
+         * `market_net` esa manfiy bo'la oladi.
+         *
+         * Xarajat bu yerda hali qo'shilmagan (u `save(order)` dan KEYIN,
+         * `applyInline` da yoziladi) — o'sha yerda `market_net` ham ayni
+         * so'rovda kamaytiriladi.
+         */
+        market_net: computeMarketSettlement({
+          total_price: order.total_price,
+          market_tariff: marketTarif,
+          extra_cost_net: order.extra_cost_net,
+        }),
         paid_amount: paidAfter,
         comment: finalComment,
         sold_at: Date.now(),
@@ -4120,6 +4137,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
               ? Order_status.PARTLY_PAID
               : Order_status.SOLD,
         to_be_paid: netToBePaid,
+        /**
+         * ⚠️ `sellOrder` bilan BIR XIL — qisman sotuv ham xuddi o'sha
+         * 4 ta CASE nusxasiga ega. Biri tuzatilib ikkinchisi qolsa
+         * tafovut qayta to'planardi.
+         *
+         * `total_price` bu yerda YANGI (kamaytirilgan) narx — shuning
+         * uchun `price` ishlatiladi, `order.total_price` emas: u hali
+         * eski qiymatda turibdi.
+         */
+        market_net: computeMarketSettlement({
+          total_price: price,
+          market_tariff: marketTarif,
+          extra_cost_net: order.extra_cost_net,
+        }),
         paid_amount: paidAfter,
         total_price: price,
         // Asl summani saqlaymiz — rollback'da total_price aynan shundan tiklanadi
@@ -5074,6 +5105,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
 
       // === Update order status ===
+      /**
+       * Buyurtma WAITING ga qaytarilib, hisob-kitob TO'LIQ tozalandimi.
+       *
+       * ⚠️ Pastdagi xarajat tuzatishi uchun kerak: tozalangan shoxda
+       * `market_net` allaqachon 0 va u YAKUNIY qiymat. Bayroqsiz
+       * qaytarilgan xarajat 0 ning ustiga qo'shilib, WAITING buyurtmada
+       * «market qarzdor» bo'lib qolardi (harness aynan shuni ushladi).
+       */
+      let settlementReset = false;
       const previousStatus = order.status;
       const targetStatus = dto?.target_status || RollbackTarget.WAITING;
 
@@ -5087,6 +5127,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       } else {
         order.sold_at = null;
         order.to_be_paid = 0;
+        /**
+         * ⚠️ `to_be_paid` BILAN BIRGA tozalanadi — 2-bosqichda xatti-harakat
+         * o'zgarmasligi uchun aynan o'sha naqsh saqlanadi.
+         *
+         * Yuqoridagi shox (superadmin + PAID/PARTLY_PAID) `to_be_paid` ni
+         * ATAYLAB tozalamaydi — bu assimetriya oldindan mavjud va uni
+         * shu yerda tuzatish xatti-harakatni o'zgartirardi. U 3-bosqichda,
+         * to'lov halqasi bilan birga ko'rib chiqiladi.
+         */
+        order.market_net = 0;
+        settlementReset = true;
       }
 
       if (targetStatus === RollbackTarget.WAITING) {
@@ -5155,10 +5206,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
        * ayirish manfiyga tushib ketardi.
        */
       if (marketExtraReversed > 0) {
-        order.extra_cost_net = Math.max(
-          0,
-          Number(order.extra_cost_net || 0) - marketExtraReversed,
-        );
+        const before = Number(order.extra_cost_net || 0);
+        order.extra_cost_net = Math.max(0, before - marketExtraReversed);
+        /**
+         * ⚠️ `market_net` AYNAN shuncha oshadi: xarajat qaytarilsa market
+         * olishi kerak bo'lgan summa ortadi. `Math.max` tufayli haqiqiy
+         * ayirma `marketExtraReversed` dan kichik bo'lishi mumkin
+         * (eski ma'lumotda `extra_cost_net` yozilmagan) — shuning uchun
+         * AYNAN qo'llanilgan farq ishlatiladi.
+         */
+        if (!settlementReset) {
+          order.market_net =
+            Number(order.market_net || 0) + (before - order.extra_cost_net);
+        }
       }
 
       await queryRunner.manager.save(order);

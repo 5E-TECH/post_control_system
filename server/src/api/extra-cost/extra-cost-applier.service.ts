@@ -247,8 +247,19 @@ export class ExtraCostApplierService {
   ): Promise<void> {
     const d = Math.trunc(Number(delta) || 0);
     if (d === 0) return;
+    /**
+     * ⚠️ `market_net` AYNI SO'ROVDA teskari ishora bilan yangilanadi.
+     *
+     * `market_net = narx − tarif − extra_cost_net`, ya'ni xarajat
+     * oshganda market olishi kerak bo'lgan summa SHUNCHA kamayadi.
+     * Ikkisini alohida so'rovda yangilash — ular bir lahza nomuvofiq
+     * qolishi va o'rtada yiqilsa abadiy ajralib ketishi demak.
+     */
     await queryRunner.manager.query(
-      `UPDATE "order" SET "extra_cost_net" = "extra_cost_net" + $1 WHERE "id" = $2`,
+      `UPDATE "order"
+          SET "extra_cost_net" = "extra_cost_net" + $1,
+              "market_net"     = "market_net" - $1
+        WHERE "id" = $2`,
       [d, orderId],
     );
   }

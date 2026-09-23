@@ -323,6 +323,26 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   extra_cost_net: number;
 
+  /**
+   * MARKET BILAN HISOB-KITOB — ISHORALI.
+   *
+   *     market_net = total_price − market_tariff − extra_cost_net
+   *
+   * ⚠️ MANFIY BO'LISHI MUMKIN va bu NORMAL: tarifdan arzon sotuvda
+   * (kafolat almashtirishi, arzon mahsulot) yoki xarajat tushumdan
+   * ko'p bo'lganda market BIZGA qarzdor bo'ladi.
+   *
+   * ⚠️ `to_be_paid` DAN FARQI. `to_be_paid` faqat `max(narx − tarif, 0)`
+   * ni kuzatadi — ya'ni manfiy hissani ham, xarajatni ham KO'RMAYDI.
+   * Aynan shu sabab market kassasi `SUM(to_be_paid)` dan doim kichik
+   * bo'lib, marketga hamma pulni to'lasa ham buyurtmalar yopilmasdi.
+   *
+   * Hisob `computeMarketSettlement()` da — uch joyda takrorlanmasin
+   * (`sellOrder`, `partlySold`, `updateOrder`).
+   */
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  market_net: number;
+
   // 🟢 One Order → Many OrderItems
   @OneToMany(() => OrderItemEntity, (item) => item.order)
   items: OrderItemEntity[];
