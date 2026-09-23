@@ -673,6 +673,7 @@ const MainDetail = () => {
           outcome={data?.data?.outcome}
           cashboxHistory={data?.data?.cashboxHistory}
           movements={data?.data?.movements}
+          cards={cards}
         />
       </div>
 

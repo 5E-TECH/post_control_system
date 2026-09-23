@@ -3228,6 +3228,19 @@ export class CashBoxService
       [Source_type.EXTRA_COST]: "Qo'shimcha xarajat",
       [Source_type.BILLS]: "To'lovlar",
       [Source_type.INVESTOR_PAYOUT]: 'Investorga to\'lov',
+      /**
+       * ⚠️ ESKI MA'LUMOT. Bu uch qiymat `cashbox_history_source_type_enum`
+       * da bor va real qatorlar mavjud (asosiy kassada `investor_allocate`
+       * — 5 qator, 2026-03), lekin hozirgi kodda ularni YOZADIGAN joy
+       * yo'q, shu sabab `Source_type` TS enumida ham yo'q.
+       *
+       * Yorliq baribir kerak: aks holda Excel eksportida o'sha qatorlar
+       * `investor_allocate` deb inglizcha texnik nom bilan chiqadi.
+       * Kalitlar SATR sifatida yoziladi — enumda yo'q.
+       */
+      investor_allocate: 'Investorga taqsimlandi',
+      investor_earning: 'Investor foydasi',
+      investor_refund: 'Investorga qaytarildi',
     };
     return labels[sourceType] || sourceType;
   }

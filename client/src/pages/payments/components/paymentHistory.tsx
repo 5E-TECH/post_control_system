@@ -1,4 +1,11 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { sourceTypeLabel } from "../../../shared/const/source-type-labels";
+import CashboxFilters, {
+  applyCashboxFilters,
+  EMPTY_FILTERS,
+  hasActiveFilters,
+  type CashboxFilterState,
+} from "./cashboxFilters";
 import HistoryPopup from "./historyPopup";
 import {
   TrendingUp,
@@ -21,6 +28,8 @@ type Props = {
   outcome: number;
   cashboxHistory: any[];
   movements?: any[];
+  /** Kassa kartalari — «Karta» filtrida nom ko'rsatish uchun. */
+  cards?: any[];
 };
 
 const movementLabel = (m: any) => {
@@ -38,7 +47,52 @@ const CashboxHistoryComponent: React.FC<Props> = ({
   outcome,
   cashboxHistory,
   movements = [],
+  cards = [],
 }) => {
+  const [filters, setFilters] = useState<CashboxFilterState>(EMPTY_FILTERS);
+  const filtering = hasActiveFilters(filters);
+
+  /**
+   * ⚠️ `useMemo` MAJBURIY — komponent pastda `React.memo` bilan
+   * o'ralgan. JSX ichida inline `.filter(...)` yozilsa har renderda
+   * yangi massiv tug'iladi va memo ishlamay qoladi.
+   */
+  const rows = useMemo(
+    () => applyCashboxFilters(cashboxHistory || [], filters),
+    [cashboxHistory, filters],
+  );
+
+  /**
+   * ⚠️ FILTR QO'YILGANDA `movements` YASHIRILADI.
+   *
+   * Ichki ko'chirmalarda `source_type`, `operation_type`,
+   * `payment_method` va `card_id` maydonlari UMUMAN YO'Q — ular boshqa
+   * jadvaldan (`cashbox_card_movement`). Filtrlanmasa «Kuryer to'lovi»
+   * tanlanganda ham ko'chirma qatori ro'yxatda turib qolardi va
+   * hisoblagich yolg'on gapirardi.
+   */
+  const shownMovements = filtering ? [] : movements;
+
+  /**
+   * ⚠️ YIG'INDILAR FILTRLANGAN TO'PLAMDAN QAYTA HISOBLANADI.
+   *
+   * Server `income`/`outcome` ni BUTUN davr bo'yicha qaytaradi. Agar
+   * filtr qo'yilib kartalar tegilmasa — ro'yxatda 5 qator, kartada esa
+   * 42 qatorning yig'indisi turardi. Pul sahifasida bu yolg'on.
+   *
+   * ⚠️ `Number()` shart: `amount` bigint transformer orqali keladi.
+   */
+  const totals = useMemo(() => {
+    if (!filtering) return { income: income ?? 0, outcome: outcome ?? 0 };
+    let i = 0;
+    let o = 0;
+    for (const r of rows) {
+      const a = Number(r?.amount) || 0;
+      if (r?.operation_type === "income") i += a;
+      else o += a;
+    }
+    return { income: i, outcome: o };
+  }, [filtering, rows, income, outcome]);
   const { t } = useTranslation("payment");
   const [showHistory, setShowHistory] = useState(false);
   const [select, setSelect] = useState("");
@@ -103,22 +157,6 @@ const CashboxHistoryComponent: React.FC<Props> = ({
     return styles[role] || { bg: "bg-gray-100 dark:bg-gray-800", text: "text-gray-600 dark:text-gray-400", label: role?.slice(0, 2).toUpperCase() };
   };
 
-  const getSourceTypeLabel = (sourceType: string) => {
-    const labels: Record<string, string> = {
-      courier_payment: "Kuryer to'lovi",
-      market_payment: "Market to'lovi",
-      manual_expense: "Qo'lda chiqim",
-      manual_income: "Qo'lda kirim",
-      correction: "Tuzatish",
-      rollback_correction: "Sotuv qaytarildi",
-      salary: "Maosh",
-      sell: "Sotuv",
-      cancel: "Bekor qilish",
-      extra_cost: "Qo'shimcha xarajat",
-      bills: "To'lovlar",
-    };
-    return labels[sourceType] || sourceType;
-  };
 
   return (
     <div className="w-full">
@@ -141,7 +179,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
               <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
             </div>
             <p className="text-lg sm:text-2xl md:text-3xl font-bold text-white tracking-tight break-all">
-              +{(income ?? 0).toLocaleString("uz-UZ")}
+              +{totals.income.toLocaleString("uz-UZ")}
             </p>
             <p className="text-xs sm:text-sm text-white/60 mt-0.5 sm:mt-1">UZS</p>
           </div>
@@ -159,12 +197,13 @@ const CashboxHistoryComponent: React.FC<Props> = ({
                 </div>
                 <span className="text-xs sm:text-sm text-white/80 font-medium">
                   {t("expense") || "chiqim"}
+                  {filtering && " (filtr)"}
                 </span>
               </div>
               <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
             </div>
             <p className="text-lg sm:text-2xl md:text-3xl font-bold text-white tracking-tight break-all">
-              -{(outcome ?? 0).toLocaleString("uz-UZ")}
+              -{totals.outcome.toLocaleString("uz-UZ")}
             </p>
             <p className="text-xs sm:text-sm text-white/60 mt-0.5 sm:mt-1">UZS</p>
           </div>
@@ -190,30 +229,71 @@ const CashboxHistoryComponent: React.FC<Props> = ({
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-900/30">
               <Sparkles size={14} className="text-purple-500" />
               <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
-                {(cashboxHistory?.length || 0) + (movements?.length || 0)} ta
+                {/*
+                  ⚠️ Filtr faol bo'lsa «N tadan M tasi» ko'rsatiladi —
+                  admin nechta yozuv YASHIRINGANINI bilishi shart, aks
+                  holda «yozuvlarim yo'qoldi» degan xulosa chiqadi.
+                */}
+                {filtering
+                  ? `${cashboxHistory?.length || 0} tadan ${rows.length} tasi`
+                  : `${(cashboxHistory?.length || 0) + (movements?.length || 0)} ta`}
               </span>
             </div>
+          </div>
+
+          {/* Filtrlar */}
+          <div className="mt-3">
+            <CashboxFilters
+              rows={cashboxHistory || []}
+              cards={cards}
+              value={filters}
+              onChange={setFilters}
+            />
+            {filtering && (movements?.length || 0) > 0 && (
+              <p className="mt-2 text-xs text-gray-400">
+                {movements?.length} ta ichki ko'chirma yashirildi — ularda
+                amal turi va to'lov usuli bo'lmaydi.
+              </p>
+            )}
           </div>
         </div>
 
         {/* History Items */}
         <div className="max-h-[520px] overflow-y-auto">
-          {(cashboxHistory?.length || 0) + (movements?.length || 0) === 0 ? (
+          {rows.length + (shownMovements?.length || 0) === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
                 <Clock size={32} className="opacity-50" />
               </div>
-              <p className="text-sm font-medium">{t("noHistory") || "Tarix mavjud emas"}</p>
-              <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">Hozircha operatsiyalar yo'q</p>
+              {/*
+                ⚠️ IKKI XIL BO'SH HOLAT.
+                Filtr faolligida sabab boshqacha: yozuv yo'qolgani emas,
+                tanlangan SANA ORALIG'IDA shu turdagi yozuv yo'qligi.
+                Buni aytmasak admin «maosh yo'qolibdi» deb o'ylaydi.
+              */}
+              {filtering ? (
+                <>
+                  <p className="text-sm font-medium">Filtrga mos yozuv yo'q</p>
+                  <p className="text-xs text-gray-300 dark:text-gray-600 mt-1 text-center max-w-[280px]">
+                    Tanlangan sana oralig'ida bu turdagi amal bo'lmagan.
+                    Sana oralig'ini kengaytiring yoki filtrni tozalang.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">{t("noHistory") || "Tarix mavjud emas"}</p>
+                  <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">Hozircha operatsiyalar yo'q</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
               {[
-                ...(cashboxHistory || []).map((h: any) => ({
+                ...(rows || []).map((h: any) => ({
                   ...h,
                   __movement: false,
                 })),
-                ...(movements || []).map((m: any) => ({
+                ...(shownMovements || []).map((m: any) => ({
                   ...m,
                   __movement: true,
                 })),
@@ -328,7 +408,7 @@ const CashboxHistoryComponent: React.FC<Props> = ({
                         <div className="flex items-center gap-2 flex-wrap">
                           {/* Source Type */}
                           <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 font-medium">
-                            {getSourceTypeLabel(item?.source_type)}
+                            {sourceTypeLabel(item?.source_type)}
                           </span>
                           {/* Payment Method */}
                           {item?.payment_method && (

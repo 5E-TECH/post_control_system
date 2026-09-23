@@ -17,6 +17,7 @@ import {
   ArrowDownLeft,
 } from "lucide-react";
 import React, { useCallback, useState, useRef, useEffect } from "react";
+import { sourceTypeLabel } from "../../shared/const/source-type-labels";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useMarket } from "../../shared/api/hooks/useMarket/useMarket";
 import { useCourier } from "../../shared/api/hooks/useCourier";
@@ -250,19 +251,6 @@ const Payments = () => {
     return new Date(Number(timestamp)).toLocaleString("uz-UZ");
   };
 
-  const sourceTypeLabels: Record<string, string> = {
-    courier_payment: "Kuryer to'lovi",
-    market_payment: "Market to'lovi",
-    manual_expense: "Qo'lda chiqim",
-    manual_income: "Qo'lda kirim",
-    correction: "Tuzatish",
-    rollback_correction: "Sotuv qaytarildi",
-    salary: "Maosh",
-    sell: "Sotuv",
-    cancel: "Bekor qilish",
-    extra_cost: "Qo'shimcha xarajat",
-    bills: "To'lovlar",
-  };
 
   const getPaymentMethodBadge = (method: string) => {
     if (method === "click_to_market") {
@@ -944,7 +932,7 @@ const Payments = () => {
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
                           <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                            {sourceTypeLabels[item?.source_type] || item?.source_type}
+                            {sourceTypeLabel(item?.source_type)}
                           </span>
                           {item?.payment_method && (
                             getPaymentMethodBadge(item?.payment_method)
