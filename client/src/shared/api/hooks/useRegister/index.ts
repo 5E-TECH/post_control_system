@@ -49,6 +49,20 @@ export const useUser = (path?: string) => {
       client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
   });
 
+  /**
+   * Market Telegram tokenini qayta yaratish.
+   *
+   * ⚠️ Tana (body) YUBORILMAYDI — yangi qiymatni server o'zi yaratadi.
+   * Muvaffaqiyatdan keyin `user` so'rovlari bekor qilinadi, shunda
+   * kartochka yangi tokenni darhol ko'rsatadi.
+   */
+  const regenerateMarketToken = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`user/market/${id}/regenerate-token`).then((res) => res.data),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
+  });
+
   const removeUser = useMutation({
     mutationFn: (id: string) =>
       api.delete(`user/${id}`).then((res) => res.data),
@@ -296,6 +310,7 @@ export const useUser = (path?: string) => {
     getAdminAndRegister,
     getUserById,
     updateUser,
+    regenerateMarketToken,
     removeUser,
     suggestCustomer,
     getCustomerOrderHistory,

@@ -44,6 +44,7 @@ import {
   ElchiShipmentService,
 } from '../elchi-cargo/elchi-shipment.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { findMarketGroup } from 'src/common/utils/telegram-group.util';
 import { BotService } from '../bots/notify-bot/bot.service';
 import { MarketplaceSyncService } from '../marketplace/marketplace-sync.service';
 import { MarketplaceEventType } from '../marketplace/marketplace.enums';
@@ -2019,11 +2020,11 @@ export class PostService {
       // har bir qaytarilgan almashtirish uchun "mahsulot qaytarildi".
       for (const o of acceptedReplOrders) {
         try {
-          const returnGroup = await this.dataSource
-            .getRepository(TelegramEntity)
-            .findOne({
-              where: { market_id: o.user_id, group_type: Group_type.CANCEL },
-            });
+          const returnGroup = await findMarketGroup(
+            this.dataSource.manager,
+            o.user_id,
+            Group_type.CANCEL,
+          );
           await this.botService.sendMessageToGroup(
             returnGroup?.group_id || null,
             `*✅ Almashtirish — mahsulot qaytarildi!*\n\n` +

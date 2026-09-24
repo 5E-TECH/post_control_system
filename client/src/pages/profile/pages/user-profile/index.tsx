@@ -24,6 +24,7 @@ import {
   Truck,
   Bot,
   Receipt,
+  RefreshCw,
 } from "lucide-react";
 import { useApiNotification } from "../../../../shared/hooks/useApiNotification";
 import { setUserData } from "../../../../shared/lib/features/login/authSlice";
@@ -38,10 +39,11 @@ const UserProfile = () => {
   const cachedMarketData = useSelector(
     (state: RootState) => state.authSlice.marketData,
   );
-  const { getUserById, updateUser } = useUser();
+  const { getUserById, updateUser, regenerateMarketToken } = useUser();
   const { data, isLoading, refetch } = getUserById(id);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [regenOpen, setRegenOpen] = useState(false);
 
   const [form] = Form.useForm();
 
@@ -677,8 +679,21 @@ const UserProfile = () => {
             </div>
           )}
 
-          {/* TG Token Card */}
-          {user?.market_tg_token && (
+          {/*
+            TELEGRAM TOKEN KARTASI.
+
+            ⚠️ SHART `market_tg_token` EMAS, `role === 'market'`.
+
+            Avval karta token MAVJUD bo'lgandagina chizilardi. Lekin
+            tokeni YO'Q (NULL) marketlar ham bor — bazaga qo'lda
+            kiritilgan qatorlar. Ularda token yo'qligi uchun karta ham,
+            demak "Qayta yaratish" tugmasi ham ko'rinmasdi: aynan yordam
+            kerak bo'lgan holatda tugma yashirin edi.
+
+            Endi karta market uchun DOIM chiqadi; token yo'q bo'lsa
+            buni aytadi va tiklash tugmasini beradi.
+          */}
+          {user?.role === "market" && (
             <div className="group bg-white dark:bg-[#1e1e2d] rounded-xl p-4 sm:p-5 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-800 md:col-span-2 lg:col-span-3">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                 <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -689,31 +704,92 @@ const UserProfile = () => {
                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium">
                       Telegram Token
                     </p>
-                    <p className="text-sm sm:text-base font-semibold text-gray-800 dark:text-white mt-0.5 font-mono truncate">
-                      {user.market_tg_token}
+                    {user.market_tg_token ? (
+                      <p className="text-sm sm:text-base font-semibold text-gray-800 dark:text-white mt-0.5 font-mono truncate">
+                        {user.market_tg_token}
+                      </p>
+                    ) : (
+                      <p className="text-sm sm:text-base font-semibold text-amber-600 dark:text-amber-500 mt-0.5">
+                        Token yo'q — bot ulanmaydi
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Botga yuborilgandan keyin token almashadi.
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(user.market_tg_token);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
-                    copied
-                      ? "bg-green-500/10 text-green-600"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  {copied ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <Copy className="w-4 h-4 sm:w-5 sm:h-5" />}
-                  <span className="text-xs sm:text-sm font-medium">
-                    {copied ? "Nusxalandi!" : "Nusxalash"}
-                  </span>
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {user.market_tg_token && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(user.market_tg_token);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all duration-300 ${
+                        copied
+                          ? "bg-green-500/10 text-green-600"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {copied ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : <Copy className="w-4 h-4 sm:w-5 sm:h-5" />}
+                      <span className="text-xs sm:text-sm font-medium">
+                        {copied ? "Nusxalandi!" : "Nusxalash"}
+                      </span>
+                    </button>
+                  )}
+
+                  {/*
+                    ⚠️ TASDIQLASH OYNASI SHART — bu amal ESKI TOKENNI
+                    DARHOL O'LDIRADI. Agar market eski tokenni allaqachon
+                    guruhga yuborgan bo'lsa, u ishlamay qoladi.
+                  */}
+                  <button
+                    onClick={() => setRegenOpen(true)}
+                    disabled={regenerateMarketToken.isPending}
+                    className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 transition-all duration-300 disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                        regenerateMarketToken.isPending ? "animate-spin" : ""
+                      }`}
+                    />
+                    <span className="text-xs sm:text-sm font-medium">
+                      {user.market_tg_token ? "Yangilash" : "Yaratish"}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
+
+          <Modal
+            open={regenOpen}
+            onCancel={() => setRegenOpen(false)}
+            okText="Ha, yangilansin"
+            cancelText="Bekor qilish"
+            confirmLoading={regenerateMarketToken.isPending}
+            title="Telegram tokenni qayta yaratish"
+            onOk={async () => {
+              try {
+                await regenerateMarketToken.mutateAsync(id as string);
+                setRegenOpen(false);
+                await refetch();
+                handleSuccess("Telegram token qayta yaratildi");
+              } catch (err) {
+                handleApiError(err, "Tokenni yangilab bo'lmadi");
+              }
+            }}
+          >
+            <p>
+              Yangi token yaratiladi va <b>eski token shu zahoti ishlamay
+              qoladi</b>.
+            </p>
+            <p className="mt-2">
+              Agar market eski tokenni allaqachon guruhga yuborgan bo'lsa,
+              unga yangi tokenni qaytadan berishingiz kerak bo'ladi.
+            </p>
+          </Modal>
 
           {/* Add Order Switch - Only for Market */}
           {user?.role === "market" && (

@@ -55,8 +55,24 @@ export class BotUpdate {
       await ctx.reply('⌛ Malumot tahlil qilinyapti...');
 
       setTimeout(async () => {
+        /**
+         * ⚠️ O'CHIRISH VA JAVOB AJRATILDI.
+         *
+         * Ilgari ikkalasi bitta `try` ichida edi. Argumentsiz
+         * `deleteMessage()` KIRUVCHI xabarni o'chiradi va bot guruhda
+         * admin bo'lmasa Telegram 400 qaytaradi — o'shanda `catch` ga
+         * sakrab, JAVOB UMUMAN YUBORILMASDI. Ya'ni foydalanuvchi na
+         * muvaffaqiyatni, na rad etish sababini ko'rardi.
+         *
+         * Bu ayniqsa endi muhim: `bot.service.ts` ga 4 ta yangi darvoza
+         * qo'shildi va ularning butun ko'rinadigan natijasi shu javob.
+         */
         try {
           await ctx.deleteMessage();
+        } catch {
+          /* ruxsat yo'q yoki xabar allaqachon o'chgan — javobni to'smasin */
+        }
+        try {
           await ctx.reply(response.message);
         } catch (error) {
           console.log('Bot addBotToGroup timeout error:', error.message);

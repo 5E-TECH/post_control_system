@@ -76,6 +76,10 @@ import { OrderGateaway } from '../socket/order.gateaway';
 import { PostRepository } from 'src/core/repository/post.repository';
 import { MyLogger } from 'src/logger/logger.service';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import {
+  findMarketGroup,
+  findMarketGroups,
+} from 'src/common/utils/telegram-group.util';
 import { TelegramRepository } from 'src/core/repository/telegram-market.repository';
 import { BotService } from '../bots/notify-bot/bot.service';
 import { toUzbekistanTimestamp } from 'src/common/utils/date.util';
@@ -705,9 +709,19 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return 'new' as const;
     };
 
-    const groups = await this.dataSource.manager.find(TelegramEntity, {
-      where: { market_id: order.user_id, group_type: Group_type.CREATE },
-    });
+    /**
+     * ⚠️ Bu CREATE yo'li — zaxira mantig'i BU YERDA ISHLAMAYDI (ataylab).
+     * `findMarketGroups` eski (NULL) qatorlarga FAQAT `cancel` uchun
+     * tushadi; sababi telegram-group.util.ts da batafsil. Qisqasi:
+     * bu yerda guruh topilishi buyurtmani CREATED holatiga qo'yadi va
+     * ✅ tugmasini kutadi, tugma esa qat'iy `group_type: CREATE` talab
+     * qiladi — eski qator bilan buyurtma qotib qolardi.
+     */
+    const groups = await findMarketGroups(
+      this.dataSource.manager,
+      order.user_id,
+      Group_type.CREATE,
+    );
 
     // Guruh yo'q — tasdiq talab qilinmaydi, to'g'ridan NEW.
     if (!groups.length) {
@@ -3318,14 +3332,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       // market'ning mavjud CANCEL guruhiga yuboramiz.
       if (order.replacement_of_order_id) {
         try {
-          const returnGroup = await this.dataSource
-            .getRepository(TelegramEntity)
-            .findOne({
-              where: {
-                market_id: order.user_id,
-                group_type: Group_type.CANCEL,
-              },
-            });
+          const returnGroup = await findMarketGroup(
+            this.dataSource.manager,
+            order.user_id,
+            Group_type.CANCEL,
+          );
           await this.botService.sendMessageToGroup(
             returnGroup?.group_id || null,
             `*🔄 Almashtirish — mahsulot qaytmoqda!*\n\n` +
@@ -3640,9 +3651,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         relations: ['courier'],
       });
 
-      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: marketId, group_type: Group_type.CANCEL || null },
-      });
+      // ⚠️ Avval `group_type: Group_type.CANCEL || null` edi — O'LIK shart:
+      // chapdagi qiymat bo'sh bo'lmagan satr, `||` hech qachon o'ngga
+      // o'tmaydi. Niyat eski NULL qatorlarni qamrash edi; endi u
+      // haqiqatan bajariladi (telegram-group.util.ts).
+      const telegramGroup = await findMarketGroup(
+        queryRunner.manager,
+        marketId,
+        Group_type.CANCEL,
+      );
 
       // Bulk amalda har order uchun alohida xabar yuborilmaydi
       if (!options?.skipNotification) {
@@ -4358,9 +4375,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         );
       }
 
-      const telegramGroup = await queryRunner.manager.findOne(TelegramEntity, {
-        where: { market_id: marketId, group_type: Group_type.CANCEL || null },
-      });
+      // ⚠️ Avval `group_type: Group_type.CANCEL || null` edi — O'LIK shart:
+      // chapdagi qiymat bo'sh bo'lmagan satr, `||` hech qachon o'ngga
+      // o'tmaydi. Niyat eski NULL qatorlarni qamrash edi; endi u
+      // haqiqatan bajariladi (telegram-group.util.ts).
+      const telegramGroup = await findMarketGroup(
+        queryRunner.manager,
+        marketId,
+        Group_type.CANCEL,
+      );
 
       // 🔟 ✅ To‘g‘rilangan cancel order logikasi
       if (totalNewQty < totalOldQty) {
@@ -8208,14 +8231,11 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       // Market Telegram xabari (commit'dan keyin — xato sotuvga ta'sir qilmaydi)
       try {
-        const returnGroup = await this.dataSource
-          .getRepository(TelegramEntity)
-          .findOne({
-            where: {
-              market_id: oldOrder.user_id,
-              group_type: Group_type.CANCEL,
-            },
-          });
+        const returnGroup = await findMarketGroup(
+          this.dataSource.manager,
+          oldOrder.user_id,
+          Group_type.CANCEL,
+        );
         await this.botService.sendMessageToGroup(
           returnGroup?.group_id || null,
           `*✅ Almashtirish — mahsulot qaytarildi!*\n\n` +
