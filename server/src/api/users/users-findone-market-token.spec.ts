@@ -110,3 +110,84 @@ describe("findOne() — market kartochkasida `market_tg_token`", () => {
     expect(body(res).market_tg_token).toBeNull();
   });
 });
+
+/**
+ * TOKENNI QAYTA YARATISH — `POST /user/market/:id/regenerate-token`.
+ *
+ * Bu endpoint tokeni NULL bo'lib qolgan marketni tiklashning YAGONA
+ * ilova-ichi yo'li. Undan oldin bunday market boshi berk ko'chada
+ * qolardi: tokenni yangilaydigan uchala joy ham marketni ESKI token
+ * orqali qidiradi, NULL esa hech narsaga mos kelmaydi.
+ */
+describe('regenerateMarketToken()', () => {
+  function makeSvc(found: { id: string; name: string; role: Roles } | null) {
+    const repo = {
+      findOne: jest.fn().mockResolvedValue(found),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
+    };
+    const activityLog = { log: jest.fn() };
+    const svc = Object.create(UserService.prototype) as UserService;
+    (svc as unknown as { userRepo: unknown }).userRepo = repo;
+    (svc as unknown as { activityLog: unknown }).activityLog = activityLog;
+    return { svc, repo, activityLog };
+  }
+
+  const ADMIN = { role: Roles.SUPERADMIN, id: 'a-1' } as JwtPayload;
+  const MARKET = { id: 'm-1', name: 'Test market', role: Roles.MARKET };
+
+  it('yangi token yaratadi va uni qaytaradi', async () => {
+    const { svc, repo } = makeSvc(MARKET);
+    const res = await svc.regenerateMarketToken('m-1', ADMIN);
+
+    const token = body(res).market_tg_token as string;
+    expect(token).toMatch(/^group_token-/);
+    // Nuqtali UPDATE — save() EMAS (eskirgan nusxa boshqa ustunlarni bosmasin).
+    expect(repo.update).toHaveBeenCalledWith(
+      { id: 'm-1' },
+      { market_tg_token: token },
+    );
+  });
+
+  it('tokeni NULL bo\'lgan marketni ham tiklaydi', async () => {
+    // `select: false` sababli findOne baribir tokensiz qator qaytaradi —
+    // metod eski qiymatga UMUMAN tayanmasligi kerak.
+    const { svc } = makeSvc(MARKET);
+    const res = await svc.regenerateMarketToken('m-1', ADMIN);
+    expect(body(res).market_tg_token).toMatch(/^group_token-/);
+  });
+
+  it('har chaqiruvda BOSHQA token beradi', async () => {
+    const { svc } = makeSvc(MARKET);
+    const a = body(await svc.regenerateMarketToken('m-1', ADMIN));
+    const b = body(await svc.regenerateMarketToken('m-1', ADMIN));
+    expect(a.market_tg_token).not.toBe(b.market_tg_token);
+  });
+
+  /**
+   * ⚠️ `catchError` NestJS istisnosini qayta uloqtiradi — ya'ni mijoz
+   * 404 oladi. Muhimi: BAZAGA HECH NARSA yozilmaydi.
+   */
+  it('market topilmasa 404 beradi va bazaga yozmaydi', async () => {
+    const { svc, repo } = makeSvc(null);
+    await expect(svc.regenerateMarketToken('yoq', ADMIN)).rejects.toThrow();
+    expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  /** Market bo'lmagan foydalanuvchiga token berilmaydi (where roli bilan). */
+  it('qidiruv FAQAT market rolida bajariladi', async () => {
+    const { svc, repo } = makeSvc(MARKET);
+    await svc.regenerateMarketToken('m-1', ADMIN);
+    expect(repo.findOne).toHaveBeenCalledWith({
+      where: { id: 'm-1', role: Roles.MARKET },
+    });
+  });
+
+  /** ⚠️ Token qiymati audit logga TUSHMASLIGI shart — u sir. */
+  it('token qiymatini logga yozmaydi', async () => {
+    const { svc, activityLog } = makeSvc(MARKET);
+    await svc.regenerateMarketToken('m-1', ADMIN);
+
+    const logged = JSON.stringify(activityLog.log.mock.calls[0][0]);
+    expect(logged).not.toMatch(/group_token-/);
+  });
+});

@@ -11,6 +11,7 @@ import {
   UseGuards,
   SetMetadata,
   Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -884,6 +885,36 @@ export class UsersController {
   @Get('profile')
   profile(@CurrentUser() user: JwtPayload) {
     return this.userService.profile(user);
+  }
+
+  /**
+   * Market Telegram tokenini qayta yaratish.
+   *
+   * ⚠️ `@Body` YO'Q — ataylab. Yangi qiymatni server o'zi yaratadi,
+   * tashqaridan qabul qilinmaydi (users.service.ts izohiga qarang).
+   *
+   * ⚠️ Marshrut `@Get(':id')` dan OLDIN turibdi va POST — `market` segmenti
+   * aniq, shuning uchun to'qnashuv yo'q.
+   */
+  @ApiOperation({ summary: 'Regenerate market telegram token' })
+  @ApiParam({ name: 'id', description: 'Market ID' })
+  @ApiResponse({ status: 200, description: 'Token regenerated' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Post('market/:id/regenerate-token')
+  regenerateMarketToken(
+    /**
+     * ⚠️ `ParseUUIDPipe` SHART. Usiz noto'g'ri `id` to'g'ridan-to'g'ri
+     * Postgres'ga borib `22P02 invalid input syntax for type uuid`
+     * beradi, `catchError` esa uni `InternalServerErrorException` ga
+     * o'rab, XOM Postgres matnini 500 bilan mijozga uzatadi.
+     * Naqsh: extra-cost.controller.ts:159.
+     */
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.regenerateMarketToken(id, user);
   }
 
   @ApiOperation({ summary: 'Get user by id' })

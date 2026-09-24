@@ -1065,6 +1065,78 @@ export class UserService implements OnModuleInit {
     }
   }
 
+  /**
+   * Market Telegram tokenini QAYTA YARATISH — `POST /user/market/:id/regenerate-token`.
+   *
+   * ── NEGA KERAK ──────────────────────────────────────────────────────────
+   *
+   * Token market yaratilganda beriladi (createMarket, :530) va har
+   * ishlatilgandan keyin ALMASHADI (order-bot.service.ts:214). Lekin uni
+   * QAYTA YARATADIGAN yo'l umuman yo'q edi:
+   *   · tokenni yangilaydigan uchala joy ham marketni ESKI TOKEN orqali
+   *     topadi (order-bot.service.ts:187, :241; notify-bot/bot.service.ts:41);
+   *   · SQL da NULL hech narsaga teng emas, demak tokeni NULL market
+   *     o'zini hech qachon tiklay olmaydi;
+   *   · `UpdateMarketDto` da bu maydon yo'q va `forbidNonWhitelisted: true`
+   *     (app.service.ts:141) PATCH orqali yozishni bloklaydi.
+   *
+   * Natijada bazaga QO'LDA INSERT qilingan market (yoki tokeni biror
+   * sababdan yo'qolgan market) boshi berk ko'chada qolardi — yagona chora
+   * bazaga qo'lda UPDATE bo'lardi. Bu endpoint aynan shuni keraksiz qiladi.
+   *
+   * ── XAVFSIZLIK ──────────────────────────────────────────────────────────
+   *
+   * ⚠️ Yangi qiymatni SERVER o'zi yaratadi — so'rov tanasidan QABUL
+   * QILMAYDI. Aks holda admin tokenni oldindan tanlab qo'ya olardi.
+   *
+   * ⚠️ Eski token SHU ZAHOTI o'ladi. Agar market eski tokenni kimgadir
+   * yuborib ulgurgan bo'lsa, u endi ishlamaydi — bu KUTILGAN xatti-harakat
+   * (sizib chiqqan tokenni bekor qilish yo'li ham shu).
+   */
+  async regenerateMarketToken(
+    id: string,
+    currentUser: JwtPayload,
+  ): Promise<object> {
+    try {
+      const market = await this.userRepo.findOne({
+        where: { id, role: Roles.MARKET },
+      });
+      if (!market) {
+        throw new NotFoundException('Market topilmadi');
+      }
+
+      const newToken = 'group_token-' + generateCustomToken();
+
+      /**
+       * ⚠️ Nuqtali UPDATE — `save(market)` EMAS.
+       *
+       * `market` obyekti `select: false` ustunlarsiz o'qilgan. Uni
+       * `save()` qilish boshqa ustunlarni eskirgan nusxa bilan ustiga
+       * yozib yuborish xavfini tug'diradi. Ayni naqsh order-botda ham
+       * ishlatiladi (order-bot.service.ts:130-138).
+       */
+      await this.userRepo.update({ id }, { market_tg_token: newToken });
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        action: 'updated',
+        /** ⚠️ Token qiymati logga YOZILMAYDI — u sir. */
+        new_value: { market_tg_token: '(qayta yaratildi)' },
+        description: `Market Telegram tokeni qayta yaratildi: ${market.name}`,
+        user: currentUser,
+      });
+
+      return successRes(
+        { market_tg_token: newToken },
+        200,
+        'Telegram token qayta yaratildi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
   async profile(user: JwtPayload): Promise<object> {
     try {
       const { id } = user;
