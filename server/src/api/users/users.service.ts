@@ -1004,7 +1004,34 @@ export class UserService implements OnModuleInit {
     }
   }
 
-  async findOne(id: string): Promise<object> {
+  /**
+   * Foydalanuvchi kartochkasi — `GET /user/:id`.
+   *
+   * ── ⚠️ `market_tg_token` BU YERDA ATAYLAB QAYTARILADI ───────────────────
+   *
+   * NIMA BO'LGAN EDI. `ff3a1972` (2026-09-19, prodga 2026-09-21) xavfsizlik
+   * tuzatishi ustunga `select: false` qo'ydi — to'g'ri qaror edi, chunki
+   * token butun `users` javobi bilan birga har bir operatorga ketardi va u
+   * token bilan marketga YANGI OPERATOR qo'shish mumkin.
+   *
+   * Lekin kompensatsiya NOTO'G'RI endpointga qo'yildi — faqat `profile()` ga.
+   * Market kartochkasini esa `user-profile/index.tsx:42` AYNAN SHU metod
+   * orqali oladi (`getUserById` -> `api.get('user/:id')`). Natijada
+   * `user-profile/index.tsx:681` dagi
+   *     {user?.market_tg_token && ( ...Telegram Token kartasi... )}
+   * sharti falsy bo'lib, karta XATOSIZ, JIMGINA g'oyib bo'ldi va admin
+   * order-botni ishga tushirish uchun tokenni ololmay qoldi.
+   *
+   * ⚠️ `currentUser` MAJBURIY — ixtiyoriy emas. Ixtiyoriy bo'lsa chaqiruvchi
+   * uni unutganda token jimgina yana yo'qolardi, ya'ni ayni shu xato
+   * qaytarilardi. Majburiy bo'lgani uchun TypeScript buni oldini oladi.
+   *
+   * Oshkoralik doirasi: FAQAT shu endpoint, FAQAT target MARKET bo'lsa,
+   * FAQAT so'rovchi SUPERADMIN/ADMIN bo'lsa. Endpoint guard'i ham shu ikki
+   * rol bilan cheklangan (`users.controller.ts:893`) — bu ikkinchi qatlam:
+   * guard kelajakda bo'shashsa ham token oqib chiqmaydi.
+   */
+  async findOne(id: string, currentUser: JwtPayload): Promise<object> {
     try {
       const user = await this.userRepo.findOne({
         where: { id: id, role: Not(Roles.SUPERADMIN) },
@@ -1013,6 +1040,25 @@ export class UserService implements OnModuleInit {
       if (!user) {
         throw new NotFoundException('User not fount');
       }
+
+      const canSeeMarketToken =
+        currentUser?.role === Roles.SUPERADMIN ||
+        currentUser?.role === Roles.ADMIN;
+
+      if (user.role === Roles.MARKET && canSeeMarketToken) {
+        /**
+         * Ustun `select: false` bo'lgani uchun uni oddiy `find` olib
+         * kelmaydi — shu bois aniq nomlangan alohida so'rov. Bu naqsh
+         * `profile()` dagi bilan bir xil (users.service.ts:1066).
+         */
+        const row = await this.userRepo
+          .createQueryBuilder('user')
+          .select('user.market_tg_token', 'market_tg_token')
+          .where('user.id = :id', { id })
+          .getRawOne<{ market_tg_token: string | null }>();
+        user.market_tg_token = row?.market_tg_token ?? (null as never);
+      }
+
       return successRes(user, 200, 'User by id');
     } catch (error) {
       return catchError(error);
@@ -1043,8 +1089,10 @@ export class UserService implements OnModuleInit {
        * sozlamalari...), oq ro'yxat qilinsa bittasi unutilib ekran
        * buzilardi. Shu bois faqat xavflilari olib tashlanadi.
        *
-       * ⚠️ Foydalanuvchining O'Z `market_tg_token` i QOLADI — market
-       * profil sahifasi uni ko'rsatadi (user-profile/index.tsx:681).
+       * ⚠️ Foydalanuvchining O'Z `market_tg_token` i QOLADI (pastda
+       * alohida so'rov bilan qo'shiladi). Bu `GET /user/profile` —
+       * marketning o'z profili. Admin ko'radigan market KARTOCHKASI esa
+       * boshqa endpoint: `GET /user/:id` -> `findOne()`.
        */
       if (myProfile) {
         delete (myProfile as Partial<UserEntity>).password;
@@ -1059,10 +1107,13 @@ export class UserService implements OnModuleInit {
        * ⚠️ MARKET O'Z TOKENINI KO'RADI — ATAYLAB.
        *
        * Ustun `select: false` (users.entity.ts), ya'ni u endi hech qaysi
-       * `find` natijasida kelmaydi. Lekin market uni profil sahifasida
-       * ko'rsatadi va nusxalaydi (user-profile/index.tsx:681) — order-botga
-       * yuborish uchun. Shu bois FAQAT egasi uchun, FAQAT MARKET rolida
-       * alohida so'rov bilan olinadi. Boshqa rollarda bu maydon yo'q.
+       * `find` natijasida kelmaydi. Shu bois FAQAT egasi uchun, FAQAT
+       * MARKET rolida alohida so'rov bilan olinadi. Boshqa rollarda bu
+       * maydon yo'q.
+       *
+       * ⚠️ Bu blok `user-profile/index.tsx:681` dagi kartani
+       * OZIQLANTIRMAYDI — o'sha karta `findOne()` dan keladi. Shuning
+       * uchun u yerda ham ayni qayta-tanlash bor; ikkisi ALOHIDA.
        */
       if (myProfile && user.role === Roles.MARKET) {
         const row = await this.userRepo

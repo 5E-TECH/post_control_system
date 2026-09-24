@@ -124,7 +124,16 @@ export class UserEntity extends BaseEntity {
    * ⚠️ QIDIRISH ishlashda davom etadi — `select: false` faqat SELECT
    * ro'yxatiga ta'sir qiladi, WHERE ga emas (bot `where: { market_tg_token }`
    * bilan qidiradi). YOZISH ham tegilmaydi (`save()` / `update()`).
-   * Egasiga ko'rsatish uchun `profile()` da ATAYLAB `addSelect` bor.
+   *
+   * ⚠️ IKKI joyda ATAYLAB qayta tanlanadi — IKKALASI ham kerak:
+   *   · `users.service.ts` `profile()`  — market O'Z tokenini ko'radi;
+   *   · `users.service.ts` `findOne()`  — admin market KARTOCHKASIDA ko'radi
+   *     (`user-profile/index.tsx:681`), order-botni ishga tushirish uchun.
+   *
+   * Dastlab faqat birinchisi qo'shilgan edi va karta 2026-09-21 dan
+   * 2026-09-24 gacha jimgina yo'qolib turdi — chunki karta `profile()` dan
+   * emas, `findOne()` dan oziqlanadi. Yangi endpoint qo'shsangiz, uning
+   * qaysi biridan o'qishini TEKSHIRING.
    */
   @Column({ type: 'varchar', nullable: true, select: false })
   market_tg_token: string;

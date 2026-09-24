@@ -892,8 +892,13 @@ export class UsersController {
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    /**
+     * ⚠️ `user` so'rovchining rolini xizmatga uzatadi: market kartochkasida
+     * `market_tg_token` FAQAT SUPERADMIN/ADMIN uchun qo'shiladi
+     * (users.service.ts:findOne izohiga qarang).
+     */
+    return this.userService.findOne(id, user);
   }
 
   @ApiOperation({ summary: 'Update admin user' })
