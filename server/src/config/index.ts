@@ -16,6 +16,19 @@ export default {
   REFRESH_TOKEN_KEY: String(process.env.REFRESH_TOKEN_KEY),
   REFRESH_TOKEN_TIME: String(process.env.REFRESH_TOKEN_TIME),
 
+  /**
+   * BOTLAR ISHGA TUSHSINMI.
+   *
+   * ⚠️ DEFAULT — YOQILGAN. Env o'zgaruvchisi YO'Q bo'lsa `true`, ya'ni
+   * prodga hech qanday ta'sir qilmaydi (u yerda bu o'zgaruvchi
+   * o'rnatilmaydi). O'chirish uchun AYNAN `BOTS_ENABLED=false` yozilishi
+   * kerak — noto'g'ri yozilgan qiymat botlarni jimgina o'chirib
+   * qo'ymaydi.
+   *
+   * Lokal ishlatish uchun: server/.env ga `BOTS_ENABLED=false`.
+   * Batafsil: src/common/utils/bot-mute.util.ts
+   */
+  BOTS_ENABLED: process.env.BOTS_ENABLED !== 'false',
   BOT_TOKEN: String(process.env.BOT_TOKEN),
   BOT_NAME: String(process.env.BOT_NAME),
   ORDER_BOT_TOKEN: String(process.env.ORDER_BOT_TOKEN),
