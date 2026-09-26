@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { Context, Telegraf } from 'telegraf';
 import { catchError, successRes } from 'src/infrastructure/lib/response';
@@ -16,6 +17,7 @@ import { InjectBot } from 'nestjs-telegraf';
 import { DataSource } from 'typeorm';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import config from 'src/config';
+import { muteBotOutbound } from 'src/common/utils/bot-mute.util';
 import { Group_type, Roles } from 'src/common/enums';
 import {
   isMarketUsable,
@@ -23,7 +25,7 @@ import {
 } from 'src/common/utils/market-gate.util';
 
 @Injectable()
-export class BotService {
+export class BotService implements OnModuleInit {
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: UserRepository,
@@ -35,6 +37,20 @@ export class BotService {
 
     private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * ⚠️ BOTLAR O'CHIRILGANDA CHIQUVCHI CHAQIRUVLAR HAM TO'XTAYDI.
+   *
+   * `launchOptions: false` faqat POLLINGni to'xtatadi — bot obyekti
+   * baribir yaratiladi va `sendMessage` Telegram'ga ketaverardi. Lokal
+   * bazadagi `group_id` lar haqiqiy guruhlarga ishora qilishi mumkin,
+   * shuning uchun chiquvchi tomon ham yopiladi.
+   */
+  onModuleInit(): void {
+    if (!config.BOTS_ENABLED) {
+      muteBotOutbound(this.bot, 'notify-bot');
+    }
+  }
 
   async addToGroup(text: string, ctx: Context) {
     const queryRunner = this.dataSource.createQueryRunner();
