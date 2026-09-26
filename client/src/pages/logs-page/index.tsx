@@ -14,6 +14,7 @@ import {
   CheckCircle,
   RotateCcw,
   Trash2,
+  Unlink,
   AlertTriangle,
   Search,
   X,
@@ -123,6 +124,12 @@ const ACTION_CONFIG: Record<string, ActionCfg> = {
   assigned: { icon: Send, tone: "purple", label: "Tayinlandi", category: "other" },
   sync_retry: { icon: RotateCcw, tone: "amber", label: "Sinxron qayta urinish", category: "other" },
   sync_deleted: { icon: Trash2, tone: "rose", label: "Sinxron o'chirildi", category: "other" },
+  /**
+   * ⚠️ `deleted` DAN ATAYLAB AJRATILGAN. Bu yerda market TIRIK qoladi —
+   * faqat Telegram guruh bog'lanishi uziladi. `deleted` ishlatilsa
+   * loglarda tirik market "O'chirildi" nishoni bilan chiqardi.
+   */
+  telegram_disconnected: { icon: Unlink, tone: "amber", label: "Telegram guruh uzildi", category: "other" },
 };
 
 const DEFAULT_ACTION: ActionCfg = { icon: Clock, tone: "gray", label: "Harakat", category: "other" };

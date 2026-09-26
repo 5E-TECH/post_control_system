@@ -68,6 +68,8 @@ import { RegionEntity } from 'src/core/entity/region.entity';
 import { RegionRepository } from 'src/core/repository/region.repository';
 import { CreateMarketDto } from './dto/create-market.dto';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
+import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
+import { Group_type } from 'src/common/enums';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { DistrictRepository } from 'src/core/repository/district.repository';
@@ -1131,6 +1133,240 @@ export class UserService implements OnModuleInit {
         { market_tg_token: newToken },
         200,
         'Telegram token qayta yaratildi',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * MARKETNING TELEGRAM HOLATI — `GET /user/market/:id/telegram`.
+   *
+   * Admin market kartochkasida ko'radi: nechta operatori bor, ulardan
+   * nechtasi Telegram orqali ulangan, nechtasi faqat platformadan, va
+   * qaysi Telegram guruhlari biriktirilgan.
+   *
+   * ── OPERATOR TURI QANDAY ANIQLANADI ─────────────────────────────────
+   *
+   * `telegram_id` ustuni bo'yicha:
+   *   · bot orqali kelgan operatorda u YOZILADI
+   *     (order-bot.service.ts registerNewOperator);
+   *   · platformadan yaratilganda YOZILMAYDI (createOperator).
+   *
+   * ⚠️ Platformada yaratilgan operator keyinchalik botga kirsa,
+   * `telegram_id` unga ham bog'lanadi (order-bot.service.ts, mavjud
+   * foydalanuvchi shoxi). Shuning uchun ro'yxat "qayerda yaratilgan"ni
+   * emas, "Telegram ULANGANMI"ni ko'rsatadi — amalda muhimi shu.
+   */
+  async marketTelegramOverview(id: string): Promise<object> {
+    try {
+      const market = await this.userRepo.findOne({
+        where: { id, role: Roles.MARKET },
+      });
+      if (!market) {
+        throw new NotFoundException('Market topilmadi');
+      }
+
+      const operators = await this.userRepo.find({
+        where: { market_id: id, role: Roles.OPERATOR, is_deleted: false },
+        select: [
+          'id',
+          'name',
+          'phone_number',
+          'status',
+          'telegram_id',
+          'created_at',
+        ],
+        order: { created_at: 'DESC' },
+      });
+
+      const items = operators.map((o) => ({
+        id: o.id,
+        name: o.name,
+        phone_number: o.phone_number,
+        status: o.status,
+        /** ⚠️ `telegram_id` ning O'ZI qaytarilmaydi — faqat bor-yo'qligi. */
+        has_telegram: o.telegram_id !== null && o.telegram_id !== undefined,
+        created_at: o.created_at,
+      }));
+
+      const groups = await this.dataSource.manager.find(TelegramEntity, {
+        where: { market_id: id },
+        order: { created_at: 'DESC' },
+      });
+
+      /**
+       * ⚠️ AMALDAGI YO'NALISHNI OSHKOR QILISH SHART.
+       *
+       * `group_type` ning O'ZI yetarli emas. `findMarketGroups`
+       * (telegram-group.util.ts) `cancel` uchun ZAXIRAGA ega: typed
+       * `cancel` qatori bo'lmasa, turi BO'SH (eski) qator FAOL kanalga
+       * aylanadi.
+       *
+       * Bu ikki jim xatoga olib kelardi:
+       *
+       * 1. Admin qizil «Shaxsiy chat» belgisiga amal qilib typed `cancel`
+       *    ni uzadi — xabarlar TO'XTAMAYDI, uxlab yotgan eski guruhga
+       *    yo'naladi. Admin "tuzatdim" deb o'ylaydi, oqim davom etadi.
+       *
+       * 2. Turi bo'sh qator «eski, ishlatilmaydi» bo'lib ko'rinadi,
+       *    aslida esa u marketning YAGONA bekor qilish kanali bo'lishi
+       *    mumkin (bazada 3 marketdan 2 tasi aynan shunday). Uzilsa
+       *    market xabarsiz qoladi — `sendMessageToGroup` null guruhda
+       *    xatoni ICHKARIDA yutadi (notify-bot/bot.service.ts:153-168),
+       *    ya'ni log ham, xato ham chiqmaydi.
+       */
+      const hasTypedCancel = groups.some(
+        (g) => g.group_type === Group_type.CANCEL,
+      );
+
+      return successRes(
+        {
+          operators: {
+            total: items.length,
+            telegram: items.filter((o) => o.has_telegram).length,
+            platform: items.filter((o) => !o.has_telegram).length,
+            inactive: items.filter((o) => o.status !== Status.ACTIVE).length,
+            items,
+          },
+          groups: groups.map((g) => ({
+            id: g.id,
+            group_type: g.group_type ?? null,
+            group_id: g.group_id,
+            /**
+             * ⚠️ Telegramda guruh/superguruh id'lari MANFIY, shaxsiy chat
+             * id'lari MUSBAT. Musbat qiymat — bu guruh emas, bir odamning
+             * shaxsiy chati: market xabarlari o'sha odamga oqadi.
+             * Bazada shunday qator bor (8810, group_id 1320841140).
+             * Admin buni ko'rib uzib qo'yishi uchun belgilab beramiz.
+             */
+            is_private_chat: Number(g.group_id) > 0,
+            /** Bekor qilish xabarlarini AMALDA shu qator oladimi. */
+            receives_cancel:
+              g.group_type === Group_type.CANCEL ||
+              (!g.group_type && !hasTypedCancel),
+            /** Hozir uxlab turibdi, lekin typed `cancel` uzilsa faollashadi. */
+            is_dormant_fallback: !g.group_type && hasTypedCancel,
+            created_at: g.created_at,
+          })),
+        },
+        200,
+        'Market telegram holati',
+      );
+    } catch (error) {
+      return catchError(error);
+    }
+  }
+
+  /**
+   * TELEGRAM GURUH ULANISHINI UZISH —
+   * `DELETE /user/market/:id/telegram/:connectionId`.
+   *
+   * ── NEGA KERAK ──────────────────────────────────────────────────────
+   *
+   * Ulanish qatorini o'chiradigan kod butun loyihada YO'Q edi. Natijada
+   * noto'g'ri ulangan guruhni (masalan shaxsiy chat sifatida ulanib
+   * qolgan qatorni) tuzatishning yagona yo'li bazaga qo'lda tegish edi.
+   *
+   * ⚠️ `market_id` SHARTGA KIRITILGAN. Faqat `connectionId` bo'yicha
+   * o'chirish boshqa marketning ulanishini o'chirib yuborish imkonini
+   * berardi (id'ni bilgan admin uchun). Ikkalasi birga tekshiriladi.
+   *
+   * ⚠️ Bu QAYTARIB BO'LMAYDIGAN amal — jadvalda soft-delete yo'q.
+   * Shuning uchun o'chirilgan qator ma'lumoti audit logga to'liq
+   * yoziladi: kerak bo'lsa qo'lda tiklash mumkin.
+   *
+   * ⚠️ OQIBATI: `create` turidagi ulanish uzilsa, market buyurtmalari
+   * endi Telegramda tasdiq kutmaydi — ular to'g'ridan-to'g'ri `NEW`
+   * holatiga o'tadi (order.service.ts:721). Bu xatti-harakat to'g'ri,
+   * lekin admin buni bilishi kerak — UI tasdiqlash oynasida aytiladi.
+   */
+  async disconnectMarketTelegram(
+    id: string,
+    connectionId: string,
+    currentUser: JwtPayload,
+  ): Promise<object> {
+    try {
+      const conn = await this.dataSource.manager.findOne(TelegramEntity, {
+        where: { id: connectionId, market_id: id },
+      });
+      if (!conn) {
+        throw new NotFoundException('Bunday ulanish topilmadi');
+      }
+
+      const market = await this.userRepo.findOne({
+        where: { id, role: Roles.MARKET },
+        select: ['id', 'name'],
+      });
+
+      /**
+       * ⚠️ ZAXIRA FAOLLASHADIMI — O'CHIRISHDAN OLDIN hisoblanadi.
+       *
+       * Typed `cancel` uzilsa, `findMarketGroups` turi bo'sh eski
+       * qatorlarga tushadi va xabarlar TO'XTAMAYDI — boshqa guruhga
+       * yo'naladi. Admin buni bilmasa "tuzatdim" deb o'ylaydi, holbuki
+       * mijoz ma'lumotlari boshqa chatga oqishda davom etadi.
+       */
+      let fallback: TelegramEntity[] = [];
+      if (conn.group_type === Group_type.CANCEL) {
+        fallback = await this.dataSource.manager.find(TelegramEntity, {
+          where: { market_id: id, group_type: IsNull() },
+        });
+      }
+
+      await this.dataSource.manager.delete(TelegramEntity, {
+        id: connectionId,
+        market_id: id,
+      });
+
+      this.activityLog.log({
+        entity_type: 'user',
+        entity_id: id,
+        /**
+         * ⚠️ `'deleted'` EMAS — market TIRIK qoladi.
+         *
+         * `'deleted'` ni `remove()`, `deleteLogist()`, `deleteOperator()`
+         * ishlatadi va u yerda foydalanuvchi haqiqatan yo'q bo'ladi.
+         * Shu nomni bu yerda ishlatsak, loglar sahifasida TIRIK market
+         * "O'chirildi" nishoni bilan chizilardi (logs-page/index.tsx:93).
+         */
+        action: 'telegram_disconnected',
+        /**
+         * ⚠️ `token` ATAYLAB yozilmaydi — u sir va allaqachon eskirgan.
+         * Qolgani tiklash uchun yetarli.
+         */
+        old_value: {
+          telegram_connection_id: conn.id,
+          group_id: conn.group_id,
+          group_type: conn.group_type ?? null,
+          created_at: conn.created_at,
+          /** Uzishdan keyin oqim qayerga ketgani — tergov uchun. */
+          activates_fallback: fallback.map((f) => ({
+            id: f.id,
+            group_id: f.group_id,
+          })),
+        },
+        description:
+          `Telegram guruh ulanishi uzildi: ${market?.name ?? id} ` +
+          `(${conn.group_type ?? 'turi belgilanmagan'}, ${conn.group_id})`,
+        user: currentUser,
+      });
+
+      return successRes(
+        {
+          id: connectionId,
+          fallback_activated: fallback.map((f) => ({
+            id: f.id,
+            group_id: f.group_id,
+          })),
+        },
+        200,
+        fallback.length
+          ? "Ulanish uzildi. DIQQAT: bekor qilish xabarlari TO'XTAMADI — " +
+            `endi eski guruh(lar)ga ketadi: ${fallback
+              .map((f) => f.group_id)
+              .join(', ')}. Oqimni butunlay to'xtatish uchun ularni ham uzing.`
+          : 'Ulanish uzildi',
       );
     } catch (error) {
       return catchError(error);

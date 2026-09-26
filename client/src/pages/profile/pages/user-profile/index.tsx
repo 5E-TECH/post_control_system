@@ -30,6 +30,7 @@ import { useApiNotification } from "../../../../shared/hooks/useApiNotification"
 import { setUserData } from "../../../../shared/lib/features/login/authSlice";
 import CourierRegionBreakdown from "./CourierRegionBreakdown";
 import InvestorEquityPanel from "./InvestorEquityPanel";
+import MarketTelegramPanel from "./MarketTelegramPanel";
 import { AiBalanceContent } from "../../../users/components/users/ai-balance-modal";
 
 const UserProfile = () => {
@@ -1167,6 +1168,20 @@ const UserProfile = () => {
           (currentUserRole === "superadmin" ||
             currentUserRole === "admin") && (
             <InvestorEquityPanel investorUserId={user.id} />
+          )}
+
+        {/*
+          Market: operatorlar va Telegram ulanishlari.
+
+          ⚠️ Rol sharti FRONTENDDA ham bor, lekin u faqat ortiqcha
+          so'rov yubormaslik uchun. Haqiqiy himoya backendda:
+          `GET/DELETE user/market/:id/telegram` guard'i
+          SUPERADMIN/ADMIN bilan cheklangan (users.controller.ts).
+        */}
+        {user?.role === "market" &&
+          (currentUserRole === "superadmin" ||
+            currentUserRole === "admin") && (
+            <MarketTelegramPanel marketId={user.id} />
           )}
       </div>
 
