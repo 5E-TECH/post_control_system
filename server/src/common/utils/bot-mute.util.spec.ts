@@ -75,11 +75,30 @@ describe('config.BOTS_ENABLED — sukut bo\'yicha qiymat', () => {
   afterEach(() => {
     if (saved === undefined) delete process.env.BOTS_ENABLED;
     else process.env.BOTS_ENABLED = saved;
+    jest.dontMock('dotenv');
     jest.resetModules();
   });
 
   const load = () => {
     jest.resetModules();
+    /**
+     * ⚠️ `dotenv` MOCK QILINADI — busiz bu test MUHITGA BOG'LIQ bo'lardi.
+     *
+     * `src/config` import paytida `dotenv.config()` chaqiradi, u esa
+     * `server/.env` dan MAVJUD BO'LMAGAN kalitni to'ldiradi. Ya'ni
+     * yuqoridagi `delete process.env.BOTS_ENABLED` bekor bo'lib,
+     * qiymat faylдан QAYTA kelardi.
+     *
+     * Natijada: `.env` da `BOTS_ENABLED=false` bo'lgan HAR BIR lokal
+     * mashinada (`.env.example` aynan shuni yozishni aytadi!) bu
+     * qo'riqchi QIZIB ketardi — va eng tabiiy "tuzatish" aynan shu
+     * assertion'ni o'chirish bo'lardi. Ya'ni prodda botlarni jimgina
+     * o'chishdan saqlaydigan yagona test o'z-o'zini yo'q qilardi.
+     *
+     * Mock bilan test faqat `process.env` → bayroq mantiqini tekshiradi,
+     * `config/index.ts` dagi predikat esa hamon haqiqatan bajariladi.
+     */
+    jest.doMock('dotenv', () => ({ config: () => ({ parsed: {} }) }));
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     return require('src/config').default as { BOTS_ENABLED: boolean };
   };
