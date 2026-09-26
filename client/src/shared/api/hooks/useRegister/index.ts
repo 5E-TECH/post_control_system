@@ -63,6 +63,33 @@ export const useUser = (path?: string) => {
       client.invalidateQueries({ queryKey: [user], refetchType: "active" }),
   });
 
+  /**
+   * Marketning Telegram holati — operatorlar va ulangan guruhlar.
+   * Faqat admin/superadmin uchun (backend guard'i cheklaydi).
+   */
+  const getMarketTelegram = (id?: string, enabled = true) =>
+    useQuery({
+      queryKey: ["market-telegram", id],
+      queryFn: () =>
+        api.get(`user/market/${id}/telegram`).then((res) => res.data),
+      enabled: Boolean(id) && enabled,
+    });
+
+  /**
+   * Telegram guruh ulanishini uzish.
+   *
+   * ⚠️ IKKI id ham yuboriladi — backend `market_id` ni ham tekshiradi,
+   * shunda boshqa marketning ulanishini o'chirib bo'lmaydi.
+   */
+  const disconnectMarketTelegram = useMutation({
+    mutationFn: ({ id, connectionId }: { id: string; connectionId: string }) =>
+      api
+        .delete(`user/market/${id}/telegram/${connectionId}`)
+        .then((res) => res.data),
+    onSuccess: (_d, v) =>
+      client.invalidateQueries({ queryKey: ["market-telegram", v.id] }),
+  });
+
   const removeUser = useMutation({
     mutationFn: (id: string) =>
       api.delete(`user/${id}`).then((res) => res.data),
@@ -311,6 +338,8 @@ export const useUser = (path?: string) => {
     getUserById,
     updateUser,
     regenerateMarketToken,
+    getMarketTelegram,
+    disconnectMarketTelegram,
     removeUser,
     suggestCustomer,
     getCustomerOrderHistory,

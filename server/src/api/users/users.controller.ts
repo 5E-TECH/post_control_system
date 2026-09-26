@@ -917,6 +917,50 @@ export class UsersController {
     return this.userService.regenerateMarketToken(id, user);
   }
 
+  /**
+   * Marketning Telegram holati — operatorlar va ulangan guruhlar.
+   *
+   * ⚠️ Marshrut `@Get(':id')` dan OLDIN e'lon qilinadi. Segment soni
+   * har xil bo'lgani uchun to'qnashuv bo'lmasligi kerak, lekin NestJS
+   * marshrutlarni E'LON TARTIBIDA moslashtiradi — bu yerdagi tartib
+   * `operators/selectable` bilan bir xil ehtiyotkorlik (users.controller.ts
+   * dagi o'sha izohga qarang).
+   */
+  @ApiOperation({ summary: 'Market telegram holati (operatorlar + guruhlar)' })
+  @ApiParam({ name: 'id', description: 'Market ID' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('market/:id/telegram')
+  marketTelegramOverview(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userService.marketTelegramOverview(id);
+  }
+
+  /**
+   * Telegram guruh ulanishini uzish.
+   *
+   * ⚠️ IKKI id ham talab qilinadi: `id` (market) va `connectionId`.
+   * Faqat `connectionId` bo'yicha o'chirish boshqa marketning
+   * ulanishini o'chirish imkonini berardi.
+   *
+   * ⚠️ Bu QAYTARIB BO'LMAYDIGAN amal (jadvalda soft-delete yo'q) —
+   * o'chirilgan qator audit logga yoziladi.
+   */
+  @ApiOperation({ summary: 'Telegram guruh ulanishini uzish' })
+  @ApiParam({ name: 'id', description: 'Market ID' })
+  @ApiParam({ name: 'connectionId', description: 'Ulanish ID' })
+  @ApiBearerAuth()
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Delete('market/:id/telegram/:connectionId')
+  disconnectMarketTelegram(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.userService.disconnectMarketTelegram(id, connectionId, user);
+  }
+
   @ApiOperation({ summary: 'Get user by id' })
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'User retrieved successfully' })
