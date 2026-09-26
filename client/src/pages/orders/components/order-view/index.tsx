@@ -416,6 +416,21 @@ const OrderView = () => {
             ?.map((item: any) => item.product?.name)
             ?.filter(Boolean)
             ?.join(", "),
+          /**
+           * ⚠️ `Mijoz` ustuni telefon raqamидан OLDIN turishi kerak.
+           *
+           * Boshqa uchala buyurtma/pochta eksportida bu ustun allaqachon
+           * shu tartibda edi (`export-post-orders-excel.ts:17`,
+           * `mail-detail/index.tsx:428` va `:569`) — faqat buyurtmalar
+           * sahifasi tushib qolgan edi, ya'ni eksportda mijoz ismi
+           * umuman ko'rinmasdi.
+           *
+           * Kalit nomi va `|| ""` zaxirasi o'sha uchtasi bilan AYNAN
+           * bir xil qoldirildi: helper ustunlarni nom bo'yicha topadi
+           * (`export-download-excel.ts:38`), shuning uchun nomlar
+           * ajralib ketmasligi kerak.
+           */
+          Mijoz: order?.customer?.name || "",
           "Telefon raqam": order?.customer?.phone_number,
           Narxi: Number((order?.total_price ?? 0) / 1000),
           Kuryer: order?.post?.courier?.name || "-",
