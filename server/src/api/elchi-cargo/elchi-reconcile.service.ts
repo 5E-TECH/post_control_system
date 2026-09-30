@@ -250,13 +250,41 @@ export class ElchiReconcileService {
       return 'unchanged';
     }
 
-    // Status o'zgarmagan — faqat "tekshirildi" belgisini yangilaymiz.
+    // Status o'zgarmagan — odatda faqat "tekshirildi" belgisini yangilaymiz.
+    //
+    // ⚠️ LEKIN PUL BACKFILL (E2E Andijon P0). Pul maydonlari (collected /
+    // elchi_fee) FAQAT `applyStatusUpdate` ichida yoziladi — u esa status
+    // o'zgargandagina chaqiriladi. Sotilgan posilkada Elchi pul maydonini
+    // KEYIN to'ldirishi mumkin (masalan `sale_collectible_amount` ustuni
+    // posilka sotilgandan keyin qo'shilgan). Status o'zgarmagani uchun bu
+    // qiymat HECH QACHON kelmasdi. Shuning uchun: shipmentda pul maydoni
+    // BO'SH, remote esa BERGAN bo'lsa — early-return QILMAYMIZ, quyidagi
+    // `applyStatusUpdate` orqali faqat pul maydonlarini backfill qilamiz
+    // (status va terminal amal idempotent — allaqachon sotilgan bo'lsa skip).
+    const remoteCollected = remote?.collected_from_customer;
+    const remoteFee = remote?.elchi_fee;
+    const needsMoneyBackfill =
+      (shipment.collected_from_customer_reported == null &&
+        remoteCollected != null &&
+        Number.isFinite(Number(remoteCollected))) ||
+      (shipment.elchi_fee_reported == null &&
+        remoteFee != null &&
+        Number.isFinite(Number(remoteFee)));
+
     if (
       normalizeElchiStatus(remoteStatus) ===
-      normalizeElchiStatus(shipment.elchi_status ?? '')
+        normalizeElchiStatus(shipment.elchi_status ?? '') &&
+      !needsMoneyBackfill
     ) {
       await this.touchSynced(shipment.id);
       return 'unchanged';
+    }
+
+    if (needsMoneyBackfill) {
+      this.logger.log(
+        `Elchi pul backfill: order=${shipment.order_id} status=${remoteStatus} ` +
+          `(status o'zgarmadi, pul maydonlari to'ldirilyapti)`,
+      );
     }
 
     this.logger.log(

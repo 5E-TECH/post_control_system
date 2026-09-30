@@ -222,6 +222,58 @@ describe('ElchiReconcileService — solishtirish', () => {
     expect(applyCalls).toHaveLength(0);
   });
 
+  /**
+   * PUL BACKFILL (E2E Andijon P0): status o'zgarmagan bo'lsa ham, shipmentда
+   * pul maydoni BO'SH va remote BERGAN bo'lsa — applyStatusUpdate orqali
+   * backfill qilinishi kerak (aks holda pul maydonlari abadiy null qolardi).
+   */
+  it("status o'zgarmagan LEKIN pul bo'sh + remote bergan -> BACKFILL", async () => {
+    const { svc, applyCalls } = buildSvc({
+      shipments: [
+        shipment({
+          elchi_status: 'sold',
+          collected_from_customer_reported: null,
+          elchi_fee_reported: null,
+        }),
+      ],
+      getShipmentImpl: jest.fn().mockResolvedValue({
+        shipment_id: '9001',
+        status: 'sold', // O'ZGARMAGAN
+        collected_from_customer: 25000,
+        elchi_fee: 15000,
+      }),
+    });
+
+    await svc.reconcileBatch();
+
+    expect(applyCalls).toHaveLength(1); // backfill uchun chaqirildi
+    expect(applyCalls[0].collected_from_customer).toBe(25000);
+    expect(applyCalls[0].elchi_fee).toBe(15000);
+  });
+
+  it("status o'zgarmagan VA pul allaqachon bor -> backfill YO'Q", async () => {
+    const { svc, applyCalls, touched } = buildSvc({
+      shipments: [
+        shipment({
+          elchi_status: 'sold',
+          collected_from_customer_reported: '25000.00',
+          elchi_fee_reported: '15000.00',
+        }),
+      ],
+      getShipmentImpl: jest.fn().mockResolvedValue({
+        shipment_id: '9001',
+        status: 'sold',
+        collected_from_customer: 25000,
+        elchi_fee: 15000,
+      }),
+    });
+
+    await svc.reconcileBatch();
+
+    expect(applyCalls).toHaveLength(0); // pul bor -> qayta yozilmaydi
+    expect(touched).toContain('s-1');
+  });
+
   it('Elchi status qaytarmasa -> tegilmaydi, belgi yangilanadi', async () => {
     const { svc, applyCalls, touched } = buildSvc({
       shipments: [shipment()],
@@ -283,13 +335,11 @@ describe('ElchiReconcileService — solishtirish', () => {
 describe('ElchiReconcileService — bitta posilkani sinxronlash', () => {
   it("Elchi'da bog'lanmagan posilka -> tekshirilmaydi", async () => {
     const { svc } = buildSvc({ shipments: [] });
-    svc.shipmentRepo.findOne = jest
-      .fn()
-      .mockResolvedValue({
-        id: 's-1',
-        order_id: 'o-1',
-        elchi_shipment_id: null,
-      });
+    svc.shipmentRepo.findOne = jest.fn().mockResolvedValue({
+      id: 's-1',
+      order_id: 'o-1',
+      elchi_shipment_id: null,
+    });
 
     const res = await svc.reconcileOne('o-1');
 
