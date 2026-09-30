@@ -382,22 +382,31 @@ export class ElchiWebhookService {
     /**
      * HAQIQIY PUL MAYDONLARI (audit M2).
      *
-     * ⚠️ `!= null` ISHLATILADI, `Number.isFinite` bilan birga — chunki 0
-     * HAQIQIY qiymat: onlayn to'langan buyurtmada kuryer NAQD YIG'MAYDI,
-     * ya'ni `collected_from_customer = 0` to'g'ri javob. `!payload.x`
-     * tekshiruvi 0 ni "yo'q" deb o'tkazib yuborardi va panel eski, yolg'on
-     * maydonga qaytib qolardi.
+     * ⚠️ UCH HOLAT AJRATILADI (`number | null | undefined`):
+     *   • son     -> yoziladi (0 ham HAQIQIY: onlayn to'langan buyurtmada
+     *                kuryer naqd yig'maydi, `collected_from_customer = 0`);
+     *   • `null`  -> ustunni NULL ga TOZALAYMIZ. Elchi sotuvni qaytarganda
+     *                (rollback/return) `sale_collectible_amount`ni null qiladi
+     *                va `GET`da `collected_from_customer: null` keladi —
+     *                ilgari bu holat e'tiborsiz qolardi (eski qiymat saqlanib,
+     *                panel qaytarilgan posilkani "Elchi yig'gan" deb sanardi,
+     *                soxta qarz shishardi);
+     *   • `undefined` -> Elchi maydonni umuman YUBORMADI, tegilmaydi.
      */
-    if (
-      payload.collected_from_customer != null &&
+    if (payload.collected_from_customer === null) {
+      shipment.collected_from_customer_reported = null;
+    } else if (
+      payload.collected_from_customer !== undefined &&
       Number.isFinite(Number(payload.collected_from_customer))
     ) {
       shipment.collected_from_customer_reported = Number(
         payload.collected_from_customer,
       ).toFixed(2);
     }
-    if (
-      payload.elchi_fee != null &&
+    if (payload.elchi_fee === null) {
+      shipment.elchi_fee_reported = null;
+    } else if (
+      payload.elchi_fee !== undefined &&
       Number.isFinite(Number(payload.elchi_fee))
     ) {
       shipment.elchi_fee_reported = Number(payload.elchi_fee).toFixed(2);
