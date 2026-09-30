@@ -15,11 +15,20 @@ import { ElchiShipmentStatusResponse } from './dto/elchi-api.dto';
 /**
  * Elchi tomonda BOSHQA O'ZGARMAYDIGAN statuslar — bunday posilkalar
  * so'rovlardan chiqariladi (aks holda CRON abadiy ularni tekshirib yurardi).
+ *
+ * ⚠️ `sold` va `partly_paid` ATAYLAB YO'Q (E2E Andijon P0).
+ *
+ * Elchida buyurtma avval `sold`, keyin pul market kassasiga tushganda `paid`
+ * bo'ladi. Agar `sold`/`partly_paid` terminal hisoblansa, webhooksiz muhitda
+ * reconcile bunday posilkani BOSHQA so'ramaydi va `paid` o'tishini —
+ * demak pul maydonlarini (collected_from_customer, elchi_fee) — HECH QACHON
+ * ko'rmaydi. Ular pul YAKUNLANMAGAN oraliq holat, shuning uchun `paid` yoki
+ * haqiqiy terminal (cancelled/closed) kelgunча qayta so'raladi. `paid`
+ * kelganda posilka pul maydonlari yangilanadi (buyurtma allaqachon SOLD
+ * bo'lsa ham — applyStatusUpdate avval snapshotni yozadi).
  */
-const TERMINAL_ELCHI_STATUSES = [
-  'sold',
+export const TERMINAL_ELCHI_STATUSES = [
   'paid',
-  'partly_paid',
   'cancelled',
   'cancelled (sent)',
   'returned_to_market',
