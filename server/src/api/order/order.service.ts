@@ -7630,6 +7630,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
      * qanchaga aylandi". Shu bilan operator buyurtmani ochganda sababni
      * ko'radi va kassadagi summa nega boshqacha ekani tushunarli bo'ladi.
      */
+    /**
+     * NARX PASAYISHI = QISMAN SOTUV EHTIMOLI (vaqtinchalik chora).
+     *
+     * Elchi qisman sotuvda asl buyurtma narxini kamaytirib, qolgan mol uchun
+     * ALOHIDA bola buyurtma ochadi — lekin PCS bola haqida hech narsa
+     * bilmaydi (faqat `total_price` pasayishini ko'radi). Qolgan mol qayerda,
+     * kim javobgar ekani jimgina yo'qolardi.
+     *
+     * To'liq yechim (bola posilka hodisasi + qaytish yozuvi) katta ish.
+     * Hozircha eng muhimi — JIMLIKNI yo'qotish: narx pasaysa sotuv baribir
+     * o'tadi (yig'ilgan pul yoziladi), LEKIN posilkaga NOMUVOFIQLIK belgisi
+     * qo'yiladi (`kind:'mismatch'`), shunda admin "Nomuvofiqlik" filtrida
+     * ko'rinadi va operator qolgan molni qo'lda tekshiradi.
+     */
+    const originalTotal = Number(order.total_price ?? 0);
+    const remoteTotal = Number(remote?.totalPrice ?? NaN);
+    const priceDropped =
+      Number.isFinite(remoteTotal) && remoteTotal < originalTotal - 0.01;
+
     const priceNote = await this.acceptElchiPriceChange(
       orderId,
       remote?.totalPrice,
@@ -7659,6 +7678,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         { comment: sellComment, extraCost: remoteExtra },
         { bypassControlGuard: true },
       );
+      // Sotuv o'tdi. Narx PASAYGAN bo'lsa — qisman sotuv ehtimoli: posilkani
+      // nomuvofiqlik deb belgilaymiz (chaqiruvchi shipment.mismatch_at qo'yadi),
+      // jimgina o'tib ketmasin.
+      if (priceDropped) {
+        const gap = Math.round(originalTotal - remoteTotal);
+        const reason =
+          `Elchi narxni pasaytirdi: ${originalTotal} -> ${remoteTotal} so'm ` +
+          `(qisman sotuv ehtimoli). Qolgan ~${gap} so'mlik mol kuzatilmagan — ` +
+          `qo'lda tekshiring.`;
+        this.logger.error(`ELCHI PARTIAL? order=${orderId} — ${reason}`);
+        return { kind: 'mismatch', reason };
+      }
       return { kind: 'applied' };
     } catch (err) {
       /**
