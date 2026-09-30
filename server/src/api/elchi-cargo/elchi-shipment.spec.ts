@@ -1,5 +1,5 @@
 /// <reference types="jest" />
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 import { ElchiShipmentService } from './elchi-shipment.service';
 import { Order_status, Status, Where_deliver } from 'src/common/enums';
 
@@ -716,7 +716,11 @@ describe('⭐ createShipmentForOrder — qop (batch) ma`lumoti', () => {
         status: Order_status.RECEIVED,
         post_id: 'draft-post',
         // QORALAMA: courier_id YO'Q.
-        post: { id: 'draft-post', qr_code_token: 'DRAFT-TOKEN', courier_id: null },
+        post: {
+          id: 'draft-post',
+          qr_code_token: 'DRAFT-TOKEN',
+          courier_id: null,
+        },
         district_id: 'd-1',
         district: { name: 'Chilonzor' },
         where_deliver: Where_deliver.CENTER,
