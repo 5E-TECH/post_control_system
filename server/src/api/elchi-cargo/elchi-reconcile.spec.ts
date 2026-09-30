@@ -275,6 +275,27 @@ describe('ElchiReconcileService — solishtirish', () => {
     expect(touched).toContain('s-1');
   });
 
+  /**
+   * ELCHI ROLLBACK RECONCILE ORQALI (P1 #423). `sold` endi TERMINAL EMAS
+   * (482), shuning uchun sotilgan posilka qayta so'raladi. Elchi sotuvni
+   * qaytarsa (sold -> waiting), reconcile buni KO'RADI va applyStatusUpdate
+   * orqali qo'llaydi (waiting -> rollback). Ilgari sold terminal bo'lgani
+   * uchun bu yo'lga FAQAT webhook orqali kirish mumkin edi — webhook o'lik
+   * bo'lsa rollback BeePostga yetmasdi (pul kassada qolardi).
+   */
+  it("sold -> waiting (Elchi rollback) reconcile orqali qo'llanadi (#423)", async () => {
+    const { svc, applyCalls } = buildSvc({
+      shipments: [shipment({ elchi_status: 'sold' })],
+      remoteStatus: 'waiting',
+    });
+
+    const res = await svc.reconcileBatch();
+
+    expect(res.applied).toBe(1);
+    expect(applyCalls).toHaveLength(1);
+    expect(applyCalls[0].status).toBe('waiting'); // rollback triggeri yetib keladi
+  });
+
   it('Elchi status qaytarmasa -> tegilmaydi, belgi yangilanadi', async () => {
     const { svc, applyCalls, touched } = buildSvc({
       shipments: [shipment()],
