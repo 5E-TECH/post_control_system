@@ -296,6 +296,27 @@ describe('ElchiReconcileService — solishtirish', () => {
     expect(applyCalls[0].status).toBe('waiting'); // rollback triggeri yetib keladi
   });
 
+  /**
+   * YOLG'ON 'unchanged' YO'Q (JdOAAthq). sold->paid: status O'ZGARDI, lekin
+   * buyurtma allaqachon SOLD bo'lgani uchun terminal amal 'skipped' qaytaradi
+   * (pul maydonlari esa yangilandi). Reconcile buni 'applied' deb sanashi
+   * kerak — ilgari 'unchanged' deb yolg'on hisobot berardi.
+   */
+  it("status o'zgardi + terminal 'skipped' (sold->paid) -> 'applied', 'unchanged' EMAS (JdOAAthq)", async () => {
+    const { svc } = buildSvc({
+      shipments: [shipment({ elchi_status: 'sold' })],
+      remoteStatus: 'paid',
+      applyImpl: jest.fn(() =>
+        Promise.resolve({ status: 'skipped', message: 'already sold' }),
+      ),
+    });
+
+    const res = await svc.reconcileBatch();
+
+    expect(res.applied).toBe(1);
+    expect(res.unchanged).toBe(0);
+  });
+
   it('Elchi status qaytarmasa -> tegilmaydi, belgi yangilanadi', async () => {
     const { svc, applyCalls, touched } = buildSvc({
       shipments: [shipment()],
