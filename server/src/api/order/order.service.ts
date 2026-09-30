@@ -2608,6 +2608,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     });
     if (actor?.external_provider === 'ldg') return;
 
+    // Elchi istisno: LDG bilan AYNAN bir xil arxitektura (elchi-cargo.module.ts).
+    // Elchi webhook'lari virtual vakil-kuryer (external_provider='elchi') nomidan
+    // sotuv/bekor qiladi. Buyurtma to'g'ridan-to'g'ri `new`dan dispatch qilinsa
+    // (dispatch-retry) yoki oraliq webhook yo'qolsa, order postsiz bo'lishi mumkin
+    // va yuqoridagi post-egalik tekshiruvidan o'tmaydi. Chaqiruvchi Elchi
+    // vakil-kuryer bo'lsa egalikni o'tkazib yuboramiz — aks holda yetkazilgan
+    // posilka (=pul) PCS'da abadiy sotilmay qolardi.
+    if (actor?.external_provider === 'elchi') return;
+
     throw new ForbiddenException('Bu buyurtma sizga tegishli emas');
   }
 
@@ -7239,13 +7248,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
     // ON_THE_ROAD yoki RECEIVED bo'lsa avval WAITING ga o'tkazamiz
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7583,13 +7599,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     // bizda hali `ON_THE_ROAD`/`RECEIVED` bo'lishi mumkin (oraliq statuslar
     // webhookda yo'qolgan bo'lsa) — avval `WAITING`ga o'tkazamiz.
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7725,13 +7748,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
 
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7872,13 +7902,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
 
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
