@@ -87,7 +87,7 @@ export interface ElchiWebhookPayload {
    * o'tadi. O'tmasa sotuv yiqilmaydi — xarajatsiz sotiladi va nomuvofiqlik
    * belgilanadi.
    */
-  extra_cost?: number;
+  extra_cost?: number | null;
 
   /**
    * ===== `settlement.payment` hodisasi maydonlari =====

@@ -432,6 +432,16 @@ export class ElchiWebhookService {
     ) {
       shipment.elchi_fee_reported = Number(payload.elchi_fee).toFixed(2);
     }
+    // KURYER HAQQI (extra_cost) — hisob-kitobda qarzdan ayiriladi (ShM3oBjJ).
+    // Ayni uch holat: null->tozala, undefined->tegilmaydi, son->yoz.
+    if (payload.extra_cost === null) {
+      shipment.extra_cost_reported = null;
+    } else if (
+      payload.extra_cost !== undefined &&
+      Number.isFinite(Number(payload.extra_cost))
+    ) {
+      shipment.extra_cost_reported = Number(payload.extra_cost).toFixed(2);
+    }
     await this.shipmentRepo.save(shipment);
 
     const mapping = mapElchiStatus(rawStatus);

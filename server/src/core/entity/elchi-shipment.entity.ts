@@ -114,6 +114,21 @@ export class ElchiShipmentEntity extends BaseEntity {
   })
   elchi_fee_reported: string | null;
 
+  /**
+   * KURYER HAQQI (extra_cost) — Elchi sotuvda yozgan qo'shimcha xarajat.
+   *
+   * Asosiy kassaga TEGMAYDI: marketdan yechilib kuryerga beriladi. Hisob-kitobda
+   * "Elchi bizga qarz" dan AYIRILADI — chunki yig'ilgan naqdning bu qismi
+   * kuryerga extra_cost sifatida ketadi, market ushlab qoladi (ShM3oBjJ).
+   */
+  @Column({
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    nullable: true,
+  })
+  extra_cost_reported: string | null;
+
   // ===== JO'NATISH HOLATI =====
 
   @Column({ type: 'int', default: 0 })
