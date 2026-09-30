@@ -101,6 +101,12 @@ export interface ElchiCreateShipmentRequest {
   batch_ref?: string;
   batch_label_token?: string;
   batch_size?: number;
+  /**
+   * OPERATOR IZOHI (order.comment) — Elchi kuryeri yetkazishda ko'rishi uchun
+   * (TzuuOKI3). Masalan "eshik kodi 1234", "faqat ertalab". Ilgari umuman
+   * yuborilmasdi.
+   */
+  comment?: string | null;
 }
 
 export interface ElchiCreateShipmentResponse {
