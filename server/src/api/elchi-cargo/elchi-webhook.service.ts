@@ -283,6 +283,19 @@ export class ElchiWebhookService {
   }
 
   /**
+   * Elchi `occurred_at` (ISO sana) ni epoch ms ga aylantiradi (jyU65k8v).
+   * Yaroqsiz yoki kelajakdagi (soat farqi oynasidan tashqari) sana rad
+   * etiladi — `null` qaytariladi (chaqiruvchi hozirgi vaqtga tushadi).
+   */
+  private parseOccurredAt(raw?: string): number | null {
+    if (!raw) return null;
+    const ms = Date.parse(raw);
+    if (!Number.isFinite(ms)) return null;
+    if (ms > Date.now() + 5 * 60_000) return null;
+    return ms;
+  }
+
+  /**
    * Statusni buyurtmaga qo'llaydi: posilkani yangilaydi, statusni moslaydi va
    * terminal amalni bajaradi.
    *
@@ -366,7 +379,15 @@ export class ElchiWebhookService {
 
     const rawStatus = String(payload.status ?? '');
     shipment.elchi_status = rawStatus || shipment.elchi_status;
-    shipment.elchi_status_changed_at = Date.now();
+    /**
+     * `occurred_at` — Elchi tomonidagi HAQIQIY o'zgarish vaqti. Webhook
+     * kechiksa yoki reconcile keyinroq tutsa ham status sanasi to'g'ri
+     * bo'ladi. Bo'lmasa (yoki yaroqsiz) — hozirgi vaqt (jyU65k8v).
+     * `last_synced_at` esa BIZ oxirgi marta sinxronlagan vaqt — har doim
+     * hozir.
+     */
+    shipment.elchi_status_changed_at =
+      this.parseOccurredAt(payload.occurred_at) ?? Date.now();
     shipment.last_synced_at = Date.now();
     if (
       payload.cod_collected != null &&
