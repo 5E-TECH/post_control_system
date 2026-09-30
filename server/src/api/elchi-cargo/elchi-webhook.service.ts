@@ -321,12 +321,30 @@ export class ElchiWebhookService {
     const remoteId =
       payload.shipment_id != null ? String(payload.shipment_id) : '';
 
+    /**
+     * ⚠️ UUID DARVOZASI — `order_id` ustuni `uuid` tipida.
+     *
+     * Elchi `external_order_id`ga ixtiyoriy satr yuborishi mumkin (yorliq,
+     * smoke-test id va h.k.). UUID bo'lmagan qiymat bilan `findOne` qilsak
+     * Postgres 22P02 tashlaydi -> `if (!shipment)` qo'riqchisigacha YETMAYDI
+     * -> HTTP 500. Elchi outboxi 500 ni vaqtinchalik deb 4 marta uradi,
+     * so'ng `permanently_failed` qilib hodisani ABADIY tashlaydi.
+     *
+     * Shuning uchun UUID bo'lmasa `order_id` qidiruvini o'tkazib yuboramiz va
+     * `elchi_shipment_id` bo'yicha qidiramiz; u ham topilmasa `skipped` (200).
+     */
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        orderId,
+      );
+
     // Posilkani `external_order_id` (bizning UUID) bo'yicha topamiz; bo'lmasa
     // Elchi posilka id'si bilan (masalan biz jo'natishda javobni yo'qotgan
     // bo'lsak, keyin webhook orqali bog'lanadi — backfill).
-    let shipment = orderId
-      ? await this.shipmentRepo.findOne({ where: { order_id: orderId } })
-      : null;
+    let shipment =
+      orderId && isUuid
+        ? await this.shipmentRepo.findOne({ where: { order_id: orderId } })
+        : null;
     if (!shipment && remoteId) {
       shipment = await this.shipmentRepo.findOne({
         where: { elchi_shipment_id: remoteId },
