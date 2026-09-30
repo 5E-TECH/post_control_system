@@ -1,4 +1,5 @@
 /// <reference types="jest" />
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument, @typescript-eslint/require-await */
 import { ElchiShipmentService } from './elchi-shipment.service';
 import { Order_status, Status, Where_deliver } from 'src/common/enums';
 
@@ -63,6 +64,12 @@ function buildSvc(
             order_number: 100042,
             status: Order_status.RECEIVED,
             post_id: 'p-1',
+            // HAQIQIY jo'natilgan pochta — kuryer biriktirilgan (qop yuboriladi).
+            post: {
+              id: 'p-1',
+              qr_code_token: 'DEFAULT-QOP',
+              courier_id: 'elchi-courier',
+            },
             // JISMONIY YORLIQDAGI token — Elchi ga `label_token` bolib ketadi.
             qr_code_token: 'PCS-LABEL-XYZ',
             district_id: 'd-1',
@@ -629,7 +636,11 @@ describe('⭐ createShipmentForOrder — qop (batch) ma`lumoti', () => {
         order_number: 11,
         status: Order_status.RECEIVED,
         post_id: 'post-77',
-        post: { id: 'post-77', qr_code_token: 'QOP-STIKER-77' },
+        post: {
+          id: 'post-77',
+          qr_code_token: 'QOP-STIKER-77',
+          courier_id: 'elchi-courier',
+        },
         district_id: 'd-1',
         district: { name: 'Chilonzor' },
         where_deliver: Where_deliver.CENTER,
@@ -665,7 +676,11 @@ describe('⭐ createShipmentForOrder — qop (batch) ma`lumoti', () => {
         order_number: 12,
         status: Order_status.RECEIVED,
         post_id: 'post-78',
-        post: { id: 'post-78', qr_code_token: '   ' },
+        post: {
+          id: 'post-78',
+          qr_code_token: '   ',
+          courier_id: 'elchi-courier',
+        },
         district_id: 'd-1',
         district: { name: 'Chilonzor' },
         where_deliver: Where_deliver.CENTER,
@@ -682,6 +697,45 @@ describe('⭐ createShipmentForOrder — qop (batch) ma`lumoti', () => {
     expect(callBody(createShipment).batch_label_token).toBeUndefined();
     // `batch_ref` esa qoladi — guruhlash pochta id'si bilan ham ishlaydi.
     expect(callBody(createShipment).batch_ref).toBe('post-78');
+  });
+
+  it('⭐ QORALAMA pochta (kuryer YO`Q) -> qop UMUMAN yuborilmaydi (#436)', async () => {
+    /**
+     * ⚠️ E2E #436. Buyurtma qoralama pochtada bo'lsa (status=new, kuryer
+     * biriktirilmagan), o'sha qoralamaning tokeni yuborilardi — lekin
+     * jismoniy yorliqda HAQIQIY jo'natilgan pochtaning tokeni turadi.
+     * Elchi operatori skanerlaganda "topilmadi" derdi. Endi kuryersiz
+     * pochta uchun qop MA'LUMOTI umuman yuborilmaydi.
+     */
+    const createShipment = jest.fn().mockResolvedValue({ shipment_id: '9001' });
+    const { svc } = buildSvc({
+      createShipmentImpl: createShipment,
+      order: {
+        id: 'o-1',
+        order_number: 13,
+        status: Order_status.RECEIVED,
+        post_id: 'draft-post',
+        // QORALAMA: courier_id YO'Q.
+        post: { id: 'draft-post', qr_code_token: 'DRAFT-TOKEN', courier_id: null },
+        district_id: 'd-1',
+        district: { name: 'Chilonzor' },
+        where_deliver: Where_deliver.CENTER,
+        to_be_paid: 0,
+        total_price: 100000,
+        customer: { name: 'Test', phone_number: '+998901112233' },
+        items: [],
+        qr_code_token: 'PCS-LABEL-13',
+      },
+    });
+
+    await svc.createShipmentForOrder('o-1', undefined, { size: 5 });
+
+    const body = callBody(createShipment);
+    expect(body.batch_label_token).toBeUndefined(); // qoralama tokeni YUBORILMAYDI
+    expect(body.batch_ref).toBeUndefined();
+    expect(body.batch_size).toBeUndefined();
+    // Posilkaning O'Z yorlig'i esa baribir ketadi (yakka qabul qilinadi).
+    expect(body.label_token).toBe('PCS-LABEL-13');
   });
 
   it('⭐ qop hajmi berilmasa POCHTADAN sanaladi (qayta jo`natish yo`li)', async () => {

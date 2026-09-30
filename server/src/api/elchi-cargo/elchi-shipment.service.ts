@@ -479,6 +479,29 @@ export class ElchiShipmentService {
      */
     const cod = Number(order.total_price ?? 0);
 
+    /**
+     * QOP (batch) YORLIG'I — FAQAT HAQIQIY JO'NATILAYOTGAN POCHTA UCHUN (E2E #436).
+     *
+     * ⚠️ Qop yorlig'i tokeni `order.post.qr_code_token` dan olinadi. Agar
+     * buyurtma QORALAMA pochtada bo'lsa (`status=new`, kuryer BIRIKTIRILMAGAN),
+     * o'sha qoralamaning tokeni yuborilardi — lekin jismoniy yorliqda HAQIQIY
+     * jo'natilgan pochtaning tokeni turadi. Natijada Elchi operatori qop
+     * yorlig'ini skanerlaganda "topilmadi" derdi.
+     *
+     * Shu bois qop ma'lumoti FAQAT kuryer biriktirilgan pochta uchun
+     * yuboriladi. Qoralamada — qop yuborilmaydi (posilka yakka ketadi, bu
+     * xavfsizroq: noto'g'ri qop tokenidan ko'ra qopsiz yaxshi).
+     */
+    const dispatchedPost =
+      order.post && order.post.courier_id ? order.post : null;
+    const batchRef = dispatchedPost ? String(order.post_id) : undefined;
+    const batchLabelToken = dispatchedPost
+      ? String(dispatchedPost.qr_code_token ?? '').trim() || undefined
+      : undefined;
+    const batchSize = dispatchedPost
+      ? await this.resolveBatchSize(order.post_id, batch?.size)
+      : undefined;
+
     try {
       const response = await this.api.createShipment({
         external_order_id: order.id,
@@ -556,10 +579,9 @@ export class ElchiShipmentService {
          * etiladigan token. Boshqa qiymat yuborilsa Elchi operatori
          * skanerlagan yorliq mos kelmasdi.
          */
-        batch_ref: order.post_id ? String(order.post_id) : undefined,
-        batch_label_token:
-          String(order.post?.qr_code_token ?? '').trim() || undefined,
-        batch_size: await this.resolveBatchSize(order.post_id, batch?.size),
+        batch_ref: batchRef,
+        batch_label_token: batchLabelToken,
+        batch_size: batchSize,
       });
 
       const remoteId = String(response?.shipment_id ?? '').trim();
