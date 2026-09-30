@@ -89,5 +89,28 @@ export interface ElchiWebhookPayload {
    */
   extra_cost?: number;
 
+  /**
+   * ===== `settlement.payment` hodisasi maydonlari =====
+   *
+   * Elchi bir marketga (bizning hamkor marketimizga) pul to'laganda yuboradi.
+   * Buyurtmaga bog'liq EMAS — market darajasidagi hisob-kitob to'lovi.
+   */
+
+  /** Elchi to'lagan summa (so'm). `settlement.payment` uchun MAJBURIY. */
+  amount?: number;
+
+  /** To'lov sanasi (epoch ms). */
+  paid_at?: number;
+
+  /**
+   * Elchi tomonidagi to'lovning BARQAROR id'si — DEDUP kaliti.
+   * `elchi_settlement_payment.external_payment_id`ga yoziladi; ayni to'lov
+   * ikki marta kelsa ikkinchisi jimgina rad etiladi.
+   */
+  payment_id?: string;
+
+  /** Ixtiyoriy izoh (o'tkazma raqami va h.k.). */
+  note?: string | null;
+
   occurred_at?: string;
 }

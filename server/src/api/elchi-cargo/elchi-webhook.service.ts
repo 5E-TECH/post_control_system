@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { ElchiConfigEntity } from 'src/core/entity/elchi-config.entity';
 import { ElchiShipmentEntity } from 'src/core/entity/elchi-shipment.entity';
 import { ElchiWebhookLogEntity } from 'src/core/entity/elchi-webhook-log.entity';
+import { ElchiSettlementPaymentEntity } from 'src/core/entity/elchi-settlement-payment.entity';
 import { OrderService } from '../order/order.service';
 import { verifyElchiSignature } from './utils/elchi-signature.util';
 import { elchiStatusLabel, mapElchiStatus } from './utils/elchi-status.mapper';
@@ -34,6 +35,8 @@ export class ElchiWebhookService {
     private readonly shipmentRepo: Repository<ElchiShipmentEntity>,
     @InjectRepository(ElchiWebhookLogEntity)
     private readonly logRepo: Repository<ElchiWebhookLogEntity>,
+    @InjectRepository(ElchiSettlementPaymentEntity)
+    private readonly settlementRepo: Repository<ElchiSettlementPaymentEntity>,
     private readonly orderService: OrderService,
   ) {}
 
@@ -211,6 +214,75 @@ export class ElchiWebhookService {
   // ===================== ICHKI =====================
 
   /**
+   * HISOB-KITOB TO'LOVINI QAYD ETISH (`settlement.payment`).
+   *
+   * Elchi bir marketga pul to'laganda yuboradi. Biz uni `elchi_settlement_payment`
+   * daftariga AVTOMATIK yozamiz — ilgari faqat qo'lda kiritilardi va unutilsa
+   * "Elchi bizga qarz" raqami abadiy noto'g'ri qolardi.
+   *
+   * ⚠️ BU KASSA EMAS. Daftar `cashbox_history`ga tegmaydi (entity izohiga
+   * qarang) — faqat solishtirish uchun. "Elchi qancha to'ladi" shu yerdan
+   * yig'iladi va qarz shunga qarab kamayadi.
+   *
+   * IDEMPOTENT: `external_payment_id` (Elchi to'lov id'si) NOYOB. Outbox retry
+   * qilsa ham ikkinchi kelish jimgina rad etiladi.
+   */
+  private async recordSettlementPayment(
+    payload: ElchiWebhookPayload,
+  ): Promise<{ status: ElchiWebhookStatus; message: string; note?: string }> {
+    const amount = Number(payload.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {
+        status: 'failed',
+        message: "settlement.payment: summa musbat bo'lishi kerak",
+        note: `amount=${String(payload.amount)}`,
+      };
+    }
+
+    const paidAt = Number(payload.paid_at) || Date.now();
+    // Kelajak sanani rad etamiz — aks holda qarzni BUGUN yolg'on kamaytirardi
+    // (qo'lda kiritishdagi ayni qoida).
+    if (paidAt > Date.now() + 60_000) {
+      return {
+        status: 'failed',
+        message: "settlement.payment: to'lov sanasi kelajakda bo'lolmaydi",
+        note: `paid_at=${paidAt}`,
+      };
+    }
+
+    const externalPaymentId = String(payload.payment_id ?? '').trim() || null;
+
+    try {
+      await this.settlementRepo.save(
+        this.settlementRepo.create({
+          amount: amount.toFixed(2),
+          paid_at: paidAt,
+          note: payload.note ? String(payload.note) : 'Elchi avto (webhook)',
+          external_payment_id: externalPaymentId,
+          created_by: null,
+        }),
+      );
+      this.logger.log(
+        `Elchi hisob-kitob to'lovi qayd etildi: ${amount} so'm ` +
+          `(payment_id=${externalPaymentId ?? '-'})`,
+      );
+      return {
+        status: 'success',
+        message: `Elchi to'lovi qayd etildi: ${amount} so'm`,
+      };
+    } catch (error) {
+      // Ayni `external_payment_id` allaqachon bor — takror, xato emas.
+      if (this.isUniqueViolation(error)) {
+        return {
+          status: 'success',
+          message: "Takror to'lov (allaqachon qayd etilgan)",
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Statusni buyurtmaga qo'llaydi: posilkani yangilaydi, statusni moslaydi va
    * terminal amalni bajaradi.
    *
@@ -239,6 +311,12 @@ export class ElchiWebhookService {
     message: string;
     note?: string;
   }> {
+    // HISOB-KITOB TO'LOVI — buyurtmaga bog'liq emas, alohida yo'l bilan
+    // yoziladi (posilka qidirmaymiz).
+    if (String(payload.event ?? '') === 'settlement.payment') {
+      return this.recordSettlementPayment(payload);
+    }
+
     const orderId = String(payload.external_order_id ?? '').trim();
     const remoteId =
       payload.shipment_id != null ? String(payload.shipment_id) : '';
