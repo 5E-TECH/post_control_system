@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { ElchiConfigEntity } from 'src/core/entity/elchi-config.entity';
 import { ElchiShipmentEntity } from 'src/core/entity/elchi-shipment.entity';
 import { ElchiWebhookLogEntity } from 'src/core/entity/elchi-webhook-log.entity';
+import { ElchiSettlementPaymentEntity } from 'src/core/entity/elchi-settlement-payment.entity';
 import { OrderService } from '../order/order.service';
 import { verifyElchiSignature } from './utils/elchi-signature.util';
 import { elchiStatusLabel, mapElchiStatus } from './utils/elchi-status.mapper';
@@ -34,6 +35,8 @@ export class ElchiWebhookService {
     private readonly shipmentRepo: Repository<ElchiShipmentEntity>,
     @InjectRepository(ElchiWebhookLogEntity)
     private readonly logRepo: Repository<ElchiWebhookLogEntity>,
+    @InjectRepository(ElchiSettlementPaymentEntity)
+    private readonly settlementRepo: Repository<ElchiSettlementPaymentEntity>,
     private readonly orderService: OrderService,
   ) {}
 
@@ -211,6 +214,75 @@ export class ElchiWebhookService {
   // ===================== ICHKI =====================
 
   /**
+   * HISOB-KITOB TO'LOVINI QAYD ETISH (`settlement.payment`).
+   *
+   * Elchi bir marketga pul to'laganda yuboradi. Biz uni `elchi_settlement_payment`
+   * daftariga AVTOMATIK yozamiz — ilgari faqat qo'lda kiritilardi va unutilsa
+   * "Elchi bizga qarz" raqami abadiy noto'g'ri qolardi.
+   *
+   * ⚠️ BU KASSA EMAS. Daftar `cashbox_history`ga tegmaydi (entity izohiga
+   * qarang) — faqat solishtirish uchun. "Elchi qancha to'ladi" shu yerdan
+   * yig'iladi va qarz shunga qarab kamayadi.
+   *
+   * IDEMPOTENT: `external_payment_id` (Elchi to'lov id'si) NOYOB. Outbox retry
+   * qilsa ham ikkinchi kelish jimgina rad etiladi.
+   */
+  private async recordSettlementPayment(
+    payload: ElchiWebhookPayload,
+  ): Promise<{ status: ElchiWebhookStatus; message: string; note?: string }> {
+    const amount = Number(payload.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {
+        status: 'failed',
+        message: "settlement.payment: summa musbat bo'lishi kerak",
+        note: `amount=${String(payload.amount)}`,
+      };
+    }
+
+    const paidAt = Number(payload.paid_at) || Date.now();
+    // Kelajak sanani rad etamiz — aks holda qarzni BUGUN yolg'on kamaytirardi
+    // (qo'lda kiritishdagi ayni qoida).
+    if (paidAt > Date.now() + 60_000) {
+      return {
+        status: 'failed',
+        message: "settlement.payment: to'lov sanasi kelajakda bo'lolmaydi",
+        note: `paid_at=${paidAt}`,
+      };
+    }
+
+    const externalPaymentId = String(payload.payment_id ?? '').trim() || null;
+
+    try {
+      await this.settlementRepo.save(
+        this.settlementRepo.create({
+          amount: amount.toFixed(2),
+          paid_at: paidAt,
+          note: payload.note ? String(payload.note) : 'Elchi avto (webhook)',
+          external_payment_id: externalPaymentId,
+          created_by: null,
+        }),
+      );
+      this.logger.log(
+        `Elchi hisob-kitob to'lovi qayd etildi: ${amount} so'm ` +
+          `(payment_id=${externalPaymentId ?? '-'})`,
+      );
+      return {
+        status: 'success',
+        message: `Elchi to'lovi qayd etildi: ${amount} so'm`,
+      };
+    } catch (error) {
+      // Ayni `external_payment_id` allaqachon bor — takror, xato emas.
+      if (this.isUniqueViolation(error)) {
+        return {
+          status: 'success',
+          message: "Takror to'lov (allaqachon qayd etilgan)",
+        };
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Statusni buyurtmaga qo'llaydi: posilkani yangilaydi, statusni moslaydi va
    * terminal amalni bajaradi.
    *
@@ -239,16 +311,40 @@ export class ElchiWebhookService {
     message: string;
     note?: string;
   }> {
+    // HISOB-KITOB TO'LOVI — buyurtmaga bog'liq emas, alohida yo'l bilan
+    // yoziladi (posilka qidirmaymiz).
+    if (String(payload.event ?? '') === 'settlement.payment') {
+      return this.recordSettlementPayment(payload);
+    }
+
     const orderId = String(payload.external_order_id ?? '').trim();
     const remoteId =
       payload.shipment_id != null ? String(payload.shipment_id) : '';
 
+    /**
+     * ⚠️ UUID DARVOZASI — `order_id` ustuni `uuid` tipida.
+     *
+     * Elchi `external_order_id`ga ixtiyoriy satr yuborishi mumkin (yorliq,
+     * smoke-test id va h.k.). UUID bo'lmagan qiymat bilan `findOne` qilsak
+     * Postgres 22P02 tashlaydi -> `if (!shipment)` qo'riqchisigacha YETMAYDI
+     * -> HTTP 500. Elchi outboxi 500 ni vaqtinchalik deb 4 marta uradi,
+     * so'ng `permanently_failed` qilib hodisani ABADIY tashlaydi.
+     *
+     * Shuning uchun UUID bo'lmasa `order_id` qidiruvini o'tkazib yuboramiz va
+     * `elchi_shipment_id` bo'yicha qidiramiz; u ham topilmasa `skipped` (200).
+     */
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        orderId,
+      );
+
     // Posilkani `external_order_id` (bizning UUID) bo'yicha topamiz; bo'lmasa
     // Elchi posilka id'si bilan (masalan biz jo'natishda javobni yo'qotgan
     // bo'lsak, keyin webhook orqali bog'lanadi — backfill).
-    let shipment = orderId
-      ? await this.shipmentRepo.findOne({ where: { order_id: orderId } })
-      : null;
+    let shipment =
+      orderId && isUuid
+        ? await this.shipmentRepo.findOne({ where: { order_id: orderId } })
+        : null;
     if (!shipment && remoteId) {
       shipment = await this.shipmentRepo.findOne({
         where: { elchi_shipment_id: remoteId },
@@ -286,22 +382,31 @@ export class ElchiWebhookService {
     /**
      * HAQIQIY PUL MAYDONLARI (audit M2).
      *
-     * ⚠️ `!= null` ISHLATILADI, `Number.isFinite` bilan birga — chunki 0
-     * HAQIQIY qiymat: onlayn to'langan buyurtmada kuryer NAQD YIG'MAYDI,
-     * ya'ni `collected_from_customer = 0` to'g'ri javob. `!payload.x`
-     * tekshiruvi 0 ni "yo'q" deb o'tkazib yuborardi va panel eski, yolg'on
-     * maydonga qaytib qolardi.
+     * ⚠️ UCH HOLAT AJRATILADI (`number | null | undefined`):
+     *   • son     -> yoziladi (0 ham HAQIQIY: onlayn to'langan buyurtmada
+     *                kuryer naqd yig'maydi, `collected_from_customer = 0`);
+     *   • `null`  -> ustunni NULL ga TOZALAYMIZ. Elchi sotuvni qaytarganda
+     *                (rollback/return) `sale_collectible_amount`ni null qiladi
+     *                va `GET`da `collected_from_customer: null` keladi —
+     *                ilgari bu holat e'tiborsiz qolardi (eski qiymat saqlanib,
+     *                panel qaytarilgan posilkani "Elchi yig'gan" deb sanardi,
+     *                soxta qarz shishardi);
+     *   • `undefined` -> Elchi maydonni umuman YUBORMADI, tegilmaydi.
      */
-    if (
-      payload.collected_from_customer != null &&
+    if (payload.collected_from_customer === null) {
+      shipment.collected_from_customer_reported = null;
+    } else if (
+      payload.collected_from_customer !== undefined &&
       Number.isFinite(Number(payload.collected_from_customer))
     ) {
       shipment.collected_from_customer_reported = Number(
         payload.collected_from_customer,
       ).toFixed(2);
     }
-    if (
-      payload.elchi_fee != null &&
+    if (payload.elchi_fee === null) {
+      shipment.elchi_fee_reported = null;
+    } else if (
+      payload.elchi_fee !== undefined &&
       Number.isFinite(Number(payload.elchi_fee))
     ) {
       shipment.elchi_fee_reported = Number(payload.elchi_fee).toFixed(2);

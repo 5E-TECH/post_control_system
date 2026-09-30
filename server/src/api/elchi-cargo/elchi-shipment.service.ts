@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ElchiConfigEntity } from 'src/core/entity/elchi-config.entity';
@@ -33,6 +34,11 @@ const ELCHI_SKIP_ORDER_STATUSES: Order_status[] = [
   Order_status.CLOSED,
 ];
 
+/** Auto-retry: jo'natilmagan (elchi_shipment_id IS NULL) posilkalar uchun. */
+const ELCHI_AUTO_RETRY_MAX_ATTEMPTS = 6;
+const ELCHI_AUTO_RETRY_BATCH_LIMIT = 30;
+const ELCHI_REDISPATCH_DELAY_MS = 300;
+
 @Injectable()
 export class ElchiShipmentService {
   private readonly logger = new Logger(ElchiShipmentService.name);
@@ -50,6 +56,88 @@ export class ElchiShipmentService {
     private readonly configService: ElchiConfigService,
     private readonly activityLog: ActivityLogService,
   ) {}
+
+  // ===================== AUTO-RETRY (JO'NATILMAGANLAR) =====================
+
+  /**
+   * JO'NATILMAGAN POSILKALARNI QAYTA JO'NATADI (LDG naqshi bilan bir xil).
+   *
+   * ⚠️ NEGA KERAK (E2E integratsiya P0). `dispatchOrdersToElchi` fire-and-forget:
+   * Elchi 502 qaytarsa yoki tarmoq uzilsa, posilka `elchi_shipment_id IS NULL`
+   * bilan qoladi va HECH KIM qayta urinmaydi — buyurtma BeePostda "yo'lda",
+   * Elchida umuman yo'q, hech qaysi tizim yetkazmaydi. reconcile ham yordam
+   * bermaydi: u `elchi_shipment_id IS NOT NULL` shartiga tayanadi, ya'ni
+   * umuman yaratilmagan posilkani KO'RMAYDI. LDG'da aynan shu maqsadda
+   * auto-retry cron bor (`ldg-admin.service.ts:autoRetryCron`), Elchida yo'q
+   * edi.
+   *
+   * `createShipmentForOrder` idempotent va send_attempts/last_error ni o'zi
+   * boshqaradi (muvaffaqiyatda `elchi_shipment_id` to'ladi, xatoda
+   * `send_attempts++` va throw) — shu bois shunchaki qayta chaqiramiz.
+   */
+  async autoRetryUnsentShipments(): Promise<{
+    retried: number;
+    success: number;
+    failed: number;
+  }> {
+    const config = await this.configRepo.findOne({ where: {} });
+    if (!config?.is_active) {
+      return { retried: 0, success: 0, failed: 0 };
+    }
+
+    const shipments = await this.shipmentRepo
+      .createQueryBuilder('s')
+      .leftJoin('s.order', 'o')
+      .where('s.elchi_shipment_id IS NULL')
+      .andWhere('s.send_attempts < :max', {
+        max: ELCHI_AUTO_RETRY_MAX_ATTEMPTS,
+      })
+      // Faqat faol (yakunlanmagan) buyurtmalar — yopilganni qayta jo'natmaymiz.
+      .andWhere('o.status NOT IN (:...skip)', {
+        skip: ELCHI_SKIP_ORDER_STATUSES,
+      })
+      .orderBy('s.send_attempts', 'ASC')
+      .addOrderBy('s.created_at', 'ASC')
+      .take(ELCHI_AUTO_RETRY_BATCH_LIMIT)
+      .getMany();
+
+    let success = 0;
+    let failed = 0;
+    for (const shipment of shipments) {
+      try {
+        await this.createShipmentForOrder(shipment.order_id);
+        success++;
+      } catch {
+        // Xato `createShipmentForOrder` ichida `last_error`/`send_attempts`
+        // ga allaqachon yozildi — bu yerda jimgina keyingisiga o'tamiz.
+        failed++;
+      }
+      await new Promise((r) => setTimeout(r, ELCHI_REDISPATCH_DELAY_MS));
+    }
+
+    if (shipments.length > 0) {
+      this.logger.log(
+        `Elchi auto-retry: ${shipments.length} ta yuborilmagan qayta urinildi, ` +
+          `${success} yuborildi, ${failed} xato`,
+      );
+    }
+    return { retried: shipments.length, success, failed };
+  }
+
+  /**
+   * Auto-retry cron — har 2 daqiqada yuborilmagan posilkalarni qayta jo'natishga
+   * urinadi (backoff: send_attempts oshgan sari kamroq ustuvor). "Tizim o'zini
+   * o'zi tuzatadi" qatlami: 502/tarmoq uzilishi operator aralashuvisiz yetadi.
+   */
+  @Cron('30 */2 * * * *', { timeZone: 'Asia/Tashkent' })
+  async autoRetryElchiCron(): Promise<void> {
+    try {
+      await this.autoRetryUnsentShipments();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Elchi auto-retry cron xatosi: ${msg}`);
+    }
+  }
 
   // ===================== KILL SWITCH =====================
 
@@ -391,6 +479,29 @@ export class ElchiShipmentService {
      */
     const cod = Number(order.total_price ?? 0);
 
+    /**
+     * QOP (batch) YORLIG'I — FAQAT HAQIQIY JO'NATILAYOTGAN POCHTA UCHUN (E2E #436).
+     *
+     * ⚠️ Qop yorlig'i tokeni `order.post.qr_code_token` dan olinadi. Agar
+     * buyurtma QORALAMA pochtada bo'lsa (`status=new`, kuryer BIRIKTIRILMAGAN),
+     * o'sha qoralamaning tokeni yuborilardi — lekin jismoniy yorliqda HAQIQIY
+     * jo'natilgan pochtaning tokeni turadi. Natijada Elchi operatori qop
+     * yorlig'ini skanerlaganda "topilmadi" derdi.
+     *
+     * Shu bois qop ma'lumoti FAQAT kuryer biriktirilgan pochta uchun
+     * yuboriladi. Qoralamada — qop yuborilmaydi (posilka yakka ketadi, bu
+     * xavfsizroq: noto'g'ri qop tokenidan ko'ra qopsiz yaxshi).
+     */
+    const dispatchedPost =
+      order.post && order.post.courier_id ? order.post : null;
+    const batchRef = dispatchedPost ? String(order.post_id) : undefined;
+    const batchLabelToken = dispatchedPost
+      ? String(dispatchedPost.qr_code_token ?? '').trim() || undefined
+      : undefined;
+    const batchSize = dispatchedPost
+      ? await this.resolveBatchSize(order.post_id, batch?.size)
+      : undefined;
+
     try {
       const response = await this.api.createShipment({
         external_order_id: order.id,
@@ -468,10 +579,9 @@ export class ElchiShipmentService {
          * etiladigan token. Boshqa qiymat yuborilsa Elchi operatori
          * skanerlagan yorliq mos kelmasdi.
          */
-        batch_ref: order.post_id ? String(order.post_id) : undefined,
-        batch_label_token:
-          String(order.post?.qr_code_token ?? '').trim() || undefined,
-        batch_size: await this.resolveBatchSize(order.post_id, batch?.size),
+        batch_ref: batchRef,
+        batch_label_token: batchLabelToken,
+        batch_size: batchSize,
       });
 
       const remoteId = String(response?.shipment_id ?? '').trim();

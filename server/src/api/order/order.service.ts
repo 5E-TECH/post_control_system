@@ -2608,6 +2608,15 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     });
     if (actor?.external_provider === 'ldg') return;
 
+    // Elchi istisno: LDG bilan AYNAN bir xil arxitektura (elchi-cargo.module.ts).
+    // Elchi webhook'lari virtual vakil-kuryer (external_provider='elchi') nomidan
+    // sotuv/bekor qiladi. Buyurtma to'g'ridan-to'g'ri `new`dan dispatch qilinsa
+    // (dispatch-retry) yoki oraliq webhook yo'qolsa, order postsiz bo'lishi mumkin
+    // va yuqoridagi post-egalik tekshiruvidan o'tmaydi. Chaqiruvchi Elchi
+    // vakil-kuryer bo'lsa egalikni o'tkazib yuboramiz — aks holda yetkazilgan
+    // posilka (=pul) PCS'da abadiy sotilmay qolardi.
+    if (actor?.external_provider === 'elchi') return;
+
     throw new ForbiddenException('Bu buyurtma sizga tegishli emas');
   }
 
@@ -7239,13 +7248,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
     // ON_THE_ROAD yoki RECEIVED bo'lsa avval WAITING ga o'tkazamiz
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7583,13 +7599,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     // bizda hali `ON_THE_ROAD`/`RECEIVED` bo'lishi mumkin (oraliq statuslar
     // webhookda yo'qolgan bo'lsa) — avval `WAITING`ga o'tkazamiz.
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7607,6 +7630,25 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
      * qanchaga aylandi". Shu bilan operator buyurtmani ochganda sababni
      * ko'radi va kassadagi summa nega boshqacha ekani tushunarli bo'ladi.
      */
+    /**
+     * NARX PASAYISHI = QISMAN SOTUV EHTIMOLI (vaqtinchalik chora).
+     *
+     * Elchi qisman sotuvda asl buyurtma narxini kamaytirib, qolgan mol uchun
+     * ALOHIDA bola buyurtma ochadi — lekin PCS bola haqida hech narsa
+     * bilmaydi (faqat `total_price` pasayishini ko'radi). Qolgan mol qayerda,
+     * kim javobgar ekani jimgina yo'qolardi.
+     *
+     * To'liq yechim (bola posilka hodisasi + qaytish yozuvi) katta ish.
+     * Hozircha eng muhimi — JIMLIKNI yo'qotish: narx pasaysa sotuv baribir
+     * o'tadi (yig'ilgan pul yoziladi), LEKIN posilkaga NOMUVOFIQLIK belgisi
+     * qo'yiladi (`kind:'mismatch'`), shunda admin "Nomuvofiqlik" filtrida
+     * ko'rinadi va operator qolgan molni qo'lda tekshiradi.
+     */
+    const originalTotal = Number(order.total_price ?? 0);
+    const remoteTotal = Number(remote?.totalPrice ?? NaN);
+    const priceDropped =
+      Number.isFinite(remoteTotal) && remoteTotal < originalTotal - 0.01;
+
     const priceNote = await this.acceptElchiPriceChange(
       orderId,
       remote?.totalPrice,
@@ -7636,6 +7678,18 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         { comment: sellComment, extraCost: remoteExtra },
         { bypassControlGuard: true },
       );
+      // Sotuv o'tdi. Narx PASAYGAN bo'lsa — qisman sotuv ehtimoli: posilkani
+      // nomuvofiqlik deb belgilaymiz (chaqiruvchi shipment.mismatch_at qo'yadi),
+      // jimgina o'tib ketmasin.
+      if (priceDropped) {
+        const gap = Math.round(originalTotal - remoteTotal);
+        const reason =
+          `Elchi narxni pasaytirdi: ${originalTotal} -> ${remoteTotal} so'm ` +
+          `(qisman sotuv ehtimoli). Qolgan ~${gap} so'mlik mol kuzatilmagan — ` +
+          `qo'lda tekshiring.`;
+        this.logger.error(`ELCHI PARTIAL? order=${orderId} — ${reason}`);
+        return { kind: 'mismatch', reason };
+      }
       return { kind: 'applied' };
     } catch (err) {
       /**
@@ -7725,13 +7779,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
 
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
@@ -7872,13 +7933,20 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
     }
 
     if (
+      order.status === Order_status.CREATED ||
+      order.status === Order_status.NEW ||
       order.status === Order_status.ON_THE_ROAD ||
       order.status === Order_status.RECEIVED
     ) {
       await this.orderRepo.update(
         {
           id: orderId,
-          status: In([Order_status.ON_THE_ROAD, Order_status.RECEIVED]),
+          status: In([
+            Order_status.CREATED,
+            Order_status.NEW,
+            Order_status.ON_THE_ROAD,
+            Order_status.RECEIVED,
+          ]),
         },
         { status: Order_status.WAITING },
       );
