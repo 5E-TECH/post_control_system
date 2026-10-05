@@ -35,6 +35,7 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import Popup from "../../../../../shared/ui/Popup";
 import dayjs from "dayjs";
+import { returnStageDisplay } from "../../../../../shared/lib/returnStage";
 
 // Status configuration
 const statusConfig: Record<
@@ -730,7 +731,9 @@ const CustomerDetail = () => {
                                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${status.bg} ${status.text} ${status.darkBg} ${status.darkText}`}
                                 >
                                   <StatusIcon className="w-3.5 h-3.5" />
-                                  {statusLabels[order.status] || order.status}
+                                  {returnStageDisplay(order)?.label ??
+                                    statusLabels[order.status] ??
+                                    order.status}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                                   <Calendar className="w-3.5 h-3.5" />

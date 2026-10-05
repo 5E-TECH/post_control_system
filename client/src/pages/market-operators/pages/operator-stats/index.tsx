@@ -20,6 +20,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { returnStageDisplay } from "../../../../shared/lib/returnStage";
 
 const statusColors: Record<string, string> = {
   sold: "bg-green-500",
@@ -453,7 +454,11 @@ const OperatorStats = () => {
                         }`}
                       />
                       <span className="text-sm text-gray-700 dark:text-gray-200 font-medium">
-                        {statusLabels[order.status] ?? order.status}
+                        {/* Bekor-qaytarish zanjirida XOM yorliq yarim
+                            haqiqat — bosqich yorlig'i ustun turadi. */}
+                        {returnStageDisplay(order)?.label ??
+                          statusLabels[order.status] ??
+                          order.status}
                       </span>
                     </div>
                     <div className="flex items-center gap-4">
