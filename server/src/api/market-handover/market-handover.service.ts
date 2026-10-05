@@ -1042,6 +1042,103 @@ export class MarketHandoverService {
     );
   }
 
+  /**
+   * ESKIRISH HISOBOTI — navbat qancha "qarigan" va qanday yopilayotgani.
+   *
+   * Ikki qismdan iborat:
+   *   1) HOZIRGI navbat yosh bucketlari (0-3 / 3-7 / 7-14 / 14+ kun) —
+   *      ombor to'lib ketayotganini vaqtida ko'rish uchun;
+   *   2) oxirgi 30 kunda posilkalar QANDAY yopilgani (`market_handover_mode`)
+   *      — market tasdig'i bilan yopilganlar va CHETLAB O'TILGANLAR
+   *      (offline akt / admin override) nisbatini ko'rsatadi.
+   *
+   * ⚠️ 2-qism nazorat o'lchovi: agar yopishlarning ko'pi `offline_signed`
+   * bo'lsa, darvoza amalda ishlamayapti — market hech qachon QR ko'rsatmayapti
+   * va xodim har kuni aktga qo'l qo'yib yopyapti.
+   *
+   * Yosh bucketlari EPOCH-MS chegaralari bilan hisoblanadi (kalendar kun
+   * EMAS) — shuning uchun vaqt mintaqasi muammosi yuzaga chiqmaydi.
+   */
+  async agingReport() {
+    const now = Date.now();
+    const d3 = now - 3 * 86_400_000;
+    const d7 = now - 7 * 86_400_000;
+    const d14 = now - 14 * 86_400_000;
+
+    const bucketRows = await this.orderRepo
+      .createQueryBuilder('o')
+      .where(awaitingMarketSql('o'))
+      .select(
+        `CASE
+           WHEN o.center_received_at >= :d3 THEN '0-3'
+           WHEN o.center_received_at >= :d7 THEN '3-7'
+           WHEN o.center_received_at >= :d14 THEN '7-14'
+           ELSE '14+'
+         END`,
+        'bucket',
+      )
+      .addSelect('COUNT(*)::int', 'parcel_count')
+      .addSelect('COALESCE(SUM(o.total_price), 0)::float8', 'total_price')
+      .addSelect('COUNT(DISTINCT o.user_id)::int', 'market_count')
+      .groupBy('bucket')
+      .setParameters({ d3, d7, d14 })
+      .getRawMany<{
+        bucket: string;
+        parcel_count: number | string;
+        total_price: number | string;
+        market_count: number | string;
+      }>();
+
+    // Bo'sh bucketlar ham qaytadi — ekranda "0" ko'rinishi "ma'lumot yo'q"
+    // dan ANIQROQ (holat yaxshi ekanini bildiradi).
+    const order = ['0-3', '3-7', '7-14', '14+'];
+    const byBucket = new Map(bucketRows.map((r) => [r.bucket, r]));
+    const buckets = order.map((b) => {
+      const r = byBucket.get(b);
+      return {
+        bucket: b,
+        parcel_count: Number(r?.parcel_count ?? 0),
+        total_price: Number(r?.total_price ?? 0),
+        market_count: Number(r?.market_count ?? 0),
+      };
+    });
+
+    const modeRows = await this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.market_handover_at >= :since', { since: now - 30 * 86_400_000 })
+      .select('o.market_handover_mode', 'mode')
+      .addSelect('COUNT(*)::int', 'parcel_count')
+      .groupBy('o.market_handover_mode')
+      .getRawMany<{ mode: string | null; parcel_count: number | string }>();
+
+    const handedOver30d = modeRows.reduce(
+      (sum, r) => sum + Number(r.parcel_count),
+      0,
+    );
+    const marketConsent = modeRows
+      .filter((r) => r.mode === MarketHandoverMode.MARKET_WEB)
+      .reduce((sum, r) => sum + Number(r.parcel_count), 0);
+
+    return successRes(
+      {
+        buckets,
+        awaiting_total: buckets.reduce((s, b) => s + b.parcel_count, 0),
+        handover_modes: modeRows.map((r) => ({
+          mode: r.mode ?? 'legacy',
+          parcel_count: Number(r.parcel_count),
+        })),
+        handed_over_30d: handedOver30d,
+        /** Market ruxsati bilan yopilganlar ulushi (%) — nazorat o'lchovi. */
+        market_consent_rate_30d:
+          handedOver30d > 0
+            ? Math.round((marketConsent / handedOver30d) * 100)
+            : null,
+      },
+      200,
+      'Eskirish hisoboti',
+    );
+  }
+
   /** ADMIN: market uchun ruxsat majburiyligini yoqish/o'chirish. */
   async setConsentRequired(
     marketId: string,

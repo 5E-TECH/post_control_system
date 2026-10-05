@@ -2,17 +2,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import {
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
 import { MarketHandoverService } from './market-handover.service';
 import { MarketReturnHandoverSessionEntity } from 'src/core/entity/market-return-handover-session.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { ActivityLogService } from '../activity-log/activity-log.service';
-import { Order_status, Replacement_state, Roles, Status } from 'src/common/enums';
+import {
+  Order_status,
+  Replacement_state,
+  Roles,
+  Status,
+} from 'src/common/enums';
 import {
   MARKET_HANDOVER_AUTH_TTL_MS,
   MARKET_HANDOVER_HEARTBEAT_GRACE_MS,
@@ -308,8 +310,7 @@ describe('MarketHandoverService', () => {
     it('SAHIFAGA BOG‘LANISH: heartbeat uzilsa ruxsat o‘ladi', async () => {
       sessionRepo.findOne.mockResolvedValue(
         activeSession({
-          last_seen_at:
-            Date.now() - MARKET_HANDOVER_HEARTBEAT_GRACE_MS - 5_000,
+          last_seen_at: Date.now() - MARKET_HANDOVER_HEARTBEAT_GRACE_MS - 5_000,
         }),
       );
 
@@ -370,9 +371,9 @@ describe('MarketHandoverService', () => {
       expect(patch.market_handover_mode).toBe(MarketHandoverMode.MARKET_WEB);
       expect(patch.market_handover_session_id).toBe(uuid(10));
       // Poyga himoyasi: dalil faqat bir marta yoziladi.
-      expect(
-        updated.find((u) => u.repo === 'order')?.criteria,
-      ).toEqual(expect.objectContaining({ market_handover_at: expect.anything() }));
+      expect(updated.find((u) => u.repo === 'order')?.criteria).toEqual(
+        expect.objectContaining({ market_handover_at: expect.anything() }),
+      );
       expect(res.data.handed_over).toBe(1);
     });
 
@@ -396,9 +397,8 @@ describe('MarketHandoverService', () => {
       expect(patch.old_returned_by).toBe(STAFF_ID);
       // Bog'liq YANGI buyurtma ham izchillik uchun yangilanadi.
       expect(
-        updated.find(
-          (u) => u.criteria?.replacement_of_order_id === repl.id,
-        )?.partial,
+        updated.find((u) => u.criteria?.replacement_of_order_id === repl.id)
+          ?.partial,
       ).toEqual({ replacement_state: Replacement_state.OLD_RETURNED });
     });
 

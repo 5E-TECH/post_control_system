@@ -188,6 +188,20 @@ export class MarketHandoverController {
     return this.service.listAwaitingOrdersOfMarket(marketId, query);
   }
 
+  @ApiOperation({
+    summary: 'Eskirish hisoboti — navbat yoshi va yopish rejimlari',
+    description:
+      'Yosh bucketlari (0-3 / 3-7 / 7-14 / 14+ kun) va oxirgi 30 kunda ' +
+      'posilkalar qanday yopilgani. `market_consent_rate_30d` past bo‘lsa ' +
+      'darvoza amalda ishlamayapti (hammasi offline akt bilan yopilyapti).',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN)
+  @Get('report/aging')
+  agingReport() {
+    return this.service.agingReport();
+  }
+
   // ════════════════════════════ ADMIN ════════════════════════════
 
   @ApiOperation({

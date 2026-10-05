@@ -4,6 +4,8 @@ import { MarketReturnHandoverSessionEntity } from 'src/core/entity/market-return
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { BotModule } from '../bots/notify-bot/bot.module';
+import { MarketHandoverCron } from './market-handover.cron';
 import { MarketHandoverController } from './market-handover.controller';
 import { MarketHandoverService } from './market-handover.service';
 
@@ -23,9 +25,11 @@ import { MarketHandoverService } from './market-handover.service';
       UserEntity,
     ]),
     ActivityLogModule,
+    // Marketga «olib keting» eslatmasi uchun (`BotService`).
+    BotModule,
   ],
   controllers: [MarketHandoverController],
-  providers: [MarketHandoverService],
+  providers: [MarketHandoverService, MarketHandoverCron],
   exports: [MarketHandoverService],
 })
 export class MarketHandoverModule {}
