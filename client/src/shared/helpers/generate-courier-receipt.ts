@@ -30,7 +30,13 @@ function formatDate(timestamp: string | number): string {
 
 export async function generateCourierReceipt(data: CourierReceiptData): Promise<void> {
   const qrValue = `post_${data.qrCodeToken}`;
-  const qrDataUrl = await QRCode.toDataURL(qrValue, { width: 200, margin: 1 });
+  /**
+   * ⚠️ `margin: 4` — STANDART quiet zone. Avval `margin: 1` edi: QR
+   * standarti chetda 4 modul bo'sh joy talab qiladi va undan kam bo'lsa
+   * apparat imager bosma yorliqni rad etadi (ayni nuqson market ruxsat
+   * QR'ida ham bor edi).
+   */
+  const qrDataUrl = await QRCode.toDataURL(qrValue, { width: 200, margin: 4 });
   const phone = formatPhone(data.courierPhone);
   const date = data.date ? formatDate(data.date) : formatDate(Date.now());
 
