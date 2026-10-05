@@ -70,6 +70,7 @@ import { CreateMarketDto } from './dto/create-market.dto';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { Group_type } from 'src/common/enums';
+import { cancelReturnStage } from 'src/common/utils/cancel-return.util';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { DistrictRepository } from 'src/core/repository/district.repository';
@@ -3869,6 +3870,9 @@ export class UserService implements OnModuleInit {
             id: order.id,
             total_price: order.total_price,
             status: order.status,
+            // Bekor qaytarish bosqichi (hosila): kuryerda / markazda / marketda.
+            // Market `cancelled (sent)` ni ko'rib "qayerda?" deb qolmasin.
+            return_stage: cancelReturnStage(order),
             product_quantity: order.product_quantity,
             where_deliver: order.where_deliver,
             comment: order.comment,

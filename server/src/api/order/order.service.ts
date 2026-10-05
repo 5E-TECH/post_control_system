@@ -37,6 +37,7 @@ import {
   Status,
   Where_deliver,
 } from 'src/common/enums';
+import { cancelReturnStage } from 'src/common/utils/cancel-return.util';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { applyCashboxDelta } from 'src/common/database/cashbox-delta.util';
 import { MarketplaceSyncService } from '../marketplace/marketplace-sync.service';
@@ -318,7 +319,17 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
 
       return successRes(
         {
-          data,
+          /**
+           * Har qatorga bekor qaytarish bosqichi (hosila) qo'shiladi:
+           * kuryerda / markazda / marketda. Kuryer o'z bekor qilgan
+           * posilkasining markazga yetib kelganini, market esa o'z
+           * qaytarishining markazda turganini SHU maydondan ko'radi —
+           * `cancelled (sent)` statusi o'zi buni aytib bermaydi.
+           */
+          data: data.map((order) => ({
+            ...order,
+            return_stage: cancelReturnStage(order),
+          })),
           total,
           page,
           limit,
@@ -1360,6 +1371,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
         max_courier_tariff_center,
         assigned_courier_tariff_home,
         assigned_courier_tariff_center,
+        /**
+         * Bekor qaytarish bosqichi — HOSILA maydon (DB'da status emas).
+         *
+         * Kuryer, markaz xodimi va market bitta ma'noni ko'rishi uchun
+         * SERVER hisoblaydi: `cancelled (sent)` statusi ikki ma'noli
+         * (kuryerda / markazda) va har ekran uni o'zi hisoblab yursa
+         * muqarrar drift beradi. Yagona manba:
+         * `src/common/utils/cancel-return.util.ts`.
+         */
+        return_stage: cancelReturnStage(newOrder),
       };
 
       if (!canSeeMarketTariff) {
