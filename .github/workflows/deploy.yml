@@ -16,9 +16,13 @@ jobs:
   # 🛡️ Faza 0 — xavfsizlik gate'i. Deploy'dan OLDIN ishlaydi.
   #   • audit:roles + guard testi — BLOKLOVCHI (yashil): RolesGuard fail-closed
   #     invariantini muhofaza qiladi (himoyalangan endpoint @AcceptRoles'siz qolmasin).
-  #   • To'liq `npm test` — hozircha INFORMATSION (continue-on-error): 3 ta suite
-  #     oldindan qizil (order-bot / courier-scanner / post.service). O'shalar
-  #     tuzatilgach `continue-on-error`ni olib tashlab, to'liq testni bloklovchi qiling.
+  #   • bekor-qaytarish darvozasi testlari — BLOKLOVCHI (yashil): bekor posilka
+  #     market ruxsatisiz CLOSED bo'lmasligi invariantini muhofaza qiladi.
+  #   • To'liq `npm test` — hozircha INFORMATSION (continue-on-error).
+  #     ⚠️ 2026-10-05 holati: to'liq to'plam YASHIL (84 suite / 1080 test).
+  #     Avvalgi izohdagi "3 ta suite oldindan qizil" ESKIRGAN edi. Bloklovchi
+  #     qilish uchun yagona to'siq — boshqa branchlarning holati; qaror
+  #     jamoada kelishilgach `continue-on-error`ni olib tashlang.
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -49,7 +53,11 @@ jobs:
         working-directory: server
         run: npx jest src/common/guards src/api/investor --ci
 
-      - name: 🧪 To'liq test to'plami (informatsion — oldindan mavjud xatolar)
+      - name: 🔒 Bekor-qaytarish darvozasi testlari (BLOKLOVCHI)
+        working-directory: server
+        run: npx jest src/api/market-handover src/common/utils/cancel-return.util.spec.ts src/api/order/cancel-return-two-stage.spec.ts src/api/post/post.service.spec.ts --ci
+
+      - name: 🧪 To'liq test to'plami (informatsion)
         working-directory: server
         continue-on-error: true
         run: npm test

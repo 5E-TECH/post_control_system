@@ -246,6 +246,78 @@ export class OrderEntity extends BaseEntity {
   @Column({ type: 'uuid', nullable: true })
   old_returned_by: string | null;
 
+  // ═══════ BEKOR QAYTARISH: IKKI BOSQICHLI TASDIQ DALILLARI ═══════
+  //
+  // Bekor qilingan posilka endi markaz qabul qilgan zahoti CLOSED
+  // BO'LMAYDI. Ikki BOSHQA fakt ikki joyda saqlanadi, status esa
+  // `cancelled (sent)` da QOLADI:
+  //
+  //   1) viloyatdan markazga keldi  → center_received_at/by
+  //   2) market ruxsati bilan topshirildi → market_handover_* (+ CLOSED)
+  //
+  // ⚠️ Yangi `Order_status` qiymati ATAYLAB qo'shilmadi — status ro'yxati
+  // repoda 15+ joyda qo'lda sanalgan va PG enum `ALTER TYPE` ni qaytarib
+  // bo'lmaydi. Bu yuqoridagi `old_product_returned_at` + `old_returned_by`
+  // naqshining AYNAN o'zi: "topshirildi" dalili statusdan ALOHIDA yoziladi.
+  //
+  // Hosila bosqich (`return_stage`) shu ustunlardan hisoblanadi —
+  // `src/common/utils/cancel-return.util.ts` dagi YAGONA predikat orqali.
+
+  /** Viloyatdan/kuryerdan markazga qabul qilingan vaqt (epoch ms). */
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  center_received_at: number | null;
+
+  /** Markazda qabul qilgan admin/registrator/superadmin ID si (audit). */
+  @Column({ type: 'uuid', nullable: true })
+  center_received_by: string | null;
+
+  /** Market egasiga jismonan topshirilgan vaqt (epoch ms). */
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  market_handover_at: number | null;
+
+  /** Topshirgan xodim ID si (audit). */
+  @Column({ type: 'uuid', nullable: true })
+  market_handover_by: string | null;
+
+  /**
+   * Qanday ruxsat bilan topshirilgani — `MarketHandoverMode`:
+   * `market_web` (market QR/PIN), `offline_signed` (vakil akti),
+   * `admin_override`, `partner_auto`. Hisobotda market tasdig'i
+   * chetlab o'tilgan holatlardan AJRATISH uchun.
+   *
+   * NULL + status CLOSED = legacy (oqim joriy etilishidan oldingi qator).
+   */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  market_handover_mode: string | null;
+
+  /** Topshirishga ruxsat bergan sessiya (audit zanjiri). */
+  @Column({ type: 'uuid', nullable: true })
+  market_handover_session_id: string | null;
+
+  /** Marketga "olib keting" eslatmasi yuborilgan vaqt — cron idempotentligi. */
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  handover_notified_at: number | null;
+
+  /** Admin navbatiga eskalatsiya qilingan vaqt (D+7). */
+  @Column({
+    type: 'bigint',
+    nullable: true,
+    transformer: bigintTransformerNullable,
+  })
+  handover_escalated_at: number | null;
+
   @Column({ type: 'jsonb', nullable: true })
   create_bot_messages: { chatId: number; messageId: number }[];
 

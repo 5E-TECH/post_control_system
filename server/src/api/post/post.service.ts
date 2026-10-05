@@ -24,6 +24,7 @@ import { catchError, successRes } from 'src/infrastructure/lib/response';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { UserRepository } from 'src/core/repository/user.repository';
 import {
+  CancelReturnStage,
   Group_type,
   Order_status,
   Post_status,
@@ -403,7 +404,12 @@ export class PostService {
 
       // 4️⃣ regionId → yangi post.id mapping
       const idMap = new Map<string, string>();
-      savedPosts.forEach((post) => idMap.set(post.region_id, post.id));
+      // `region_id` endi nullable (bekor pochtalari viloyatsiz bo'lishi
+      // mumkin) — bu yerda faqat YETKAZISH pochtalari bor, lekin tip
+      // xavfsizligi uchun guard qoldiriladi.
+      savedPosts.forEach((post) => {
+        if (post.region_id) idMap.set(post.region_id, post.id);
+      });
 
       // 5️⃣ Endi orderlarga post_id biriktiramiz
       for (const order of orphanOrders) {
@@ -557,13 +563,18 @@ export class PostService {
       }
       // Oddiy (regional) kuryerlar — mavjud xatti-harakat: post regioni bo'yicha.
       // Super kuryerlarni bu ro'yxatdan chiqaramiz (ular alohida qaytariladi).
-      const couriers = await this.userRepo.find({
-        where: {
-          region_id: post.region_id,
-          status: Status.ACTIVE,
-          is_super_courier: false,
-        },
-      });
+      // ⚠️ Viloyatsiz pochta (bekor/qaytarish pochtasi) uchun "shu viloyat
+      // kuryerlari" to'plami BO'SH. `region_id: undefined` bersak TypeORM
+      // shartni butunlay tashlab, BARCHA aktiv kuryerni qaytarardi.
+      const couriers = post.region_id
+        ? await this.userRepo.find({
+            where: {
+              region_id: post.region_id,
+              status: Status.ACTIVE,
+              is_super_courier: false,
+            },
+          })
+        : [];
 
       // Super kuryerlar: barcha viloyatlarga xizmat qiladiganlar (LDG kabi)
       // YOKI shu viloyatga aniq biriktirilganlar.
@@ -577,10 +588,12 @@ export class PostService {
       });
       for (const c of allRegionSupers) superCouriersMap.set(c.id, c);
 
-      const attached = await this.courierRegionRepo.find({
-        where: { region_id: post.region_id },
-        relations: ['courier'],
-      });
+      const attached = post.region_id
+        ? await this.courierRegionRepo.find({
+            where: { region_id: post.region_id },
+            relations: ['courier'],
+          })
+        : [];
       for (const a of attached) {
         const c = a.courier;
         if (c && c.status === Status.ACTIVE && c.is_super_courier) {
@@ -745,6 +758,11 @@ export class PostService {
           qr_code_token: normalizeQrToken(id),
           status: Order_status.CANCELLED_SENT,
           canceled_post_id: postId,
+          // ⚠️ `cancelled (sent)` endi IKKI MA'NOLI: kuryerda yoki markazda.
+          // Manifest skaneri faqat HALI QABUL QILINMAGAN posilkani topishi
+          // kerak — aks holda markazda turgan posilka "pochtada bor" deb
+          // chiqib, ikkinchi marta qabul qilinardi.
+          center_received_at: IsNull(),
         },
         select: ['id'],
       });
@@ -982,9 +1000,14 @@ export class PostService {
       let superTariffHome: number | null = null;
       let superTariffCenter: number | null = null;
       if (courier.is_super_courier) {
-        const cr = await queryRunner.manager.findOne(CourierRegionEntity, {
-          where: { courier_id: courierId, region_id: originalPost.region_id },
-        });
+        const cr = originalPost.region_id
+          ? await queryRunner.manager.findOne(CourierRegionEntity, {
+              where: {
+                courier_id: courierId,
+                region_id: originalPost.region_id,
+              },
+            })
+          : null;
         superTariffHome = cr?.tariff_home ?? courier.tariff_home ?? null;
         superTariffCenter = cr?.tariff_center ?? courier.tariff_center ?? null;
       }
@@ -1921,27 +1944,55 @@ export class PostService {
       // qoladi — keyingi qabulda olinishi mumkin; CANCELLED'ga aylantirilmaydi,
       // aks holda sotuvdan tushib hisobot buzilardi).
 
-      // Qabul qilingan ODDIY buyurtmalar => CLOSED
+      // ⚠️ QABUL QILINGAN BUYURTMALAR ENDI CLOSED BO'LMAYDI.
+      //
+      // "Viloyatdan markazga keldi" va "marketga topshirildi" — IKKI BOSHQA
+      // fakt. Avval ikkisi ham bitta CLOSED ga siqilgan edi: mol omborda
+      // turganda ham tizim "yopilgan" deb ko'rsatardi va MARKET hech narsani
+      // tasdiqlamasdi. Endi bu qadam faqat BIRINCHI faktni yozadi, CLOSED ni
+      // esa market ruxsati bilan `market-handover` moduli yozadi.
+      //
+      // Status `cancelled (sent)` da ATAYLAB QOLADI (yangi enum qiymati
+      // qo'shilmadi — izoh: 1750700000000-CancelReturnMarketHandover.ts).
+      // Hosila bosqich `cancelReturnStage()` orqali hisoblanadi, ya'ni
+      // kuryer ham, market ham posilkaning markazda turganini ko'radi.
+      //
+      // Qabul qilish MEXANIKASI o'zgarmadi: qaysi buyurtma kelgani
+      // avvalgidek `order_ids` bilan belgilanadi (skaner yoki ro'yxat).
+      const centerReceivedAt = Date.now();
       if (acceptedNormalIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(acceptedNormalIds) },
-          { status: Order_status.CLOSED },
+          {
+            id: In(acceptedNormalIds),
+            // ⚠️ STATUS GUARDI: faqat hamon qaytish yo'lidagi buyurtmaga
+            // dalil yoziladi. Agar buyurtma oradan boshqa yo'l bilan chiqib
+            // ketgan bo'lsa (superadmin rollback → WAITING/CANCELLED, qayta
+            // sotuv), unga "markazga qabul qilindi" muhrini bosmaymiz.
+            status: Order_status.CANCELLED_SENT,
+          },
+          {
+            center_received_at: centerReceivedAt,
+            center_received_by: user?.id ?? null,
+          },
         );
       }
 
-      // Qabul qilingan ALMASHTIRISH (eski) buyurtmalar => OLD_RETURNED.
-      // Status SOTILGAN QOLADI, canceled_post_id QOLADI, PUL O'ZGARMAYDI —
-      // "marketga qaytarildi" dalili: vaqt + qabul qilgan shaxs.
-      const returnedAt = Date.now();
+      // Qabul qilingan ALMASHTIRISH (eski) buyurtmalar: status SOTILGAN
+      // QOLADI, canceled_post_id QOLADI, PUL O'ZGARMAYDI — avvalgidek.
+      //
+      // ⚠️ LEKIN `OLD_RETURNED` + `old_product_returned_at` ENDI BU YERDA
+      // YOZILMAYDI. Ular "eski mahsulot MARKETGA QAYTARILDI" degan dalil va
+      // marketga Telegram xabarini yuboradi — holbuki mol hali omborda.
+      // O'sha dalil ham market ruxsati bilan yoziladi (market-handover).
+      // Bu qadamda faqat markazga kelgani qayd etiladi.
       if (acceptedReplOrders.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
           { id: In(acceptedReplOrders.map((o) => o.id)) },
           {
-            replacement_state: Replacement_state.OLD_RETURNED,
-            old_product_returned_at: returnedAt,
-            old_returned_by: user?.id ?? null,
+            center_received_at: centerReceivedAt,
+            center_received_by: user?.id ?? null,
           },
         );
       }
@@ -1954,7 +2005,16 @@ export class PostService {
       if (remainingNormalIds.length > 0) {
         await queryRunner.manager.update(
           OrderEntity,
-          { id: In(remainingNormalIds), status: Order_status.CANCELLED_SENT },
+          {
+            id: In(remainingNormalIds),
+            status: Order_status.CANCELLED_SENT,
+            // ⚠️ IKKINCHI DEVOR: markazga ALLAQACHON qabul qilingan posilka
+            // kuryerga QAYTMASLIGI kerak. Bugun `remainingNormalIds` ga faqat
+            // qabul qilinmaganlar tushadi, ya'ni shart hozir ortiqcha — lekin
+            // `cancelled (sent)` endi IKKI MA'NOLI (kuryerda / markazda) va
+            // bu guard invariantni kelgusi refaktorda ham ushlab turadi.
+            center_received_at: IsNull(),
+          },
           { status: Order_status.CANCELLED, canceled_post_id: null },
         );
       }
@@ -1979,28 +2039,34 @@ export class PostService {
 
       await queryRunner.commitTransaction();
 
-      // Activity log — ODDIY qabul (CLOSED)
+      // Activity log — markazga qabul qilindi (status O'ZGARMAYDI)
       for (const oid of acceptedNormalIds) {
         this.activityLog.log({
           entity_type: 'order',
           entity_id: oid,
-          action: 'status_change',
-          new_value: { status: Order_status.CLOSED },
-          description: `Bekor qilingan buyurtma qabul qilindi (CLOSED)`,
+          action: 'center_received',
+          new_value: {
+            status: Order_status.CANCELLED_SENT,
+            center_received_at: centerReceivedAt,
+            return_stage: CancelReturnStage.AT_CENTER,
+          },
+          description: `Bekor qilingan buyurtma viloyatdan markazga qabul qilindi — market ruxsati kutilmoqda`,
           user,
         });
       }
-      // Activity log — ALMASHTIRISH qaytarildi (OLD_RETURNED, status SOLD qoladi)
+      // Activity log — ALMASHTIRISH qatori markazga keldi (SOLD qoladi).
+      // "Marketga qaytarildi" dalili bu yerda YOZILMAYDI (market ruxsati kerak).
       for (const o of acceptedReplOrders) {
         this.activityLog.log({
           entity_type: 'order',
           entity_id: o.id,
-          action: 'replacement_returned',
+          action: 'center_received',
           new_value: {
             order_number: o.order_number,
-            replacement_state: Replacement_state.OLD_RETURNED,
+            center_received_at: centerReceivedAt,
+            return_stage: CancelReturnStage.AT_CENTER,
           },
-          description: `Almashtirish: eski buyurtma #${o.order_number} marketga qaytarildi`,
+          description: `Almashtirish: eski buyurtma #${o.order_number} markazga qabul qilindi — marketga topshirish uchun ruxsat kutilmoqda`,
           user,
         });
       }
@@ -2016,24 +2082,38 @@ export class PostService {
         });
       }
 
-      // Market Telegram xabari (commit'dan keyin — xato qabulni buzmaydi):
-      // har bir qaytarilgan almashtirish uchun "mahsulot qaytarildi".
-      for (const o of acceptedReplOrders) {
+      // Market Telegram xabari (commit'dan keyin — xato qabulni buzmaydi).
+      //
+      // ⚠️ MA'NOSI O'ZGARDI: avval "mahsulot sizga topshirildi" deb
+      // yuborilardi, holbuki mol omborda edi. Endi xabar CHAQIRUV:
+      // "qaytarishlaringiz markazda, olib ketishingiz mumkin". Market bo'yicha
+      // BITTA xabar — har posilka uchun alohida emas (kuniga ~150 qaytarishda
+      // posilka-posilka xabar guruhni ko'mib tashlaydi).
+      const perMarketCount = new Map<string, number>();
+      for (const o of acceptedOrders) {
+        perMarketCount.set(o.user_id, (perMarketCount.get(o.user_id) ?? 0) + 1);
+      }
+      for (const [marketId, count] of perMarketCount) {
         try {
           const returnGroup = await findMarketGroup(
             this.dataSource.manager,
-            o.user_id,
+            marketId,
             Group_type.CANCEL,
           );
           await this.botService.sendMessageToGroup(
             returnGroup?.group_id || null,
-            `*✅ Almashtirish — mahsulot qaytarildi!*\n\n` +
-              `📦 Eski buyurtma *#${o.order_number}* mahsuloti sizga (marketga) qaytarib topshirildi.\n`,
+            `*📦 Qaytarishlaringiz markazda!*\n\n` +
+              `${count} ta bekor qilingan buyurtma viloyatdan markazga qabul qilindi va sizni kutmoqda.\n\n` +
+              `Olib ketish uchun kabinetdagi *«Qaytarilgan buyurtmalar»* bo'limidan topshirishga ruxsat bering.`,
           );
         } catch {}
       }
 
-      return successRes({}, 200, 'Post received successfully');
+      return successRes(
+        { awaiting_market_count: acceptedOrders.length },
+        200,
+        'Post received successfully',
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       return catchError(error);

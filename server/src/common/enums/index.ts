@@ -102,6 +102,28 @@ export enum OrderCreatedSource {
   MARKETPLACE = 'marketplace',
 }
 
+/**
+ * Bekor qilingan posilka JISMONAN qayerda — HOSILA (derived) bosqich.
+ *
+ * ⚠️ Bu `order.status` ustuni EMAS va DB'da saqlanmaydi. Qiymat
+ * `src/common/utils/cancel-return.util.ts` dagi YAGONA predikatdan
+ * hisoblanadi va API javoblariga `return_stage` bo'lib qo'shiladi — shunda
+ * kuryer, markaz xodimi va market bitta ma'noni ko'radi va har ekran o'zi
+ * shart hisoblab yurmaydi.
+ *
+ * Nega status emas: `Order_status` repoda 15+ joyda qo'lda sanalgan va PG
+ * enum `ALTER TYPE` ni qaytarib bo'lmaydi — batafsil izoh
+ * `1750700000000-CancelReturnMarketHandover.ts` da.
+ */
+export enum CancelReturnStage {
+  /** Kuryerda yoki yo'lda — markaz hali qabul qilmagan. */
+  WITH_COURIER = 'courier',
+  /** Markazda turibdi, market ruxsati/olib ketishi kutilmoqda. */
+  AT_CENTER = 'center',
+  /** Market egasiga topshirilgan (status ham CLOSED bo'ladi). */
+  WITH_MARKET = 'market',
+}
+
 export enum Post_status {
   NEW = 'new',
   SENT = 'sent',

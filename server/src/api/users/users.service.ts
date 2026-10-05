@@ -3362,19 +3362,33 @@ export class UserService implements OnModuleInit {
       });
 
       const total = orders.length;
+      /**
+       * ⚠️ `closed` SOTILGAN BUKETIDAN OLIB TASHLANDI (hisobot tuzatishi).
+       *
+       * `closed` buyurtma bekor-qaytarish oqimidan keladi: mijoz olmadi,
+       * posilka marketga qaytarildi. U HECH QACHON sotilgan bo'lmaydi.
+       * Avval u `sold` buketida ham, `total_revenue` da ham sanalardi —
+       * ya'ni operator "muvaffaqiyat foizi" va daromadi SHISHIRILGAN edi.
+       * Ikki bosqichli topshirishda `closed` ning ma'nosi "marketga
+       * topshirildi" ga toraydi, ya'ni uni sotuv deb sanash yanada bema'ni.
+       *
+       * ⚠️ Shu sabab tuzatishdan keyin operator raqamlari PASAYADI — bu
+       * regressiya emas, haqiqatning tiklanishi.
+       */
       const sold = orders.filter((o) =>
-        ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status),
+        ['sold', 'paid', 'partly_paid'].includes(o.status),
       ).length;
+      // Bekor zanjirining BARCHA bosqichi bekor deb sanaladi: kuryerda
+      // (`cancelled`), qaytish yo'lida/markazda (`cancelled (sent)`) va
+      // marketga topshirilgan (`closed`).
       const cancelled = orders.filter((o) =>
-        ['cancelled', 'cancelled (sent)'].includes(o.status),
+        ['cancelled', 'cancelled (sent)', 'closed'].includes(o.status),
       ).length;
       const pending = total - sold - cancelled;
       const success_rate = total > 0 ? Math.round((sold / total) * 100) : 0;
 
       const total_revenue = orders
-        .filter((o) =>
-          ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status),
-        )
+        .filter((o) => ['sold', 'paid', 'partly_paid'].includes(o.status))
         .reduce((sum, o) => sum + Number(o.total_price || 0), 0);
 
       return successRes(
@@ -3837,16 +3851,18 @@ export class UserService implements OnModuleInit {
             });
           }
 
+          // ⚠️ CLOSED bekor zanjirining OXIRI ("marketga topshirildi"),
+          // sotuv emas — shuning uchun `isCancelled` ga ko'chirildi.
           const isCancelled = [
             Order_status.CANCELLED,
             Order_status.CANCELLED_SENT,
+            Order_status.CLOSED,
           ].includes(order.status);
 
           const isSold = [
             Order_status.SOLD,
             Order_status.PAID,
             Order_status.PARTLY_PAID,
-            Order_status.CLOSED,
           ].includes(order.status);
 
           return {

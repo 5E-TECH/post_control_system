@@ -30,8 +30,20 @@ export class PostEntity extends BaseEntity {
   @Column({ type: 'varchar', name: 'qr_code_token' })
   qr_code_token: string;
 
-  @Column({ type: 'uuid' })
-  region_id: string;
+  /**
+   * Pochta viloyati — YETKAZISH pochtasida majburiy ma'no tashiydi, BEKOR
+   * (qaytarish) pochtasida esa faqat qo'shimcha ma'lumot.
+   *
+   * ⚠️ NULLABLE qilindi. Avval ustun NOT NULL edi, lekin uni yozuvchi uch
+   * joy (`attachOrdersToCanceledPost`, `attachReplacementToCanceledPost`,
+   * rollback) `courier.region_id` ni beradi — tashqi provayderlarning
+   * (Elchi) virtual vakil-kuryerida esa viloyat YO'Q. Ya'ni Elchi posilkasi
+   * bekor pochtaga biriktirilganda NOT NULL buzilib, amal xato bilan
+   * yiqilardi. Iste'molchilar allaqachon null'ga tayyor
+   * (region.service.ts: `if (!p.region_id) continue`).
+   */
+  @Column({ type: 'uuid', nullable: true })
+  region_id: string | null;
 
   @Column({ type: 'enum', enum: Post_status, default: Post_status.NEW })
   status: Post_status;

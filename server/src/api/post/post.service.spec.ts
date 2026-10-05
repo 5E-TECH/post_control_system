@@ -552,7 +552,7 @@ describe('PostService — Return Requests', () => {
   describe('receiveCanceledPost', () => {
     const postId = uuid(80);
 
-    it("qisman qabulda post stats faqat CLOSED'larga moslab kamayadi", async () => {
+    it('qisman qabulda post stats qabul qilinganlarga moslab kamayadi', async () => {
       const allOrders = [
         { id: uuid(1), total_price: 100000 },
         { id: uuid(2), total_price: 100000 },
@@ -572,7 +572,7 @@ describe('PostService — Return Requests', () => {
       manager.find.mockResolvedValueOnce(allOrders);
       dataSourceMock.createQueryRunner.mockReturnValue(qr);
 
-      // 3 ta qabul qilinadi (CLOSED), 2 ta kuryerga qaytadi (CANCELLED)
+      // 3 tasi markazga qabul qilinadi, 2 tasi kuryerga qaytadi (CANCELLED)
       const acceptedIds = [uuid(1), uuid(2), uuid(3)];
       const result: any = await service.receiveCanceledPost(
         postId,
@@ -590,13 +590,39 @@ describe('PostService — Return Requests', () => {
         }),
       );
 
-      // ✅ Qabul qilinganlar CLOSED, qolganlari CANCELLED + canceled_post_id=null
+      /**
+       * ✅ QABUL QILINGANLAR CLOSED BO'LMAYDI — bu o'zgarishning yuragi.
+       *
+       * Markaz posilkani qabul qilgani "marketga topshirildi" DEGANI EMAS:
+       * mol omborda turadi va market hali ruxsat bermagan. Shuning uchun
+       * bu qadam faqat `center_received_at` dalilini yozadi, status esa
+       * `cancelled (sent)` da qoladi. CLOSED ni `market-handover` moduli
+       * market ruxsati bilan yozadi.
+       */
       const closedUpdate = updated.find(
         (u) =>
           u.entity === OrderEntity &&
           u.partial?.status === Order_status.CLOSED,
       );
-      expect(closedUpdate).toBeTruthy();
+      expect(closedUpdate).toBeUndefined();
+
+      const centerUpdate = updated.find(
+        (u) =>
+          u.entity === OrderEntity &&
+          u.partial?.center_received_at !== undefined,
+      );
+      expect(centerUpdate?.partial).toEqual(
+        expect.objectContaining({
+          center_received_at: expect.any(Number),
+          center_received_by: user_admin().id,
+        }),
+      );
+      // Status O'ZGARTIRILMAYDI — faqat dalil ustunlari yoziladi.
+      expect(centerUpdate?.partial?.status).toBeUndefined();
+      // Dalil faqat hamon qaytish yo'lidagi qatorga yoziladi (status guardi).
+      expect(centerUpdate?.criteria?.status).toBe(Order_status.CANCELLED_SENT);
+
+      // ✅ Qabul qilinmaganlar CANCELLED + canceled_post_id=null
       const backUpdate = updated.find(
         (u) =>
           u.entity === OrderEntity &&

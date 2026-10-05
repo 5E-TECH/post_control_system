@@ -195,6 +195,25 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformerNonNull })
   extra_cost_auto_approve_under: number;
 
+  /**
+   * Market uchun: BEKOR QAYTARISHNI TOPSHIRISHDA MARKET RUXSATI MAJBURIYMI.
+   *
+   * `false` (default) — ruxsat QAYD ETILADI, lekin MAJBURLANMAYDI: xodim
+   * market QR'isiz ham offline akt bilan topshira oladi (kim topshirgani va
+   * qanday rejimda — `order.market_handover_mode` da qoladi).
+   *
+   * `true` — topshirish uchun market QR/PIN sessiyasi SHART; offline akt
+   * faqat ADMIN/SUPERADMIN uchun qoladi.
+   *
+   * ⚠️ Default ATAYLAB `false`: BeePost'da panelga UMUMAN kirmaydigan
+   * marketlar bor (parolsiz akkauntlar, marketplace vakil-akkauntlari).
+   * Majburiy qilinsa birinchi kundan ularning posilkalari omborda qotardi.
+   * Bayroqni market onboarding'dan o'tgach ADMIN yoqadi — bu
+   * `extra_cost_proof_required` bilan ayni naqsh.
+   */
+  @Column({ type: 'boolean', default: false })
+  cancel_handover_consent_required: boolean;
+
   // Operator uchun komissiya sozlamalari
   @Column({ type: 'enum', enum: Commission_type, nullable: true })
   commission_type: Commission_type | null;
