@@ -1013,12 +1013,40 @@ export class MarketHandoverService {
 
     if (query.search) {
       const raw = query.search.trim();
+      const digits = raw.replace(/[^\d]/g, '');
       const asNumber = Number(raw.replace('#', ''));
-      if (Number.isFinite(asNumber) && raw.replace('#', '').length > 0) {
-        qb.andWhere('o.order_number = :num', { num: asNumber });
-      } else {
-        qb.andWhere('o.qr_code_token ILIKE :tok', { tok: `%${raw}%` });
+
+      /**
+       * ⚠️ SHARTLAR "YOKI" BILAN BIRLASHADI, tarmoqlanmaydi.
+       *
+       * Avval raqamli kiritma «buyurtma raqami» deb talqin qilinardi va
+       * TELEFON bo'yicha qidiruv jimgina 0 natija berardi (telefon
+       * bo'lagi ham sof raqam). Market esa posilkani ko'pincha MIJOZ
+       * ismi yoki telefonidan eslaydi — yorliq kodini u bilmaydi.
+       *
+       * Telefon bazada formatlangan (`+998…`), shuning uchun faqat
+       * RAQAMLAR bo'yicha solishtiriladi.
+       */
+      const clauses = [
+        'o.qr_code_token ILIKE :tok',
+        'customer.name ILIKE :tok',
+      ];
+      const params: Record<string, unknown> = { tok: `%${raw}%` };
+
+      if (/^#?\d+$/.test(raw) && Number.isFinite(asNumber)) {
+        clauses.push('o.order_number = :num');
+        params.num = asNumber;
       }
+      // 4 raqamdan kam bo'lsa telefon bo'yicha qidiruv butun ro'yxatni
+      // qaytarardi — ma'nosiz va sekin.
+      if (digits.length >= 4) {
+        clauses.push(
+          "regexp_replace(customer.phone_number, '[^0-9]', '', 'g') LIKE :phone",
+        );
+        params.phone = `%${digits}%`;
+      }
+
+      qb.andWhere(`(${clauses.join(' OR ')})`, params);
     }
 
     const [orders, total] = await qb

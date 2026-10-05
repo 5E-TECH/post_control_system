@@ -173,7 +173,7 @@ function MarketReturns() {
           allowClear
           size="large"
           prefix={<Search className="h-4 w-4 text-gray-400" />}
-          placeholder="Buyurtma raqami yoki QR kodi"
+          placeholder="Buyurtma raqami, mijoz ismi yoki telefoni"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);

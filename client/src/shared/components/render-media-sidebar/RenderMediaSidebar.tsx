@@ -266,7 +266,10 @@ const Navbar = ({ role }: { role: string }) => {
       case "market":
         return (
           <div className={navContainerClass}>
-            <div className="flex justify-between items-center px-4 py-2">
+            {/* ⚠️ `px-2` — `px-4` EMAS. Market navida 7 ikonka bor: 360px
+                telefonda 7×44+32=340px, 6 oraliqqa 20px qoladi (ikonkalar
+                tegib turadi). Kuryer navi aynan shu sabab `px-2` da. */}
+            <div className="flex justify-between items-center px-2 py-2">
             <NavLink
               to={buildAdminPath()}
               className={({ isActive }) => getNavItemClass(isActive)}

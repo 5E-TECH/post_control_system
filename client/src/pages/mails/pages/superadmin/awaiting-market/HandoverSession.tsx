@@ -565,7 +565,16 @@ function HandoverSession() {
             return (
               <div
                 key={o.id}
+                /*
+                  ⚠️ BUTUN KARTA BOSILADI. antd Checkbox 20px — telefonda
+                  teginish nishoni sifatida kichik (44px talab). Loyihadagi
+                  naqsh (refused-mail-detail): karta `onClick` bilan
+                  almashtiradi, checkbox esa faqat vizual.
+                */
+                onClick={() => auth && toggle(o.id)}
                 className={`rounded-xl border p-3 transition-colors ${
+                  auth ? "cursor-pointer" : ""
+                } ${
                   manual
                     ? "border-orange-300 bg-orange-50/60 dark:border-orange-800 dark:bg-orange-900/10"
                     : checked
@@ -575,11 +584,16 @@ function HandoverSession() {
               >
                 {/* ── 1-qator: kim, nima, holati ── */}
                 <div className="flex flex-wrap items-center gap-3">
-                  <Checkbox
-                    checked={checked}
-                    onChange={() => toggle(o.id)}
-                    disabled={!auth}
-                  />
+                  <span
+                    className="-m-2 p-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onChange={() => toggle(o.id)}
+                      disabled={!auth}
+                    />
+                  </span>
                   <span className="text-base font-bold tabular-nums text-gray-900 dark:text-gray-100">
                     #{o.order_number}
                   </span>
@@ -624,6 +638,7 @@ function HandoverSession() {
                         Skanerlanmadi
                       </span>
                       <Select
+                        onClick={(e) => e.stopPropagation()}
                         size="small"
                         placeholder="Sababni tanlang"
                         value={reasons[o.id]}
@@ -699,7 +714,14 @@ function HandoverSession() {
 
       {/* ─────── Pastdagi yopishqoq panel ─────── */}
       {selectedIds.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white/95 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+        /*
+          ⚠️ MOBIL NAV USTIDA. Mobil navigatsiya `fixed bottom-0 z-50` va
+          ~60px baland, DOM'da bu paneldan KEYIN render bo'ladi — ya'ni
+          `bottom-0` + past z-index bo'lsa tugma telefonda nav ostida qolib
+          BOSILMAYDI. Loyihadagi to'g'ri naqsh: `max-[650px]:bottom-20`
+          (courier-bulk, AiFinanceChat).
+        */
+        <div className="fixed bottom-0 left-0 right-0 z-[60] border-t border-gray-200 bg-white/95 py-3 backdrop-blur max-[650px]:bottom-20 max-[650px]:rounded-t-2xl max-[650px]:border dark:border-gray-800 dark:bg-gray-900/95">
           <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-3 px-4 sm:px-6 lg:px-8">
             <span className="text-base font-bold tabular-nums text-gray-800 dark:text-gray-100">
               {selectedIds.length} ta tanlandi

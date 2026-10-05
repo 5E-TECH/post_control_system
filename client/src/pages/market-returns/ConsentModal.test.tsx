@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import ConsentModal from "./ConsentModal";
 import type { ConsentSession } from "../../shared/api/hooks/useMarketHandover";
 
@@ -108,10 +108,33 @@ describe("ConsentModal — market QR/PIN ruxsati", () => {
     expect(onRegenerate).not.toHaveBeenCalled();
   });
 
-  it("⭐ TELEFON: QR o'lchami ekranga moslanadi (qat'iy px EMAS)", () => {
-    // Qat'iy `size` bersak kichik telefonda QR modaldan chiqib ketardi yoki
-    // keraksiz kichik bo'lardi — apparat skaner esa ekrandan o'qiydi.
-    const { container } = render(
+  /**
+   * ⚠️ APPARAT SKANER TELEFON EKRANIDAN O'QIYDI — geometriya SHART:
+   *
+   *  · QUIET ZONE: QR standarti chetda 4 modul bo'sh joy talab qiladi.
+   *    Qat'iy `p-4` (16px) 29 modulli QR'da ~2 modul chiqardi va imager
+   *    QR'ni rad etardi.
+   *  · MODUL BUTUN PIKSEL: o'lcham modul soniga karrali bo'lmasa
+   *    (224/29=7.72px) antialiasing modul chetlarini kulrang qiladi va
+   *    kontrast yo'qoladi.
+   *  · QR modal ichiga SIG'ISHI kerak: 360px telefonda foydali kenglik
+   *    min(420, 360−16) − 2×12 = 320px.
+   */
+  /**
+   * ⚠️ `viewBox` bo'yicha tanlab bo'lmaydi: lucide ikonkalari ham
+   * `0 0 24 24` beradi. QR'ning yagona o'ziga xos belgisi —
+   * `shape-rendering="crispEdges"`.
+   */
+  const qrSvg = () =>
+    document.querySelector<SVGElement>('svg[shape-rendering="crispEdges"]');
+
+  it("⭐ TELEFON: QR geometriyasi — butun modul + 4 modulli quiet zone", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 360,
+    });
+
+    render(
       <ConsentModal
         open
         onClose={() => {}}
@@ -121,13 +144,47 @@ describe("ConsentModal — market QR/PIN ruxsati", () => {
       />,
     );
 
-    const wrap = Array.from(document.querySelectorAll<HTMLElement>("div")).find(
-      (el) => el.style.width.includes("min("),
-    );
-    expect(wrap?.style.width).toBe("min(72vw, 260px)");
+    await waitFor(() => expect(qrSvg()).toBeTruthy());
+    const svg = qrSvg()!;
 
-    const svg = (wrap ?? container).querySelector("svg");
-    expect(svg?.getAttribute("style")).toContain("width: 100%");
+    const modules = Number(svg.getAttribute("viewBox")!.split(" ")[2]);
+    const size = Number(svg.getAttribute("width"));
+    expect(modules).toBeGreaterThan(0);
+
+    // 1) Modul BUTUN piksel.
+    expect(size % modules).toBe(0);
+    const modulePx = size / modules;
+    expect(modulePx).toBeGreaterThanOrEqual(5);
+
+    // 2) Quiet zone AYNAN 4 modul.
+    const wrap = svg.parentElement as HTMLElement;
+    expect(wrap.style.padding).toBe(`${modulePx * 4}px`);
+
+    // 3) Modal ichiga sig'adi (360px telefon → 320px foydali kenglik).
+    expect(size + modulePx * 8).toBeLessThanOrEqual(320);
+
+    // 4) Antialiasing o'chirilgan.
+    expect(svg.getAttribute("shape-rendering")).toBe("crispEdges");
+  });
+
+  it("⭐ chetga tegish ruxsatni YO'Q QILMAYDI (maskClosable=false)", () => {
+    // Telefonda tasodifiy chet tegish modalni yopardi va `onClose`
+    // sessiyani tashlardi → market qaytadan bosib, serverda YANGI sessiya
+    // ochilardi (QR/PIN almashadi, xodim eski QR bilan xato oladi).
+    const onClose = vi.fn();
+    render(
+      <ConsentModal
+        open
+        onClose={onClose}
+        session={session()}
+        loading={false}
+        onRegenerate={() => {}}
+      />,
+    );
+
+    const mask = document.querySelector(".ant-modal-wrap");
+    (mask as HTMLElement)?.click();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("⭐ TELEFON: ekran uxlamasligi uchun wakeLock so'raladi va qaytariladi", () => {
