@@ -40,6 +40,7 @@ import ReplacementBadge from "../../../../../shared/components/replacement-badge
 import ExtraCostProofField, {
   type ProofFieldValue,
 } from "../../../../../shared/components/ExtraCostProofField";
+import { returnStageDisplay } from "../../../../../shared/lib/returnStage";
 
 const statusConfig: Record<
   string,
@@ -447,6 +448,13 @@ const AllOrders = () => {
     return `${config.bg} ${config.text} ${config.darkBg} ${config.darkText}`;
   };
 
+  /**
+   * Bekor-qaytarish zanjirida XOM status yarim haqiqat: `cancelled (sent)`
+   * "yo'lda" degan ma'noni beradi, holbuki posilka markazda bo'lishi mumkin.
+   * Kuryer o'z posilkasining markazga yetib kelganini SHU yorliqdan ko'radi.
+   */
+  const stageOf = (order: unknown) => returnStageDisplay(order as never);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -476,12 +484,13 @@ const AllOrders = () => {
             {/* Header: Status + Index */}
             <div className="flex items-center justify-between mb-3">
               <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${getStatusStyle(
-                  item.status,
-                )}`}
+                title={stageOf(item)?.title}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
+                  stageOf(item)?.tone ?? getStatusStyle(item.status)
+                }`}
               >
                 <Package className="w-3.5 h-3.5" />
-                {st(`${item.status}`)}
+                {stageOf(item)?.label ?? st(`${item.status}`)}
               </span>
               <span className="text-xs text-gray-400">
                 #{(page - 1) * limit + index + 1}
@@ -660,11 +669,12 @@ const AllOrders = () => {
                 </td>
                 <td className="px-3 py-3">
                   <span
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${getStatusStyle(
-                      item.status,
-                    )}`}
+                    title={stageOf(item)?.title}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
+                      stageOf(item)?.tone ?? getStatusStyle(item.status)
+                    }`}
                   >
-                    {st(`${item.status}`)}
+                    {stageOf(item)?.label ?? st(`${item.status}`)}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-right">

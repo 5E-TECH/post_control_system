@@ -1,4 +1,5 @@
 import { Button } from "antd";
+import { returnStageDisplay } from "../../../../shared/lib/returnStage";
 import { AlertCircle } from "lucide-react";
 import { memo, type FC } from "react";
 
@@ -101,13 +102,29 @@ const OrderTableComp: FC<Props> = ({ data }) => {
                 {item?.market?.name}
               </td>
               <td className="pl-10">
-                <span
-                  className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                    statusColors[item.status] || "bg-slate-400"
-                  }`}
-                >
-                  {item.status.toUpperCase()}
-                </span>
+                {/* ⚠️ Bekor-qaytarish zanjirida XOM status yarim haqiqat:
+                    `cancelled (sent)` "yo'lda" degan ma'noni beradi, holbuki
+                    posilka markazda bo'lishi mumkin. Kuryer o'z posilkasining
+                    markazga yetib kelganini SHU yorliqdan ko'radi. */}
+                {(() => {
+                  const stage = returnStageDisplay(item);
+                  return stage ? (
+                    <span
+                      title={stage.title}
+                      className={`rounded-2xl px-3 py-2 text-[13px] font-semibold ${stage.tone}`}
+                    >
+                      {stage.label}
+                    </span>
+                  ) : (
+                    <span
+                      className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
+                        statusColors[item.status] || "bg-slate-400"
+                      }`}
+                    >
+                      {item.status.toUpperCase()}
+                    </span>
+                  );
+                })()}
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}

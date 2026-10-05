@@ -30,6 +30,10 @@ import {
   Check,
   X,
 } from "lucide-react";
+import {
+  returnStageDisplay,
+  type ReturnStageSource,
+} from "../../shared/lib/returnStage";
 
 const fmt = (val: number) =>
   new Intl.NumberFormat("uz-UZ").format(val || 0);
@@ -69,7 +73,26 @@ const statusConfig: Record<
   closed: { bg: "bg-zinc-100", text: "text-zinc-700", darkBg: "dark:bg-zinc-800", darkText: "dark:text-zinc-400", label: "Yopilgan" },
 };
 
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({
+  status,
+  order,
+}: {
+  status: string;
+  order?: ReturnStageSource;
+}) => {
+  // Bekor-qaytarish zanjirida XOM status yarim haqiqat («Bekor (yuborilgan)»
+  // = yo'lda), shuning uchun bosqich yorlig'i ko'rsatiladi.
+  const stage = returnStageDisplay(order ?? { status });
+  if (stage) {
+    return (
+      <span
+        title={stage.title}
+        className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold ${stage.tone}`}
+      >
+        {stage.label}
+      </span>
+    );
+  }
   const config = statusConfig[status] || statusConfig.new;
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${config.bg} ${config.text} ${config.darkBg} ${config.darkText}`}>
@@ -189,7 +212,7 @@ const OrderCard = ({
     {/* Header: Status + Index + Actions */}
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-2">
-        <StatusBadge status={item?.status} />
+        <StatusBadge status={item?.status} order={item} />
         <span className="text-xs text-gray-400">#{index + 1}</span>
       </div>
       {canEditOrder(item?.status) && (
@@ -612,7 +635,7 @@ const OperatorOrders = () => {
                       </div>
                     </td>
                     <td className="px-4 py-4">
-                      <StatusBadge status={item?.status} />
+                      <StatusBadge status={item?.status} order={item} />
                     </td>
                     <td className="px-4 py-4 text-right">
                       <span className="font-semibold text-gray-800 dark:text-white">
