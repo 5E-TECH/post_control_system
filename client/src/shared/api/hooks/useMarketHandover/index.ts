@@ -24,11 +24,29 @@ export interface AwaitingOrder {
   qr_code_token: string;
   total_price: number;
   status: string;
-  is_replacement_return: boolean;
   center_received_at: number | null;
   age_days: number;
   escalated: boolean;
   return_stage: ReturnStage;
+
+  /**
+   * Posilkani TANIB olish uchun — pochta ichidagi buyurtma kartasi bilan
+   * bir xil to'plam. Xodim 150 posilka orasidan qaysi birini topshirayotganini
+   * raqamdan emas, MIJOZ va TUMAN bo'yicha ham tekshiradi.
+   */
+  customer_name: string | null;
+  customer_phone: string | null;
+  district_name: string | null;
+  where_deliver: string | null;
+  created_at: number | null;
+  product_quantity: number | null;
+  comment: string | null;
+
+  /** Almashtirish yorlig'i (`ReplacementBadge`) uchun. */
+  is_replacement_return: boolean;
+  replacement_state: string | null;
+  replacement_of_order_id: string | null;
+  replacementOf: { order_number?: number } | null;
 }
 
 export interface AwaitingOrdersPage {

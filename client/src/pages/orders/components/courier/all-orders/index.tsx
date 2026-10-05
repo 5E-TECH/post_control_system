@@ -22,6 +22,7 @@ import {
   XCircle,
   Package,
   RotateCcw,
+  Warehouse,
 } from "lucide-react";
 import { memo, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useOrder } from "../../../../../shared/api/hooks/useOrder";
@@ -40,7 +41,10 @@ import ReplacementBadge from "../../../../../shared/components/replacement-badge
 import ExtraCostProofField, {
   type ProofFieldValue,
 } from "../../../../../shared/components/ExtraCostProofField";
-import { returnStageDisplay } from "../../../../../shared/lib/returnStage";
+import {
+  formatMoment,
+  returnStageDisplay,
+} from "../../../../../shared/lib/returnStage";
 
 const statusConfig: Record<
   string,
@@ -517,6 +521,21 @@ const AllOrders = () => {
                 </a>
               </div>
             </div>
+
+            {/*
+              MARKAZ QABUL QILGANI — KURYER UCHUN JAVOB.
+              ⚠️ Bekor qilingan posilkaning statusi markazga topshirilgandan
+              keyin ham `cancelled (sent)` da qoladi. Kuryerda "men bergandim,
+              nega hali ham bekor-jo'natilgan?" degan savol tug'ilmasligi uchun
+              yorliq «Markazda» deydi, bu qator esa QACHON qabul qilinganini
+              aniq ko'rsatadi — ya'ni kuryerning javobgarligi yopilgan.
+            */}
+            {item?.center_received_at && (
+              <div className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900/20 dark:text-sky-300">
+                <Warehouse className="h-3.5 w-3.5" />
+                Markaz qabul qildi: {formatMoment(item.center_received_at)}
+              </div>
+            )}
 
             {/* Info Row */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs mb-3">

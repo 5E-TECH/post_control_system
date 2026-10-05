@@ -19,9 +19,14 @@ import {
   Loader2,
   Package,
   PackageCheck,
-  ScanLine,
   ShieldCheck,
   Timer,
+  Calendar,
+  MapPin,
+  Phone,
+  QrCode,
+  Truck,
+  Warehouse,
 } from "lucide-react";
 import {
   MANUAL_OVERRIDE_REASONS,
@@ -39,6 +44,8 @@ import {
   formatMmSs,
   useSecondsCountdown,
 } from "../../../../../shared/hooks/useSecondsCountdown";
+import { formatMoment } from "../../../../../shared/lib/returnStage";
+import ReplacementBadge from "../../../../../shared/components/replacement-badge";
 import {
   buildManualOverrides,
   canSubmitBatch,
@@ -399,78 +406,92 @@ function HandoverSession() {
         </Button>
       </div>
 
-      {/* ─────── Ruxsat paneli ─────── */}
+      {/* ─────── Ruxsat holati — INGICHKA chiziq ─────── */}
+      {/*
+        ⚠️ Ilgari bu ikki holat BALAND karta edi va 1080p ekranda ro'yxatdan
+        atigi bir-ikki posilka ko'rinardi. Xodimga ish boshlangach RO'YXAT
+        kerak, chaqiriq emas — shuning uchun marketplace qabulidagi ixcham
+        naqsh: bitta ingichka qator.
+      */}
       {!auth ? (
-        <div className="mb-4 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10">
-          <div className="flex flex-wrap items-center gap-3 border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/30">
-            {/* ⚠️ Skaner DOIM aktiv — tugma yo'q. Jonli nuqta xodimga
-                "tizim kutib turibdi" degan ishonch beradi. */}
-            <span className="relative flex h-3 w-3 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-60" />
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-600" />
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-900/10">
+          <span className="inline-flex items-center gap-2">
+            <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+              <span className="absolute inline-flex h-4 w-4 animate-ping rounded-full bg-amber-400 opacity-50" />
+              <QrCode className="relative h-4 w-4 text-amber-700 dark:text-amber-400" />
             </span>
-            <ScanLine className="h-5 w-5 text-amber-700 dark:text-amber-400" />
-            <span className="font-semibold text-amber-900 dark:text-amber-200">
-              Skaner aktiv — market QR'ini o'qiting
+            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              Skaner tayyor — market QR'ini o'qiting
             </span>
             {scan.isPending && (
-              <Loader2 className="h-4 w-4 animate-spin text-amber-700" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-700" />
             )}
-          </div>
+          </span>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
-            <p className="m-0 max-w-md text-sm text-amber-900/80 dark:text-amber-200/70">
-              Market kabinetida «Topshirishga ruxsat beraman» tugmasini bossin.
-              QR'ni skaner bilan o'qisangiz ruxsat O'ZI ochiladi.
-            </p>
+          <span className="hidden h-4 w-px bg-amber-300/60 sm:block dark:bg-amber-800" />
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider text-amber-700/70 dark:text-amber-300/60">
-                QR o'qilmasa
-              </span>
-              <Input
-                value={pin}
-                onChange={(e) =>
-                  setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-                }
-                placeholder="PIN"
-                prefix={<KeyRound className="h-4 w-4 text-gray-400" />}
-                className="w-[150px] text-center font-mono text-base tracking-[0.25em]"
-                onPressEnter={() => pin.length === 6 && authorize({ pin })}
-              />
-              <Button
-                type="primary"
-                loading={scan.isPending}
-                disabled={pin.length !== 6}
-                onClick={() => authorize({ pin })}
-              >
-                Tasdiqlash
-              </Button>
-            </div>
-          </div>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs text-amber-700/80 dark:text-amber-300/70">
+              yoki PIN
+            </span>
+            <Input
+              size="small"
+              value={pin}
+              onChange={(e) =>
+                setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
+              }
+              placeholder="000000"
+              prefix={<KeyRound className="h-3.5 w-3.5 text-gray-400" />}
+              className="w-[132px] text-center font-mono tracking-[0.2em]"
+              onPressEnter={() => pin.length === 6 && authorize({ pin })}
+            />
+            <Button
+              size="small"
+              type="primary"
+              loading={scan.isPending}
+              disabled={pin.length !== 6}
+              onClick={() => authorize({ pin })}
+            >
+              Tasdiqlash
+            </Button>
+          </span>
+
+          <span className="ml-auto text-xs text-amber-700/70 dark:text-amber-300/60">
+            Market kabinetida «Topshirishga ruxsat beraman» tugmasini bossin
+          </span>
         </div>
       ) : (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-900/10">
-          <span className="relative flex h-3 w-3 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-            <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-600" />
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+          <span className="inline-flex items-center gap-2">
+            <span className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+              <span className="absolute inline-flex h-4 w-4 animate-ping rounded-full bg-emerald-400 opacity-50" />
+              <QrCode className="relative h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            </span>
+            <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+              Skaner tayyor — posilka yorliqlarini o'qiting
+            </span>
           </span>
-          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-          <span className="font-semibold text-emerald-800 dark:text-emerald-300">
-            Ruxsat ochiq — posilkalarni skanerlang
-          </span>
+
           <span
-            className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-semibold tabular-nums ${
+            className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-sm font-semibold tabular-nums ${
               left < 60
                 ? "animate-pulse bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
                 : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
             }`}
             title="Ruxsat shu vaqtdan keyin tugaydi"
           >
-            <Timer className="h-4 w-4" />
+            <Timer className="h-3.5 w-3.5" />
             {formatMmSs(left)}
           </span>
+
+          {handedInSession > 0 && (
+            <span className="text-xs text-emerald-700/80 dark:text-emerald-300/70">
+              {handedInSession} ta topshirildi
+            </span>
+          )}
+
           <Button
+            size="small"
             className="ml-auto"
             onClick={finishSession}
             loading={finish.isPending}
@@ -479,7 +500,6 @@ function HandoverSession() {
           </Button>
         </div>
       )}
-
       {/* ─────── Skaner javobi ─────── */}
       {visualFeedback.show && (
         <div
@@ -545,7 +565,7 @@ function HandoverSession() {
             return (
               <div
                 key={o.id}
-                className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 transition-colors ${
+                className={`rounded-xl border p-3 transition-colors ${
                   manual
                     ? "border-orange-300 bg-orange-50/60 dark:border-orange-800 dark:bg-orange-900/10"
                     : checked
@@ -553,74 +573,124 @@ function HandoverSession() {
                       : "border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
                 }`}
               >
-                <Checkbox
-                  checked={checked}
-                  onChange={() => toggle(o.id)}
-                  disabled={!auth}
-                />
-                <div className="min-w-[120px]">
-                  <div className="text-base font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                {/* ── 1-qator: kim, nima, holati ── */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <Checkbox
+                    checked={checked}
+                    onChange={() => toggle(o.id)}
+                    disabled={!auth}
+                  />
+                  <span className="text-base font-bold tabular-nums text-gray-900 dark:text-gray-100">
                     #{o.order_number}
-                  </div>
-                  <div className="text-xs tabular-nums text-gray-500">
-                    {money(o.total_price)}
-                  </div>
+                  </span>
+
+                  {/*
+                    ⚠️ MIJOZ ISMI — raqamdan muhimroq. Xodim 150 posilka
+                    orasidan qaysi birini topshirayotganini yorliq raqamiga
+                    emas, odamga qarab ham tekshiradi (pochta ichidagi
+                    buyurtma kartasi bilan bir xil to'plam).
+                  */}
+                  <span className="min-w-0 flex-1 truncate font-semibold text-gray-800 dark:text-gray-200">
+                    {o.customer_name || "—"}
+                  </span>
+
+                  <ReplacementBadge order={o} />
+
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums ${ageTone(o.age_days)}`}
+                    title="Markazda qancha turgani"
+                  >
+                    {o.age_days} kun
+                  </span>
+
+                  {o.escalated && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                      <AlertTriangle className="h-3 w-3" />
+                      Muddati o'tdi
+                    </span>
+                  )}
+
+                  {checked && !manual && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Skanerlandi
+                    </span>
+                  )}
+
+                  {manual && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                        <AlertTriangle className="h-3 w-3" />
+                        Skanerlanmadi
+                      </span>
+                      <Select
+                        size="small"
+                        placeholder="Sababni tanlang"
+                        value={reasons[o.id]}
+                        onChange={(v) =>
+                          setReasons((r) => ({ ...r, [o.id]: v as string }))
+                        }
+                        className="min-w-[210px]"
+                        status={reasons[o.id] ? undefined : "error"}
+                        options={MANUAL_OVERRIDE_REASONS.map((r) => ({
+                          value: r,
+                          label: r,
+                        }))}
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <span
-                  className={`rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums ${ageTone(o.age_days)}`}
-                  title="Markazda qancha turgani"
-                >
-                  {o.age_days} kun
-                </span>
-
-                {o.is_replacement_return && (
-                  <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                    Almashtirish
-                  </span>
-                )}
-
-                {o.escalated && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                    <AlertTriangle className="h-3 w-3" />
-                    Muddati o'tdi
-                  </span>
-                )}
-
-                {checked && !manual && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Skanerlandi
-                  </span>
-                )}
-
-                {/* Qo'lda belgilangan — YOPIQ sabab majburiy */}
-                {manual && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                      <AlertTriangle className="h-3 w-3" />
-                      Skanerlanmadi
+                {/* ── 2-qator: posilka tafsilotlari ── */}
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-2 text-xs text-gray-600 dark:border-gray-800 dark:text-gray-300">
+                  {o.customer_phone && (
+                    <span className="inline-flex items-center gap-1">
+                      <Phone className="h-3 w-3 text-gray-400" />
+                      {o.customer_phone}
                     </span>
-                    <Select
-                      size="small"
-                      placeholder="Sababni tanlang"
-                      value={reasons[o.id]}
-                      onChange={(v) =>
-                        setReasons((r) => ({ ...r, [o.id]: v as string }))
-                      }
-                      className="min-w-[210px]"
-                      status={reasons[o.id] ? undefined : "error"}
-                      options={MANUAL_OVERRIDE_REASONS.map((r) => ({
-                        value: r,
-                        label: r,
-                      }))}
-                    />
-                  </div>
-                )}
-
-                <span className="ml-auto font-mono text-xs text-gray-400">
-                  {o.qr_code_token}
-                </span>
+                  )}
+                  {o.district_name && (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-gray-400" />
+                      {o.district_name}
+                    </span>
+                  )}
+                  {o.where_deliver && (
+                    <span className="inline-flex items-center gap-1">
+                      <Truck className="h-3 w-3 text-gray-400" />
+                      {o.where_deliver === "center" ? "Markazga" : "Manzilga"}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1 font-semibold text-gray-800 tabular-nums dark:text-gray-200">
+                    {money(o.total_price)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 tabular-nums">
+                    <Package className="h-3 w-3 text-gray-400" />
+                    {Number(o.product_quantity ?? 0)} dona
+                  </span>
+                  <span className="inline-flex items-center gap-1 tabular-nums">
+                    <Calendar className="h-3 w-3 text-gray-400" />
+                    {formatMoment(o.created_at)}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 text-sky-700 dark:text-sky-300"
+                    title="Viloyatdan markazga qabul qilingan vaqt"
+                  >
+                    <Warehouse className="h-3 w-3" />
+                    {formatMoment(o.center_received_at)}
+                  </span>
+                  {o.comment && (
+                    <span
+                      className="min-w-0 max-w-[280px] truncate italic text-gray-500"
+                      title={o.comment}
+                    >
+                      «{o.comment}»
+                    </span>
+                  )}
+                  <span className="ml-auto font-mono text-[11px] text-gray-400">
+                    {o.qr_code_token}
+                  </span>
+                </div>
               </div>
             );
           })}

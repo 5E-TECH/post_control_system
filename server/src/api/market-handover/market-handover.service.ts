@@ -989,8 +989,24 @@ export class MarketHandoverService {
     const page = Math.max(1, Number(query.page ?? 1));
     const limit = Math.min(200, Math.max(1, Number(query.limit ?? 50)));
 
+    /**
+     * ⚠️ `leftJoinAndSelect` ATAYLAB ISHLATILMAYDI — u `market`/`customer`
+     * munosabatlari bilan butun `users` qatorini (parol hash'i, tokenlar)
+     * olib kelardi. Shuning uchun `leftJoin` + ANIQ ustunlar: javobda faqat
+     * ekranga kerakli maydon bo'ladi.
+     *
+     * To-many (`items`) ATAYLAB qo'shilmaydi: `skip`/`take` bilan birga u
+     * sahifalashni buzadi (DISTINCT subquery) va sekinlashtiradi — dona soni
+     * uchun `o.product_quantity` ustuni allaqachon bor.
+     */
     const qb = this.orderRepo
       .createQueryBuilder('o')
+      .leftJoin('o.customer', 'customer')
+      .leftJoin('o.district', 'district')
+      .leftJoin('o.replacementOf', 'replacementOf')
+      .addSelect(['customer.id', 'customer.name', 'customer.phone_number'])
+      .addSelect(['district.id', 'district.name'])
+      .addSelect(['replacementOf.id', 'replacementOf.order_number'])
       .where('o.user_id = :marketId', { marketId })
       .andWhere(awaitingMarketSql('o'))
       .orderBy('o.center_received_at', 'ASC');
@@ -1019,13 +1035,31 @@ export class MarketHandoverService {
           qr_code_token: o.qr_code_token,
           total_price: o.total_price,
           status: o.status,
-          is_replacement_return: o.is_replacement_return,
           center_received_at: o.center_received_at,
           age_days: Math.floor(
             (now - Number(o.center_received_at ?? now)) / 86_400_000,
           ),
           escalated: o.handover_escalated_at != null,
           return_stage: CancelReturnStage.AT_CENTER,
+
+          // ─── Topshirish ekranida xodim posilkani TANIY olishi uchun ───
+          // (pochta ichidagi buyurtma kartasi bilan bir xil to'plam:
+          // mijoz, telefon, tuman, qayerga, sana, dona, izoh.)
+          customer_name: o.customer?.name ?? null,
+          customer_phone: o.customer?.phone_number ?? null,
+          district_name: o.district?.name ?? null,
+          where_deliver: o.where_deliver,
+          created_at: o.created_at,
+          product_quantity: o.product_quantity,
+          comment: o.comment ?? null,
+
+          // Almashtirish yorlig'i (`ReplacementBadge`) uchun to'plam.
+          is_replacement_return: o.is_replacement_return,
+          replacement_state: o.replacement_state,
+          replacement_of_order_id: o.replacement_of_order_id,
+          replacementOf: o.replacementOf
+            ? { order_number: o.replacementOf.order_number }
+            : null,
         })),
         page,
         limit,
