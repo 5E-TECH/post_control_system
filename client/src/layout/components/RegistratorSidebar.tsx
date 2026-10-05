@@ -6,6 +6,7 @@ import {
   Calendar1,
   Apple,
   ScanLine,
+  Warehouse,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -24,6 +25,11 @@ const RegistratorSidebar = () => {
       to: "/marketplace-intake",
       icon: <ScanLine />,
       label: "Marketplace qabuli",
+    },
+    {
+      to: "/mails/awaiting-market",
+      icon: <Warehouse />,
+      label: "Market kutilmoqda",
     },
     { to: "/products", icon: <Apple />, label: t("products") },
   ];

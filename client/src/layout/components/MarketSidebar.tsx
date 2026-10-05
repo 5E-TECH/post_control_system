@@ -1,10 +1,11 @@
 import { memo } from "react";
-import { House, ShoppingBag, Apple, Calendar1, CreditCard, Users, Bot, Receipt } from "lucide-react";
+import { House, ShoppingBag, Apple, Calendar1, CreditCard, Users, Bot, Receipt, PackageCheck } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../app/store";
 import { useExtraCost } from "../../shared/api/hooks/useExtraCost";
+import { useMarketHandover } from "../../shared/api/hooks/useMarketHandover";
 
 const MarketSidebar = () => {
   const { t } = useTranslation(['sidebar'])
@@ -14,6 +15,12 @@ const MarketSidebar = () => {
   // Bu komponent faqat market roli uchun render bo'ladi.
   const { getMarketCounts } = useExtraCost();
   const { data: extraCostCounts } = getMarketCounts();
+
+  // ⚠️ Markazda turgan bekor posilkalar — market ruxsat bermasa ular
+  // OMBORDA QOLADI (avto-yopish yo'q). Shuning uchun raqam menyuda doim
+  // ko'rinib turadi, aks holda market "mendan nima kutilyapti" ni bilmaydi.
+  const { getMyReturnCounts } = useMarketHandover();
+  const { data: returnCounts } = getMyReturnCounts();
 
   const links = [
     { to: "/", icon: <House />, label: t("dashboard"), end: true },
@@ -35,6 +42,12 @@ const MarketSidebar = () => {
       icon: <Receipt />,
       label: "Qo'shimcha xarajat",
       badge: Number(extraCostCounts?.open ?? 0),
+    },
+    {
+      to: "/market-returns",
+      icon: <PackageCheck />,
+      label: "Qaytarilgan buyurtmalar",
+      badge: Number(returnCounts?.awaiting ?? 0),
     },
     { to: "/market-operators", icon: <Users />, label: "Operatorlar" },
     { to: "/ai-balance", icon: <Bot />, label: "AI balans" },

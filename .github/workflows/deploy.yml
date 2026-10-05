@@ -162,6 +162,12 @@ jobs:
               rm -rf client/dist client/build
               cd client
               npm ci --prefer-offline --legacy-peer-deps
+              # 🔒 Klient testlari — BLOKLOVCHI (2026-10-05 da qo'shildi).
+              # Vitest + RTL; hozircha bekor-qaytarish ekranlarining
+              # invariantlarini qo'riqlaydi (QR taymeri, qo'lda belgilashda
+              # sabab majburiyligi). Qizil bo'lsa dist YIG'ILMAYDI — ya'ni
+              # buzuq frontend prodga chiqmaydi.
+              npm run test
               NODE_OPTIONS='--max-old-space-size=1024' npm run build
               cd ..
               # Qurilgan dist QAYSI commitdan ekanini belgilab qo'yamiz.

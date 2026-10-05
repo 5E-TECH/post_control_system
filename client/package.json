@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && node --max-old-space-size=2048 node_modules/vite/bin/vite.js build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -58,6 +60,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/estree": "^1.0.8",
     "@types/file-saver": "^2.0.7",
     "@types/lodash": "^4.17.23",
@@ -67,12 +72,15 @@
     "@types/react-dom": "^19.1.7",
     "@types/react-input-mask": "^3.0.6",
     "@vitejs/plugin-react-swc": "^4.0.0",
+    "@vitest/coverage-v8": "^3.2.7",
     "eslint": "^9.33.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "jsdom": "^26.1.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.1",
-    "vite": "^7.1.2"
+    "vite": "^7.1.2",
+    "vitest": "^3.2.7"
   }
 }

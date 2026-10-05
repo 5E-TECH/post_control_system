@@ -13,6 +13,7 @@ import {
   Repeat,
   Megaphone,
   ScanLine,
+  Warehouse,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -31,6 +32,11 @@ const AdminSidebar = () => {
       label: t("new_orders"),
     },
     { to: "/mails", icon: <MailOpen />, label: t("mails") },
+    {
+      to: "/mails/awaiting-market",
+      icon: <Warehouse />,
+      label: "Market kutilmoqda",
+    },
     {
       to: "/replacement-returns",
       icon: <Repeat />,

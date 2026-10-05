@@ -13,9 +13,11 @@ import {
   UserRound,
   MapPin,
   Zap,
+  PackageCheck,
 } from "lucide-react";
 import { buildAdminPath } from "../../const";
 import { useExtraCost } from "../../api/hooks/useExtraCost";
+import { useMarketHandover } from "../../api/hooks/useMarketHandover";
 
 // Umumiy nav container stili - barcha rollar uchun
 const navContainerClass = `
@@ -69,6 +71,11 @@ const Navbar = ({ role }: { role: string }) => {
   const { getMarketCounts, getCourierCounts } = useExtraCost();
   const { data: marketCounts } = getMarketCounts(role === "market");
   const { data: courierCounts } = getCourierCounts(role === "courier");
+
+  // Markazda topshirishni kutayotgan bekor posilkalar (faqat market roli).
+  const { getMyReturnCounts } = useMarketHandover();
+  const { data: returnCounts } = getMyReturnCounts(role === "market");
+  const marketReturns = Number(returnCounts?.awaiting ?? 0);
 
   const marketExtraCost = Number(marketCounts?.open ?? 0);
   const courierExtraCost =
@@ -301,6 +308,15 @@ const Navbar = ({ role }: { role: string }) => {
             >
               <Receipt className="w-6 h-6" />
               <NavBadge count={marketExtraCost} />
+            </NavLink>
+            <NavLink
+              to={buildAdminPath("market-returns")}
+              className={({ isActive }) =>
+                `relative ${getNavItemClass(isActive)}`
+              }
+            >
+              <PackageCheck className="w-6 h-6" />
+              <NavBadge count={marketReturns} />
             </NavLink>
             </div>
           </div>

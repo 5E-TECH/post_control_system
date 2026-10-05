@@ -136,6 +136,13 @@ const UserProfile = lazy(() => import("../pages/profile/pages/user-profile"));
 const MarketExtraCost = lazy(
   () => import("../pages/extra-cost-requests/market"),
 );
+const MarketReturns = lazy(() => import("../pages/market-returns"));
+const AwaitingMarket = lazy(
+  () => import("../pages/mails/pages/superadmin/awaiting-market"),
+);
+const HandoverSession = lazy(
+  () => import("../pages/mails/pages/superadmin/awaiting-market/HandoverSession"),
+);
 const CourierExtraCost = lazy(
   () => import("../pages/extra-cost-requests/courier"),
 );
@@ -345,6 +352,29 @@ const AppRouters = () => {
               element: <MailDetail />,
             },
             { path: "mails/refused/mails/:id", element: <RefusedMailDetail /> },
+            // «Markazda — market kutilmoqda» navbati va topshirish ekrani.
+            // ⚠️ `RequireRole`: topshirish ekrani JISMONIY custody qarorini
+            // qabul qiladi (posilka marketga o'tadi) — URL orqali kirishni
+            // ham bloklash kerak. Qiyos: `mails/refused/mails/:id` guardsiz
+            // chiqib ketgan (mavjud bo'shliq, bu yerda takrorlanmaydi).
+            {
+              path: "mails/awaiting-market",
+              element: (
+                <RequireRole
+                  roles={["superadmin", "admin", "registrator", "logist"]}
+                >
+                  <AwaitingMarket />
+                </RequireRole>
+              ),
+            },
+            {
+              path: "mails/awaiting-market/:marketId",
+              element: (
+                <RequireRole roles={["superadmin", "admin", "registrator"]}>
+                  <HandoverSession />
+                </RequireRole>
+              ),
+            },
 
             {
               path: "courier-mails/:id",
@@ -384,6 +414,18 @@ const AppRouters = () => {
               element: (
                 <RequireRole roles={["market"]}>
                   <MarketExtraCost />
+                </RequireRole>
+              ),
+            },
+            // Bekor qaytarishlar — market MARKAZDA turgan posilkalarini
+            // ko'radi va topshirishga ruxsat (QR + PIN) beradi.
+            // ⚠️ `RequireRole` SHART: bu sahifa MOL qarorini qabul qiladi —
+            // ruxsat berilsa posilka marketga topshirilgan deb yoziladi.
+            {
+              path: "market-returns",
+              element: (
+                <RequireRole roles={["market"]}>
+                  <MarketReturns />
                 </RequireRole>
               ),
             },
