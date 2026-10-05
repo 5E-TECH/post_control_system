@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef } from "react";
 import { Button, Modal } from "antd";
 import QRCode from "react-qr-code";
-import { Loader2, RefreshCw, ShieldCheck, Timer } from "lucide-react";
+import { Loader2, RefreshCw, ShieldCheck, Sun, Timer } from "lucide-react";
 import {
   formatMmSs,
   useSecondsCountdown,
@@ -17,17 +17,32 @@ interface Props {
   onRegenerate: () => void;
 }
 
+/** `navigator.wakeLock` hamma brauzerda yo'q — tip mahalliy e'lon qilinadi. */
+type WakeLockSentinel = { release: () => Promise<void> };
+type NavigatorWithWakeLock = Navigator & {
+  wakeLock?: { request: (type: "screen") => Promise<WakeLockSentinel> };
+};
+
 /**
  * MARKET RUXSATI — QR + PIN.
+ *
+ * ⚠️ ASOSIY QURILMA — TELEFON. Market QR'ni amalda telefonidan ko'rsatadi,
+ * markaz xodimi esa APPARAT skaner bilan EKRANDAN o'qiydi. Shundan kelib
+ * chiqadigan uch talab:
+ *
+ *   1. QR imkon qadar KATTA va to'liq kontrastli bo'lsin — o'lcham ekranga
+ *      moslanadi (`min(72vw, 260px)`), kichik telefonda ham maksimal.
+ *   2. Ekran UXLAB QOLMASIN — market QR'ni ko'rsatib turganda telefon
+ *      o'chsa, xodim skanerlay olmaydi va ikkisi vaqt yo'qotadi. Shuning
+ *      uchun `wakeLock` (qo'llab-quvvatlanmasa jimgina o'tkazib yuboriladi).
+ *   3. YORQINLIK muhim — xira ekranni skaner o'qimaydi, shuning uchun
+ *      eslatma ko'rsatiladi (brauzer yorqinlikni o'zi o'zgartira olmaydi).
  *
  * ⚠️ TAYMER MAJBURIY. Elchi frontendidagi aniq nuqson: market QR modalida
  * sanoq YO'Q edi va market YAROQSIZ QR ko'rsatib turardi — xodim skanerlaydi,
  * "muddati tugagan" chiqadi, ikkisi ham nima bo'layotganini tushunmaydi.
- * Shuning uchun bu yerda: sanoq ko'rinadi, tugaganda QR XIRALASHADI va
- * «Yangilash» tugmasi chiqadi.
  *
- * ⚠️ PIN — QR ning ZAXIRASI, qo'shimcha hashamat emas. Market telefoni eski
- * yoki ekrani xira bo'lsa kamera QR'ni o'qiy olmaydi; shunda xodim 6 xonani
+ * ⚠️ PIN — QR ning ZAXIRASI: skaner ekrandan o'qiy olmasa xodim 6 xonani
  * klaviaturadan kiritadi. Shu sabab PIN katta shriftda va ajratib
  * ko'rsatiladi.
  */
@@ -57,6 +72,33 @@ function ConsentModal({
     onRegenerate();
   }, [onRegenerate]);
 
+  /**
+   * EKRAN UXLAB QOLMASIN — QR ko'rsatilayotganda.
+   *
+   * Qo'llab-quvvatlanmasa (iOS Safari'ning eski versiyalari, HTTP) xato
+   * JIMGINA yutiladi: bu qulaylik, shart emas.
+   */
+  useEffect(() => {
+    if (!open || !session) return;
+    const nav = navigator as NavigatorWithWakeLock;
+    if (!nav.wakeLock) return;
+
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+    void nav.wakeLock
+      .request("screen")
+      .then((s) => {
+        if (cancelled) void s.release().catch(() => {});
+        else sentinel = s;
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      void sentinel?.release().catch(() => {});
+    };
+  }, [open, session]);
+
   return (
     <Modal
       open={open}
@@ -81,35 +123,45 @@ function ConsentModal({
           Ruxsat yaratilmadi. Qaytadan urinib ko'ring.
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-4 py-2">
-          <p className="text-center text-sm text-gray-600 dark:text-gray-300">
+        <div className="flex flex-col items-center gap-3 py-1">
+          <p className="m-0 text-center text-sm text-gray-600 dark:text-gray-300">
             Markaz xodimiga shu QR'ni ko'rsating yoki PIN'ni aytib bering.
-            Shundan keyin posilkalaringizni topshirishadi.
           </p>
 
+          {/*
+            ⚠️ O'LCHAM EKRANGA MOSLANADI. Qat'iy `size` bersak kichik
+            telefonda QR modaldan chiqib ketardi yoki keraksiz kichik
+            bo'lardi — apparat skaner esa ekrandan o'qiydi va kichik QR'ni
+            ilg'amaydi. SVG konteynerni to'liq egallaydi.
+          */}
           <div
-            className={`rounded-xl bg-white p-4 transition-opacity ${
+            className={`rounded-xl bg-white p-3 transition-opacity ${
               expired ? "opacity-20" : "opacity-100"
             }`}
+            style={{ width: "min(72vw, 260px)" }}
           >
-            {/* ⚠️ Kattaroq va MAKSIMAL kontrastli: apparat skaner telefon
-                EKRANIDAN o'qiydi — kichik yoki xira QR o'qilmaydi va market
-                xodim bilan birga vaqt yo'qotadi. */}
             <QRCode
               value={session.qr_token}
-              size={224}
               level="M"
               bgColor="#ffffff"
               fgColor="#000000"
+              style={{ width: "100%", height: "auto", display: "block" }}
             />
           </div>
+
+          {!expired && (
+            <p className="m-0 inline-flex items-center gap-1.5 text-center text-xs text-gray-400">
+              <Sun className="h-3.5 w-3.5 shrink-0" />
+              Ekran yorqinligini oshirsangiz skaner tezroq o'qiydi
+            </p>
+          )}
 
           <div className="w-full rounded-xl bg-gray-50 p-3 text-center dark:bg-gray-800">
             <div className="text-[11px] uppercase tracking-wider text-gray-500">
               QR o'qilmasa — PIN
             </div>
             <div
-              className={`font-mono text-3xl font-bold tracking-[0.3em] ${
+              className={`font-mono text-[32px] font-bold leading-tight tracking-[0.25em] sm:text-3xl ${
                 expired
                   ? "text-gray-400 line-through"
                   : "text-gray-900 dark:text-gray-100"
@@ -126,6 +178,7 @@ function ConsentModal({
               </span>
               <Button
                 type="primary"
+                size="large"
                 icon={<RefreshCw className="h-4 w-4" />}
                 loading={loading}
                 onClick={handleRegenerate}
@@ -135,13 +188,13 @@ function ConsentModal({
               </Button>
             </div>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-100 px-2.5 py-1 text-sm font-semibold tabular-nums text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-100 px-3 py-1 text-base font-semibold tabular-nums text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
               <Timer className="h-4 w-4" />
               {formatMmSs(left)}
             </span>
           )}
 
-          <p className="text-center text-xs text-gray-400">
+          <p className="m-0 text-center text-xs text-gray-400">
             Ruxsat {session.awaiting_count} ta posilka uchun amal qiladi.
             Xodim skanerlagach unga 10 daqiqa beriladi.
           </p>

@@ -108,6 +108,85 @@ describe("ConsentModal — market QR/PIN ruxsati", () => {
     expect(onRegenerate).not.toHaveBeenCalled();
   });
 
+  it("⭐ TELEFON: QR o'lchami ekranga moslanadi (qat'iy px EMAS)", () => {
+    // Qat'iy `size` bersak kichik telefonda QR modaldan chiqib ketardi yoki
+    // keraksiz kichik bo'lardi — apparat skaner esa ekrandan o'qiydi.
+    const { container } = render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session()}
+        loading={false}
+        onRegenerate={() => {}}
+      />,
+    );
+
+    const wrap = Array.from(document.querySelectorAll<HTMLElement>("div")).find(
+      (el) => el.style.width.includes("min("),
+    );
+    expect(wrap?.style.width).toBe("min(72vw, 260px)");
+
+    const svg = (wrap ?? container).querySelector("svg");
+    expect(svg?.getAttribute("style")).toContain("width: 100%");
+  });
+
+  it("⭐ TELEFON: ekran uxlamasligi uchun wakeLock so'raladi va qaytariladi", () => {
+    const release = vi.fn().mockResolvedValue(undefined);
+    const request = vi.fn().mockResolvedValue({ release });
+    Object.defineProperty(navigator, "wakeLock", {
+      configurable: true,
+      value: { request },
+    });
+
+    const { unmount } = render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session()}
+        loading={false}
+        onRegenerate={() => {}}
+      />,
+    );
+    expect(request).toHaveBeenCalledWith("screen");
+
+    unmount();
+    // release — mikro-vazifadan keyin chaqiriladi.
+    return Promise.resolve().then(() => {
+      expect(release).toHaveBeenCalled();
+    });
+  });
+
+  it("wakeLock qo'llab-quvvatlanmasa JIM o'tkazib yuboriladi", () => {
+    Object.defineProperty(navigator, "wakeLock", {
+      configurable: true,
+      value: undefined,
+    });
+    expect(() =>
+      render(
+        <ConsentModal
+          open
+          onClose={() => {}}
+          session={session()}
+          loading={false}
+          onRegenerate={() => {}}
+        />,
+      ),
+    ).not.toThrow();
+  });
+
+  it("yorqinlik eslatmasi ko'rsatiladi (skaner xira ekranni o'qimaydi)", () => {
+    render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session()}
+        loading={false}
+        onRegenerate={() => {}}
+      />,
+    );
+    expect(screen.getByText(/yorqinligini oshirsangiz/i)).toBeInTheDocument();
+  });
+
   it("yuklanayotganda holat ko'rsatiladi", () => {
     render(
       <ConsentModal
