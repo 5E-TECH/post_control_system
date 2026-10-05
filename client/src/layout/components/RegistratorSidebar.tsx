@@ -27,7 +27,7 @@ const RegistratorSidebar = () => {
       label: "Marketplace qabuli",
     },
     {
-      to: "/mails/awaiting-market",
+      to: "/awaiting-market",
       icon: <Warehouse />,
       label: "Market kutilmoqda",
     },

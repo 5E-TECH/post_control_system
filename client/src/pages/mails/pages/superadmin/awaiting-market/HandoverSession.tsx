@@ -13,12 +13,13 @@ import { Button, Checkbox, Input, Modal, Select } from "antd";
 import {
   AlertTriangle,
   ArrowLeft,
-  Camera,
   CheckCircle2,
   FileSignature,
   KeyRound,
   Loader2,
   Package,
+  PackageCheck,
+  ScanLine,
   ShieldCheck,
   Timer,
 } from "lucide-react";
@@ -30,10 +31,10 @@ import {
 } from "../../../../../shared/api/hooks/useMarketHandover";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useManifestScanner } from "../../../../../shared/hooks/useManifestScanner";
+import { useMarketQrScanner } from "../../../../../shared/hooks/useMarketQrScanner";
 import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
 import { api } from "../../../../../shared/api";
 import { BASE_URL } from "../../../../../shared/const";
-import CourierCameraScanner from "../../../../../shared/components/courier-camera-scanner";
 import {
   formatMmSs,
   useSecondsCountdown,
@@ -48,35 +49,49 @@ import {
 /**
  * Bir sahifada ko'rsatiladigan maksimal posilka.
  *
- * ⚠️ Market bir kelganda 100–200 posilka olib ketadi, shuning uchun
- * manifest BIR MARTA to'liq yuklanadi — skaner har skanni xotiradan
- * ~0ms da tekshiradi (sahifalash bo'lsa skaner yarim ro'yxatni
- * "topilmadi" deb rad etardi).
+ * ⚠️ Market bir kelganda 100–200 posilka olib ketadi, shuning uchun manifest
+ * BIR MARTA to'liq yuklanadi — skaner har skanni xotiradan ~0ms da
+ * tekshiradi (sahifalash bo'lsa skaner yarim ro'yxatni "topilmadi" deb rad
+ * etardi).
  */
 const MANIFEST_LIMIT = 200;
 
 const money = (n?: number | null) =>
   `${Number(n ?? 0).toLocaleString("uz-UZ")} so'm`;
 
+/** Yosh bo'yicha rang. Sinflar LITERAL (Tailwind shablondan sinf yasamaydi). */
+const ageTone = (days: number) =>
+  days >= 14
+    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+    : days >= 7
+      ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+      : days >= 3
+        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
+
 /**
  * MARKETGA TOPSHIRISH SESSIYASI.
  *
- * Oqim: market QR'ini skanerlash (yoki PIN) → 10 daqiqalik ruxsat →
- * posilkalarni skanerlab partiya-partiya topshirish → «Yakunlash».
+ * Oqim: market QR'ini APPARAT SKANER o'qiydi (sahifaga kirgan zahoti aktiv,
+ * tugma bosish SHART EMAS) → 10 daqiqalik ruxsat → posilkalarni skanerlab
+ * partiya-partiya topshirish → «Yakunlash».
  *
- * ⚠️ RUXSAT SAHIFAGA BOG'LANGAN. Sahifa har 30 s da heartbeat yuboradi va
- * chiqishda ruxsatni yopadi. Market ketgandan keyin ruxsat amalda qolib
- * ketsa «market ruxsat berdi» dalili ishonchini yo'qotadi.
+ * ⚠️ IKKI SKANER, BIRI AKTIV: ruxsat ochilmaguncha faqat market-QR
+ * tinglovchisi, ochilgandan keyin faqat posilka manifesti ishlaydi. Ikkisi
+ * bir vaqtda yoqilsa ayni skan ikki marta ishlanardi.
  *
- * ⚠️ ELCHI FRONTENDIDAGI IKKI NUQSON ATAYLAB TAKRORLANMAYDI:
- *   1) QR skanerlangach BARCHA buyurtma avtomatik tanlanmaydi — faqat
- *      jismonan skanerlangani;
- *   2) taymer ko'rinadi (market yaroqsiz QR ko'rsatib turmaydi).
+ * ⚠️ RUXSAT SAHIFAGA BOG'LANGAN: har 30 s heartbeat, chiqishda yopiladi.
+ * Market ketgandan keyin ruxsat amalda qolsa «market ruxsat berdi» dalili
+ * ishonchini yo'qotadi.
+ *
+ * ⚠️ ELCHI FRONTENDIDAGI IKKI NUQSON ATAYLAB TAKRORLANMAYDI: (1) QR
+ * o'qilgach BARCHA buyurtma avtomatik tanlanmaydi — faqat jismonan
+ * skanerlangani; (2) taymer ko'rinadi.
  */
 function HandoverSession() {
   const { marketId = "" } = useParams();
   const navigate = useNavigate();
-  const { handleApiError, handleSuccess } = useApiNotification();
+  const { handleApiError, handleSuccess, handleWarning } = useApiNotification();
   const {
     getAwaitingOrders,
     scan,
@@ -88,10 +103,10 @@ function HandoverSession() {
 
   const [auth, setAuth] = useState<HandoverAuthorization | null>(null);
   const [pin, setPin] = useState("");
-  const [cameraOpen, setCameraOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [scannedIds, setScannedIds] = useState<Set<string>>(new Set());
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [handedInSession, setHandedInSession] = useState(0);
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [offlineForm, setOfflineForm] = useState({
     representative_name: "",
@@ -102,9 +117,9 @@ function HandoverSession() {
   const { data, isLoading, refetch } = getAwaitingOrders(marketId, {
     limit: MANIFEST_LIMIT,
   });
-  // ⚠️ `useMemo` SHART: `data?.orders ?? []` har renderda YANGI massiv
-  // beradi va u pastdagi `manifest` useMemo'sini har renderda qayta
-  // hisoblashga majburlardi (200 posilkada sezilarli).
+  // ⚠️ `useMemo` SHART: `data?.orders ?? []` har renderda YANGI massiv beradi
+  // va pastdagi `manifest` useMemo'sini har renderda qayta hisoblashga
+  // majburlardi (200 posilkada sezilarli).
   const orders = useMemo(() => data?.orders ?? [], [data]);
   const total = Number(data?.total ?? 0);
 
@@ -115,8 +130,7 @@ function HandoverSession() {
   useEffect(() => {
     if (auth && left <= 0) {
       setAuth(null);
-      handleApiError(
-        { response: { data: { message: "" } } },
+      handleWarning(
         "Ruxsat tugadi",
         "10 daqiqalik oyna tugadi — market yangi QR ko'rsatsin",
       );
@@ -124,7 +138,6 @@ function HandoverSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth, left]);
 
-  // Heartbeat: sahifa ochiq turganini serverga bildiradi.
   useEffect(() => {
     if (!auth) return;
     const token = auth.authorization_token;
@@ -132,9 +145,9 @@ function HandoverSession() {
       Math.max(5, Number(auth.heartbeat_interval_seconds || 30)) * 1000;
     const id = setInterval(() => {
       heartbeat.mutate(token, {
-        // Server ruxsatni yopgan bo'lsa (muddat/boshqa xodim) — ekranni
-        // DARHOL haqiqatga keltiramiz, aks holda xodim topshirayotgandek
-        // o'ylab turib har bosishda xato olardi.
+        // Server ruxsatni yopgan bo'lsa ekranni DARHOL haqiqatga keltiramiz:
+        // aks holda xodim topshirayotgandek o'ylab turib har bosishda xato
+        // olardi.
         onError: () => setAuth(null),
       });
     }, everyMs);
@@ -142,7 +155,6 @@ function HandoverSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth?.authorization_token]);
 
-  // Sahifadan chiqishda / tab yopilganda ruxsatni YOPAMIZ.
   const authRef = useRef<HandoverAuthorization | null>(null);
   authRef.current = auth;
   useEffect(() => {
@@ -157,7 +169,42 @@ function HandoverSession() {
     };
   }, []);
 
-  // ─────────────────────────── Skaner ───────────────────────────
+  // ─────────────────────── Ruxsat ochish ───────────────────────
+
+  const authorize = useCallback(
+    (body: { qr_token?: string; pin?: string }) => {
+      scan.mutate(
+        { ...body, market_id: marketId },
+        {
+          onSuccess: (res) => {
+            setAuth(res);
+            setPin("");
+            setHandedInSession(0);
+            handleSuccess("Ruxsat ochildi", "Posilkalarni skanerlang");
+          },
+          onError: (err) => handleApiError(err, "Ruxsat ochilmadi"),
+        },
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [marketId],
+  );
+
+  /**
+   * MARKET QR SKANERI — sahifaga kirgan zahoti aktiv, TUGMA YO'Q.
+   * Faqat ruxsat ochilmagan paytda ishlaydi.
+   */
+  useMarketQrScanner({
+    enabled: !auth && !scan.isPending,
+    onMarketToken: (token) => authorize({ qr_token: token }),
+    onForeignToken: () =>
+      handleWarning(
+        "Bu market QR'i emas",
+        "Avval market kabinetidagi ruxsat QR'ini o'qiting",
+      ),
+  });
+
+  // ─────────────────────── Posilka skaneri ───────────────────────
 
   const manifest = useMemo(() => {
     const map = new Map<string, string>();
@@ -171,12 +218,11 @@ function HandoverSession() {
   selectedRef.current = selectedIds;
 
   /**
-   * Skaner tanlagan buyurtmalarni ALOHIDA belgilab boramiz.
+   * Skaner tanlagan posilkalarni ALOHIDA belgilab boramiz.
    *
-   * ⚠️ NEGA KERAK: qo'lda belgilangan (skanerlanmagan) posilka uchun
-   * YOPIQ sabab majburiy — "yorliq o'qilmadi" dalili shunda yoziladi.
-   * Skanerlangani esa sababsiz o'tadi. Bu farqni faqat shu yerda bilib
-   * olish mumkin.
+   * ⚠️ NEGA KERAK: qo'lda belgilangan (skanerlanmagan) posilka uchun YOPIQ
+   * sabab majburiy — "yorliq o'qilmadi" dalili shunda yoziladi. Skanerlangani
+   * sababsiz o'tadi. Bu farqni faqat shu yerda bilib olish mumkin.
    */
   const setSelectedFromScanner = useCallback<
     Dispatch<SetStateAction<string[]>>
@@ -210,36 +256,11 @@ function HandoverSession() {
     setSelectedIds: setSelectedFromScanner,
     onMissResolved: refetch,
     resetKey: marketId,
-    // ⚠️ Skaner FAQAT ruxsat ochiq bo'lganda ishlaydi: ruxsatsiz skanerlash
-    // xodimda "ish ketdi" tuyg'usini berib, keyin topshirishda xato chiqardi.
     enabled: Boolean(auth),
   });
 
   // ─────────────────────────── Amallar ───────────────────────────
 
-  const authorize = useCallback(
-    (body: { qr_token?: string; pin?: string }) => {
-      scan.mutate(
-        { ...body, market_id: marketId },
-        {
-          onSuccess: (res) => {
-            setAuth(res);
-            setPin("");
-            setCameraOpen(false);
-            handleSuccess(
-              "Ruxsat ochildi",
-              "Posilkalarni skanerlab topshiring",
-            );
-          },
-          onError: (err) => handleApiError(err, "Ruxsat ochilmadi"),
-        },
-      );
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [marketId],
-  );
-
-  // Qoidalar `handover.logic.ts` da — u test bilan qulflangan.
   const manualIds = useMemo(
     () => manualSelection(selectedIds, scannedIds),
     [selectedIds, scannedIds],
@@ -259,16 +280,14 @@ function HandoverSession() {
     [auth, selectedIds, scannedIds, reasons],
   );
 
+  const clearSelection = useCallback(() => {
+    setSelectedIds([]);
+    setScannedIds(new Set());
+    setReasons({});
+  }, []);
+
   const submitBatch = useCallback(() => {
     if (!auth || selectedIds.length === 0) return;
-    if (missingReasons.length > 0) {
-      handleApiError(
-        {},
-        "Sabab kerak",
-        "Qo'lda belgilangan posilkalar uchun sabab tanlanishi shart",
-      );
-      return;
-    }
     complete.mutate(
       {
         market_id: marketId,
@@ -282,31 +301,33 @@ function HandoverSession() {
             "Topshirildi",
             `${res.handed_over} ta posilka marketga topshirildi`,
           );
-          setSelectedIds([]);
-          setScannedIds(new Set());
-          setReasons({});
+          setHandedInSession((n) => n + Number(res.handed_over ?? 0));
+          clearSelection();
           void refetch();
         },
         onError: (err) => handleApiError(err, "Topshirib bo'lmadi"),
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth, selectedIds, manualIds, missingReasons, reasons, marketId]);
+  }, [auth, selectedIds, manualIds, reasons, marketId]);
 
   const finishSession = useCallback(() => {
     if (!auth) return;
     finish.mutate(auth.authorization_token, {
       onSuccess: () => {
         setAuth(null);
-        setSelectedIds([]);
-        setScannedIds(new Set());
-        setReasons({});
-        handleSuccess("Yakunlandi", "Topshirish sessiyasi yopildi");
+        clearSelection();
+        handleSuccess(
+          "Yakunlandi",
+          handedInSession > 0
+            ? `${handedInSession} ta posilka topshirildi`
+            : "Sessiya yopildi",
+        );
       },
       onError: () => setAuth(null),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth]);
+  }, [auth, handedInSession]);
 
   const submitOffline = useCallback(() => {
     if (selectedIds.length === 0) return;
@@ -319,9 +340,7 @@ function HandoverSession() {
             `${res.handed_over} ta posilka`,
           );
           setOfflineOpen(false);
-          setSelectedIds([]);
-          setScannedIds(new Set());
-          setReasons({});
+          clearSelection();
           setOfflineForm({
             representative_name: "",
             representative_phone: "",
@@ -342,76 +361,100 @@ function HandoverSession() {
 
   // ─────────────────────────── Ko'rinish ───────────────────────────
 
+  const scannedCount = selectedIds.filter((id) => scannedIds.has(id)).length;
+
   return (
-    <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 pb-24 sm:px-6 lg:px-8">
-      <div className="mb-4 flex items-center gap-3">
+    <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 pb-28 sm:px-6 lg:px-8">
+      {/* ─────── Sarlavha ─────── */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <Button
           icon={<ArrowLeft className="h-4 w-4" />}
-          onClick={() => navigate("/mails/awaiting-market")}
+          onClick={() => navigate("/awaiting-market")}
         />
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-bold text-gray-900 dark:text-gray-100">
             Marketga topshirish
           </h1>
           <p className="text-sm text-gray-500">
             Markazda {total} ta posilka
-            {total > MANIFEST_LIMIT
-              ? ` (ekranda ${MANIFEST_LIMIT} tasi — qolganini topshirgandan keyin yangilang)`
+            {total > MANIFEST_LIMIT ? ` · ekranda ${MANIFEST_LIMIT} tasi` : ""}
+            {handedInSession > 0
+              ? ` · bu sessiyada ${handedInSession} ta topshirildi`
               : ""}
           </p>
         </div>
+
+        <Button
+          className="ml-auto"
+          icon={<FileSignature className="h-4 w-4" />}
+          disabled={selectedIds.length === 0 || Boolean(auth)}
+          onClick={() => setOfflineOpen(true)}
+          title={
+            auth
+              ? "Ruxsat ochiq — oddiy topshirishdan foydalaning"
+              : "Market panelga kira olmasa: vakil akti bilan topshirish"
+          }
+        >
+          Offline akt
+        </Button>
       </div>
 
       {/* ─────── Ruxsat paneli ─────── */}
       {!auth ? (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/40 dark:bg-amber-900/10">
-          <div className="mb-3 flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-300">
-            <ShieldCheck className="h-5 w-5" />
-            Market ruxsati kerak
+        <div className="mb-4 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10">
+          <div className="flex flex-wrap items-center gap-3 border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/30">
+            {/* ⚠️ Skaner DOIM aktiv — tugma yo'q. Jonli nuqta xodimga
+                "tizim kutib turibdi" degan ishonch beradi. */}
+            <span className="relative flex h-3 w-3 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-60" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-600" />
+            </span>
+            <ScanLine className="h-5 w-5 text-amber-700 dark:text-amber-400" />
+            <span className="font-semibold text-amber-900 dark:text-amber-200">
+              Skaner aktiv — market QR'ini o'qiting
+            </span>
+            {scan.isPending && (
+              <Loader2 className="h-4 w-4 animate-spin text-amber-700" />
+            )}
           </div>
-          <p className="mb-3 text-sm text-amber-800/80 dark:text-amber-200/80">
-            Market kabinetida «Topshirishga ruxsat beraman» tugmasini bossin.
-            So'ng QR'ni skanerlang yoki 6 xonali PIN'ni kiriting.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="primary"
-              icon={<Camera className="h-4 w-4" />}
-              onClick={() => setCameraOpen(true)}
-            >
-              QR skanerlash
-            </Button>
-            <Input
-              value={pin}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              placeholder="PIN (6 xona)"
-              prefix={<KeyRound className="h-4 w-4 text-gray-400" />}
-              className="max-w-[180px] font-mono tracking-[0.2em]"
-              onPressEnter={() => pin.length === 6 && authorize({ pin })}
-            />
-            <Button
-              loading={scan.isPending}
-              disabled={pin.length !== 6}
-              onClick={() => authorize({ pin })}
-            >
-              Tasdiqlash
-            </Button>
 
-            <Button
-              className="ml-auto"
-              icon={<FileSignature className="h-4 w-4" />}
-              disabled={selectedIds.length === 0}
-              onClick={() => setOfflineOpen(true)}
-              title="Market panelga kira olmasa — vakil akti bilan topshirish"
-            >
-              Offline akt ({selectedIds.length})
-            </Button>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3">
+            <p className="m-0 max-w-md text-sm text-amber-900/80 dark:text-amber-200/70">
+              Market kabinetida «Topshirishga ruxsat beraman» tugmasini bossin.
+              QR'ni skaner bilan o'qisangiz ruxsat O'ZI ochiladi.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-wider text-amber-700/70 dark:text-amber-300/60">
+                QR o'qilmasa
+              </span>
+              <Input
+                value={pin}
+                onChange={(e) =>
+                  setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                placeholder="PIN"
+                prefix={<KeyRound className="h-4 w-4 text-gray-400" />}
+                className="w-[150px] text-center font-mono text-base tracking-[0.25em]"
+                onPressEnter={() => pin.length === 6 && authorize({ pin })}
+              />
+              <Button
+                type="primary"
+                loading={scan.isPending}
+                disabled={pin.length !== 6}
+                onClick={() => authorize({ pin })}
+              >
+                Tasdiqlash
+              </Button>
+            </div>
           </div>
         </div>
       ) : (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-900/10">
+          <span className="relative flex h-3 w-3 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-600" />
+          </span>
           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           <span className="font-semibold text-emerald-800 dark:text-emerald-300">
             Ruxsat ochiq — posilkalarni skanerlang
@@ -422,23 +465,22 @@ function HandoverSession() {
                 ? "animate-pulse bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
                 : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
             }`}
+            title="Ruxsat shu vaqtdan keyin tugaydi"
           >
             <Timer className="h-4 w-4" />
             {formatMmSs(left)}
           </span>
           <Button
-            icon={<Camera className="h-4 w-4" />}
-            onClick={() => setCameraOpen(true)}
+            className="ml-auto"
+            onClick={finishSession}
+            loading={finish.isPending}
           >
-            Kamera
-          </Button>
-          <Button className="ml-auto" onClick={finishSession} loading={finish.isPending}>
             Yakunlash
           </Button>
         </div>
       )}
 
-      {/* ─────── Skaner feedback ─────── */}
+      {/* ─────── Skaner javobi ─────── */}
       {visualFeedback.show && (
         <div
           className={`mb-3 rounded-lg px-3 py-2 text-sm font-semibold ${
@@ -453,11 +495,47 @@ function HandoverSession() {
         </div>
       )}
 
+      {/* ─────── Ro'yxat sarlavhasi ─────── */}
+      <div className="mb-2 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+        <span className="inline-flex items-center gap-1.5">
+          <Package className="h-4 w-4" />
+          {orders.length} ta posilka
+        </span>
+        {selectedIds.length > 0 && (
+          <>
+            <span className="inline-flex items-center gap-1.5 text-emerald-600">
+              <PackageCheck className="h-4 w-4" />
+              {scannedCount} skanerlandi
+            </span>
+            {manualIds.length > 0 && (
+              <span className="inline-flex items-center gap-1.5 text-orange-600">
+                <AlertTriangle className="h-4 w-4" />
+                {manualIds.length} qo'lda
+              </span>
+            )}
+            <button
+              type="button"
+              className="ml-auto text-gray-400 underline hover:text-gray-600"
+              onClick={clearSelection}
+            >
+              Tanlovni tozalash
+            </button>
+          </>
+        )}
+      </div>
+
       {/* ─────── Posilkalar ─────── */}
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 py-16 text-gray-500">
           <Loader2 className="h-5 w-5 animate-spin" />
           Yuklanmoqda…
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="rounded-2xl border border-gray-100 bg-white py-12 text-center dark:border-gray-800 dark:bg-gray-900">
+          <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
+          <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
+            Bu marketda topshiriladigan posilka qolmadi
+          </p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -467,30 +545,45 @@ function HandoverSession() {
             return (
               <div
                 key={o.id}
-                className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 ${
-                  checked
-                    ? "border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-900/10"
-                    : "border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
+                className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 transition-colors ${
+                  manual
+                    ? "border-orange-300 bg-orange-50/60 dark:border-orange-800 dark:bg-orange-900/10"
+                    : checked
+                      ? "border-emerald-300 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-900/10"
+                      : "border-gray-100 bg-white dark:border-gray-800 dark:bg-gray-900"
                 }`}
               >
-                <Checkbox checked={checked} onChange={() => toggle(o.id)} />
-                <Package className="h-4 w-4 text-gray-400" />
-                <div className="min-w-[110px]">
-                  <div className="font-semibold text-gray-900 dark:text-gray-100">
+                <Checkbox
+                  checked={checked}
+                  onChange={() => toggle(o.id)}
+                  disabled={!auth}
+                />
+                <div className="min-w-[120px]">
+                  <div className="text-base font-bold tabular-nums text-gray-900 dark:text-gray-100">
                     #{o.order_number}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs tabular-nums text-gray-500">
                     {money(o.total_price)}
                   </div>
                 </div>
 
-                <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                <span
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums ${ageTone(o.age_days)}`}
+                  title="Markazda qancha turgani"
+                >
                   {o.age_days} kun
                 </span>
 
                 {o.is_replacement_return && (
                   <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
                     Almashtirish
+                  </span>
+                )}
+
+                {o.escalated && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                    <AlertTriangle className="h-3 w-3" />
+                    Muddati o'tdi
                   </span>
                 )}
 
@@ -503,19 +596,19 @@ function HandoverSession() {
 
                 {/* Qo'lda belgilangan — YOPIQ sabab majburiy */}
                 {manual && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1 rounded-md bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
                       <AlertTriangle className="h-3 w-3" />
-                      Qo'lda
+                      Skanerlanmadi
                     </span>
                     <Select
                       size="small"
-                      placeholder="Sabab"
+                      placeholder="Sababni tanlang"
                       value={reasons[o.id]}
                       onChange={(v) =>
                         setReasons((r) => ({ ...r, [o.id]: v as string }))
                       }
-                      className="min-w-[190px]"
+                      className="min-w-[210px]"
                       status={reasons[o.id] ? undefined : "error"}
                       options={MANUAL_OVERRIDE_REASONS.map((r) => ({
                         value: r,
@@ -536,14 +629,20 @@ function HandoverSession() {
 
       {/* ─────── Pastdagi yopishqoq panel ─────── */}
       {selectedIds.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white/95 p-3 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
-          <div className="mx-auto flex max-w-screen-2xl items-center gap-3 px-4">
-            <span className="font-semibold tabular-nums text-gray-700 dark:text-gray-200">
+        <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white/95 py-3 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+          <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center gap-3 px-4 sm:px-6 lg:px-8">
+            <span className="text-base font-bold tabular-nums text-gray-800 dark:text-gray-100">
               {selectedIds.length} ta tanlandi
             </span>
             {missingReasons.length > 0 && (
-              <span className="text-sm text-red-600">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600">
+                <AlertTriangle className="h-4 w-4" />
                 {missingReasons.length} ta posilka uchun sabab kerak
+              </span>
+            )}
+            {!auth && (
+              <span className="text-sm text-amber-700">
+                Market ruxsati kutilmoqda
               </span>
             )}
             <Button
@@ -559,24 +658,6 @@ function HandoverSession() {
           </div>
         </div>
       )}
-
-      {/* ─────── Kamera ─────── */}
-      <CourierCameraScanner
-        open={cameraOpen}
-        onClose={() => setCameraOpen(false)}
-        onToken={(token) => {
-          // Market QR'i (MRC-…) — ruxsat ochadi. Posilka QR'lari esa
-          // klaviatura-skaner orqali `useManifestScanner` ga tushadi.
-          if (token.startsWith("MRC-")) authorize({ qr_token: token });
-        }}
-        statusText={auth ? "Posilka skaneri" : "Market QR'ini skanerlang"}
-        hint={
-          auth
-            ? "Posilka yorlig'ini kameraga tuting"
-            : "Market telefonidagi QR'ni kameraga tuting"
-        }
-        tone={auth ? "emerald" : "amber"}
-      />
 
       {/* ─────── Offline akt ─────── */}
       <Modal

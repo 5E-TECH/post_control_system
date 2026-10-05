@@ -31,7 +31,7 @@ const Sidebar = () => {
     },
     { to: "/mails", icon: <MailOpen />, label: t("mails") },
     {
-      to: "/mails/awaiting-market",
+      to: "/awaiting-market",
       icon: <Warehouse />,
       label: "Market kutilmoqda",
     },

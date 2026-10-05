@@ -357,8 +357,12 @@ const AppRouters = () => {
             // qabul qiladi (posilka marketga o'tadi) — URL orqali kirishni
             // ham bloklash kerak. Qiyos: `mails/refused/mails/:id` guardsiz
             // chiqib ketgan (mavjud bo'shliq, bu yerda takrorlanmaydi).
+            // ⚠️ YO'L ATAYLAB `mails/*` DAN TASHQARIDA. `SidebarLink` da
+            // `end` kommentga olingan, ya'ni NavLink PREFIKS bo'yicha mos
+            // keladi — `/mails/awaiting-market` da «Pochtalar» punkti ham
+            // aktiv bo'lib qolardi (ikki menyu bir vaqtda yoniq).
             {
-              path: "mails/awaiting-market",
+              path: "awaiting-market",
               element: (
                 <RequireRole
                   roles={["superadmin", "admin", "registrator", "logist"]}
@@ -368,7 +372,7 @@ const AppRouters = () => {
               ),
             },
             {
-              path: "mails/awaiting-market/:marketId",
+              path: "awaiting-market/:marketId",
               element: (
                 <RequireRole roles={["superadmin", "admin", "registrator"]}>
                   <HandoverSession />

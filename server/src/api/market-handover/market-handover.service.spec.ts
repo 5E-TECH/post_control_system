@@ -143,7 +143,9 @@ describe('MarketHandoverService', () => {
       expect(row.qr_token_hash).toMatch(/^[0-9a-f]{64}$/);
       expect(row.pin_hash).toMatch(/^[0-9a-f]{64}$/);
       // Xom token javobda bor, LEKIN bazadagi qatorda yo'q.
-      expect(res.data.qr_token).toMatch(/^MRC-/);
+      // ⚠️ KICHIK harfli prefiks: apparat skaner yo'li buzilmasligi uchun
+      // (klient `normalizeQrToken` hammasini kichik harfga tushiradi).
+      expect(res.data.qr_token).toMatch(/^mrc-[0-9a-f]{32}$/);
       expect(JSON.stringify(row)).not.toContain(res.data.qr_token);
       expect(JSON.stringify(row)).not.toContain(res.data.pin);
     });
@@ -188,7 +190,7 @@ describe('MarketHandoverService', () => {
         qr_expires_at: Date.now() + 60_000,
       });
 
-      const res: any = await service.scan({ qr_token: 'MRC-abc' }, staff());
+      const res: any = await service.scan({ qr_token: 'mrc-abc' }, staff());
 
       expect(res.data.authorization_token).toMatch(/^MRA-/);
       expect(res.data.remaining_seconds).toBe(
@@ -212,7 +214,7 @@ describe('MarketHandoverService', () => {
       });
 
       await expect(
-        service.scan({ qr_token: 'MRC-abc' }, staff()),
+        service.scan({ qr_token: 'mrc-abc' }, staff()),
       ).rejects.toThrow(BadRequestException);
 
       expect(
@@ -225,7 +227,7 @@ describe('MarketHandoverService', () => {
     it('allaqachon ishlatilgan ruxsat qayta skanerlanmaydi', async () => {
       sessionRepo.findOne.mockResolvedValue(activeSession());
       await expect(
-        service.scan({ qr_token: 'MRC-abc' }, staff()),
+        service.scan({ qr_token: 'mrc-abc' }, staff()),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -233,6 +235,26 @@ describe('MarketHandoverService', () => {
       await expect(
         service.scan({ qr_token: 'XXX-abc' }, staff()),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('⭐ APPARAT SKANER: KATTA harfda kelgan QR ham qabul qilinadi', async () => {
+      // Caps Lock yoqiq skaner `MRC-ABC` yuborishi mumkin; klient
+      // normalizatori `mrc-abc` qiladi. Ikkisi ham AYNI sessiyani topishi
+      // shart — aks holda skaner yo'li jimgina o'lik bo'ladi.
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        market_id: MARKET_ID,
+        status: MarketHandoverSessionStatus.PENDING,
+        qr_expires_at: Date.now() + 60_000,
+      });
+
+      const res: any = await service.scan({ qr_token: '  MRC-AbC12  ' }, staff());
+      expect(res.data.authorization_token).toMatch(/^MRA-/);
+      // Qidiruv KICHIK harfli tokenning hashi bilan ketgan.
+      const lookedUp = sessionRepo.findOne.mock.calls[0][0].where.qr_token_hash;
+      expect(lookedUp).toBe(
+        require('crypto').createHash('sha256').update('mrc-abc12').digest('hex'),
+      );
     });
 
     it('PIN yo‘lida market_id MAJBURIY (brute-force maydonini qisadi)', async () => {

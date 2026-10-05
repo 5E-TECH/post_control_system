@@ -134,7 +134,7 @@ function AwaitingMarket() {
             <button
               key={m.market_id}
               type="button"
-              onClick={() => navigate(`/mails/awaiting-market/${m.market_id}`)}
+              onClick={() => navigate(`/awaiting-market/${m.market_id}`)}
               className="flex w-full flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left transition-colors hover:border-sky-300 hover:bg-sky-50/40 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-sky-800 dark:hover:bg-sky-900/10"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800">

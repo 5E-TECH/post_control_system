@@ -227,8 +227,16 @@ function MarketReturns() {
                 </span>
               )}
 
-              <span className="ml-auto font-mono text-xs text-gray-400">
-                {o.qr_code_token}
+              {/* ⚠️ Xom QR token ATAYLAB ko'rsatilmaydi: u xodim skanerlaydigan
+                  yorliq, market uchun ma'nosiz shovqin. O'rniga posilka
+                  qachon markazga kelgani ko'rsatiladi. */}
+              <span className="ml-auto text-xs text-gray-400">
+                {o.center_received_at
+                  ? new Date(Number(o.center_received_at)).toLocaleDateString(
+                      "uz-UZ",
+                      { day: "2-digit", month: "2-digit", year: "numeric" },
+                    )
+                  : ""}
               </span>
             </div>
           ))}

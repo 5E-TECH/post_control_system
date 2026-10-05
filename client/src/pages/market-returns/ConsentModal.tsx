@@ -92,7 +92,16 @@ function ConsentModal({
               expired ? "opacity-20" : "opacity-100"
             }`}
           >
-            <QRCode value={session.qr_token} size={180} />
+            {/* ⚠️ Kattaroq va MAKSIMAL kontrastli: apparat skaner telefon
+                EKRANIDAN o'qiydi — kichik yoki xira QR o'qilmaydi va market
+                xodim bilan birga vaqt yo'qotadi. */}
+            <QRCode
+              value={session.qr_token}
+              size={224}
+              level="M"
+              bgColor="#ffffff"
+              fgColor="#000000"
+            />
           </div>
 
           <div className="w-full rounded-xl bg-gray-50 p-3 text-center dark:bg-gray-800">

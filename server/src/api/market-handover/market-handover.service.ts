@@ -222,7 +222,20 @@ export class MarketHandoverService {
       },
     );
 
-    const qrToken = `MRC-${generateCustomToken(16)}`;
+    /**
+     * ⚠️ PREFIKS KICHIK HARFLARDA — ATAYLAB.
+     *
+     * Apparat (klaviatura-wedge) skaner o'qigan tokenni klient
+     * `normalizeQrToken` orqali o'tkazadi, u esa Caps Lock / RU layout
+     * himoyasi uchun HAMMASINI kichik harfga tushiradi. Katta harfli
+     * prefiks bo'lsa skanerlangan qiymat generatsiya qilinganidan farq
+     * qilardi → sha256 MOS KELMASDI va market QR'i HECH QACHON
+     * topilmasdi (skaner yo'li butunlay o'lik bo'lardi).
+     *
+     * Token tanasi `generateCustomToken` dan keladi — u allaqachon
+     * kichik harfli hex, ya'ni normalizatsiyadan O'ZGARMASDAN o'tadi.
+     */
+    const qrToken = `mrc-${generateCustomToken(16)}`;
     // 6 xonali PIN — QR zaxirasi (market telefoni eski/ekrani xira bo'lsa).
     const pin = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const expiresAt = now + MARKET_HANDOVER_QR_TTL_MS;
@@ -274,9 +287,14 @@ export class MarketHandoverService {
       const now = Date.now();
       let session: MarketReturnHandoverSessionEntity | null = null;
 
-      const rawQr = String(dto.qr_token ?? '').trim();
+      // ⚠️ KICHIK HARFGA keltiriladi: apparat skaner Caps Lock bilan
+      // KATTA harfda yuborishi mumkin, klient normalizatori esa kichik
+      // harfga tushiradi. Ikkisi ham AYNI hashga tushishi kerak.
+      const rawQr = String(dto.qr_token ?? '')
+        .trim()
+        .toLowerCase();
       if (rawQr) {
-        if (!rawQr.startsWith('MRC-')) {
+        if (!rawQr.startsWith('mrc-')) {
           throw new BadRequestException('QR token noto‘g‘ri');
         }
         session = await repo.findOne({
