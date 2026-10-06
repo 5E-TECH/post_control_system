@@ -9,22 +9,24 @@ import {
   type SetStateAction,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Checkbox, Input, Modal, Select } from "antd";
+import { Button, Checkbox, Modal, Select } from "antd";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   FileSignature,
+  FileText,
   KeyRound,
   Loader2,
+  MapPin,
   Package,
   PackageCheck,
-  ShieldCheck,
-  Timer,
-  MapPin,
   Phone,
   QrCode,
+  ShieldCheck,
+  Timer,
+  User,
 } from "lucide-react";
 import {
   MANUAL_OVERRIDE_REASON_KEYS,
@@ -37,6 +39,7 @@ import { useApiNotification } from "../../../../../shared/hooks/useApiNotificati
 import { useManifestScanner } from "../../../../../shared/hooks/useManifestScanner";
 import { useMarketQrScanner } from "../../../../../shared/hooks/useMarketQrScanner";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
+import PinInput from "../../../../../shared/components/pin-input";
 import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
 import { BASE_URL } from "../../../../../shared/const";
 import {
@@ -64,6 +67,8 @@ import {
  * etardi).
  */
 const MANIFEST_LIMIT = 200;
+/** Market PIN uzunligi — server `createConsent` bilan AYNI. */
+const PIN_LENGTH = 6;
 
 const money = (n?: number | null) =>
   `${Number(n ?? 0).toLocaleString("uz-UZ")} so'm`;
@@ -446,26 +451,28 @@ function HandoverSession() {
             <span className="text-xs text-amber-700/80 dark:text-amber-300/70">
               {t("orPin")}
             </span>
-            <Input
-              size="small"
+            <PinInput
               value={pin}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              placeholder="000000"
-              prefix={<KeyRound className="h-3.5 w-3.5 text-gray-400" />}
-              className="w-[132px] text-center font-mono tracking-[0.2em]"
-              onPressEnter={() => pin.length === 6 && authorize({ pin })}
+              onChange={setPin}
+              // To'lgan zahoti yuboriladi; tugma faqat qayta urinish uchun.
+              onComplete={(digits) => authorize({ pin: digits })}
+              disabled={scan.isPending}
+              invalid={scan.isError && pin.length === PIN_LENGTH}
+              length={PIN_LENGTH}
             />
-            <Button
-              size="small"
-              type="primary"
-              loading={scan.isPending}
-              disabled={pin.length !== 6}
+            <button
+              type="button"
+              disabled={pin.length !== PIN_LENGTH || scan.isPending}
               onClick={() => authorize({ pin })}
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 text-sm font-semibold text-white transition-all hover:from-purple-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-700 dark:disabled:to-gray-700"
             >
+              {scan.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <KeyRound className="h-4 w-4" />
+              )}
               {t("confirm")}
-            </Button>
+            </button>
           </span>
 
           <span className="ml-auto text-xs text-amber-700/70 dark:text-amber-300/60">
@@ -944,36 +951,78 @@ function HandoverSession() {
         <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
           {t("offlineModalHint")}
         </p>
-        <div className="flex flex-col gap-2">
-          <Input
-            placeholder={t("repName")}
-            value={offlineForm.representative_name}
-            onChange={(e) =>
-              setOfflineForm((f) => ({
-                ...f,
-                representative_name: e.target.value,
-              }))
-            }
-          />
-          <Input
-            placeholder={t("repPhone")}
-            value={offlineForm.representative_phone}
-            onChange={(e) =>
-              setOfflineForm((f) => ({
-                ...f,
-                representative_phone: e.target.value,
-              }))
-            }
-          />
-          <Input.TextArea
-            rows={2}
-            placeholder={t("offlineReason")}
-            value={offlineForm.reason}
-            onChange={(e) =>
-              setOfflineForm((f) => ({ ...f, reason: e.target.value }))
-            }
-          />
-          <div className="text-xs text-gray-400">
+        {/* ⚠️ YORLIQLAR SHART. Avval uch maydon faqat placeholder bilan
+            turardi: xodim yozishni boshlagach nima so'ralganini ko'rmay
+            qolardi, akt esa HISOBOTGA kiradi — vakil ismi noto'g'ri
+            yozilsa topshirish dalili yo'qoladi. */}
+        <div className="flex flex-col gap-3">
+          <div>
+            <label htmlFor="rep-name" className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+              {t("repName")} <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                id="rep-name"
+                type="text"
+                placeholder={t("repName")}
+                value={offlineForm.representative_name}
+                onChange={(e) =>
+                  setOfflineForm((f) => ({
+                    ...f,
+                    representative_name: e.target.value,
+                  }))
+                }
+                className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-800 transition-all placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-gray-700 dark:bg-[#312D4B] dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="rep-phone" className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+              {t("repPhone")} <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                id="rep-phone"
+                // Telefonda raqamli klaviatura; `type=tel` harf ham qabul
+                // qiladi (ba'zi vakillar «+998 (90)» ko'rinishida yozadi).
+                type="tel"
+                inputMode="tel"
+                placeholder="+998 90 123 45 67"
+                value={offlineForm.representative_phone}
+                onChange={(e) =>
+                  setOfflineForm((f) => ({
+                    ...f,
+                    representative_phone: e.target.value,
+                  }))
+                }
+                className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-800 transition-all placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-gray-700 dark:bg-[#312D4B] dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="offline-reason" className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">
+              {t("offlineReason")} <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <FileText className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <textarea
+                id="offline-reason"
+                rows={2}
+                placeholder={t("offlineReason")}
+                value={offlineForm.reason}
+                onChange={(e) =>
+                  setOfflineForm((f) => ({ ...f, reason: e.target.value }))
+                }
+                className="min-h-[64px] py-2 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-800 transition-all placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 dark:border-gray-700 dark:bg-[#312D4B] dark:text-white resize-y"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
             {t("offlineWillHand", { count: selectedIds.length })}
           </div>
         </div>

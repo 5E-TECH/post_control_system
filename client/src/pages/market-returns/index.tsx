@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from "react";
-import { Button, Empty, Input, Pagination, type PaginationProps } from "antd";
+import { Button, Empty, Pagination, type PaginationProps } from "antd";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -8,7 +8,6 @@ import {
   Package,
   Phone,
   RefreshCw,
-  Search,
   ShieldCheck,
   Truck,
   Warehouse,
@@ -20,6 +19,7 @@ import {
 import { useApiNotification } from "../../shared/hooks/useApiNotification";
 import { useDebouncedValue } from "../../shared/hooks/useDebouncedValue";
 import { formatPhone } from "../../shared/helpers/formatPhone";
+import SearchInput from "../../shared/components/search-input";
 import {
   formatMoment,
   returnAgeTone,
@@ -198,28 +198,29 @@ function MarketReturns() {
 
       {/* ─────── Qidiruv ─────── */}
       <div className="mb-3 flex items-center gap-2">
-        <Input
-          allowClear
-          size="large"
-          prefix={<Search className="h-4 w-4 text-gray-400" />}
-          placeholder={t("searchOrders")}
+        <SearchInput
+          className="flex-1 sm:max-w-sm"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
+          onChange={(next) => {
+            setSearch(next);
             setPage(1);
           }}
-          className="sm:max-w-sm"
+          // Debounce 400ms — spinner kutish BORLIGINI ko'rsatadi, aks holda
+          // yozib bo'lgach ro'yxat «qotgan» ko'rinadi.
+          loading={isFetching && search !== debouncedSearch}
+          placeholder={t("searchOrders")}
         />
-        <Button
-          size="large"
+        <button
+          type="button"
           aria-label={t("refresh")}
-          icon={
-            <RefreshCw
-              className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
-            />
-          }
+          title={t("refresh")}
           onClick={() => void refetch()}
-        />
+          className="h-10 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-[#2A263D] dark:text-gray-300 dark:hover:bg-[#352F4A] flex items-center justify-center"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+          />
+        </button>
       </div>
 
       {/* ─────── Mobil: karta ro'yxati ─────── */}
