@@ -161,8 +161,31 @@ function HandoverSession() {
 
   const left = useSecondsCountdown(auth?.remaining_seconds, auth?.session_id);
 
+  /**
+   * ⚠️ IKKINCHI HIMOYA QATLAMI (production nuqsoni, 2026-10-06).
+   *
+   * Bu effekt `left <= 0` bo'lsa ruxsatni o'chiradi. Sanoq hooki yangi
+   * sessiya uchun ESKI qiymatni (0) qaytargan bir renderda ham shu shart
+   * rost bo'lib, PIN kiritilgan yoki QR skanerlangan ZAHOTI ruxsat
+   * o'chardi va «ruxsat tugadi» chiqardi — tasdiqlash umuman ishlamasdi.
+   *
+   * Hook tuzatildi (`useSecondsCountdown` endi qiymatni saqlamaydi), ammo
+   * bu yerda ham qo'riqlanadi: HAR YANGI sessiya uchun birinchi baho
+   * O'TKAZIB YUBORILADI. Sanoq endi boshlangan bo'lsa u tugagan bo'lishi
+   * MUMKIN EMAS, shuning uchun bu shart hech qanday haqiqiy muddatni
+   * yo'qotmaydi — tugashni keyingi tiklar baribir ushlaydi.
+   */
+  const expiryArmedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (auth && left <= 0) {
+    if (!auth) {
+      expiryArmedFor.current = null;
+      return;
+    }
+    if (expiryArmedFor.current !== auth.session_id) {
+      expiryArmedFor.current = auth.session_id;
+      return;
+    }
+    if (left <= 0) {
       setAuth(null);
       handleWarning(t("toastExpiredTitle"), t("toastExpiredBody"));
     }
