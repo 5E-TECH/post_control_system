@@ -120,5 +120,9 @@
   "consentPinBlockedBody": "This code was revoked for security — get a new QR",
   "consentSingleUseHint": "The QR and PIN are SINGLE-USE: once scanned you need a new one",
   "consentAllHandedTitle": "No returns left at the centre",
-  "consentAllHandedBody": "Everything has been handed over"
+  "consentAllHandedBody": "Everything has been handed over",
+  "colProduct": "Product",
+  "productsHint": "Which product was cancelled and is at the centre",
+  "moreProducts": "+{{count}}",
+  "noProductName": "Name not set"
 }

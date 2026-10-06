@@ -26,6 +26,7 @@ import { MarketHandoverService } from './market-handover.service';
 import {
   AwaitingQueryDto,
   CompleteHandoverDto,
+  HandoverHistoryQueryDto,
   HandoverConsentFlagDto,
   HandoverSessionTokenDto,
   OfflineHandoverDto,
@@ -100,6 +101,24 @@ export class MarketHandoverController {
   @Get('my/returns/counts')
   countsForMarket(@CurrentUser() user: JwtPayload) {
     return this.service.countsForMarket(user);
+  }
+
+  @ApiOperation({
+    summary: 'Market: men olgan qaytarishlar (partiya bo‘yicha)',
+    description:
+      'Topshirilgan posilkalar PARTIYA bo‘yicha guruhlanadi — xuddi ' +
+      '«topshirilgan pochta» kabi. Market omborga bir keladi va o‘nlab ' +
+      'posilkani birga olib ketadi; yassi ro‘yxat bu faktni yo‘qotadi. ' +
+      '`market_id` TOKENDAN olinadi (IDOR himoyasi).',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET, Roles.OPERATOR)
+  @Get('my/handovers')
+  listMyHandovers(
+    @Query() query: HandoverHistoryQueryDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.listMyHandovers(user, query);
   }
 
   // ════════════════════════════ XODIM ════════════════════════════
@@ -200,6 +219,42 @@ export class MarketHandoverController {
     @Query() query: AwaitingQueryDto,
   ) {
     return this.service.listAwaitingOrdersOfMarket(marketId, query);
+  }
+
+  @ApiOperation({
+    summary: 'Xodim: topshirilgan qaytarishlar tarixi (partiya bo‘yicha)',
+    description:
+      'Sana oralig‘i va market bo‘yicha filtrlanadi. Sana `YYYY-MM-DD` ' +
+      'SATR — Toshkent kuni (epoch EMAS), pochta ro‘yxati bilan ayni.',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.SUPERADMIN, Roles.ADMIN, Roles.REGISTRATOR, Roles.LOGIST)
+  @Get('handovers')
+  listHandovers(@Query() query: HandoverHistoryQueryDto) {
+    return this.service.listHandovers(query);
+  }
+
+  @ApiOperation({
+    summary: 'Partiya tarkibi — topshirilgan posilkalar + MAHSULOTLARI',
+    description:
+      'Market faqat O‘Z partiyasini ocha oladi (`market_id` tokendan ' +
+      'WHERE shartiga qo‘shiladi — IDOR himoyasi).',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(
+    Roles.SUPERADMIN,
+    Roles.ADMIN,
+    Roles.REGISTRATOR,
+    Roles.LOGIST,
+    Roles.MARKET,
+    Roles.OPERATOR,
+  )
+  @Get('handovers/:sessionId')
+  handoverBatch(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.handoverBatchOrders(sessionId, user);
   }
 
   @ApiOperation({

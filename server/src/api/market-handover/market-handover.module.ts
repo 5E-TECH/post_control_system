@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MarketReturnHandoverSessionEntity } from 'src/core/entity/market-return-handover-session.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
+import { OrderItemEntity } from 'src/core/entity/order-item.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { BotModule } from '../bots/notify-bot/bot.module';
@@ -22,6 +23,8 @@ import { MarketHandoverService } from './market-handover.service';
     TypeOrmModule.forFeature([
       MarketReturnHandoverSessionEntity,
       OrderEntity,
+      // Ro'yxatlarda «qanday mahsulot bekor bo'lgan» ustuni uchun.
+      OrderItemEntity,
       UserEntity,
     ]),
     ActivityLogModule,

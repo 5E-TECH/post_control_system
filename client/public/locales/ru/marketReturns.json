@@ -120,5 +120,9 @@
   "consentPinBlockedBody": "Код отменён в целях безопасности — получите новый QR",
   "consentSingleUseHint": "QR и PIN ОДНОРАЗОВЫЕ: после сканирования нужен новый",
   "consentAllHandedTitle": "Возвратов в центре не осталось",
-  "consentAllHandedBody": "Всё передано"
+  "consentAllHandedBody": "Всё передано",
+  "colProduct": "Товар",
+  "productsHint": "Какой товар отменён и лежит в центре",
+  "moreProducts": "+{{count}}",
+  "noProductName": "Название не указано"
 }

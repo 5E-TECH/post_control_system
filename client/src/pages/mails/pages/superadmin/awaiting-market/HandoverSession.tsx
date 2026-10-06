@@ -42,6 +42,7 @@ import {
   useMarketQrScanner,
 } from "../../../../../shared/hooks/useMarketQrScanner";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
+import { summarizeProducts } from "../../../../../shared/lib/orderProducts";
 import PinInput from "../../../../../shared/components/pin-input";
 import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
 import { BASE_URL } from "../../../../../shared/const";
@@ -80,7 +81,7 @@ const money = (n?: number | null) =>
 /** Desktop skeleton — `order-view` dagi naqsh. */
 const TableRowSkeleton = () => (
   <tr className="animate-pulse">
-    {[...Array(8)].map((_, i) => (
+    {[...Array(9)].map((_, i) => (
       <td key={i} className="px-4 py-4">
         <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700" />
       </td>
@@ -739,10 +740,27 @@ function HandoverSession() {
                   <span className="inline-flex items-center gap-1 font-semibold tabular-nums text-gray-800 dark:text-gray-200">
                     {money(o.total_price)}
                   </span>
-                  <span className="inline-flex items-center gap-1 tabular-nums">
-                    <Package className="h-3 w-3 text-gray-400" />
-                    {t("pcs", { count: Number(o.product_quantity ?? 0) })}
-                  </span>
+                  {/* MAHSULOT — «2 dona» o'rniga NIMA ekani. */}
+                  {(() => {
+                    const p = summarizeProducts(o.items, o.product_quantity);
+                    return (
+                      <span
+                        className="inline-flex min-w-0 items-center gap-1"
+                        title={p.nameless ? t("noProductName") : p.fullText}
+                      >
+                        <Package className="h-3 w-3 shrink-0 text-gray-400" />
+                        <span className="truncate">
+                          {p.nameless
+                            ? t("pcs", { count: p.totalQuantity })
+                            : p.visible
+                                .map((it) => `${it.name} x${it.quantity}`)
+                                .join(", ")}
+                          {p.hiddenCount > 0 &&
+                            ` ${t("moreProducts", { count: p.hiddenCount })}`}
+                        </span>
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -808,6 +826,12 @@ function HandoverSession() {
                 <th className="min-w-[150px] px-4 py-4 text-left text-sm font-semibold">
                   {t("colAddress")}
                 </th>
+                <th
+                  className="min-w-[160px] px-4 py-4 text-left text-sm font-semibold"
+                  title={t("productsHint")}
+                >
+                  {t("colProduct")}
+                </th>
                 <th className="whitespace-nowrap px-4 py-4 text-right text-sm font-semibold">
                   {t("colPrice")}
                 </th>
@@ -824,7 +848,7 @@ function HandoverSession() {
                 [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center">
+                  <td colSpan={9} className="py-12 text-center">
                     <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
                     <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
                       {t("noneLeft")}
@@ -903,6 +927,45 @@ function HandoverSession() {
                             ? t("deliverCenter")
                             : t("deliverAddress")}
                         </div>
+                      </td>
+                      {/* MAHSULOT — xodim ham qaysi molni berayotganini ko'radi. */}
+                      <td className="max-w-[200px] px-4 py-4 text-sm">
+                        {(() => {
+                          const p = summarizeProducts(
+                            o.items,
+                            o.product_quantity,
+                          );
+                          if (p.nameless) {
+                            return (
+                              <span
+                                className="text-gray-400"
+                                title={t("noProductName")}
+                              >
+                                {t("pcs", { count: p.totalQuantity })}
+                              </span>
+                            );
+                          }
+                          return (
+                            <div className="min-w-0" title={p.fullText}>
+                              {p.visible.map((it) => (
+                                <div
+                                  key={it.name}
+                                  className="truncate text-gray-800 dark:text-gray-200"
+                                >
+                                  {it.name}
+                                  <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                                    x{it.quantity}
+                                  </span>
+                                </div>
+                              ))}
+                              {p.hiddenCount > 0 && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {t("moreProducts", { count: p.hiddenCount })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-gray-800 dark:text-white">
                         <div>{money(o.total_price)}</div>
