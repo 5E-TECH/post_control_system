@@ -137,8 +137,33 @@ function ConsentModal({
   // ochiq bo'lsa. Aks holda market modalni ochib qo'yib ketsa server
   // soniyada bitta sessiya yaratib yotardi.
   const autoRenewed = useRef<string | null>(null);
+  /**
+   * ⚠️ IKKINCHI HIMOYA QATLAMI (production nuqsoni, 2026-10-06).
+   *
+   * Sanoq hooki yangi sessiya uchun bir renderda ESKI 0 ni qaytarganda
+   * `expired` rost bo'lib, bu effekt DARHOL yangi ruxsat so'rardi. Yangi
+   * sessiya kelardi → yana stale 0 → yana so'rov: CHEKSIZ halqa. Market
+   * ekranidagi QR bir renderdayoq eskirar, xodim esa doim «muddati
+   * tugagan» xatosini olardi.
+   *
+   * Hook tuzatildi, lekin bu yerda ham HAR YANGI sessiya uchun birinchi
+   * baho o'tkazib yuboriladi: endigina olingan QR tugagan bo'lishi
+   * mumkin emas.
+   */
+  const seenSession = useRef<string | null>(null);
   useEffect(() => {
-    if (!open || !session || !expired) return;
+    if (!open || !session) return;
+
+    // ⚠️ ARMING `expired` DAN OLDIN: pastroqda bo'lsa, sessiya hali
+    // tirik paytda (expired=false) effekt erta chiqib ketib, qo'riqlagich
+    // umuman qurolmasdi — va keyin muddat HAQIQATAN tugaganda birinchi
+    // baho o'tkazib yuborilib, yangi QR hech qachon so'ralmasdi.
+    if (seenSession.current !== session.session_id) {
+      seenSession.current = session.session_id;
+      return;
+    }
+
+    if (!expired) return;
     // ⚠️ Topshirish borayotganda YANGI QR YARATILMAYDI: xodimning 10
     // daqiqalik oynasi tirik va ikkinchi QR market ekranida chalg'itardi.
     if (inHandover || closed) return;

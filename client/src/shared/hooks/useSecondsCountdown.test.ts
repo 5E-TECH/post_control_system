@@ -76,3 +76,78 @@ describe("useSecondsCountdown", () => {
     expect(result.current).toBe(0);
   });
 });
+
+/**
+ * ⚠️ PRODUCTION NUQSONI (2026-10-06) — ENG MUHIM TEST.
+ *
+ * SIMPTOM: xodim PIN kiritgan yoki QR skanerlagan ZAHOTI «ruxsat tugadi»
+ * chiqardi va tasdiqlash ishlamasdi.
+ *
+ * SABAB: `left` faqat `useState` INITIALIZER ida (birinchi mount) va
+ * `useEffect` ichida yangilanardi. Effektlar esa renderdan KEYIN ishlaydi,
+ * ya'ni `restartKey` o'zgargan RENDERDA hook hamon ESKI qiymatni (0)
+ * qaytarardi. Chaqiruvchi shu bitta renderda «muddati tugagan» degan
+ * xulosaga kelardi:
+ *   · HandoverSession: `if (auth && left <= 0) setAuth(null)` → ruxsat
+ *     ochilgan zahoti O'CHIRILARDI;
+ *   · ConsentModal: `expired` → avto-yangilash → YANGI sessiya → yana
+ *     stale 0 → yana yangilash — CHEKSIZ halqa, market ekranidagi QR
+ *     doim eskirgan bo'lardi (xodim «muddati tugagan» xatosini olardi).
+ *
+ * Shuning uchun sanoq `restartKey` o'zgarganda AYNI RENDERDA to'g'ri
+ * qiymat berishi SHART.
+ */
+describe("useSecondsCountdown — restartKey o'zgarganda AYNI RENDERDA", () => {
+  it("yangi kalit kelgan renderda ESKI qiymat qaytarmaydi", () => {
+    const seen: number[] = [];
+
+    const { rerender } = renderHook(
+      ({ total, key }: { total: number | undefined; key: string | undefined }) => {
+        const left = useSecondsCountdown(total, key);
+        seen.push(left);
+        return left;
+      },
+      {
+        initialProps: { total: undefined, key: undefined } as {
+          total: number | undefined;
+          key: string | undefined;
+        },
+      },
+    );
+
+    expect(seen.at(-1)).toBe(0);
+
+    // Ruxsat ochildi: 600 soniya, yangi sessiya kaliti.
+    seen.length = 0;
+    rerender({ total: 600, key: "sessiya-1" });
+
+    // ⚠️ BIRINCHI render 0 bo'lMASLIGI kerak — aks holda chaqiruvchi
+    // «tugagan» deb hisoblab ruxsatni darhol o'chiradi.
+    expect(seen[0]).toBe(600);
+    expect(seen).not.toContain(0);
+  });
+
+  it("ketma-ket sessiyalarda ham nol oralig'i yo'q", () => {
+    const seen: number[] = [];
+    const { rerender } = renderHook(
+      ({ total, key }: { total: number; key: string }) => {
+        const left = useSecondsCountdown(total, key);
+        seen.push(left);
+        return left;
+      },
+      { initialProps: { total: 120, key: "s1" } },
+    );
+
+    seen.length = 0;
+    rerender({ total: 120, key: "s2" });
+    rerender({ total: 120, key: "s3" });
+
+    // Market modalidagi cheksiz «yangi QR» halqasi aynan shu nolda tug'ilardi.
+    expect(seen).not.toContain(0);
+  });
+
+  it("muddat HAQIQATAN tugaganda 0 qaytaradi (yolg'on tuzatma emas)", () => {
+    const { result } = renderHook(() => useSecondsCountdown(0, "s1"));
+    expect(result.current).toBe(0);
+  });
+});
