@@ -89,9 +89,7 @@
   "reasonQrUnreadable": "QR o'qilmayapti",
   "reasonLabelLost": "Yorliq yo'qolgan",
   "reasonQrWet": "QR namlangan yoki xiralashgan",
-  "colOrder": "Buyurtma",
   "colCustomer": "Mijoz",
-  "colDistrict": "Tuman",
   "colPrice": "Summa",
   "colReceived": "Markazga qabul",
   "colStage": "Holat",
@@ -99,5 +97,8 @@
   "colMarket": "Market",
   "colParcels": "Posilka",
   "colStatus": "Holat",
-  "colScanStatus": "Skaner holati"
+  "colScanStatus": "Skaner holati",
+  "colIndex": "№",
+  "colPhone": "Telefon",
+  "colAddress": "Viloyat / Tuman"
 }

@@ -37,6 +37,7 @@ export interface AwaitingOrder {
   customer_name: string | null;
   customer_phone: string | null;
   district_name: string | null;
+  region_name: string | null;
   where_deliver: string | null;
   created_at: number | null;
   product_quantity: number | null;

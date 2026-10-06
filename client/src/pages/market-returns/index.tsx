@@ -11,7 +11,6 @@ import {
   Search,
   ShieldCheck,
   Truck,
-  User,
   Warehouse,
 } from "lucide-react";
 import {
@@ -39,7 +38,7 @@ const money = (n?: number | null) =>
  */
 const TableRowSkeleton = () => (
   <tr className="animate-pulse">
-    {[...Array(7)].map((_, i) => (
+    {[...Array(8)].map((_, i) => (
       <td key={i} className="px-4 py-4">
         <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700" />
       </td>
@@ -237,10 +236,18 @@ function MarketReturns() {
               key={o.id}
               className="rounded-xl bg-white p-4 shadow-sm dark:bg-[#2A263D]"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-base font-bold tabular-nums text-gray-900 dark:text-white">
+              {/* ISM birinchi, yorliq raqami ostida — market posilkani
+                  raqamdan emas, MIJOZdan eslaydi. */}
+              <div className="mb-2 min-w-0">
+                <div className="truncate text-base font-bold text-gray-800 dark:text-white">
+                  {o.customer_name || "—"}
+                </div>
+                <div className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
                   #{o.order_number}
-                </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-md bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
                   {t("statAtCenter")}
                 </span>
@@ -262,30 +269,27 @@ function MarketReturns() {
                 </span>
               </div>
 
-              {/* Mijoz — market posilkani SHU bo'yicha taniydi */}
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-2 text-sm dark:border-gray-700">
-                <span className="inline-flex min-w-0 items-center gap-1.5 text-gray-800 dark:text-gray-200">
-                  <User className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                  <span className="truncate font-medium">
-                    {o.customer_name || "—"}
-                  </span>
-                </span>
-                {o.customer_phone && (
+              {/* ⚠️ TELEFON KATTA va bosiladigan: market mijozga aynan shu
+                  yerdan qo'ng'iroq qiladi, kichik shrift xato o'qiladi. */}
+              {o.customer_phone && (
+                <div className="mt-2 border-t border-gray-100 pt-2 dark:border-gray-700">
                   <a
                     href={`tel:${o.customer_phone}`}
-                    className="inline-flex items-center gap-1.5 py-1.5 text-gray-600 dark:text-gray-300"
+                    className="inline-flex items-center gap-2 py-1 text-lg font-semibold tabular-nums text-purple-700 dark:text-purple-300"
                   >
-                    <Phone className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                    <Phone className="h-4 w-4 shrink-0 text-emerald-500" />
                     {formatPhone(o.customer_phone)}
                   </a>
-                )}
-              </div>
+                </div>
+              )}
 
               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
-                {o.district_name && (
+                {(o.region_name || o.district_name) && (
                   <span className="inline-flex items-center gap-1">
                     <MapPin className="h-3 w-3 text-gray-400" />
-                    {o.district_name}
+                    {[o.region_name, o.district_name]
+                      .filter(Boolean)
+                      .join(", ")}
                   </span>
                 )}
                 {o.where_deliver && (
@@ -330,14 +334,17 @@ function MarketReturns() {
           <table className="w-full">
             <thead>
               <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
-                <th className="w-20 px-4 py-4 text-left text-sm font-semibold">
-                  {t("colOrder")}
+                <th className="w-14 px-4 py-4 text-left text-sm font-semibold">
+                  {t("colIndex")}
                 </th>
-                <th className="min-w-[180px] px-4 py-4 text-left text-sm font-semibold">
+                <th className="min-w-[200px] px-4 py-4 text-left text-sm font-semibold">
                   {t("colCustomer")}
                 </th>
-                <th className="min-w-[120px] px-4 py-4 text-left text-sm font-semibold">
-                  {t("colDistrict")}
+                <th className="min-w-[160px] whitespace-nowrap px-4 py-4 text-left text-sm font-semibold">
+                  {t("colPhone")}
+                </th>
+                <th className="min-w-[150px] px-4 py-4 text-left text-sm font-semibold">
+                  {t("colAddress")}
                 </th>
                 <th className="whitespace-nowrap px-4 py-4 text-right text-sm font-semibold">
                   {t("colPrice")}
@@ -358,34 +365,54 @@ function MarketReturns() {
                 [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12">
+                  <td colSpan={8} className="py-12">
                     <Empty description={emptyText} />
                   </td>
                 </tr>
               ) : (
-                orders.map((o) => (
+                orders.map((o, index) => (
                   <tr
                     key={o.id}
                     className="transition-colors hover:bg-purple-50 dark:hover:bg-[#3d3759]"
                   >
-                    <td className="px-4 py-4 text-sm font-bold tabular-nums text-gray-800 dark:text-white">
-                      #{o.order_number}
+                    {/* Tartib raqami — buyurtma raqami EMAS (u ism ostida). */}
+                    <td className="px-4 py-4 text-sm tabular-nums text-gray-500 dark:text-gray-400">
+                      {(page - 1) * limit + index + 1}
                     </td>
                     <td className="px-4 py-4">
                       <div className="min-w-0">
-                        <span className="block truncate font-medium text-gray-800 dark:text-white">
+                        <span className="block truncate font-semibold text-gray-800 dark:text-white">
                           {o.customer_name || "—"}
                         </span>
-                        {o.customer_phone && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatPhone(o.customer_phone)}
-                          </span>
-                        )}
+                        {/* Yorliq raqami ism OSTIDA — xodim ikkisini birga
+                            o'qiydi, alohida ustun esa jadvalni cho'zardi. */}
+                        <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                          #{o.order_number}
+                        </span>
                         <ReplacementBadge order={o} className="mt-0.5" />
                       </div>
                     </td>
+                    {/* Telefon KATTA: market mijozga qo'ng'iroq qilish uchun
+                        ekrandan o'qiydi, kichik shriftda xato o'qiladi. */}
+                    <td className="whitespace-nowrap px-4 py-4">
+                      {o.customer_phone ? (
+                        <a
+                          href={`tel:${o.customer_phone}`}
+                          className="text-base font-semibold tabular-nums text-purple-700 hover:underline dark:text-purple-300"
+                        >
+                          {formatPhone(o.customer_phone)}
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
-                      <div>{o.district_name || "—"}</div>
+                      <div className="font-medium text-gray-800 dark:text-gray-100">
+                        {o.region_name || "—"}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {o.district_name || "—"}
+                      </div>
                       <div className="text-xs text-gray-400">
                         {deliverLabel(o.where_deliver)}
                       </div>

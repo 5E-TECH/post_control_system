@@ -27,7 +27,7 @@ const money = (n?: number | null) =>
 /** Desktop skeleton — `order-view` dagi naqsh. */
 const TableRowSkeleton = () => (
   <tr className="animate-pulse">
-    {[...Array(6)].map((_, i) => (
+    {[...Array(7)].map((_, i) => (
       <td key={i} className="px-4 py-4">
         <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700" />
       </td>
@@ -184,9 +184,9 @@ function AwaitingMarket() {
                       <a
                         href={`tel:${m.market_phone}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="m-0 inline-flex items-center gap-1 py-1 text-xs text-gray-500 dark:text-gray-400"
+                        className="m-0 inline-flex items-center gap-1.5 py-1 text-base font-semibold tabular-nums text-purple-700 dark:text-purple-300"
                       >
-                        <Phone className="h-3 w-3 text-emerald-500" />
+                        <Phone className="h-4 w-4 shrink-0 text-emerald-500" />
                         {formatPhone(m.market_phone)}
                       </a>
                     )}
@@ -236,11 +236,14 @@ function AwaitingMarket() {
           <table className="w-full">
             <thead>
               <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
-                <th className="w-12 px-4 py-4 text-left text-sm font-semibold">
-                  #
+                <th className="w-14 px-4 py-4 text-left text-sm font-semibold">
+                  {t("colIndex")}
                 </th>
                 <th className="min-w-[200px] px-4 py-4 text-left text-sm font-semibold">
                   {t("colMarket")}
+                </th>
+                <th className="min-w-[160px] whitespace-nowrap px-4 py-4 text-left text-sm font-semibold">
+                  {t("colPhone")}
                 </th>
                 <th className="whitespace-nowrap px-4 py-4 text-left text-sm font-semibold">
                   {t("colParcels")}
@@ -259,7 +262,7 @@ function AwaitingMarket() {
                 [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
               ) : markets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12">
+                  <td colSpan={7} className="py-12">
                     <Empty description={t("emptyQueue")} />
                   </td>
                 </tr>
@@ -279,16 +282,29 @@ function AwaitingMarket() {
                           <Store className="h-4 w-4 text-white" />
                         </div>
                         <div className="min-w-0">
-                          <span className="block truncate font-medium text-gray-800 dark:text-white">
+                          <span className="block truncate font-semibold text-gray-800 dark:text-white">
                             {m.market_name || "—"}
                           </span>
-                          {m.market_phone && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {formatPhone(m.market_phone)}
-                            </span>
-                          )}
                         </div>
                       </div>
+                    </td>
+                    {/* ⚠️ TELEFON KATTA va alohida ustunda: ruxsat kelmasa
+                        xodim marketga AYNAN shu yerdan qo'ng'iroq qiladi.
+                        `stopPropagation` — qator ochilib ketmasin. */}
+                    <td
+                      className="whitespace-nowrap px-4 py-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {m.market_phone ? (
+                        <a
+                          href={`tel:${m.market_phone}`}
+                          className="text-base font-semibold tabular-nums text-purple-700 hover:underline dark:text-purple-300"
+                        >
+                          {formatPhone(m.market_phone)}
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-4 text-sm tabular-nums text-gray-700 dark:text-gray-200">
                       {t("pcs", { count: m.parcel_count })}

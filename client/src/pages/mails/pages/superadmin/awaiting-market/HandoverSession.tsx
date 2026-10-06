@@ -72,7 +72,7 @@ const money = (n?: number | null) =>
 /** Desktop skeleton — `order-view` dagi naqsh. */
 const TableRowSkeleton = () => (
   <tr className="animate-pulse">
-    {[...Array(7)].map((_, i) => (
+    {[...Array(8)].map((_, i) => (
       <td key={i} className="px-4 py-4">
         <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700" />
       </td>
@@ -612,11 +612,14 @@ function HandoverSession() {
                       disabled={!auth}
                     />
                   </span>
-                  <span className="text-base font-bold tabular-nums text-gray-900 dark:text-white">
-                    #{o.order_number}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-semibold text-gray-800 dark:text-gray-200">
-                    {o.customer_name || "—"}
+                  {/* ISM birinchi, yorliq raqami OSTIDA kichikroq. */}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-base font-bold text-gray-800 dark:text-white">
+                      {o.customer_name || "—"}
+                    </span>
+                    <span className="block text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                      #{o.order_number}
+                    </span>
                   </span>
                   <ReplacementBadge order={o} />
                   <span
@@ -628,20 +631,24 @@ function HandoverSession() {
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-2 text-xs text-gray-600 dark:border-gray-700 dark:text-gray-300">
+                  {/* ⚠️ TELEFON KATTA — qatorni ko'z bilan solishtirishda
+                      kichik shrift xato beradi. */}
                   {o.customer_phone && (
                     <a
                       href={`tel:${o.customer_phone}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 py-1"
+                      className="inline-flex w-full items-center gap-1.5 py-1 text-base font-semibold tabular-nums text-purple-700 dark:text-purple-300"
                     >
-                      <Phone className="h-3 w-3 text-emerald-500" />
+                      <Phone className="h-4 w-4 shrink-0 text-emerald-500" />
                       {formatPhone(o.customer_phone)}
                     </a>
                   )}
-                  {o.district_name && (
+                  {(o.region_name || o.district_name) && (
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="h-3 w-3 text-gray-400" />
-                      {o.district_name}
+                      {[o.region_name, o.district_name]
+                        .filter(Boolean)
+                        .join(", ")}
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1 font-semibold tabular-nums text-gray-800 dark:text-gray-200">
@@ -704,14 +711,17 @@ function HandoverSession() {
             <thead>
               <tr className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
                 <th className="w-12 px-4 py-4" />
-                <th className="w-24 px-4 py-4 text-left text-sm font-semibold">
-                  {t("colOrder")}
+                <th className="w-14 px-4 py-4 text-left text-sm font-semibold">
+                  {t("colIndex")}
                 </th>
-                <th className="min-w-[180px] px-4 py-4 text-left text-sm font-semibold">
+                <th className="min-w-[200px] px-4 py-4 text-left text-sm font-semibold">
                   {t("colCustomer")}
                 </th>
-                <th className="min-w-[120px] px-4 py-4 text-left text-sm font-semibold">
-                  {t("colDistrict")}
+                <th className="min-w-[160px] whitespace-nowrap px-4 py-4 text-left text-sm font-semibold">
+                  {t("colPhone")}
+                </th>
+                <th className="min-w-[150px] px-4 py-4 text-left text-sm font-semibold">
+                  {t("colAddress")}
                 </th>
                 <th className="whitespace-nowrap px-4 py-4 text-right text-sm font-semibold">
                   {t("colPrice")}
@@ -729,7 +739,7 @@ function HandoverSession() {
                 [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center">
+                  <td colSpan={8} className="py-12 text-center">
                     <ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
                     <p className="m-0 font-semibold text-gray-700 dark:text-gray-200">
                       {t("noneLeft")}
@@ -737,7 +747,7 @@ function HandoverSession() {
                   </td>
                 </tr>
               ) : (
-                orders.map((o) => {
+                orders.map((o, index) => {
                   const checked = selectedIds.includes(o.id);
                   const manual = checked && !scannedIds.has(o.id);
                   return (
@@ -762,24 +772,47 @@ function HandoverSession() {
                           disabled={!auth}
                         />
                       </td>
-                      <td className="px-4 py-4 text-sm font-bold tabular-nums text-gray-800 dark:text-white">
-                        #{o.order_number}
+                      {/* Tartib raqami — yorliq raqami ism OSTIDA turadi. */}
+                      <td className="px-4 py-4 text-sm tabular-nums text-gray-500 dark:text-gray-400">
+                        {index + 1}
                       </td>
                       <td className="px-4 py-4">
                         <div className="min-w-0">
-                          <span className="block truncate font-medium text-gray-800 dark:text-white">
+                          <span className="block truncate font-semibold text-gray-800 dark:text-white">
                             {o.customer_name || "—"}
                           </span>
-                          {o.customer_phone && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {formatPhone(o.customer_phone)}
-                            </span>
-                          )}
+                          <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                            #{o.order_number}
+                          </span>
                           <ReplacementBadge order={o} className="mt-0.5" />
                         </div>
                       </td>
+                      {/* ⚠️ TELEFON KATTA: xodim topshirishdan oldin mijozga
+                          emas, MARKETga tekshirish uchun o'qiydi — qatorni
+                          ko'z bilan solishtirishda kichik shrift xato beradi.
+                          `stopPropagation` — bosilganda qator TANLANMASIN. */}
+                      <td
+                        className="whitespace-nowrap px-4 py-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {o.customer_phone ? (
+                          <a
+                            href={`tel:${o.customer_phone}`}
+                            className="text-base font-semibold tabular-nums text-purple-700 hover:underline dark:text-purple-300"
+                          >
+                            {formatPhone(o.customer_phone)}
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
-                        <div>{o.district_name || "—"}</div>
+                        <div className="font-medium text-gray-800 dark:text-gray-100">
+                          {o.region_name || "—"}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {o.district_name || "—"}
+                        </div>
                         <div className="text-xs text-gray-400">
                           {o.where_deliver === "center"
                             ? t("deliverCenter")

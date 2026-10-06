@@ -1003,9 +1003,13 @@ export class MarketHandoverService {
       .createQueryBuilder('o')
       .leftJoin('o.customer', 'customer')
       .leftJoin('o.district', 'district')
+      // ⚠️ VILOYAT ham kerak: xodim «Andijon / Asaka» ni bir ko'rishda
+      // ajratadi, faqat tuman nomi esa noaniq (bir xil nomli tumanlar bor).
+      .leftJoin('district.region', 'region')
       .leftJoin('o.replacementOf', 'replacementOf')
       .addSelect(['customer.id', 'customer.name', 'customer.phone_number'])
       .addSelect(['district.id', 'district.name'])
+      .addSelect(['region.id', 'region.name'])
       .addSelect(['replacementOf.id', 'replacementOf.order_number'])
       .where('o.user_id = :marketId', { marketId })
       .andWhere(awaitingMarketSql('o'))
@@ -1076,6 +1080,7 @@ export class MarketHandoverService {
           customer_name: o.customer?.name ?? null,
           customer_phone: o.customer?.phone_number ?? null,
           district_name: o.district?.name ?? null,
+          region_name: o.district?.region?.name ?? null,
           where_deliver: o.where_deliver,
           created_at: o.created_at,
           product_quantity: o.product_quantity,

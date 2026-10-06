@@ -89,9 +89,7 @@
   "reasonQrUnreadable": "QR not scanning",
   "reasonLabelLost": "Label lost",
   "reasonQrWet": "QR wet or smudged",
-  "colOrder": "Order",
   "colCustomer": "Customer",
-  "colDistrict": "District",
   "colPrice": "Amount",
   "colReceived": "Received at centre",
   "colStage": "Stage",
@@ -99,5 +97,8 @@
   "colMarket": "Market",
   "colParcels": "Parcels",
   "colStatus": "Status",
-  "colScanStatus": "Scan status"
+  "colScanStatus": "Scan status",
+  "colIndex": "#",
+  "colPhone": "Phone",
+  "colAddress": "Region / District"
 }

@@ -89,9 +89,7 @@
   "reasonQrUnreadable": "QR не считывается",
   "reasonLabelLost": "Этикетка потеряна",
   "reasonQrWet": "QR намок или размыт",
-  "colOrder": "Заказ",
   "colCustomer": "Клиент",
-  "colDistrict": "Район",
   "colPrice": "Сумма",
   "colReceived": "Принят в центре",
   "colStage": "Статус",
@@ -99,5 +97,8 @@
   "colMarket": "Маркет",
   "colParcels": "Посылки",
   "colStatus": "Статус",
-  "colScanStatus": "Статус сканирования"
+  "colScanStatus": "Статус сканирования",
+  "colIndex": "№",
+  "colPhone": "Телефон",
+  "colAddress": "Область / Район"
 }
