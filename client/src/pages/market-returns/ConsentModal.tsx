@@ -2,12 +2,23 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Button, Modal } from "antd";
 import { useTranslation } from "react-i18next";
 import QRCode from "react-qr-code";
-import { Loader2, RefreshCw, ShieldCheck, Sun, Timer } from "lucide-react";
+import {
+  Loader2,
+  PackageCheck,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  Sun,
+  Timer,
+} from "lucide-react";
 import {
   formatMmSs,
   useSecondsCountdown,
 } from "../../shared/hooks/useSecondsCountdown";
-import type { ConsentSession } from "../../shared/api/hooks/useMarketHandover";
+import type {
+  ConsentSession,
+  ConsentStatus,
+} from "../../shared/api/hooks/useMarketHandover";
 
 interface Props {
   open: boolean;
@@ -16,6 +27,15 @@ interface Props {
   loading: boolean;
   /** Muddat tugaganda / qayta so'ralganda yangi ruxsat yaratadi. */
   onRegenerate: () => void;
+  /**
+   * SERVERDAN kelgan holat (3 s polling).
+   *
+   * ⚠️ NEGA MAHALLIY SANOQ YETMAYDI. QR BIR MARTALIK: xodim skanerlashi
+   * bilan u o'ladi, LEKIN mahalliy taymer hamon ishlab turadi va market
+   * yaroqsiz QR'ni ko'rsatishda davom etardi. Server holati ekranni
+   * darhol almashtiradi.
+   */
+  status?: ConsentStatus | null;
 }
 
 /** `navigator.wakeLock` hamma brauzerda yo'q — tip mahalliy e'lon qilinadi. */
@@ -82,10 +102,36 @@ function ConsentModal({
   session,
   loading,
   onRegenerate,
+  status = null,
 }: Props) {
   const { t } = useTranslation("marketReturns");
   const left = useSecondsCountdown(session?.ttl_seconds, session?.session_id);
-  const expired = Boolean(session) && left <= 0;
+
+  /**
+   * SERVER holati MAHALLIY sanoqdan USTUN.
+   *
+   * ⚠️ Faqat shu sessiya uchun: `status` boshqa (eski) sessiyani
+   * ko'rsatayotgan bo'lsa unga ishonmaymiz — market tugmani ikki marta
+   * bossa server yangi sessiya yaratadi va polling eskisini qaytarishi
+   * mumkin (poyga).
+   */
+  const sameSession =
+    status != null &&
+    session != null &&
+    status.session_id === session.session_id;
+
+  /** Xodim skanerlab, topshirish BORAYOTGAN payt. */
+  const inHandover = sameSession && status.state === "handover";
+  /** Sessiya yopilgan: topshirildi, bekor qilindi yoki PIN bloklandi. */
+  const closed = sameSession && status.state === "done";
+  const pinBlocked = closed && status.pin_blocked;
+
+  // Muddat: mahalliy sanoq TUGADI yoki server «expired» dedi.
+  const expired =
+    Boolean(session) &&
+    !inHandover &&
+    !closed &&
+    (left <= 0 || (sameSession && status.state === "expired"));
 
   // Muddat tugagach AVTOMATIK yangilash — FAQAT bir marta va faqat modal
   // ochiq bo'lsa. Aks holda market modalni ochib qo'yib ketsa server
@@ -93,10 +139,13 @@ function ConsentModal({
   const autoRenewed = useRef<string | null>(null);
   useEffect(() => {
     if (!open || !session || !expired) return;
+    // ⚠️ Topshirish borayotganda YANGI QR YARATILMAYDI: xodimning 10
+    // daqiqalik oynasi tirik va ikkinchi QR market ekranida chalg'itardi.
+    if (inHandover || closed) return;
     if (autoRenewed.current === session.session_id) return;
     autoRenewed.current = session.session_id;
     onRegenerate();
-  }, [open, session, expired, onRegenerate]);
+  }, [open, session, expired, inHandover, closed, onRegenerate]);
 
   const handleRegenerate = useCallback(() => {
     autoRenewed.current = null;
@@ -173,7 +222,8 @@ function ConsentModal({
     };
   }, [open, session]);
 
-  const showingQr = Boolean(session) && !expired;
+  const showingQr =
+    Boolean(session) && !expired && !inHandover && !closed;
 
   return (
     <Modal
@@ -209,6 +259,95 @@ function ConsentModal({
       ) : !session ? (
         <div className="py-8 text-center text-gray-500 dark:text-gray-400">
           {t("consentNotCreated")}
+        </div>
+      ) : inHandover || closed ? (
+        /*
+          ⚠️ QR BU YERDA KO'RSATILMAYDI — u allaqachon ISHLATILGAN.
+          Avval ekran o'zgarmasdi: market yaroqsiz QR'ni ko'rsatib turardi,
+          xodim esa «muddati tugagan» xatosini olardi va ikkisi bir-birini
+          aylanib yurardi.
+        */
+        <div className="flex flex-col items-center gap-3 py-6 text-center">
+          {inHandover ? (
+            <>
+              <span className="relative flex h-12 w-12 items-center justify-center">
+                <span className="absolute h-12 w-12 animate-ping rounded-full bg-emerald-400/40" />
+                <PackageCheck className="relative h-8 w-8 text-emerald-600" />
+              </span>
+              <div>
+                <p className="m-0 text-base font-bold text-gray-800 dark:text-white">
+                  {t("consentUsedTitle")}
+                </p>
+                <p className="m-0 text-sm text-gray-500 dark:text-gray-400">
+                  {t("consentUsedBody")}
+                </p>
+              </div>
+              {/* Xodimning 10 daqiqalik oynasi — market ham ko'rib tursin. */}
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-100 px-3 py-1 text-base font-semibold tabular-nums text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                <Timer className="h-4 w-4" />
+                {formatMmSs(status?.seconds_left ?? 0)}
+              </span>
+              {Number(status?.handed_over_count ?? 0) > 0 && (
+                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                  {t("consentHandedSoFar", {
+                    count: Number(status?.handed_over_count ?? 0),
+                  })}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              {pinBlocked ? (
+                <ShieldAlert className="h-10 w-10 text-red-500" />
+              ) : Number(status?.awaiting_count ?? 0) === 0 ? (
+                <PackageCheck className="h-10 w-10 text-emerald-500" />
+              ) : (
+                <ShieldCheck className="h-10 w-10 text-gray-400" />
+              )}
+              <div>
+                <p
+                  className={`m-0 text-base font-bold ${
+                    pinBlocked
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-gray-800 dark:text-white"
+                  }`}
+                >
+                  {pinBlocked
+                    ? t("consentPinBlockedTitle")
+                    : Number(status?.awaiting_count ?? 0) === 0
+                      ? t("consentAllHandedTitle")
+                      : t("consentDoneTitle")}
+                </p>
+                <p className="m-0 text-sm text-gray-500 dark:text-gray-400">
+                  {pinBlocked
+                    ? t("consentPinBlockedBody")
+                    : Number(status?.awaiting_count ?? 0) === 0
+                      ? t("consentAllHandedBody")
+                      : t("consentDoneBody")}
+                </p>
+              </div>
+              {Number(status?.handed_over_count ?? 0) > 0 && (
+                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                  {t("consentHandedSoFar", {
+                    count: Number(status?.handed_over_count ?? 0),
+                  })}
+                </span>
+              )}
+              {/* Posilka qolmasa yangi QR MA'NOSIZ — tugma berilmaydi. */}
+              {Number(status?.awaiting_count ?? 0) > 0 && (
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<RefreshCw className="h-4 w-4" />}
+                  loading={loading}
+                  onClick={handleRegenerate}
+                  block
+                >
+                  {t("consentNew")}
+                </Button>
+              )}
+            </>
+          )}
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 py-1">
@@ -294,6 +433,10 @@ function ConsentModal({
 
           <p className="m-0 hidden text-center text-xs text-gray-400 sm:block">
             {t("consentValidFor", { count: session.awaiting_count })}
+          </p>
+          {/* Market QR'ni ikkinchi xodimga ham ko'rsatishga urinmasin. */}
+          <p className="m-0 hidden text-center text-[11px] text-gray-400 sm:block">
+            {t("consentSingleUseHint")}
           </p>
         </div>
       )}

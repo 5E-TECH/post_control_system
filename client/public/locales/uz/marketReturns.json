@@ -110,5 +110,15 @@
   "regionsHint": "Posilkalar qaysi viloyatlardan kelgan",
   "noRegion": "Viloyat belgilanmagan",
   "statTotalSum": "Jami summa",
-  "statEscalated": "Eskalatsiya"
+  "statEscalated": "Eskalatsiya",
+  "consentUsedTitle": "Xodim skanerladi",
+  "consentUsedBody": "Topshirish boshlandi — posilkalarni xodimdan oling",
+  "consentHandedSoFar": "{{count}} ta topshirildi",
+  "consentDoneTitle": "Sessiya yopildi",
+  "consentDoneBody": "Yangi ruxsat kerak bo'lsa tugmani bosing",
+  "consentPinBlockedTitle": "PIN 5 marta xato kiritildi",
+  "consentPinBlockedBody": "Xavfsizlik uchun bu kod bekor qilindi — yangi QR oling",
+  "consentSingleUseHint": "QR va PIN BIR MARTALIK: xodim o'qigach yangisi kerak bo'ladi",
+  "consentAllHandedTitle": "Markazda qaytarish qolmadi",
+  "consentAllHandedBody": "Hammasi topshirildi"
 }

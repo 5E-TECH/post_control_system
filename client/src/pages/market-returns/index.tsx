@@ -81,7 +81,7 @@ function MarketReturns() {
   const [modalOpen, setModalOpen] = useState(false);
   const [session, setSession] = useState<ConsentSession | null>(null);
 
-  const { getMyReturns, getMyReturnCounts, createConsent } =
+  const { getMyReturns, getMyReturnCounts, getConsentStatus, createConsent } =
     useMarketHandover();
   const { handleApiError } = useApiNotification();
 
@@ -96,6 +96,13 @@ function MarketReturns() {
 
   const { data, isLoading, isFetching, refetch } = getMyReturns(params);
   const { data: counts } = getMyReturnCounts();
+  /**
+   * RUXSAT HOLATI — faqat modal ochiq bo'lganda so'raladi.
+   *
+   * ⚠️ QR BIR MARTALIK: xodim skanerlashi bilan o'ladi. Polling bo'lmasa
+   * market yaroqsiz QR'ni ko'rsatib turardi.
+   */
+  const { data: consentStatus } = getConsentStatus(modalOpen);
 
   const requestConsent = useCallback(() => {
     setModalOpen(true);
@@ -112,6 +119,9 @@ function MarketReturns() {
   const closeModal = useCallback(() => {
     setModalOpen(false);
     setSession(null);
+    // Topshirilgan posilkalar ro'yxatdan chiqsin (sonlar ham yangilanadi).
+    void refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const orders = data?.orders ?? [];
@@ -484,6 +494,7 @@ function MarketReturns() {
         session={session}
         loading={createConsent.isPending}
         onRegenerate={requestConsent}
+        status={consentStatus ?? null}
       />
     </div>
   );

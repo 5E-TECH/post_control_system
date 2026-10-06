@@ -110,5 +110,15 @@
   "regionsHint": "Из каких областей поступили посылки",
   "noRegion": "Область не указана",
   "statTotalSum": "Общая сумма",
-  "statEscalated": "Эскалация"
+  "statEscalated": "Эскалация",
+  "consentUsedTitle": "Сотрудник отсканировал",
+  "consentUsedBody": "Передача началась — получите посылки у сотрудника",
+  "consentHandedSoFar": "передано: {{count}}",
+  "consentDoneTitle": "Сессия закрыта",
+  "consentDoneBody": "Нажмите кнопку, если нужен новый доступ",
+  "consentPinBlockedTitle": "PIN введён неверно 5 раз",
+  "consentPinBlockedBody": "Код отменён в целях безопасности — получите новый QR",
+  "consentSingleUseHint": "QR и PIN ОДНОРАЗОВЫЕ: после сканирования нужен новый",
+  "consentAllHandedTitle": "Возвратов в центре не осталось",
+  "consentAllHandedBody": "Всё передано"
 }

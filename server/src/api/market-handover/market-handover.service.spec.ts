@@ -181,6 +181,104 @@ describe('MarketHandoverService', () => {
 
   // ══════════════════ XODIM: SKAN / PIN ══════════════════
 
+  // ══════════════════ MARKET: RUXSAT HOLATI ══════════════════
+
+  /**
+   * ⚠️ NEGA BU YO'L BOR. QR/PIN BIR MARTALIK: xodim skanerlashi bilan
+   * sessiya `PENDING → ACTIVE` ga o'tadi va eski kod o'ladi. Market
+   * ekranida esa QR sanoq bilan TURAVERARDI — market yaroqsiz kodni
+   * ko'rsatib, xodim «muddati tugagan» xatosini olardi.
+   */
+  describe('consentStatus', () => {
+    it('SIR QAYTMAYDI — token/PIN javobda yo‘q', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        status: MarketHandoverSessionStatus.PENDING,
+        qr_expires_at: Date.now() + 60_000,
+        qr_token_hash: 'a'.repeat(64),
+        pin_hash: 'b'.repeat(64),
+        handed_over_count: 0,
+      });
+      const res: any = await service.consentStatus(marketUser());
+      const text = JSON.stringify(res);
+      expect(text).not.toContain('a'.repeat(64));
+      expect(text).not.toContain('b'.repeat(64));
+      expect(res.data.qr_token).toBeUndefined();
+      expect(res.data.pin).toBeUndefined();
+    });
+
+    it('QR tirik → waiting, qolgan soniya bilan', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        status: MarketHandoverSessionStatus.PENDING,
+        qr_expires_at: Date.now() + 90_000,
+        handed_over_count: 0,
+      });
+      const res: any = await service.consentStatus(marketUser());
+      expect(res.data.state).toBe('waiting');
+      expect(res.data.seconds_left).toBeGreaterThan(80);
+      expect(res.data.seconds_left).toBeLessThanOrEqual(90);
+    });
+
+    it('PENDING lekin muddat o‘tgan → expired', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        status: MarketHandoverSessionStatus.PENDING,
+        qr_expires_at: Date.now() - 1_000,
+        handed_over_count: 0,
+      });
+      const res: any = await service.consentStatus(marketUser());
+      expect(res.data.state).toBe('expired');
+      expect(res.data.seconds_left).toBe(0);
+    });
+
+    it('xodim skanerlagan → handover, ruxsat oynasi qolgan soniyasi', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        status: MarketHandoverSessionStatus.ACTIVE,
+        qr_expires_at: Date.now() - 5_000,
+        authorization_expires_at: Date.now() + 300_000,
+        handed_over_count: 3,
+      });
+      const res: any = await service.consentStatus(marketUser());
+      expect(res.data.state).toBe('handover');
+      expect(res.data.seconds_left).toBeGreaterThan(290);
+      expect(res.data.handed_over_count).toBe(3);
+    });
+
+    it('PIN bloklangan sessiya → done + pin_blocked', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        status: MarketHandoverSessionStatus.CLOSED,
+        qr_expires_at: Date.now() - 5_000,
+        close_reason: MarketHandoverCloseReason.PIN_BLOCKED,
+        handed_over_count: 0,
+      });
+      const res: any = await service.consentStatus(marketUser());
+      expect(res.data.state).toBe('done');
+      expect(res.data.pin_blocked).toBe(true);
+    });
+
+    it('oddiy yopilgan sessiya → done, pin_blocked FALSE', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        status: MarketHandoverSessionStatus.CLOSED,
+        qr_expires_at: Date.now() - 5_000,
+        close_reason: MarketHandoverCloseReason.FINISHED,
+        handed_over_count: 4,
+      });
+      const res: any = await service.consentStatus(marketUser());
+      expect(res.data.state).toBe('done');
+      expect(res.data.pin_blocked).toBe(false);
+    });
+
+    it('sessiya umuman yo‘q → none', async () => {
+      sessionRepo.findOne.mockResolvedValue(null);
+      const res: any = await service.consentStatus(marketUser());
+      expect(res.data.state).toBe('none');
+    });
+  });
+
   describe('scan', () => {
     it('PENDING ruxsatni ACTIVE qiladi va 10 daqiqalik oyna beradi', async () => {
       sessionRepo.findOne.mockResolvedValue({

@@ -213,7 +213,17 @@ function HandoverSession() {
             setHandedInSession(0);
             handleSuccess(t("toastConsentOpened"), t("toastScanParcels"));
           },
-          onError: (err) => handleApiError(err, t("toastConsentFailedScan")),
+          onError: (err) => {
+            /**
+             * ⚠️ MAYDON TOZALANADI. Xato kod maydonda qolib ketardi:
+             * ramka qizil, ichida esa ayni yaroqsiz raqamlar — xodim
+             * ularni qo'lda o'chirishi kerak bo'lardi va «Tasdiqlash»
+             * ayni xato kodni QAYTA yuborib, serverdagi 5 urinish
+             * chegarasini bekorga yeyardi.
+             */
+            setPin("");
+            handleApiError(err, t("toastConsentFailedScan"));
+          },
         },
       );
     },
@@ -457,7 +467,9 @@ function HandoverSession() {
               // To'lgan zahoti yuboriladi; tugma faqat qayta urinish uchun.
               onComplete={(digits) => authorize({ pin: digits })}
               disabled={scan.isPending}
-              invalid={scan.isError && pin.length === PIN_LENGTH}
+              // Maydon tozalangani uchun `pin.length` ga tayanib
+              // bo'lmaydi — xato yorlig'i so'nggi urinish natijasidan.
+              invalid={scan.isError && pin.length === 0}
               length={PIN_LENGTH}
             />
             <button

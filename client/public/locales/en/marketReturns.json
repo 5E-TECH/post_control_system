@@ -110,5 +110,15 @@
   "regionsHint": "Which regions the parcels came from",
   "noRegion": "No region set",
   "statTotalSum": "Total amount",
-  "statEscalated": "Escalated"
+  "statEscalated": "Escalated",
+  "consentUsedTitle": "Staff scanned it",
+  "consentUsedBody": "Handover started — collect the parcels from the staff",
+  "consentHandedSoFar": "{{count}} handed over",
+  "consentDoneTitle": "Session closed",
+  "consentDoneBody": "Press the button if you need a new authorization",
+  "consentPinBlockedTitle": "PIN entered wrong 5 times",
+  "consentPinBlockedBody": "This code was revoked for security — get a new QR",
+  "consentSingleUseHint": "The QR and PIN are SINGLE-USE: once scanned you need a new one",
+  "consentAllHandedTitle": "No returns left at the centre",
+  "consentAllHandedBody": "Everything has been handed over"
 }

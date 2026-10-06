@@ -69,6 +69,20 @@ export class MarketHandoverController {
     return this.service.createConsent(user);
   }
 
+  @ApiOperation({
+    summary: 'Market: ruxsatimning holati',
+    description:
+      'QR/PIN BIR MARTALIK: xodim skanerlashi bilan eski kod o‘ladi. Market ' +
+      'modali shu yo‘lni so‘rab turadi va holat o‘zgarsa ekranni almashtiradi ' +
+      '(`waiting` / `expired` / `handover` / `done`). Javobda token/PIN YO‘Q.',
+  })
+  @UseGuards(JwtGuard, RolesGuard)
+  @AcceptRoles(Roles.MARKET)
+  @Get('consent/status')
+  consentStatus(@CurrentUser() user: JwtPayload) {
+    return this.service.consentStatus(user);
+  }
+
   @ApiOperation({ summary: 'Market: markazda turgan qaytarishlarim' })
   @UseGuards(JwtGuard, RolesGuard)
   @AcceptRoles(Roles.MARKET, Roles.OPERATOR)

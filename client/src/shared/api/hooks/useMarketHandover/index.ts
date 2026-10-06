@@ -15,6 +15,37 @@ import { api } from "../../";
  */
 export const marketHandoverKey = "market-handover";
 
+/**
+ * MARKET RUXSATINING HOLATI.
+ *
+ * ⚠️ NEGA POLLING KERAK. QR/PIN BIR MARTALIK: xodim skanerlashi bilan
+ * sessiya `PENDING → ACTIVE` ga o'tadi va eski kod o'ladi. Market ekranida
+ * esa QR sanoq bilan TURAVERARDI — market yaroqsiz kodni ko'rsatib,
+ * xodim «muddati tugagan» xatosini olardi.
+ *
+ *   waiting  — QR tirik, xodim hali skanerlamagan
+ *   expired  — muddat o'tdi, YANGI QR kerak
+ *   handover — xodim skanerladi, topshirish borayotgan payt
+ *   done     — sessiya yopilgan (topshirildi / PIN bloklandi / bekor)
+ *   none     — hali ruxsat yaratilmagan
+ */
+export type ConsentState =
+  | "none"
+  | "waiting"
+  | "expired"
+  | "handover"
+  | "done";
+
+export interface ConsentStatus {
+  state: ConsentState;
+  session_id?: string;
+  seconds_left: number;
+  handed_over_count: number;
+  /** 5 marta xato PIN — market YANGI QR ko'rsatishi SHART. */
+  pin_blocked: boolean;
+  awaiting_count: number;
+}
+
 /** Bekor qaytarish bosqichi — SERVER hisoblaydi (hosila maydon). */
 export type ReturnStage = "courier" | "center" | "market";
 
@@ -192,6 +223,27 @@ export const useMarketHandover = () => {
       refetchInterval: 60_000,
     });
 
+  /**
+   * Ruxsat holatini KUZATADI (faqat modal ochiq bo'lganda).
+   *
+   * ⚠️ 3 SONIYA: xodim QR'ni skanerlagach market ekrani DARHOL
+   * almashishi kerak — aks holda u yaroqsiz QR'ni ko'rsatib turadi.
+   * 60 s (boshqa so'rovlardagi oraliq) bu yerda juda sekin.
+   *
+   * ⚠️ `enabled` — modal yopiq bo'lsa so'rov KETMAYDI: market kuni bo'yi
+   * kabinetda ochiq o'tiradi, 3 soniyalik polling bekorga yuk bo'lardi.
+   */
+  const getConsentStatus = (enabled = true) =>
+    useQuery<ConsentStatus>({
+      queryKey: [marketHandoverKey, "consent", "status"],
+      queryFn: () =>
+        api.get("market-handover/consent/status").then((res) => res.data?.data),
+      enabled,
+      refetchInterval: enabled ? 3_000 : false,
+      // Modal qayta ochilganda eski holat ko'rinib qolmasin.
+      staleTime: 0,
+    });
+
   const createConsent = useMutation<ConsentSession, unknown, void>({
     mutationFn: () =>
       api.post("market-handover/consent").then((res) => res.data?.data),
@@ -324,6 +376,7 @@ export const useMarketHandover = () => {
   return {
     getMyReturns,
     getMyReturnCounts,
+    getConsentStatus,
     createConsent,
     getAwaitingMarkets,
     getAwaitingOrders,

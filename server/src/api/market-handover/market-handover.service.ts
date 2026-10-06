@@ -279,6 +279,87 @@ export class MarketHandoverService {
     );
   }
 
+  /**
+   * MARKET: o'z ruxsatining HOLATI (modal polling uchun).
+   *
+   * ⚠️ NEGA KERAK. QR/PIN BIR MARTALIK: xodim skanerlashi bilan sessiya
+   * `PENDING → ACTIVE` ga o'tadi va eski QR ishlamaydi; 5 marta xato PIN
+   * esa uni `CLOSED` qiladi. LEKIN market ekranida eski QR sanoq bilan
+   * TURAVERARDI — market yaroqsiz kodni ko'rsatib, xodim «muddati
+   * tugagan» xatosini olardi va ikkisi bir-birini aylanib yurardi.
+   *
+   * ⚠️ Javobda SIR YO'Q — token/PIN qaytmaydi, faqat holat va qolgan
+   * soniya. Yangi QR faqat `POST consent` bilan olinadi.
+   */
+  async consentStatus(user: JwtPayload) {
+    const marketId = String(user.id);
+    const now = Date.now();
+
+    const session = await this.sessionRepo.findOne({
+      where: { market_id: marketId },
+      order: { created_at: 'DESC' },
+    });
+
+    const awaiting = await this.orderRepo.count({
+      where: { user_id: marketId, ...awaitingMarketWhere() },
+    });
+
+    if (!session) {
+      return successRes(
+        { state: 'none', awaiting_count: awaiting },
+        200,
+        'Ruxsat yo‘q',
+      );
+    }
+
+    const pending = session.status === MarketHandoverSessionStatus.PENDING;
+    const qrExpiresAt = Number(session.qr_expires_at ?? 0);
+    // PENDING, lekin QR muddati o'tgan — market uchun bu «tugagan».
+    const qrAlive = pending && qrExpiresAt > now;
+
+    /**
+     * Market uchun TO'RT holat:
+     *   waiting  — QR tirik, xodim hali skanerlamagan
+     *   expired  — QR muddati o'tgan, YANGI kerak
+     *   handover — xodim skanerladi, topshirish BORAYOTGAN paytda
+     *   done     — sessiya yopilgan (topshirildi / bloklandi / bekor)
+     */
+    const state = qrAlive
+      ? 'waiting'
+      : pending
+        ? 'expired'
+        : session.status === MarketHandoverSessionStatus.ACTIVE
+          ? 'handover'
+          : 'done';
+
+    return successRes(
+      {
+        state,
+        session_id: session.id,
+        /** `waiting` da QR, `handover` da ruxsat oynasi qolgan soniyasi. */
+        seconds_left:
+          state === 'waiting'
+            ? Math.max(0, Math.floor((qrExpiresAt - now) / 1000))
+            : state === 'handover'
+              ? Math.max(
+                  0,
+                  Math.floor(
+                    (Number(session.authorization_expires_at ?? 0) - now) /
+                      1000,
+                  ),
+                )
+              : 0,
+        handed_over_count: Number(session.handed_over_count ?? 0),
+        /** 5 marta xato PIN — market YANGI QR ko'rsatishi shart. */
+        pin_blocked:
+          session.close_reason === MarketHandoverCloseReason.PIN_BLOCKED,
+        awaiting_count: awaiting,
+      },
+      200,
+      'Ruxsat holati',
+    );
+  }
+
   // ──────────────────────── XODIM: SKAN / PIN ────────────────────────
 
   /**

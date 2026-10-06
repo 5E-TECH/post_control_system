@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import ConsentModal from "./ConsentModal";
-import type { ConsentSession } from "../../shared/api/hooks/useMarketHandover";
+import type {
+  ConsentSession,
+  ConsentStatus,
+} from "../../shared/api/hooks/useMarketHandover";
 
 const session = (over: Partial<ConsentSession> = {}): ConsentSession => ({
   session_id: "s-1",
@@ -255,5 +258,140 @@ describe("ConsentModal — market QR/PIN ruxsati", () => {
       />,
     );
     expect(screen.getByText(/tayyorlanmoqda/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * ⚠️ QR/PIN BIR MARTALIK — ENG MUHIM QULF.
+ *
+ * Xodim skanerlashi bilan server sessiyani `PENDING → ACTIVE` ga o'tkazadi
+ * va eski kod o'ladi. Avval market ekrani O'ZGARMASDI: u yaroqsiz QR'ni
+ * ko'rsatib turardi, xodim esa «muddati tugagan» xatosini olardi —
+ * ikkisi bir-birini aylanib yurardi. Shuning uchun server holati
+ * ekranni ALMASHTIRISHI majburiy xulq.
+ */
+describe("ConsentModal — server holati (bir martalik QR)", () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.useRealTimers());
+
+  const status = (
+    over: Partial<ConsentStatus> = {},
+  ): ConsentStatus => ({
+    state: "waiting",
+    session_id: "s-1",
+    seconds_left: 120,
+    handed_over_count: 0,
+    pin_blocked: false,
+    awaiting_count: 7,
+    ...over,
+  });
+
+  /**
+   * ⚠️ `document.body` DAN qidiriladi, `container` dan EMAS: antd `Modal`
+   * portal bilan `body` ga chiqadi, ya'ni `container.querySelector` DOIM
+   * `null` qaytarardi — «QR yo'q» testlari yolg'on yashil bo'lardi.
+   */
+  const qrNode = () =>
+    document.body.querySelector('svg[shape-rendering="crispEdges"]');
+
+  it("xodim skanerlagach QR YO'QOLADI va topshirish ekrani chiqadi", () => {
+    render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session()}
+        loading={false}
+        onRegenerate={() => {}}
+        status={status({ state: "handover", seconds_left: 540 })}
+      />,
+    );
+
+    expect(qrNode()).toBeNull();
+    expect(screen.queryByText("123456")).toBeNull();
+    expect(screen.getByText(/Xodim skanerladi/)).toBeInTheDocument();
+    // Xodimning 10 daqiqalik oynasi market ekranida ham ko'rinadi.
+    expect(screen.getByText("09:00")).toBeInTheDocument();
+  });
+
+  it("topshirish borayotganda avto-yangilash ISHLAMAYDI", () => {
+    const onRegenerate = vi.fn();
+    render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        // Mahalliy sanoq allaqachon tugagan (ttl 0).
+        session={session({ ttl_seconds: 0 })}
+        loading={false}
+        onRegenerate={onRegenerate}
+        status={status({ state: "handover", seconds_left: 300 })}
+      />,
+    );
+    // ⚠️ Ikkinchi QR xodimning TIRIK oynasi ustiga chiqib chalg'itardi.
+    expect(onRegenerate).not.toHaveBeenCalled();
+  });
+
+  it("PIN 5 marta xato kiritilsa sabab aytiladi va yangi ruxsat taklif qilinadi", () => {
+    render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session()}
+        loading={false}
+        onRegenerate={() => {}}
+        status={status({ state: "done", pin_blocked: true })}
+      />,
+    );
+    expect(screen.getByText(/PIN 5 marta xato/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Yangi ruxsat/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("posilka qolmasa yangi ruxsat tugmasi BERILMAYDI", () => {
+    render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session()}
+        loading={false}
+        onRegenerate={() => {}}
+        status={status({ state: "done", awaiting_count: 0 })}
+      />,
+    );
+    expect(screen.getByText(/qaytarish qolmadi/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Yangi ruxsat/ })).toBeNull();
+  });
+
+  /**
+   * ⚠️ POYGA HIMOYASI. Market tugmani ikki marta bossa server yangi
+   * sessiya yaratadi, polling esa ESKI sessiya holatini qaytarishi mumkin.
+   * Boshqa sessiyaning holati yangi QR'ni o'chirib qo'ymasligi kerak.
+   */
+  it("BOSHQA sessiya holati joriy QR'ga ta'sir qilmaydi", () => {
+    render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session({ session_id: "s-2" })}
+        loading={false}
+        onRegenerate={() => {}}
+        status={status({ session_id: "s-1", state: "done" })}
+      />,
+    );
+    expect(qrNode()).toBeTruthy();
+    expect(screen.getByText("123456")).toBeInTheDocument();
+  });
+
+  it("holat kelmasa eski xulq saqlanadi (QR ko'rinadi)", () => {
+    render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session()}
+        loading={false}
+        onRegenerate={() => {}}
+      />,
+    );
+    expect(qrNode()).toBeTruthy();
   });
 });
