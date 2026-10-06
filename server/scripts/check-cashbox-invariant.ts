@@ -18,6 +18,7 @@
 import 'reflect-metadata';
 import * as fs from 'fs';
 import dataSource from '../src/data-source';
+import { compareFrozen } from './lib/frozen-baseline';
 
 interface DriftRow {
   cashbox_id: string;
@@ -36,6 +37,8 @@ function parseArg(prefix: string): string | null {
 async function main() {
   const snapshotPath = parseArg('--snapshot=');
   const comparePath = parseArg('--compare=');
+  /** ⚠️ QO'ZG'ALMAS tayanch — izoh uchun `lib/frozen-baseline.ts` ga qara. */
+  const freezePath = parseArg('--freeze=');
 
   await dataSource.initialize();
   console.log('🔌 DB ulandi. Cashbox invariant tekshirilmoqda...\n');
@@ -83,6 +86,16 @@ async function main() {
   // ============================================================
   // SNAPSHOT REJIMI — baseline yozib qo'yamiz, halt qilmaymiz
   // ============================================================
+  if (freezePath) {
+    compareFrozen(
+      freezePath,
+      'kassa invarianti',
+      rows.length,
+      drifted.map((r) => ({ id: r.cashbox_id, diff: r.diff })),
+    );
+    process.exit(0);
+  }
+
   if (snapshotPath) {
     const payload = {
       taken_at: new Date().toISOString(),

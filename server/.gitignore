@@ -59,3 +59,9 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /uploads/
 
 backups/
+
+# Muzlatilgan invariant baseline'lari — SERVERDA yashaydi va deploylar
+# orasida saqlanadi (`git reset --hard` kuzatilmagan fayllarga tegmaydi,
+# `server/dist` ham aynan shu sabab omon qoladi). Repoga TUSHMASLIGI
+# kerak: har muhitda o'z raqami bo'ladi.
+/.baselines
