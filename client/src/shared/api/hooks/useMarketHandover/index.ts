@@ -66,7 +66,16 @@ export interface AwaitingMarketRow {
   total_price: number;
   oldest_center_received_at: number;
   oldest_age_days: number;
+  newest_center_received_at: number;
   escalated_count: number;
+  /** Posilkalar QAYSI viloyatlardan kelgan («Navoiy viloyati, Andijon viloyati»). */
+  regions: string | null;
+  district_count: number;
+  /** Jami mahsulot donasi (posilka soni emas). */
+  item_count: number;
+  replacement_count: number;
+  /** Shu market uchun topshirish ayni paytda OCHIQ — ikkinchi xodim kutsin. */
+  active_session: boolean;
 }
 
 export interface AwaitingMarketsPage {
@@ -75,6 +84,9 @@ export interface AwaitingMarketsPage {
   limit: number;
   total_markets: number;
   total_parcels: number;
+  /** Omborda turgan qaytarishlarning UMUMIY summasi. */
+  total_price: number;
+  total_escalated: number;
 }
 
 export interface MarketReturnCounts {

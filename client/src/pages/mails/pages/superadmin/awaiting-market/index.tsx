@@ -15,7 +15,10 @@ import {
 } from "lucide-react";
 import { useMarketHandover } from "../../../../../shared/api/hooks/useMarketHandover";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
-import { returnAgeTone } from "../../../../../shared/lib/returnStage";
+import {
+  formatMoment,
+  returnAgeTone,
+} from "../../../../../shared/lib/returnStage";
 import { useDebouncedValue } from "../../../../../shared/hooks/useDebouncedValue";
 
 const PAGE_SIZE = 30;
@@ -27,7 +30,7 @@ const money = (n?: number | null) =>
 /** Desktop skeleton — `order-view` dagi naqsh. */
 const TableRowSkeleton = () => (
   <tr className="animate-pulse">
-    {[...Array(7)].map((_, i) => (
+    {[...Array(8)].map((_, i) => (
       <td key={i} className="px-4 py-4">
         <div className="h-4 w-full rounded bg-gray-200 dark:bg-gray-700" />
       </td>
@@ -136,7 +139,9 @@ function AwaitingMarket() {
       </div>
 
       {/* ─────── Xulosa ─────── */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
+      {/* ⚠️ Plitkalar OMBORNING umumiy holati: qidiruv ularni toraytirmaydi
+          (server ham shu mantiqda hisoblaydi). */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4 dark:border-gray-800 dark:bg-[#2A263D]">
           <div className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
             {t("statTotalParcels")}
@@ -151,6 +156,29 @@ function AwaitingMarket() {
           </div>
           <div className="text-xl font-bold tabular-nums text-gray-800 sm:text-2xl dark:text-white">
             {total}
+          </div>
+        </div>
+        {/* Omborda turgan PUL — admin uchun bu bosim o'lchovi. */}
+        <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4 dark:border-gray-800 dark:bg-[#2A263D]">
+          <div className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            {t("statTotalSum")}
+          </div>
+          <div className="text-xl font-bold tabular-nums text-gray-800 sm:text-2xl dark:text-white">
+            {money(Number(data?.total_price ?? 0))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4 dark:border-gray-800 dark:bg-[#2A263D]">
+          <div className="text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            {t("statEscalated")}
+          </div>
+          <div
+            className={`text-xl font-bold tabular-nums sm:text-2xl ${
+              Number(data?.total_escalated ?? 0) > 0
+                ? "text-red-600 dark:text-red-400"
+                : "text-gray-800 dark:text-white"
+            }`}
+          >
+            {Number(data?.total_escalated ?? 0)}
           </div>
         </div>
       </div>
@@ -198,7 +226,12 @@ function AwaitingMarket() {
               <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
                 <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-sm font-semibold tabular-nums text-gray-700 dark:bg-gray-800 dark:text-gray-200">
                   <Package className="h-3.5 w-3.5" />
-                  {t("pcs", { count: m.parcel_count })}
+                  {t("parcelsCount", { count: m.parcel_count })}
+                </span>
+                <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                  {t("pcs", { count: m.item_count })}
+                  {m.district_count > 0 &&
+                    ` · ${t("districtsCount", { count: m.district_count })}`}
                 </span>
                 <span
                   className={`rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums ${returnAgeTone(m.oldest_age_days)}`}
@@ -206,6 +239,24 @@ function AwaitingMarket() {
                 >
                   {t("days", { count: m.oldest_age_days })}
                 </span>
+                {m.active_session && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                    title={t("activeSessionHint")}
+                  >
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                    {t("activeSession")}
+                  </span>
+                )}
+                {m.replacement_count > 0 && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                    title={t("replacementReturnsHint")}
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    {t("replacementReturns", { count: m.replacement_count })}
+                  </span>
+                )}
                 {m.escalated_count > 0 && (
                   <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
                     <AlertTriangle className="h-3 w-3" />
@@ -224,6 +275,21 @@ function AwaitingMarket() {
                 <span className="ml-auto text-sm font-semibold tabular-nums text-gray-800 dark:text-gray-200">
                   {money(m.total_price)}
                 </span>
+              </div>
+
+              {/* Aniq sana — market bilan gaplashganda dalil kerak. */}
+              <div
+                className="mt-2 flex items-center gap-1 text-xs tabular-nums text-gray-500 dark:text-gray-400"
+                title={t("oldestAgeHint")}
+              >
+                <Warehouse className="h-3 w-3 shrink-0" />
+                {formatMoment(m.oldest_center_received_at)}
+                {m.newest_center_received_at !==
+                  m.oldest_center_received_at && (
+                  <span title={t("newestReceivedHint")}>
+                    → {formatMoment(m.newest_center_received_at)}
+                  </span>
+                )}
               </div>
             </button>
           ))
@@ -252,6 +318,9 @@ function AwaitingMarket() {
                   {t("colPrice")}
                 </th>
                 <th className="whitespace-nowrap px-4 py-4 text-left text-sm font-semibold">
+                  {t("colReceived")}
+                </th>
+                <th className="min-w-[220px] px-4 py-4 text-left text-sm font-semibold">
                   {t("colStatus")}
                 </th>
                 <th className="w-10 px-4 py-4" />
@@ -262,7 +331,7 @@ function AwaitingMarket() {
                 [...Array(8)].map((_, i) => <TableRowSkeleton key={i} />)
               ) : markets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12">
+                  <td colSpan={8} className="py-12">
                     <Empty description={t("emptyQueue")} />
                   </td>
                 </tr>
@@ -284,6 +353,14 @@ function AwaitingMarket() {
                         <div className="min-w-0">
                           <span className="block truncate font-semibold text-gray-800 dark:text-white">
                             {m.market_name || "—"}
+                          </span>
+                          {/* Ism OSTIDA viloyatlar: admin «qaysi viloyatdan
+                              yig'ilib qolgan» ni shu yerdan ko'radi. */}
+                          <span
+                            className="block truncate text-xs text-gray-500 dark:text-gray-400"
+                            title={t("regionsHint")}
+                          >
+                            {m.regions || t("noRegion")}
                           </span>
                         </div>
                       </div>
@@ -307,10 +384,34 @@ function AwaitingMarket() {
                       )}
                     </td>
                     <td className="px-4 py-4 text-sm tabular-nums text-gray-700 dark:text-gray-200">
-                      {t("pcs", { count: m.parcel_count })}
+                      <div className="font-semibold">
+                        {t("parcelsCount", { count: m.parcel_count })}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {t("pcs", { count: m.item_count })}
+                        {m.district_count > 0 &&
+                          ` · ${t("districtsCount", { count: m.district_count })}`}
+                      </div>
                     </td>
                     <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-gray-800 dark:text-white">
                       {money(m.total_price)}
+                    </td>
+                    {/* Yosh yorlig'i «3 kun» deydi, LEKIN admin aniq sanani
+                        so'raydi (market bilan gaplashganda dalil kerak).
+                        Birinchi = eng keksa, ikkinchi = eng oxirgi. */}
+                    <td className="whitespace-nowrap px-4 py-4 text-sm tabular-nums text-gray-600 dark:text-gray-300">
+                      <div title={t("oldestAgeHint")}>
+                        {formatMoment(m.oldest_center_received_at)}
+                      </div>
+                      {m.newest_center_received_at !==
+                        m.oldest_center_received_at && (
+                        <div
+                          className="text-xs text-gray-500 dark:text-gray-400"
+                          title={t("newestReceivedHint")}
+                        >
+                          → {formatMoment(m.newest_center_received_at)}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -320,6 +421,26 @@ function AwaitingMarket() {
                         >
                           {t("days", { count: m.oldest_age_days })}
                         </span>
+                        {m.active_session && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                            title={t("activeSessionHint")}
+                          >
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                            {t("activeSession")}
+                          </span>
+                        )}
+                        {m.replacement_count > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                            title={t("replacementReturnsHint")}
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            {t("replacementReturns", {
+                              count: m.replacement_count,
+                            })}
+                          </span>
+                        )}
                         {m.escalated_count > 0 && (
                           <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
                             <AlertTriangle className="h-3 w-3" />

@@ -100,5 +100,15 @@
   "colScanStatus": "Skaner holati",
   "colIndex": "№",
   "colPhone": "Telefon",
-  "colAddress": "Viloyat / Tuman"
+  "colAddress": "Viloyat / Tuman",
+  "districtsCount": "{{count}} tuman",
+  "activeSession": "Topshirilyapti",
+  "activeSessionHint": "Bu marketda topshirish AYNI PAYTDA ochiq — ikkinchi xodim kutsin",
+  "replacementReturns": "{{count}} almashtirish",
+  "replacementReturnsHint": "Almashtirish qaytarishi: eski mahsulot marketga qaytadi",
+  "newestReceivedHint": "Oxirgi posilka markazga kelgan vaqt",
+  "regionsHint": "Posilkalar qaysi viloyatlardan kelgan",
+  "noRegion": "Viloyat belgilanmagan",
+  "statTotalSum": "Jami summa",
+  "statEscalated": "Eskalatsiya"
 }

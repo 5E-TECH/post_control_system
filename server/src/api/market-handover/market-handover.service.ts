@@ -13,6 +13,8 @@ import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity
 import { MarketReturnHandoverSessionEntity } from 'src/core/entity/market-return-handover-session.entity';
 import { OrderEntity } from 'src/core/entity/order.entity';
 import { UserEntity } from 'src/core/entity/users.entity';
+import { DistrictEntity } from 'src/core/entity/district.entity';
+import { RegionEntity } from 'src/core/entity/region.entity';
 import {
   CancelReturnStage,
   Order_status,
@@ -67,7 +69,13 @@ interface AwaitingMarketRow {
   parcel_count: number | string;
   total_price: number | string;
   oldest_center_received_at: number | string;
+  newest_center_received_at: number | string;
   escalated_count: number | string;
+  /** Posilkalar QAYSI viloyatlardan kelgan («Navoiy, Andijon»). */
+  regions: string | null;
+  district_count: number | string;
+  item_count: number | string;
+  replacement_count: number | string;
 }
 
 @Injectable()
@@ -895,6 +903,12 @@ export class MarketHandoverService {
     const qb = this.orderRepo
       .createQueryBuilder('o')
       .innerJoin(UserEntity, 'm', 'm.id = o.user_id')
+      // ⚠️ VILOYAT uchun: admin «qaysi viloyatlardan yig'ilib qolgan» ni
+      // bir ko'rishda ko'rishi kerak — tuman nomi yolg'iz holda noaniq.
+      // `leftJoin`: tumani o'chirilgan eski buyurtma qatordan TUSHIB
+      // qolmasligi uchun (innerJoin bo'lsa posilka sanoqdan chiqardi).
+      .leftJoin(DistrictEntity, 'd', 'd.id = o.district_id')
+      .leftJoin(RegionEntity, 'r', 'r.id = d.region_id')
       .where(awaitingMarketSql('o'))
       .select('o.user_id', 'market_id')
       .addSelect('m.name', 'market_name')
@@ -902,11 +916,24 @@ export class MarketHandoverService {
       .addSelect('m.cancel_handover_consent_required', 'consent_required')
       .addSelect('COUNT(*)::int', 'parcel_count')
       .addSelect('COALESCE(SUM(o.total_price), 0)::float8', 'total_price')
+      .addSelect('COALESCE(SUM(o.product_quantity), 0)::int', 'item_count')
       .addSelect('MIN(o.center_received_at)', 'oldest_center_received_at')
+      .addSelect('MAX(o.center_received_at)', 'newest_center_received_at')
       .addSelect(
         'COUNT(*) FILTER (WHERE o.handover_escalated_at IS NOT NULL)::int',
         'escalated_count',
       )
+      // Almashtirish qaytarishlari ALOHIDA sanaladi: ular uchun eski
+      // mahsulot marketga qaytadi va buxgalteriyada boshqacha yuriladi.
+      .addSelect(
+        'COUNT(*) FILTER (WHERE o.is_replacement_return = true)::int',
+        'replacement_count',
+      )
+      .addSelect(
+        "STRING_AGG(DISTINCT r.name, ', ' ORDER BY r.name)",
+        'regions',
+      )
+      .addSelect('COUNT(DISTINCT o.district_id)::int', 'district_count')
       .groupBy('o.user_id')
       .addGroupBy('m.name')
       .addGroupBy('m.phone_number')
@@ -942,24 +969,80 @@ export class MarketHandoverService {
         total_price: Number(r.total_price),
         oldest_center_received_at: oldest,
         oldest_age_days: Math.floor((now - oldest) / 86_400_000),
+        newest_center_received_at: Number(r.newest_center_received_at),
         escalated_count: Number(r.escalated_count),
+        regions: r.regions ?? null,
+        district_count: Number(r.district_count),
+        item_count: Number(r.item_count),
+        replacement_count: Number(r.replacement_count),
+        /** Shu market uchun topshirish AYNI PAYTDA ochiqmi (pastda to'ldiriladi). */
+        active_session: false,
       };
     });
 
-    // Umumiy hisob — alohida so'rovda (guruhlangan natijaning qatorlar soni).
-    const totalMarkets = await this.orderRepo
+    /**
+     * OCHIQ SESSIYA — ikki xodim bir marketni BIR PAYTDA topshirmasligi uchun.
+     *
+     * ⚠️ NEGA KERAK. Ruxsat 10 daqiqa amal qiladi va shu oynada ikkinchi
+     * xodim ayni marketni ochsa, posilkalar ikki manifestga tushib
+     * hisobot chalkashardi. Ro'yxatda «topshirilyapti» yorlig'i ko'rinsa
+     * ikkinchi xodim kutadi.
+     *
+     * Bitta so'rov — sahifadagi marketlar uchun (N+1 bo'lmaydi).
+     */
+    const marketIds = markets.map((m) => m.market_id);
+    if (marketIds.length) {
+      const open = await this.sessionRepo
+        .createQueryBuilder('s')
+        .select('DISTINCT s.market_id', 'market_id')
+        .where('s.market_id IN (:...ids)', { ids: marketIds })
+        .andWhere('s.status = :active', {
+          active: MarketHandoverSessionStatus.ACTIVE,
+        })
+        .andWhere('s.authorization_expires_at > :now', { now })
+        .getRawMany<{ market_id: string }>();
+      const openSet = new Set(open.map((o) => String(o.market_id)));
+      for (const m of markets) m.active_session = openSet.has(m.market_id);
+    }
+
+    /**
+     * UMUMIY XULOSA — BITTA agregat so'rov.
+     *
+     * ⚠️ TUZATILGAN NUQSON: `total_parcels` avval `markets.reduce(...)` bilan
+     * hisoblanardi, ya'ni FAQAT JORIY SAHIFADAN. Sahifada 50 market bo'lsa va
+     * navbatda 80 ta bo'lsa, «Jami posilka» plitkasi kam ko'rsatardi — admin
+     * omborda qancha posilka turganini NOTO'G'RI bilardi.
+     *
+     * ⚠️ Qidiruv filtri ATAYLAB QO'LLANMAYDI: plitkalar «omborda umuman
+     * nima turgani» ni ko'rsatadi, qidiruv esa faqat ro'yxatni toraytiradi
+     * (`total_markets` ham shu mantiqda ishlagan).
+     */
+    const totals = await this.orderRepo
       .createQueryBuilder('o')
       .where(awaitingMarketSql('o'))
-      .select('COUNT(DISTINCT o.user_id)::int', 'c')
-      .getRawOne<{ c: number }>();
+      .select('COUNT(DISTINCT o.user_id)::int', 'markets')
+      .addSelect('COUNT(*)::int', 'parcels')
+      .addSelect('COALESCE(SUM(o.total_price), 0)::float8', 'sum_price')
+      .addSelect(
+        'COUNT(*) FILTER (WHERE o.handover_escalated_at IS NOT NULL)::int',
+        'escalated',
+      )
+      .getRawOne<{
+        markets: number | string;
+        parcels: number | string;
+        sum_price: number | string;
+        escalated: number | string;
+      }>();
 
     return successRes(
       {
         markets,
         page,
         limit,
-        total_markets: Number(totalMarkets?.c ?? 0),
-        total_parcels: markets.reduce((s, m) => s + m.parcel_count, 0),
+        total_markets: Number(totals?.markets ?? 0),
+        total_parcels: Number(totals?.parcels ?? 0),
+        total_price: Number(totals?.sum_price ?? 0),
+        total_escalated: Number(totals?.escalated ?? 0),
       },
       200,
       'Market kutilmoqda',

@@ -100,5 +100,15 @@
   "colScanStatus": "Scan status",
   "colIndex": "#",
   "colPhone": "Phone",
-  "colAddress": "Region / District"
+  "colAddress": "Region / District",
+  "districtsCount": "{{count}} districts",
+  "activeSession": "Handover open",
+  "activeSessionHint": "A handover for this market is OPEN right now — a second staff member should wait",
+  "replacementReturns": "{{count}} replacement",
+  "replacementReturnsHint": "Replacement return: the old item goes back to the market",
+  "newestReceivedHint": "When the latest parcel arrived at the centre",
+  "regionsHint": "Which regions the parcels came from",
+  "noRegion": "No region set",
+  "statTotalSum": "Total amount",
+  "statEscalated": "Escalated"
 }

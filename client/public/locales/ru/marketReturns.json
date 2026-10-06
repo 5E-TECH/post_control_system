@@ -100,5 +100,15 @@
   "colScanStatus": "Статус сканирования",
   "colIndex": "№",
   "colPhone": "Телефон",
-  "colAddress": "Область / Район"
+  "colAddress": "Область / Район",
+  "districtsCount": "{{count}} р-н",
+  "activeSession": "Передаётся",
+  "activeSessionHint": "Передача по этому маркету СЕЙЧАС открыта — второму сотруднику подождать",
+  "replacementReturns": "{{count}} замена",
+  "replacementReturnsHint": "Возврат по замене: старый товар возвращается маркету",
+  "newestReceivedHint": "Когда последняя посылка поступила в центр",
+  "regionsHint": "Из каких областей поступили посылки",
+  "noRegion": "Область не указана",
+  "statTotalSum": "Общая сумма",
+  "statEscalated": "Эскалация"
 }
