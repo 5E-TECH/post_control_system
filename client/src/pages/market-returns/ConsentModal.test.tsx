@@ -395,3 +395,71 @@ describe("ConsentModal — server holati (bir martalik QR)", () => {
     expect(qrNode()).toBeTruthy();
   });
 });
+
+/**
+ * ⚠️ PRODUCTION NUQSONI (2026-10-06) — CHEKSIZ «YANGI QR» HALQASI.
+ *
+ * Sanoq hooki yangi sessiya uchun bir renderda ESKI 0 ni qaytarganda
+ * `expired` rost bo'lib, avto-yangilash DARHOL yangi ruxsat so'rardi;
+ * yangi sessiya kelardi → yana stale 0 → yana so'rov. Market ekranidagi
+ * QR bir renderdayoq eskirar, xodim esa doim «muddati tugagan» xatosini
+ * olardi.
+ *
+ * Hook tuzatildi, LEKIN modal ham mustaqil qo'riqlanadi: har yangi
+ * sessiya uchun birinchi baho o'tkazib yuboriladi.
+ */
+describe("ConsentModal — yangi sessiya darhol «tugagan» deb hisoblanmaydi", () => {
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.useRealTimers());
+
+  it("YANGI sessiya kelganda avto-yangilash CHAQIRILMAYDI", () => {
+    const onRegenerate = vi.fn();
+    const { rerender } = render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session({ session_id: "s-1", ttl_seconds: 120 })}
+        loading={false}
+        onRegenerate={onRegenerate}
+      />,
+    );
+    expect(onRegenerate).not.toHaveBeenCalled();
+
+    // Ketma-ket yangi sessiyalar — halqa aynan shu yerda tug'ilardi.
+    for (const id of ["s-2", "s-3", "s-4"]) {
+      rerender(
+        <ConsentModal
+          open
+          onClose={() => {}}
+          session={session({ session_id: id, ttl_seconds: 120 })}
+          loading={false}
+          onRegenerate={onRegenerate}
+        />,
+      );
+    }
+    expect(onRegenerate).not.toHaveBeenCalled();
+
+    // Sanoq ham to'g'ri: 02:00 ko'rinadi, 00:00 emas.
+    expect(screen.getByText("02:00")).toBeInTheDocument();
+  });
+
+  it("muddat HAQIQATAN tugagach bir marta yangilanadi", () => {
+    const onRegenerate = vi.fn();
+    render(
+      <ConsentModal
+        open
+        onClose={() => {}}
+        session={session({ session_id: "s-9", ttl_seconds: 2 })}
+        loading={false}
+        onRegenerate={onRegenerate}
+      />,
+    );
+    expect(onRegenerate).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    // Qo'riqlagich HAQIQIY muddat tugashini TO'SMAYDI.
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
+});
+

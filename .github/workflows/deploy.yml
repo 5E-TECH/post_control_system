@@ -282,6 +282,42 @@ jobs:
                 echo '    Tuzatish: sudo apt-get install -y ffmpeg'
               fi
 
+              # ----- 🧊 MUZLATILGAN BASELINE — O'SISH O'LCHOVI -----
+              #
+              # ⚠️ NEGA YUQORIDAGI TEKSHIRUVLAR YETARLI EMAS.
+              # --snapshot/--compare juftligi HAR DEPLOYDA baseline'ni
+              # QAYTA oladi, ya'ni faqat 'shu migratsiya buzdimi?' ga
+              # javob beradi. Ikki deploy ORASIDA to'plangan farq
+              # keyingi deployda yangi baseline bo'lib jimgina qabul
+              # qilinadi — 2026-10-06 da market hisob-kitobi aynan
+              # shunday 152/210 ga yetdi, darvoza esa har safar yashil
+              # chiqardi (va TO'G'RI chiqardi: o'sish migratsiyadan
+              # emas, kundalik ishdan).
+              #
+              # Muzlatilgan baseline bir marta yoziladi va keyin HECH
+              # QACHON qayta yozilmaydi, shuning uchun deploylar
+              # orasidagi o'sish ham ko'rinadi.
+              #
+              # ⚠️ KATALOG KUZATILMAYDI (.gitignore) — AYNAN SHU SABAB
+              # OMON QOLADI. 'git reset --hard' (139-satr) faqat
+              # kuzatiladigan fayllarni tiklaydi, kuzatilmaganlarga
+              # TEGMAYDI — 'server/dist' ham xuddi shu sabab deploylar
+              # orasida saqlanadi.
+              #
+              # ⚠️ Yo'l NISBIY va unda $ YO'Q: butun ssh bloki qo'sh
+              # tirnoq ichida, ya'ni 'dollar-qavs' runner'da bajarilib,
+              # SERVERNING emas, runner'ning qiymatini qo'yardi. Tilda
+              # (~) ham ishlatilmaydi — u '=' dan keyin har shellda
+              # kengaymaydi (dash/sh da o'z holicha qolardi).
+              #
+              # ⚠️ HALT QILMAYDI (|| true): bu o'lchov asbobi, darvoza
+              # emas. Tarixiy tafovut foydalanuvchi qarori bilan ataylab
+              # tuzatilmagan; tuzatish Yangi yilga rejalashtirilgan.
+              mkdir -p .baselines
+              echo '🧊 Muzlatilgan baseline bilan o.sish o.lchovi...'
+              npm run db:check-cashbox -- --freeze=.baselines/cb-frozen.json || true
+              npm run db:check-market-settlement -- --freeze=.baselines/ms-frozen.json || true
+
               # ----- 🔖 BUILD SHTAMPI (restart darvozasi uchun) -----
               #
               # Shtamp AYNAN SHU YERDA, barcha invariantlardan KEYIN

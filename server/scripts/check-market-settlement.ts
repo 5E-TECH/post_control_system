@@ -38,6 +38,7 @@
 import 'reflect-metadata';
 import * as fs from 'fs';
 import dataSource from '../src/data-source';
+import { compareFrozen } from './lib/frozen-baseline';
 
 interface DriftRow {
   market_id: string;
@@ -56,6 +57,13 @@ function parseArg(prefix: string): string | null {
 async function main() {
   const snapshotPath = parseArg('--snapshot=');
   const comparePath = parseArg('--compare=');
+  /**
+   * ⚠️ `--freeze` — QO'ZG'ALMAS tayanch nuqta (`--snapshot` dan FARQLI).
+   * `--snapshot` har deployda qayta yoziladi va deploylar ORASIDAGI
+   * o'sishni ko'rsatmaydi; `--freeze` bir marta yozilib, keyin faqat
+   * o'qiladi. Hech qachon halt qilmaydi.
+   */
+  const freezePath = parseArg('--freeze=');
 
   await dataSource.initialize();
   console.log('🔌 DB ulandi. Market hisob-kitob invarianti tekshirilmoqda...\n');
@@ -149,6 +157,17 @@ async function main() {
   console.log(`\n📊 Jami: ${rows.length} ta market, ${drifted.length} ta farqli.`);
 
   await dataSource.destroy();
+
+  // ── FREEZE — muzlatilgan baseline bilan o'lchov (halt QILMAYDI) ───
+  if (freezePath) {
+    compareFrozen(
+      freezePath,
+      'market hisob-kitobi',
+      rows.length,
+      drifted.map((r) => ({ id: r.market_id, diff: r.diff })),
+    );
+    process.exit(0);
+  }
 
   // ── SNAPSHOT — baseline yozib qo'yamiz, halt qilmaymiz ────────────
   if (snapshotPath) {
