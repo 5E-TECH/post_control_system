@@ -37,7 +37,10 @@ import {
 } from "../../../../../shared/api/hooks/useMarketHandover";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useManifestScanner } from "../../../../../shared/hooks/useManifestScanner";
-import { useMarketQrScanner } from "../../../../../shared/hooks/useMarketQrScanner";
+import {
+  MARKET_QR_PREFIX,
+  useMarketQrScanner,
+} from "../../../../../shared/hooks/useMarketQrScanner";
 import { formatPhone } from "../../../../../shared/helpers/formatPhone";
 import PinInput from "../../../../../shared/components/pin-input";
 import { normalizeQrToken } from "../../../../../shared/helpers/normalizeQrToken";
@@ -197,12 +200,42 @@ function HandoverSession() {
     const token = auth.authorization_token;
     const everyMs =
       Math.max(5, Number(auth.heartbeat_interval_seconds || 30)) * 1000;
+
+    /**
+     * ⚠️ BITTA XATO RUXSATNI O'LDIRMAYDI.
+     *
+     * Avval `onError: () => setAuth(null)` edi: BITTA o'tkinchi tarmoq
+     * uzilishi yoki 502 butun topshirishni bekor qilardi — xodim
+     * posilkalarni skanerlab bo'lib, «Topshirish» bosganda ruxsat
+     * yo'qligini bilardi va hammasini boshidan boshlashga majbur edi.
+     * Holbuki SERVER bunday emas: heartbeat 30 s da bir ketadi, server
+     * esa 60 s sabr qiladi, ya'ni bitta o'tkazib yuborilgan tik hali
+     * sessiyani yopmaydi. Klient serverdan QATTIQROQ bo'lishi mantiqsiz.
+     *
+     * Endi ikki holat AJRATILADI:
+     *   · 4xx (401/403/404) — server ANIQ «bu ruxsat yo'q» dedi →
+     *     darhol tozalanadi, aks holda xodim har bosishda xato olardi;
+     *   · tarmoq / 5xx — vaqtinchalik. Ketma-ket IKKI marta
+     *     muvaffaqiyatsiz bo'lsagina tozalanadi (≈60 s — serverning
+     *     o'z sabr oynasi bilan bir xil).
+     */
+    let consecutiveFailures = 0;
+
     const id = setInterval(() => {
       heartbeat.mutate(token, {
-        // Server ruxsatni yopgan bo'lsa ekranni DARHOL haqiqatga keltiramiz:
-        // aks holda xodim topshirayotgandek o'ylab turib har bosishda xato
-        // olardi.
-        onError: () => setAuth(null),
+        onSuccess: () => {
+          consecutiveFailures = 0;
+        },
+        onError: (err) => {
+          const status = (err as { response?: { status?: number } })?.response
+            ?.status;
+          const sessionGone =
+            status === 401 || status === 403 || status === 404;
+          consecutiveFailures += 1;
+          if (sessionGone || consecutiveFailures >= 2) {
+            setAuth(null);
+          }
+        },
       });
     }, everyMs);
     return () => clearInterval(id);
@@ -487,6 +520,16 @@ function HandoverSession() {
             <PinInput
               value={pin}
               onChange={setPin}
+              // Fokus PIN maydonida bo'lsa skaner belgilari shu yerga
+              // tushadi — ularni PIN deb yemasdan ruxsat ochishga
+              // yo'naltiramiz (aks holda har skan soxta PIN urinishi edi).
+              scannerPrefix={MARKET_QR_PREFIX}
+              onScannedToken={(raw) => {
+                const token = normalizeQrToken(raw);
+                if (token.startsWith(MARKET_QR_PREFIX)) {
+                  authorize({ qr_token: token });
+                }
+              }}
               // To'lgan zahoti yuboriladi; tugma faqat qayta urinish uchun.
               onComplete={(digits) => authorize({ pin: digits })}
               disabled={scan.isPending}

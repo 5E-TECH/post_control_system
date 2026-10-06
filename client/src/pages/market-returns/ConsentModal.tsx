@@ -53,6 +53,14 @@ const MIN_MODULE_PX = 5;
 const MAX_MODULE_PX = 10;
 /** QR standarti: chetda 4 modul bo'sh (oq) joy bo'lishi SHART. */
 const QUIET_ZONE_MODULES = 4;
+/**
+ * Mahalliy sanoq tugagach yangi QR so'rashdan OLDIN kutiladigan vaqt.
+ *
+ * Server holati 3 soniyada bir keladi (`getConsentStatus`), shuning uchun
+ * undan UZUNROQ: xodim oxirgi soniyalarda skanerlagan bo'lsa, holat
+ * `handover` ga o'tib ulguradi va yangi sessiya yaratilmaydi.
+ */
+const RENEW_GRACE_MS = 4_000;
 
 /**
  * MARKET RUXSATI — QR + PIN.
@@ -168,8 +176,26 @@ function ConsentModal({
     // daqiqalik oynasi tirik va ikkinchi QR market ekranida chalg'itardi.
     if (inHandover || closed) return;
     if (autoRenewed.current === session.session_id) return;
-    autoRenewed.current = session.session_id;
-    onRegenerate();
+
+    /**
+     * ⚠️ POLLING BILAN POYGA — KUTIB TURAMIZ.
+     *
+     * Mahalliy sanoq 0 ga yetgan payt xodim xuddi o'sha soniyalarda
+     * skanerlagan bo'lishi mumkin. Server holati esa 3 soniyada bir
+     * keladi, ya'ni `inHandover` hali `false`. Darhol yangilasak
+     * topshirish O'RTASIDA yangi sessiya yaratilardi: market ekranida
+     * yangi QR chiqib, `sameSession` buzilardi va «Xodim skanerladi»
+     * ekrani umuman ko'rinmasdi.
+     *
+     * Shuning uchun bir polling oraligidan UZUNROQ kutamiz. Shu vaqt
+     * ichida holat `handover` ga o'tsa effekt qayta ishga tushadi va
+     * cleanup taymerni BEKOR QILADI — yangi sessiya yaratilmaydi.
+     */
+    const timer = setTimeout(() => {
+      autoRenewed.current = session.session_id;
+      onRegenerate();
+    }, RENEW_GRACE_MS);
+    return () => clearTimeout(timer);
   }, [open, session, expired, inHandover, closed, onRegenerate]);
 
   const handleRegenerate = useCallback(() => {
