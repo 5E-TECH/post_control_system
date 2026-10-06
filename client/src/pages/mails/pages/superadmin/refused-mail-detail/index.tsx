@@ -502,7 +502,14 @@ const RefusedMailDetail = () => {
 
       {/* Mobile Fixed Action Button */}
       {!hideSend && selectedIds.length > 0 && (
-        <div className="sm:hidden fixed bottom-4 left-4 right-4 z-50">
+        /*
+          ⚠️ `bottom-4` EMAS. Mobil navigatsiya `fixed bottom-0 z-50` va
+          ~60px baland, DOM'da bu tugmadan KEYIN render bo'ladi — ya'ni
+          bir xil z-50 da nav USTIDA chiziladi va tugma telefonda
+          BOSILMASDI. Loyihadagi to'g'ri naqsh: `bottom-20` + yuqori
+          z-index (courier-bulk, AiFinanceChat).
+        */
+        <div className="sm:hidden fixed bottom-20 left-4 right-4 z-[60]">
           <button
             disabled={isPending}
             onClick={handleClick}

@@ -143,6 +143,14 @@ export class ExtraCostDecisionService {
         Order_status.PAID,
         Order_status.PARTLY_PAID,
         Order_status.CANCELLED,
+        // ⚠️ CANCELLED_SENT shu ro'yxatda YO'Q edi — bu HOZIRDAN buzuq:
+        // kuryer bekor qilgan posilkani qaytarish-pochtasiga topshirgach
+        // buyurtma CANCELLED_SENT bo'ladi va market uning qo'shimcha
+        // xarajatini TASDIQLAY OLMASDI (409 "holati o'zgargan"), avto-backstop
+        // ham jim yiqilardi. Oyna avval soatlar edi; ikki bosqichli
+        // topshirishda u market kelguncha — HAFTALARGA cho'ziladi. Ya'ni
+        // tuzatilmasa kuryerlar o'z haqqini olmay qolardi.
+        Order_status.CANCELLED_SENT,
         Order_status.CLOSED,
       ];
       if (!settledStatuses.includes(order.status)) {

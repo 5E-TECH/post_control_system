@@ -24,6 +24,7 @@ import { ExternalProxyModule } from './external-proxy/external-proxy.module';
 import { ExternalIntegrationModule } from './external-integration/external-integration.module';
 import { IntegrationSyncModule } from './integration-sync/integration-sync.module';
 import { ExtraCostModule } from './extra-cost/extra-cost.module';
+import { MarketHandoverModule } from './market-handover/market-handover.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
 import { LdgCargoModule } from './ldg-cargo/ldg-cargo.module';
 import { ElchiCargoModule } from './elchi-cargo/elchi-cargo.module';
@@ -87,6 +88,7 @@ import { AiUsageModule } from './ai-usage/ai-usage.module';
     ExternalIntegrationModule,
     IntegrationSyncModule,
     ExtraCostModule,
+    MarketHandoverModule,
     LdgCargoModule,
     ElchiCargoModule,
     MarketplaceModule,

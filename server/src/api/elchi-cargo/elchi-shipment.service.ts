@@ -579,6 +579,8 @@ export class ElchiShipmentService {
          * etiladigan token. Boshqa qiymat yuborilsa Elchi operatori
          * skanerlagan yorliq mos kelmasdi.
          */
+        // Operator izohi — Elchi kuryeri yetkazishda ko'radi (TzuuOKI3).
+        comment: String(order.comment ?? '').trim() || undefined,
         batch_ref: batchRef,
         batch_label_token: batchLabelToken,
         batch_size: batchSize,

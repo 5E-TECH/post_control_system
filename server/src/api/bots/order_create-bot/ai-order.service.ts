@@ -676,11 +676,13 @@ export class AiOrderService {
     const phone9 = (draft.phone_number || '').replace(/\D/g, '').slice(-9);
     if (phone9.length < 9) return; // to'liq 9 raqam bo'lsagina ishonchli qidiruv
 
+    // ⚠️ CLOSED olib tashlandi — u bekor qilinib marketga qaytarilgan
+    // posilka, mijozga yetkazilmagan. Almashtirish nomzodi bo'la olmaydi
+    // (order.service.ts dagi DELIVERED_STATUSES bilan ayni sabab).
     const DELIVERED = [
       Order_status.SOLD,
       Order_status.PAID,
       Order_status.PARTLY_PAID,
-      Order_status.CLOSED,
     ];
     const rows = await this.orderRepo
       .createQueryBuilder('o')

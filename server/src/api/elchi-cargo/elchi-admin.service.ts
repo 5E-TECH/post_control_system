@@ -619,6 +619,7 @@ export class ElchiAdminService {
     cod_sent: number;
     cod_collected: number;
     elchi_fee: number;
+    extra_cost: number;
     paid_by_elchi: number;
     debt: number;
     unreported_count: number;
@@ -641,9 +642,12 @@ export class ElchiAdminService {
           'collected',
         )
         .addSelect('COALESCE(SUM(s.elchi_fee_reported), 0)', 'fee')
+        // KURYER HAQQI (extra_cost) — qarzdan ayiriladi (ShM3oBjJ). Ayni
+        // qatorlar ustidan (collected+fee bor), null->0.
+        .addSelect('COALESCE(SUM(s.extra_cost_reported), 0)', 'extra')
         .where('s.collected_from_customer_reported IS NOT NULL')
         .andWhere('s.elchi_fee_reported IS NOT NULL')
-        .getRawOne<{ collected: string; fee: string }>(),
+        .getRawOne<{ collected: string; fee: string; extra: string }>(),
       this.paymentRepo
         .createQueryBuilder('p')
         .select('COALESCE(SUM(p.amount), 0)', 'sum')
@@ -661,18 +665,22 @@ export class ElchiAdminService {
     const codSent = Number(sent?.sum ?? 0);
     const codCollected = Number(reported?.collected ?? 0);
     const elchiFee = Number(reported?.fee ?? 0);
+    const extraCost = Number(reported?.extra ?? 0);
     const paidByElchi = Number(paid?.sum ?? 0);
 
     return {
       cod_sent: codSent,
       cod_collected: codCollected,
       elchi_fee: elchiFee,
+      extra_cost: extraCost,
       paid_by_elchi: paidByElchi,
       /**
-       * Elchi yig'gan, o'z tarifini ushlab qolgan, qolganini bizga berishi
-       * kerak — shundan allaqachon to'lagani ayiriladi.
+       * Elchi yig'gan, o'z TARIFINI (elchi_fee) va KURYER HAQQINI (extra_cost)
+       * ushlab qoladi, qolganini bizga berishi kerak — shundan allaqachon
+       * to'lagani ayiriladi. extra_cost asosiy kassaga tegmaydi, marketdan
+       * kuryerga ketadi, shu sabab qarzni KAMAYTIRADI (ShM3oBjJ).
        */
-      debt: codCollected - elchiFee - paidByElchi,
+      debt: codCollected - elchiFee - extraCost - paidByElchi,
       unreported_count: Number(unreported?.cnt ?? 0),
     };
   }

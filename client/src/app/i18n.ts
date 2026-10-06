@@ -28,6 +28,11 @@ i18n
   // for all options read: https://www.i18next.com/overview/configuration-options
   .init({
     fallbackLng: "uz",
+    // ⚠️ Brauzer "ru-RU" / "en-US" kabi region kodini beradi, backend esa
+    // faqat /locales/ru/… ni biladi — `languageOnly` bo'lmasa har namespace
+    // uchun 404 ketadi va tarjima kechikib yuklanadi.
+    supportedLngs: ["uz", "ru", "en"],
+    load: "languageOnly",
     debug: false,
     fallbackNS: ["header", "sidebar", "dashboard", "history", "login"],
     backend: {

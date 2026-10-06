@@ -11,6 +11,7 @@ import {
   Calendar1,
   Settings,
   Megaphone,
+  Warehouse,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -29,12 +30,17 @@ const Sidebar = () => {
       label: t("new_orders"),
     },
     { to: "/mails", icon: <MailOpen />, label: t("mails") },
+    {
+      to: "/awaiting-market",
+      icon: <Warehouse />,
+      label: t("awaiting_market"),
+    },
     { to: "/products", icon: <Apple />, label: t("products") },
     { to: "/all-users", icon: <UserRound />, label: t("users") },
     { to: "/payments", icon: <CreditCard />, label: t("payments") },
     { to: "/m-balance", icon: <Scale />, label: t("balance") },
     { to: "/regions", icon: <MapPinned />, label: t("region") },
-    { to: "/send-message", icon: <Megaphone />, label: "Bildirishnomalar" },
+    { to: "/send-message", icon: <Megaphone />, label: t("notifications") },
     { to: "/settings", icon: <Settings />, label: t("settings") },
   ];
 

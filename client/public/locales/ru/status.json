@@ -1,12 +1,21 @@
- {
-    "new": "Новый",
-    "received": "Получен",
-    "on the road": "В пути",
-    "waiting": "Ожидает",
-    "sold": "Продан",
-    "cancelled": "Отменён",
-    "paid": "Оплачен",
-    "partly_paid": "Частично оплачен",
-    "cancelled_sent": "Отменён (отправлен)",
-    "closed": "Закрыт"
-  }
+{
+  "new": "Новый",
+  "received": "Получен",
+  "on the road": "В пути",
+  "waiting": "Ожидает",
+  "sold": "Продан",
+  "cancelled": "Отменён",
+  "paid": "Оплачен",
+  "partly_paid": "Частично оплачен",
+  "cancelled_sent": "Отменён (отправлен)",
+  "closed": "Закрыт",
+  "created": "Создан",
+  "cancelled (sent)": "Отменён (в пути назад)",
+  "returned_to_market": "Выдан магазину",
+  "returnStageCourier": "У курьера",
+  "returnStageCenter": "В центре",
+  "returnStageMarket": "Выдан магазину",
+  "returnStageCourierHint": "Отменён — курьер везёт в центр",
+  "returnStageCenterHint": "Принят от курьера и находится в центре — ожидается, что магазин заберёт",
+  "returnStageMarketHint": "Выдан владельцу по разрешению магазина — цепочка закрыта"
+}

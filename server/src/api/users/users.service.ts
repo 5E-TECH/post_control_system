@@ -70,6 +70,7 @@ import { CreateMarketDto } from './dto/create-market.dto';
 import { generateCustomToken } from 'src/infrastructure/lib/qr-token/qr.token';
 import { TelegramEntity } from 'src/core/entity/telegram-market.entity';
 import { Group_type } from 'src/common/enums';
+import { cancelReturnStage } from 'src/common/utils/cancel-return.util';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { DistrictEntity } from 'src/core/entity/district.entity';
 import { DistrictRepository } from 'src/core/repository/district.repository';
@@ -3362,19 +3363,33 @@ export class UserService implements OnModuleInit {
       });
 
       const total = orders.length;
+      /**
+       * ⚠️ `closed` SOTILGAN BUKETIDAN OLIB TASHLANDI (hisobot tuzatishi).
+       *
+       * `closed` buyurtma bekor-qaytarish oqimidan keladi: mijoz olmadi,
+       * posilka marketga qaytarildi. U HECH QACHON sotilgan bo'lmaydi.
+       * Avval u `sold` buketida ham, `total_revenue` da ham sanalardi —
+       * ya'ni operator "muvaffaqiyat foizi" va daromadi SHISHIRILGAN edi.
+       * Ikki bosqichli topshirishda `closed` ning ma'nosi "marketga
+       * topshirildi" ga toraydi, ya'ni uni sotuv deb sanash yanada bema'ni.
+       *
+       * ⚠️ Shu sabab tuzatishdan keyin operator raqamlari PASAYADI — bu
+       * regressiya emas, haqiqatning tiklanishi.
+       */
       const sold = orders.filter((o) =>
-        ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status),
+        ['sold', 'paid', 'partly_paid'].includes(o.status),
       ).length;
+      // Bekor zanjirining BARCHA bosqichi bekor deb sanaladi: kuryerda
+      // (`cancelled`), qaytish yo'lida/markazda (`cancelled (sent)`) va
+      // marketga topshirilgan (`closed`).
       const cancelled = orders.filter((o) =>
-        ['cancelled', 'cancelled (sent)'].includes(o.status),
+        ['cancelled', 'cancelled (sent)', 'closed'].includes(o.status),
       ).length;
       const pending = total - sold - cancelled;
       const success_rate = total > 0 ? Math.round((sold / total) * 100) : 0;
 
       const total_revenue = orders
-        .filter((o) =>
-          ['sold', 'paid', 'partly_paid', 'closed'].includes(o.status),
-        )
+        .filter((o) => ['sold', 'paid', 'partly_paid'].includes(o.status))
         .reduce((sum, o) => sum + Number(o.total_price || 0), 0);
 
       return successRes(
@@ -3837,22 +3852,27 @@ export class UserService implements OnModuleInit {
             });
           }
 
+          // ⚠️ CLOSED bekor zanjirining OXIRI ("marketga topshirildi"),
+          // sotuv emas — shuning uchun `isCancelled` ga ko'chirildi.
           const isCancelled = [
             Order_status.CANCELLED,
             Order_status.CANCELLED_SENT,
+            Order_status.CLOSED,
           ].includes(order.status);
 
           const isSold = [
             Order_status.SOLD,
             Order_status.PAID,
             Order_status.PARTLY_PAID,
-            Order_status.CLOSED,
           ].includes(order.status);
 
           return {
             id: order.id,
             total_price: order.total_price,
             status: order.status,
+            // Bekor qaytarish bosqichi (hosila): kuryerda / markazda / marketda.
+            // Market `cancelled (sent)` ni ko'rib "qayerda?" deb qolmasin.
+            return_stage: cancelReturnStage(order),
             product_quantity: order.product_quantity,
             where_deliver: order.where_deliver,
             comment: order.comment,
@@ -3915,15 +3935,25 @@ export class UserService implements OnModuleInit {
         select: ['id', 'status', 'operator_accepted_at'],
       });
 
+      /**
+       * ⚠️ CLOSED SOTUV EMAS — `isCancelled` (3857) bilan AYNI qoida.
+       *
+       * Ayni javob ichida qarama-qarshilik bor edi: qator darajasida
+       * CLOSED buyurtma «bekor qilingan» deb belgilanardi (3855-3860),
+       * xulosa plitkasida esa «sotilgan» deb sanalardi. Operator bitta
+       * ekranda ikki xil raqam ko'rib, qaysi biri to'g'ri ekanini
+       * bilmasdi. CLOSED — bekor zanjirining OXIRI («marketga
+       * topshirildi»), ya'ni sotuv EMAS.
+       */
       const soldStatuses = [
         Order_status.SOLD,
         Order_status.PAID,
         Order_status.PARTLY_PAID,
-        Order_status.CLOSED,
       ];
       const cancelStatuses = [
         Order_status.CANCELLED,
         Order_status.CANCELLED_SENT,
+        Order_status.CLOSED,
       ];
 
       const stats = {

@@ -8,6 +8,11 @@ import QRCode from "react-qr-code";
 import { useTranslation } from "react-i18next";
 import { useGlobalScanner } from "../../../../../shared/components/global-scanner";
 import { InputNumber, Modal } from "antd";
+import {
+  formatMoment,
+  resolveReturnStage,
+  returnStageBadge,
+} from "../../../../../shared/lib/returnStage";
 import { useApiNotification } from "../../../../../shared/hooks/useApiNotification";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
@@ -126,6 +131,9 @@ const OrderDetails = () => {
   const token = data?.data?.qr_code_token;
   const status = data?.data?.status;
   const statusStyle = statusConfig[status] || statusConfig.new;
+  /** Bekor qaytarish bosqichi — kuryerda / markazda / marketga topshirildi. */
+  const returnStage = returnStageBadge(resolveReturnStage(data?.data));
+  const stageKind = resolveReturnStage(data?.data);
 
   const { role, id: userId } = useSelector((state: RootState) => state.roleSlice);
   const currentRole = role || localStorage.getItem("role");
@@ -313,12 +321,24 @@ const OrderDetails = () => {
 
             <div className="flex items-center gap-3">
               {/* Status Badge */}
-              <span
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${statusStyle.bg} ${statusStyle.text} ${statusStyle.darkBg} ${statusStyle.darkText}`}
-              >
-                <span>{statusStyle.icon}</span>
-                {st(`${status}`)}
-              </span>
+              {/* ⚠️ Bekor-qaytarish zanjirida XOM status yarim haqiqat
+                  (`cancelled (sent)` = "yo'lda"), shuning uchun bosqich
+                  yorlig'i ko'rsatiladi. Dalili pastdagi kartada. */}
+              {returnStage ? (
+                <span
+                  title={st(returnStage.titleKey)}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium ${returnStage.tone}`}
+                >
+                  {st(returnStage.labelKey)}
+                </span>
+              ) : (
+                <span
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${statusStyle.bg} ${statusStyle.text} ${statusStyle.darkBg} ${statusStyle.darkText}`}
+                >
+                  <span>{statusStyle.icon}</span>
+                  {st(`${status}`)}
+                </span>
+              )}
 
               {/* Rollback Button */}
               {canRollback && (
@@ -373,6 +393,61 @@ const OrderDetails = () => {
             </div>
           </div>
         </div>
+
+        {/*
+          BEKOR QAYTARISH DALILI — «kuryerdan olganimizni qayerdan bilamiz?»
+          degan savolning javobi aynan shu karta. Status o'zgarmagani uchun
+          (`cancelled (sent)` qoladi) qabul va topshirish faktlari ALOHIDA
+          ustunlarda saqlanadi — kim, qachon, qanday ruxsat bilan.
+        */}
+        {stageKind && (
+          <div className="mb-6 rounded-2xl border border-sky-100 bg-sky-50/60 p-4 dark:border-sky-900/30 dark:bg-sky-900/10">
+            <p className="mb-3 text-sm font-bold text-sky-900 dark:text-sky-200">
+              Bekor qaytarish zanjiri
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <p className="m-0 text-[11px] uppercase tracking-wider text-gray-500">
+                  1. Kuryer bekor qildi
+                </p>
+                <p className="m-0 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  {formatMoment(data?.data?.cancelled_at)}
+                </p>
+              </div>
+              <div>
+                <p className="m-0 text-[11px] uppercase tracking-wider text-gray-500">
+                  2. Viloyatdan markazga qabul qilindi
+                </p>
+                <p className="m-0 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  {data?.data?.center_received_at
+                    ? formatMoment(data.data.center_received_at)
+                    : "Hali qabul qilinmadi"}
+                </p>
+              </div>
+              <div>
+                <p className="m-0 text-[11px] uppercase tracking-wider text-gray-500">
+                  3. Marketga topshirildi
+                </p>
+                <p className="m-0 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  {data?.data?.market_handover_at
+                    ? formatMoment(data.data.market_handover_at)
+                    : "Market ruxsati kutilmoqda"}
+                </p>
+                {data?.data?.market_handover_mode && (
+                  <p className="m-0 text-xs text-gray-500">
+                    {data.data.market_handover_mode === "market_web"
+                      ? "Market QR/PIN ruxsati bilan"
+                      : data.data.market_handover_mode === "offline_signed"
+                        ? "Offline akt bilan (vakil imzosi)"
+                        : data.data.market_handover_mode === "admin_override"
+                          ? "Admin qarori bilan"
+                          : data.data.market_handover_mode}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Almashtirish (kafolat-swap) ma'lumoti + eski/yangi buyurtmaga havola */}
         {(data?.data?.replacement_of_order_id ||

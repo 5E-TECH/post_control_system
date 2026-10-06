@@ -363,8 +363,20 @@ export class ElchiReconcileService {
     }
 
     if (outcome.note && /nomuvofiq/i.test(outcome.message)) return 'mismatch';
-    if (outcome.status === 'success') return 'applied';
-    return 'unchanged';
+
+    /**
+     * ⚠️ YOLG'ON 'unchanged' YO'Q (JdOAAthq).
+     *
+     * Bu yergacha yetdik — demak yuqoridagi erta-return (status TENG VA pul
+     * backfill YO'Q) shartidan O'TDIK, ya'ni status O'ZGARDI yoki pul
+     * maydonlari backfill qilindi. `applyStatusUpdate` posilkani DB'ga
+     * saqladi (status/pul). Terminal amal `skipped` bo'lsa ham (masalan
+     * `sold→paid`da buyurtma allaqachon SOLD → markDeliveredByElchi skip),
+     * REAL o'zgarish bo'lgan — shuni 'applied' deb qaytaramiz. Ilgari bu
+     * yerda `outcome.status !== 'success'` bo'lsa 'unchanged' qaytarilardi va
+     * reconcile "hech narsa o'zgarmadi" deb yolg'on hisobot berardi.
+     */
+    return 'applied';
   }
 
   /**

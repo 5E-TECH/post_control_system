@@ -81,18 +81,13 @@
     "investor_payout": "Investor payout",
     "investor_refund": "Investment refund"
   },
-
   "tuman": "District",
-
   "telefon_nomer": "Phone number",
-
   "delivery": {
     "center": "center",
     "address": "address"
   },
-
   "sotuv": "selling",
-
   "button": {
     "export": "Export to Excel",
     "openShift": "Open Shift",
@@ -145,5 +140,7 @@
     "notStartedWarning": "You need to start a shift before making any cashbox transactions. All operations will be recorded after the shift starts.",
     "opening": "Opening...",
     "startAndContinue": "Start Shift"
-  }
+  },
+  "karta": "Card",
+  "kartalar": "Cards"
 }

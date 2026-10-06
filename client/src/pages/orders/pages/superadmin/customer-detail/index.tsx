@@ -35,6 +35,8 @@ import { useSelector } from "react-redux";
 import type { RootState } from "../../../../../app/store";
 import Popup from "../../../../../shared/ui/Popup";
 import dayjs from "dayjs";
+import { returnStageDisplay } from "../../../../../shared/lib/returnStage";
+import { useTranslation } from "react-i18next";
 
 // Status configuration
 const statusConfig: Record<
@@ -148,6 +150,7 @@ interface OrderHistoryItem {
 }
 
 const CustomerDetail = () => {
+  const { t: st } = useTranslation("status");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -730,7 +733,13 @@ const CustomerDetail = () => {
                                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${status.bg} ${status.text} ${status.darkBg} ${status.darkText}`}
                                 >
                                   <StatusIcon className="w-3.5 h-3.5" />
-                                  {statusLabels[order.status] || order.status}
+                                  {(() => {
+                                    const sg = returnStageDisplay(order);
+                                    return sg
+                                      ? st(sg.labelKey)
+                                      : (statusLabels[order.status] ??
+                                        order.status);
+                                  })()}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                                   <Calendar className="w-3.5 h-3.5" />

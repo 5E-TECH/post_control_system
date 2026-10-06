@@ -1,6 +1,8 @@
 import { Button } from "antd";
+import { returnStageDisplay } from "../../../../shared/lib/returnStage";
 import { AlertCircle } from "lucide-react";
 import { memo, type FC } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   data: any[];
@@ -20,6 +22,7 @@ const statusColors: Record<string, string> = {
 };
 
 const OrderTableComp: FC<Props> = ({ data }) => {
+  const { t: st } = useTranslation("status");
   return (
     <div>
       <table className="w-full">
@@ -101,13 +104,29 @@ const OrderTableComp: FC<Props> = ({ data }) => {
                 {item?.market?.name}
               </td>
               <td className="pl-10">
-                <span
-                  className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
-                    statusColors[item.status] || "bg-slate-400"
-                  }`}
-                >
-                  {item.status.toUpperCase()}
-                </span>
+                {/* ⚠️ Bekor-qaytarish zanjirida XOM status yarim haqiqat:
+                    `cancelled (sent)` "yo'lda" degan ma'noni beradi, holbuki
+                    posilka markazda bo'lishi mumkin. Kuryer o'z posilkasining
+                    markazga yetib kelganini SHU yorliqdan ko'radi. */}
+                {(() => {
+                  const stage = returnStageDisplay(item);
+                  return stage ? (
+                    <span
+                      title={st(stage.titleKey)}
+                      className={`rounded-2xl px-3 py-2 text-[13px] font-semibold ${stage.tone}`}
+                    >
+                      {st(stage.labelKey)}
+                    </span>
+                  ) : (
+                    <span
+                      className={`py-2 px-3 rounded-2xl text-[13px] text-white ${
+                        statusColors[item.status] || "bg-slate-400"
+                      }`}
+                    >
+                      {item.status.toUpperCase()}
+                    </span>
+                  );
+                })()}
               </td>
               <td className="pl-10 text-[#2E263DB2] text-[15px] dark:text-[#d5d1eb]">
                 {new Intl.NumberFormat("uz-UZ").format(item?.total_price)}

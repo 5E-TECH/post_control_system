@@ -13,6 +13,7 @@ import {
   Repeat,
   Megaphone,
   ScanLine,
+  Warehouse,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
 import { useTranslation } from "react-i18next";
@@ -32,21 +33,26 @@ const AdminSidebar = () => {
     },
     { to: "/mails", icon: <MailOpen />, label: t("mails") },
     {
+      to: "/awaiting-market",
+      icon: <Warehouse />,
+      label: t("awaiting_market"),
+    },
+    {
       to: "/replacement-returns",
       icon: <Repeat />,
-      label: "Almashtirishlar",
+      label: t("replacements"),
     },
     {
       to: "/marketplace-intake",
       icon: <ScanLine />,
-      label: "Marketplace qabuli",
+      label: t("marketplace_intake"),
     },
     { to: "/products", icon: <Apple />, label: t("products") },
     { to: "/all-users", icon: <UserRound />, label: t("users") },
     { to: "/payments", icon: <CreditCard />, label: t("payments") },
     { to: "/m-balance", icon: <Scale />, label: t("balance") },
     { to: "/regions", icon: <MapPinned />, label: t("region") },
-    { to: "/send-message", icon: <Megaphone />, label: "Bildirishnomalar" },
+    { to: "/send-message", icon: <Megaphone />, label: t("notifications") },
     { to: "/settings", icon: <Settings />, label: t("settings") },
   ];
   const sidebarRedux = useSelector((state: RootState) => state.sidebar);

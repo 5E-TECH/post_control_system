@@ -87,4 +87,34 @@ describe('applyStatusUpdate — rollback pul snapshoti', () => {
     const last = saved[saved.length - 1];
     expect(last.collected_from_customer_reported).toBe('0.00');
   });
+
+  it('occurred_at berilsa -> elchi_status_changed_at shu vaqtga yoziladi (jyU65k8v)', async () => {
+    const { svc, saved } = buildSvc(shipment());
+    const ts = '2026-09-20T10:00:00.000Z';
+    await svc.applyStatusUpdate(CFG, {
+      event: 'shipment.status_changed',
+      external_order_id: UUID,
+      shipment_id: '40',
+      status: 'waiting',
+      occurred_at: ts,
+    });
+    const last = saved[saved.length - 1];
+    expect(last.elchi_status_changed_at).toBe(Date.parse(ts));
+  });
+
+  it('occurred_at kelajakda -> rad etiladi (hozirgi vaqt ishlatiladi)', async () => {
+    const { svc, saved } = buildSvc(shipment());
+    const future = new Date(Date.now() + 3600_000).toISOString();
+    const before = Date.now();
+    await svc.applyStatusUpdate(CFG, {
+      event: 'shipment.status_changed',
+      external_order_id: UUID,
+      shipment_id: '40',
+      status: 'waiting',
+      occurred_at: future,
+    });
+    const last = saved[saved.length - 1];
+    expect(last.elchi_status_changed_at).toBeGreaterThanOrEqual(before);
+    expect(last.elchi_status_changed_at).toBeLessThan(Date.parse(future));
+  });
 });
