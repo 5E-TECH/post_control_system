@@ -124,5 +124,22 @@
   "colProduct": "Mahsulot",
   "productsHint": "Qaysi mahsulot bekor qilinib markazda turibdi",
   "moreProducts": "+{{count}} ta",
-  "noProductName": "Nomi ko'rsatilmagan"
+  "noProductName": "Nomi ko'rsatilmagan",
+  "tabAwaiting": "Markazda kutilmoqda",
+  "tabHistory": "Men olganlarim",
+  "historyTitle": "Topshirilgan qaytarishlar",
+  "historySubtitle": "Partiya bo'yicha — market omborga bir kelib hammasini birga oladi",
+  "emptyHistory": "Hozircha topshirilgan qaytarish yo'q",
+  "emptyHistoryHint": "Posilkalar topshirilgach bu yerda partiya bo'lib ko'rinadi",
+  "channelWeb": "Market QR'i bilan",
+  "channelOffline": "Offline akt",
+  "batchStaff": "Topshirgan xodim",
+  "handedAt": "Topshirilgan vaqt",
+  "batchDetailTitle": "Partiya tarkibi",
+  "backToHistory": "Orqaga",
+  "filterFrom": "Boshlanish sanasi",
+  "filterTo": "Tugash sanasi",
+  "filterReset": "Tozalash",
+  "searchBatches": "Market nomi yoki buyurtma raqami",
+  "batchOf": "{{count}} ta posilka shu partiyada"
 }

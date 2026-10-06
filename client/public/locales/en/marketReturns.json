@@ -124,5 +124,22 @@
   "colProduct": "Product",
   "productsHint": "Which product was cancelled and is at the centre",
   "moreProducts": "+{{count}}",
-  "noProductName": "Name not set"
+  "noProductName": "Name not set",
+  "tabAwaiting": "Awaiting at centre",
+  "tabHistory": "What I collected",
+  "historyTitle": "Handed-over returns",
+  "historySubtitle": "By batch — the market comes once and takes everything together",
+  "emptyHistory": "No handed-over returns yet",
+  "emptyHistoryHint": "Once parcels are handed over they appear here as batches",
+  "channelWeb": "By market QR",
+  "channelOffline": "Offline act",
+  "batchStaff": "Handed over by",
+  "handedAt": "Handed over at",
+  "batchDetailTitle": "Batch contents",
+  "backToHistory": "Back",
+  "filterFrom": "From date",
+  "filterTo": "To date",
+  "filterReset": "Reset",
+  "searchBatches": "Market name or order number",
+  "batchOf": "{{count}} parcels in this batch"
 }

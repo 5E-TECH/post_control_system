@@ -27,6 +27,7 @@ import {
 } from "../../shared/lib/returnStage";
 import ReplacementBadge from "../../shared/components/replacement-badge";
 import ConsentModal from "./ConsentModal";
+import BatchList from "../handovers/BatchList";
 
 const PAGE_SIZE = 20;
 
@@ -80,6 +81,14 @@ function MarketReturns() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 400);
   const [modalOpen, setModalOpen] = useState(false);
+  /**
+   * TAB: markazda kutayotganlar yoki MEN OLGANLARIM.
+   *
+   * ⚠️ Alohida sahifa EMAS, tab: market uchun bu ikkisi BITTA ish —
+   * «nima kutyapti» va «nima oldim». Ikki menyu bandi qo'shsak
+   * telefonda (7 ta ikonka) joy yetmasdi.
+   */
+  const [tab, setTab] = useState<"awaiting" | "history">("awaiting");
   const [session, setSession] = useState<ConsentSession | null>(null);
 
   const { getMyReturns, getMyReturnCounts, getConsentStatus, createConsent } =
@@ -156,6 +165,33 @@ function MarketReturns() {
         </div>
       </div>
 
+      {/* ─────── Tablar ─────── */}
+      <div className="mb-4 flex gap-1 rounded-xl bg-gray-100 p-1 dark:bg-[#2A263D]">
+        {(["awaiting", "history"] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+              tab === key
+                ? "bg-white text-purple-700 shadow-sm dark:bg-[#3d3759] dark:text-purple-300"
+                : "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+            }`}
+          >
+            {key === "awaiting" ? t("tabAwaiting") : t("tabHistory")}
+            {key === "awaiting" && awaiting > 0 && (
+              <span className="ml-1.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                {awaiting}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {tab === "history" ? (
+        <BatchList mode="market" />
+      ) : (
+      <>
       {/*
         ASOSIY AMAL — telefonda BUTUN KENGLIKDA va yuqorida.
         ⚠️ Market shu tugmani bosib QR'ni xodimga ko'rsatadi; u ro'yxatning
@@ -551,6 +587,9 @@ function MarketReturns() {
             className="[&_.ant-pagination-item-active]:border-purple-600 [&_.ant-pagination-item-active]:bg-purple-600 [&_.ant-pagination-item-active_a]:text-white"
           />
         </div>
+      )}
+
+      </>
       )}
 
       <ConsentModal

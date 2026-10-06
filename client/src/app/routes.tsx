@@ -143,6 +143,10 @@ const AwaitingMarket = lazy(
 const HandoverSession = lazy(
   () => import("../pages/mails/pages/superadmin/awaiting-market/HandoverSession"),
 );
+const Handovers = lazy(() => import("../pages/handovers"));
+const HandoverBatchDetail = lazy(
+  () => import("../pages/handovers/BatchDetail"),
+);
 const CourierExtraCost = lazy(
   () => import("../pages/extra-cost-requests/courier"),
 );
@@ -368,6 +372,38 @@ const AppRouters = () => {
                   roles={["superadmin", "admin", "registrator", "logist"]}
                 >
                   <AwaitingMarket />
+                </RequireRole>
+              ),
+            },
+            // Topshirilganlar TARIXI — «Market kutilmoqda» juftligi.
+            // Yo'l `mails/*` dan TASHQARIDA: `SidebarLink` prefiks
+            // bo'yicha mos keladi va ikki menyu birga yonib qolardi.
+            {
+              path: "handovers",
+              element: (
+                <RequireRole
+                  roles={["superadmin", "admin", "registrator", "logist"]}
+                >
+                  <Handovers />
+                </RequireRole>
+              ),
+            },
+            {
+              // Market ham o'z partiyasini ochadi — ruxsat SERVERDA
+              // (`market_id` tokendan), bu yerda faqat ko'rinish.
+              path: "handovers/:sessionId",
+              element: (
+                <RequireRole
+                  roles={[
+                    "superadmin",
+                    "admin",
+                    "registrator",
+                    "logist",
+                    "market",
+                    "operator",
+                  ]}
+                >
+                  <HandoverBatchDetail />
                 </RequireRole>
               ),
             },

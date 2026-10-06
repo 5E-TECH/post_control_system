@@ -6,6 +6,7 @@ import {
   Calendar1,
   Apple,
   ScanLine,
+  PackageCheck,
   Warehouse,
 } from "lucide-react";
 import SidebarLink from "./SidebarLink";
@@ -30,6 +31,11 @@ const RegistratorSidebar = () => {
       to: "/awaiting-market",
       icon: <Warehouse />,
       label: t("awaiting_market"),
+    },
+    {
+      to: "/handovers",
+      icon: <PackageCheck />,
+      label: t("handovers"),
     },
     { to: "/products", icon: <Apple />, label: t("products") },
   ];

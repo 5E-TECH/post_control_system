@@ -124,5 +124,22 @@
   "colProduct": "Товар",
   "productsHint": "Какой товар отменён и лежит в центре",
   "moreProducts": "+{{count}}",
-  "noProductName": "Название не указано"
+  "noProductName": "Название не указано",
+  "tabAwaiting": "Ожидают в центре",
+  "tabHistory": "Мои получения",
+  "historyTitle": "Переданные возвраты",
+  "historySubtitle": "По партиям — маркет приезжает раз и забирает всё сразу",
+  "emptyHistory": "Переданных возвратов пока нет",
+  "emptyHistoryHint": "После передачи посылки появятся здесь партиями",
+  "channelWeb": "По QR маркета",
+  "channelOffline": "Офлайн-акт",
+  "batchStaff": "Передал сотрудник",
+  "handedAt": "Время передачи",
+  "batchDetailTitle": "Состав партии",
+  "backToHistory": "Назад",
+  "filterFrom": "Дата начала",
+  "filterTo": "Дата окончания",
+  "filterReset": "Сбросить",
+  "searchBatches": "Название маркета или номер заказа",
+  "batchOf": "{{count}} посылок в этой партии"
 }
