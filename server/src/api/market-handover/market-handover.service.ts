@@ -427,6 +427,32 @@ export class MarketHandoverService {
       if (!session) {
         throw new NotFoundException('Ruxsat topilmadi yoki yangilangan');
       }
+
+      /**
+       * ⚠️ QR SAHIFADAGI MARKETGA TEGISHLI BO'LISHI SHART — VA BU
+       * TEKSHIRUV ISTE'MOLDAN OLDIN TURADI.
+       *
+       * NOSOZLIK: omborda ikki market vakili navbatda turadi. Xodim
+       * «Market A» sahifasini ochadi, apparat skaner esa (u sahifaga
+       * kirgan zahoti DOIM aktiv, tugma yo'q) yonidagi B vakilining
+       * telefonidagi QR'ini o'qib yuboradi. QR shoxi sessiyani FAQAT
+       * token hashi bo'yicha topardi, shuning uchun B ning BIR MARTALIK
+       * ruxsati ACTIVE bo'lib YOQIB YUBORILARDI: B ning QR/PIN'i o'ladi,
+       * xodim esa «ruxsat ochildi» muvaffaqiyatini ko'rib A ning
+       * posilkalarini skanerlashga tushadi — va har `complete` chaqirig'i
+       * 403 beradi (market tekshiruvi faqat o'sha yerda bor, ya'ni QR
+       * allaqachon yoqilgandan KEYIN). Natija: B qaytadan QR so'raydi,
+       * A ning topshirishi umuman boshlanmaydi, sabab ekranda tushunarsiz.
+       *
+       * Bu yerda istisno otilsa tranzaksiya ROLLBACK bo'ladi va sessiya
+       * ISTE'MOL QILINMAYDI — B ning QR'i tirik qoladi.
+       */
+      if (dto.market_id && String(session.market_id) !== String(dto.market_id)) {
+        throw new ForbiddenException(
+          'Bu QR boshqa marketga tegishli — shu market sahifasini ochib skanerlang',
+        );
+      }
+
       if (session.status !== MarketHandoverSessionStatus.PENDING) {
         throw new BadRequestException(
           'Bu ruxsat allaqachon ishlatilgan — market yangi QR ko‘rsatsin',

@@ -750,4 +750,82 @@ describe('MarketHandoverService', () => {
       });
     });
   });
+  // ══════════════════ QR BOSHQA MARKETGA TEGISHLI ══════════════════
+
+  /**
+   * ⚠️ NOSOZLIK. Omborda ikki market vakili navbatda. Xodim «Market A»
+   * sahifasini ochadi, apparat skaner (sahifaga kirgan zahoti DOIM aktiv)
+   * yonidagi B vakilining QR'ini o'qib yuboradi. Avval QR shoxi sessiyani
+   * FAQAT token hashi bo'yicha topardi va B ning BIR MARTALIK ruxsati
+   * yoqib yuborilardi; market tekshiruvi esa faqat `complete` da, ya'ni
+   * KEYIN edi. Natijada B ning QR'i o'lib, xodim 403 lar ichida qolardi.
+   */
+  describe('scan — QR sahifadagi marketga tegishliligi', () => {
+    const OTHER_MARKET = uuid(7);
+
+    it('boshqa marketning QR’i RAD ETILADI va ISTE’MOL QILINMAYDI', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        market_id: OTHER_MARKET,
+        status: MarketHandoverSessionStatus.PENDING,
+        qr_expires_at: Date.now() + 60_000,
+      });
+
+      await expect(
+        service.scan(
+          { qr_token: 'mrc-aaaabbbbccccdddd', market_id: MARKET_ID } as any,
+          staff(),
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      // ⚠️ ENG MUHIMI: sessiya ACTIVE ga O'TKAZILMAGAN — begona marketning
+      // QR'i tirik qoladi.
+      expect(
+        updated.some(
+          (u) => u.partial?.status === MarketHandoverSessionStatus.ACTIVE,
+        ),
+      ).toBe(false);
+      expect(qr.rollbackTransaction).toHaveBeenCalled();
+      expect(qr.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('O’Z marketining QR’i o’tadi', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        market_id: MARKET_ID,
+        status: MarketHandoverSessionStatus.PENDING,
+        qr_expires_at: Date.now() + 60_000,
+      });
+      orderRepo.count.mockResolvedValue(3);
+
+      const res: any = await service.scan(
+        { qr_token: 'mrc-aaaabbbbccccdddd', market_id: MARKET_ID } as any,
+        staff(),
+      );
+      expect(res.data.market_id).toBe(MARKET_ID);
+      expect(
+        updated.some(
+          (u) => u.partial?.status === MarketHandoverSessionStatus.ACTIVE,
+        ),
+      ).toBe(true);
+    });
+
+    it('market_id yuborilmasa eski xulq saqlanadi (faqat token bo’yicha)', async () => {
+      // Tashqi integratsiya market_id yubormasligi mumkin — orqaga moslik.
+      sessionRepo.findOne.mockResolvedValue({
+        id: uuid(10),
+        market_id: OTHER_MARKET,
+        status: MarketHandoverSessionStatus.PENDING,
+        qr_expires_at: Date.now() + 60_000,
+      });
+      orderRepo.count.mockResolvedValue(1);
+
+      const res: any = await service.scan(
+        { qr_token: 'mrc-aaaabbbbccccdddd' } as any,
+        staff(),
+      );
+      expect(res.data.market_id).toBe(OTHER_MARKET);
+    });
+  });
+
 });

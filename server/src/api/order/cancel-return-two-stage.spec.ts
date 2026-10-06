@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 /// <reference types="jest" />
 import { OrderService } from './order.service';
 import { CancelReturnStage, Order_status } from 'src/common/enums';
@@ -202,6 +204,50 @@ describe('markReturnedByElchi — LDG bilan simmetriya', () => {
     const res: any = await svc.markReturnedByElchi('o-1', 'elchi-courier');
     expect(res.kind).toBe('mismatch');
   });
+
+  /**
+   * ⚠️ ENG MUHIM KEYS — SHU EPIKDAGI BO'SHLIQ AYNAN BU YERDA EDI.
+   *
+   * Elchi IKKI terminal webhook yuboradi: avval `cancelled` (buyurtmani
+   * CANCELLED qiladi), keyin `cancelled (sent)` / `returned_to_market`.
+   * Ikkinchisi kelganda darvoza `CANCELLED` ni ham SKIP qilardi, ya'ni
+   * CANCELLED_SENT ga ko'tarish kodiga YETIB BORMASDI va posilka
+   * CANCELLED da qotib qolardi: pochtada yo'q (canceled_post_id NULL),
+   * skaner filtri (NEW | CANCELLED_SENT) ham ko'rmaydi → `center_received_at`
+   * hech qachon yozilmaydi va «Markazda» navbatida ko'rinmaydi.
+   * `markReturnedByLdg` esa bu holatni to'g'ri ishlaydi — simmetriya shart.
+   */
+  it('ALLAQACHON CANCELLED bo‘lsa — skip EMAS, CANCELLED_SENT ga ko‘tariladi', async () => {
+    const { svc, updates } = buildReturnedSvc(Order_status.CANCELLED);
+
+    const res: any = await svc.markReturnedByElchi('o-1', 'elchi-courier');
+
+    expect(res).toEqual({ kind: 'applied' });
+    const promote = updates.find(
+      (u) => u.partial?.status === Order_status.CANCELLED_SENT,
+    );
+    expect(promote).toBeTruthy();
+  });
+
+  it('ALLAQACHON CANCELLED bo‘lsa cancelOrder IKKINCHI marta chaqirilmaydi', async () => {
+    // `cancelOrder` NON_CANCELLABLE_STATUSES ichida CANCELLED ni sanaydi va
+    // ikkinchi chaqiruvda BadRequest tashlardi.
+    const { svc } = buildReturnedSvc(Order_status.CANCELLED);
+    await svc.markReturnedByElchi('o-1', 'elchi-courier');
+    expect(svc.cancelOrder).not.toHaveBeenCalled();
+  });
+
+  it('LDG bilan darvoza RO‘YXATI bir xil (faqat CLOSED + CANCELLED_SENT)', async () => {
+    // Ikki integratsiya bir xil holatda bir xil ishlashi kerak.
+    for (const status of [Order_status.CLOSED, Order_status.CANCELLED_SENT]) {
+      const e = buildReturnedSvc(status);
+      const l = buildReturnedSvc(status);
+      const re: any = await e.svc.markReturnedByElchi('o-1', 'elchi-courier');
+      const rl: any = await l.svc.markReturnedByLdg('o-1', 'ldg-courier');
+      expect(re.kind).toBe('skipped');
+      expect(rl.kind).toBe('skipped');
+    }
+  });
 });
 
 describe('markReturnedByLdg — markazdagi posilka orqaga qaytmaydi', () => {
@@ -215,5 +261,54 @@ describe('markReturnedByLdg — markazdagi posilka orqaga qaytmaydi', () => {
     expect(promote?.criteria).toEqual(
       expect.objectContaining({ center_received_at: expect.anything() }),
     );
+  });
+});
+
+/**
+ * ALMASHTIRISH UCHUN YAROQLI STATUSLAR — IKKI JOYDA, BIR XIL.
+ *
+ * ⚠️ NEGA MANBA MATNI O'QILADI. Ro'yxatlar `order.service.ts` ichida
+ * LOKAL const sifatida yozilgan (biri `createOrder` validatorida, ikkinchisi
+ * `replacement-candidates` pickerida), ya'ni import qilib solishtirish
+ * mumkin emas. Ular ajralib ketganda esa foydalanuvchi BOSHI BERK
+ * ko'chaga kirardi: picker CLOSED buyurtmani taklif qiladi, «Almashtirish»
+ * bosilganda validator rad etadi va sabab ekranda ko'rinmaydi. Aynan shu
+ * holat sodir bo'lgan — shu sabab qulflanadi.
+ */
+describe('almashtirish: picker ↔ validator ro‘yxati bir xil', () => {
+  const src = readFileSync(
+    join(__dirname, 'order.service.ts'),
+    'utf8',
+  );
+
+  /**
+   * `const <NOM>: Order_status[] = [ ... ];` ichidagi statuslarni oladi.
+   *
+   * ⚠️ RegExp EMAS, indeks bo'yicha: naqshda `[` va `]` bor va ularni
+   * shablon-satr ichida ekranlash ikki qatlamli qochish talab qiladi —
+   * xato juda oson o'tib ketadi.
+   */
+  const statusesOf = (name: string): string[] => {
+    const head = `const ${name}: Order_status[] = [`;
+    const i = src.indexOf(head);
+    if (i < 0) throw new Error(`${name} ro'yxati manbada topilmadi`);
+    const j = src.indexOf(']', i + head.length);
+    return src
+      .slice(i + head.length, j)
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .sort();
+  };
+
+  it('DELIVERED_STATUSES (validator) va DELIVERED (picker) AYNI', () => {
+    expect(statusesOf('DELIVERED')).toEqual(statusesOf('DELIVERED_STATUSES'));
+  });
+
+  it('CLOSED ikkisida ham YO‘Q — u bekor zanjirining oxiri, sotuv emas', () => {
+    expect(statusesOf('DELIVERED_STATUSES')).not.toContain(
+      'Order_status.CLOSED',
+    );
+    expect(statusesOf('DELIVERED')).not.toContain('Order_status.CLOSED');
   });
 });

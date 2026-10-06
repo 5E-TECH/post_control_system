@@ -8033,8 +8033,34 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       return { kind: 'skipped', reason: 'order_not_found' };
     }
 
+    /**
+     * ⚠️ `CANCELLED` BU DARVOZADA EMAS — LDG BILAN SIMMETRIYA
+     * (memory: pcs-elchi-ldg-simmetriya).
+     *
+     * NOSOZLIK: Elchi ikki terminal webhook YUBORADI — avval `cancelled`
+     * (mapper: terminal_action 'cancel'), keyin `cancelled (sent)` yoki
+     * `returned_to_market` (terminal_action 'return'); webhook servisida
+     * shipment darajasida terminal-gate yo'q, ya'ni ikkinchisi ham
+     * dispatch qilinadi. Birinchi webhook buyurtmani CANCELLED qiladi,
+     * ikkinchisi esa shu darvozada SKIP bo'lib ketardi va pastdagi
+     * CANCELLED → CANCELLED_SENT ko'tarishga YETIB BORMASDI. Natijada:
+     *   · status CANCELLED, `canceled_post_id` NULL (Elchi virtual
+     *     kuryeri qaytarish-pochtasi oqimida qatnashmaydi) →
+     *     `receiveCanceledPost` uni olmaydi;
+     *   · `receiveWithScaner` filtri In([NEW, CANCELLED_SENT]) → rad etadi.
+     * Ya'ni jismonan omborga kelgan posilkaga `center_received_at`
+     * yozilmaydi, u «Markazda — market kutilmoqda» navbatida ko'rinmaydi
+     * va cron eskalatsiyasi ham ko'rmaydi.
+     *
+     * `markReturnedByLdg` (7505) aynan shu holatni TO'G'RI ishlaydi:
+     * darvozada faqat CLOSED + CANCELLED_SENT, CANCELLED esa o'tib
+     * ketib CANCELLED_SENT ga ko'tariladi.
+     *
+     * ⚠️ `cancelOrder` ni shartli chaqirish SHART: uning
+     * `NON_CANCELLABLE_STATUSES` ro'yxatida CANCELLED ham bor (3489) va
+     * ikkinchi marta chaqirilsa BadRequest tashlardi.
+     */
     if (
-      order.status === Order_status.CANCELLED ||
       order.status === Order_status.CANCELLED_SENT ||
       order.status === Order_status.CLOSED
     ) {
@@ -8072,12 +8098,16 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       );
     }
 
-    await this.cancelOrder(
-      this.elchiActor(elchiCourierUserId),
-      orderId,
-      { comment: 'Elchi posilkani qaytardi', extraCost: 0 },
-      { bypassControlGuard: true },
-    );
+    // Allaqachon CANCELLED bo'lsa ikkinchi marta bekor qilinmaydi —
+    // `cancelOrder` BadRequest tashlardi (LDG'dagi 7530 naqshi).
+    if (order.status !== Order_status.CANCELLED) {
+      await this.cancelOrder(
+        this.elchiActor(elchiCourierUserId),
+        orderId,
+        { comment: 'Elchi posilkani qaytardi', extraCost: 0 },
+        { bypassControlGuard: true },
+      );
+    }
 
     // ⚠️ LDG BILAN SIMMETRIYA (memory: pcs-elchi-ldg-simmetriya).
     //
@@ -8249,11 +8279,23 @@ export class OrderService extends BaseService<CreateOrderDto, OrderEntity> {
       }
 
       const limit = Math.min(Number(query.limit) || 30, 50);
+      /**
+       * ⚠️ `createOrder` DAGI RO'YXAT BILAN AYNI BO'LISHI SHART (559-563).
+       *
+       * CLOSED shu ro'yxatda qolib ketgan edi, validatordan esa olib
+       * tashlangan — natijada picker CLOSED buyurtmani TAKLIF qilardi,
+       * «Almashtirish» bosilganda esa «Faqat yetkazib berilgan
+       * (sotilgan) buyurtmani almashtirish mumkin» xatosi chiqardi.
+       * Foydalanuvchi boshi berk ko'chaga kirardi va sababi ko'rinmasdi.
+       *
+       * CLOSED — bekor zanjirining OXIRI: mahsulot mijozga yetib
+       * bormagan, u MARKETGA qaytarilgan. Yetib bormagan mahsulotni
+       * almashtirish ma'nosiz, shuning uchun ikki joydan ham chiqarildi.
+       */
       const DELIVERED: Order_status[] = [
         Order_status.SOLD,
         Order_status.PAID,
         Order_status.PARTLY_PAID,
-        Order_status.CLOSED,
       ];
 
       const qb = this.orderRepo

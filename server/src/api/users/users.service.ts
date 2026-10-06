@@ -3935,15 +3935,25 @@ export class UserService implements OnModuleInit {
         select: ['id', 'status', 'operator_accepted_at'],
       });
 
+      /**
+       * ⚠️ CLOSED SOTUV EMAS — `isCancelled` (3857) bilan AYNI qoida.
+       *
+       * Ayni javob ichida qarama-qarshilik bor edi: qator darajasida
+       * CLOSED buyurtma «bekor qilingan» deb belgilanardi (3855-3860),
+       * xulosa plitkasida esa «sotilgan» deb sanalardi. Operator bitta
+       * ekranda ikki xil raqam ko'rib, qaysi biri to'g'ri ekanini
+       * bilmasdi. CLOSED — bekor zanjirining OXIRI («marketga
+       * topshirildi»), ya'ni sotuv EMAS.
+       */
       const soldStatuses = [
         Order_status.SOLD,
         Order_status.PAID,
         Order_status.PARTLY_PAID,
-        Order_status.CLOSED,
       ];
       const cancelStatuses = [
         Order_status.CANCELLED,
         Order_status.CANCELLED_SENT,
+        Order_status.CLOSED,
       ];
 
       const stats = {
